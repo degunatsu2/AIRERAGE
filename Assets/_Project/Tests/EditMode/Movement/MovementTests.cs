@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Degunatsu.Core.Common;
+using Degunatsu.Core.Physics;
 using Degunatsu.Core.Tests.Support;
 using NUnit.Framework;
 
@@ -98,7 +99,7 @@ namespace Degunatsu.Core.Tests.Movement
         [Test]
         public void Air_FastHorizontalMomentum_IsKeptWhileHoldingSameDirection()
         {
-            var harness = new SimHarness(new BoxWorld(), spawn: new Vector3(0f, 50f, 0f));
+            var harness = new SimHarness(new BoxTerrain(), spawn: new Vector3(0f, 50f, 0f));
             var state = harness.State;
             state.Velocity = new Vector3(15f, 0f, 0f);
             harness.State = state;
@@ -111,7 +112,7 @@ namespace Degunatsu.Core.Tests.Movement
         [Test]
         public void Air_OppositeInput_DeceleratesWithAirAcceleration()
         {
-            var harness = new SimHarness(new BoxWorld(), spawn: new Vector3(0f, 50f, 0f));
+            var harness = new SimHarness(new BoxTerrain(), spawn: new Vector3(0f, 50f, 0f));
             var state = harness.State;
             state.Velocity = new Vector3(15f, 0f, 0f);
             harness.State = state;
@@ -125,7 +126,7 @@ namespace Degunatsu.Core.Tests.Movement
         [Test]
         public void CoyoteTime_AllowsGroundJumpShortlyAfterLeavingLedge()
         {
-            var world = new BoxWorld().AddBox(-20f, -1f, 0f, 0f);
+            var world = new BoxTerrain().AddBox(-20f, -1f, 0f, 0f);
             var harness = new SimHarness(world, spawn: new Vector3(-2f, StandingY, 0f));
 
             harness.StepUntil(s => !s.Grounded, Inputs.Right, 120);
@@ -156,7 +157,7 @@ namespace Degunatsu.Core.Tests.Movement
         [Test]
         public void AirJump_CanBeUsedOnlyConfiguredTimes()
         {
-            var harness = new SimHarness(new BoxWorld(), spawn: new Vector3(0f, 50f, 0f));
+            var harness = new SimHarness(new BoxTerrain(), spawn: new Vector3(0f, 50f, 0f));
             harness.Step(Inputs.None, 3);
 
             harness.Step(Inputs.Jump);

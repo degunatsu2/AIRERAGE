@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using Degunatsu.Core.Physics;
 using Degunatsu.Core.Tests.Support;
 using Degunatsu.Core.Wire;
 using NUnit.Framework;
@@ -18,7 +19,7 @@ namespace Degunatsu.Core.Tests.Wire
         {
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
             config.Wire.Inertial.ReelSpeed = 0f;
-            var harness = new SimHarness(new BoxWorld(), config);
+            var harness = new SimHarness(new BoxTerrain(), config);
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(4f, -3f, 0f), Anchor);
             float rope = harness.State.Wire.RopeLength;
 
@@ -36,7 +37,7 @@ namespace Degunatsu.Core.Tests.Wire
             config.Wire.Inertial.ReelSpeed = 0f;
             config.Wire.Inertial.SwingAcceleration = 0f;
             config.Wire.Inertial.Damping = 0f;
-            var harness = new SimHarness(new BoxWorld(), config);
+            var harness = new SimHarness(new BoxTerrain(), config);
 
             float length = 4f;
             float amplitudeRad = 10f * MathF.PI / 180f;
@@ -68,7 +69,7 @@ namespace Degunatsu.Core.Tests.Wire
         public void Reel_ShortensRopeToMinimum()
         {
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
-            var harness = new SimHarness(new BoxWorld(), config);
+            var harness = new SimHarness(new BoxTerrain(), config);
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(0f, -8f, 0f), Anchor);
 
             float seconds = (8f - config.Wire.MinRopeLength) / config.Wire.Inertial.ReelSpeed;
@@ -84,7 +85,7 @@ namespace Degunatsu.Core.Tests.Wire
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
             config.Movement.Gravity = 0f;
             config.Wire.Inertial.SwingAcceleration = 0f;
-            var harness = new SimHarness(new BoxWorld(), config);
+            var harness = new SimHarness(new BoxTerrain(), config);
             // 半径 8m の円周上を接線方向に 5 m/s で動いている状態から、半径 4m まで巻き取る。
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(0f, -8f, 0f), Anchor, new Vector3(5f, 0f, 0f));
 

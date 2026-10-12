@@ -1,0 +1,20 @@
+{
+    "name": "Degunatsu.Editor",
+    "rootNamespace": "Degunatsu.Editor",
+    "references": [
+        "Degunatsu.Core",
+        "Degunatsu.Runtime",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

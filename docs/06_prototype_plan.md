@@ -117,7 +117,8 @@ Phase 1 はローカルのみですが、次の点を最初から守ります。
 | T1-4 タイプA | 完了 | ✅ 自動テスト済み（dotnet） |
 | T1-5 タイプB | 完了 | ✅ 自動テスト済み（dotnet） |
 | T1-6 共通の契約テスト | 完了 | ✅ 自動テスト済み（dotnet） |
-| T1-7〜T1-10 Unity 側 | 未着手（Unity が必要） | — |
+| T1-7 Unity との接続 | 途中。T1-7a（カメラ以外）は完了: シーンの地形の読み込み（D-32）、入力、ティックループ、表示、調整値のアセット、仮の Sandbox_Wire。カメラの追従（Cinemachine）はパッケージの追加の承認待ち | ✅ Unity のバッチモードで確認済み（EditMode 60件、PlayMode 1件）／ ⚠️ 操作は未検証（ユーザーの確認待ち） |
+| T1-8〜T1-10 | 未着手 | — |
 
 Core は Unity 6000.3.26f1 でもコンパイルでき、EditMode テスト 49件が通ることを確認した（2026-10-12、クラウドのバッチモード）。
 
@@ -181,13 +182,13 @@ Core は Unity 6000.3.26f1 でもコンパイルでき、EditMode テスト 49�
 
 ### T1-7. Unity との接続
 
-- **内容**: `SimulationRunner`（ティックループと描画の補間）、`UnityCollisionQuery`、`InputSystemAdapter`、`CharacterView`（箱）、`WireView`（LineRenderer）、カメラ（Cinemachine 3 で追従）、ScriptableObject の定義と変換。
+- **内容**: `SimulationRunner`（ティックループと描画の補間）、`SceneTerrainBuilder`（シーンの BoxCollider から Core の `BoxTerrain` を作る。D-32）、`InputSystemAdapter`、`CharacterView`（箱）、`WireView`（LineRenderer）、カメラ（Cinemachine 3 で追従）、ScriptableObject の定義と変換。
 - **完了条件**:
   - [ ] [手動] シーンを再生すると、キャラクターをパッドとキーボードで操作できる
   - [ ] [手動] ワイヤーが線で表示され、接続点が見える
   - [ ] [手動] プレイ中に ScriptableObject の値を変えると、すぐに挙動が変わる
   - [ ] [手動] Console にエラーや警告が出ない
-  - [ ] [手動] 壁際でぶら下がり、ロープが壁面とほぼ平行になっても、「地形に遮られた」と誤判定されて外れない（Unity の Raycast が面の縁に当たる可能性があるため。テスト用の矩形ワールドでは起きない）
+  - [x] [自動] 壁際でぶら下がり、ロープが壁面とほぼ平行になっても、「地形に遮られた」と誤判定されて外れない（D-32 で Unity の Raycast を使わなくなったため、Core のテスト `HangingBesideWall_RopeAlongWallFace_IsNotBlocked` で確認できる）
 
 ### T1-8. 検証用アリーナ（Sandbox_Wire）
 

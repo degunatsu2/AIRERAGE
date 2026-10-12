@@ -23,7 +23,7 @@ namespace Degunatsu.Core.Physics
 
     /// <summary>
     /// シミュレーションが地形を調べるためのインターフェース。
-    /// Unity 側では Physics のクエリで、テストでは矩形の集まりで実装する。
+    /// 実装は BoxTerrain（軸平行の矩形の集まり）。Unity のシーンからは SceneTerrainBuilder で作る（D-32）。
     /// 地形は静的（動かない）で、ゲームプレイは XY 平面上で行う。
     /// </summary>
     public interface ICollisionQuery

@@ -6,7 +6,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 ## 現在の状態
 
 - **Phase 1 の途中**。UnityEngine に依存しない Core（移動、ワイヤーの共通制御、タイプA/B）と自動テストは完成（`docs/06_prototype_plan.md` 5章の進捗表）。
-- **Unity プロジェクトを作成済み**（2026-10-12、Unity 6000.3.26f1、「Universal 3D」テンプレート。D-04）。クラウドでも Unity をバッチモードで使える（`docs/08` 4.2）。Phase 0 は完了。次は T1-7（Unity との接続）。
+- **Unity プロジェクトを作成済み**（2026-10-12、Unity 6000.3.26f1、「Universal 3D」テンプレート。D-04）。クラウドでも Unity をバッチモードで使える（`docs/08` 4.2）。Phase 0 は完了。T1-7（Unity との接続）の途中: カメラ以外（T1-7a）は完了し、ユーザーの操作確認と、カメラ用の Cinemachine の追加の承認を待っている。
 - 決定済みの判断（D-01 Unity 6.3 LTS、D-03 PC/Windows、D-04、D-05 Git LFS、D-18、P-1〜P-4）は `docs/02_open_decisions.md` に記録してある。
 
 ## 設計書（作業前に関係する章を読む）
@@ -45,6 +45,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 
 - シミュレーションは固定ティック（60Hz、`SimTime`）の純C#（`Degunatsu.Core`、`noEngineReferences: true`）。`Time`、`UnityEngine.Random`、静的な可変状態を使わない。
 - キャラクターの移動は Rigidbody を使わない自前のキネマティック制御（`KinematicMotor`）。当たり形状は軸平行の箱。衝突は `ICollisionQuery` を通して調べる。
+- 地形は Core の `BoxTerrain`（純C#）。シーンでは回転しない `BoxCollider` で置き、`SceneTerrainBuilder` が読み込む。Unity の物理クエリ（PhysX）は使わない（D-32）。
 - 入力はティック単位の `PlayerInput`（量子化）。状態は構造体（`CharacterState` / `WireState`）で持ち、等値比較できるようにする。
 - ワイヤーは共通の `WireController` と、差し替え可能な `IWireMotionModel`（`InertialWireModel` / `ResponsiveWireModel`）。モデルは速度とロープ長だけを決める。
 - 調整値は Core の `[Serializable]` な設定クラス（`MovementTuning` / `WireTuning` / `CharacterConfig`）に置き、`Validate()` で検査する。仮値は設定クラスの初期値の1か所にだけ書く。
@@ -74,7 +75,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 
 ## 検証と報告
 
-- **この開発環境（クラウド）では、Unity をバッチモードで動かせる**（`docs/08` 4.2）。エディタがなければ `bash tools/unity/install_editor.sh`、ライセンスは SessionStart フックが `tools/unity/activate_license.sh` で有効化する（認証に失敗したら同じ値で再試行しない）。Unity 側のコンパイルと EditMode テストは `bash tools/unity/run_editmode_tests.sh` で確認する。
+- **この開発環境（クラウド）では、Unity をバッチモードで動かせる**（`docs/08` 4.2）。エディタがなければ `bash tools/unity/install_editor.sh`、ライセンスは SessionStart フックが `tools/unity/activate_license.sh` で有効化する（認証に失敗したら同じ値で再試行しない）。Unity 側のコンパイルとテストは `bash tools/unity/run_unity_tests.sh`（EditMode）と `bash tools/unity/run_unity_tests.sh PlayMode` で確認する。検証用シーン（Sandbox_Wire）はエディタのビルダーで生成する（`docs/08` 4.2）。
 - 画面の見た目と操作感は確認できない。確認していないものを確認済みのように報告しない。手動で行う操作と確認方法を具体的に示す。
 - Core のロジックは `dotnet test tools/CoreTests/Degunatsu.Core.Tests` で検証する。クラウドセッションでは SessionStart フック（`.claude/hooks/session-start.sh`）が .NET 8 SDK を apt で導入する（Microsoft の配布元はネットワークポリシーで遮断されているが、Ubuntu のリポジトリと NuGet には接続できる）。
 - GitHub Actions（`.github/workflows/core-tests.yml`）でも、push のたびに `.meta` の検査と Core のテストを実行する。

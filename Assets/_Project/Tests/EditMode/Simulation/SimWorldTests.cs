@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Input;
+using Degunatsu.Core.Physics;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Core.Tests.Support;
 using NUnit.Framework;
@@ -13,7 +14,7 @@ namespace Degunatsu.Core.Tests.Simulation
         [Test]
         public void Step_EmptyWorld_AdvancesTickWithoutErrors()
         {
-            var sim = new SimWorld(new BoxWorld());
+            var sim = new SimWorld(new BoxTerrain());
             sim.AddCharacter(new CharacterConfig(), new Vector3(0f, 10f, 0f));
 
             var inputs = new[] { new PlayerInput(0, 0, InputButtons.None) };
@@ -29,7 +30,7 @@ namespace Degunatsu.Core.Tests.Simulation
         [Test]
         public void Step_InputCountMismatch_Throws()
         {
-            var sim = new SimWorld(new BoxWorld());
+            var sim = new SimWorld(new BoxTerrain());
             sim.AddCharacter(new CharacterConfig(), Vector3.Zero);
             sim.AddCharacter(new CharacterConfig(), Vector3.Zero);
 
@@ -39,7 +40,7 @@ namespace Degunatsu.Core.Tests.Simulation
         [Test]
         public void Step_TwoCharacters_UseTheirOwnInputs()
         {
-            var world = new BoxWorld().AddBox(-50f, -1f, 50f, 0f);
+            var world = new BoxTerrain().AddBox(-50f, -1f, 50f, 0f);
             var sim = new SimWorld(world);
             sim.AddCharacter(new CharacterConfig(), new Vector3(-5f, 0.91f, 0f));
             sim.AddCharacter(new CharacterConfig(), new Vector3(5f, 0.91f, 0f));
@@ -57,7 +58,7 @@ namespace Degunatsu.Core.Tests.Simulation
         [Test]
         public void AddCharacter_InvalidTuning_ThrowsWithFieldName()
         {
-            var sim = new SimWorld(new BoxWorld());
+            var sim = new SimWorld(new BoxTerrain());
             var config = new CharacterConfig();
             config.Movement.RunSpeed = -1f;
             config.Wire.MinRopeLength = 20f;

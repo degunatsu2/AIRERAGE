@@ -1,4 +1,5 @@
 using System.Numerics;
+using Degunatsu.Core.Physics;
 using Degunatsu.Core.Tests.Support;
 using Degunatsu.Core.Wire;
 using NUnit.Framework;
@@ -14,7 +15,7 @@ namespace Degunatsu.Core.Tests.Wire
         public void FromRest_ReachesAnchorWithinExpectedTicks()
         {
             var config = WireTestSetup.LongAttachConfig(WireModelType.Responsive);
-            var harness = new SimHarness(new BoxWorld(), config, new Vector3(0f, 20f, 0f));
+            var harness = new SimHarness(new BoxTerrain(), config, new Vector3(0f, 20f, 0f));
             WireTestSetup.AttachAt(harness, new Vector3(0f, 20f, 0f), new Vector3(8f, 20f, 0f));
 
             var tuning = config.Wire.Responsive;
@@ -34,7 +35,7 @@ namespace Degunatsu.Core.Tests.Wire
         public void Pull_SpeedStaysWithinPullAndSteerSpeed()
         {
             var config = WireTestSetup.LongAttachConfig(WireModelType.Responsive);
-            var harness = new SimHarness(new BoxWorld(), config, new Vector3(0f, 20f, 0f));
+            var harness = new SimHarness(new BoxTerrain(), config, new Vector3(0f, 20f, 0f));
             WireTestSetup.AttachAt(harness, new Vector3(-10f, 15f, 0f), new Vector3(0f, 20f, 0f));
 
             var tuning = config.Wire.Responsive;
@@ -50,7 +51,7 @@ namespace Degunatsu.Core.Tests.Wire
         public void Arrived_HangsInPlaceWithoutFalling()
         {
             var config = WireTestSetup.LongAttachConfig(WireModelType.Responsive);
-            var harness = new SimHarness(new BoxWorld(), config, new Vector3(0f, 20f, 0f));
+            var harness = new SimHarness(new BoxTerrain(), config, new Vector3(0f, 20f, 0f));
             var anchor = new Vector3(5f, 20f, 0f);
             WireTestSetup.AttachAt(harness, new Vector3(0f, 20f, 0f), anchor);
 

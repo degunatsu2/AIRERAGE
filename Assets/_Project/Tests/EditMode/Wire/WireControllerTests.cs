@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using Degunatsu.Core.Physics;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Core.Tests.Support;
 using Degunatsu.Core.Wire;
@@ -14,7 +15,7 @@ namespace Degunatsu.Core.Tests.Wire
     {
         private const float StandingY = 0.91f;
 
-        private static BoxWorld GroundWithCeiling(bool attachable)
+        private static BoxTerrain GroundWithCeiling(bool attachable)
         {
             return TestArenas.Ground().AddBox(-20f, 8f, 20f, 9f, attachable);
         }
@@ -198,6 +199,25 @@ namespace Degunatsu.Core.Tests.Wire
 
             Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Cooldown));
             Assert.That(harness.State.Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.LineBlocked));
+        }
+
+        [Test]
+        public void HangingBesideWall_RopeAlongWallFace_IsNotBlocked()
+        {
+            // 左の壁（内側の面 x = -30）と天井（下面 y = 10）の角に接続し、壁に押し付けながらぶら下がる。
+            // ロープが壁面とほぼ平行になっても、壁に遮られたと誤判定しない（docs/06_prototype_plan.md T1-7）。
+            var harness = new SimHarness(TestArenas.Playground(), spawn: new Vector3(-29.55f, 5f, 0f), facing: -1);
+            var state = harness.State;
+            state.Wire = new WireState { Phase = WirePhase.Attached, Anchor = new Vector3(-30f, 10f, 0f), RopeLength = 5f };
+            state.PreviousButtons = Degunatsu.Core.Input.InputButtons.Wire;
+            harness.State = state;
+
+            for (int tick = 0; tick < 60; tick++)
+            {
+                harness.Step(Inputs.Wire(-1f, 0f));
+                Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Attached),
+                    $"{tick} ティック目に外れた（理由 {harness.State.Wire.LastReleaseReason}）: {harness.State}");
+            }
         }
 
         [Test]

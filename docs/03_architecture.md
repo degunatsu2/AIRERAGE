@@ -32,8 +32,9 @@
 │                                      ▼        │ 予測・照合（リコンシリエーション）│ │
 │  SimulationRunner（ティックを回す） ──▶ ┌──────────────────────────────────┐       │ │
 │                                        │ Degunatsu.Core（純C#・固定ティック） │       │ │
-│  UnityCollisionQuery ◀─ ICollisionQuery │  Movement：KinematicMotor            │       │ │
-│  （Physics.Raycast 等）                 │  Wire    ：WireController            │       │ │
+│                                        │  Physics ：BoxTerrain（地形）        │       │ │
+│  SceneTerrainBuilder ────────────────▶ │  Movement：KinematicMotor            │       │ │
+│  （シーンの BoxCollider を読む）       │  Wire    ：WireController            │       │ │
 │                                        │            ＋ IWireMotionModel(A|B)  │       │ │
 │                                        │  Combat  ：ActionStateMachine 等     │       │ │
 │                                        │  Economy ：CoinLedger（ホスト権威）  │       │ │
@@ -56,7 +57,8 @@ Degunatsu.Net         （Core と Runtime を参照。NGO を参照するのは�
 
 Degunatsu.Editor      （Runtime を参照。エディタ拡張のみ）
 Degunatsu.Core.Tests  （Core を参照。EditMode テスト。dotnet test でも実行する）
-Degunatsu.Runtime.Tests（Runtime を参照。PlayMode テスト。最小限）
+Degunatsu.Runtime.Tests（Runtime と Core.Tests を参照。EditMode テスト。シーンの読み込みなど）
+Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを再生する通しの確認。最小限）
 ```
 
 - Core は Runtime・Net・UnityEngine を**絶対に参照しない**。asmdef の設定で強制する。
@@ -70,7 +72,7 @@ Degunatsu.Runtime.Tests（Runtime を参照。PlayMode テスト。最小限）
 |---|---|---|---|
 | Core/Common | ティック、数学の補助、決定的な乱数、ログのインターフェース | `Tick`, `DeterministicRandom`, `ILog` | 1 |
 | Core/Input | 入力コマンド、先行入力のバッファ | `PlayerInput`, `InputBuffer` | 1 |
-| Core/Physics | 衝突クエリのインターフェースと形状 | `ICollisionQuery`, `CastHit` | 1 |
+| Core/Physics | 衝突クエリのインターフェースと、軸平行の箱でできた地形 | `ICollisionQuery`, `CastHit`, `BoxTerrain` | 1 |
 | Core/Movement | 走行、ジャンプ、重力、地形との衝突解決（すり抜け防止の連続判定） | `KinematicMotor`, `MovementConfig` | 1 |
 | Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン | `WireController`, `WireState`, `WireTargeting` | 1 |
 | Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
@@ -78,7 +80,7 @@ Degunatsu.Runtime.Tests（Runtime を参照。PlayMode テスト。最小限）
 | Core/Combat | アクション状態遷移、キャンセル規則、命中判定、ガード | `ActionStateMachine`, `HitResolver` | 3 |
 | Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
 | Core/Match | 試合進行、タイマー、出現、復帰、勝敗 | `MatchRules`, `MatchState` | 4 |
-| Runtime/Simulation | ティックループ、Unity の物理を使った衝突クエリ | `SimulationRunner`, `UnityCollisionQuery` | 1 |
+| Runtime/Simulation | ティックループ、シーンの地形の読み込み | `SimulationRunner`, `SceneTerrainBuilder` | 1 |
 | Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
 | Runtime/Presentation | 状態を読んで表示する | `CharacterView`, `WireView` | 1 |
@@ -102,7 +104,11 @@ Degunatsu.Runtime.Tests（Runtime を参照。PlayMode テスト。最小限）
   - ネットワークの予測では、自キャラだけを数ティック分再計算する必要がある。Unity の物理エンジンはシーン全体でしか進められない。
   - 操作感（加速、空中制御、ワイヤーの拘束）を直接制御できる。
   - 決定性を保ちやすい。
-- 地形は静的なコライダー。動く足場などのギミックは「ティックから位置が一意に決まる」形で作る（予測と矛盾させないため）。
+- 地形は静的。動く足場などのギミックは「ティックから位置が一意に決まる」形で作る（予測と矛盾させないため）。
+- **地形の衝突判定は Core の `BoxTerrain`（純C#）で行い、Unity の物理クエリ（PhysX）は使わない**（D-32）。
+  - シーンには地形を `BoxCollider` で置き、開始時に `SceneTerrainBuilder` が `BoxTerrain` に読み込む。条件は「地形の層にある」「回転していない」「Z = 0 の面を横切る」。条件に合わないコライダーはエラーを出して除く。
+  - 理由: PhysX の `BoxCast` は形状を約2mm膨らませて扱い（距離が短くなる、表面から2mm以内で始めると当たらない）、テストの結果と一致しなかった（2026-10-12 の計測）。純C#なら決定的で、テスト（`dotnet test`）と同じ結果になる。
+  - 制約: 地形は軸平行の箱だけ（斜面や回転した形は未対応。必要になったら `BoxTerrain` を拡張する）。
 - アリーナには「細長い壁」があるため、高速移動時のすり抜けを**連続判定（スイープ）**で防ぐ。これを自動テストで保証する。
 
 ### 4.3 ワイヤー: 共通の制御＋差し替え可能な運動モデル
@@ -203,7 +209,8 @@ degunatsu/
 │     │  └─ Editor/              # Degunatsu.Editor.asmdef
 │     ├─ Tests/
 │     │  ├─ EditMode/            # Degunatsu.Core.Tests.asmdef（純C#）
-│     │  └─ PlayMode/            # Degunatsu.Runtime.Tests.asmdef
+│     │  ├─ Runtime/             # Degunatsu.Runtime.Tests.asmdef（EditMode）
+│     │  └─ PlayMode/            # Degunatsu.PlayMode.Tests.asmdef
 │     ├─ Data/                   # ScriptableObject アセット
 │     │  ├─ Characters/
 │     │  ├─ Movement/
@@ -212,7 +219,7 @@ degunatsu/
 │     │  └─ Rules/
 │     ├─ Input/                  # .inputactions
 │     ├─ Prefabs/
-│     ├─ Scenes/                 # Sandbox_Wire.unity など
+│     ├─ Scenes/                 # Sandbox_Wire.unity など（Sandbox_Wire は Editor のビルダーで生成する）
 │     ├─ Art/
 │     ├─ Materials/
 │     ├─ Audio/

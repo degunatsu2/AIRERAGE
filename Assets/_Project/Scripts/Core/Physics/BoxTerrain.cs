@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Physics;
 
-namespace Degunatsu.Core.Tests.Support
+namespace Degunatsu.Core.Physics
 {
     /// <summary>
-    /// テスト用の地形。XY 平面上の軸平行な矩形（Z 方向には無限に続く）とアンカーポイントの集まり。
-    /// スイープは Minkowski 和を使った厳密な計算で、Unity の Physics.BoxCast と同じ意味になるようにする。
+    /// 軸平行な矩形（XY 平面上。Z 方向には無限に続く）とアンカーポイントの集まりでできた地形。
+    /// スイープは Minkowski 和を使った厳密な計算で、結果が決定的になる。
+    /// Unity のシーンでは、軸平行な BoxCollider から作る（Degunatsu.Runtime の SceneTerrainBuilder）。
+    /// Unity の物理エンジン（PhysX）のクエリは、形状を約2mm膨らませて扱うため使わない（docs/03_architecture.md 4.2）。
     /// </summary>
-    public sealed class BoxWorld : ICollisionQuery
+    public sealed class BoxTerrain : ICollisionQuery
     {
         public readonly struct Box
         {
@@ -31,23 +32,25 @@ namespace Degunatsu.Core.Tests.Support
         public IReadOnlyList<Box> Boxes => _boxes;
         public IReadOnlyList<Vector3> AnchorPoints => _anchors;
 
-        public BoxWorld AddBox(float minX, float minY, float maxX, float maxY, bool attachable = false)
+        /// <summary>矩形を追加する。最小値が最大値より小さくない（NaN を含む）場合は ArgumentException。</summary>
+        public BoxTerrain AddBox(float minX, float minY, float maxX, float maxY, bool attachable = false)
         {
-            if (minX >= maxX || minY >= maxY)
+            if (!(minX < maxX) || !(minY < maxY))
             {
-                throw new ArgumentException("矩形の最小値は最大値より小さくしてください");
+                throw new ArgumentException(
+                    $"矩形の最小値は最大値より小さくしてください（min=({minX}, {minY}) max=({maxX}, {maxY})）");
             }
             _boxes.Add(new Box(new Vector2(minX, minY), new Vector2(maxX, maxY), attachable));
             return this;
         }
 
-        public BoxWorld AddAnchor(float x, float y)
+        public BoxTerrain AddAnchor(float x, float y)
         {
             _anchors.Add(new Vector3(x, y, 0f));
             return this;
         }
 
-        /// <summary>箱が地形に重なっているか（tolerance より深い重なりのみ）。テストの検証用。</summary>
+        /// <summary>箱が地形に重なっているか（tolerance より深い重なりのみ）。</summary>
         public bool IsOverlapping(Vector3 center, Vector3 halfExtents, float tolerance = 1e-4f)
         {
             foreach (Box box in _boxes)

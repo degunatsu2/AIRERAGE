@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Degunatsu.Core.Input;
+using Degunatsu.Core.Physics;
 using Degunatsu.Core.Simulation;
 using NUnit.Framework;
 
@@ -11,7 +12,7 @@ namespace Degunatsu.Core.Tests.Support
     /// </summary>
     public sealed class SimHarness
     {
-        public SimHarness(BoxWorld world, CharacterConfig config = null, Vector3? spawn = null, int facing = 1)
+        public SimHarness(BoxTerrain world, CharacterConfig config = null, Vector3? spawn = null, int facing = 1)
         {
             World = world;
             Config = config ?? new CharacterConfig();
@@ -19,7 +20,7 @@ namespace Degunatsu.Core.Tests.Support
             Sim.AddCharacter(Config, spawn ?? new Vector3(0f, 0.91f, 0f), facing);
         }
 
-        public BoxWorld World { get; }
+        public BoxTerrain World { get; }
         public CharacterConfig Config { get; }
         public SimWorld Sim { get; }
 

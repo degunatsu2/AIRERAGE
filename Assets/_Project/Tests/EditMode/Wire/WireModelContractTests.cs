@@ -1,6 +1,7 @@
 using System.Numerics;
-using Degunatsu.Core.Input;
 using Degunatsu.Core.Common;
+using Degunatsu.Core.Input;
+using Degunatsu.Core.Physics;
 using Degunatsu.Core.Tests.Support;
 using Degunatsu.Core.Wire;
 using NUnit.Framework;
@@ -26,7 +27,7 @@ namespace Degunatsu.Core.Tests.Wire
         public void WhileAttached_SpeedNeverExceedsSharedCap_AndRopeLengthHolds()
         {
             var config = WireTestSetup.LongAttachConfig(_modelType);
-            var harness = new SimHarness(new BoxWorld(), config, new Vector3(0f, 20f, 0f));
+            var harness = new SimHarness(new BoxTerrain(), config, new Vector3(0f, 20f, 0f));
             WireTestSetup.AttachAt(harness, new Vector3(-9f, 14f, 0f), new Vector3(0f, 20f, 0f), new Vector3(0f, -15f, 0f));
 
             for (int i = 0; i < 300; i++)
@@ -59,7 +60,7 @@ namespace Degunatsu.Core.Tests.Wire
         public void SwingingThroughArena_NeverPenetratesTerrain()
         {
             var config = WireTestSetup.LongAttachConfig(_modelType);
-            BoxWorld world = TestArenas.Playground();
+            BoxTerrain world = TestArenas.Playground();
             var harness = new SimHarness(world, config, new Vector3(-6f, 0.91f, 0f));
 
             PlayerInput[] pattern =
@@ -89,7 +90,7 @@ namespace Degunatsu.Core.Tests.Wire
         public void OnRelease_ExitSpeedIsLimitedBySharedCap()
         {
             var config = WireTestSetup.LongAttachConfig(_modelType);
-            var harness = new SimHarness(new BoxWorld(), config, new Vector3(0f, 20f, 0f));
+            var harness = new SimHarness(new BoxTerrain(), config, new Vector3(0f, 20f, 0f));
             // モデルによって接続中の最高速は違う（タイプBは上限より遅い）ので、解除直前の速度を直接与える。
             WireTestSetup.AttachAt(harness, new Vector3(-9f, 14f, 0f), new Vector3(0f, 20f, 0f), new Vector3(15f, -20f, 0f));
             Assert.That(harness.State.Velocity.Length(), Is.GreaterThan(config.Wire.ExitSpeedCap), "前提: 解除前は出口速度上限より速い");

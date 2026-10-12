@@ -18,7 +18,7 @@
 | 項目 | 可否 |
 |---|---|
 | Unity でのコンパイル確認（エラー・警告） | できる |
-| EditMode / PlayMode テストの実行 | できる（EditMode は確認済み。PlayMode はテストがまだない） |
+| EditMode / PlayMode テストの実行 | できる（どちらも確認済み） |
 | シーンを起動し、記録した入力やスクリプトで操作して、結果（位置、状態、ログ）を検証する | できる |
 | 画面のスクリーンショット（仮想ディスプレイ Xvfb＋ソフトウェア描画） | できる見込み（描画は遅い） |
 | ビルドの作成（Linux 向け。Windows 向けはモジュール次第） | できる見込み |
@@ -125,7 +125,9 @@ exit 0
 |---|---|---|
 | エディタの導入 | `bash tools/unity/install_editor.sh` | セットアップスクリプト（3.3）を登録していれば不要。`ProjectSettings/ProjectVersion.txt` のバージョンを入れる |
 | ライセンスの有効化 | `bash tools/unity/activate_license.sh` | SessionStart フックが、エディタがあれば自動で実行する。有効化済みなら何もしない |
-| EditMode テスト | `bash tools/unity/run_editmode_tests.sh` | コンパイルとテストを行い、結果を要約する。ログと結果は `Logs/`（コミットしない）。2回目以降は約30秒、初回（`Library/` がない）は約2分 |
+| EditMode テスト | `bash tools/unity/run_unity_tests.sh` | コンパイルとテストを行い、結果を要約する。ログと結果は `Logs/`（コミットしない）。2回目以降は約30秒、初回（`Library/` がない）は約2分 |
+| PlayMode テスト | `bash tools/unity/run_unity_tests.sh PlayMode` | シーンを再生する通しの確認。約40秒 |
+| 検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxWireSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Wire.unity` を作り直す（地形の配置はビルダーのコード）。エディタではメニューの「Degunatsu」から |
 
 ## 5. うまくいかない場合の代案
 

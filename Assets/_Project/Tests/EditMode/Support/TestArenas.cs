@@ -1,3 +1,5 @@
+using Degunatsu.Core.Physics;
+
 namespace Degunatsu.Core.Tests.Support
 {
     /// <summary>
@@ -6,17 +8,17 @@ namespace Degunatsu.Core.Tests.Support
     public static class TestArenas
     {
         /// <summary>地面（上面 y = 0）だけ。</summary>
-        public static BoxWorld Ground()
+        public static BoxTerrain Ground()
         {
-            return new BoxWorld().AddBox(-100f, -1f, 100f, 0f);
+            return new BoxTerrain().AddBox(-100f, -1f, 100f, 0f);
         }
 
         /// <summary>
         /// 地面、接続できる天井（下面 y = 10）、左右の壁、細い壁、浮いた足場、アンカーポイントを含む遊び場。
         /// </summary>
-        public static BoxWorld Playground()
+        public static BoxTerrain Playground()
         {
-            return new BoxWorld()
+            return new BoxTerrain()
                 .AddBox(-30f, -1f, 30f, 0f)                       // 地面
                 .AddBox(-30f, 10f, 30f, 11f, attachable: true)    // 天井（接続できる）
                 .AddBox(-31f, -1f, -30f, 11f)                     // 左の壁
