@@ -130,6 +130,7 @@ exit 0
 | テストを絞り込む | `bash tools/unity/run_unity_tests.sh EditMode <テストの名前>` | Unity の `-testFilter` に渡す。`[Explicit]` のテストは名前で指定したときだけ実行される |
 | 入力の記録の照合 | `bash tools/unity/run_unity_tests.sh EditMode Degunatsu.Runtime.Tests.RecordedReplayTests` | `InputRecordings/` の記録を再生し、最後の状態が記録と一致するかを確かめる（別の PC で記録したファイルでの決定性の確認。docs/04 3.5） |
 | 検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxWireSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Wire.unity` を作り直す（地形の配置はビルダーのコード）。エディタではメニューの「Degunatsu」から |
+| オンライン用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxOnlineSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Online.unity` を作り直す（地形は Sandbox_Wire と同じ。docs/10 T2-7） |
 
 ## 5. うまくいかない場合の代案
 

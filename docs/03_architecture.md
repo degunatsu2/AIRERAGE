@@ -87,7 +87,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
 | Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom` | 1 |
 | Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム）、入力の記録と再生 | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels`, `ReplayControls` | 1 |
-| Net | 接続、入力の交換、予測と巻き戻し（ロールバック）、時刻の同期、不一致の検出 | Phase 2 で設計する | 2 |
+| Net | 通信路（Unity Transport）、セッション（参加、開始、入力の中継、不一致の検出）、オンラインの検証用の画面。ロールバックの本体は Core/Rollback | `TransportLink`, `NetMessages`, `OnlineSession`, `OnlineRunner` | 2 |
 
 ---
 
@@ -166,8 +166,8 @@ public interface IWireMotionModel
 | Test Framework | EditMode / PlayMode テスト | Phase 0（Unity に同梱） |
 | URP | 描画（テンプレートに含まれる） | Phase 0 |
 | Cinemachine 3.x | カメラの追従、デッドゾーン、ダンピング | Phase 1（カメラはシミュレーションに影響しないので後から差し替え可能）。**導入済み**: 3.1.7（2026-10-12、ユーザーの承認。依存で Splines 2.9.1 も入った） |
-| Netcode for GameObjects 2.x ＋ Unity Transport | ネットワーク | Phase 2 |
-| Multiplayer Play Mode 2.0 | エディタ上で最大4プレイヤーを起動して検証 | Phase 2 |
+| Unity Transport 2.x | 通信路（UDP）。ロールバックの層は自前（D-14、D-15） | Phase 2。**導入済み**: 2.7.4（2026-10-13、ユーザーの承認。当初の候補だった Netcode for GameObjects は使わない） |
+| Multiplayer Play Mode 2.0 | エディタ上で最大4プレイヤーを起動して検証 | Phase 2。**導入済み**: 2.0.2（2026-10-13、ユーザーの承認） |
 | Multiplayer Tools | ネットワークシミュレーター（遅延・パケットロスの模擬）、プロファイラ | Phase 2 |
 | Multiplayer Services | セッション（参加コード）、Relay（NAT越え） | Phase 6 |
 
@@ -224,7 +224,7 @@ degunatsu/
 │     │  └─ Rules/
 │     ├─ Input/                  # .inputactions
 │     ├─ Prefabs/
-│     ├─ Scenes/                 # Sandbox_Wire.unity など（Sandbox_Wire は Editor のビルダーで生成する）
+│     ├─ Scenes/                 # Sandbox_Wire.unity、Sandbox_Online.unity（どちらも Editor のビルダーで生成する）
 │     ├─ Art/
 │     ├─ Materials/
 │     ├─ Audio/

@@ -94,7 +94,7 @@ namespace Degunatsu.Editor
             new Vector2(7f, 9f),
         };
 
-        private static readonly Vector3 SpawnPosition = new Vector3(0f, 1f, 0f);
+        internal static readonly Vector3 SpawnPosition = new Vector3(0f, 1f, 0f);
 
         private readonly struct Zone
         {
@@ -170,31 +170,7 @@ namespace Degunatsu.Editor
             Material startZoneMaterial = LoadOrCreateMaterial("ZoneStart", new Color(0.2f, 0.8f, 0.3f), unlit: true);
             Material goalZoneMaterial = LoadOrCreateMaterial("ZoneGoal", new Color(0.9f, 0.25f, 0.25f), unlit: true);
 
-            var terrainRoot = new GameObject("Terrain").transform;
-            foreach (TerrainBox box in Terrain)
-            {
-                GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                go.name = box.Name;
-                go.transform.SetParent(terrainRoot, false);
-                Vector2 center = (box.Min + box.Max) * 0.5f;
-                Vector2 size = box.Max - box.Min;
-                go.transform.localPosition = new Vector3(center.x, center.y, 0f);
-                go.transform.localScale = new Vector3(size.x, size.y, TerrainDepth);
-                go.GetComponent<MeshRenderer>().sharedMaterial = box.Attachable ? attachableMaterial : terrainMaterial;
-                if (box.Attachable)
-                {
-                    go.AddComponent<WireAttachable>();
-                }
-            }
-
-            var anchorRoot = new GameObject("AnchorPoints").transform;
-            foreach (Vector2 point in AnchorPoints)
-            {
-                GameObject go = CreateVisual(PrimitiveType.Sphere, "AnchorPoint", anchorMaterial, Vector3.one * 0.5f);
-                go.transform.SetParent(anchorRoot, false);
-                go.transform.localPosition = new Vector3(point.x, point.y, 0f);
-                go.AddComponent<WireAnchorPoint>();
-            }
+            CreateArena(terrainMaterial, attachableMaterial, anchorMaterial);
 
             var zoneRoot = new GameObject("CourseZones").transform;
             foreach (Zone zone in Zones)
@@ -249,8 +225,38 @@ namespace Degunatsu.Editor
             Debug.Log($"SandboxWireSceneBuilder: {ScenePath} を作った");
         }
 
+        /// <summary>検証用アリーナの地形（BoxCollider）とアンカーポイントを作る。オンライン用のシーンでも使う。</summary>
+        internal static void CreateArena(Material terrainMaterial, Material attachableMaterial, Material anchorMaterial)
+        {
+            var terrainRoot = new GameObject("Terrain").transform;
+            foreach (TerrainBox box in Terrain)
+            {
+                GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.name = box.Name;
+                go.transform.SetParent(terrainRoot, false);
+                Vector2 center = (box.Min + box.Max) * 0.5f;
+                Vector2 size = box.Max - box.Min;
+                go.transform.localPosition = new Vector3(center.x, center.y, 0f);
+                go.transform.localScale = new Vector3(size.x, size.y, TerrainDepth);
+                go.GetComponent<MeshRenderer>().sharedMaterial = box.Attachable ? attachableMaterial : terrainMaterial;
+                if (box.Attachable)
+                {
+                    go.AddComponent<WireAttachable>();
+                }
+            }
+
+            var anchorRoot = new GameObject("AnchorPoints").transform;
+            foreach (Vector2 point in AnchorPoints)
+            {
+                GameObject go = CreateVisual(PrimitiveType.Sphere, "AnchorPoint", anchorMaterial, Vector3.one * 0.5f);
+                go.transform.SetParent(anchorRoot, false);
+                go.transform.localPosition = new Vector3(point.x, point.y, 0f);
+                go.AddComponent<WireAnchorPoint>();
+            }
+        }
+
         /// <summary>ビルド設定のシーン一覧に加える（PlayMode テストで名前から読み込むため）。</summary>
-        private static void AddToBuildSettings(string path)
+        internal static void AddToBuildSettings(string path)
         {
             EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
             foreach (EditorBuildSettingsScene existing in scenes)
@@ -316,7 +322,7 @@ namespace Degunatsu.Editor
         }
 
         /// <summary>照準のインジケーター（照準の線、終点の印、射程の円）。半透明にするため Sprites-Default を使う。</summary>
-        private static AimIndicatorView CreateAimIndicator()
+        internal static AimIndicatorView CreateAimIndicator()
         {
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             if (material == null)
@@ -347,7 +353,7 @@ namespace Degunatsu.Editor
             SetReference(view, "_camera", camera);
         }
 
-        private static LineRenderer CreateIndicatorLine(Transform parent, string name, Material material, float width)
+        internal static LineRenderer CreateIndicatorLine(Transform parent, string name, Material material, float width)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -365,7 +371,7 @@ namespace Degunatsu.Editor
         /// キャラクターを横から追従するカメラ（Cinemachine 3）。回転はせず、位置だけを合わせる。
         /// マウスホイールと LB / RB で距離を変えられる（CameraZoom）。
         /// </summary>
-        private static void CreateFollowCamera(Transform target, InputActionAsset inputActions)
+        internal static CinemachineCamera CreateFollowCamera(Transform target, InputActionAsset inputActions)
         {
             // カメラの位置は Cinemachine が決める（再生時にキャラクターへ合わせる）ので、ここでは置かない。
             Camera camera = Object.FindFirstObjectByType<Camera>();
@@ -386,9 +392,10 @@ namespace Degunatsu.Editor
             var zoom = go.AddComponent<CameraZoom>();
             SetReference(zoom, "_composer", composer);
             SetReference(zoom, "_inputActions", inputActions);
+            return virtualCamera;
         }
 
-        private static CharacterConfigAsset LoadOrCreateCharacterConfig()
+        internal static CharacterConfigAsset LoadOrCreateCharacterConfig()
         {
             var asset = AssetDatabase.LoadAssetAtPath<CharacterConfigAsset>(CharacterConfigPath);
             if (asset != null)
@@ -401,7 +408,7 @@ namespace Degunatsu.Editor
             return asset;
         }
 
-        private static Material LoadOrCreateMaterial(string name, Color color, bool unlit = false)
+        internal static Material LoadOrCreateMaterial(string name, Color color, bool unlit = false)
         {
             string path = $"{MaterialFolder}/{name}.mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -423,7 +430,7 @@ namespace Degunatsu.Editor
         }
 
         /// <summary>見た目だけの物を作る（コライダーを外す。地形として読み込まれないように）。</summary>
-        private static GameObject CreateVisual(PrimitiveType type, string name, Material material, Vector3 scale)
+        internal static GameObject CreateVisual(PrimitiveType type, string name, Material material, Vector3 scale)
         {
             GameObject go = GameObject.CreatePrimitive(type);
             go.name = name;
@@ -433,7 +440,7 @@ namespace Degunatsu.Editor
             return go;
         }
 
-        private static void SetReference(Object target, string field, Object value)
+        internal static void SetReference(Object target, string field, Object value)
         {
             var serialized = new SerializedObject(target);
             SerializedProperty property = serialized.FindProperty(field);
@@ -449,7 +456,7 @@ namespace Degunatsu.Editor
             }
         }
 
-        private static void EnsureFolder(string folder)
+        internal static void EnsureFolder(string folder)
         {
             folder = folder.Replace('\\', '/');
             if (AssetDatabase.IsValidFolder(folder))

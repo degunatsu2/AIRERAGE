@@ -14,6 +14,12 @@ namespace Degunatsu.Core.Rollback
     /// </summary>
     public sealed class InputExchange
     {
+        /// <summary>
+        /// 1つのメッセージに入れる入力の最大の数。通信路が一度に送れる大きさ（約1400バイト）に収まるようにする
+        /// （16 バイト＋180 × 6 バイト = 1096 バイト）。
+        /// </summary>
+        public const int MaxInputsPerMessage = 180;
+
         private readonly RollbackSession _session;
         private readonly RollbackSettings _settings;
         private readonly TimeSync _timeSync;
@@ -74,14 +80,14 @@ namespace Degunatsu.Core.Rollback
         }
 
         /// <summary>
-        /// 相手 remotePlayer に送るメッセージを作る。確認されていない自分の入力（古い方から最大 MaxInputs 個）と、
+        /// 相手 remotePlayer に送るメッセージを作る。確認されていない自分の入力（古い方から最大 MaxInputsPerMessage 個）と、
         /// 相手の入力をどこまで受け取ったかを入れる。毎フレーム、相手ごとに送る。
         /// </summary>
         public InputMessage BuildMessage(int remotePlayer)
         {
             CheckRemote(remotePlayer);
             int start = _ackedBy[remotePlayer] + 1;
-            int last = Math.Min(_session.LocalInputTick - 1, start + InputMessage.MaxInputs - 1);
+            int last = Math.Min(_session.LocalInputTick - 1, start + MaxInputsPerMessage - 1);
             var inputs = new List<PlayerInput>(Math.Max(0, last - start + 1));
             for (int tick = start; tick <= last; tick++)
             {

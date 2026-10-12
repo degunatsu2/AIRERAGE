@@ -73,7 +73,8 @@ namespace Degunatsu.Core.Tests.Rollback
 
             InputMessage message = a.BuildMessage(1);
 
-            Assert.That(message.Inputs.Count, Is.EqualTo(InputMessage.MaxInputs));
+            Assert.That(message.Inputs.Count, Is.EqualTo(InputExchange.MaxInputsPerMessage));
+            Assert.That(message.ToBytes().Length, Is.LessThan(1200), "通信路が一度に送れる大きさに収まらない");
             Assert.That(message.StartTick, Is.EqualTo(2), "古い入力から送る（受け手が順に確定できるように）");
         }
 
