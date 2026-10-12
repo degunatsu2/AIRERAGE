@@ -63,9 +63,9 @@ namespace Degunatsu.Editor
 
         // 追従カメラの初期値【仮】（D-13。プレイして調整する）。シーンの CinemachineCamera で編集できる。
         // 視野角 40°・距離 22m で、縦 約16m × 横 約28m（16:9）が映る（ワイヤーの最大長 12m が収まる）。
+        // デッドゾーンは使わない（止まったときのキャラクターの画面上の位置が、毎回同じ中央になるように）。
         private const float CameraFieldOfView = 40f;
         private const float CameraDistance = 22f;
-        private const float CameraDeadZone = 0.1f;   // 画面の割合
         private const float CameraDamping = 0.3f;    // 秒
 
         [MenuItem("Degunatsu/Sandbox_Wire シーンを作り直す")]
@@ -100,7 +100,9 @@ namespace Degunatsu.Editor
             Material attachableMaterial = LoadOrCreateMaterial("TerrainAttachable", new Color(0.25f, 0.6f, 0.75f));
             Material characterMaterial = LoadOrCreateMaterial("Character", new Color(0.95f, 0.55f, 0.2f));
             Material anchorMaterial = LoadOrCreateMaterial("Anchor", new Color(0.95f, 0.85f, 0.2f));
-            Material wireMaterial = LoadOrCreateMaterial("Wire", new Color(0.95f, 0.95f, 0.95f), unlit: true);
+            // ワイヤーの色は仮（背景の明るい空と区別できるように、線は紫、接続点の印は橙）。
+            Material wireMaterial = LoadOrCreateMaterial("Wire", new Color(0.6f, 0.2f, 0.85f), unlit: true);
+            Material attachedAnchorMaterial = LoadOrCreateMaterial("WireAnchor", new Color(1f, 0.5f, 0f), unlit: true);
 
 
             var terrainRoot = new GameObject("Terrain").transform;
@@ -142,7 +144,7 @@ namespace Degunatsu.Editor
             line.numCapVertices = 2;
             line.shadowCastingMode = ShadowCastingMode.Off;
             line.receiveShadows = false;
-            GameObject anchorMarker = CreateVisual(PrimitiveType.Sphere, "AttachedAnchor", wireMaterial, Vector3.one * 0.3f);
+            GameObject anchorMarker = CreateVisual(PrimitiveType.Sphere, "AttachedAnchor", attachedAnchorMaterial, Vector3.one * 0.3f);
             anchorMarker.transform.SetParent(wireGo.transform, false);
             var wireView = wireGo.AddComponent<WireView>();
             SetReference(wireView, "_anchorMarker", anchorMarker.transform);
@@ -199,10 +201,7 @@ namespace Degunatsu.Editor
             var composer = go.AddComponent<CinemachinePositionComposer>();
             composer.CameraDistance = CameraDistance;
             composer.Damping = new Vector3(CameraDamping, CameraDamping, 0f);
-            ScreenComposerSettings composition = ScreenComposerSettings.Default;
-            composition.DeadZone.Enabled = true;
-            composition.DeadZone.Size = new Vector2(CameraDeadZone, CameraDeadZone);
-            composer.Composition = composition;
+            composer.Composition = ScreenComposerSettings.Default; // デッドゾーンなし（画面の中央に合わせる）
         }
 
         private static CharacterConfigAsset LoadOrCreateCharacterConfig()
