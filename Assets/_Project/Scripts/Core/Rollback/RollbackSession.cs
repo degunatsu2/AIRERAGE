@@ -312,13 +312,14 @@ namespace Degunatsu.Core.Rollback
             return true;
         }
 
-        // 確定ティックより古い入力は、予測にも巻き戻しにも使わないので捨てる。
+        // 確定ティックより古く、計算も済んだティックの入力は、予測にも巻き戻しにも使わないので捨てる。
+        // 相手の入力が先のティックまで届いていると、確定ティックが今のティックより先になる（遅れて始めた側）ので、今のティックでも制限する。
         private void DiscardOldInputs()
         {
-            int confirmed = ConfirmedTick;
+            int discardBefore = Math.Min(ConfirmedTick, CurrentTick);
             for (int p = 0; p < PlayerCount; p++)
             {
-                while (_oldestKept[p] < confirmed)
+                while (_oldestKept[p] < discardBefore)
                 {
                     _inputs[p].Remove(_oldestKept[p]);
                     _oldestKept[p]++;

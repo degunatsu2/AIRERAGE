@@ -118,6 +118,29 @@ namespace Degunatsu.Core.Tests.Rollback
             Assert.Throws<InvalidOperationException>(() => session.AdvanceFrame(Inputs.None));
         }
 
+        [Test]
+        public void RemoteInputsAheadOfTheLocalWorld_AreKeptUntilSimulated()
+        {
+            // 遅れて始めた側（T2-7 で見つかった）: 始める前に、相手の先のティックまでの入力がまとめて届く。
+            // 確定ティックが今のティックより先にあっても、まだ計算していないティックの入力を捨ててはいけない。
+            SimWorld world = TwoPlayerWorld();
+            var session = new RollbackSession(world, 1, new RollbackSettings { InputDelayTicks = 2, MaxPredictionTicks = 8 });
+            for (int tick = 2; tick < 10; tick++)
+            {
+                session.AddRemoteInput(0, tick, Inputs.Right);
+            }
+
+            SimWorld reference = TwoPlayerWorld();
+            for (int frame = 0; frame < 8; frame++)
+            {
+                session.AdvanceFrame(Inputs.None);
+                reference.Step(new[] { frame >= 2 ? Inputs.Right : Inputs.None, Inputs.None });
+            }
+
+            Assert.That(world.Checksum(), Is.EqualTo(reference.Checksum()));
+            Assert.That(session.RollbackCount, Is.EqualTo(0), "入力が先に届いているので、予測も巻き戻しもいらない");
+        }
+
         private static SimWorld TwoPlayerWorld()
         {
             var world = new SimWorld(TestArenas.Playground());
