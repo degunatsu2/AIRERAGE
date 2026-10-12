@@ -96,7 +96,8 @@ namespace Degunatsu.Core.Tests.Rollback
             var world = new SimWorld(TestArenas.Playground());
             world.AddCharacter(new CharacterConfig(), PseudoNetwork.Spawns[0]);
             world.AddCharacter(new CharacterConfig(), PseudoNetwork.Spawns[1]);
-            return new InputExchange(new RollbackSession(world, localPlayer, settings ?? Settings));
+            settings = settings ?? Settings;
+            return new InputExchange(new RollbackSession(world, localPlayer, settings), settings);
         }
     }
 }

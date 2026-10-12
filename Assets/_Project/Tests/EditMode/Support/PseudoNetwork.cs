@@ -36,6 +36,7 @@ namespace Degunatsu.Core.Tests.Support
             _loss = lossRate;
             Settings = settings;
             Scripts = new PlayerInput[players][];
+            Normalized = new PlayerInput[players][];
             Sessions = new RollbackSession[players];
             Exchanges = new InputExchange[players];
             Worlds = new SimWorld[players];
@@ -44,12 +45,16 @@ namespace Degunatsu.Core.Tests.Support
                 Scripts[p] = MakeScript(seed * 31 + p, 4000);
                 Worlds[p] = MakeWorld(players);
                 Sessions[p] = new RollbackSession(Worlds[p], p, settings);
-                Exchanges[p] = new InputExchange(Sessions[p]);
+                Exchanges[p] = new InputExchange(Sessions[p], settings);
+                Normalized[p] = Normalize(Scripts[p], settings);
             }
         }
 
         public RollbackSettings Settings { get; }
         public PlayerInput[][] Scripts { get; }
+
+        /// <summary>入力列を InputNormalizer で正規化したもの（実際にシミュレーションに使われる入力）。</summary>
+        public PlayerInput[][] Normalized { get; }
         public RollbackSession[] Sessions { get; }
         public InputExchange[] Exchanges { get; }
 
@@ -70,10 +75,23 @@ namespace Degunatsu.Core.Tests.Support
 
         private readonly Dictionary<int, ulong> _confirmed = new Dictionary<int, ulong>();
 
-        /// <summary>プレイヤー p がティック t に使う本当の入力（入力遅延の分の最初のティックは空の入力）。</summary>
+        /// <summary>プレイヤー p がティック t に使う本当の入力（正規化した入力。入力遅延の分の最初のティックは空の入力）。</summary>
         public PlayerInput TrueInput(int p, int t)
         {
-            return t < Settings.InputDelayTicks ? default : Scripts[p][t];
+            return t < Settings.InputDelayTicks ? default : Normalized[p][t];
+        }
+
+        /// <summary>入力列を、プレイヤーが入力した順（入力遅延の後のティックから）に正規化する。</summary>
+        private static PlayerInput[] Normalize(PlayerInput[] script, RollbackSettings settings)
+        {
+            var normalized = new PlayerInput[script.Length];
+            PlayerInput previous = default;
+            for (int t = settings.InputDelayTicks; t < script.Length; t++)
+            {
+                normalized[t] = InputNormalizer.Normalize(script[t], previous, settings.MoveHysteresis);
+                previous = normalized[t];
+            }
+            return normalized;
         }
 
         /// <summary>全員がティック targetTick まで進み、そこまでの入力がすべて確定するまでフレームを進める。</summary>

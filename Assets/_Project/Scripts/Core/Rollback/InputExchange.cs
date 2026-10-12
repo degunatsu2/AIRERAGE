@@ -6,6 +6,7 @@ namespace Degunatsu.Core.Rollback
 {
     /// <summary>
     /// 入力の送受信の規則（docs/10_online_plan.md T2-4）。RollbackSession を包み、
+    /// 自分の入力は InputNormalizer で正規化してから使う（自分のシミュレーションにも、送るのにも同じものを使う）。
     /// 相手ごとに「まだ確認されていない自分の入力」を覚えておき、毎回まとめて送り直す（欠落に備えた冗長送信）。
     /// 届いたメッセージの入力はセッションに渡し、確認応答で送らなくてよい入力を捨てる。
     /// 通信はしない（BuildMessage で作ったメッセージを送り、届いたメッセージを Receive に渡すのは呼び出し側）。
@@ -13,6 +14,8 @@ namespace Degunatsu.Core.Rollback
     public sealed class InputExchange
     {
         private readonly RollbackSession _session;
+        private readonly RollbackSettings _settings;
+        private PlayerInput _lastLocalInput;
 
         // まだ全員に確認されていない自分の入力。ティック → 入力。
         private readonly Dictionary<int, PlayerInput> _unacked = new Dictionary<int, PlayerInput>();
@@ -21,9 +24,10 @@ namespace Degunatsu.Core.Rollback
         // 相手ごとの、自分の入力をどこまで受け取ったと確認されたか。
         private readonly int[] _ackedBy;
 
-        public InputExchange(RollbackSession session)
+        public InputExchange(RollbackSession session, RollbackSettings settings)
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
+            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _ackedBy = new int[session.PlayerCount];
             int lastDefault = session.LocalInputTick - 1; // 入力遅延の分の最初のティックは、全員が空の入力で確定している
             for (int p = 0; p < _ackedBy.Length; p++)
@@ -38,15 +42,20 @@ namespace Degunatsu.Core.Rollback
         /// <summary>まだ全員に確認されていない自分の入力の数（再送の量の目安）。</summary>
         public int UnackedCount => _unacked.Count;
 
-        /// <summary>自分の入力を覚えてから、セッションを1ティック進める（RollbackSession.AdvanceFrame）。</summary>
-        public void AdvanceFrame(PlayerInput localInput)
+        /// <summary>
+        /// 自分の入力を正規化して、セッションを1ティック進める（RollbackSession.AdvanceFrame）。使った入力を返す。
+        /// </summary>
+        public PlayerInput AdvanceFrame(PlayerInput localInput)
         {
             int tick = _session.LocalInputTick;
-            _session.AdvanceFrame(localInput);
+            PlayerInput normalized = InputNormalizer.Normalize(localInput, _lastLocalInput, _settings.MoveHysteresis);
+            _session.AdvanceFrame(normalized);
+            _lastLocalInput = normalized;
             if (_session.PlayerCount > 1)
             {
-                _unacked[tick] = localInput;
+                _unacked[tick] = normalized;
             }
+            return normalized;
         }
 
         /// <summary>
