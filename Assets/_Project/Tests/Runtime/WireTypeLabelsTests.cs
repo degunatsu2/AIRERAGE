@@ -22,11 +22,10 @@ namespace Degunatsu.Runtime.Tests
         }
 
         [Test]
-        public void Next_CyclesAThenBThenOldA()
+        public void Next_AlternatesAAndB()
         {
-            Assert.That(WireTypeLabels.Next(WireModelType.Orbit), Is.EqualTo(WireModelType.Responsive));
+            Assert.That(WireTypeLabels.Next(WireModelType.Inertial), Is.EqualTo(WireModelType.Responsive));
             Assert.That(WireTypeLabels.Next(WireModelType.Responsive), Is.EqualTo(WireModelType.Inertial));
-            Assert.That(WireTypeLabels.Next(WireModelType.Inertial), Is.EqualTo(WireModelType.Orbit));
         }
     }
 }

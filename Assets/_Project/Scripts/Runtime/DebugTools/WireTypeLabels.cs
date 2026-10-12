@@ -5,28 +5,25 @@ namespace Degunatsu.Runtime.DebugTools
 {
     /// <summary>
     /// デバッグ機能でのワイヤーのタイプの名前と、切り替えの順番。
-    /// A は円運動の試行版（D-11、Orbit）。従来の物理・慣性モデル（Inertial）は比較のため「A-old」として残している。
     /// </summary>
     public static class WireTypeLabels
     {
         private static readonly WireModelType[] OrderArray =
         {
-            WireModelType.Orbit, WireModelType.Responsive, WireModelType.Inertial,
+            WireModelType.Inertial, WireModelType.Responsive,
         };
 
-        /// <summary>切り替えと表示の順番（A → B → A-old → A）。</summary>
+        /// <summary>切り替えと表示の順番（A → B → A）。</summary>
         public static IReadOnlyList<WireModelType> Order => OrderArray;
 
         public static string Short(WireModelType type)
         {
             switch (type)
             {
-                case WireModelType.Orbit:
+                case WireModelType.Inertial:
                     return "A";
                 case WireModelType.Responsive:
                     return "B";
-                case WireModelType.Inertial:
-                    return "A-old";
                 default:
                     return type.ToString();
             }
@@ -36,12 +33,10 @@ namespace Degunatsu.Runtime.DebugTools
         {
             switch (type)
             {
-                case WireModelType.Orbit:
-                    return "A (Orbit, trial)";
+                case WireModelType.Inertial:
+                    return "A (Inertial)";
                 case WireModelType.Responsive:
                     return "B (Responsive)";
-                case WireModelType.Inertial:
-                    return "A-old (Inertial)";
                 default:
                     return type.ToString();
             }

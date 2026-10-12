@@ -52,10 +52,8 @@ namespace Degunatsu.PlayMode.Tests
             controls.CycleSpeed();
             Assert.That(runner.SpeedScale, Is.EqualTo(1f));
 
-            // タイプの切り替え（A → B → A-old の3種類。3回で元に戻す。アセットの値を変えるため）
+            // タイプの切り替え（2回で元に戻す。アセットの値を変えるため）
             WireModelType original = runner.PlayerConfig.Wire.ModelType;
-            controls.ToggleWireType();
-            Assert.That(runner.PlayerConfig.Wire.ModelType, Is.Not.EqualTo(original));
             controls.ToggleWireType();
             Assert.That(runner.PlayerConfig.Wire.ModelType, Is.Not.EqualTo(original));
             controls.ToggleWireType();

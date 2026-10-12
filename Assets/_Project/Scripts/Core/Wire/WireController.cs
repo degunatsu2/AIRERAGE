@@ -90,7 +90,8 @@ namespace Degunatsu.Core.Wire
         {
             IWireMotionModel model = WireMotionModels.Get(tuning.ModelType);
             var context = new WireMotionContext(
-                state.Position, state.Velocity, state.Wire.Anchor, state.Wire.RopeLength, state.Wire.SwingDirection,
+                state.Position, state.Velocity, state.Wire.Anchor, state.Wire.RopeLength,
+                state.Wire.PhaseTicks, state.Wire.AttachSpeed,
                 input.Move, gravity, SimTime.DeltaTime, tuning);
             WireMotionResult result = model.Step(context);
             state.Wire.RopeLength = result.RopeLength;
@@ -136,27 +137,6 @@ namespace Degunatsu.Core.Wire
                 state.AirJumpsUsed = 0;
             }
             EnterCooldown(ref state, tuning.ReleaseCooldownTicks);
-        }
-
-        /// <summary>
-        /// 接続点の周りを回る向き（1 = 反時計回り、-1 = 時計回り）を、向いている方向から決める。
-        /// 接線のうち、向いている方向（左右）に進む方を選ぶ。ロープが水平で決まらないときは、下へ回る方を選ぶ。
-        /// </summary>
-        public static sbyte SwingDirectionFor(Vector3 position, Vector3 anchor, int facing)
-        {
-            Vector3 fromAnchor = position - anchor;
-            fromAnchor.Z = 0f;
-            Vector3 counterClockwise = SimMath.PerpendicularXY(fromAnchor);
-            float alongFacing = counterClockwise.X * (facing < 0 ? -1f : 1f);
-            if (alongFacing > SimMath.Epsilon)
-            {
-                return 1;
-            }
-            if (alongFacing < -SimMath.Epsilon)
-            {
-                return -1;
-            }
-            return counterClockwise.Y <= 0f ? (sbyte)1 : (sbyte)-1;
         }
 
         private void UpdateAttached(ref CharacterState state, in InputFrame input, WireTuning tuning)
@@ -252,7 +232,7 @@ namespace Degunatsu.Core.Wire
             float distance = toAnchor.Length();
             float ropeLength = distance < tuning.MinRopeLength ? tuning.MinRopeLength : distance;
             state.Wire.RopeLength = ropeLength > tuning.MaxLength ? tuning.MaxLength : ropeLength;
-            state.Wire.SwingDirection = SwingDirectionFor(state.Position, anchor, state.Facing);
+            state.Wire.AttachSpeed = state.Velocity.Length();
         }
 
         private static void Miss(ref CharacterState state, WireMissReason reason)

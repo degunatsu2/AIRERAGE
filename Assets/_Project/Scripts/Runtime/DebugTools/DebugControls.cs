@@ -7,7 +7,7 @@ namespace Degunatsu.Runtime.DebugTools
 {
     /// <summary>
     /// デバッグ用の操作（docs/06_prototype_plan.md 3章）。DegunatsuControls.inputactions の "Debug" マップを読む。
-    /// - ToggleWireType（Tab / Select）: ワイヤーのタイプを A → B → A-old の順に切り替える（調整値のアセットの値を変える）
+    /// - ToggleWireType（Tab / Select）: ワイヤーのタイプ A / B を切り替える（調整値のアセットの値を変える）
     /// - CycleSpeed（F1 / 十字キー下）: シミュレーションの速さを 1 → 1/2 → 1/4 → 一時停止 → 1 の順に変える
     /// - StepTick（F2 / 十字キー右）: 一時停止中に1ティックだけ進める
     /// </summary>

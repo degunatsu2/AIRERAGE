@@ -28,7 +28,7 @@ MonoBehaviour:
       HalfWidth: 0.4
       HalfHeight: 0.9
     Wire:
-      ModelType: 2
+      ModelType: 0
       ButtonMode: 0
       MaxLength: 12
       FireSpeed: 60

@@ -11,11 +11,6 @@ namespace Degunatsu.Core.Wire
 
         /// <summary>B. 操作追従重視。</summary>
         Responsive,
-
-        /// <summary>
-        /// A の試行版（D-11）。接続した瞬間に向いている方向へ、接続点を中心にロープ長を半径とする円を描いて回る。
-        /// </summary>
-        Orbit,
     }
 
     /// <summary>ワイヤーボタンの操作方式（D-07）。</summary>
@@ -29,7 +24,7 @@ namespace Degunatsu.Core.Wire
     }
 
     /// <summary>
-    /// ワイヤーの調整値。初期値はすべて【仮】（docs/06_prototype_plan.md 4.2〜4.5）。
+    /// ワイヤーの調整値。初期値はすべて【仮】（docs/06_prototype_plan.md 4.2〜4.4）。
     /// 共通の値（射程、上限など）と、モデルごとの値を分けて持つ。
     /// </summary>
     [Serializable]
@@ -65,7 +60,7 @@ namespace Degunatsu.Core.Wire
         /// <summary>
         /// 接続中のスティックの入力が速さに与える影響（0〜1、0 なら影響なし）。【試行】
         /// 進む方向と同じ向きに入力すると速さが最大で (1 + この値) 倍に、逆向きなら (1 - この値) 倍になる。
-        /// 進む方向はモデルが決める（B: 接続点へ向かう方向、A の試行版: 円の接線方向）。
+        /// 進む方向はモデルが決める（B: 接続点へ向かう方向）。A はスティックで振りに力を加える（InertialWireTuning.SwingAcceleration）ので使わない。
         /// </summary>
         public float AttachedInputInfluence = 0.25f;
 
@@ -92,7 +87,6 @@ namespace Degunatsu.Core.Wire
 
         public InertialWireTuning Inertial = new InertialWireTuning();
         public ResponsiveWireTuning Responsive = new ResponsiveWireTuning();
-        public OrbitWireTuning Orbit = new OrbitWireTuning();
 
         public TuningValidator Validate()
         {
@@ -113,7 +107,6 @@ namespace Degunatsu.Core.Wire
             v.InRange(nameof(AttachedInputInfluence), AttachedInputInfluence, 0f, 1f);
             v.NotNull(nameof(Inertial), Inertial);
             v.NotNull(nameof(Responsive), Responsive);
-            v.NotNull(nameof(Orbit), Orbit);
             if (Inertial != null)
             {
                 v.Merge(Inertial.Validate());
@@ -121,10 +114,6 @@ namespace Degunatsu.Core.Wire
             if (Responsive != null)
             {
                 v.Merge(Responsive.Validate());
-            }
-            if (Orbit != null)
-            {
-                v.Merge(Orbit.Validate());
             }
             return v;
         }
@@ -143,12 +132,28 @@ namespace Degunatsu.Core.Wire
         /// <summary>減衰（1/s）。0 ならエネルギーが保存される。</summary>
         public float Damping = 0f;
 
+        /// <summary>
+        /// 接続直後の速さの下限（m/s。0 なら使わない）。止まっている状態から接続したときの初速の遅さを補う
+        /// （ユーザーの指示、2026-10-12）。接続した瞬間の速さがこれより遅いときだけ、速さがこの値に届くように
+        /// 接続点の方向へ強く引く（巻き取りも速くなる）。振りの速さが育てば、通常の巻き取りに戻る。
+        /// </summary>
+        public float StartPullSpeed = 14f;
+
+        /// <summary>接続してから、StartPullSpeed の下限を保つティック数。</summary>
+        public int StartPullTicks = 20;
+
+        /// <summary>その後、下限を巻き取りの速さ（ReelSpeed）まで直線的に下げるティック数。</summary>
+        public int StartPullFadeTicks = 20;
+
         public TuningValidator Validate()
         {
             var v = new TuningValidator(nameof(InertialWireTuning));
             v.NonNegative(nameof(ReelSpeed), ReelSpeed);
             v.NonNegative(nameof(SwingAcceleration), SwingAcceleration);
             v.NonNegative(nameof(Damping), Damping);
+            v.NonNegative(nameof(StartPullSpeed), StartPullSpeed);
+            v.NonNegative(nameof(StartPullTicks), StartPullTicks);
+            v.NonNegative(nameof(StartPullFadeTicks), StartPullFadeTicks);
             return v;
         }
     }
@@ -180,25 +185,6 @@ namespace Degunatsu.Core.Wire
             v.NonNegative(nameof(SteerSpeed), SteerSpeed);
             v.NonNegative(nameof(GravityScale), GravityScale);
             v.NonNegative(nameof(ArrivalRadius), ArrivalRadius);
-            return v;
-        }
-    }
-
-    /// <summary>タイプA の試行版（円運動）の調整値。</summary>
-    [Serializable]
-    public sealed class OrbitWireTuning
-    {
-        /// <summary>円を回る速さ（m/s）。</summary>
-        public float OrbitSpeed = 14f;
-
-        /// <summary>回る速さへの加速度（m/s²）。接続した瞬間の速度から、この加速度で回る速度に近づく。</summary>
-        public float OrbitAcceleration = 90f;
-
-        public TuningValidator Validate()
-        {
-            var v = new TuningValidator(nameof(OrbitWireTuning));
-            v.Positive(nameof(OrbitSpeed), OrbitSpeed);
-            v.Positive(nameof(OrbitAcceleration), OrbitAcceleration);
             return v;
         }
     }

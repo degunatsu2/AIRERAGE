@@ -9,7 +9,6 @@ namespace Degunatsu.Core.Wire.Models
     {
         private static readonly IWireMotionModel InertialModel = new InertialWireModel();
         private static readonly IWireMotionModel ResponsiveModel = new ResponsiveWireModel();
-        private static readonly IWireMotionModel OrbitModel = new OrbitWireModel();
 
         public static IWireMotionModel Get(WireModelType type)
         {
@@ -19,8 +18,6 @@ namespace Degunatsu.Core.Wire.Models
                     return InertialModel;
                 case WireModelType.Responsive:
                     return ResponsiveModel;
-                case WireModelType.Orbit:
-                    return OrbitModel;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type), type, "未対応のワイヤーモデルです");
             }

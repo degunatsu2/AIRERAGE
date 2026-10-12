@@ -143,7 +143,7 @@ namespace Degunatsu.Runtime.DebugTools
                 _text.Append('\n');
             }
             // 行数: 見出し、状態、前回、ベストの見出し、コースごとの行
-            GUI.Box(new Rect(10f, 10f, 400f, 12f + 22f * (_timer.Goals.Count + 4)), _text.ToString(), _style);
+            GUI.Box(new Rect(10f, 10f, 320f, 12f + 22f * (_timer.Goals.Count + 4)), _text.ToString(), _style);
         }
 
         private string Best(string course, WireModelType type)

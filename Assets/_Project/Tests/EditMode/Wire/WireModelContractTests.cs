@@ -14,7 +14,6 @@ namespace Degunatsu.Core.Tests.Wire
     /// </summary>
     [TestFixture(WireModelType.Inertial)]
     [TestFixture(WireModelType.Responsive)]
-    [TestFixture(WireModelType.Orbit)]
     public class WireModelContractTests
     {
         private readonly WireModelType _modelType;

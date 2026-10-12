@@ -79,11 +79,8 @@ namespace Degunatsu.Core.Wire
         /// <summary>ロープの長さ。キャラクターと接続点の距離はこれを超えない。</summary>
         public float RopeLength;
 
-        /// <summary>
-        /// 接続点の周りを回る向き（1 = 反時計回り、-1 = 時計回り）。接続した瞬間に向いている方向から決め、接続中は変えない。
-        /// 円運動のモデル（タイプA の試行版）が使う。
-        /// </summary>
-        public sbyte SwingDirection;
+        /// <summary>接続した瞬間の速さ（m/s）。接続直後の補助を使うかの判断に使う。</summary>
+        public float AttachSpeed;
 
         /// <summary>Cooldown の残りティック。</summary>
         public int CooldownTicksLeft;
@@ -108,7 +105,7 @@ namespace Degunatsu.Core.Wire
                 && TargetPoint.Equals(other.TargetPoint)
                 && Anchor.Equals(other.Anchor)
                 && RopeLength.Equals(other.RopeLength)
-                && SwingDirection == other.SwingDirection
+                && AttachSpeed.Equals(other.AttachSpeed)
                 && CooldownTicksLeft == other.CooldownTicksLeft
                 && LastReleaseReason == other.LastReleaseReason
                 && LastMissReason == other.LastMissReason;
@@ -131,7 +128,7 @@ namespace Degunatsu.Core.Wire
             hash.Add(TargetPoint);
             hash.Add(Anchor);
             hash.Add(RopeLength);
-            hash.Add(SwingDirection);
+            hash.Add(AttachSpeed);
             hash.Add(CooldownTicksLeft);
             hash.Add(LastReleaseReason);
             hash.Add(LastMissReason);

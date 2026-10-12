@@ -206,15 +206,12 @@ namespace Degunatsu.Core.Tests.Wire
             Assert.That(harness.State.Grounded, Is.False, "前提: 空中で解除した");
             Assert.That(harness.State.AirJumpsUsed, Is.EqualTo(restore ? 0 : airJumps));
 
-            // 回復したなら、もう一度空中ジャンプできる。
+            // 回復したなら、もう一度空中ジャンプできる（回復しなければ、空中ジャンプは起きない）。
             harness.Step(Inputs.Jump);
+            Assert.That(harness.State.AirJumpsUsed, Is.EqualTo(airJumps));
             if (restore)
             {
                 Assert.That(harness.State.Velocity.Y, Is.EqualTo(config.Movement.JumpSpeed).Within(1e-4f));
-            }
-            else
-            {
-                Assert.That(harness.State.Velocity.Y, Is.LessThan(config.Movement.JumpSpeed));
             }
         }
 

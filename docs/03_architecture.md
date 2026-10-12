@@ -75,7 +75,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Core/Physics | 衝突クエリのインターフェースと、軸平行の箱でできた地形 | `ICollisionQuery`, `CastHit`, `BoxTerrain` | 1 |
 | Core/Movement | 走行、ジャンプ、重力、地形との衝突解決（すり抜け防止の連続判定） | `KinematicMotor`, `MovementConfig` | 1 |
 | Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン | `WireController`, `WireState`, `WireTargeting` | 1 |
-| Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `OrbitWireModel`, `ResponsiveWireModel`, `InertialWireModel` | 1 |
+| Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
 | Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態 | `SimWorld`, `CharacterState` | 1 |
 | Core/Combat | アクション状態遷移、キャンセル規則、命中判定、ガード | `ActionStateMachine`, `HitResolver` | 3 |
 | Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
@@ -123,10 +123,9 @@ public interface IWireMotionModel
 
 - `WireController`（共通）: フェーズ管理、照準とエイムアシスト、接続判定、最大長、強制解除、クールダウン、速度の上限、解除時の慣性、キャンセル判定のためのフェーズ公開。
 - `IWireMotionModel`（差し替え）: 接続中の速度とロープ長の変化だけを計算する。
-  - `OrbitWireModel`（タイプA の試行版）: 接続点の周りを一定の速さで回る円運動。回る向きは接続時に `WireController` が決めて `WireState.SwingDirection` に入れる。
+  - `InertialWireModel`（タイプA）: ロープ長の拘束、重力、巻き取り、スティックによる振り。遅い状態で接続した直後の強い引き（接続した瞬間の速さは `WireState.AttachSpeed`）。
   - `ResponsiveWireModel`（タイプB）: アンカーへ向かう目標速度への収束、スティックによる進路の調整。
-  - `InertialWireModel`（従来のタイプA。比較のため A-old として残す）: ロープ長の拘束、重力、巻き取り、スティックによる振り。
-  - 接続中のスティックの入力による速さの倍率（`WireTuning.AttachedInputInfluence`）は、`WireMotionContext.InputSpeedScale` で全モデル共通に計算する（進む方向だけをモデルが渡す）。
+  - 接続中のスティックの入力による速さの倍率（`WireTuning.AttachedInputInfluence`）は、`WireMotionContext.InputSpeedScale` で共通に計算する（進む方向だけをモデルが渡す。今はタイプB が使う）。
 - どちらを使うかは `WireProfile` データの `modelType` で選ぶ。
 - **共通の契約テスト**（速度上限を超えない、壁をすり抜けない、解除時の速度が規則どおり、など）を、NUnit のパラメータ化テストで両モデルに同じように適用する。
 

@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using Degunatsu.Core.Common;
 
@@ -6,6 +7,7 @@ namespace Degunatsu.Core.Wire.Models
     /// <summary>
     /// タイプA: 物理・慣性重視。ロープ長の拘束と重力による振り子運動。
     /// 巻き取るとロープが縮み、角運動量の保存で振りが速くなる（上限は共通の MaxAttachedSpeed）。
+    /// 遅い状態で接続した直後は、速さが下限（StartPullSpeed）に届くように接続点の方向へ強く引く。
     /// </summary>
     public sealed class InertialWireModel : IWireMotionModel
     {
@@ -38,8 +40,19 @@ namespace Degunatsu.Core.Wire.Models
                 velocity *= MathMax(0f, 1f - tuning.Damping * dt);
             }
 
+            // 接続直後で遅いときは、速さが下限に届くように巻き取りを速くする。
+            float radialSpeed = Vector3.Dot(velocity, radial);
+            Vector3 tangential = velocity - radial * radialSpeed;
+            float reelSpeed = tuning.ReelSpeed;
+            float startPull = StartPullInSpeed(context, tuning, tangential.Length());
+            bool pullingAtStart = startPull > reelSpeed;
+            if (pullingAtStart)
+            {
+                reelSpeed = startPull;
+            }
+
             float lengthBefore = context.RopeLength;
-            float lengthAfter = MathMax(context.Tuning.MinRopeLength, lengthBefore - tuning.ReelSpeed * dt);
+            float lengthAfter = MathMax(context.Tuning.MinRopeLength, lengthBefore - reelSpeed * dt);
             if (lengthAfter > lengthBefore)
             {
                 // 最小長より短い状態で接続した場合は、ロープを伸ばさない。
@@ -51,14 +64,42 @@ namespace Degunatsu.Core.Wire.Models
             {
                 // ロープは伸びないので外向きの速度は消え、巻き取りの速さで内側へ引かれる。
                 // ロープの力は接続点に向かう（中心力）ので角運動量は変わらず、半径が縮むと振りが自然に速くなる。
-                float radialSpeed = Vector3.Dot(velocity, radial);
-                Vector3 tangential = velocity - radial * radialSpeed;
+                // 接続直後の強い引きの間は、接続点の方向の速さをロープが決める
+                // （引きが弱まるときに、勢いでロープがたるまないように）。最小長に達したら通常に戻す。
                 float reelInSpeed = (lengthBefore - lengthAfter) / dt;
-                float newRadialSpeed = radialSpeed < -reelInSpeed ? radialSpeed : -reelInSpeed;
+                bool ropeControlsRadial = pullingAtStart && lengthAfter > context.Tuning.MinRopeLength;
+                bool keepFasterInward = !ropeControlsRadial && radialSpeed < -reelInSpeed;
+                float newRadialSpeed = keepFasterInward ? radialSpeed : -reelInSpeed;
                 velocity = tangential + radial * newRadialSpeed;
             }
 
             return new WireMotionResult(velocity, lengthAfter);
+        }
+
+        /// <summary>
+        /// 接続直後の速さの下限に届くのに必要な、接続点の方向の速さ（不要なら 0）。
+        /// 接続した瞬間の速さが StartPullSpeed より遅いときだけ使う。下限は StartPullTicks の間 StartPullSpeed で、
+        /// その後 StartPullFadeTicks で ReelSpeed まで直線的に下がる（通常の巻き取りへ切れ目なく戻る）。
+        /// </summary>
+        private static float StartPullInSpeed(in WireMotionContext context, InertialWireTuning tuning, float tangentialSpeed)
+        {
+            int ticks = context.AttachedTicks;
+            if (tuning.StartPullSpeed <= 0f || context.AttachSpeed >= tuning.StartPullSpeed
+                || ticks >= tuning.StartPullTicks + tuning.StartPullFadeTicks)
+            {
+                return 0f;
+            }
+            float floor = tuning.StartPullSpeed;
+            if (ticks >= tuning.StartPullTicks)
+            {
+                float fade = (float)(ticks - tuning.StartPullTicks) / tuning.StartPullFadeTicks;
+                floor += (tuning.ReelSpeed - tuning.StartPullSpeed) * fade;
+            }
+            if (tangentialSpeed >= floor)
+            {
+                return 0f;
+            }
+            return MathF.Sqrt(floor * floor - tangentialSpeed * tangentialSpeed);
         }
 
         private static float MathMax(float a, float b)
