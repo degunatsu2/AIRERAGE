@@ -15,7 +15,7 @@
 | 5 | **状態は明示的な構造体で持つ** | ネットワーク同期、巻き戻し、デバッグ表示、テストでの検証が容易になる |
 | 6 | **調整用の数値はデータ（ScriptableObject）に置く** | コードを編集せずに調整するため。コード中に数値を散在させない |
 | 7 | **ネットワーク層はシミュレーションの外側に置く** | ローカルとオンラインで同じシミュレーションを使う。ネットワークライブラリへの依存を1つのアセンブリに閉じ込める |
-| 8 | **重要な結果はホスト専用の権威サービスが確定する** | 命中、コイン、ゲージ、撃破、勝敗の二重加算や不正な確定を防ぐ |
+| 8 | **重要な結果は、確定ティックのシミュレーション結果を正とする**（ロールバック方式。D-14）。結果を決める処理はシミュレーションの中に一本化し、ネットワークでは入力だけを送る | 命中、コイン、ゲージ、撃破、勝敗の二重加算や不正な確定を防ぐ |
 | 9 | **シングルトンやグローバル状態を増やさない** | 構成ルート（Bootstrap）で依存を組み立て、明示的に渡す |
 
 ---
@@ -28,8 +28,8 @@
 │                                      ▼                                            │
 │                              PlayerInput（ティックごと）                            │
 │                                      │        ┌── Degunatsu.Net（Phase 2〜）────┐ │
-│                                      │◀──────▶│ 入力送信／スナップショット受信    │ │
-│                                      ▼        │ 予測・照合（リコンシリエーション）│ │
+│                                      │◀──────▶│ 入力の送受信（全員の入力）        │ │
+│                                      ▼        │ 予測・巻き戻し（ロールバック）    │ │
 │  SimulationRunner（ティックを回す） ──▶ ┌──────────────────────────────────┐       │ │
 │                                        │ Degunatsu.Core（純C#・固定ティック） │       │ │
 │                                        │  Physics ：BoxTerrain（地形）        │       │ │
@@ -37,8 +37,8 @@
 │  （シーンの BoxCollider を読む）       │  Wire    ：WireController            │       │ │
 │                                        │            ＋ IWireMotionModel(A|B)  │       │ │
 │                                        │  Combat  ：ActionStateMachine 等     │       │ │
-│                                        │  Economy ：CoinLedger（ホスト権威）  │       │ │
-│                                        │  Match   ：MatchRules（ホスト権威）  │       │ │
+│                                        │  Economy ：CoinLedger                │       │ │
+│                                        │  Match   ：MatchRules                │       │ │
 │                                        └──────────────────────────────────┘       │ │
 │                                      │ 状態（読み取り専用）                        └──┘ │
 │                                      ▼                                            │
@@ -53,7 +53,7 @@ Degunatsu.Core        （noEngineReferences: true。UnityEngine を参照しな�
    ▲
 Degunatsu.Runtime     （Core を参照。MonoBehaviour、ScriptableObject、アダプター）
    ▲
-Degunatsu.Net         （Core と Runtime を参照。NGO を参照するのはここだけ。Phase 2〜）
+Degunatsu.Net         （Core と Runtime を参照。ネットワークのライブラリを参照するのはここだけ。Phase 2〜）
 
 Degunatsu.Editor      （Runtime を参照。エディタ拡張のみ）
 Degunatsu.Core.Tests  （Core を参照。EditMode テスト。dotnet test でも実行する）
@@ -85,7 +85,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
 | Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom` | 1 |
 | Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム） | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels` | 1 |
-| Net | 接続、入力・スナップショットのメッセージ、予測と照合、ラグ補償 | Phase 2 で設計する | 2 |
+| Net | 接続、入力の交換、予測と巻き戻し（ロールバック）、時刻の同期、不一致の検出 | Phase 2 で設計する | 2 |
 
 ---
 
