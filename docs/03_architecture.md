@@ -75,7 +75,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Core/Physics | 衝突クエリのインターフェースと、軸平行の箱でできた地形 | `ICollisionQuery`, `CastHit`, `BoxTerrain` | 1 |
 | Core/Movement | 走行、ジャンプ、重力、地形との衝突解決（すり抜け防止の連続判定） | `KinematicMotor`, `MovementConfig` | 1 |
 | Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン | `WireController`, `WireState`, `WireTargeting` | 1 |
-| Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
+| Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `OrbitWireModel`, `ResponsiveWireModel`, `InertialWireModel` | 1 |
 | Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態 | `SimWorld`, `CharacterState` | 1 |
 | Core/Combat | アクション状態遷移、キャンセル規則、命中判定、ガード | `ActionStateMachine`, `HitResolver` | 3 |
 | Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
@@ -83,8 +83,8 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Runtime/Simulation | ティックループ、シーンの地形の読み込み | `SimulationRunner`, `SceneTerrainBuilder` | 1 |
 | Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
-| Runtime/Presentation | 状態を読んで表示する | `CharacterView`, `WireView` | 1 |
-| Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム） | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone` | 1 |
+| Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom` | 1 |
+| Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム） | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels` | 1 |
 | Net | 接続、入力・スナップショットのメッセージ、予測と照合、ラグ補償 | Phase 2 で設計する | 2 |
 
 ---
@@ -123,8 +123,10 @@ public interface IWireMotionModel
 
 - `WireController`（共通）: フェーズ管理、照準とエイムアシスト、接続判定、最大長、強制解除、クールダウン、速度の上限、解除時の慣性、キャンセル判定のためのフェーズ公開。
 - `IWireMotionModel`（差し替え）: 接続中の速度とロープ長の変化だけを計算する。
-  - `InertialWireModel`（タイプA）: ロープ長の拘束、重力、巻き取り、スティックによる振り。
+  - `OrbitWireModel`（タイプA の試行版）: 接続点の周りを一定の速さで回る円運動。回る向きは接続時に `WireController` が決めて `WireState.SwingDirection` に入れる。
   - `ResponsiveWireModel`（タイプB）: アンカーへ向かう目標速度への収束、スティックによる進路の調整。
+  - `InertialWireModel`（従来のタイプA。比較のため A-old として残す）: ロープ長の拘束、重力、巻き取り、スティックによる振り。
+  - 接続中のスティックの入力による速さの倍率（`WireTuning.AttachedInputInfluence`）は、`WireMotionContext.InputSpeedScale` で全モデル共通に計算する（進む方向だけをモデルが渡す）。
 - どちらを使うかは `WireProfile` データの `modelType` で選ぶ。
 - **共通の契約テスト**（速度上限を超えない、壁をすり抜けない、解除時の速度が規則どおり、など）を、NUnit のパラメータ化テストで両モデルに同じように適用する。
 
@@ -140,7 +142,7 @@ public interface IWireMotionModel
 ### 4.5 入力
 
 - `InputSystemAdapter` がティックごとに Input System を読み取り、`PlayerInput` を作る。
-- `PlayerInput` の内容: 移動の方向、照準の方向（マウスでの照準のとき。なければ移動の方向で照準する）、ボタンのビットマスク。方向は量子化した整数。ネットワークで送りやすく、端末による誤差が出ないようにするため量子化する。
+- `PlayerInput` の内容: 移動の方向、照準の方向（マウスでの照準と、ゲームパッドの右スティックでの照準のとき。なければ移動の方向で照準する）、ボタンのビットマスク。方向は量子化した整数。ネットワークで送りやすく、端末による誤差が出ないようにするため量子化する。
 - 「押した瞬間」の判定と先行入力（【仮】6ティック）は Core 側で行う。
 
 ### 4.6 アニメーションとゲームロジック

@@ -1,8 +1,10 @@
 using System.Collections;
 using Degunatsu.Core.Wire;
 using Degunatsu.Runtime.DebugTools;
+using Degunatsu.Runtime.Presentation;
 using Degunatsu.Runtime.Simulation;
 using NUnit.Framework;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -10,7 +12,8 @@ using UnityEngine.TestTools;
 namespace Degunatsu.PlayMode.Tests
 {
     /// <summary>
-    /// デバッグ機能（docs/06_prototype_plan.md T1-9）を Sandbox_Wire で動かして確かめる（キーの代わりにメソッドを呼ぶ）。
+    /// デバッグ機能（docs/06_prototype_plan.md T1-9）とカメラのズームを Sandbox_Wire で動かして確かめる
+    /// （キーの代わりにメソッドを呼ぶ）。
     /// </summary>
     public sealed class DebugToolsTests
     {
@@ -49,12 +52,37 @@ namespace Degunatsu.PlayMode.Tests
             controls.CycleSpeed();
             Assert.That(runner.SpeedScale, Is.EqualTo(1f));
 
-            // タイプの切り替え（2回で元に戻す。アセットの値を変えるため）
+            // タイプの切り替え（A → B → A-old の3種類。3回で元に戻す。アセットの値を変えるため）
             WireModelType original = runner.PlayerConfig.Wire.ModelType;
             controls.ToggleWireType();
             Assert.That(runner.PlayerConfig.Wire.ModelType, Is.Not.EqualTo(original));
             controls.ToggleWireType();
+            Assert.That(runner.PlayerConfig.Wire.ModelType, Is.Not.EqualTo(original));
+            controls.ToggleWireType();
             Assert.That(runner.PlayerConfig.Wire.ModelType, Is.EqualTo(original));
+        }
+
+        [UnityTest]
+        public IEnumerator CameraZoom_StaysWithinLimits_AndMovesTheCamera()
+        {
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+
+            var zoom = Object.FindFirstObjectByType<CameraZoom>();
+            var composer = Object.FindFirstObjectByType<CinemachinePositionComposer>();
+            Assert.That(zoom, Is.Not.Null, "CameraZoom がない");
+            Assert.That(zoom.MinDistance, Is.LessThan(composer.CameraDistance), "前提: 初期の距離から近づける");
+            Assert.That(zoom.MaxDistance, Is.GreaterThan(composer.CameraDistance), "前提: 初期の距離から離せる");
+
+            zoom.ZoomIn(1000f);
+            Assert.That(zoom.TargetDistance, Is.EqualTo(zoom.MinDistance));
+            yield return WaitSeconds(1f);
+            Assert.That(composer.CameraDistance, Is.EqualTo(zoom.MinDistance).Within(0.1f), "カメラが近づかない");
+
+            zoom.ZoomIn(-1000f);
+            Assert.That(zoom.TargetDistance, Is.EqualTo(zoom.MaxDistance));
+            yield return WaitSeconds(1f);
+            Assert.That(composer.CameraDistance, Is.EqualTo(zoom.MaxDistance).Within(0.1f), "カメラが離れない");
         }
 
         private static IEnumerator WaitSeconds(float seconds)

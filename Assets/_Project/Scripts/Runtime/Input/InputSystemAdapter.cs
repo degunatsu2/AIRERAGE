@@ -9,10 +9,11 @@ namespace Degunatsu.Runtime.Input
     /// <summary>
     /// Input System を読み、ティックごとの PlayerInput を作る（docs/03_architecture.md 4.5）。
     /// Input System を直接読むのはここだけで、シミュレーションは PlayerInput だけを見る。
-    /// アクションは DegunatsuControls.inputactions の "Player" マップ（Move / Jump / Wire / Reset / Point）。
+    /// アクションは DegunatsuControls.inputactions の "Player" マップ（Move / Jump / Wire / Reset / Point / Aim）。
     ///
     /// 照準（D-08）: 最後に使った機器がキーボードかマウスなら、マウスポインターの方向に照準する（PlayerInput の照準の方向）。
-    /// ゲームパッドなら照準の方向を指定せず、シミュレーションが左スティックの方向で照準する。
+    /// ゲームパッドなら、右スティックを倒しているときはその方向に照準する。倒していなければ照準の方向を指定せず、
+    /// シミュレーションが左スティックの方向で照準する。
     /// </summary>
     public sealed class InputSystemAdapter : IDisposable
     {
@@ -24,6 +25,7 @@ namespace Degunatsu.Runtime.Input
         private readonly InputAction _wire;
         private readonly InputAction _reset;
         private readonly InputAction _point;
+        private readonly InputAction _aim;
         private readonly InputAction[] _deviceActions;
 
         // 前のティックからの間に押されたボタン。ティックの間に押して離しても取りこぼさないようにする。
@@ -31,6 +33,7 @@ namespace Degunatsu.Runtime.Input
 
         private bool _hasPointer;
         private Vector2 _pointerWorld;
+        private float _aimStickDeadzone;
 
         public InputSystemAdapter(InputActionAsset actions)
         {
@@ -44,7 +47,8 @@ namespace Degunatsu.Runtime.Input
             _wire = _map.FindAction("Wire", throwIfNotFound: true);
             _reset = _map.FindAction("Reset", throwIfNotFound: true);
             _point = _map.FindAction("Point", throwIfNotFound: true);
-            _deviceActions = new[] { _move, _jump, _wire, _reset };
+            _aim = _map.FindAction("Aim", throwIfNotFound: true);
+            _deviceActions = new[] { _move, _jump, _wire, _reset, _aim };
             UsingPointer = Mouse.current != null;
         }
 
@@ -66,9 +70,11 @@ namespace Degunatsu.Runtime.Input
 
         /// <summary>
         /// 毎フレーム、ティックを進める前に呼ぶ。camera はマウスポインターの位置をゲームプレイ平面（Z = 0）に写すのに使う。
+        /// aimStickDeadzone より小さい右スティックの入力は無視する（WireTuning.AimDeadzone を渡す）。
         /// </summary>
-        public void Poll(Camera camera)
+        public void Poll(Camera camera, float aimStickDeadzone)
         {
+            _aimStickDeadzone = aimStickDeadzone;
             if (_jump.WasPressedThisFrame())
             {
                 _pressedSinceLastTick |= InputButtons.Jump;
@@ -139,11 +145,19 @@ namespace Degunatsu.Runtime.Input
 
             Vector2 move = _move.ReadValue<Vector2>();
             SimInput input = SimInput.FromAxes(move.x, move.y, buttons);
-            if (!_hasPointer)
+            if (_hasPointer)
             {
-                return input;
+                return input.WithAim(new System.Numerics.Vector2(_pointerWorld.x - position.X, _pointerWorld.y - position.Y));
             }
-            return input.WithAim(new System.Numerics.Vector2(_pointerWorld.x - position.X, _pointerWorld.y - position.Y));
+            if (!UsingPointer)
+            {
+                Vector2 aimStick = _aim.ReadValue<Vector2>();
+                if (aimStick.magnitude >= _aimStickDeadzone && aimStick.sqrMagnitude > 0f)
+                {
+                    return input.WithAim(new System.Numerics.Vector2(aimStick.x, aimStick.y));
+                }
+            }
+            return input;
         }
 
         private void UpdateActiveDevice()

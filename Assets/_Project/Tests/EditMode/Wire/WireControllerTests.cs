@@ -182,6 +182,59 @@ namespace Degunatsu.Core.Tests.Wire
                 "解除の次のティックに押せば射出できる");
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void Release_AfterUsingUpAirJumps_RestoresThemWhenEnabled(bool restore)
+        {
+            var config = new CharacterConfig();
+            config.Wire.RestoreAirJumpsOnRelease = restore;
+            var harness = new SimHarness(GroundWithCeiling(attachable: true), config);
+            int airJumps = config.Movement.AirJumps;
+
+            // ジャンプして、空中ジャンプを使い切る。
+            harness.Step(Inputs.Jump);
+            for (int i = 0; i < airJumps; i++)
+            {
+                harness.Step(Inputs.None, 5);
+                harness.Step(Inputs.Jump);
+            }
+            Assert.That(harness.State.AirJumpsUsed, Is.EqualTo(airJumps), "前提: 空中ジャンプを使い切った");
+
+            // 接続して、すぐに解除する。
+            harness.StepUntil(s => s.Wire.Phase == WirePhase.Attached, Inputs.Wire(0f, 1f), 20);
+            harness.Step(Inputs.None);
+            Assert.That(harness.State.Grounded, Is.False, "前提: 空中で解除した");
+            Assert.That(harness.State.AirJumpsUsed, Is.EqualTo(restore ? 0 : airJumps));
+
+            // 回復したなら、もう一度空中ジャンプできる。
+            harness.Step(Inputs.Jump);
+            if (restore)
+            {
+                Assert.That(harness.State.Velocity.Y, Is.EqualTo(config.Movement.JumpSpeed).Within(1e-4f));
+            }
+            else
+            {
+                Assert.That(harness.State.Velocity.Y, Is.LessThan(config.Movement.JumpSpeed));
+            }
+        }
+
+        [Test]
+        public void Miss_DoesNotRestoreAirJumps()
+        {
+            var harness = new SimHarness(TestArenas.Ground());
+            harness.Step(Inputs.Jump);
+            harness.Step(Inputs.None, 5);
+            harness.Step(Inputs.Jump);
+            int used = harness.State.AirJumpsUsed;
+            Assert.That(used, Is.GreaterThan(0), "前提: 空中ジャンプを使った");
+
+            // 何もない方向に撃って外す（接続しない）。
+            harness.StepUntil(s => s.Wire.Phase == WirePhase.Retracting, Inputs.Wire(0f, 1f), 30);
+
+            Assert.That(harness.State.Grounded, Is.False);
+            Assert.That(harness.State.AirJumpsUsed, Is.EqualTo(used));
+        }
+
         [Test]
         public void ReleaseCooldownTicks_WhenSet_WaitsBeforeReady()
         {

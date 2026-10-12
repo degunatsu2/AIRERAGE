@@ -118,7 +118,7 @@ namespace Degunatsu.Runtime.Simulation
 
         private void Update()
         {
-            _input.Poll(_camera);
+            _input.Poll(_camera, _character.Config.Wire.AimDeadzone);
             if (_input.ResetRequested)
             {
                 ResetPlayer();

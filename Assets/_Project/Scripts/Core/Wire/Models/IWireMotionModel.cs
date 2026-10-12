@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 
 namespace Degunatsu.Core.Wire.Models
@@ -11,23 +12,38 @@ namespace Degunatsu.Core.Wire.Models
         public readonly Vector3 Velocity;
         public readonly Vector3 Anchor;
         public readonly float RopeLength;
+
+        /// <summary>接続点の周りを回る向き（WireState.SwingDirection。1 = 反時計回り、-1 = 時計回り）。</summary>
+        public readonly int SwingDirection;
+
         public readonly Vector2 Stick;
         public readonly float Gravity;
         public readonly float DeltaTime;
         public readonly WireTuning Tuning;
 
         public WireMotionContext(
-            Vector3 position, Vector3 velocity, Vector3 anchor, float ropeLength,
+            Vector3 position, Vector3 velocity, Vector3 anchor, float ropeLength, int swingDirection,
             Vector2 stick, float gravity, float deltaTime, WireTuning tuning)
         {
             Position = position;
             Velocity = velocity;
             Anchor = anchor;
             RopeLength = ropeLength;
+            SwingDirection = swingDirection;
             Stick = stick;
             Gravity = gravity;
             DeltaTime = deltaTime;
             Tuning = tuning;
+        }
+
+        /// <summary>
+        /// スティックの入力による速さの倍率（WireTuning.AttachedInputInfluence）。両タイプで共通に使う。
+        /// direction（正規化済み）は、そのモデルで進む方向。同じ向きに入力すると速く、逆向きなら遅くなる。
+        /// </summary>
+        public float InputSpeedScale(Vector3 direction)
+        {
+            float along = Math.Clamp(Vector3.Dot(new Vector3(Stick.X, Stick.Y, 0f), direction), -1f, 1f);
+            return 1f + Tuning.AttachedInputInfluence * along;
         }
     }
 

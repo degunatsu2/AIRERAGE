@@ -9,11 +9,12 @@ using NUnit.Framework;
 namespace Degunatsu.Core.Tests.Wire
 {
     /// <summary>
-    /// 両タイプが守るべき共通の規則（docs/06_prototype_plan.md T1-6）。
-    /// 同じテストを両方のモデルに適用し、タイプによる不公平や抜け穴がないことを確かめる。
+    /// すべてのタイプが守るべき共通の規則（docs/06_prototype_plan.md T1-6）。
+    /// 同じテストをすべてのモデルに適用し、タイプによる不公平や抜け穴がないことを確かめる。
     /// </summary>
     [TestFixture(WireModelType.Inertial)]
     [TestFixture(WireModelType.Responsive)]
+    [TestFixture(WireModelType.Orbit)]
     public class WireModelContractTests
     {
         private readonly WireModelType _modelType;

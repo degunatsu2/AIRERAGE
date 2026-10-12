@@ -16,6 +16,7 @@ namespace Degunatsu.Core.Tests.Simulation
     {
         [TestCase(WireModelType.Inertial)]
         [TestCase(WireModelType.Responsive)]
+        [TestCase(WireModelType.Orbit)]
         public void SameInputSequence_ProducesIdenticalStates(WireModelType modelType)
         {
             List<CharacterState> first = Run(modelType);

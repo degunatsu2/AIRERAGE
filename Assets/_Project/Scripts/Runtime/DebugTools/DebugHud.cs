@@ -79,7 +79,7 @@ namespace Degunatsu.Runtime.DebugTools
 
             _text.Clear();
             _text.Append("Debug  Tab: type  F1: speed  F2: step\n");
-            _text.Append("Type ").Append(tuning.ModelType == WireModelType.Inertial ? "A (Inertial)" : "B (Responsive)")
+            _text.Append("Type ").Append(WireTypeLabels.Long(tuning.ModelType))
                 .Append("   Speed ").Append(_runner.SpeedScale > 0f ? "x" + _runner.SpeedScale.ToString("0.##") : "PAUSED")
                 .Append("   Tick ").Append(_runner.CurrentTick).Append('\n');
             _text.Append("Input ").Append(_runner.UsingPointer ? "mouse" : "pad").Append("  move (")

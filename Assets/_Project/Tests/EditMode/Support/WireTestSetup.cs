@@ -19,8 +19,12 @@ namespace Degunatsu.Core.Tests.Support
             return config;
         }
 
-        /// <summary>position で anchor に接続し、ワイヤーボタンを押し続けている状態にする。</summary>
-        public static void AttachAt(SimHarness harness, Vector3 position, Vector3 anchor, Vector3 velocity = default)
+        /// <summary>
+        /// position で anchor に接続し、ワイヤーボタンを押し続けている状態にする。
+        /// swingDirection は円運動のモデルで回る向き（1 = 反時計回り、-1 = 時計回り）。
+        /// </summary>
+        public static void AttachAt(
+            SimHarness harness, Vector3 position, Vector3 anchor, Vector3 velocity = default, sbyte swingDirection = 1)
         {
             var state = harness.State;
             state.Position = position;
@@ -32,6 +36,7 @@ namespace Degunatsu.Core.Tests.Support
                 Phase = WirePhase.Attached,
                 Anchor = anchor,
                 RopeLength = Vector3.Distance(position, anchor),
+                SwingDirection = swingDirection,
             };
             harness.State = state;
         }

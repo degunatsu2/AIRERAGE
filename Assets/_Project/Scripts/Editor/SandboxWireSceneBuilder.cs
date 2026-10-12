@@ -221,7 +221,7 @@ namespace Degunatsu.Editor
             var wireView = wireGo.AddComponent<WireView>();
             SetReference(wireView, "_anchorMarker", anchorMarker.transform);
 
-            CreateFollowCamera(characterGo.transform);
+            CreateFollowCamera(characterGo.transform, inputActions);
             AimIndicatorView aimIndicator = CreateAimIndicator();
 
             var runner = new GameObject("Simulation").AddComponent<SimulationRunner>();
@@ -322,7 +322,7 @@ namespace Degunatsu.Editor
             var root = new GameObject("AimIndicator");
             LineRenderer aimLine = CreateIndicatorLine(root.transform, "AimLine", material, 0.07f);
             LineRenderer marker = CreateIndicatorLine(root.transform, "TargetMarker", material, 0.06f);
-            LineRenderer ring = CreateIndicatorLine(root.transform, "RangeRing", material, 0.05f);
+            LineRenderer ring = CreateIndicatorLine(root.transform, "RangeRing", material, 0.08f);
 
             var view = root.AddComponent<AimIndicatorView>();
             SetReference(view, "_aimLine", aimLine);
@@ -345,8 +345,11 @@ namespace Degunatsu.Editor
             return line;
         }
 
-        /// <summary>キャラクターを横から追従するカメラ（Cinemachine 3）。回転はせず、位置だけを合わせる。</summary>
-        private static void CreateFollowCamera(Transform target)
+        /// <summary>
+        /// キャラクターを横から追従するカメラ（Cinemachine 3）。回転はせず、位置だけを合わせる。
+        /// マウスホイールと LB / RB で距離を変えられる（CameraZoom）。
+        /// </summary>
+        private static void CreateFollowCamera(Transform target, InputActionAsset inputActions)
         {
             // カメラの位置は Cinemachine が決める（再生時にキャラクターへ合わせる）ので、ここでは置かない。
             Camera camera = Object.FindFirstObjectByType<Camera>();
@@ -363,6 +366,10 @@ namespace Degunatsu.Editor
             composer.CameraDistance = CameraDistance;
             composer.Damping = new Vector3(CameraDamping, CameraDamping, 0f);
             composer.Composition = ScreenComposerSettings.Default; // デッドゾーンなし（画面の中央に合わせる）
+
+            var zoom = go.AddComponent<CameraZoom>();
+            SetReference(zoom, "_composer", composer);
+            SetReference(zoom, "_inputActions", inputActions);
         }
 
         private static CharacterConfigAsset LoadOrCreateCharacterConfig()

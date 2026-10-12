@@ -14,6 +14,9 @@ namespace Degunatsu.Runtime.DebugTools
     /// </summary>
     public sealed class CourseTimerHud : MonoBehaviour
     {
+        // ベストタイムの表の1列の幅（文字数）。
+        private const int ColumnWidth = 9;
+
         [SerializeField] private SimulationRunner _runner;
 
         private CourseTimer _timer;
@@ -106,7 +109,7 @@ namespace Degunatsu.Runtime.DebugTools
             }
 
             _text.Clear();
-            _text.Append("Course timer  (wire type ").Append(TypeLabel(_runner.PlayerConfig.Wire.ModelType)).Append(")\n");
+            _text.Append("Course timer  (wire type ").Append(WireTypeLabels.Short(_runner.PlayerConfig.Wire.ModelType)).Append(")\n");
             switch (_timer.Phase)
             {
                 case CourseTimer.TimerPhase.Waiting:
@@ -122,18 +125,25 @@ namespace Degunatsu.Runtime.DebugTools
             if (_timer.LastRecord is CourseTimer.Record last)
             {
                 _text.Append("Last: ").Append(last.Course).Append(' ').Append(Seconds(last.Ticks))
-                    .Append(" (").Append(TypeLabel(last.WireType)).Append(")\n");
+                    .Append(" (").Append(WireTypeLabels.Short(last.WireType)).Append(")\n");
             }
-            _text.Append("Best        A        B\n");
+            _text.Append("Best      ");
+            foreach (WireModelType type in WireTypeLabels.Order)
+            {
+                _text.Append(WireTypeLabels.Short(type).PadLeft(ColumnWidth));
+            }
+            _text.Append('\n');
             foreach (CourseTimer.Goal goal in _timer.Goals)
             {
-                _text.Append(goal.Course.PadRight(10))
-                    .Append(Best(goal.Course, WireModelType.Inertial).PadLeft(8))
-                    .Append(Best(goal.Course, WireModelType.Responsive).PadLeft(9))
-                    .Append('\n');
+                _text.Append(goal.Course.PadRight(10));
+                foreach (WireModelType type in WireTypeLabels.Order)
+                {
+                    _text.Append(Best(goal.Course, type).PadLeft(ColumnWidth));
+                }
+                _text.Append('\n');
             }
             // 行数: 見出し、状態、前回、ベストの見出し、コースごとの行
-            GUI.Box(new Rect(10f, 10f, 320f, 12f + 22f * (_timer.Goals.Count + 4)), _text.ToString(), _style);
+            GUI.Box(new Rect(10f, 10f, 400f, 12f + 22f * (_timer.Goals.Count + 4)), _text.ToString(), _style);
         }
 
         private string Best(string course, WireModelType type)
@@ -146,9 +156,5 @@ namespace Degunatsu.Runtime.DebugTools
             return SimTime.TicksToSeconds(ticks).ToString("0.00") + "s";
         }
 
-        private static string TypeLabel(WireModelType type)
-        {
-            return type == WireModelType.Inertial ? "A" : "B";
-        }
     }
 }

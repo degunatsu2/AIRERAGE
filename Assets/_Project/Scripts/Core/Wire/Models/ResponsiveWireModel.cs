@@ -5,6 +5,7 @@ namespace Degunatsu.Core.Wire.Models
 {
     /// <summary>
     /// タイプB: 操作追従重視。接続点へ向かう目標速度に素早く収束する。スティックで進路を横にずらせる。
+    /// スティックを接続点の方向に入れると少し速く、逆に入れると少し遅くなる（WireTuning.AttachedInputInfluence）。
     /// 到着したらその場で静止してぶら下がる。
     /// </summary>
     public sealed class ResponsiveWireModel : IWireMotionModel
@@ -28,7 +29,8 @@ namespace Degunatsu.Core.Wire.Models
             Vector3 pullDirection = toAnchor / distance;
             Vector3 lateral = SimMath.PerpendicularXY(pullDirection);
             float steer = Vector3.Dot(new Vector3(context.Stick.X, context.Stick.Y, 0f), lateral);
-            Vector3 targetVelocity = pullDirection * tuning.PullSpeed + lateral * (steer * tuning.SteerSpeed);
+            float pullSpeed = tuning.PullSpeed * context.InputSpeedScale(pullDirection);
+            Vector3 targetVelocity = pullDirection * pullSpeed + lateral * (steer * tuning.SteerSpeed);
 
             Vector3 velocity = context.Velocity;
             velocity.Y -= context.Gravity * tuning.GravityScale * dt;

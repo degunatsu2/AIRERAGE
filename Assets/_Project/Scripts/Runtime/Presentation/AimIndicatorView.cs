@@ -6,7 +6,8 @@ namespace Degunatsu.Runtime.Presentation
 {
     /// <summary>
     /// ワイヤーの照準のインジケーター。半透明の線で射出の方向を示し、終点の印と色で結果の予測を示す
-    /// （接続できる / 接続できない地形に当たる / 届かない）。射程の限界は薄い円で示す。
+    /// （接続できる / 接続できない地形に当たる / 届かない）。射程の限界は円で示す
+    /// （色は仮にワイヤーと同じ紫。後でキャラクターとワイヤーの輪郭線と一緒に、プレイヤーカラーに合わせる）。
     /// 予測は WireTargeting.PredictShot（射出と同じ計算）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class AimIndicatorView : MonoBehaviour
@@ -22,7 +23,7 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private Color _attachColor = new Color(0.15f, 0.95f, 0.4f, 0.8f);
         [SerializeField] private Color _blockedColor = new Color(1f, 0.25f, 0.25f, 0.7f);
         [SerializeField] private Color _outOfRangeColor = new Color(0.1f, 0.1f, 0.15f, 0.45f);
-        [SerializeField] private Color _rangeColor = new Color(0.1f, 0.1f, 0.15f, 0.22f);
+        [SerializeField] private Color _rangeColor = new Color(0.6f, 0.2f, 0.85f, 0.55f);
         [Tooltip("すぐに射出できないとき（回収中・クールダウン中）の不透明度の倍率")]
         [SerializeField, Range(0f, 1f)] private float _notReadyAlphaScale = 0.35f;
 

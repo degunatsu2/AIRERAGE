@@ -90,7 +90,7 @@ namespace Degunatsu.Core.Wire
         {
             IWireMotionModel model = WireMotionModels.Get(tuning.ModelType);
             var context = new WireMotionContext(
-                state.Position, state.Velocity, state.Wire.Anchor, state.Wire.RopeLength,
+                state.Position, state.Velocity, state.Wire.Anchor, state.Wire.RopeLength, state.Wire.SwingDirection,
                 input.Move, gravity, SimTime.DeltaTime, tuning);
             WireMotionResult result = model.Step(context);
             state.Wire.RopeLength = result.RopeLength;
@@ -124,13 +124,39 @@ namespace Degunatsu.Core.Wire
 
         /// <summary>
         /// 接続を解除する。速度は共通の出口速度上限で制限して引き継ぐ。
+        /// RestoreAirJumpsOnRelease なら空中ジャンプの回数を回復する。
         /// その後は ReleaseCooldownTicks だけ待つ（0 なら次のティックから射出できる）。
         /// </summary>
         public static void Release(ref CharacterState state, WireReleaseReason reason, WireTuning tuning)
         {
             state.Velocity = SimMath.ClampMagnitude(state.Velocity, tuning.ExitSpeedCap);
             state.Wire.LastReleaseReason = reason;
+            if (tuning.RestoreAirJumpsOnRelease)
+            {
+                state.AirJumpsUsed = 0;
+            }
             EnterCooldown(ref state, tuning.ReleaseCooldownTicks);
+        }
+
+        /// <summary>
+        /// 接続点の周りを回る向き（1 = 反時計回り、-1 = 時計回り）を、向いている方向から決める。
+        /// 接線のうち、向いている方向（左右）に進む方を選ぶ。ロープが水平で決まらないときは、下へ回る方を選ぶ。
+        /// </summary>
+        public static sbyte SwingDirectionFor(Vector3 position, Vector3 anchor, int facing)
+        {
+            Vector3 fromAnchor = position - anchor;
+            fromAnchor.Z = 0f;
+            Vector3 counterClockwise = SimMath.PerpendicularXY(fromAnchor);
+            float alongFacing = counterClockwise.X * (facing < 0 ? -1f : 1f);
+            if (alongFacing > SimMath.Epsilon)
+            {
+                return 1;
+            }
+            if (alongFacing < -SimMath.Epsilon)
+            {
+                return -1;
+            }
+            return counterClockwise.Y <= 0f ? (sbyte)1 : (sbyte)-1;
         }
 
         private void UpdateAttached(ref CharacterState state, in InputFrame input, WireTuning tuning)
@@ -226,6 +252,7 @@ namespace Degunatsu.Core.Wire
             float distance = toAnchor.Length();
             float ropeLength = distance < tuning.MinRopeLength ? tuning.MinRopeLength : distance;
             state.Wire.RopeLength = ropeLength > tuning.MaxLength ? tuning.MaxLength : ropeLength;
+            state.Wire.SwingDirection = SwingDirectionFor(state.Position, anchor, state.Facing);
         }
 
         private static void Miss(ref CharacterState state, WireMissReason reason)

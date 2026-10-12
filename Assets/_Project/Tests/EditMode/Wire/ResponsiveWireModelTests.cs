@@ -1,4 +1,5 @@
 using System.Numerics;
+using Degunatsu.Core.Input;
 using Degunatsu.Core.Physics;
 using Degunatsu.Core.Tests.Support;
 using Degunatsu.Core.Wire;
@@ -32,19 +33,32 @@ namespace Degunatsu.Core.Tests.Wire
         }
 
         [Test]
-        public void Pull_SpeedStaysWithinPullAndSteerSpeed()
+        public void Pull_SpeedStaysWithinPullAndSteerSpeedIncludingInputInfluence()
         {
             var config = WireTestSetup.LongAttachConfig(WireModelType.Responsive);
             var harness = new SimHarness(new BoxTerrain(), config, new Vector3(0f, 20f, 0f));
             WireTestSetup.AttachAt(harness, new Vector3(-10f, 15f, 0f), new Vector3(0f, 20f, 0f));
 
             var tuning = config.Wire.Responsive;
-            float limit = Vector2.Distance(Vector2.Zero, new Vector2(tuning.PullSpeed, tuning.SteerSpeed)) + 0.01f;
+            // スティックを接続点の方向に入れると、牽引の速さは最大で (1 + AttachedInputInfluence) 倍になる。
+            float maxPullSpeed = tuning.PullSpeed * (1f + config.Wire.AttachedInputInfluence);
+            float limit = Vector2.Distance(Vector2.Zero, new Vector2(maxPullSpeed, tuning.SteerSpeed)) + 0.01f;
             for (int i = 0; i < 60; i++)
             {
                 harness.Step(Inputs.Wire(0f, 1f));
                 Assert.That(harness.State.Velocity.Length(), Is.LessThanOrEqualTo(limit), $"ティック {i}");
             }
+        }
+
+        [Test]
+        public void AnchorUpperLeft_StickLeftOrUpIsFaster_RightOrDownIsSlower()
+        {
+            // ユーザーの例（2026-10-12）: 左上の接続点に引かれているとき、右・下の入力で少し遅く、左・上の入力で少し速くなる。
+            float neutral = PullSpeedAfter(Inputs.Wire());
+            Assert.That(PullSpeedAfter(Inputs.Wire(-1f, 0f)), Is.GreaterThan(neutral + 1f), "左");
+            Assert.That(PullSpeedAfter(Inputs.Wire(0f, 1f)), Is.GreaterThan(neutral + 1f), "上");
+            Assert.That(PullSpeedAfter(Inputs.Wire(1f, 0f)), Is.LessThan(neutral - 1f), "右");
+            Assert.That(PullSpeedAfter(Inputs.Wire(0f, -1f)), Is.LessThan(neutral - 1f), "下");
         }
 
         [Test]
@@ -62,6 +76,19 @@ namespace Degunatsu.Core.Tests.Wire
             Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.LessThanOrEqualTo(config.Wire.Responsive.ArrivalRadius + 0.01f));
             Assert.That(Vector3.Distance(harness.State.Position, hangingAt), Is.LessThan(0.01f));
             Assert.That(harness.State.Velocity.Length(), Is.LessThan(1e-3f));
+        }
+
+        // 左上の接続点（距離 10 m）に引かれ始めてから 12 ティック後の、接続点の方向の速さ。
+        private static float PullSpeedAfter(PlayerInput input)
+        {
+            var config = WireTestSetup.LongAttachConfig(WireModelType.Responsive);
+            var harness = new SimHarness(new BoxTerrain(), config, new Vector3(0f, 20f, 0f));
+            var anchor = new Vector3(-6f, 18f, 0f);
+            WireTestSetup.AttachAt(harness, new Vector3(0f, 10f, 0f), anchor);
+
+            harness.Step(input, 12);
+            Vector3 toAnchor = anchor - harness.State.Position;
+            return Vector3.Dot(harness.State.Velocity, Vector3.Normalize(toAnchor));
         }
     }
 }

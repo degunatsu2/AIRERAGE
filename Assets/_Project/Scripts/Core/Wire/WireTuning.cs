@@ -11,6 +11,11 @@ namespace Degunatsu.Core.Wire
 
         /// <summary>B. 操作追従重視。</summary>
         Responsive,
+
+        /// <summary>
+        /// A の試行版（D-11）。接続した瞬間に向いている方向へ、接続点を中心にロープ長を半径とする円を描いて回る。
+        /// </summary>
+        Orbit,
     }
 
     /// <summary>ワイヤーボタンの操作方式（D-07）。</summary>
@@ -24,7 +29,7 @@ namespace Degunatsu.Core.Wire
     }
 
     /// <summary>
-    /// ワイヤーの調整値。初期値はすべて【仮】（docs/06_prototype_plan.md 4.2〜4.4）。
+    /// ワイヤーの調整値。初期値はすべて【仮】（docs/06_prototype_plan.md 4.2〜4.5）。
     /// 共通の値（射程、上限など）と、モデルごとの値を分けて持つ。
     /// </summary>
     [Serializable]
@@ -51,6 +56,19 @@ namespace Degunatsu.Core.Wire
         /// </summary>
         public int ReleaseCooldownTicks = 0;
 
+        /// <summary>
+        /// 接続を解除したときに空中ジャンプの回数を回復するか（ユーザーの指示: 機動力を上げるため。2026-10-12）。
+        /// 外れた場合（接続しなかった場合）は回復しない。
+        /// </summary>
+        public bool RestoreAirJumpsOnRelease = true;
+
+        /// <summary>
+        /// 接続中のスティックの入力が速さに与える影響（0〜1、0 なら影響なし）。【試行】
+        /// 進む方向と同じ向きに入力すると速さが最大で (1 + この値) 倍に、逆向きなら (1 - この値) 倍になる。
+        /// 進む方向はモデルが決める（B: 接続点へ向かう方向、A の試行版: 円の接線方向）。
+        /// </summary>
+        public float AttachedInputInfluence = 0.25f;
+
         /// <summary>エイムアシストの角度（度、照準方向から左右それぞれ）。</summary>
         public float AimAssistAngleDeg = 12f;
 
@@ -74,6 +92,7 @@ namespace Degunatsu.Core.Wire
 
         public InertialWireTuning Inertial = new InertialWireTuning();
         public ResponsiveWireTuning Responsive = new ResponsiveWireTuning();
+        public OrbitWireTuning Orbit = new OrbitWireTuning();
 
         public TuningValidator Validate()
         {
@@ -91,8 +110,10 @@ namespace Degunatsu.Core.Wire
             v.Positive(nameof(MaxAttachTicks), MaxAttachTicks);
             v.Positive(nameof(MaxAttachedSpeed), MaxAttachedSpeed);
             v.Positive(nameof(ExitSpeedCap), ExitSpeedCap);
+            v.InRange(nameof(AttachedInputInfluence), AttachedInputInfluence, 0f, 1f);
             v.NotNull(nameof(Inertial), Inertial);
             v.NotNull(nameof(Responsive), Responsive);
+            v.NotNull(nameof(Orbit), Orbit);
             if (Inertial != null)
             {
                 v.Merge(Inertial.Validate());
@@ -100,6 +121,10 @@ namespace Degunatsu.Core.Wire
             if (Responsive != null)
             {
                 v.Merge(Responsive.Validate());
+            }
+            if (Orbit != null)
+            {
+                v.Merge(Orbit.Validate());
             }
             return v;
         }
@@ -155,6 +180,25 @@ namespace Degunatsu.Core.Wire
             v.NonNegative(nameof(SteerSpeed), SteerSpeed);
             v.NonNegative(nameof(GravityScale), GravityScale);
             v.NonNegative(nameof(ArrivalRadius), ArrivalRadius);
+            return v;
+        }
+    }
+
+    /// <summary>タイプA の試行版（円運動）の調整値。</summary>
+    [Serializable]
+    public sealed class OrbitWireTuning
+    {
+        /// <summary>円を回る速さ（m/s）。</summary>
+        public float OrbitSpeed = 14f;
+
+        /// <summary>回る速さへの加速度（m/s²）。接続した瞬間の速度から、この加速度で回る速度に近づく。</summary>
+        public float OrbitAcceleration = 90f;
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(OrbitWireTuning));
+            v.Positive(nameof(OrbitSpeed), OrbitSpeed);
+            v.Positive(nameof(OrbitAcceleration), OrbitAcceleration);
             return v;
         }
     }

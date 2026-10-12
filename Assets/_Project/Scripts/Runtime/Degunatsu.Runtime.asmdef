@@ -3,6 +3,7 @@
     "rootNamespace": "Degunatsu.Runtime",
     "references": [
         "Degunatsu.Core",
+        "Unity.Cinemachine",
         "Unity.InputSystem"
     ],
     "includePlatforms": [],
