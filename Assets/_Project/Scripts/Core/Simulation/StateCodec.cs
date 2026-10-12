@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using Degunatsu.Core.Input;
@@ -17,7 +18,9 @@ namespace Degunatsu.Core.Simulation
         /// <summary>バイト列の形式の版。</summary>
         public const int FormatVersion = 1;
 
-        private const ulong FnvOffset = 14695981039346656037UL;
+        /// <summary>FNV-1a 64bit の初期値。</summary>
+        public const ulong FnvOffsetBasis = 14695981039346656037UL;
+
         private const ulong FnvPrime = 1099511628211UL;
 
         public static byte[] ToBytes(in CharacterState state)
@@ -52,13 +55,49 @@ namespace Degunatsu.Core.Simulation
         /// <summary>状態のチェックサム（FNV-1a 64bit）。</summary>
         public static ulong Checksum(in CharacterState state)
         {
-            ulong hash = FnvOffset;
+            ulong hash = FnvOffsetBasis;
             foreach (byte b in ToBytes(state))
             {
-                hash ^= b;
-                hash *= FnvPrime;
+                hash = MixByte(hash, b);
             }
             return hash;
+        }
+
+        /// <summary>ワールドの全状態（ティック数と全キャラクターの状態）のチェックサム。</summary>
+        public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states)
+        {
+            ulong hash = Mix(FnvOffsetBasis, tick);
+            for (int i = 0; i < states.Count; i++)
+            {
+                hash = Mix(hash, Checksum(states[i]));
+            }
+            return hash;
+        }
+
+        /// <summary>チェックサム hash に 64bit の値を加える（下位のバイトから順に FNV-1a で混ぜる）。</summary>
+        public static ulong Mix(ulong hash, ulong value)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                hash = MixByte(hash, (byte)(value >> (8 * i)));
+            }
+            return hash;
+        }
+
+        /// <summary>チェックサム hash に 32bit の値を加える。</summary>
+        public static ulong Mix(ulong hash, int value)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                hash = MixByte(hash, (byte)(value >> (8 * i)));
+            }
+            return hash;
+        }
+
+        private static ulong MixByte(ulong hash, byte value)
+        {
+            hash ^= value;
+            return hash * FnvPrime;
         }
 
         public static void Write(BinaryWriter writer, in CharacterState state)

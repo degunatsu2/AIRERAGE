@@ -75,6 +75,12 @@ namespace Degunatsu.Core.Common
             }
         }
 
+        /// <summary>個々の項目では表せない条件（項目の組み合わせなど）の誤りを加える。</summary>
+        public void Fail(string message)
+        {
+            _errors.Add(message);
+        }
+
         public void Merge(TuningValidator other)
         {
             foreach (string error in other._errors)

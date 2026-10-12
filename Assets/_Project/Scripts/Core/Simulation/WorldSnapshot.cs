@@ -1,0 +1,48 @@
+using System;
+using System.Collections.Generic;
+
+namespace Degunatsu.Core.Simulation
+{
+    /// <summary>
+    /// SimWorld の全状態（ティック数と全キャラクターの状態）の写し（docs/10_online_plan.md T2-1）。
+    /// ロールバックで巻き戻すために保存する。毎ティック作り直さずに済むよう、同じインスタンスに上書きして使い回せる。
+    /// 調整値は試合中に変わらない前提なので含めない。
+    /// </summary>
+    public sealed class WorldSnapshot
+    {
+        private CharacterState[] _states = new CharacterState[0];
+
+        /// <summary>このスナップショットのティック数（次に計算するティック）。</summary>
+        public int Tick { get; private set; }
+
+        public int CharacterCount => _states.Length;
+
+        public CharacterState GetState(int index)
+        {
+            if (index < 0 || index >= CharacterCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index), index, $"キャラクターの番号は 0〜{CharacterCount - 1}");
+            }
+            return _states[index];
+        }
+
+        /// <summary>全状態のチェックサム（ティック数と全キャラクターの状態。PC が違っても同じ値）。</summary>
+        public ulong Checksum()
+        {
+            return StateCodec.WorldChecksum(Tick, _states);
+        }
+
+        internal void Capture(int tick, IReadOnlyList<CharacterState> states)
+        {
+            if (_states.Length != states.Count)
+            {
+                _states = new CharacterState[states.Count];
+            }
+            for (int i = 0; i < states.Count; i++)
+            {
+                _states[i] = states[i];
+            }
+            Tick = tick;
+        }
+    }
+}

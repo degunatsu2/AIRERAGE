@@ -40,10 +40,45 @@ namespace Degunatsu.Core.Simulation
             return _states[index];
         }
 
-        /// <summary>状態を直接書き換える（位置のリセット、テスト、ネットワークの照合で使う）。</summary>
+        /// <summary>状態を直接書き換える（位置のリセット、テスト、入力の再生で使う）。</summary>
         public void SetState(int index, CharacterState state)
         {
             _states[index] = state;
+        }
+
+        /// <summary>全状態（ティック数と全キャラクターの状態）を snapshot に書き写す（ロールバックの保存）。</summary>
+        public void SaveTo(WorldSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+            snapshot.Capture(Tick, _states);
+        }
+
+        /// <summary>snapshot の全状態に戻す（ロールバックの巻き戻し）。キャラクターの数が違えば ArgumentException。</summary>
+        public void LoadFrom(WorldSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+            if (snapshot.CharacterCount != _states.Count)
+            {
+                throw new ArgumentException(
+                    $"スナップショットのキャラクターの数（{snapshot.CharacterCount}）がワールド（{_states.Count}）と違います", nameof(snapshot));
+            }
+            for (int i = 0; i < _states.Count; i++)
+            {
+                _states[i] = snapshot.GetState(i);
+            }
+            Tick = snapshot.Tick;
+        }
+
+        /// <summary>今の全状態のチェックサム（WorldSnapshot.Checksum と同じ値）。</summary>
+        public ulong Checksum()
+        {
+            return StateCodec.WorldChecksum(Tick, _states);
         }
 
         public CharacterConfig GetConfig(int index)

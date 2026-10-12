@@ -1,0 +1,30 @@
+using System;
+using Degunatsu.Core.Common;
+
+namespace Degunatsu.Core.Rollback
+{
+    /// <summary>ロールバックの設定。初期値はすべて【仮】（docs/10_online_plan.md 4章）。</summary>
+    [Serializable]
+    public sealed class RollbackSettings
+    {
+        /// <summary>入力遅延（ティック）。自分の入力を、何ティック後のティックに使うか。</summary>
+        public int InputDelayTicks = 2;
+
+        /// <summary>予測の上限（ティック）。確定していないティックをこれより先に進めない（入力が届くまで待つ）。</summary>
+        public int MaxPredictionTicks = 8;
+
+        /// <summary>不正な値があれば InvalidTuningException を投げる。</summary>
+        public void Validate()
+        {
+            var v = new TuningValidator(nameof(RollbackSettings));
+            v.NonNegative(nameof(InputDelayTicks), InputDelayTicks);
+            v.NonNegative(nameof(MaxPredictionTicks), MaxPredictionTicks);
+            if (InputDelayTicks + MaxPredictionTicks < 1)
+            {
+                // どちらも 0 だと、全員が互いの入力を待ち続けて進めない。
+                v.Fail($"{nameof(InputDelayTicks)} と {nameof(MaxPredictionTicks)} の少なくとも一方は 1 以上が必要です");
+            }
+            v.ThrowIfInvalid();
+        }
+    }
+}
