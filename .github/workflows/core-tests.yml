@@ -1,0 +1,32 @@
+# Core（UnityEngine 非依存のシミュレーション）のテストを Unity なしで実行する。
+# Unity の Test Runner での実行は、Unity のライセンス設定が必要なため別途検討する（docs/07_quality.md 3章）。
+name: Core Tests
+
+on:
+  push:
+    paths:
+      - "Assets/**"
+      - "tools/**"
+      - ".github/workflows/core-tests.yml"
+  pull_request:
+    paths:
+      - "Assets/**"
+      - "tools/**"
+      - ".github/workflows/core-tests.yml"
+
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Unity の .meta ファイルを検査
+        run: python3 tools/unity_meta.py --check
+
+      - name: Core のテストを実行
+        run: dotnet test tools/CoreTests/Degunatsu.Core.Tests --nologo
