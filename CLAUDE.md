@@ -6,7 +6,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 ## 現在の状態
 
 - **Phase 1 の途中**。UnityEngine に依存しない Core（移動、ワイヤーの共通制御、タイプA/B）と自動テストは完成（`docs/06_prototype_plan.md` 5章の進捗表）。
-- **Unity プロジェクトはまだない**。クラウドで Unity を使う準備の途中（`docs/08`）: ネットワークは設定済みで、エディタは `bash tools/unity/install_editor.sh` で `/opt/unity/<バージョン>/Editor/Unity` に導入できる。ライセンス情報（環境変数）はユーザーが登録済みだが、**有効化は認証エラー（Invalid Credential）で失敗し、アカウント側の確認待ち**（`docs/08` 3.2、6章）。失敗した値で再試行しない。プロジェクトは Claude がクラウドでテンプレートから作成する（D-04 の変更、`docs/08` 4.1）。T1-7 以降（Unity 側）はプロジェクトができるまで着手しない。
+- **Unity プロジェクトを作成済み**（2026-10-12、Unity 6000.3.26f1、「Universal 3D」テンプレート。D-04）。クラウドでも Unity をバッチモードで使える（`docs/08` 4.2）。次は T1-7（Unity との接続）。Phase 0 の完了条件のうち、空のシーンの再生だけ未確認。
 - 決定済みの判断（D-01 Unity 6.3 LTS、D-03 PC/Windows、D-04、D-05 Git LFS、D-18、P-1〜P-4）は `docs/02_open_decisions.md` に記録してある。
 
 ## 設計書（作業前に関係する章を読む）
@@ -74,7 +74,8 @@ Claude Code を使い、小さな単位で段階的に開発する。
 
 ## 検証と報告
 
-- **この開発環境（クラウド）では、Unity Editor を導入して起動できるが、ライセンスが未設定のためプロジェクトを開けない**（`docs/08`）。Unity 上の動作、シーン、操作感はまだ確認できない。確認していないものを確認済みのように報告しない。手動で行う操作と確認方法を具体的に示す。
+- **この開発環境（クラウド）では、Unity をバッチモードで動かせる**（`docs/08` 4.2）。エディタがなければ `bash tools/unity/install_editor.sh`、ライセンスは SessionStart フックが `tools/unity/activate_license.sh` で有効化する（認証に失敗したら同じ値で再試行しない）。Unity 側のコンパイルと EditMode テストは `bash tools/unity/run_editmode_tests.sh` で確認する。
+- 画面の見た目と操作感は確認できない。確認していないものを確認済みのように報告しない。手動で行う操作と確認方法を具体的に示す。
 - Core のロジックは `dotnet test tools/CoreTests/Degunatsu.Core.Tests` で検証する。クラウドセッションでは SessionStart フック（`.claude/hooks/session-start.sh`）が .NET 8 SDK を apt で導入する（Microsoft の配布元はネットワークポリシーで遮断されているが、Ubuntu のリポジトリと NuGet には接続できる）。
 - GitHub Actions（`.github/workflows/core-tests.yml`）でも、push のたびに `.meta` の検査と Core のテストを実行する。
-- 報告では、検証の種類を区別する: ✅ 自動テスト済み（dotnet）／ ✅ Unity で確認済み（ユーザーの報告による）／ ⚠️ 未検証（手順を添える）。
+- 報告では、検証の種類を区別する: ✅ 自動テスト済み（dotnet）／ ✅ Unity のバッチモードで確認済み（クラウド）／ ✅ Unity で確認済み（ユーザーの報告による）／ ⚠️ 未検証（手順を添える）。

@@ -42,14 +42,14 @@ Phase 7  バランス調整・プレイテスト・配布
 | `tools/CoreTests`（dotnet test 用のプロジェクト）とサンプルテストの作成 | Claude |
 | クラウドセッション用の SessionStart フック（.NET SDK の自動導入）の作成 | Claude |
 | GitHub Actions で Core のテストを自動実行する設定（任意） | Claude |
-| Input System の有効化（Project Settings の Active Input Handling） | ユーザー（Claude は手順を案内） |
+| Input System の有効化（Project Settings の Active Input Handling） | テンプレートで有効（`activeInputHandler: 1`。Claude が確認） |
 
 **完了条件**:
-- [ ] Unity 6.3 LTS でプロジェクトが開け、空のシーンを再生できる [手動]
-- [ ] asmdef の依存方向が [03](03_architecture.md) のとおりで、コンパイルエラーがない [手動]
-- [ ] `dotnet test tools/CoreTests` でサンプルテストが通る [自動]
-- [ ] Unity の Test Runner（EditMode）で同じサンプルテストが通る [手動]
-- [ ] `Library/` などの生成物がコミットされていない [自動: git status]
+- [ ] Unity 6.3 LTS でプロジェクトが開け、空のシーンを再生できる [手動]（開けることはクラウドのバッチモードで確認済み。シーンの再生は未確認）
+- [x] asmdef の依存方向が [03](03_architecture.md) のとおりで、コンパイルエラーがない [手動]（2026-10-12、クラウドのバッチモードで確認）
+- [x] `dotnet test tools/CoreTests` でサンプルテストが通る [自動]
+- [x] Unity の Test Runner（EditMode）で同じサンプルテストが通る [手動]（2026-10-12、クラウドのバッチモードで 49件成功）
+- [x] `Library/` などの生成物がコミットされていない [自動: git status]
 
 ---
 
