@@ -48,10 +48,12 @@ namespace Degunatsu.Core.Simulation
                 Locomotion.UpdateVelocity(ref state, frame, movement);
             }
 
+            System.Numerics.Vector3 beforeMove = state.Position;
             _motor.Move(ref state.Position, ref state.Velocity, halfExtents, state.Velocity * SimTime.DeltaTime);
 
             if (attached)
             {
+                _wire.UpdateRopeWrap(ref state, beforeMove, config.Wire);
                 _wire.ApplyRopeConstraint(ref state, halfExtents);
             }
 

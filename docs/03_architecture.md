@@ -74,7 +74,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Core/Input | 入力コマンド、先行入力のバッファ | `PlayerInput`, `InputBuffer` | 1 |
 | Core/Physics | 衝突クエリのインターフェースと、軸平行の箱でできた地形 | `ICollisionQuery`, `CastHit`, `BoxTerrain` | 1 |
 | Core/Movement | 走行、ジャンプ、重力、地形との衝突解決（すり抜け防止の連続判定） | `KinematicMotor`, `MovementConfig` | 1 |
-| Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン | `WireController`, `WireState`, `WireTargeting` | 1 |
+| Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン、ロープの巻き付き（D-33） | `WireController`, `WireState`, `WireTargeting`, `RopeWrapping`, `RopePivots` | 1 |
 | Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
 | Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態、状態のバイト列とチェックサム（PC 間で同じ値） | `SimWorld`, `CharacterState`, `StateCodec` | 1 |
 | Core/Replay | 入力の記録と再生（開始時の状態＋入力列＋最後の状態のチェックサム。テキストで保存） | `InputRecorder`, `InputRecording` | 1 |

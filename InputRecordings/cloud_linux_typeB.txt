@@ -1,11 +1,11 @@
 degunatsu-input-recording 1
-state-format 1
+state-format 2
 tick-rate 60
 wire-model Responsive
 ticks 340
-final-checksum e1cfede22b438700
-start AAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==
-config {"Movement":{"RunSpeed":8.0,"GroundAcceleration":80.0,"AirAcceleration":30.0,"AirDrag":2.0,"Gravity":30.0,"MaxFallSpeed":20.0,"JumpSpeed":12.0,"AirJumps":1,"CoyoteTicks":6,"JumpBufferTicks":6,"MoveDeadzone":0.20000000298023225,"HalfWidth":0.4000000059604645,"HalfHeight":0.8999999761581421},"Wire":{"ModelType":1,"ButtonMode":0,"MaxLength":12.0,"FireSpeed":60.0,"MissRetractTicks":10,"CooldownTicks":20,"ReleaseCooldownTicks":0,"RestoreAirJumpsOnRelease":true,"AttachedInputInfluence":0.25,"AimAssistAngleDeg":12.0,"NeutralAimAngleDeg":45.0,"AimDeadzone":0.30000001192092898,"MinRopeLength":1.0,"MaxAttachTicks":180,"MaxAttachedSpeed":22.0,"ExitSpeedCap":18.0,"Inertial":{"ReelSpeed":8.0,"SwingAcceleration":10.0,"Damping":0.0,"StartPullSpeed":14.0,"StartPullTicks":20,"StartPullFadeTicks":20},"Responsive":{"PullSpeed":16.0,"PullAcceleration":120.0,"SteerSpeed":6.0,"GravityScale":0.20000000298023225,"ArrivalRadius":1.0}}}
+final-checksum 91e5819fa58a0240
+start AAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+config {"Movement":{"RunSpeed":8.0,"GroundAcceleration":80.0,"AirAcceleration":30.0,"AirDrag":2.0,"Gravity":30.0,"MaxFallSpeed":20.0,"JumpSpeed":12.0,"AirJumps":1,"CoyoteTicks":6,"JumpBufferTicks":6,"MoveDeadzone":0.20000000298023225,"HalfWidth":0.4000000059604645,"HalfHeight":0.8999999761581421},"Wire":{"ModelType":1,"ButtonMode":0,"MaxLength":12.0,"FireSpeed":60.0,"MissRetractTicks":10,"CooldownTicks":20,"ReleaseCooldownTicks":0,"RestoreAirJumpsOnRelease":true,"AttachedInputInfluence":0.25,"AimAssistAngleDeg":6.0,"NeutralAimAngleDeg":45.0,"AimDeadzone":0.30000001192092898,"MinRopeLength":1.0,"ReleaseWhenLineBlocked":false,"RopeWrapping":true,"MaxAttachTicks":180,"MaxAttachedSpeed":22.0,"ExitSpeedCap":18.0,"Inertial":{"ReelSpeed":8.0,"SwingAcceleration":10.0,"Damping":0.0,"StartPullSpeed":14.0,"StartPullTicks":20,"StartPullFadeTicks":20},"Responsive":{"PullSpeed":16.0,"PullAcceleration":120.0,"SteerSpeed":6.0,"GravityScale":0.20000000298023225,"ArrivalRadius":1.0}}}
 inputs
 0 0 0 0 0 20
 127 0 0 0 0 15

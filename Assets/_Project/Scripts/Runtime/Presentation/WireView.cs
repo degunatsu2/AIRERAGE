@@ -7,6 +7,7 @@ namespace Degunatsu.Runtime.Presentation
 {
     /// <summary>
     /// ワイヤーを線で表示する（プロトタイプ用）。フックが飛んでいる間はフックまで、接続中は接続点まで線を引き、接続点に印を置く。
+    /// ロープが地形の角に巻き付いているときは、角（支点）で折れ曲がった線にする（D-33）。
     /// 外れたフックを回収している間は、外れた位置からキャラクターへ戻ってくるフックまで線を引く。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
@@ -55,8 +56,24 @@ namespace Degunatsu.Runtime.Presentation
             }
 
             _line.enabled = true;
-            _line.SetPosition(0, from);
-            _line.SetPosition(1, to);
+            if (wire.Phase == WirePhase.Attached && wire.Pivots.Count > 0)
+            {
+                // キャラクター → 最後の支点 → … → 最初の支点 → 接続点。
+                int count = wire.Pivots.Count;
+                _line.positionCount = count + 2;
+                _line.SetPosition(0, from);
+                for (int i = 0; i < count; i++)
+                {
+                    _line.SetPosition(i + 1, wire.Pivots[count - 1 - i].ToUnity());
+                }
+                _line.SetPosition(count + 1, to);
+            }
+            else
+            {
+                _line.positionCount = 2;
+                _line.SetPosition(0, from);
+                _line.SetPosition(1, to);
+            }
             if (_anchorMarker != null)
             {
                 _anchorMarker.gameObject.SetActive(wire.Phase == WirePhase.Attached);

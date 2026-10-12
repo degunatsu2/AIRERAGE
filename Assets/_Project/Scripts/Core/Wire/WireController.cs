@@ -90,7 +90,7 @@ namespace Degunatsu.Core.Wire
         {
             IWireMotionModel model = WireMotionModels.Get(tuning.ModelType);
             var context = new WireMotionContext(
-                state.Position, state.Velocity, state.Wire.Anchor, state.Wire.RopeLength,
+                state.Position, state.Velocity, state.Wire.ActivePivot, state.Wire.RopeLength,
                 state.Wire.PhaseTicks, state.Wire.AttachSpeed,
                 input.Move, gravity, SimTime.DeltaTime, tuning);
             WireMotionResult result = model.Step(context);
@@ -99,12 +99,23 @@ namespace Degunatsu.Core.Wire
         }
 
         /// <summary>
-        /// 移動後に、接続点との距離がロープ長を超えていれば内側へ戻し、外向きの速度を取り除く。
+        /// 移動後に、ロープの巻き付き（D-33）を更新する。previousPosition は移動の前の位置。ApplyRopeConstraint の前に呼ぶ。
+        /// </summary>
+        public void UpdateRopeWrap(ref CharacterState state, Vector3 previousPosition, WireTuning tuning)
+        {
+            if (tuning.RopeWrapping)
+            {
+                RopeWrapping.Update(ref state.Wire, previousPosition, state.Position, _collision);
+            }
+        }
+
+        /// <summary>
+        /// 移動後に、今の支点（接続点か、巻き付いた角）との距離がロープ長を超えていれば内側へ戻し、外向きの速度を取り除く。
         /// 戻す移動にも衝突判定を使うので、地形にめり込まない。
         /// </summary>
         public void ApplyRopeConstraint(ref CharacterState state, Vector3 halfExtents)
         {
-            Vector3 fromAnchor = state.Position - state.Wire.Anchor;
+            Vector3 fromAnchor = state.Position - state.Wire.ActivePivot;
             fromAnchor.Z = 0f;
             float distance = fromAnchor.Length();
             if (distance <= state.Wire.RopeLength + RopeSlack || distance < SimMath.Epsilon)
@@ -132,6 +143,7 @@ namespace Degunatsu.Core.Wire
         {
             state.Velocity = SimMath.ClampMagnitude(state.Velocity, tuning.ExitSpeedCap);
             state.Wire.LastReleaseReason = reason;
+            state.Wire.Pivots = default;
             if (tuning.RestoreAirJumpsOnRelease)
             {
                 state.AirJumpsUsed = 0;
@@ -153,7 +165,7 @@ namespace Degunatsu.Core.Wire
             {
                 Release(ref state, WireReleaseReason.MaxDuration, tuning);
             }
-            else if (tuning.ReleaseWhenLineBlocked && !WireTargeting.HasLineOfSight(state.Position, state.Wire.Anchor, _collision))
+            else if (tuning.ReleaseWhenLineBlocked && !WireTargeting.HasLineOfSight(state.Position, state.Wire.ActivePivot, _collision))
             {
                 Release(ref state, WireReleaseReason.LineBlocked, tuning);
             }
@@ -227,6 +239,7 @@ namespace Degunatsu.Core.Wire
             anchor.Z = 0f;
             SetPhase(ref state.Wire, WirePhase.Attached);
             state.Wire.Anchor = anchor;
+            state.Wire.Pivots = default;
             state.Wire.HookPosition = anchor;
 
             Vector3 toAnchor = anchor - state.Position;

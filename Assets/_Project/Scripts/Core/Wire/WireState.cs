@@ -73,10 +73,16 @@ namespace Degunatsu.Core.Wire
         /// <summary>エイムアシストで狙っているアンカーポイント。</summary>
         public Vector3 TargetPoint;
 
-        /// <summary>接続点（Attached 中）。</summary>
+        /// <summary>接続点（Attached 中）。フックが刺さった点。</summary>
         public Vector3 Anchor;
 
-        /// <summary>ロープの長さ。キャラクターと接続点の距離はこれを超えない。</summary>
+        /// <summary>ロープが地形の角に巻き付いてできた支点（D-33）。</summary>
+        public RopePivots Pivots;
+
+        /// <summary>
+        /// 今のロープの長さ（最後の支点、または支点がなければ接続点から、キャラクターまでの長さ）。
+        /// キャラクターと今の支点の距離はこれを超えない。
+        /// </summary>
         public float RopeLength;
 
         /// <summary>接続した瞬間の速さ（m/s）。接続直後の補助を使うかの判断に使う。</summary>
@@ -94,6 +100,9 @@ namespace Degunatsu.Core.Wire
         /// </summary>
         public bool IsPulling => Phase == WirePhase.Attached;
 
+        /// <summary>今ロープが曲がっている点（最後の支点。支点がなければ接続点）。運動モデルはこの点を中心に動く。</summary>
+        public Vector3 ActivePivot => Pivots.Count > 0 ? Pivots[Pivots.Count - 1] : Anchor;
+
         public bool Equals(WireState other)
         {
             return Phase == other.Phase
@@ -104,6 +113,7 @@ namespace Degunatsu.Core.Wire
                 && HasTargetPoint == other.HasTargetPoint
                 && TargetPoint.Equals(other.TargetPoint)
                 && Anchor.Equals(other.Anchor)
+                && Pivots.Equals(other.Pivots)
                 && RopeLength.Equals(other.RopeLength)
                 && AttachSpeed.Equals(other.AttachSpeed)
                 && CooldownTicksLeft == other.CooldownTicksLeft
@@ -127,6 +137,7 @@ namespace Degunatsu.Core.Wire
             hash.Add(HasTargetPoint);
             hash.Add(TargetPoint);
             hash.Add(Anchor);
+            hash.Add(Pivots);
             hash.Add(RopeLength);
             hash.Add(AttachSpeed);
             hash.Add(CooldownTicksLeft);

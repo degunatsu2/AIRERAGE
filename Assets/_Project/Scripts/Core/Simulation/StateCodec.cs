@@ -16,7 +16,7 @@ namespace Degunatsu.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 1;
+        public const int FormatVersion = 2;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -120,6 +120,13 @@ namespace Degunatsu.Core.Simulation
             writer.Write(wire.HasTargetPoint);
             Write(writer, wire.TargetPoint);
             Write(writer, wire.Anchor);
+            RopePivots pivots = wire.Pivots;
+            writer.Write(pivots.Count);
+            Write(writer, pivots.P0);
+            Write(writer, pivots.P1);
+            Write(writer, pivots.P2);
+            Write(writer, pivots.P3);
+            writer.Write(pivots.Clockwise);
             writer.Write(wire.RopeLength);
             writer.Write(wire.AttachSpeed);
             writer.Write(wire.CooldownTicksLeft);
@@ -150,6 +157,15 @@ namespace Degunatsu.Core.Simulation
                 HasTargetPoint = reader.ReadBoolean(),
                 TargetPoint = ReadVector3(reader),
                 Anchor = ReadVector3(reader),
+                Pivots = new RopePivots
+                {
+                    Count = reader.ReadByte(),
+                    P0 = ReadVector3(reader),
+                    P1 = ReadVector3(reader),
+                    P2 = ReadVector3(reader),
+                    P3 = ReadVector3(reader),
+                    Clockwise = reader.ReadByte(),
+                },
                 RopeLength = reader.ReadSingle(),
                 AttachSpeed = reader.ReadSingle(),
                 CooldownTicksLeft = reader.ReadInt32(),

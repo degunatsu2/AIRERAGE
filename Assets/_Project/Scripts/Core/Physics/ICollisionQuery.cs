@@ -22,6 +22,22 @@ namespace Degunatsu.Core.Physics
     }
 
     /// <summary>
+    /// ロープが巻き付ける地形の角（D-33）。Vertex は地形の角そのもの、Pivot はロープの支点を置く点
+    /// （角から外側へ少しずらした点。角を通る線が箱の面に触れて遮られたと判定しないように）。
+    /// </summary>
+    public readonly struct RopeCorner
+    {
+        public readonly Vector3 Vertex;
+        public readonly Vector3 Pivot;
+
+        public RopeCorner(Vector3 vertex, Vector3 pivot)
+        {
+            Vertex = vertex;
+            Pivot = pivot;
+        }
+    }
+
+    /// <summary>
     /// シミュレーションが地形を調べるためのインターフェース。
     /// 実装は BoxTerrain（軸平行の矩形の集まり）。Unity のシーンからは SceneTerrainBuilder で作る（D-32）。
     /// 地形は静的（動かない）で、ゲームプレイは XY 平面上で行う。
@@ -48,5 +64,10 @@ namespace Degunatsu.Core.Physics
         /// ワイヤーのエイムアシストの対象になるアンカーポイント。
         /// </summary>
         IReadOnlyList<Vector3> AnchorPoints { get; }
+
+        /// <summary>
+        /// ロープが巻き付ける地形の角（ほかの地形に埋まっていない角。D-33）。
+        /// </summary>
+        IReadOnlyList<RopeCorner> RopeCorners { get; }
     }
 }

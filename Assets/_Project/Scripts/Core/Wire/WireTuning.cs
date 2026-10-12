@@ -82,6 +82,12 @@ namespace Degunatsu.Core.Wire
         /// </summary>
         public bool ReleaseWhenLineBlocked = false;
 
+        /// <summary>
+        /// ロープを地形の角に巻き付けるか（D-33。ユーザーの決定で試す。2026-10-13）。巻き付けられないとき（支点が多すぎるなど）は、
+        /// ReleaseWhenLineBlocked に従う（解除するか、ロープが地形を通り抜ける）。
+        /// </summary>
+        public bool RopeWrapping = true;
+
         /// <summary>最大接続時間（ティック）。</summary>
         public int MaxAttachTicks = 180;
 

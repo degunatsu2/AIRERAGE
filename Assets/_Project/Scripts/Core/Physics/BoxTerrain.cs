@@ -26,11 +26,28 @@ namespace Degunatsu.Core.Physics
             }
         }
 
+        /// <summary>ロープが巻き付く角を、角から外側へずらす距離（m）。角を通る線が箱の面に触れて遮られたと判定しないように。</summary>
+        public const float RopeCornerOffset = 0.01f;
+
         private readonly List<Box> _boxes = new List<Box>();
         private readonly List<Vector3> _anchors = new List<Vector3>();
+        private readonly List<RopeCorner> _ropeCorners = new List<RopeCorner>();
+        private bool _ropeCornersDirty = true;
 
         public IReadOnlyList<Box> Boxes => _boxes;
         public IReadOnlyList<Vector3> AnchorPoints => _anchors;
+
+        public IReadOnlyList<RopeCorner> RopeCorners
+        {
+            get
+            {
+                if (_ropeCornersDirty)
+                {
+                    BuildRopeCorners();
+                }
+                return _ropeCorners;
+            }
+        }
 
         /// <summary>矩形を追加する。最小値が最大値より小さくない（NaN を含む）場合は ArgumentException。</summary>
         public BoxTerrain AddBox(float minX, float minY, float maxX, float maxY, bool attachable = false)
@@ -41,6 +58,7 @@ namespace Degunatsu.Core.Physics
                     $"矩形の最小値は最大値より小さくしてください（min=({minX}, {minY}) max=({maxX}, {maxY})）");
             }
             _boxes.Add(new Box(new Vector2(minX, minY), new Vector2(maxX, maxY), attachable));
+            _ropeCornersDirty = true;
             return this;
         }
 
@@ -116,6 +134,41 @@ namespace Degunatsu.Core.Physics
         public bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, out CastHit hit)
         {
             return SweepBox(origin, Vector3.Zero, direction * maxDistance, out hit);
+        }
+
+        // 各矩形の4つの角を外側へ少しずらし、ほかの矩形に埋まっていないものだけを残す（並びは矩形を追加した順で決まる）。
+        private void BuildRopeCorners()
+        {
+            _ropeCorners.Clear();
+            foreach (Box box in _boxes)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    float sx = (i & 1) == 0 ? -1f : 1f;
+                    float sy = (i & 2) == 0 ? -1f : 1f;
+                    float vx = sx < 0f ? box.Min.X : box.Max.X;
+                    float vy = sy < 0f ? box.Min.Y : box.Max.Y;
+                    float x = vx + sx * RopeCornerOffset;
+                    float y = vy + sy * RopeCornerOffset;
+                    if (!ContainsPoint(x, y))
+                    {
+                        _ropeCorners.Add(new RopeCorner(new Vector3(vx, vy, 0f), new Vector3(x, y, 0f)));
+                    }
+                }
+            }
+            _ropeCornersDirty = false;
+        }
+
+        private bool ContainsPoint(float x, float y)
+        {
+            foreach (Box box in _boxes)
+            {
+                if (x > box.Min.X && x < box.Max.X && y > box.Min.Y && y < box.Max.Y)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
