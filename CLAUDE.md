@@ -6,7 +6,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 ## 現在の状態
 
 - **Phase 1 の途中**。UnityEngine に依存しない Core（移動、ワイヤーの共通制御、タイプA/B）と自動テストは完成（`docs/06_prototype_plan.md` 5章の進捗表）。
-- **Unity プロジェクトはまだない**。Unity を使う方法（クラウド環境の設定 `docs/08` か、ユーザーのPCで作成 `docs/09`）の決定待ち。T1-7 以降（Unity 側）はそれまで着手しない。
+- **Unity プロジェクトはまだない**。クラウドで Unity を使う準備の途中（`docs/08`）: ネットワークは設定済みで、エディタは `bash tools/unity/install_editor.sh` で `/opt/unity/<バージョン>/Editor/Unity` に導入できる。**ライセンス情報（環境変数）の登録待ち**。T1-7 以降（Unity 側）はそれまで着手しない。
 - 決定済みの判断（D-01 Unity 6.3 LTS、D-03 PC/Windows、D-04、D-05 Git LFS、D-18、P-1〜P-4）は `docs/02_open_decisions.md` に記録してある。
 
 ## 設計書（作業前に関係する章を読む）
@@ -74,7 +74,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 
 ## 検証と報告
 
-- **この開発環境（クラウド）には Unity Editor がない**。Unity 上の動作、シーン、操作感は確認できない。確認していないものを確認済みのように報告しない。手動で行う操作と確認方法を具体的に示す。
+- **この開発環境（クラウド）では、Unity Editor を導入して起動できるが、ライセンスが未設定のためプロジェクトを開けない**（`docs/08`）。Unity 上の動作、シーン、操作感はまだ確認できない。確認していないものを確認済みのように報告しない。手動で行う操作と確認方法を具体的に示す。
 - Core のロジックは `dotnet test tools/CoreTests/Degunatsu.Core.Tests` で検証する。クラウドセッションでは SessionStart フック（`.claude/hooks/session-start.sh`）が .NET 8 SDK を apt で導入する（Microsoft の配布元はネットワークポリシーで遮断されているが、Ubuntu のリポジトリと NuGet には接続できる）。
 - GitHub Actions（`.github/workflows/core-tests.yml`）でも、push のたびに `.meta` の検査と Core のテストを実行する。
 - 報告では、検証の種類を区別する: ✅ 自動テスト済み（dotnet）／ ✅ Unity で確認済み（ユーザーの報告による）／ ⚠️ 未検証（手順を添える）。
