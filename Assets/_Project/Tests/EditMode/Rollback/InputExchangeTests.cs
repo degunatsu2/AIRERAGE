@@ -88,7 +88,7 @@ namespace Degunatsu.Core.Tests.Rollback
             {
                 Assert.That(exchange.UnackedCount, Is.LessThan(40), "確認された入力が捨てられていない");
             }
-            Assert.That(network.SentBytes / (double)network.SentMessages, Is.LessThan(11 + 6 * 20), "1つのメッセージが大きすぎる");
+            Assert.That(network.SentBytes / (double)network.SentMessages, Is.LessThan(16 + 6 * 20), "1つのメッセージが大きすぎる");
         }
 
         private static InputExchange Create(int localPlayer, RollbackSettings settings = null)

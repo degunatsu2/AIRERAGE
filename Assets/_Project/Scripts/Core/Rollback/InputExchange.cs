@@ -9,12 +9,14 @@ namespace Degunatsu.Core.Rollback
     /// 自分の入力は InputNormalizer で正規化してから使う（自分のシミュレーションにも、送るのにも同じものを使う）。
     /// 相手ごとに「まだ確認されていない自分の入力」を覚えておき、毎回まとめて送り直す（欠落に備えた冗長送信）。
     /// 届いたメッセージの入力はセッションに渡し、確認応答で送らなくてよい入力を捨てる。
+    /// メッセージで互いのティックを伝え合い、TimeSync で進みすぎを推定する（T2-6）。
     /// 通信はしない（BuildMessage で作ったメッセージを送り、届いたメッセージを Receive に渡すのは呼び出し側）。
     /// </summary>
     public sealed class InputExchange
     {
         private readonly RollbackSession _session;
         private readonly RollbackSettings _settings;
+        private readonly TimeSync _timeSync;
         private PlayerInput _lastLocalInput;
 
         // まだ全員に確認されていない自分の入力。ティック → 入力。
@@ -35,12 +37,25 @@ namespace Degunatsu.Core.Rollback
                 _ackedBy[p] = lastDefault;
             }
             _oldestUnacked = lastDefault + 1;
+            _timeSync = new TimeSync(session.PlayerCount, session.LocalPlayer, session.CurrentTick, settings);
         }
 
         public RollbackSession Session => _session;
 
         /// <summary>まだ全員に確認されていない自分の入力の数（再送の量の目安）。</summary>
         public int UnackedCount => _unacked.Count;
+
+        /// <summary>自分が相手より何ティック先に進んでいるかの推定（TimeSync.TicksAhead）。</summary>
+        public float TicksAhead => _timeSync.TicksAhead;
+
+        /// <summary>
+        /// 待つべきフレーム数（TimeSync.RecommendWait）。毎フレーム呼び、0 でなければその数のフレームだけ
+        /// AdvanceFrame を呼ばずに待つ（BuildMessage と Receive は続ける）。
+        /// </summary>
+        public int RecommendWaitFrames()
+        {
+            return _timeSync.RecommendWait(_session.CurrentTick);
+        }
 
         /// <summary>
         /// 自分の入力を正規化して、セッションを1ティック進める（RollbackSession.AdvanceFrame）。使った入力を返す。
@@ -72,7 +87,9 @@ namespace Degunatsu.Core.Rollback
             {
                 inputs.Add(_unacked[tick]);
             }
-            return new InputMessage(_session.LocalPlayer, _session.ContiguousTick(remotePlayer), start, inputs);
+            int now = _session.CurrentTick;
+            return new InputMessage(
+                _session.LocalPlayer, now, _timeSync.AdvantageOver(remotePlayer, now), _session.ContiguousTick(remotePlayer), start, inputs);
         }
 
         /// <summary>届いたメッセージを処理する。同じメッセージが何度届いても、順番が前後してもよい。</summary>
@@ -83,6 +100,7 @@ namespace Degunatsu.Core.Rollback
                 throw new ArgumentNullException(nameof(message));
             }
             CheckRemote(message.Sender);
+            _timeSync.OnMessage(message.Sender, _session.CurrentTick, message.SenderTick, message.Advantage);
             // 同じ入力の再送や、確定して古くなった入力は、セッションが無視する。
             for (int i = 0; i < message.Inputs.Count; i++)
             {

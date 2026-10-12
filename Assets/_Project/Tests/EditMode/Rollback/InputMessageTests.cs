@@ -18,21 +18,23 @@ namespace Degunatsu.Core.Tests.Rollback
                 PlayerInput.FromAxes(0.25f, -1f, InputButtons.None),
                 default(PlayerInput),
             };
-            var message = new InputMessage(3, 1234567, 1234500, inputs);
+            var message = new InputMessage(3, 1234570, -5, 1234567, 1234500, inputs);
 
             InputMessage read = InputMessage.FromBytes(message.ToBytes());
 
             Assert.That(read.Sender, Is.EqualTo(3));
+            Assert.That(read.SenderTick, Is.EqualTo(1234570));
+            Assert.That(read.Advantage, Is.EqualTo(-5));
             Assert.That(read.Ack, Is.EqualTo(1234567));
             Assert.That(read.StartTick, Is.EqualTo(1234500));
             Assert.That(read.Inputs, Is.EqualTo(inputs));
-            Assert.That(message.ToBytes().Length, Is.EqualTo(11 + 6 * inputs.Length), "1つの入力は6バイト");
+            Assert.That(message.ToBytes().Length, Is.EqualTo(16 + 6 * inputs.Length), "16バイト＋1つの入力につき6バイト");
         }
 
         [Test]
         public void Bytes_WithoutInputs_RoundTrip()
         {
-            InputMessage read = InputMessage.FromBytes(new InputMessage(0, -1, 2, new PlayerInput[0]).ToBytes());
+            InputMessage read = InputMessage.FromBytes(new InputMessage(0, 0, 0, -1, 2, new PlayerInput[0]).ToBytes());
 
             Assert.That(read.Inputs, Is.Empty);
             Assert.That(read.Ack, Is.EqualTo(-1));
@@ -41,7 +43,7 @@ namespace Degunatsu.Core.Tests.Rollback
         [Test]
         public void FromBytes_BrokenData_Throws()
         {
-            byte[] bytes = new InputMessage(1, 5, 6, new[] { PlayerInput.FromAxes(1f, 0f, InputButtons.Jump) }).ToBytes();
+            byte[] bytes = new InputMessage(1, 7, 0, 5, 6, new[] { PlayerInput.FromAxes(1f, 0f, InputButtons.Jump) }).ToBytes();
 
             byte[] wrongVersion = (byte[])bytes.Clone();
             wrongVersion[0] = 99;
@@ -55,7 +57,14 @@ namespace Degunatsu.Core.Tests.Rollback
         {
             var inputs = new PlayerInput[InputMessage.MaxInputs + 1];
 
-            Assert.Throws<ArgumentException>(() => new InputMessage(0, 0, 0, inputs));
+            Assert.Throws<ArgumentException>(() => new InputMessage(0, 0, 0, 0, 0, inputs));
+        }
+
+        [Test]
+        public void Advantage_IsClampedToTheByteRange()
+        {
+            Assert.That(new InputMessage(0, 0, 500, 0, 0, new PlayerInput[0]).Advantage, Is.EqualTo(127));
+            Assert.That(new InputMessage(0, 0, -500, 0, 0, new PlayerInput[0]).Advantage, Is.EqualTo(-128));
         }
     }
 }

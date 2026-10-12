@@ -16,6 +16,12 @@ namespace Degunatsu.Core.Rollback
         /// <summary>移動のスティックの揺れとして無視する変化（量子化した値。最大 127）。InputNormalizer で使う。</summary>
         public int MoveHysteresis = 2;
 
+        /// <summary>時刻の同期で、待つかを判断する間隔（ティック）。TimeSync で使う。</summary>
+        public int TimeSyncIntervalTicks = 30;
+
+        /// <summary>相手よりこのティック数以上進んでいたら待つ。TimeSync で使う。</summary>
+        public int TimeSyncThresholdTicks = 1;
+
         /// <summary>不正な値があれば InvalidTuningException を投げる。</summary>
         public void Validate()
         {
@@ -23,6 +29,8 @@ namespace Degunatsu.Core.Rollback
             v.NonNegative(nameof(InputDelayTicks), InputDelayTicks);
             v.NonNegative(nameof(MaxPredictionTicks), MaxPredictionTicks);
             v.NonNegative(nameof(MoveHysteresis), MoveHysteresis);
+            v.Positive(nameof(TimeSyncIntervalTicks), TimeSyncIntervalTicks);
+            v.Positive(nameof(TimeSyncThresholdTicks), TimeSyncThresholdTicks);
             if (InputDelayTicks + MaxPredictionTicks < 1)
             {
                 // どちらも 0 だと、全員が互いの入力を待ち続けて進めない。

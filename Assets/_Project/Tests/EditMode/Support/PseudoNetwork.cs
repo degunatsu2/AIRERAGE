@@ -27,6 +27,10 @@ namespace Degunatsu.Core.Tests.Support
         private readonly int _jitter;
         private readonly double _loss;
         private readonly List<Packet> _inFlight = new List<Packet>();
+        private readonly int[] _waitFrames;
+        private readonly int[] _stalledByPeer;
+        private long _spreadSum;
+        private int _spreadSamples;
 
         public PseudoNetwork(int players, RollbackSettings settings, int latencyFrames, int jitterFrames, double lossRate, int seed)
         {
@@ -39,6 +43,8 @@ namespace Degunatsu.Core.Tests.Support
             Normalized = new PlayerInput[players][];
             Sessions = new RollbackSession[players];
             Exchanges = new InputExchange[players];
+            _waitFrames = new int[players];
+            _stalledByPeer = new int[players];
             Worlds = new SimWorld[players];
             for (int p = 0; p < players; p++)
             {
@@ -66,6 +72,26 @@ namespace Degunatsu.Core.Tests.Support
 
         /// <summary>入力を待って進めなかったフレームの数（全員の合計）。</summary>
         public int StalledFrames { get; private set; }
+
+        /// <summary>プレイヤー p が予測の上限で進めなかったフレームの数。</summary>
+        public int StalledFramesOf(int p)
+        {
+            return _stalledByPeer[p];
+        }
+
+        /// <summary>時計が速いプレイヤー（-1 ならいない）。ExtraStepEvery フレームごとに、もう1ティック進もうとする。</summary>
+        public int FastPeer { get; set; } = -1;
+
+        public int ExtraStepEvery { get; set; }
+
+        /// <summary>時刻の同期の勧め（InputExchange.RecommendWaitFrames）に従って待つか。</summary>
+        public bool UseTimeSync { get; set; } = true;
+
+        /// <summary>時刻の同期で待ったフレームの数（全員の合計）。</summary>
+        public int TimeSyncWaitFrames { get; private set; }
+
+        /// <summary>全員が進んでいる間の、最も進んだプレイヤーと最も遅れたプレイヤーのティックの差の平均。</summary>
+        public double AverageTickSpread => _spreadSamples == 0 ? 0.0 : _spreadSum / (double)_spreadSamples;
 
         /// <summary>同じティックについて、プレイヤーによって確定した状態のチェックサムが違った回数。</summary>
         public int ChecksumMismatches { get; private set; }
@@ -138,20 +164,53 @@ namespace Degunatsu.Core.Tests.Support
                 if (session.CurrentTick >= targetTick)
                 {
                     session.Reconcile();
+                    continue;
                 }
-                else if (session.CanAdvance)
+                if (_waitFrames[p] > 0)
                 {
+                    _waitFrames[p]--;
+                    TimeSyncWaitFrames++;
+                    session.Reconcile();
+                    continue;
+                }
+                int steps = p == FastPeer && ExtraStepEvery > 0 && Frame % ExtraStepEvery == 0 ? 2 : 1;
+                for (int i = 0; i < steps && session.CurrentTick < targetTick; i++)
+                {
+                    if (!session.CanAdvance)
+                    {
+                        StalledFrames++;
+                        _stalledByPeer[p]++;
+                        session.Reconcile();
+                        break;
+                    }
                     Exchanges[p].AdvanceFrame(Scripts[p][session.LocalInputTick]);
                 }
-                else
+                if (UseTimeSync)
                 {
-                    StalledFrames++;
-                    session.Reconcile();
+                    _waitFrames[p] += Exchanges[p].RecommendWaitFrames();
                 }
             }
             Send();
             CompareConfirmedChecksums();
+            MeasureSpread(targetTick);
             Frame++;
+        }
+
+        private void MeasureSpread(int targetTick)
+        {
+            int min = int.MaxValue;
+            int max = int.MinValue;
+            foreach (RollbackSession session in Sessions)
+            {
+                if (session.CurrentTick >= targetTick)
+                {
+                    return;
+                }
+                min = Math.Min(min, session.CurrentTick);
+                max = Math.Max(max, session.CurrentTick);
+            }
+            _spreadSum += max - min;
+            _spreadSamples++;
         }
 
         private void Send()

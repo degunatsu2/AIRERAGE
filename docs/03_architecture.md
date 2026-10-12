@@ -78,7 +78,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
 | Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態、状態のバイト列とチェックサム（PC 間で同じ値） | `SimWorld`, `CharacterState`, `StateCodec` | 1 |
 | Core/Replay | 入力の記録と再生（開始時の状態＋入力列＋最後の状態のチェックサム。テキストで保存） | `InputRecorder`, `InputRecording` | 1 |
-| Core/Rollback | ロールバックの層（入力の管理、入力遅延、予測、巻き戻しと再計算、確定ティック）と入力の送受信の規則（冗長送信、確認応答、メッセージのバイト列）。通信はしない。docs/10 | `RollbackSession`, `RollbackSettings`, `InputExchange`, `InputMessage`（状態の保存は Simulation の `WorldSnapshot`） | 2 |
+| Core/Rollback | ロールバックの層（入力の管理、入力遅延、予測、巻き戻しと再計算、確定ティック）と入力の送受信の規則（冗長送信、確認応答、メッセージのバイト列）。通信はしない。docs/10 | `RollbackSession`, `RollbackSettings`, `InputExchange`, `InputMessage`, `InputNormalizer`, `TimeSync`（状態の保存は Simulation の `WorldSnapshot`） | 2 |
 | Core/Combat | アクション状態遷移、キャンセル規則、命中判定、ガード | `ActionStateMachine`, `HitResolver` | 3 |
 | Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
 | Core/Match | 試合進行、タイマー、出現、復帰、勝敗 | `MatchRules`, `MatchState` | 4 |
