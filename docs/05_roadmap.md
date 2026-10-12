@@ -37,7 +37,7 @@ Phase 7  バランス調整・プレイテスト・配布
 | 作業 | 担当 |
 |---|---|
 | 判断事項 D-01 / D-03 / D-04 / D-05 の決定 | ユーザー |
-| Unity Hub で Unity 6.3 LTS の「Universal 3D」テンプレートからプロジェクトを作成し、push する | ユーザー（Claude は手順を案内） |
+| Unity 6.3 LTS の「Universal 3D」テンプレートからプロジェクトを作成し、push する | Claude（クラウド環境で作成。D-04、[08](08_cloud_unity_setup.md)） |
 | `.gitattributes`（改行コードと LFS）、フォルダ構成、asmdef の作成 | Claude |
 | `tools/CoreTests`（dotnet test 用のプロジェクト）とサンプルテストの作成 | Claude |
 | クラウドセッション用の SessionStart フック（.NET SDK の自動導入）の作成 | Claude |
