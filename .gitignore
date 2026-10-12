@@ -1,0 +1,66 @@
+# Unity（プロジェクトをリポジトリ直下に置く前提: docs/02_open_decisions.md D-04）
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Asset Store tools
+/[Aa]ssets/AssetStoreTools*
+
+# IDE / 自動生成
+.vs/
+.vscode/
+.idea/
+.gradle/
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Unity が生成するクラッシュレポートなど
+sysinfo.txt
+mono_crash.*
+crashlytics-build.properties
+
+# ビルド成果物
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Gradle / Addressables
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Unity 外のテストプロジェクト（tools/CoreTests）
+# Unity が生成する *.csproj は無視するが、tools/ 以下の手書きのプロジェクトは管理する
+!/tools/**/*.csproj
+/tools/**/bin/
+/tools/**/obj/
+/tools/**/TestResults/
+
+# OS
+.DS_Store
+Thumbs.db

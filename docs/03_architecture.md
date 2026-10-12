@@ -1,0 +1,247 @@
+# 03. システム構成・フォルダ構成・命名規則
+
+> ステータス: ドラフト v0.1（2026-10-12）。推奨案です。承認後に確定します。
+
+---
+
+## 1. 基本方針
+
+| # | 方針 | 理由 |
+|---|---|---|
+| 1 | **シミュレーション（ゲームルールの真実）とプレゼンテーション（見た目・音・UI）を分ける** | 判定・硬直・ゲージ・ネットワーク上の結果と、アニメーションの状態を混同しないため |
+| 2 | **シミュレーションは固定ティック【仮】60Hz で進める**。`Time.deltaTime` を使わない | 操作感とフレームデータを安定させ、ネットワークの予測や再計算を可能にするため |
+| 3 | **シミュレーションのコアは UnityEngine に依存しない純C#にする** | Unity 無しで自動テストできる（このクラウド環境でも `dotnet test` で実行できることを確認済み）。予測やロールバックに必要な決定性を確保しやすい |
+| 4 | **入力はティック単位のコマンド構造体にする** | ネットワークでは入力だけを送る。入力を記録して再生すれば、不具合を再現できる |
+| 5 | **状態は明示的な構造体で持つ** | ネットワーク同期、巻き戻し、デバッグ表示、テストでの検証が容易になる |
+| 6 | **調整用の数値はデータ（ScriptableObject）に置く** | コードを編集せずに調整するため。コード中に数値を散在させない |
+| 7 | **ネットワーク層はシミュレーションの外側に置く** | ローカルとオンラインで同じシミュレーションを使う。ネットワークライブラリへの依存を1つのアセンブリに閉じ込める |
+| 8 | **重要な結果はホスト専用の権威サービスが確定する** | 命中、コイン、ゲージ、撃破、勝敗の二重加算や不正な確定を防ぐ |
+| 9 | **シングルトンやグローバル状態を増やさない** | 構成ルート（Bootstrap）で依存を組み立て、明示的に渡す |
+
+---
+
+## 2. 全体構成
+
+```
+┌────────────────────────── Unity 側（Degunatsu.Runtime）──────────────────────────┐
+│ Unity Input System → InputAdapter ──┐                                            │
+│                                      ▼                                            │
+│                              PlayerInput（ティックごと）                            │
+│                                      │        ┌── Degunatsu.Net（Phase 2〜）────┐ │
+│                                      │◀──────▶│ 入力送信／スナップショット受信    │ │
+│                                      ▼        │ 予測・照合（リコンシリエーション）│ │
+│  SimulationRunner（ティックを回す） ──▶ ┌──────────────────────────────────┐       │ │
+│                                        │ Degunatsu.Core（純C#・固定ティック） │       │ │
+│  UnityCollisionQuery ◀─ ICollisionQuery │  Movement：KinematicMotor            │       │ │
+│  （Physics.Raycast 等）                 │  Wire    ：WireController            │       │ │
+│                                        │            ＋ IWireMotionModel(A|B)  │       │ │
+│                                        │  Combat  ：ActionStateMachine 等     │       │ │
+│                                        │  Economy ：CoinLedger（ホスト権威）  │       │ │
+│                                        │  Match   ：MatchRules（ホスト権威）  │       │ │
+│                                        └──────────────────────────────────┘       │ │
+│                                      │ 状態（読み取り専用）                        └──┘ │
+│                                      ▼                                            │
+│  Presentation：CharacterView / WireView / カメラ / HUD / エフェクト / Animator      │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.1 アセンブリ（asmdef）と依存方向
+
+```
+Degunatsu.Core        （noEngineReferences: true。UnityEngine を参照しない）
+   ▲
+Degunatsu.Runtime     （Core を参照。MonoBehaviour、ScriptableObject、アダプター）
+   ▲
+Degunatsu.Net         （Core と Runtime を参照。NGO を参照するのはここだけ。Phase 2〜）
+
+Degunatsu.Editor      （Runtime を参照。エディタ拡張のみ）
+Degunatsu.Core.Tests  （Core を参照。EditMode テスト。dotnet test でも実行する）
+Degunatsu.Runtime.Tests（Runtime を参照。PlayMode テスト。最小限）
+```
+
+- Core は Runtime・Net・UnityEngine を**絶対に参照しない**。asmdef の設定で強制する。
+- 逆方向の参照が必要になったら、Core 側にインターフェースを置き、Runtime 側で実装する（例: `ICollisionQuery`、`ILog`）。
+
+---
+
+## 3. モジュールの責務
+
+| モジュール | 責務 | 主な型（予定） | フェーズ |
+|---|---|---|---|
+| Core/Common | ティック、数学の補助、決定的な乱数、ログのインターフェース | `Tick`, `DeterministicRandom`, `ILog` | 1 |
+| Core/Input | 入力コマンド、先行入力のバッファ | `PlayerInput`, `InputBuffer` | 1 |
+| Core/Physics | 衝突クエリのインターフェースと形状 | `ICollisionQuery`, `CastHit` | 1 |
+| Core/Movement | 走行、ジャンプ、重力、地形との衝突解決（すり抜け防止の連続判定） | `KinematicMotor`, `MovementConfig` | 1 |
+| Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン | `WireController`, `WireState`, `WireTargeting` | 1 |
+| Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
+| Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態 | `SimWorld`, `CharacterState` | 1 |
+| Core/Combat | アクション状態遷移、キャンセル規則、命中判定、ガード | `ActionStateMachine`, `HitResolver` | 3 |
+| Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
+| Core/Match | 試合進行、タイマー、出現、復帰、勝敗 | `MatchRules`, `MatchState` | 4 |
+| Runtime/Simulation | ティックループ、Unity の物理を使った衝突クエリ | `SimulationRunner`, `UnityCollisionQuery` | 1 |
+| Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
+| Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
+| Runtime/Presentation | 状態を読んで表示する | `CharacterView`, `WireView` | 1 |
+| Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え | `DebugHud` | 1 |
+| Net | 接続、入力・スナップショットのメッセージ、予測と照合、ラグ補償 | Phase 2 で設計する | 2 |
+
+---
+
+## 4. 主要な設計
+
+### 4.1 シミュレーションと固定ティック
+
+- `SimulationRunner`（MonoBehaviour）が `Update` で経過時間を蓄積し、1/60秒ごとに `SimWorld.Step(inputs)` を呼ぶ。Unity の `FixedUpdate` には依存しない（ネットワークの再計算で同じ処理を何度も呼べるようにするため）。
+- 描画は直前と現在のティックの状態を補間して滑らかにする。
+- Core の中では `Time`、`UnityEngine.Random`、`System.DateTime`、静的な可変状態を使わない。乱数は試合ごとのシードから作る `DeterministicRandom` を使う。
+
+### 4.2 キャラクターの移動は自前のキネマティック制御
+
+- **Rigidbody は使わない**。速度と位置を自前で積分し、地形との衝突は `ICollisionQuery`（カプセルキャスト等）で解決する。
+- 理由:
+  - ネットワークの予測では、自キャラだけを数ティック分再計算する必要がある。Unity の物理エンジンはシーン全体でしか進められない。
+  - 操作感（加速、空中制御、ワイヤーの拘束）を直接制御できる。
+  - 決定性を保ちやすい。
+- 地形は静的なコライダー。動く足場などのギミックは「ティックから位置が一意に決まる」形で作る（予測と矛盾させないため）。
+- アリーナには「細長い壁」があるため、高速移動時のすり抜けを**連続判定（スイープ）**で防ぐ。これを自動テストで保証する。
+
+### 4.3 ワイヤー: 共通の制御＋差し替え可能な運動モデル
+
+```csharp
+// 接続中の1ティック分の運動を計算する。フェーズ遷移（解除など）は WireController が決める。
+public interface IWireMotionModel
+{
+    WireMotionResult Step(in WireMotionContext context);
+}
+```
+
+- `WireController`（共通）: フェーズ管理、照準とエイムアシスト、接続判定、最大長、強制解除、クールダウン、速度の上限、解除時の慣性、キャンセル判定のためのフェーズ公開。
+- `IWireMotionModel`（差し替え）: 接続中の速度とロープ長の変化だけを計算する。
+  - `InertialWireModel`（タイプA）: ロープ長の拘束、重力、巻き取り、スティックによる振り。
+  - `ResponsiveWireModel`（タイプB）: アンカーへ向かう目標速度への収束、スティックによる進路の調整。
+- どちらを使うかは `WireProfile` データの `modelType` で選ぶ。
+- **共通の契約テスト**（速度上限を超えない、壁をすり抜けない、解除時の速度が規則どおり、など）を、NUnit のパラメータ化テストで両モデルに同じように適用する。
+
+### 4.4 データ（ScriptableObject）と Core の設定
+
+- Core には `[Serializable]` な純C#の設定クラス（例: `WireTuning`）を置く。
+- Runtime の ScriptableObject（例: `WireProfileAsset`）はそれを1つのフィールドとして持ち、インスペクターで編集できるようにする。
+- 実行時に Core の設定へ変換し、`Validate()` で値の範囲を検査する。不正な値はアセット名とフィールド名を含むエラーで止める（握りつぶさない）。
+- 予定しているデータ: `CharacterDefinition`, `MovementTuning`, `WireProfile`, `AttackDefinition`, `GuardTuning`, `GaugeTuning`, `EconomyRules`, `MatchRules`, `DepthPolicy`。
+- 開発中はプレイ中に ScriptableObject を編集すると即座に反映されるようにする（調整の往復を速くするため）。
+
+### 4.5 入力
+
+- `InputSystemAdapter` がティックごとに Input System を読み取り、`PlayerInput` を作る。
+- `PlayerInput` の内容: 移動・照準の方向（量子化した整数）、ボタンのビットマスク。ネットワークで送りやすく、端末による誤差が出ないようにするため量子化する。
+- 「押した瞬間」の判定と先行入力（【仮】6ティック）は Core 側で行う。
+
+### 4.6 アニメーションとゲームロジック
+
+- `CharacterView` が `CharacterState`（アクション状態と、その状態に入ってからの経過ティック）を読み、Animator のパラメータやクリップの再生位置を決める。
+- アニメーションイベントで攻撃判定を出したり、状態を遷移させたりしない。
+
+### 4.7 エラー処理とログ
+
+- 例外を空の catch で握りつぶさない。
+- Core では状態遷移の失敗理由を返せるようにする（例: キャンセルできなかった理由）。デバッグHUDに表示する。
+- ログは `ILog` を経由する（Runtime で `Debug.Log` に接続する）。
+- 入力の記録と再生の仕組みを用意し、不具合を確実に再現できるようにする（Phase 1 の後半）。
+
+### 4.8 パッケージ（導入は承認後）
+
+| パッケージ | 用途 | 導入時期 |
+|---|---|---|
+| Input System | 入力 | Phase 0 |
+| Test Framework | EditMode / PlayMode テスト | Phase 0（Unity に同梱） |
+| URP | 描画（テンプレートに含まれる） | Phase 0 |
+| Cinemachine 3.x | カメラの追従、デッドゾーン、ダンピング | Phase 1（カメラはシミュレーションに影響しないので後から差し替え可能） |
+| Netcode for GameObjects 2.x ＋ Unity Transport | ネットワーク | Phase 2 |
+| Multiplayer Play Mode 2.0 | エディタ上で最大4プレイヤーを起動して検証 | Phase 2 |
+| Multiplayer Tools | ネットワークシミュレーター（遅延・パケットロスの模擬）、プロファイラ | Phase 2 |
+| Multiplayer Services | セッション（参加コード）、Relay（NAT越え） | Phase 6 |
+
+各パッケージは導入する時点で、Unity のバージョンとの互換性と最新版を確認する。
+
+---
+
+## 5. フォルダ構成
+
+Unity プロジェクトをリポジトリ直下に置く前提です（D-04）。
+
+```
+degunatsu/
+├─ CLAUDE.md                     # Claude Code 向けのプロジェクト規約
+├─ README.md
+├─ docs/                         # 設計書（本書を含む）
+├─ tools/
+│  └─ CoreTests/                 # dotnet test 用のプロジェクト（Core と EditMode テストのソースを参照）
+├─ Assets/
+│  └─ _Project/                  # 自作アセットはすべてここ（サードパーティと分ける）
+│     ├─ Scripts/
+│     │  ├─ Core/                # Degunatsu.Core.asmdef（UnityEngine 非依存）
+│     │  │  ├─ Common/
+│     │  │  ├─ Input/
+│     │  │  ├─ Physics/
+│     │  │  ├─ Movement/
+│     │  │  ├─ Wire/
+│     │  │  │  └─ Models/
+│     │  │  ├─ Simulation/
+│     │  │  ├─ Combat/           # Phase 3
+│     │  │  ├─ Economy/          # Phase 4
+│     │  │  └─ Match/            # Phase 4
+│     │  ├─ Runtime/             # Degunatsu.Runtime.asmdef
+│     │  │  ├─ Bootstrap/
+│     │  │  ├─ Simulation/
+│     │  │  ├─ Input/
+│     │  │  ├─ Data/
+│     │  │  ├─ Presentation/
+│     │  │  ├─ Camera/
+│     │  │  └─ DebugTools/
+│     │  ├─ Net/                 # Degunatsu.Net.asmdef（Phase 2）
+│     │  └─ Editor/              # Degunatsu.Editor.asmdef
+│     ├─ Tests/
+│     │  ├─ EditMode/            # Degunatsu.Core.Tests.asmdef（純C#）
+│     │  └─ PlayMode/            # Degunatsu.Runtime.Tests.asmdef
+│     ├─ Data/                   # ScriptableObject アセット
+│     │  ├─ Characters/
+│     │  ├─ Movement/
+│     │  ├─ Wire/
+│     │  ├─ Attacks/
+│     │  └─ Rules/
+│     ├─ Input/                  # .inputactions
+│     ├─ Prefabs/
+│     ├─ Scenes/                 # Sandbox_Wire.unity など
+│     ├─ Art/
+│     ├─ Materials/
+│     ├─ Audio/
+│     └─ Settings/               # URP の設定アセットなど
+├─ Packages/
+└─ ProjectSettings/
+```
+
+### 5.1 Unity 外でのテスト（tools/CoreTests）
+
+- `tools/CoreTests/CoreTests.csproj` が `Assets/_Project/Scripts/Core/**/*.cs` と `Assets/_Project/Tests/EditMode/**/*.cs` をソースとして取り込み、NUnit で実行する。
+- 同じテストを Unity の Test Runner（EditMode）でも実行できる。テストは UnityEngine を使わない。
+- `LangVersion` を Unity 6 の C# バージョン（C# 9）に合わせ、Unity でコンパイルできない新しい構文を検出する。
+- Core はベクトル型に `System.Numerics.Vector2/Vector3` を使う（Unity と .NET の両方で使える）。Unity の型とは Runtime の境界で変換する。
+- このクラウド環境では、.NET 8 SDK を apt で導入し、NUnit のテストが動くことを確認済み。セッションのたびに自動で導入する仕組み（SessionStart フック）は Phase 0 で用意する。
+
+---
+
+## 6. 命名規則
+
+| 対象 | 規則 | 例 |
+|---|---|---|
+| 名前空間 | `Degunatsu.<アセンブリ>.<機能>` | `Degunatsu.Core.Wire` |
+| 型・メソッド・プロパティ | PascalCase | `WireController`, `TryFire()` |
+| private フィールド | `_camelCase`（インスペクターでは先頭の `_` が除かれて表示される） | `[SerializeField] private float _maxSpeed;` |
+| ローカル変数・引数 | camelCase | `ropeLength` |
+| インターフェース | `I` で始める | `IWireMotionModel` |
+| 単位を含む名前 | 時間はティック数なら `Ticks`、秒なら `Seconds`。角度は `Deg` / `Rad` | `cooldownTicks`, `aimAssistAngleDeg` |
+| 単位 | 距離は m（Unity の 1単位 = 1m）、速度は m/s、加速度は m/s² | — |
+| ScriptableObject のクラス | `〜Asset` または `〜Definition` | `WireProfileAsset`, `AttackDefinition` |
+| ScriptableObject のアセット | `種類_名前_バリエーション` | `WireProfile_Inertial_Default` |
+| シーン | 検証用は `Sandbox_`、本番のアリーナは `Arena_` | `Sandbox_Wire`, `Arena_Factory` |
+| テスト | `対象_条件_期待結果` | `Fire_NoTargetInRange_EntersRetracting` |
