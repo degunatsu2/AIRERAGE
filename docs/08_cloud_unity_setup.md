@@ -36,7 +36,10 @@
 ```
 *.unity3d.com
 *.unity.com
+lfs.github.com
 ```
+
+（`lfs.github.com` は Git LFS で画像などをアップロードするため。D-05）
 
 これで、エディタの配布元（download.unity3d.com）、リリース情報（services.api.unity.com）、パッケージレジストリ（packages.unity.com など）、ライセンス・サインイン（license.unity3d.com、activation.unity3d.com、core.cloud.unity3d.com、api.unity.com、login.unity.com など）に接続できるようになる。
 
@@ -143,5 +146,5 @@ exit 0
 | ライセンスなしでのプロジェクト作成（`-batchmode -nographics -createProject`） | `No valid Unity Editor license found. Please activate your license.` で終了（終了コード 198）。ライセンス情報の登録が必要 |
 | テンプレート | `com.unity.template.urp-blank` 17.1.0 をレジストリから取得し、SHA1 一致（約30MB。ダウンロード URL は別のホストへのリダイレクトなので `curl -L` が必要） |
 | プロジェクトの作成（`-createProject -cloneFromTemplate`） | 成功（約310秒）。コンパイルエラー 0。音声デバイスがないため ALSA / FMOD のエラーが出るが、動作には影響しない |
-| Git LFS へのアップロード（`git lfs push`） | **できない**。`lfs.github.com` への接続が環境のネットワークポリシーで遮断される（403）。画像などを LFS でコミットするときは、Allowed domains に `lfs.github.com` を追加する必要がある（効くかは追加後に確認する） |
+| Git LFS へのアップロード（`git lfs push`） | 初めは `lfs.github.com` が環境のネットワークポリシーで遮断された（403）。ユーザーが Allowed domains に `lfs.github.com` を追加した後は、アップロードできた（24KB の画像で確認）。リポジトリには `git lfs install --local --skip-smudge` で pre-push フックを入れてある（クラウドのセッションごとに必要） |
 | リポジトリのプロジェクトを開いて EditMode テスト（`-runTests -testPlatform EditMode`） | **49件すべて成功**（`Degunatsu.Core.Tests`、8つのテストクラス）。コンパイルエラー 0、警告 0。初回は約125秒（インポートを含む）、2回目は約26秒。既存の `.meta` は書き換えられなかった |

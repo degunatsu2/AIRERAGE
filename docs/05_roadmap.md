@@ -45,7 +45,7 @@ Phase 7  バランス調整・プレイテスト・配布
 | Input System の有効化（Project Settings の Active Input Handling） | テンプレートで有効（`activeInputHandler: 1`。Claude が確認） |
 
 **完了条件**:
-- [ ] Unity 6.3 LTS でプロジェクトが開け、空のシーンを再生できる [手動]（開けることはクラウドのバッチモードで確認済み。シーンの再生は未確認）
+- [x] Unity 6.3 LTS でプロジェクトが開け、空のシーンを再生できる [手動]（2026-10-12、ユーザーが SampleScene を再生して確認。再生時に出た `UnityConnectWebRequestException: Token Exchange failed` は、エディタの Unity アカウントのサインインに関するもので、プロジェクトの問題ではない。Unity Hub でサインインし直すと解消する見込み）
 - [x] asmdef の依存方向が [03](03_architecture.md) のとおりで、コンパイルエラーがない [手動]（2026-10-12、クラウドのバッチモードで確認）
 - [x] `dotnet test tools/CoreTests` でサンプルテストが通る [自動]
 - [x] Unity の Test Runner（EditMode）で同じサンプルテストが通る [手動]（2026-10-12、クラウドのバッチモードで 49件成功）
