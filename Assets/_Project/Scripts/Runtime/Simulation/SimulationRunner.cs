@@ -49,8 +49,34 @@ namespace Degunatsu.Runtime.Simulation
         /// <summary>操作するキャラクターの位置をリセットしたときに通知する。</summary>
         public event Action PlayerReset;
 
-        /// <summary>操作するキャラクターの調整値（読み取り用。値はシミュレーションと共有している）。</summary>
+        /// <summary>操作するキャラクターの調整値（値はシミュレーションと共有している）。</summary>
         public CharacterConfig PlayerConfig => _character.Config;
+
+        /// <summary>操作するキャラクターの今の状態。</summary>
+        public CharacterState PlayerState => _world.GetState(_player);
+
+        /// <summary>最後のティックで使った入力。</summary>
+        public SimInput LastInput { get; private set; }
+
+        /// <summary>これまでに進めたティック数。</summary>
+        public int CurrentTick => _world.Tick;
+
+        /// <summary>マウスポインターで照準しているか。</summary>
+        public bool UsingPointer => _input != null && _input.UsingPointer;
+
+        /// <summary>シミュレーションの速さの倍率（デバッグ用。1 = 等速、0 = 一時停止）。</summary>
+        public float SpeedScale { get; set; } = 1f;
+
+        /// <summary>1ティックだけ進める（デバッグ用。一時停止中のコマ送り）。</summary>
+        public void StepOnce()
+        {
+            if (!enabled)
+            {
+                return;
+            }
+            StepTick();
+            _accumulator = 0f;
+        }
 
         private void Awake()
         {
@@ -98,16 +124,13 @@ namespace Degunatsu.Runtime.Simulation
                 ResetPlayer();
             }
 
-            _accumulator += Time.deltaTime;
+            _accumulator += Time.deltaTime * SpeedScale;
             int ticks = 0;
             while (_accumulator >= SimTime.DeltaTime && ticks < MaxTicksPerFrame)
             {
-                _previous = _world.GetState(_player);
-                _inputs[0] = _input.ConsumeTick(_previous.Position);
-                _world.Step(_inputs);
+                StepTick();
                 _accumulator -= SimTime.DeltaTime;
                 ticks++;
-                PlayerTicked?.Invoke(_world.GetState(_player));
             }
             if (ticks == MaxTicksPerFrame && _accumulator >= SimTime.DeltaTime)
             {
@@ -115,7 +138,17 @@ namespace Degunatsu.Runtime.Simulation
                 _accumulator = 0f;
             }
 
-            Render(_accumulator / SimTime.DeltaTime);
+            // 一時停止中は補間せず、今のティックの状態を表示する（コマ送りの結果がすぐ見えるように）。
+            Render(SpeedScale > 0f ? _accumulator / SimTime.DeltaTime : 1f);
+        }
+
+        private void StepTick()
+        {
+            _previous = _world.GetState(_player);
+            _inputs[0] = _input.ConsumeTick(_previous.Position);
+            LastInput = _inputs[0];
+            _world.Step(_inputs);
+            PlayerTicked?.Invoke(_world.GetState(_player));
         }
 
         private void Render(float alpha)

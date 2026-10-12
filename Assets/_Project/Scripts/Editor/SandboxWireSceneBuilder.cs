@@ -236,6 +236,8 @@ namespace Degunatsu.Editor
             var courseTimer = new GameObject("CourseTimer").AddComponent<CourseTimerHud>();
             SetReference(courseTimer, "_runner", runner);
 
+            CreateDebugTools(runner, inputActions);
+
             EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
             {
@@ -290,6 +292,22 @@ namespace Degunatsu.Editor
             bar.transform.SetParent(parent, false);
             bar.transform.localPosition = localPosition;
             bar.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+        }
+
+        /// <summary>デバッグ機能（操作、表示、軌跡）。docs/06_prototype_plan.md T1-9。</summary>
+        private static void CreateDebugTools(SimulationRunner runner, InputActionAsset inputActions)
+        {
+            var root = new GameObject("DebugTools");
+            var controls = root.AddComponent<DebugControls>();
+            SetReference(controls, "_runner", runner);
+            SetReference(controls, "_inputActions", inputActions);
+            var hud = root.AddComponent<DebugHud>();
+            SetReference(hud, "_runner", runner);
+
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            LineRenderer trailLine = CreateIndicatorLine(root.transform, "Trail", material, 0.05f);
+            var trail = trailLine.gameObject.AddComponent<TrailView>();
+            SetReference(trail, "_runner", runner);
         }
 
         /// <summary>照準のインジケーター（照準の線、終点の印、射程の円）。半透明にするため Sprites-Default を使う。</summary>
