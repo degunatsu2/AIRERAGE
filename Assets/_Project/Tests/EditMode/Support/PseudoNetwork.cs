@@ -10,9 +10,10 @@ using Degunatsu.Core.Wire;
 namespace Degunatsu.Core.Tests.Support
 {
     /// <summary>
-    /// ロールバックのセッションを、遅延・揺らぎ・欠落のある疑似ネットワークでつなぐテスト補助（docs/10_online_plan.md T2-3）。
-    /// 全員が同じ速さでフレームを進める。各プレイヤーは毎フレーム、相手ごとに「まだ確認されていない自分の入力」と
-    /// 「相手の入力をどこまで受け取ったか（確認応答）」を1つのメッセージで送る。乱数の種を固定し、毎回同じ結果になる。
+    /// ロールバックのセッションを、遅延・揺らぎ・欠落のある疑似ネットワークでつなぐテスト補助（docs/10_online_plan.md T2-3、T2-4）。
+    /// 全員が同じ速さでフレームを進める。各プレイヤーは毎フレーム、相手ごとに InputExchange.BuildMessage で作ったメッセージを
+    /// バイト列にして送り、届いたバイト列を InputExchange.Receive に渡す（製品のコードと同じ送受信の規則）。
+    /// 乱数の種を固定し、毎回同じ結果になる。
     /// </summary>
     public sealed class PseudoNetwork
     {
@@ -25,10 +26,7 @@ namespace Degunatsu.Core.Tests.Support
         private readonly int _latency;
         private readonly int _jitter;
         private readonly double _loss;
-        private readonly List<Message> _inFlight = new List<Message>();
-
-        // _acked[from][to]: to が受け取ったと確認した from の入力の最大のティック。
-        private readonly int[][] _acked;
+        private readonly List<Packet> _inFlight = new List<Packet>();
 
         public PseudoNetwork(int players, RollbackSettings settings, int latencyFrames, int jitterFrames, double lossRate, int seed)
         {
@@ -39,24 +37,25 @@ namespace Degunatsu.Core.Tests.Support
             Settings = settings;
             Scripts = new PlayerInput[players][];
             Sessions = new RollbackSession[players];
+            Exchanges = new InputExchange[players];
             Worlds = new SimWorld[players];
-            _acked = new int[players][];
             for (int p = 0; p < players; p++)
             {
                 Scripts[p] = MakeScript(seed * 31 + p, 4000);
                 Worlds[p] = MakeWorld(players);
                 Sessions[p] = new RollbackSession(Worlds[p], p, settings);
-                _acked[p] = new int[players];
-                for (int q = 0; q < players; q++)
-                {
-                    _acked[p][q] = settings.InputDelayTicks - 1;
-                }
+                Exchanges[p] = new InputExchange(Sessions[p]);
             }
         }
 
         public RollbackSettings Settings { get; }
         public PlayerInput[][] Scripts { get; }
         public RollbackSession[] Sessions { get; }
+        public InputExchange[] Exchanges { get; }
+
+        /// <summary>送ったメッセージの数と、その合計のバイト数（欠落したものを含む）。</summary>
+        public int SentMessages { get; private set; }
+        public long SentBytes { get; private set; }
         public SimWorld[] Worlds { get; }
         public int Frame { get; private set; }
 
@@ -124,7 +123,7 @@ namespace Degunatsu.Core.Tests.Support
                 }
                 else if (session.CanAdvance)
                 {
-                    session.AdvanceFrame(Scripts[p][session.LocalInputTick]);
+                    Exchanges[p].AdvanceFrame(Scripts[p][session.LocalInputTick]);
                 }
                 else
                 {
@@ -141,29 +140,19 @@ namespace Degunatsu.Core.Tests.Support
         {
             for (int from = 0; from < Sessions.Length; from++)
             {
-                RollbackSession sender = Sessions[from];
                 for (int to = 0; to < Sessions.Length; to++)
                 {
                     if (to == from)
                     {
                         continue;
                     }
-                    var message = new Message
-                    {
-                        From = from,
-                        To = to,
-                        Ack = sender.ContiguousTick(to),
-                        DeliverFrame = Frame + _latency + (_jitter > 0 ? _random.Next(_jitter + 1) : 0),
-                    };
-                    // 確認されていない自分の入力をすべて送る（欠落に備えた冗長送信）。セッションは確定した古い入力を捨てるので、
-                    // 送る入力は送り手が自分で持っておく（ここでは入力列から取る）。
-                    for (int tick = _acked[from][to] + 1; tick <= sender.ContiguousTick(from); tick++)
-                    {
-                        message.Inputs.Add((tick, TrueInput(from, tick)));
-                    }
+                    byte[] bytes = Exchanges[from].BuildMessage(to).ToBytes();
+                    SentMessages++;
+                    SentBytes += bytes.Length;
+                    int deliverFrame = Frame + _latency + (_jitter > 0 ? _random.Next(_jitter + 1) : 0);
                     if (_random.NextDouble() >= _loss)
                     {
-                        _inFlight.Add(message);
+                        _inFlight.Add(new Packet(to, deliverFrame, bytes));
                     }
                 }
             }
@@ -173,20 +162,14 @@ namespace Degunatsu.Core.Tests.Support
         {
             for (int i = 0; i < _inFlight.Count; i++)
             {
-                Message message = _inFlight[i];
-                if (message.DeliverFrame > Frame)
+                Packet packet = _inFlight[i];
+                if (packet.DeliverFrame > Frame)
                 {
                     continue;
                 }
                 _inFlight.RemoveAt(i);
                 i--;
-                RollbackSession receiver = Sessions[message.To];
-                foreach ((int tick, PlayerInput input) in message.Inputs)
-                {
-                    receiver.AddRemoteInput(message.From, tick, input);
-                }
-                // 送り主は、受け手の入力を message.Ack まで受け取っている。
-                _acked[message.To][message.From] = Math.Max(_acked[message.To][message.From], message.Ack);
+                Exchanges[packet.To].Receive(InputMessage.FromBytes(packet.Bytes));
             }
         }
 
@@ -278,13 +261,18 @@ namespace Degunatsu.Core.Tests.Support
             }
         }
 
-        private sealed class Message
+        private readonly struct Packet
         {
-            public int From;
-            public int To;
-            public int Ack;
-            public int DeliverFrame;
-            public readonly List<(int Tick, PlayerInput Input)> Inputs = new List<(int, PlayerInput)>();
+            public readonly int To;
+            public readonly int DeliverFrame;
+            public readonly byte[] Bytes;
+
+            public Packet(int to, int deliverFrame, byte[] bytes)
+            {
+                To = to;
+                DeliverFrame = deliverFrame;
+                Bytes = bytes;
+            }
         }
     }
 }
