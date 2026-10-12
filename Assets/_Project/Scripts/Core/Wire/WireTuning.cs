@@ -65,7 +65,7 @@ namespace Degunatsu.Core.Wire
         public float AttachedInputInfluence = 0.25f;
 
         /// <summary>エイムアシストの角度（度、照準方向から左右それぞれ）。</summary>
-        public float AimAssistAngleDeg = 12f;
+        public float AimAssistAngleDeg = 6f;
 
         /// <summary>スティックの入力がないときの照準角（度、向いている方向から上向きに）。</summary>
         public float NeutralAimAngleDeg = 45f;

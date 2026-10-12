@@ -34,7 +34,7 @@ MonoBehaviour:
       FireSpeed: 60
       MissRetractTicks: 10
       CooldownTicks: 20
-      AimAssistAngleDeg: 12
+      AimAssistAngleDeg: 6
       NeutralAimAngleDeg: 45
       AimDeadzone: 0.3
       MinRopeLength: 1

@@ -88,26 +88,29 @@ namespace Degunatsu.Core.Tests.Wire
         [Test]
         public void AimAssist_PicksAnchorClosestToAimWithinAngle()
         {
+            // どちらもアシストの角度の内側にある2つのアンカーポイントのうち、照準に近い方を選ぶ。
+            float assist = new CharacterConfig().Wire.AimAssistAngleDeg;
             float height = 5f;
             var world = TestArenas.Ground()
-                .AddAnchor(TanDeg(10f) * height, StandingY + height)
-                .AddAnchor(TanDeg(3f) * height, StandingY + height)
+                .AddAnchor(TanDeg(assist * 0.8f) * height, StandingY + height)
+                .AddAnchor(TanDeg(assist * 0.3f) * height, StandingY + height)
                 .AddAnchor(TanDeg(-20f) * height, StandingY + height);
             var harness = new SimHarness(world);
 
             harness.Step(Inputs.Wire(0f, 1f));
 
             Assert.That(harness.State.Wire.HasTargetPoint, Is.True);
-            Assert.That(harness.State.Wire.TargetPoint.X, Is.EqualTo(TanDeg(3f) * height).Within(1e-4f));
+            Assert.That(harness.State.Wire.TargetPoint.X, Is.EqualTo(TanDeg(assist * 0.3f) * height).Within(1e-4f));
 
             harness.StepUntil(s => s.Wire.Phase == WirePhase.Attached, Inputs.Wire(0f, 1f), 20);
-            Assert.That(harness.State.Wire.Anchor.X, Is.EqualTo(TanDeg(3f) * height).Within(1e-4f));
+            Assert.That(harness.State.Wire.Anchor.X, Is.EqualTo(TanDeg(assist * 0.3f) * height).Within(1e-4f));
         }
 
         [Test]
         public void AimAssist_IgnoresAnchorOutsideAngle()
         {
-            var world = TestArenas.Ground().AddAnchor(TanDeg(20f) * 5f, StandingY + 5f);
+            float assist = new CharacterConfig().Wire.AimAssistAngleDeg;
+            var world = TestArenas.Ground().AddAnchor(TanDeg(assist * 1.3f) * 5f, StandingY + 5f);
             var harness = new SimHarness(world);
 
             harness.Step(Inputs.Wire(0f, 1f));
