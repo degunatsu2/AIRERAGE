@@ -67,6 +67,12 @@ namespace Degunatsu.Runtime.Simulation
         /// <summary>シミュレーションの速さの倍率（デバッグ用。1 = 等速、0 = 一時停止）。</summary>
         public float SpeedScale { get; set; } = 1f;
 
+        /// <summary>
+        /// 設定されている間は、プレイヤーの入力の代わりにこの入力を使う（入力の再生など、デバッグ用）。
+        /// 入力が尽きたら null に戻る。プレイヤーの入力は読み捨てる（再生の後に、押したボタンが残らないように）。
+        /// </summary>
+        public ITickInputSource InputOverride { get; set; }
+
         /// <summary>1ティックだけ進める（デバッグ用。一時停止中のコマ送り）。</summary>
         public void StepOnce()
         {
@@ -145,8 +151,20 @@ namespace Degunatsu.Runtime.Simulation
         private void StepTick()
         {
             _previous = _world.GetState(_player);
-            _inputs[0] = _input.ConsumeTick(_previous.Position);
-            LastInput = _inputs[0];
+            SimInput input = _input.ConsumeTick(_previous.Position);
+            if (InputOverride != null)
+            {
+                if (InputOverride.TryGetNext(out SimInput overridden))
+                {
+                    input = overridden;
+                }
+                else
+                {
+                    InputOverride = null;
+                }
+            }
+            _inputs[0] = input;
+            LastInput = input;
             _world.Step(_inputs);
             PlayerTicked?.Invoke(_world.GetState(_player));
         }
@@ -174,12 +192,20 @@ namespace Degunatsu.Runtime.Simulation
             }
         }
 
-        private void ResetPlayer()
+        /// <summary>
+        /// 操作するキャラクターの状態を置き換える（入力の再生の開始など、デバッグ用）。
+        /// 入力以外で状態が変わったことを PlayerReset で知らせる。
+        /// </summary>
+        public void SetPlayerState(CharacterState state)
         {
-            CharacterState state = CharacterState.Spawn(_spawnPoint.position.ToNumerics(), 1);
             _world.SetState(_player, state);
             _previous = state;
             PlayerReset?.Invoke();
+        }
+
+        private void ResetPlayer()
+        {
+            SetPlayerState(CharacterState.Spawn(_spawnPoint.position.ToNumerics(), 1));
         }
     }
 }

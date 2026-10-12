@@ -328,6 +328,24 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "SaveRecording",
+                    "type": "Button",
+                    "id": "32e2c51d-6d9e-4e51-92f4-fcc5045be454",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PlayRecording",
+                    "type": "Button",
+                    "id": "5b8bf441-68f1-47e5-9e8f-4eca7d0d2fd8",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -394,6 +412,50 @@
                     "processors": "",
                     "groups": "",
                     "action": "StepTick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2771941e-b365-4c87-9963-571bf16ca877",
+                    "path": "<Keyboard>/f5",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SaveRecording",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0e9d7edb-4ef7-4db3-b4f3-473531f5b46c",
+                    "path": "<Gamepad>/dpad/up",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SaveRecording",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0f081484-0975-479b-a82a-7a2b26d7e216",
+                    "path": "<Keyboard>/f6",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PlayRecording",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e69e59a7-2595-4c07-925c-85ff7f47aba1",
+                    "path": "<Gamepad>/dpad/left",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PlayRecording",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

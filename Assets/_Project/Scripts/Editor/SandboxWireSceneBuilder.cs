@@ -294,7 +294,7 @@ namespace Degunatsu.Editor
             bar.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
         }
 
-        /// <summary>デバッグ機能（操作、表示、軌跡）。docs/06_prototype_plan.md T1-9。</summary>
+        /// <summary>デバッグ機能（操作、表示、入力の記録と再生、軌跡）。docs/06_prototype_plan.md T1-9。</summary>
         private static void CreateDebugTools(SimulationRunner runner, InputActionAsset inputActions)
         {
             var root = new GameObject("DebugTools");
@@ -303,6 +303,9 @@ namespace Degunatsu.Editor
             SetReference(controls, "_inputActions", inputActions);
             var hud = root.AddComponent<DebugHud>();
             SetReference(hud, "_runner", runner);
+            var replay = root.AddComponent<ReplayControls>();
+            SetReference(replay, "_runner", runner);
+            SetReference(replay, "_inputActions", inputActions);
 
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             LineRenderer trailLine = CreateIndicatorLine(root.transform, "Trail", material, 0.05f);

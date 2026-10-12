@@ -10,6 +10,7 @@ namespace Degunatsu.Runtime.DebugTools
     /// - ToggleWireType（Tab / Select）: ワイヤーのタイプ A / B を切り替える（調整値のアセットの値を変える）
     /// - CycleSpeed（F1 / 十字キー下）: シミュレーションの速さを 1 → 1/2 → 1/4 → 一時停止 → 1 の順に変える
     /// - StepTick（F2 / 十字キー右）: 一時停止中に1ティックだけ進める
+    /// 同じマップの SaveRecording（F5）と PlayRecording（F6）は ReplayControls が読む。
     /// </summary>
     public sealed class DebugControls : MonoBehaviour
     {

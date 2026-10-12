@@ -2,7 +2,10 @@
 # Unity のテスト（EditMode / PlayMode）をバッチモードで実行し、結果を要約する（docs/08_cloud_unity_setup.md）。
 #
 # 使い方:
-#   bash tools/unity/run_unity_tests.sh [EditMode|PlayMode]   （既定は EditMode）
+#   bash tools/unity/run_unity_tests.sh [EditMode|PlayMode] [テストの絞り込み]   （既定は EditMode、絞り込みなし）
+#
+# テストの絞り込みは Unity の -testFilter に渡す（テストの完全な名前か正規表現）。
+# [Explicit] のテスト（例: Degunatsu.Runtime.Tests.RecordedReplayTests）は、名前で絞り込んだときだけ実行される。
 #
 # エディタのバージョンは ProjectSettings/ProjectVersion.txt に合わせる（導入は tools/unity/install_editor.sh、
 # ライセンスは tools/unity/activate_license.sh）。ログと結果の XML は Logs/（.gitignore の対象）に出力する。
@@ -10,6 +13,7 @@
 set -euo pipefail
 
 PLATFORM="${1:-EditMode}"
+FILTER="${2:-}"
 case "$PLATFORM" in
   EditMode | PlayMode) ;;
   *)
@@ -34,8 +38,13 @@ results="$ROOT/Logs/$name-results.xml"
 log="$ROOT/Logs/$name.log"
 rm -f "$results"
 
+filter_args=()
+if [ -n "$FILTER" ]; then
+  filter_args=(-testFilter "$FILTER")
+fi
+
 start=$(date +%s)
-"$editor" -batchmode -nographics -projectPath "$ROOT" -runTests -testPlatform "$PLATFORM" \
+"$editor" -batchmode -nographics -projectPath "$ROOT" -runTests -testPlatform "$PLATFORM" "${filter_args[@]}" \
   -testResults "$results" -logFile "$log" && status=0 || status=$?
 echo "[run_unity_tests] $PLATFORM: Unity の終了コード $status（$(( $(date +%s) - start ))秒）。ログ: $log" >&2
 

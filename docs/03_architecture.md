@@ -76,7 +76,8 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Core/Movement | 走行、ジャンプ、重力、地形との衝突解決（すり抜け防止の連続判定） | `KinematicMotor`, `MovementConfig` | 1 |
 | Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン | `WireController`, `WireState`, `WireTargeting` | 1 |
 | Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
-| Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態 | `SimWorld`, `CharacterState` | 1 |
+| Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態、状態のバイト列とチェックサム（PC 間で同じ値） | `SimWorld`, `CharacterState`, `StateCodec` | 1 |
+| Core/Replay | 入力の記録と再生（開始時の状態＋入力列＋最後の状態のチェックサム。テキストで保存） | `InputRecorder`, `InputRecording` | 1 |
 | Core/Combat | アクション状態遷移、キャンセル規則、命中判定、ガード | `ActionStateMachine`, `HitResolver` | 3 |
 | Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
 | Core/Match | 試合進行、タイマー、出現、復帰、勝敗 | `MatchRules`, `MatchState` | 4 |
@@ -84,7 +85,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
 | Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom` | 1 |
-| Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム） | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels` | 1 |
+| Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム）、入力の記録と再生 | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels`, `ReplayControls` | 1 |
 | Net | 接続、入力の交換、予測と巻き戻し（ロールバック）、時刻の同期、不一致の検出 | Phase 2 で設計する | 2 |
 
 ---
@@ -195,6 +196,7 @@ degunatsu/
 │     │  │  ├─ Wire/
 │     │  │  │  └─ Models/
 │     │  │  ├─ Simulation/
+│     │  │  ├─ Replay/
 │     │  │  ├─ Combat/           # Phase 3
 │     │  │  ├─ Economy/          # Phase 4
 │     │  │  └─ Match/            # Phase 4

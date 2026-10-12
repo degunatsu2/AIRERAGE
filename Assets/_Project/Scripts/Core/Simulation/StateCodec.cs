@@ -1,0 +1,138 @@
+using System;
+using System.IO;
+using System.Numerics;
+using Degunatsu.Core.Input;
+using Degunatsu.Core.Wire;
+
+namespace Degunatsu.Core.Simulation
+{
+    /// <summary>
+    /// CharacterState をバイト列にする（入力の記録の保存、PC 間の比較に使う）。
+    /// 浮動小数点はビットのまま書くので、復元すると元と1ビットも違わない。
+    /// チェックサムはこのバイト列から計算する（プロセスや PC が違っても同じ値になる。HashCode とは違う）。
+    /// フィールドを追加したら、Write と Read の両方に加え、FormatVersion を上げる。
+    /// </summary>
+    public static class StateCodec
+    {
+        /// <summary>バイト列の形式の版。</summary>
+        public const int FormatVersion = 1;
+
+        private const ulong FnvOffset = 14695981039346656037UL;
+        private const ulong FnvPrime = 1099511628211UL;
+
+        public static byte[] ToBytes(in CharacterState state)
+        {
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                Write(writer, state);
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        public static CharacterState FromBytes(byte[] bytes)
+        {
+            if (bytes == null)
+            {
+                throw new ArgumentNullException(nameof(bytes));
+            }
+            using (var stream = new MemoryStream(bytes))
+            using (var reader = new BinaryReader(stream))
+            {
+                CharacterState state = Read(reader);
+                if (stream.Position != stream.Length)
+                {
+                    throw new FormatException($"状態のバイト列の長さが合いません（{stream.Length} バイト中 {stream.Position} バイトを読んだ）");
+                }
+                return state;
+            }
+        }
+
+        /// <summary>状態のチェックサム（FNV-1a 64bit）。</summary>
+        public static ulong Checksum(in CharacterState state)
+        {
+            ulong hash = FnvOffset;
+            foreach (byte b in ToBytes(state))
+            {
+                hash ^= b;
+                hash *= FnvPrime;
+            }
+            return hash;
+        }
+
+        public static void Write(BinaryWriter writer, in CharacterState state)
+        {
+            Write(writer, state.Position);
+            Write(writer, state.Velocity);
+            writer.Write(state.Facing);
+            writer.Write(state.Grounded);
+            writer.Write(state.CoyoteTicksLeft);
+            writer.Write(state.JumpBufferTicksLeft);
+            writer.Write(state.AirJumpsUsed);
+            writer.Write((ushort)state.PreviousButtons);
+
+            WireState wire = state.Wire;
+            writer.Write((byte)wire.Phase);
+            writer.Write(wire.PhaseTicks);
+            Write(writer, wire.HookPosition);
+            Write(writer, wire.HookDirection);
+            writer.Write(wire.HookTraveled);
+            writer.Write(wire.HasTargetPoint);
+            Write(writer, wire.TargetPoint);
+            Write(writer, wire.Anchor);
+            writer.Write(wire.RopeLength);
+            writer.Write(wire.AttachSpeed);
+            writer.Write(wire.CooldownTicksLeft);
+            writer.Write((byte)wire.LastReleaseReason);
+            writer.Write((byte)wire.LastMissReason);
+        }
+
+        public static CharacterState Read(BinaryReader reader)
+        {
+            var state = new CharacterState
+            {
+                Position = ReadVector3(reader),
+                Velocity = ReadVector3(reader),
+                Facing = reader.ReadInt32(),
+                Grounded = reader.ReadBoolean(),
+                CoyoteTicksLeft = reader.ReadInt32(),
+                JumpBufferTicksLeft = reader.ReadInt32(),
+                AirJumpsUsed = reader.ReadInt32(),
+                PreviousButtons = (InputButtons)reader.ReadUInt16(),
+            };
+            state.Wire = new WireState
+            {
+                Phase = (WirePhase)reader.ReadByte(),
+                PhaseTicks = reader.ReadInt32(),
+                HookPosition = ReadVector3(reader),
+                HookDirection = ReadVector3(reader),
+                HookTraveled = reader.ReadSingle(),
+                HasTargetPoint = reader.ReadBoolean(),
+                TargetPoint = ReadVector3(reader),
+                Anchor = ReadVector3(reader),
+                RopeLength = reader.ReadSingle(),
+                AttachSpeed = reader.ReadSingle(),
+                CooldownTicksLeft = reader.ReadInt32(),
+                LastReleaseReason = (WireReleaseReason)reader.ReadByte(),
+                LastMissReason = (WireMissReason)reader.ReadByte(),
+            };
+            return state;
+        }
+
+        private static void Write(BinaryWriter writer, Vector3 value)
+        {
+            writer.Write(value.X);
+            writer.Write(value.Y);
+            writer.Write(value.Z);
+        }
+
+        private static Vector3 ReadVector3(BinaryReader reader)
+        {
+            float x = reader.ReadSingle();
+            float y = reader.ReadSingle();
+            float z = reader.ReadSingle();
+            return new Vector3(x, y, z);
+        }
+    }
+}
