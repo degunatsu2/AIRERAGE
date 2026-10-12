@@ -1,0 +1,58 @@
+# 改行コード: リポジトリ内は LF に正規化する
+* text=auto
+
+*.cs            text diff=csharp
+*.asmdef        text
+*.asmref        text
+*.json          text
+*.md            text
+*.yml           text
+*.yaml          text
+*.sh            text eol=lf
+*.py            text eol=lf
+*.csproj        text
+
+# Unity のテキスト形式アセット（Force Text 前提）
+*.unity         text
+*.prefab        text
+*.asset         text
+*.mat           text
+*.anim          text
+*.controller    text
+*.overrideController text
+*.physicMaterial text
+*.inputactions  text
+*.shadergraph   text
+*.shadersubgraph text
+*.meta          text
+
+# Git LFS（D-05）。使う前に各PCで `git lfs install` を実行すること
+# 画像
+*.png  filter=lfs diff=lfs merge=lfs -text
+*.jpg  filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.psd  filter=lfs diff=lfs merge=lfs -text
+*.tga  filter=lfs diff=lfs merge=lfs -text
+*.tif  filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.exr  filter=lfs diff=lfs merge=lfs -text
+*.hdr  filter=lfs diff=lfs merge=lfs -text
+# 3D モデル
+*.fbx   filter=lfs diff=lfs merge=lfs -text
+*.obj   filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+# 音声・動画
+*.wav  filter=lfs diff=lfs merge=lfs -text
+*.mp3  filter=lfs diff=lfs merge=lfs -text
+*.ogg  filter=lfs diff=lfs merge=lfs -text
+*.aif  filter=lfs diff=lfs merge=lfs -text
+*.aiff filter=lfs diff=lfs merge=lfs -text
+*.mp4  filter=lfs diff=lfs merge=lfs -text
+*.mov  filter=lfs diff=lfs merge=lfs -text
+# フォント
+*.ttf filter=lfs diff=lfs merge=lfs -text
+*.otf filter=lfs diff=lfs merge=lfs -text
+# ネイティブプラグイン
+*.dll   filter=lfs diff=lfs merge=lfs -text
+*.so    filter=lfs diff=lfs merge=lfs -text
+*.dylib filter=lfs diff=lfs merge=lfs -text
