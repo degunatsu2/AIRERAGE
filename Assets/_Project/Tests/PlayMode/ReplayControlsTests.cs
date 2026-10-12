@@ -14,7 +14,7 @@ namespace Degunatsu.PlayMode.Tests
 {
     /// <summary>
     /// 入力の記録と再生（docs/06_prototype_plan.md T1-9b）を Sandbox_Wire で動かして確かめる（キーの代わりにメソッドを呼ぶ）。
-    /// 決まった入力で動かして保存し、再生して最後の状態が一致することを確かめる。
+    /// 記録を始めてから決まった入力で動かして保存し、再生すると記録を始めた状態から始まり、最後の状態が一致することを確かめる。
     /// </summary>
     public sealed class ReplayControlsTests
     {
@@ -40,7 +40,7 @@ namespace Degunatsu.PlayMode.Tests
         }
 
         [UnityTest]
-        public IEnumerator SaveThenPlay_ReachesTheSameFinalState()
+        public IEnumerator RecordThenPlay_StartsWhereRecordingStarted_AndReachesTheSameFinalState()
         {
             SceneManager.LoadScene("Sandbox_Wire");
             yield return null;
@@ -48,8 +48,11 @@ namespace Degunatsu.PlayMode.Tests
             var runner = Object.FindFirstObjectByType<SimulationRunner>();
             var replay = Object.FindFirstObjectByType<ReplayControls>();
             Assert.That(replay, Is.Not.Null, "ReplayControls がない");
+            yield return WaitSeconds(0.3f); // 出現位置から落ちて着地するまで（記録の前の動き）
 
-            // 走る、ジャンプ、右上へワイヤー、解除、左へ走る。
+            // 記録を始めてから、決まった入力で動かす（走る、ジャンプ、右上へワイヤー、解除、左へ走る）。
+            replay.StartRecording();
+            Degunatsu.Core.Simulation.CharacterState start = runner.PlayerState;
             var script = new ScriptedInput();
             script.Add(SimInput.FromAxes(1f, 0f, InputButtons.None), 20);
             script.Add(SimInput.FromAxes(1f, 0f, InputButtons.Jump), 3);
@@ -57,18 +60,56 @@ namespace Degunatsu.PlayMode.Tests
             script.Add(SimInput.FromAxes(-1f, 0f, InputButtons.None), 40);
             runner.InputOverride = script;
             yield return WaitUntil(() => runner.InputOverride == null, 10f);
+            Assert.That(replay.IsRecording, Is.True);
             Assert.That(replay.RecordedTicks, Is.GreaterThanOrEqualTo(script.Count), "前提: 決まった入力を記録している");
+            int recordedTicks = replay.RecordedTicks;
 
-            string path = replay.SaveRecording(_folder);
+            string path = replay.StopRecording(_folder);
             Assert.That(path, Is.Not.Null, replay.Message);
             Assert.That(File.Exists(path), Is.True, "保存したファイルがない");
+            Assert.That(replay.IsRecording, Is.False);
 
+            // 再生は、記録を始めたときの状態から始まり、記録した長さで終わる。
             replay.PlayFile(path);
             Assert.That(replay.IsReplaying, Is.True, replay.Message);
+            Assert.That(runner.PlayerState, Is.EqualTo(start), "再生が記録を始めたときの状態から始まらない");
+            int startTick = runner.CurrentTick;
             yield return WaitUntil(() => !replay.IsReplaying, 30f);
 
             // 再生の最後のティックで、状態のチェックサムを記録と比べている。
             Assert.That(replay.LastReplayMatched, Is.True, replay.Message);
+            Assert.That(runner.CurrentTick - startTick, Is.GreaterThanOrEqualTo(recordedTicks));
+            Assert.That(runner.CurrentTick - startTick, Is.LessThan(recordedTicks + 30), "記録より長く再生している");
+        }
+
+        [UnityTest]
+        public IEnumerator StopReplay_ReturnsControlImmediately()
+        {
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            var replay = Object.FindFirstObjectByType<ReplayControls>();
+            replay.StartRecording();
+            yield return WaitSeconds(0.5f);
+            string path = replay.StopRecording(_folder);
+            Assert.That(path, Is.Not.Null, replay.Message);
+
+            replay.PlayFile(path);
+            Assert.That(replay.IsReplaying, Is.True);
+            replay.StopReplay();
+
+            Assert.That(replay.IsReplaying, Is.False);
+            Assert.That(runner.InputOverride, Is.Null, "入力の差し替えが残っている");
+        }
+
+        private static IEnumerator WaitSeconds(float seconds)
+        {
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start < seconds)
+            {
+                yield return null;
+            }
         }
 
         private static IEnumerator WaitUntil(System.Func<bool> condition, float timeoutSeconds)

@@ -183,9 +183,11 @@ namespace Degunatsu.Runtime.Simulation
             if (_aimIndicator != null)
             {
                 // 表示の位置（補間した位置）から、今の入力で射出したときの結果を予測して示す。
+                // 入力を差し替えている間（再生中）は、プレイヤーの今の入力ではなく、最後のティックで使った入力で示す。
                 Vector3 origin = Vector3.Lerp(_previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
                 System.Numerics.Vector3 simOrigin = origin.ToNumerics();
-                var frame = new InputFrame(_input.Peek(simOrigin), current.PreviousButtons);
+                SimInput shown = InputOverride != null ? LastInput : _input.Peek(simOrigin);
+                var frame = new InputFrame(shown, current.PreviousButtons);
                 WireTuning wire = _character.Config.Wire;
                 WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _terrain);
                 _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength);

@@ -14,37 +14,42 @@ using SimInput = Degunatsu.Core.Input.PlayerInput;
 namespace Degunatsu.Runtime.DebugTools
 {
     /// <summary>
-    /// 入力の記録と再生（docs/06_prototype_plan.md T1-9b）。直近の入力を記録し続け、
-    /// SaveRecording（F5）でファイルに保存し、PlayRecording（F6）で最新のファイルを再生する。
-    /// 再生の最後に状態のチェックサムを記録と比べ、同じ動きになったかを表示する。
-    /// 位置のリセットとタイプの切り替えで、記録はそこからやり直す（入力以外で状態や動きが変わるため）。
+    /// 入力の記録と再生（docs/06_prototype_plan.md T1-9b）。
+    /// - SaveRecording（F5 / 十字キー上）: 記録を始める。もう一度押すと記録を終えてファイルに保存する。
+    /// - PlayRecording（F6 / 十字キー左）: 最新の記録を再生する（記録中なら、記録を終えて保存してから再生する）。再生中に押すと止める。
+    /// 再生は記録を始めたときの状態から始め、記録した長さだけ進める。最後に状態のチェックサムを記録と比べ、
+    /// 同じ動きになったかを表示する。再生中は記録しない。
+    /// 記録中に位置のリセットやタイプの切り替えをすると、そこで記録を終えて保存する（入力以外で状態や動きが変わるため）。
     /// ファイルはプロジェクト直下の InputRecordings フォルダに置く（不具合の報告に添付できるテキスト）。
     /// </summary>
     public sealed class ReplayControls : MonoBehaviour
     {
         private const string MapName = "Debug";
         private const string FolderName = "InputRecordings";
-        private const float Width = 420f;
+        private const float Width = 460f;
 
         [SerializeField] private SimulationRunner _runner;
         [SerializeField] private InputActionAsset _inputActions;
-        [Tooltip("記録しておく長さ（秒）。これより古い入力は捨てる")]
-        [SerializeField] private float _recordSeconds = 60f;
+        [Tooltip("1回の記録の最大の長さ（秒）。超えたら記録を終えて保存する【仮】")]
+        [SerializeField] private float _maxRecordSeconds = 300f;
 
         private InputActionMap _map;
         private InputAction _save;
         private InputAction _play;
         private InputRecorder _recorder;
+        private bool _recording;
         private Playback _playback;
         private GUIStyle _style;
 
         /// <summary>記録を保存するフォルダ（プロジェクト直下の InputRecordings）。</summary>
         public static string DefaultFolder => Path.GetFullPath(Path.Combine(Application.dataPath, "..", FolderName));
 
-        /// <summary>記録しているティック数。</summary>
-        public int RecordedTicks => _recorder != null ? _recorder.Count : 0;
+        public bool IsRecording => _recording;
 
         public bool IsReplaying => _playback != null;
+
+        /// <summary>今の記録のティック数。</summary>
+        public int RecordedTicks => _recording ? _recorder.Count : 0;
 
         /// <summary>最後に終わった再生で、最後の状態が記録と一致したか。まだ再生していなければ null。</summary>
         public bool? LastReplayMatched { get; private set; }
@@ -63,7 +68,7 @@ namespace Degunatsu.Runtime.DebugTools
             _map = _inputActions.FindActionMap(MapName, throwIfNotFound: true);
             _save = _map.FindAction("SaveRecording", throwIfNotFound: true);
             _play = _map.FindAction("PlayRecording", throwIfNotFound: true);
-            _recorder = new InputRecorder(Math.Max(1, SimTime.SecondsToTicks(_recordSeconds)));
+            _recorder = new InputRecorder(Math.Max(1, SimTime.SecondsToTicks(_maxRecordSeconds)));
         }
 
         private void OnEnable()
@@ -93,29 +98,63 @@ namespace Degunatsu.Runtime.DebugTools
             {
                 // シミュレーションが動いていなければ、記録もしない（原因は SimulationRunner がログに出している）。
                 enabled = false;
-                return;
             }
-            RestartRecording();
         }
 
         private void Update()
         {
             if (_save.WasPressedThisFrame())
             {
-                SaveRecording(DefaultFolder);
+                if (_recording)
+                {
+                    StopRecording(DefaultFolder);
+                }
+                else
+                {
+                    StartRecording();
+                }
             }
             if (_play.WasPressedThisFrame())
             {
-                PlayLatest(DefaultFolder);
+                if (_playback != null)
+                {
+                    StopReplay();
+                }
+                else
+                {
+                    if (_recording)
+                    {
+                        StopRecording(DefaultFolder);
+                    }
+                    PlayLatest(DefaultFolder);
+                }
             }
         }
 
-        /// <summary>直近の記録を folder に保存し、ファイルのパスを返す。記録がないか保存に失敗したら null。</summary>
-        public string SaveRecording(string folder)
+        /// <summary>今の状態から記録を始める。再生中は始めない。</summary>
+        public void StartRecording()
         {
+            if (_playback != null)
+            {
+                Message = "Stop the replay first (F6)";
+                return;
+            }
+            _recorder.Restart(_runner.PlayerState, _runner.PlayerConfig.Wire.ModelType);
+            _recording = true;
+            Message = "Recording... (F5: stop and save)";
+        }
+
+        /// <summary>記録を終えて folder に保存し、ファイルのパスを返す。記録が空か保存に失敗したら null。</summary>
+        public string StopRecording(string folder)
+        {
+            if (!_recording)
+            {
+                return null;
+            }
+            _recording = false;
             if (_recorder.Count == 0)
             {
-                Message = "Nothing recorded yet";
+                Message = "Recording stopped (nothing recorded)";
                 return null;
             }
             InputRecording recording = _recorder.Build(JsonUtility.ToJson(_runner.PlayerConfig));
@@ -150,9 +189,14 @@ namespace Degunatsu.Runtime.DebugTools
             PlayFile(latest);
         }
 
-        /// <summary>記録のファイルを読んで再生を始める。</summary>
+        /// <summary>記録のファイルを読んで、記録を始めたときの状態から再生する。記録中は再生しない。</summary>
         public void PlayFile(string path)
         {
+            if (_recording)
+            {
+                Message = "Stop recording first (F5)";
+                return;
+            }
             InputRecording recording;
             try
             {
@@ -174,38 +218,69 @@ namespace Degunatsu.Runtime.DebugTools
                 Debug.LogWarning($"{name}: 調整値が記録したときと違うので、同じ動きにならないことがあります（{path}）", this);
             }
 
+            StopReplay();
             _runner.SetPlayerState(recording.StartState);
             _playback = new Playback(recording, Path.GetFileName(path), sameConfig);
             _runner.InputOverride = _playback;
-            Message = $"Playing {_playback.FileName}" + (sameConfig ? string.Empty : " (config differs!)");
+            Message = $"Playing {_playback.FileName} (F6: stop)" + (sameConfig ? string.Empty : " (config differs!)");
+        }
+
+        /// <summary>再生を止める（その場から操作できるようになる）。</summary>
+        public void StopReplay()
+        {
+            if (_playback == null)
+            {
+                return;
+            }
+            _runner.InputOverride = null;
+            _playback = null;
+            Message = "Replay stopped";
         }
 
         private void OnPlayerTicked(CharacterState after)
         {
-            if (_playback != null && _playback.Finished)
+            if (_playback != null)
             {
-                FinishReplay(after);
+                if (_playback.Finished)
+                {
+                    FinishReplay(after);
+                }
+                return;
+            }
+            if (!_recording)
+            {
+                return;
             }
 
-            // タイプが切り替わっていたら、このティックから記録し直す（切り替え前の入力は、今のタイプでは再生できない）。
-            WireModelType type = _runner.PlayerConfig.Wire.ModelType;
-            if (type != _recorder.WireModelType)
+            // タイプが切り替わっていたら、切り替える前までを保存する（切り替えた後の入力は、記録のタイプでは再生できない）。
+            if (_runner.PlayerConfig.Wire.ModelType != _recorder.WireModelType)
             {
-                _recorder.Restart(_recorder.CurrentState, type);
+                StopRecording(DefaultFolder);
+                Message += " - stopped by type change";
+                return;
             }
             _recorder.Add(_runner.LastInput, after);
+            if (_recorder.Count >= _recorder.Capacity)
+            {
+                StopRecording(DefaultFolder);
+                Message += " - reached the limit";
+            }
         }
 
         private void OnPlayerReset()
         {
+            // 再生を始めたとき（PlayFile）も呼ばれるが、そのときは記録も再生もしていない。
             if (_playback != null)
             {
-                // 再生中に位置をリセットしたら、再生をやめる。
                 _runner.InputOverride = null;
                 _playback = null;
                 Message = "Replay canceled";
             }
-            RestartRecording();
+            if (_recording)
+            {
+                StopRecording(DefaultFolder);
+                Message += " - stopped by reset";
+            }
         }
 
         private void FinishReplay(CharacterState after)
@@ -228,11 +303,6 @@ namespace Degunatsu.Runtime.DebugTools
             _playback = null;
         }
 
-        private void RestartRecording()
-        {
-            _recorder.Restart(_runner.PlayerState, _runner.PlayerConfig.Wire.ModelType);
-        }
-
         private void OnGUI()
         {
             if (!_runner.enabled)
@@ -243,10 +313,20 @@ namespace Degunatsu.Runtime.DebugTools
             {
                 _style = new GUIStyle(GUI.skin.box) { alignment = TextAnchor.UpperLeft, fontSize = 15 };
             }
-            string status = _playback != null
-                ? $"PLAYING {_playback.Played}/{_playback.Recording.Inputs.Count}"
-                : $"REC {SimTime.TicksToSeconds(_recorder.Count):0.0}s (max {_recordSeconds:0}s)";
-            string text = $"Replay  F5: save  F6: play newest\n{status}\n{Message}";
+            string status;
+            if (_playback != null)
+            {
+                status = $"PLAYING {SimTime.TicksToSeconds(_playback.Played):0.0}s / {SimTime.TicksToSeconds(_playback.Recording.Inputs.Count):0.0}s";
+            }
+            else if (_recording)
+            {
+                status = $"REC {SimTime.TicksToSeconds(_recorder.Count):0.0}s (max {_maxRecordSeconds:0}s)";
+            }
+            else
+            {
+                status = "Idle";
+            }
+            string text = $"Replay  F5: start/stop rec  F6: play newest/stop\n{status}\n{Message}";
             const int lines = 3;
             float height = 12f + 21f * lines;
             GUI.Box(new Rect(10f, Screen.height - height - 10f, Width, height), text, _style);
