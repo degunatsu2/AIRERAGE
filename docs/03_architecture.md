@@ -97,7 +97,7 @@ Degunatsu.Runtime.Tests（Runtime を参照。PlayMode テスト。最小限）
 
 ### 4.2 キャラクターの移動は自前のキネマティック制御
 
-- **Rigidbody は使わない**。速度と位置を自前で積分し、地形との衝突は `ICollisionQuery`（カプセルキャスト等）で解決する。
+- **Rigidbody は使わない**。速度と位置を自前で積分し、地形との衝突は `ICollisionQuery`（箱のスイープ、重なりの解消、レイキャスト）で解決する。キャラクターの当たり形状は軸平行の箱。
 - 理由:
   - ネットワークの予測では、自キャラだけを数ティック分再計算する必要がある。Unity の物理エンジンはシーン全体でしか進められない。
   - 操作感（加速、空中制御、ワイヤーの拘束）を直接制御できる。
@@ -127,7 +127,8 @@ public interface IWireMotionModel
 - Core には `[Serializable]` な純C#の設定クラス（例: `WireTuning`）を置く。
 - Runtime の ScriptableObject（例: `WireProfileAsset`）はそれを1つのフィールドとして持ち、インスペクターで編集できるようにする。
 - 実行時に Core の設定へ変換し、`Validate()` で値の範囲を検査する。不正な値はアセット名とフィールド名を含むエラーで止める（握りつぶさない）。
-- 予定しているデータ: `CharacterDefinition`, `MovementTuning`, `WireProfile`, `AttackDefinition`, `GuardTuning`, `GaugeTuning`, `EconomyRules`, `MatchRules`, `DepthPolicy`。
+- 実装済みの設定: `MovementTuning`, `WireTuning`（`InertialWireTuning` / `ResponsiveWireTuning` を含む）、それらをまとめた `CharacterConfig`。
+- 予定しているデータ: `CharacterDefinition`, `AttackDefinition`, `GuardTuning`, `GaugeTuning`, `EconomyRules`, `MatchRules`, `DepthPolicy`。
 - 開発中はプレイ中に ScriptableObject を編集すると即座に反映されるようにする（調整の往復を速くするため）。
 
 ### 4.5 入力
@@ -237,6 +238,7 @@ degunatsu/
 | 名前空間 | `Degunatsu.<アセンブリ>.<機能>` | `Degunatsu.Core.Wire` |
 | 型・メソッド・プロパティ | PascalCase | `WireController`, `TryFire()` |
 | private フィールド | `_camelCase`（インスペクターでは先頭の `_` が除かれて表示される） | `[SerializeField] private float _maxSpeed;` |
+| Core の設定クラスのフィールド | PascalCase の public フィールド（Core は UnityEngine の `SerializeField` を使えないため。Unity は public フィールドをシリアライズする） | `public float RunSpeed = 8f;` |
 | ローカル変数・引数 | camelCase | `ropeLength` |
 | インターフェース | `I` で始める | `IWireMotionModel` |
 | 単位を含む名前 | 時間はティック数なら `Ticks`、秒なら `Seconds`。角度は `Deg` / `Rad` | `cooldownTicks`, `aimAssistAngleDeg` |

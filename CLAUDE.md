@@ -5,8 +5,9 @@ Claude Code を使い、小さな単位で段階的に開発する。
 
 ## 現在の状態
 
-- **Phase 0 の前**（設計書のみ。Unity プロジェクトはまだない）。
-- Phase 0 を始めるには、ユーザーの判断が必要: D-01（Unity のバージョン）/ D-03（対象プラットフォーム）/ D-04（プロジェクトの配置）/ D-05（Git LFS）。詳細は `docs/02_open_decisions.md`。
+- **Phase 1 の途中**。UnityEngine に依存しない Core（移動、ワイヤーの共通制御、タイプA/B）と自動テストは完成（`docs/06_prototype_plan.md` 5章の進捗表）。
+- **Unity プロジェクトはまだない**。Unity を使う方法（クラウド環境の設定 `docs/08` か、ユーザーのPCで作成 `docs/09`）の決定待ち。T1-7 以降（Unity 側）はそれまで着手しない。
+- 決定済みの判断（D-01 Unity 6.3 LTS、D-03 PC/Windows、D-04、D-05 Git LFS、D-18、P-1〜P-4）は `docs/02_open_decisions.md` に記録してある。
 
 ## 設計書（作業前に関係する章を読む）
 
@@ -20,12 +21,13 @@ Claude Code を使い、小さな単位で段階的に開発する。
 | `docs/06_prototype_plan.md` | 最初のプロトタイプ（ワイヤー移動）の実装計画 |
 | `docs/07_quality.md` | テストと品質管理の方針、手動プレイテストのチェックリスト |
 | `docs/08_cloud_unity_setup.md` | クラウド環境で Unity Editor を動かすための設定（ユーザー側の設定が必要） |
+| `docs/09_unity_project_setup.md` | Unity プロジェクトの作成手順（ユーザーのPCで行う場合） |
 
 ## 確定している基本原則（ユーザーの指示）
 
 - 4つの面白さ（コイン争奪、空中コンボ、キャラクター対戦、目標争奪）を、**1つのアリーナ・1つの戦闘システム・1つのスコア設計**に統合する。別モードにしない。
 - ワイヤーの2タイプ（A: 物理・慣性重視、B: 操作追従重視）は、ルール・戦闘・スコア・ネットワークを共有する。差は設定値か差し替え可能な運動ロジックだけで表し、**タイプごとにコードを複製しない**。
-- キャンセル規則: 攻撃→攻撃は最大1回。攻撃→ワイヤーは可。ワイヤー→攻撃はワイヤーで引っ張られている間だけ可。状態遷移とキャンセルの可否は明示的に管理する。
+- キャンセル規則: 攻撃→攻撃は最大1回。攻撃→ワイヤーは可（クールタイムあり。使うとエフェクトを出し、キャラ周囲に半透明の円形クールタイマーを表示する。P-1）。ワイヤー→攻撃は接続中（`WireState.IsPulling`）の間だけ可（D-18）。状態遷移とキャンセルの可否は明示的に管理する。
 - フレームデータ、ガード／ジャストガードの受付時間などはデータで調整できるようにする。未確定の数値は【仮】と明記し、最終仕様として固定しない。
 - コインの獲得・所持・ドロップ・消滅・最終スコアへの反映は別の概念として扱う。報酬の発生と加算は一元管理し、二重加算や不正な加算を防ぐ。
 - キャラクターは共通の戦闘基盤＋データ（ScriptableObject）＋最小限の固有ロジックで差別化する。
@@ -39,12 +41,21 @@ Claude Code を使い、小さな単位で段階的に開発する。
 - エラーを握りつぶさない（空の catch を書かない）。原因を追える情報を残す。
 - 未確定の機能を先回りして作り込まない。
 
-### 提案中のアーキテクチャ（`docs/03_architecture.md`。承認後に「確定」へ移す）
+### アーキテクチャ（`docs/03_architecture.md`。この方針で実装中）
 
-- シミュレーションは固定ティック（60Hz）の純C#（`Degunatsu.Core`、`noEngineReferences: true`）。`Time`、`UnityEngine.Random`、静的な可変状態を使わない。
-- キャラクターの移動は Rigidbody を使わない自前のキネマティック制御。衝突は `ICollisionQuery` を通して調べる。
-- 入力はティック単位の `PlayerInput`。状態は構造体で持つ。
-- NGO への依存は `Degunatsu.Net` に閉じ込める。
+- シミュレーションは固定ティック（60Hz、`SimTime`）の純C#（`Degunatsu.Core`、`noEngineReferences: true`）。`Time`、`UnityEngine.Random`、静的な可変状態を使わない。
+- キャラクターの移動は Rigidbody を使わない自前のキネマティック制御（`KinematicMotor`）。当たり形状は軸平行の箱。衝突は `ICollisionQuery` を通して調べる。
+- 入力はティック単位の `PlayerInput`（量子化）。状態は構造体（`CharacterState` / `WireState`）で持ち、等値比較できるようにする。
+- ワイヤーは共通の `WireController` と、差し替え可能な `IWireMotionModel`（`InertialWireModel` / `ResponsiveWireModel`）。モデルは速度とロープ長だけを決める。
+- 調整値は Core の `[Serializable]` な設定クラス（`MovementTuning` / `WireTuning` / `CharacterConfig`）に置き、`Validate()` で検査する。仮値は設定クラスの初期値の1か所にだけ書く。
+- NGO への依存は `Degunatsu.Net` に閉じ込める（Phase 2）。
+
+### Core を書くときの制約
+
+- Unity 6 と同じ条件でコンパイルできること: **.NET Standard 2.1、C# 9**（file-scoped namespace、record struct、global using などは使わない）。`tools/CoreTests` のビルドがこれを検査する（警告もエラー扱い）。
+- テストは Unity の NUnit（3.5 相当）にある API だけを使う（`Assert.Multiple` などは使わない）。テストも UnityEngine を使わない。
+- ベクトルは `System.Numerics`。Unity の型との変換は Runtime 側の境界で行う。
+- `Assets/` にファイルやフォルダを追加・削除したら、`python3 tools/unity_meta.py` で `.meta` を生成し、`--check` で検査する。
 
 ## 作業の進め方（すべてのタスクで）
 
@@ -64,5 +75,6 @@ Claude Code を使い、小さな単位で段階的に開発する。
 ## 検証と報告
 
 - **この開発環境（クラウド）には Unity Editor がない**。Unity 上の動作、シーン、操作感は確認できない。確認していないものを確認済みのように報告しない。手動で行う操作と確認方法を具体的に示す。
-- Core のロジックは `dotnet test` で検証する（`tools/CoreTests` は Phase 0 で作る）。.NET 8 SDK は `apt-get install -y dotnet-sdk-8.0` で入る（Microsoft の配布元はネットワークポリシーで遮断されているが、Ubuntu のリポジトリと NuGet には接続できる）。
+- Core のロジックは `dotnet test tools/CoreTests/Degunatsu.Core.Tests` で検証する。クラウドセッションでは SessionStart フック（`.claude/hooks/session-start.sh`）が .NET 8 SDK を apt で導入する（Microsoft の配布元はネットワークポリシーで遮断されているが、Ubuntu のリポジトリと NuGet には接続できる）。
+- GitHub Actions（`.github/workflows/core-tests.yml`）でも、push のたびに `.meta` の検査と Core のテストを実行する。
 - 報告では、検証の種類を区別する: ✅ 自動テスト済み（dotnet）／ ✅ Unity で確認済み（ユーザーの報告による）／ ⚠️ 未検証（手順を添える）。

@@ -6,7 +6,7 @@ Unity / C# で制作する、2.5D横視点のワイヤーアクション型オ�
 
 ## 現在の状態
 
-設計段階です（Unity プロジェクトはまだありません）。
+Phase 1（ワイヤー移動プロトタイプ）の途中です。UnityEngine に依存しないコアロジックと自動テストまで完成しています。Unity プロジェクトはまだ作成していません。
 
 ## 設計書
 
@@ -21,5 +21,6 @@ Unity / C# で制作する、2.5D横視点のワイヤーアクション型オ�
 | 7 | 最初のプロトタイプ（ワイヤー移動）の実装計画 | [docs/06_prototype_plan.md](docs/06_prototype_plan.md) |
 | 8 | テストと品質管理の方針 | [docs/07_quality.md](docs/07_quality.md) |
 | — | クラウド環境で Unity Editor を動かすための設定 | [docs/08_cloud_unity_setup.md](docs/08_cloud_unity_setup.md) |
+| — | Unity プロジェクトの作成手順（ユーザーのPCで行う場合） | [docs/09_unity_project_setup.md](docs/09_unity_project_setup.md) |
 
 Claude Code 向けの規約は [CLAUDE.md](CLAUDE.md) にあります。
