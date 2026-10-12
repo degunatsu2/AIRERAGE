@@ -84,7 +84,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
 | Runtime/Presentation | 状態を読んで表示する | `CharacterView`, `WireView` | 1 |
-| Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え | `DebugHud` | 1 |
+| Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、コースのタイム計測 | `DebugHud`, `CourseTimer`, `CourseTimerHud`, `CourseZone` | 1 |
 | Net | 接続、入力・スナップショットのメッセージ、予測と照合、ラグ補償 | Phase 2 で設計する | 2 |
 
 ---

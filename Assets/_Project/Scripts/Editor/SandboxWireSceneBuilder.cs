@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Degunatsu.Runtime.Data;
+using Degunatsu.Runtime.DebugTools;
 using Degunatsu.Runtime.Presentation;
 using Degunatsu.Runtime.Simulation;
 using Unity.Cinemachine;
@@ -47,19 +48,82 @@ namespace Degunatsu.Editor
             }
         }
 
-        // T1-7 の確認用の最初の配置。Core のテストの遊び場（TestArenas.Playground）と同じ。T1-8 で広げる。
+        // 検証用アリーナ（docs/06_prototype_plan.md T1-8）。横 120m（x = -60〜60）、高さ 30m。
+        // 中央のスタートから、左（足場渡り）・右（細い壁越え）・上（空中）の3コースに分かれる。左端は天井の低い通路。
+        // 配置は現在の移動とワイヤーの仮の値（ジャンプ 2.4m＋空中ジャンプ、ワイヤーの最大長 12m）で届くように決めた。
         private static readonly TerrainBox[] Terrain =
         {
-            new TerrainBox("Ground", -30f, -1f, 30f, 0f),
-            new TerrainBox("Ceiling", -30f, 10f, 30f, 11f, attachable: true),
-            new TerrainBox("WallLeft", -31f, -1f, -30f, 11f),
-            new TerrainBox("WallRight", 30f, -1f, 31f, 11f),
-            new TerrainBox("ThinWall", 8f, 0f, 8.2f, 6f),
-            new TerrainBox("FloatingPlatform", -4f, 4f, -1f, 4.5f, attachable: true),
+            // 外枠（天井は接続できる）
+            new TerrainBox("Ground", -60f, -1f, 60f, 0f),
+            new TerrainBox("Ceiling", -60f, 30f, 60f, 31f, attachable: true),
+            new TerrainBox("WallLeft", -61f, -1f, -60f, 31f),
+            new TerrainBox("WallRight", 60f, -1f, 61f, 31f),
+
+            // 左「Platforms」: 幅 1〜2m の足場の連なり（接続できる）。下を歩けるよう、いちばん低い足場の下面は 2.2m。
+            new TerrainBox("Platform1", -7.5f, 2.2f, -5.5f, 2.6f, attachable: true),
+            new TerrainBox("Platform2", -12f, 3.6f, -10.5f, 4f, attachable: true),
+            new TerrainBox("Platform3", -16.5f, 5f, -15.5f, 5.4f, attachable: true),
+            new TerrainBox("Platform4", -21f, 6.2f, -19.5f, 6.6f, attachable: true),
+            new TerrainBox("Platform5", -26f, 7.6f, -25f, 8f, attachable: true),
+            new TerrainBox("Platform6", -31f, 9f, -29.5f, 9.4f, attachable: true),
+            new TerrainBox("PlatformGoal", -36f, 10.4f, -33f, 10.8f, attachable: true),
+
+            // 右「Walls」: 厚さ 0.2〜0.5m・高さ 8m の細い壁（接続できない）と、上の梁（接続できる）。
+            new TerrainBox("WallsBeam", 6f, 12f, 32f, 13f, attachable: true),
+            new TerrainBox("ThinWall1", 10f, 0f, 10.2f, 8f),
+            new TerrainBox("ThinWall2", 16f, 0f, 16.3f, 8f),
+            new TerrainBox("ThinWall3", 22f, 0f, 22.5f, 8f),
+            new TerrainBox("ThinWall4", 28f, 0f, 28.2f, 8f),
+
+            // 上「Air」: 空中の障害物（接続できる）と、高さ 24m のゴールの足場。
+            new TerrainBox("AirBlock1", 3f, 8f, 5f, 8.5f, attachable: true),
+            new TerrainBox("AirBlock2", -6f, 13f, -4f, 13.5f, attachable: true),
+            new TerrainBox("AirBlock3", 2f, 18f, 4f, 18.5f, attachable: true),
+            new TerrainBox("AirGoal", -2f, 24f, 2f, 24.5f, attachable: true),
+
+            // 左端: 天井の低い通路（引っかかりの確認用。計測はしない）。すき間は 0.2m と 0.1m（キャラクターの高さは 1.8m）。
+            new TerrainBox("CorridorCeilingHigh", -58f, 2f, -50f, 3f),
+            new TerrainBox("CorridorCeilingLow", -50f, 1.9f, -44f, 3f),
         };
 
-        private static readonly Vector2[] AnchorPoints = { new Vector2(3f, 7f), new Vector2(-10f, 6f) };
-        private static readonly Vector3 SpawnPosition = new Vector3(-15f, 1f, 0f);
+        private static readonly Vector2[] AnchorPoints =
+        {
+            new Vector2(-2f, 10f),
+            new Vector2(4.5f, 14f),
+            new Vector2(-3f, 20f),
+            new Vector2(7f, 9f),
+        };
+
+        private static readonly Vector3 SpawnPosition = new Vector3(0f, 1f, 0f);
+
+        private readonly struct Zone
+        {
+            public readonly CourseZone.ZoneKind Kind;
+            public readonly string Course;
+            public readonly Vector2 Min;
+            public readonly Vector2 Max;
+
+            public Zone(CourseZone.ZoneKind kind, string course, float minX, float minY, float maxX, float maxY)
+            {
+                Kind = kind;
+                Course = course;
+                Min = new Vector2(minX, minY);
+                Max = new Vector2(maxX, maxY);
+            }
+        }
+
+        // タイム計測コースのスタートとゴール（キャラクターの箱が範囲に重なったら入ったとみなす）。
+        private static readonly Zone[] Zones =
+        {
+            new Zone(CourseZone.ZoneKind.Start, "", -2f, 0f, 2f, 2.5f),
+            new Zone(CourseZone.ZoneKind.Goal, "Platforms", -36f, 10.8f, -33f, 13.3f),
+            new Zone(CourseZone.ZoneKind.Goal, "Walls", 33f, 0f, 37f, 3f),
+            new Zone(CourseZone.ZoneKind.Goal, "Air", -2f, 24.5f, 2f, 27f),
+        };
+
+        // 範囲の枠の太さと、奥行きの位置（キャラクターより奥に置く）。
+        private const float ZoneFrameWidth = 0.08f;
+        private const float ZoneFrameZ = 0.6f;
 
         // 追従カメラの初期値【仮】（D-13。プレイして調整する）。シーンの CinemachineCamera で編集できる。
         // 視野角 40°・距離 22m で、縦 約16m × 横 約28m（16:9）が映る（ワイヤーの最大長 12m が収まる）。
@@ -103,7 +167,8 @@ namespace Degunatsu.Editor
             // ワイヤーの色は仮（背景の明るい空と区別できるように、線は紫、接続点の印は橙）。
             Material wireMaterial = LoadOrCreateMaterial("Wire", new Color(0.6f, 0.2f, 0.85f), unlit: true);
             Material attachedAnchorMaterial = LoadOrCreateMaterial("WireAnchor", new Color(1f, 0.5f, 0f), unlit: true);
-
+            Material startZoneMaterial = LoadOrCreateMaterial("ZoneStart", new Color(0.2f, 0.8f, 0.3f), unlit: true);
+            Material goalZoneMaterial = LoadOrCreateMaterial("ZoneGoal", new Color(0.9f, 0.25f, 0.25f), unlit: true);
 
             var terrainRoot = new GameObject("Terrain").transform;
             foreach (TerrainBox box in Terrain)
@@ -129,6 +194,13 @@ namespace Degunatsu.Editor
                 go.transform.SetParent(anchorRoot, false);
                 go.transform.localPosition = new Vector3(point.x, point.y, 0f);
                 go.AddComponent<WireAnchorPoint>();
+            }
+
+            var zoneRoot = new GameObject("CourseZones").transform;
+            foreach (Zone zone in Zones)
+            {
+                bool isStart = zone.Kind == CourseZone.ZoneKind.Start;
+                CreateZone(zoneRoot, zone, isStart ? startZoneMaterial : goalZoneMaterial);
             }
 
             var spawn = new GameObject("SpawnPoint").transform;
@@ -158,6 +230,9 @@ namespace Degunatsu.Editor
             SetReference(runner, "_characterView", characterView);
             SetReference(runner, "_wireView", wireView);
 
+            var courseTimer = new GameObject("CourseTimer").AddComponent<CourseTimerHud>();
+            SetReference(courseTimer, "_runner", runner);
+
             EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
             {
@@ -182,6 +257,36 @@ namespace Degunatsu.Editor
             scenes.CopyTo(updated, 0);
             updated[scenes.Length] = new EditorBuildSettingsScene(path, true);
             EditorBuildSettings.scenes = updated;
+        }
+
+        /// <summary>計測コースの範囲（トリガーの BoxCollider）と、その枠の表示を作る。</summary>
+        private static void CreateZone(Transform parent, Zone zone, Material frameMaterial)
+        {
+            string name = zone.Kind == CourseZone.ZoneKind.Start ? "Start" : $"Goal_{zone.Course}";
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            Vector2 center = (zone.Min + zone.Max) * 0.5f;
+            Vector2 size = zone.Max - zone.Min;
+            go.transform.localPosition = new Vector3(center.x, center.y, 0f);
+            var collider = go.AddComponent<BoxCollider>();
+            collider.isTrigger = true;
+            collider.size = new Vector3(size.x, size.y, 1f);
+            go.AddComponent<CourseZone>().Configure(zone.Kind, zone.Course);
+
+            // 枠（上下左右の4本の棒）
+            float w = ZoneFrameWidth;
+            CreateFrameBar(go.transform, frameMaterial, new Vector3(0f, size.y * 0.5f, ZoneFrameZ), new Vector3(size.x, w, w));
+            CreateFrameBar(go.transform, frameMaterial, new Vector3(0f, -size.y * 0.5f, ZoneFrameZ), new Vector3(size.x, w, w));
+            CreateFrameBar(go.transform, frameMaterial, new Vector3(-size.x * 0.5f, 0f, ZoneFrameZ), new Vector3(w, size.y, w));
+            CreateFrameBar(go.transform, frameMaterial, new Vector3(size.x * 0.5f, 0f, ZoneFrameZ), new Vector3(w, size.y, w));
+        }
+
+        private static void CreateFrameBar(Transform parent, Material material, Vector3 localPosition, Vector3 scale)
+        {
+            GameObject bar = CreateVisual(PrimitiveType.Cube, "Frame", material, scale);
+            bar.transform.SetParent(parent, false);
+            bar.transform.localPosition = localPosition;
+            bar.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
         }
 
         /// <summary>キャラクターを横から追従するカメラ（Cinemachine 3）。回転はせず、位置だけを合わせる。</summary>

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Physics;
@@ -35,6 +36,15 @@ namespace Degunatsu.Runtime.Simulation
         private int _player;
         private CharacterState _previous;
         private float _accumulator;
+
+        /// <summary>操作するキャラクターの1ティックが終わるたびに、その状態を通知する（計測などのデバッグ機能用）。</summary>
+        public event Action<CharacterState> PlayerTicked;
+
+        /// <summary>操作するキャラクターの位置をリセットしたときに通知する。</summary>
+        public event Action PlayerReset;
+
+        /// <summary>操作するキャラクターの調整値（読み取り用。値はシミュレーションと共有している）。</summary>
+        public CharacterConfig PlayerConfig => _character.Config;
 
         private void Awake()
         {
@@ -90,6 +100,7 @@ namespace Degunatsu.Runtime.Simulation
                 _world.Step(_inputs);
                 _accumulator -= SimTime.DeltaTime;
                 ticks++;
+                PlayerTicked?.Invoke(_world.GetState(_player));
             }
             if (ticks == MaxTicksPerFrame && _accumulator >= SimTime.DeltaTime)
             {
@@ -118,6 +129,7 @@ namespace Degunatsu.Runtime.Simulation
             CharacterState state = CharacterState.Spawn(_spawnPoint.position.ToNumerics(), 1);
             _world.SetState(_player, state);
             _previous = state;
+            PlayerReset?.Invoke();
         }
     }
 }

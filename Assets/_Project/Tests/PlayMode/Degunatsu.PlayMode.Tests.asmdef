@@ -4,6 +4,7 @@
     "references": [
         "Degunatsu.Core",
         "Degunatsu.Runtime",
+        "Unity.Cinemachine",
         "UnityEngine.TestRunner"
     ],
     "includePlatforms": [],

@@ -1,7 +1,9 @@
 using System.Collections;
+using Degunatsu.Runtime.DebugTools;
 using Degunatsu.Runtime.Presentation;
 using Degunatsu.Runtime.Simulation;
 using NUnit.Framework;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -40,14 +42,21 @@ namespace Degunatsu.PlayMode.Tests
             Assert.That(view.transform.position.y, Is.EqualTo(StandingY).Within(0.02f), "地面に立っていない");
             Assert.That(view.transform.localScale, Is.EqualTo(new Vector3(0.8f, 1.8f, 0.8f)), "箱の大きさがキャラクターの当たり判定と違う");
 
-            // 追従カメラ（Cinemachine）が、キャラクターの手前から横向きに映している。
+            // 追従カメラ（Cinemachine）が、設定した距離だけ手前から、横向きに映している。
             Camera camera = Camera.main;
+            var composer = Object.FindFirstObjectByType<CinemachinePositionComposer>();
             Assert.That(camera, Is.Not.Null, "MainCamera がない");
+            Assert.That(composer, Is.Not.Null, "CinemachinePositionComposer がない");
             Vector3 offset = camera.transform.position - view.transform.position;
-            Assert.That(offset.z, Is.LessThan(-1f), "カメラがキャラクターの手前にない");
+            Assert.That(-offset.z, Is.EqualTo(composer.CameraDistance).Within(0.05f), "カメラが Cinemachine の距離にない");
             Assert.That(Mathf.Abs(offset.x), Is.LessThan(2f), "カメラが横方向に追従していない");
             Assert.That(Mathf.Abs(offset.y), Is.LessThan(2f), "カメラが縦方向に追従していない");
             Assert.That(Quaternion.Angle(camera.transform.rotation, Quaternion.identity), Is.LessThan(0.01f), "カメラが回転している");
+
+            // 出現位置はスタートの範囲の中なので、計測は「スタートを出るのを待つ」状態になっている。
+            var courseTimer = Object.FindFirstObjectByType<CourseTimerHud>();
+            Assert.That(courseTimer, Is.Not.Null, "CourseTimerHud がない");
+            Assert.That(courseTimer.Timer.Phase, Is.EqualTo(CourseTimer.TimerPhase.Ready));
         }
     }
 }
