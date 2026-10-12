@@ -162,7 +162,7 @@ public interface IWireMotionModel
 | Input System | 入力 | Phase 0 |
 | Test Framework | EditMode / PlayMode テスト | Phase 0（Unity に同梱） |
 | URP | 描画（テンプレートに含まれる） | Phase 0 |
-| Cinemachine 3.x | カメラの追従、デッドゾーン、ダンピング | Phase 1（カメラはシミュレーションに影響しないので後から差し替え可能） |
+| Cinemachine 3.x | カメラの追従、デッドゾーン、ダンピング | Phase 1（カメラはシミュレーションに影響しないので後から差し替え可能）。**導入済み**: 3.1.7（2026-10-12、ユーザーの承認。依存で Splines 2.9.1 も入った） |
 | Netcode for GameObjects 2.x ＋ Unity Transport | ネットワーク | Phase 2 |
 | Multiplayer Play Mode 2.0 | エディタ上で最大4プレイヤーを起動して検証 | Phase 2 |
 | Multiplayer Tools | ネットワークシミュレーター（遅延・パケットロスの模擬）、プロファイラ | Phase 2 |

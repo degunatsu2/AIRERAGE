@@ -3,6 +3,7 @@ using System.IO;
 using Degunatsu.Runtime.Data;
 using Degunatsu.Runtime.Presentation;
 using Degunatsu.Runtime.Simulation;
+using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -59,7 +60,13 @@ namespace Degunatsu.Editor
 
         private static readonly Vector2[] AnchorPoints = { new Vector2(3f, 7f), new Vector2(-10f, 6f) };
         private static readonly Vector3 SpawnPosition = new Vector3(-15f, 1f, 0f);
-        private static readonly Vector3 CameraPosition = new Vector3(0f, 5f, -31f);
+
+        // 追従カメラの初期値【仮】（D-13。プレイして調整する）。シーンの CinemachineCamera で編集できる。
+        // 視野角 40°・距離 22m で、縦 約16m × 横 約28m（16:9）が映る（ワイヤーの最大長 12m が収まる）。
+        private const float CameraFieldOfView = 40f;
+        private const float CameraDistance = 22f;
+        private const float CameraDeadZone = 0.1f;   // 画面の割合
+        private const float CameraDamping = 0.3f;    // 秒
 
         [MenuItem("Degunatsu/Sandbox_Wire シーンを作り直す")]
         private static void BuildFromMenu()
@@ -95,8 +102,6 @@ namespace Degunatsu.Editor
             Material anchorMaterial = LoadOrCreateMaterial("Anchor", new Color(0.95f, 0.85f, 0.2f));
             Material wireMaterial = LoadOrCreateMaterial("Wire", new Color(0.95f, 0.95f, 0.95f), unlit: true);
 
-            Camera camera = Object.FindFirstObjectByType<Camera>();
-            camera.transform.SetPositionAndRotation(CameraPosition, Quaternion.identity);
 
             var terrainRoot = new GameObject("Terrain").transform;
             foreach (TerrainBox box in Terrain)
@@ -142,6 +147,8 @@ namespace Degunatsu.Editor
             var wireView = wireGo.AddComponent<WireView>();
             SetReference(wireView, "_anchorMarker", anchorMarker.transform);
 
+            CreateFollowCamera(characterGo.transform);
+
             var runner = new GameObject("Simulation").AddComponent<SimulationRunner>();
             SetReference(runner, "_character", character);
             SetReference(runner, "_inputActions", inputActions);
@@ -173,6 +180,29 @@ namespace Degunatsu.Editor
             scenes.CopyTo(updated, 0);
             updated[scenes.Length] = new EditorBuildSettingsScene(path, true);
             EditorBuildSettings.scenes = updated;
+        }
+
+        /// <summary>キャラクターを横から追従するカメラ（Cinemachine 3）。回転はせず、位置だけを合わせる。</summary>
+        private static void CreateFollowCamera(Transform target)
+        {
+            // カメラの位置は Cinemachine が決める（再生時にキャラクターへ合わせる）ので、ここでは置かない。
+            Camera camera = Object.FindFirstObjectByType<Camera>();
+            camera.gameObject.AddComponent<CinemachineBrain>();
+
+            var go = new GameObject("FollowCamera");
+            var virtualCamera = go.AddComponent<CinemachineCamera>();
+            virtualCamera.Follow = target;
+            LensSettings lens = LensSettings.Default;
+            lens.FieldOfView = CameraFieldOfView;
+            virtualCamera.Lens = lens;
+
+            var composer = go.AddComponent<CinemachinePositionComposer>();
+            composer.CameraDistance = CameraDistance;
+            composer.Damping = new Vector3(CameraDamping, CameraDamping, 0f);
+            ScreenComposerSettings composition = ScreenComposerSettings.Default;
+            composition.DeadZone.Enabled = true;
+            composition.DeadZone.Size = new Vector2(CameraDeadZone, CameraDeadZone);
+            composer.Composition = composition;
         }
 
         private static CharacterConfigAsset LoadOrCreateCharacterConfig()

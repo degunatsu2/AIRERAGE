@@ -39,6 +39,15 @@ namespace Degunatsu.PlayMode.Tests
 
             Assert.That(view.transform.position.y, Is.EqualTo(StandingY).Within(0.02f), "地面に立っていない");
             Assert.That(view.transform.localScale, Is.EqualTo(new Vector3(0.8f, 1.8f, 0.8f)), "箱の大きさがキャラクターの当たり判定と違う");
+
+            // 追従カメラ（Cinemachine）が、キャラクターの手前から横向きに映している。
+            Camera camera = Camera.main;
+            Assert.That(camera, Is.Not.Null, "MainCamera がない");
+            Vector3 offset = camera.transform.position - view.transform.position;
+            Assert.That(offset.z, Is.LessThan(-1f), "カメラがキャラクターの手前にない");
+            Assert.That(Mathf.Abs(offset.x), Is.LessThan(2f), "カメラが横方向に追従していない");
+            Assert.That(Mathf.Abs(offset.y), Is.LessThan(2f), "カメラが縦方向に追従していない");
+            Assert.That(Quaternion.Angle(camera.transform.rotation, Quaternion.identity), Is.LessThan(0.01f), "カメラが回転している");
         }
     }
 }

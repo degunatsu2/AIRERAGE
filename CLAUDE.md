@@ -6,7 +6,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 ## 現在の状態
 
 - **Phase 1 の途中**。UnityEngine に依存しない Core（移動、ワイヤーの共通制御、タイプA/B）と自動テストは完成（`docs/06_prototype_plan.md` 5章の進捗表）。
-- **Unity プロジェクトを作成済み**（2026-10-12、Unity 6000.3.26f1、「Universal 3D」テンプレート。D-04）。クラウドでも Unity をバッチモードで使える（`docs/08` 4.2）。Phase 0 は完了。T1-7（Unity との接続）の途中: カメラ以外（T1-7a）は完了し、ユーザーの操作確認と、カメラ用の Cinemachine の追加の承認を待っている。
+- **Unity プロジェクトを作成済み**（2026-10-12、Unity 6000.3.26f1、「Universal 3D」テンプレート。D-04）。クラウドでも Unity をバッチモードで使える（`docs/08` 4.2）。Phase 0 は完了。T1-7（Unity との接続）は実装が完了し（追従カメラは Cinemachine 3.1.7）、ユーザーの操作確認を待っている。
 - 決定済みの判断（D-01 Unity 6.3 LTS、D-03 PC/Windows、D-04、D-05 Git LFS、D-18、P-1〜P-4）は `docs/02_open_decisions.md` に記録してある。
 
 ## 設計書（作業前に関係する章を読む）
