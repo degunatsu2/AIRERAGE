@@ -6,7 +6,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 ## 現在の状態
 
 - **Phase 1 の途中**。UnityEngine に依存しない Core（移動、ワイヤーの共通制御、タイプA/B）と自動テストは完成（`docs/06_prototype_plan.md` 5章の進捗表）。
-- **Unity プロジェクトはまだない**。クラウドで Unity を使う準備の途中（`docs/08`）: ネットワークは設定済みで、エディタは `bash tools/unity/install_editor.sh` で `/opt/unity/<バージョン>/Editor/Unity` に導入できる。ライセンス情報（環境変数）はユーザーが登録済みだが、**有効化はまだ確認していない**。プロジェクトは Claude がクラウドでテンプレートから作成する（D-04 の変更、`docs/08` 4.1）。T1-7 以降（Unity 側）はプロジェクトができるまで着手しない。
+- **Unity プロジェクトはまだない**。クラウドで Unity を使う準備の途中（`docs/08`）: ネットワークは設定済みで、エディタは `bash tools/unity/install_editor.sh` で `/opt/unity/<バージョン>/Editor/Unity` に導入できる。ライセンス情報（環境変数）はユーザーが登録済みだが、**有効化は認証エラー（Invalid Credential）で失敗し、アカウント側の確認待ち**（`docs/08` 3.2、6章）。失敗した値で再試行しない。プロジェクトは Claude がクラウドでテンプレートから作成する（D-04 の変更、`docs/08` 4.1）。T1-7 以降（Unity 側）はプロジェクトができるまで着手しない。
 - 決定済みの判断（D-01 Unity 6.3 LTS、D-03 PC/Windows、D-04、D-05 Git LFS、D-18、P-1〜P-4）は `docs/02_open_decisions.md` に記録してある。
 
 ## 設計書（作業前に関係する章を読む）
