@@ -19,6 +19,7 @@ Claude Code を使い、小さな単位で段階的に開発する。
 | `docs/05_roadmap.md` | 開発フェーズと完了条件 |
 | `docs/06_prototype_plan.md` | 最初のプロトタイプ（ワイヤー移動）の実装計画 |
 | `docs/07_quality.md` | テストと品質管理の方針、手動プレイテストのチェックリスト |
+| `docs/08_cloud_unity_setup.md` | クラウド環境で Unity Editor を動かすための設定（ユーザー側の設定が必要） |
 
 ## 確定している基本原則（ユーザーの指示）
 

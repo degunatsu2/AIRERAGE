@@ -20,5 +20,6 @@ Unity / C# で制作する、2.5D横視点のワイヤーアクション型オ�
 | 6 | 開発フェーズと完了条件 | [docs/05_roadmap.md](docs/05_roadmap.md) |
 | 7 | 最初のプロトタイプ（ワイヤー移動）の実装計画 | [docs/06_prototype_plan.md](docs/06_prototype_plan.md) |
 | 8 | テストと品質管理の方針 | [docs/07_quality.md](docs/07_quality.md) |
+| — | クラウド環境で Unity Editor を動かすための設定 | [docs/08_cloud_unity_setup.md](docs/08_cloud_unity_setup.md) |
 
 Claude Code 向けの規約は [CLAUDE.md](CLAUDE.md) にあります。
