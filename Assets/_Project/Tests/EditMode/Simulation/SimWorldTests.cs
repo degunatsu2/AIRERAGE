@@ -99,5 +99,47 @@ namespace Degunatsu.Core.Tests.Simulation
             Assert.That(frame.WasPressed(InputButtons.Jump), Is.False);
             Assert.That(frame.Released, Is.EqualTo(InputButtons.Jump));
         }
+
+        [Test]
+        public void WithAim_NormalizesAndQuantizesDirection_KeepsMoveAndButtons()
+        {
+            var input = PlayerInput.FromAxes(1f, 0f, InputButtons.Wire).WithAim(new Vector2(3f, 4f));
+
+            Assert.That(input.HasAim, Is.True);
+            Assert.That(input.AimX, Is.EqualTo((sbyte)76));  // 0.6 * 127 = 76.2
+            Assert.That(input.AimY, Is.EqualTo((sbyte)102)); // 0.8 * 127 = 101.6
+            Assert.That(input.MoveX, Is.EqualTo((sbyte)127));
+            Assert.That(input.IsHeld(InputButtons.Wire), Is.True);
+            Assert.That(input.Aim.Length(), Is.EqualTo(1f).Within(0.01f));
+        }
+
+        [Test]
+        public void WithAim_ZeroDirection_MeansNoAim()
+        {
+            var input = PlayerInput.FromAxes(1f, 0f, InputButtons.None).WithAim(Vector2.Zero);
+
+            Assert.That(input.HasAim, Is.False);
+        }
+
+        [Test]
+        public void InputFrame_Aim_UsesAimWhenGiven_OtherwiseMove()
+        {
+            PlayerInput moveOnly = PlayerInput.FromAxes(1f, 0f, InputButtons.None);
+            PlayerInput withAim = moveOnly.WithAim(new Vector2(0f, 1f));
+
+            Assert.That(new InputFrame(moveOnly, InputButtons.None).Aim, Is.EqualTo(moveOnly.Move));
+            Assert.That(new InputFrame(withAim, InputButtons.None).Aim, Is.EqualTo(new Vector2(0f, 1f)));
+            Assert.That(new InputFrame(withAim, InputButtons.None).Move, Is.EqualTo(moveOnly.Move), "移動は照準に影響されない");
+        }
+
+        [Test]
+        public void Equality_IncludesAim()
+        {
+            PlayerInput a = PlayerInput.FromAxes(0f, 0f, InputButtons.None).WithAim(new Vector2(1f, 0f));
+            PlayerInput b = PlayerInput.FromAxes(0f, 0f, InputButtons.None).WithAim(new Vector2(0f, 1f));
+
+            Assert.That(a.Equals(b), Is.False);
+            Assert.That(a.Equals(PlayerInput.FromAxes(0f, 0f, InputButtons.None).WithAim(new Vector2(2f, 0f))), Is.True);
+        }
     }
 }

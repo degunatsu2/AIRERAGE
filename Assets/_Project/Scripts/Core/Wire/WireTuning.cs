@@ -42,8 +42,14 @@ namespace Degunatsu.Core.Wire
         /// <summary>外れたフックの回収時間（ティック）。</summary>
         public int MissRetractTicks = 10;
 
-        /// <summary>解除後・回収後のクールダウン（ティック）。</summary>
+        /// <summary>外れたフックの回収後のクールダウン（ティック）。</summary>
         public int CooldownTicks = 20;
+
+        /// <summary>
+        /// 接続を解除した後のクールダウン（ティック）。0 なら解除した直後から射出できる
+        /// （ユーザーの指示: 原則として解除後にクールタイムを生じさせない。2026-10-12）。
+        /// </summary>
+        public int ReleaseCooldownTicks = 0;
 
         /// <summary>エイムアシストの角度（度、照準方向から左右それぞれ）。</summary>
         public float AimAssistAngleDeg = 12f;
@@ -76,6 +82,7 @@ namespace Degunatsu.Core.Wire
             v.Positive(nameof(FireSpeed), FireSpeed);
             v.NonNegative(nameof(MissRetractTicks), MissRetractTicks);
             v.NonNegative(nameof(CooldownTicks), CooldownTicks);
+            v.NonNegative(nameof(ReleaseCooldownTicks), ReleaseCooldownTicks);
             v.InRange(nameof(AimAssistAngleDeg), AimAssistAngleDeg, 0f, 90f);
             v.InRange(nameof(NeutralAimAngleDeg), NeutralAimAngleDeg, -90f, 90f);
             v.InRange(nameof(AimDeadzone), AimDeadzone, 0f, 0.95f);

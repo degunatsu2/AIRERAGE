@@ -67,7 +67,7 @@ namespace Degunatsu.Core.Wire
                     state.Wire.PhaseTicks++;
                     if (state.Wire.PhaseTicks >= tuning.MissRetractTicks)
                     {
-                        EnterCooldown(ref state, tuning);
+                        EnterCooldown(ref state, tuning.CooldownTicks);
                     }
                     break;
 
@@ -124,12 +124,13 @@ namespace Degunatsu.Core.Wire
 
         /// <summary>
         /// 接続を解除する。速度は共通の出口速度上限で制限して引き継ぐ。
+        /// その後は ReleaseCooldownTicks だけ待つ（0 なら次のティックから射出できる）。
         /// </summary>
         public static void Release(ref CharacterState state, WireReleaseReason reason, WireTuning tuning)
         {
             state.Velocity = SimMath.ClampMagnitude(state.Velocity, tuning.ExitSpeedCap);
             state.Wire.LastReleaseReason = reason;
-            EnterCooldown(ref state, tuning);
+            EnterCooldown(ref state, tuning.ReleaseCooldownTicks);
         }
 
         private void UpdateAttached(ref CharacterState state, in InputFrame input, WireTuning tuning)
@@ -155,20 +156,13 @@ namespace Degunatsu.Core.Wire
         private void Fire(ref CharacterState state, in InputFrame input, WireTuning tuning)
         {
             Vector3 origin = state.Position;
-            Vector3 aim = WireTargeting.AimDirection(input.Move, state.Facing, tuning);
-
-            state.Wire.HasTargetPoint = WireTargeting.TryFindAssistTarget(origin, aim, tuning, _collision, out Vector3 target);
-            if (state.Wire.HasTargetPoint)
-            {
-                Vector3 toTarget = target - origin;
-                toTarget.Z = 0f;
-                aim = SimMath.NormalizeOr(toTarget, aim);
-            }
+            WireAim aim = WireTargeting.ResolveAim(origin, input.Aim, state.Facing, tuning, _collision);
 
             SetPhase(ref state.Wire, WirePhase.Firing);
-            state.Wire.TargetPoint = state.Wire.HasTargetPoint ? target : default;
+            state.Wire.HasTargetPoint = aim.HasTargetPoint;
+            state.Wire.TargetPoint = aim.HasTargetPoint ? aim.TargetPoint : default;
             state.Wire.HookPosition = origin;
-            state.Wire.HookDirection = aim;
+            state.Wire.HookDirection = aim.Direction;
             state.Wire.HookTraveled = 0f;
             state.Wire.LastReleaseReason = WireReleaseReason.None;
             state.Wire.LastMissReason = WireMissReason.None;
@@ -241,17 +235,17 @@ namespace Degunatsu.Core.Wire
             state.Wire.HasTargetPoint = false;
         }
 
-        private static void EnterCooldown(ref CharacterState state, WireTuning tuning)
+        private static void EnterCooldown(ref CharacterState state, int cooldownTicks)
         {
             state.Wire.HasTargetPoint = false;
-            if (tuning.CooldownTicks <= 0)
+            if (cooldownTicks <= 0)
             {
                 SetPhase(ref state.Wire, WirePhase.Ready);
                 state.Wire.CooldownTicksLeft = 0;
                 return;
             }
             SetPhase(ref state.Wire, WirePhase.Cooldown);
-            state.Wire.CooldownTicksLeft = tuning.CooldownTicks;
+            state.Wire.CooldownTicksLeft = cooldownTicks;
         }
 
         private static void SetPhase(ref WireState wire, WirePhase phase)

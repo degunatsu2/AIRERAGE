@@ -57,6 +57,20 @@ namespace Degunatsu.PlayMode.Tests
             var courseTimer = Object.FindFirstObjectByType<CourseTimerHud>();
             Assert.That(courseTimer, Is.Not.Null, "CourseTimerHud がない");
             Assert.That(courseTimer.Timer.Phase, Is.EqualTo(CourseTimer.TimerPhase.Ready));
+
+            // 照準のインジケーター: 射出できる状態なので照準の線が出ていて、射程の円はキャラクターを中心に射程の半径。
+            var aim = Object.FindFirstObjectByType<AimIndicatorView>();
+            Assert.That(aim, Is.Not.Null, "AimIndicatorView がない");
+            LineRenderer aimLine = aim.transform.Find("AimLine").GetComponent<LineRenderer>();
+            LineRenderer ring = aim.transform.Find("RangeRing").GetComponent<LineRenderer>();
+            Assert.That(aimLine.enabled, Is.True, "照準の線が出ていない");
+            Assert.That(aimLine.startColor.a, Is.GreaterThan(0f).And.LessThan(1f), "照準の線が半透明でない");
+            float maxLength = runner.PlayerConfig.Wire.MaxLength;
+            for (int i = 0; i < ring.positionCount; i += ring.positionCount / 4)
+            {
+                float radius = Vector3.Distance(ring.GetPosition(i), view.transform.position);
+                Assert.That(radius, Is.EqualTo(maxLength).Within(0.05f), "射程の円の半径が射程と違う");
+            }
         }
     }
 }

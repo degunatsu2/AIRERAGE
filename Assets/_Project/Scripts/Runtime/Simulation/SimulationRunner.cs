@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using Degunatsu.Core.Common;
+using Degunatsu.Core.Input;
 using Degunatsu.Core.Physics;
 using Degunatsu.Core.Simulation;
+using Degunatsu.Core.Wire;
 using Degunatsu.Runtime.Data;
 using Degunatsu.Runtime.Input;
 using Degunatsu.Runtime.Presentation;
@@ -27,11 +29,15 @@ namespace Degunatsu.Runtime.Simulation
         [SerializeField] private Transform _spawnPoint;
         [Tooltip("地形として読み込むコライダーの層")]
         [SerializeField] private LayerMask _terrainMask = 1;
+        [Tooltip("マウスポインターでの照準に使うカメラ")]
+        [SerializeField] private Camera _camera;
         [SerializeField] private CharacterView _characterView;
         [SerializeField] private WireView _wireView;
+        [SerializeField] private AimIndicatorView _aimIndicator;
 
         private readonly SimInput[] _inputs = new SimInput[1];
         private SimWorld _world;
+        private BoxTerrain _terrain;
         private InputSystemAdapter _input;
         private int _player;
         private CharacterState _previous;
@@ -62,6 +68,7 @@ namespace Degunatsu.Runtime.Simulation
                 Debug.LogError(error, this);
             }
 
+            _terrain = terrain;
             _world = new SimWorld(terrain);
             _player = _world.AddCharacter(_character.Config, _spawnPoint.position.ToNumerics());
             _previous = _world.GetState(_player);
@@ -85,7 +92,7 @@ namespace Degunatsu.Runtime.Simulation
 
         private void Update()
         {
-            _input.Poll();
+            _input.Poll(_camera);
             if (_input.ResetRequested)
             {
                 ResetPlayer();
@@ -96,7 +103,7 @@ namespace Degunatsu.Runtime.Simulation
             while (_accumulator >= SimTime.DeltaTime && ticks < MaxTicksPerFrame)
             {
                 _previous = _world.GetState(_player);
-                _inputs[0] = _input.ConsumeTick();
+                _inputs[0] = _input.ConsumeTick(_previous.Position);
                 _world.Step(_inputs);
                 _accumulator -= SimTime.DeltaTime;
                 ticks++;
@@ -121,6 +128,16 @@ namespace Degunatsu.Runtime.Simulation
             if (_wireView != null)
             {
                 _wireView.Render(_previous, current, alpha);
+            }
+            if (_aimIndicator != null)
+            {
+                // 表示の位置（補間した位置）から、今の入力で射出したときの結果を予測して示す。
+                Vector3 origin = Vector3.Lerp(_previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
+                System.Numerics.Vector3 simOrigin = origin.ToNumerics();
+                var frame = new InputFrame(_input.Peek(simOrigin), current.PreviousButtons);
+                WireTuning wire = _character.Config.Wire;
+                WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _terrain);
+                _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength);
             }
         }
 

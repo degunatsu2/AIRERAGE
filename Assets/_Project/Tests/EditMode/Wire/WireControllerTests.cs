@@ -157,15 +157,44 @@ namespace Degunatsu.Core.Tests.Wire
         }
 
         [Test]
-        public void ReleaseButton_WhileAttached_EntersCooldownWithReason()
+        public void ReleaseButton_WhileAttached_ReturnsToReadyWithReason()
         {
             var harness = new SimHarness(GroundWithCeiling(attachable: true));
             harness.StepUntil(s => s.Wire.Phase == WirePhase.Attached, Inputs.Wire(0f, 1f), 20);
 
             harness.Step(Inputs.None);
 
-            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Cooldown));
+            // 解除後のクールダウンは既定で 0（ユーザーの指示）
+            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Ready));
             Assert.That(harness.State.Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.ButtonReleased));
+        }
+
+        [Test]
+        public void ReleaseThenPressAgain_FiresOnTheNextTick()
+        {
+            var harness = new SimHarness(GroundWithCeiling(attachable: true));
+            harness.StepUntil(s => s.Wire.Phase == WirePhase.Attached, Inputs.Wire(0f, 1f), 20);
+            harness.Step(Inputs.None);
+
+            harness.Step(Inputs.Wire(0f, 1f));
+
+            Assert.That(harness.State.Wire.Phase, Is.Not.EqualTo(WirePhase.Ready).And.Not.EqualTo(WirePhase.Cooldown),
+                "解除の次のティックに押せば射出できる");
+        }
+
+        [Test]
+        public void ReleaseCooldownTicks_WhenSet_WaitsBeforeReady()
+        {
+            var config = new CharacterConfig();
+            config.Wire.ReleaseCooldownTicks = 10;
+            var harness = new SimHarness(GroundWithCeiling(attachable: true), config);
+            harness.StepUntil(s => s.Wire.Phase == WirePhase.Attached, Inputs.Wire(0f, 1f), 20);
+
+            harness.Step(Inputs.None);
+            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Cooldown));
+
+            int ticks = harness.StepUntil(s => s.Wire.Phase == WirePhase.Ready, Inputs.None, 30);
+            Assert.That(ticks, Is.EqualTo(10));
         }
 
         [Test]
@@ -182,7 +211,7 @@ namespace Degunatsu.Core.Tests.Wire
 
             Assert.That(state.Velocity.Length(), Is.EqualTo(tuning.ExitSpeedCap).Within(1e-4f));
             Assert.That(state.Velocity.X / state.Velocity.Y, Is.EqualTo(0.75f).Within(1e-5f));
-            Assert.That(state.Wire.Phase, Is.EqualTo(WirePhase.Cooldown));
+            Assert.That(state.Wire.Phase, Is.EqualTo(WirePhase.Ready));
         }
 
         [Test]
@@ -197,7 +226,7 @@ namespace Degunatsu.Core.Tests.Wire
 
             harness.Step(Inputs.Wire());
 
-            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Cooldown));
+            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Ready));
             Assert.That(harness.State.Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.LineBlocked));
         }
 
@@ -248,7 +277,7 @@ namespace Degunatsu.Core.Tests.Wire
 
             harness.Step(Inputs.Wire());
 
-            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Cooldown));
+            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Ready));
             Assert.That(harness.State.Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.ButtonToggled));
         }
 

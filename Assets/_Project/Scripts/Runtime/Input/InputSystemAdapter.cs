@@ -1,5 +1,6 @@
 using System;
 using Degunatsu.Core.Input;
+using UnityEngine;
 using UnityEngine.InputSystem;
 using SimInput = Degunatsu.Core.Input.PlayerInput;
 
@@ -8,7 +9,10 @@ namespace Degunatsu.Runtime.Input
     /// <summary>
     /// Input System を読み、ティックごとの PlayerInput を作る（docs/03_architecture.md 4.5）。
     /// Input System を直接読むのはここだけで、シミュレーションは PlayerInput だけを見る。
-    /// アクションは DegunatsuControls.inputactions の "Player" マップ（Move / Jump / Wire / Reset）。
+    /// アクションは DegunatsuControls.inputactions の "Player" マップ（Move / Jump / Wire / Reset / Point）。
+    ///
+    /// 照準（D-08）: 最後に使った機器がキーボードかマウスなら、マウスポインターの方向に照準する（PlayerInput の照準の方向）。
+    /// ゲームパッドなら照準の方向を指定せず、シミュレーションが左スティックの方向で照準する。
     /// </summary>
     public sealed class InputSystemAdapter : IDisposable
     {
@@ -19,9 +23,14 @@ namespace Degunatsu.Runtime.Input
         private readonly InputAction _jump;
         private readonly InputAction _wire;
         private readonly InputAction _reset;
+        private readonly InputAction _point;
+        private readonly InputAction[] _deviceActions;
 
         // 前のティックからの間に押されたボタン。ティックの間に押して離しても取りこぼさないようにする。
         private InputButtons _pressedSinceLastTick;
+
+        private bool _hasPointer;
+        private Vector2 _pointerWorld;
 
         public InputSystemAdapter(InputActionAsset actions)
         {
@@ -34,10 +43,16 @@ namespace Degunatsu.Runtime.Input
             _jump = _map.FindAction("Jump", throwIfNotFound: true);
             _wire = _map.FindAction("Wire", throwIfNotFound: true);
             _reset = _map.FindAction("Reset", throwIfNotFound: true);
+            _point = _map.FindAction("Point", throwIfNotFound: true);
+            _deviceActions = new[] { _move, _jump, _wire, _reset };
+            UsingPointer = Mouse.current != null;
         }
 
         /// <summary>このフレームで位置のリセットが押されたか（Poll で更新する）。</summary>
         public bool ResetRequested { get; private set; }
+
+        /// <summary>マウスポインターで照準しているか（最後に使った機器がキーボードかマウス）。</summary>
+        public bool UsingPointer { get; private set; }
 
         public void Enable()
         {
@@ -49,8 +64,10 @@ namespace Degunatsu.Runtime.Input
             _map.Disable();
         }
 
-        /// <summary>毎フレーム、ティックを進める前に呼ぶ。</summary>
-        public void Poll()
+        /// <summary>
+        /// 毎フレーム、ティックを進める前に呼ぶ。camera はマウスポインターの位置をゲームプレイ平面（Z = 0）に写すのに使う。
+        /// </summary>
+        public void Poll(Camera camera)
         {
             if (_jump.WasPressedThisFrame())
             {
@@ -61,12 +78,56 @@ namespace Degunatsu.Runtime.Input
                 _pressedSinceLastTick |= InputButtons.Wire;
             }
             ResetRequested = _reset.WasPressedThisFrame();
+
+            UpdateActiveDevice();
+            _hasPointer = UsingPointer && camera != null
+                && TryProjectToGameplayPlane(camera, _point.ReadValue<Vector2>(), out _pointerWorld);
         }
 
-        /// <summary>1ティック分の入力を作る。前のティックから押されたボタンは、離していても押している扱いにする。</summary>
-        public SimInput ConsumeTick()
+        /// <summary>
+        /// 1ティック分の入力を作る。前のティックから押されたボタンは、離していても押している扱いにする。
+        /// position は、照準の方向を求めるためのキャラクターの位置。
+        /// </summary>
+        public SimInput ConsumeTick(System.Numerics.Vector3 position)
         {
-            InputButtons buttons = _pressedSinceLastTick;
+            SimInput input = Build(position, _pressedSinceLastTick);
+            _pressedSinceLastTick = InputButtons.None;
+            return input;
+        }
+
+        /// <summary>今の入力を、記録を消費せずに作る（照準のインジケーターの表示用）。</summary>
+        public SimInput Peek(System.Numerics.Vector3 position)
+        {
+            return Build(position, InputButtons.None);
+        }
+
+        public void Dispose()
+        {
+            _map.Disable();
+        }
+
+        /// <summary>画面上の位置を、ゲームプレイ平面（Z = 0）上の点に写す。</summary>
+        public static bool TryProjectToGameplayPlane(Camera camera, Vector2 screenPosition, out Vector2 world)
+        {
+            Ray ray = camera.ScreenPointToRay(screenPosition);
+            world = default;
+            if (Mathf.Abs(ray.direction.z) < 1e-6f)
+            {
+                return false;
+            }
+            float distance = -ray.origin.z / ray.direction.z;
+            if (distance < 0f)
+            {
+                return false;
+            }
+            Vector3 point = ray.origin + ray.direction * distance;
+            world = new Vector2(point.x, point.y);
+            return true;
+        }
+
+        private SimInput Build(System.Numerics.Vector3 position, InputButtons latched)
+        {
+            InputButtons buttons = latched;
             if (_jump.IsPressed())
             {
                 buttons |= InputButtons.Jump;
@@ -75,15 +136,29 @@ namespace Degunatsu.Runtime.Input
             {
                 buttons |= InputButtons.Wire;
             }
-            _pressedSinceLastTick = InputButtons.None;
 
-            UnityEngine.Vector2 move = _move.ReadValue<UnityEngine.Vector2>();
-            return SimInput.FromAxes(move.x, move.y, buttons);
+            Vector2 move = _move.ReadValue<Vector2>();
+            SimInput input = SimInput.FromAxes(move.x, move.y, buttons);
+            if (!_hasPointer)
+            {
+                return input;
+            }
+            return input.WithAim(new System.Numerics.Vector2(_pointerWorld.x - position.X, _pointerWorld.y - position.Y));
         }
 
-        public void Dispose()
+        private void UpdateActiveDevice()
         {
-            _map.Disable();
+            if (_point.WasPerformedThisFrame())
+            {
+                UsingPointer = true;
+            }
+            foreach (InputAction action in _deviceActions)
+            {
+                if (action.WasPerformedThisFrame() && action.activeControl != null)
+                {
+                    UsingPointer = !(action.activeControl.device is Gamepad);
+                }
+            }
         }
     }
 }

@@ -4,6 +4,51 @@ using Degunatsu.Core.Physics;
 
 namespace Degunatsu.Core.Wire
 {
+    /// <summary>射出の方向と、エイムアシストの対象。</summary>
+    public readonly struct WireAim
+    {
+        public readonly Vector3 Direction;
+        public readonly bool HasTargetPoint;
+        public readonly Vector3 TargetPoint;
+
+        public WireAim(Vector3 direction, bool hasTargetPoint, Vector3 targetPoint)
+        {
+            Direction = direction;
+            HasTargetPoint = hasTargetPoint;
+            TargetPoint = targetPoint;
+        }
+    }
+
+    /// <summary>射出したときの結果の予測。</summary>
+    public enum WireShotResult : byte
+    {
+        /// <summary>接続できる。</summary>
+        Attach,
+
+        /// <summary>接続できない地形に当たって外れる。</summary>
+        HitNonAttachable,
+
+        /// <summary>射程内に何もなく外れる。</summary>
+        OutOfRange,
+    }
+
+    /// <summary>今の位置から射出したときの予測（照準のインジケーター用）。</summary>
+    public readonly struct WireShotPreview
+    {
+        public readonly WireAim Aim;
+        public readonly WireShotResult Result;
+
+        /// <summary>接続点、当たった点、または射程の端。</summary>
+        public readonly Vector3 EndPoint;
+
+        public WireShotPreview(WireAim aim, WireShotResult result, Vector3 endPoint)
+        {
+            Aim = aim;
+            Result = result;
+            EndPoint = endPoint;
+        }
+    }
+
     /// <summary>
     /// ワイヤーの照準（D-08）とエイムアシスト。
     /// </summary>
@@ -67,6 +112,47 @@ namespace Degunatsu.Core.Wire
                 target = anchors[i];
             }
             return found;
+        }
+
+        /// <summary>
+        /// 射出の方向を決める（射出のときと同じ計算）。照準の入力から方向を求め、エイムアシストの対象があればそこへ向ける。
+        /// </summary>
+        public static WireAim ResolveAim(Vector3 origin, Vector2 aimInput, int facing, WireTuning tuning, ICollisionQuery collision)
+        {
+            Vector3 direction = AimDirection(aimInput, facing, tuning);
+            if (!TryFindAssistTarget(origin, direction, tuning, collision, out Vector3 target))
+            {
+                return new WireAim(direction, false, default);
+            }
+            Vector3 toTarget = target - origin;
+            toTarget.Z = 0f;
+            return new WireAim(SimMath.NormalizeOr(toTarget, direction), true, target);
+        }
+
+        /// <summary>
+        /// 今の位置から射出したときの結果を予測する（表示用）。フックが飛ぶ間のキャラクターの移動は考えない。
+        /// フックの判定（WireController）と同じく、照準方向へ射程まで（対象があれば対象まで）地形を調べる。
+        /// </summary>
+        public static WireShotPreview PredictShot(Vector3 origin, Vector2 aimInput, int facing, WireTuning tuning, ICollisionQuery collision)
+        {
+            WireAim aim = ResolveAim(origin, aimInput, facing, tuning, collision);
+            float reach = tuning.MaxLength;
+            if (aim.HasTargetPoint)
+            {
+                Vector3 toTarget = aim.TargetPoint - origin;
+                toTarget.Z = 0f;
+                reach = toTarget.Length();
+            }
+
+            if (reach > 0f && collision.Raycast(origin, aim.Direction, reach, out CastHit hit))
+            {
+                return new WireShotPreview(aim, hit.Attachable ? WireShotResult.Attach : WireShotResult.HitNonAttachable, hit.Point);
+            }
+            if (aim.HasTargetPoint)
+            {
+                return new WireShotPreview(aim, WireShotResult.Attach, aim.TargetPoint);
+            }
+            return new WireShotPreview(aim, WireShotResult.OutOfRange, origin + aim.Direction * tuning.MaxLength);
         }
 
         /// <summary>

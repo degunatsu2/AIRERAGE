@@ -100,7 +100,7 @@ namespace Degunatsu.Core.Tests.Wire
             // 解除のティックでは、上限で制限した後に1ティック分の重力と空中制御が加わる。
             var movement = config.Movement;
             float allowance = (movement.Gravity + movement.AirAcceleration) * SimTime.DeltaTime;
-            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Cooldown));
+            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Ready));
             Assert.That(harness.State.Velocity.Length(), Is.LessThanOrEqualTo(config.Wire.ExitSpeedCap + allowance));
         }
     }

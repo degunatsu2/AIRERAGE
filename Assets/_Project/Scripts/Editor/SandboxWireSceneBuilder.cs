@@ -222,6 +222,7 @@ namespace Degunatsu.Editor
             SetReference(wireView, "_anchorMarker", anchorMarker.transform);
 
             CreateFollowCamera(characterGo.transform);
+            AimIndicatorView aimIndicator = CreateAimIndicator();
 
             var runner = new GameObject("Simulation").AddComponent<SimulationRunner>();
             SetReference(runner, "_character", character);
@@ -229,6 +230,8 @@ namespace Degunatsu.Editor
             SetReference(runner, "_spawnPoint", spawn);
             SetReference(runner, "_characterView", characterView);
             SetReference(runner, "_wireView", wireView);
+            SetReference(runner, "_aimIndicator", aimIndicator);
+            SetReference(runner, "_camera", Object.FindFirstObjectByType<Camera>());
 
             var courseTimer = new GameObject("CourseTimer").AddComponent<CourseTimerHud>();
             SetReference(courseTimer, "_runner", runner);
@@ -287,6 +290,41 @@ namespace Degunatsu.Editor
             bar.transform.SetParent(parent, false);
             bar.transform.localPosition = localPosition;
             bar.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+        }
+
+        /// <summary>照準のインジケーター（照準の線、終点の印、射程の円）。半透明にするため Sprites-Default を使う。</summary>
+        private static AimIndicatorView CreateAimIndicator()
+        {
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            if (material == null)
+            {
+                throw new InvalidOperationException("組み込みのマテリアル Sprites-Default が見つからない");
+            }
+
+            var root = new GameObject("AimIndicator");
+            LineRenderer aimLine = CreateIndicatorLine(root.transform, "AimLine", material, 0.07f);
+            LineRenderer marker = CreateIndicatorLine(root.transform, "TargetMarker", material, 0.06f);
+            LineRenderer ring = CreateIndicatorLine(root.transform, "RangeRing", material, 0.05f);
+
+            var view = root.AddComponent<AimIndicatorView>();
+            SetReference(view, "_aimLine", aimLine);
+            SetReference(view, "_targetMarker", marker);
+            SetReference(view, "_rangeRing", ring);
+            return view;
+        }
+
+        private static LineRenderer CreateIndicatorLine(Transform parent, string name, Material material, float width)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var line = go.AddComponent<LineRenderer>();
+            line.sharedMaterial = material;
+            line.widthMultiplier = width;
+            line.numCapVertices = 4;
+            line.useWorldSpace = true;
+            line.shadowCastingMode = ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            return line;
         }
 
         /// <summary>キャラクターを横から追従するカメラ（Cinemachine 3）。回転はせず、位置だけを合わせる。</summary>
