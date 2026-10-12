@@ -140,4 +140,4 @@
 ### 記録の残し方
 
 - 日付、Unity のバージョン、コミットのハッシュ、使った入力デバイス、変更した調整値を書く。
-- 記録は `docs/playtests/YYYY-MM-DD_<内容>.md` に残す（Phase 1 で作成する）。
+- 記録は `docs/playtests/YYYY-MM-DD_<内容>.md` に残す（最初の記録: `docs/playtests/2026-10-13_phase1_checklist.md`）。

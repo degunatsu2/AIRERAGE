@@ -264,11 +264,14 @@ namespace Degunatsu.Core.Tests.Wire
             Assert.That(state.Wire.Phase, Is.EqualTo(WirePhase.Ready));
         }
 
-        [Test]
-        public void LineBlocked_WhileAttached_ForcesRelease()
+        [TestCase(true)]
+        [TestCase(false)]
+        public void LineBlocked_WhileAttached_ReleasesOnlyWhenEnabled(bool releaseWhenBlocked)
         {
             var world = GroundWithCeiling(attachable: true).AddBox(2f, 4f, 3f, 6f);
-            var harness = new SimHarness(world, spawn: new Vector3(5f, 3f, 0f));
+            var config = new CharacterConfig();
+            config.Wire.ReleaseWhenLineBlocked = releaseWhenBlocked;
+            var harness = new SimHarness(world, config, spawn: new Vector3(5f, 3f, 0f));
             var state = harness.State;
             state.Wire = new WireState { Phase = WirePhase.Attached, Anchor = new Vector3(0f, 8f, 0f), RopeLength = 7.1f };
             state.PreviousButtons = Degunatsu.Core.Input.InputButtons.Wire;
@@ -276,8 +279,27 @@ namespace Degunatsu.Core.Tests.Wire
 
             harness.Step(Inputs.Wire());
 
-            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Ready));
-            Assert.That(harness.State.Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.LineBlocked));
+            if (releaseWhenBlocked)
+            {
+                Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Ready));
+                Assert.That(harness.State.Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.LineBlocked));
+            }
+            else
+            {
+                // ロープは地形を通り抜け、接続を保つ。ロープの長さの拘束は続く。
+                Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Attached));
+                Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.LessThanOrEqualTo(harness.State.Wire.RopeLength + 1e-3f));
+            }
+        }
+
+        [Test]
+        public void Fire_HitsNonAttachableSurface_KeepsTheHitPointAsHookPosition()
+        {
+            var harness = new SimHarness(GroundWithCeiling(attachable: false));
+
+            harness.StepUntil(s => s.Wire.Phase == WirePhase.Retracting, Inputs.Wire(0f, 1f), 20);
+
+            Assert.That(harness.State.Wire.HookPosition.Y, Is.EqualTo(8f).Within(1e-3f), "外れた位置が天井の面にない");
         }
 
         [Test]

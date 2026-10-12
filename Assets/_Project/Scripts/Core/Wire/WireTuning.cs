@@ -76,6 +76,12 @@ namespace Degunatsu.Core.Wire
         /// <summary>ロープの最小の長さ（m）。</summary>
         public float MinRopeLength = 1f;
 
+        /// <summary>
+        /// 接続中にロープ（キャラクターと接続点を結ぶ線）が地形に遮られたら解除するか。
+        /// false ならロープは地形を通り抜け、接続を保つ（ユーザーのプレイテスト: 壁に引っかかったときに解除されるのが気になる。2026-10-13。D-33）。
+        /// </summary>
+        public bool ReleaseWhenLineBlocked = false;
+
         /// <summary>最大接続時間（ティック）。</summary>
         public int MaxAttachTicks = 180;
 

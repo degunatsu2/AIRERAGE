@@ -178,7 +178,7 @@ namespace Degunatsu.Runtime.Simulation
             }
             if (_wireView != null)
             {
-                _wireView.Render(_previous, current, alpha);
+                _wireView.Render(_previous, current, alpha, _character.Config.Wire);
             }
             if (_aimIndicator != null)
             {

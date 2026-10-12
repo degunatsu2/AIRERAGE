@@ -153,7 +153,7 @@ namespace Degunatsu.Core.Wire
             {
                 Release(ref state, WireReleaseReason.MaxDuration, tuning);
             }
-            else if (!WireTargeting.HasLineOfSight(state.Position, state.Wire.Anchor, _collision))
+            else if (tuning.ReleaseWhenLineBlocked && !WireTargeting.HasLineOfSight(state.Position, state.Wire.Anchor, _collision))
             {
                 Release(ref state, WireReleaseReason.LineBlocked, tuning);
             }
@@ -201,6 +201,8 @@ namespace Degunatsu.Core.Wire
                 }
                 else
                 {
+                    // 当たった点を外れた位置として残す（外れた表示に使う）。
+                    wire.HookPosition = hit.Point;
                     Miss(ref state, WireMissReason.HitNonAttachable);
                 }
                 return;

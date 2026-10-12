@@ -233,6 +233,8 @@ namespace Degunatsu.Editor
             SetReference(runner, "_aimIndicator", aimIndicator);
             SetReference(runner, "_camera", Object.FindFirstObjectByType<Camera>());
 
+            CreateMissIndicator(runner, Object.FindFirstObjectByType<Camera>());
+
             var courseTimer = new GameObject("CourseTimer").AddComponent<CourseTimerHud>();
             SetReference(courseTimer, "_runner", runner);
 
@@ -332,6 +334,17 @@ namespace Degunatsu.Editor
             SetReference(view, "_targetMarker", marker);
             SetReference(view, "_rangeRing", ring);
             return view;
+        }
+
+        /// <summary>ワイヤーが外れたときの表示（×印と MISS）。半透明にするため Sprites-Default を使う。</summary>
+        private static void CreateMissIndicator(SimulationRunner runner, Camera camera)
+        {
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var root = new GameObject("MissIndicator");
+            LineRenderer cross = CreateIndicatorLine(root.transform, "Cross", material, 0.1f);
+            var view = cross.gameObject.AddComponent<MissIndicatorView>();
+            SetReference(view, "_runner", runner);
+            SetReference(view, "_camera", camera);
         }
 
         private static LineRenderer CreateIndicatorLine(Transform parent, string name, Material material, float width)

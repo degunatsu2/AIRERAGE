@@ -7,6 +7,7 @@ namespace Degunatsu.Runtime.Presentation
 {
     /// <summary>
     /// ワイヤーを線で表示する（プロトタイプ用）。フックが飛んでいる間はフックまで、接続中は接続点まで線を引き、接続点に印を置く。
+    /// 外れたフックを回収している間は、外れた位置からキャラクターへ戻ってくるフックまで線を引く。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     [RequireComponent(typeof(LineRenderer))]
@@ -24,10 +25,10 @@ namespace Degunatsu.Runtime.Presentation
             Hide();
         }
 
-        public void Render(in CharacterState previous, in CharacterState current, float alpha)
+        public void Render(in CharacterState previous, in CharacterState current, float alpha, WireTuning tuning)
         {
             WireState wire = current.Wire;
-            if (wire.Phase != WirePhase.Firing && wire.Phase != WirePhase.Attached)
+            if (wire.Phase != WirePhase.Firing && wire.Phase != WirePhase.Attached && wire.Phase != WirePhase.Retracting)
             {
                 Hide();
                 return;
@@ -38,6 +39,12 @@ namespace Degunatsu.Runtime.Presentation
             if (wire.Phase == WirePhase.Attached)
             {
                 to = wire.Anchor.ToUnity();
+            }
+            else if (wire.Phase == WirePhase.Retracting)
+            {
+                // 外れた位置（HookPosition）から、回収の時間をかけてキャラクターへ戻す。
+                float progress = tuning.MissRetractTicks > 0 ? Mathf.Clamp01((wire.PhaseTicks + alpha) / tuning.MissRetractTicks) : 1f;
+                to = Vector3.Lerp(wire.HookPosition.ToUnity(), from, progress);
             }
             else
             {
