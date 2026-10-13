@@ -7,8 +7,8 @@ namespace Degunatsu.Runtime.Presentation
 {
     /// <summary>
     /// キャラクターの状態を箱で表示する（プロトタイプ用）。直前と現在のティックの状態を補間する。
-    /// 戦闘の状態を色で示す（判定と見た目ができるまでの仮の表示。docs/11_combat_plan.md）: 攻撃の段階（発生・持続・硬直）、
-    /// ヒットストップ、のけぞり。攻撃の判定が出ている間は、その箱を線で描く（_hitboxLine があれば）。
+    /// 戦闘の状態を色で示す（判定と見た目ができるまでの仮の表示。docs/11_combat_plan.md）: 攻撃の段階（発生・持続・硬直。
+    /// 撃破技の発生は金色のチャージ）、ヒットストップ、のけぞり。攻撃の判定が出ている間は、その箱を線で描く（_hitboxLine があれば）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
@@ -17,6 +17,7 @@ namespace Degunatsu.Runtime.Presentation
         {
             None,
             Startup,
+            Charge,
             Active,
             Recovery,
             Hitstop,
@@ -26,6 +27,8 @@ namespace Degunatsu.Runtime.Presentation
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         [SerializeField] private Color _startupColor = new Color(1f, 0.85f, 0.2f);
+        [Tooltip("撃破技の発生（チャージ）の色（D-38。エフェクトができるまでの仮の表示）")]
+        [SerializeField] private Color _chargeColor = new Color(1f, 0.72f, 0f);
         [SerializeField] private Color _activeColor = new Color(0.95f, 0.15f, 0.15f);
         [SerializeField] private Color _recoveryColor = new Color(0.45f, 0.5f, 0.8f);
         [SerializeField] private Color _hitstopColor = Color.white;
@@ -44,7 +47,9 @@ namespace Degunatsu.Runtime.Presentation
             {
                 switch (_shown)
                 {
-                    case Tint.Startup: return AttackPhase.Startup;
+                    case Tint.Startup:
+                    case Tint.Charge:
+                        return AttackPhase.Startup;
                     case Tint.Active: return AttackPhase.Active;
                     case Tint.Recovery: return AttackPhase.Recovery;
                     default: return null;
@@ -104,7 +109,7 @@ namespace Degunatsu.Runtime.Presentation
                 case ActionKind.Attack:
                     switch (combat.Get(state.Action.Attack).PhaseAt(state.Action.Ticks))
                     {
-                        case AttackPhase.Startup: return Tint.Startup;
+                        case AttackPhase.Startup: return state.Action.Attack == combat.KoAttack ? Tint.Charge : Tint.Startup;
                         case AttackPhase.Active: return Tint.Active;
                         default: return Tint.Recovery;
                     }
@@ -118,6 +123,7 @@ namespace Degunatsu.Runtime.Presentation
             switch (tint)
             {
                 case Tint.Startup: return _startupColor;
+                case Tint.Charge: return _chargeColor;
                 case Tint.Active: return _activeColor;
                 case Tint.Recovery: return _recoveryColor;
                 case Tint.Hitstop: return _hitstopColor;
@@ -131,14 +137,20 @@ namespace Degunatsu.Runtime.Presentation
             {
                 return;
             }
-            bool active = state.Action.Kind == ActionKind.Attack
-                && combat.Get(state.Action.Attack).PhaseAt(state.Action.Ticks) == AttackPhase.Active;
-            _hitboxLine.enabled = active;
-            if (!active)
+            AttackHit hit = null;
+            if (state.Action.Kind == ActionKind.Attack)
+            {
+                foreach (AttackHit candidate in combat.Get(state.Action.Attack).Hits)
+                {
+                    hit = hit ?? (candidate.IsActiveAt(state.Action.Ticks) ? candidate : null);
+                }
+            }
+            _hitboxLine.enabled = hit != null;
+            if (hit == null)
             {
                 return;
             }
-            HitResolver.Hitbox(state, combat.Get(state.Action.Attack), out System.Numerics.Vector2 center, out System.Numerics.Vector2 half);
+            HitResolver.Hitbox(state, hit, out System.Numerics.Vector2 center, out System.Numerics.Vector2 half);
             const float z = -0.6f; // キャラクターの手前に描く
             _hitboxLine.loop = true;
             _hitboxLine.positionCount = 4;

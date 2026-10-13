@@ -58,9 +58,10 @@ namespace Degunatsu.Core.Tests.Combat
                 Assert.That(ticks, Is.LessThanOrEqualTo(data.TotalTicks), "攻撃が終わらない");
             }
 
-            Assert.That(startup, Is.EqualTo(data.StartupTicks));
-            Assert.That(active, Is.EqualTo(data.ActiveTicks));
-            Assert.That(recovery, Is.EqualTo(data.RecoveryTicks));
+            Assert.That(data.Hits.Length, Is.EqualTo(1), "前提: 判定が1つの攻撃");
+            Assert.That(startup, Is.EqualTo(data.FirstHitTick));
+            Assert.That(active, Is.EqualTo(data.Hits[0].ActiveTicks));
+            Assert.That(recovery, Is.EqualTo(data.TotalTicks - data.FirstHitTick - data.Hits[0].ActiveTicks));
             Assert.That(harness.State.Action.IsFree, Is.True);
 
             harness.Step(Attack(), 30);
@@ -126,9 +127,9 @@ namespace Degunatsu.Core.Tests.Combat
             for (int t = 1; t < total; t++)
             {
                 attacking.Step(Inputs.None);
-                if (attacking.State.Action.Ticks == ground.StartupTicks + ground.ActiveTicks)
+                if (attacking.State.Action.Ticks == ground.Motions[1].StartTick)
                 {
-                    Assert.That(attacking.State.Velocity.Y, Is.GreaterThan(0f), "硬直に入るときに上へ飛び出す");
+                    Assert.That(attacking.State.Velocity.Y, Is.GreaterThan(0f), "2段目で斜め上へ飛び出す");
                 }
                 leftGround |= !attacking.State.Grounded;
             }
@@ -226,21 +227,59 @@ namespace Degunatsu.Core.Tests.Combat
         public void Validate_RejectsAttackWithoutStartupOrActive()
         {
             var config = new CharacterConfig();
-            config.Combat.AirUp.ActiveTicks = 0;
+            config.Combat.AirUp.Hits[0].ActiveTicks = 0;
 
             Assert.Throws<InvalidTuningException>(() => config.Validate());
         }
 
         [Test]
-        public void Validate_RejectsGroundAttackThatStaysOnTheGround()
+        public void Validate_RejectsHitsAndMotionsOutsideTheAttack()
         {
             var config = new CharacterConfig();
-            config.Combat.Ground.LaunchVelocityY = 0f;
-            Assert.Throws<InvalidTuningException>(() => config.Validate(), "上へ飛び出さない地上技");
+            config.Combat.AirSide.Hits[0].StartTick = config.Combat.AirSide.TotalTicks;
+            Assert.Throws<InvalidTuningException>(() => config.Validate(), "攻撃の長さを超える判定");
 
             config = new CharacterConfig();
-            config.Combat.Ground.LaunchAtRecovery = false;
-            Assert.Throws<InvalidTuningException>(() => config.Validate(), "飛び出しのない地上技");
+            config.Combat.Ground.Motions[0].Ticks = config.Combat.Ground.TotalTicks;
+            Assert.Throws<InvalidTuningException>(() => config.Validate(), "攻撃の長さを超える動き");
+
+            config = new CharacterConfig();
+            config.Combat.AirUp.Hits = new AttackHit[0];
+            Assert.Throws<InvalidTuningException>(() => config.Validate(), "判定のない攻撃");
+        }
+
+        [Test]
+        public void GroundAttackThatStaysOnTheGround_IsAllowed()
+        {
+            // 「地上技は最後に空中に移る」はキャラクターを作るときの方針で、決まりではない（D-35、2026-10-13 ユーザー）。
+            var config = new CharacterConfig();
+            config.Combat.Ground.Motions = new AttackMotion[0];
+
+            Assert.DoesNotThrow(() => config.Validate());
+        }
+
+        [Test]
+        public void KoMove_ChargesWithInertia_ThenDives()
+        {
+            // デフォルトのキャラクターの撃破技は空中・下（D-38）。チャージ中は慣性のまま、その後は斜め下へ飛び込む。
+            SimHarness harness = InAir();
+            CombatTuning combat = harness.Config.Combat;
+            Assert.That(combat.KoAttack, Is.EqualTo(AttackSlot.AirDown));
+            CharacterState start = harness.State;
+            start.Velocity = new Vector3(6f, 0f, 0f);
+            harness.State = start;
+
+            harness.Step(Attack(0f, -1f));
+            AttackData ko = combat.AirDown;
+            harness.Step(Inputs.None, ko.FirstHitTick - 1);
+            Assert.That(harness.State.Velocity.X, Is.GreaterThan(5f), "チャージ中は慣性のまま横に動く");
+            Assert.That(harness.State.Velocity.Y, Is.LessThan(0f), "チャージ中も重力で落ちる");
+
+            harness.Step(Inputs.None);
+            Assert.That(harness.State.Action.Ticks, Is.EqualTo(ko.FirstHitTick));
+            Assert.That(harness.State.Action.StrikeSpeed, Is.GreaterThan(5f), "打つ直前の速さを覚える");
+            Assert.That(harness.State.Velocity.X, Is.EqualTo(ko.Motions[0].VelocityX).Within(1e-4f), "斜め下へ飛び込む");
+            Assert.That(harness.State.Velocity.Y, Is.EqualTo(ko.Motions[0].VelocityY).Within(1e-4f));
         }
 
         [Test]

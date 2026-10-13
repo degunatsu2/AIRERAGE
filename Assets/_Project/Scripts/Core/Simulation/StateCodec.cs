@@ -17,7 +17,7 @@ namespace Degunatsu.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 4;
+        public const int FormatVersion = 5;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -140,6 +140,7 @@ namespace Degunatsu.Core.Simulation
             writer.Write(action.Ticks);
             writer.Write(action.Duration);
             writer.Write(action.HitMask);
+            writer.Write(action.StrikeSpeed);
 
             CombatState combat = state.Combat;
             writer.Write(combat.HitstopTicksLeft);
@@ -194,7 +195,8 @@ namespace Degunatsu.Core.Simulation
                 Attack = (AttackSlot)reader.ReadByte(),
                 Ticks = reader.ReadInt32(),
                 Duration = reader.ReadInt32(),
-                HitMask = reader.ReadByte(),
+                HitMask = reader.ReadUInt32(),
+                StrikeSpeed = reader.ReadSingle(),
             };
             state.Combat = new CombatState
             {

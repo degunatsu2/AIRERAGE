@@ -14,8 +14,8 @@ namespace Degunatsu.Core.Tests.Replay
     /// </summary>
     public class StateCodecTests
     {
-        // Checksum_IsStableAcrossRunsAndMachines の期待値（形式の版 4。2026-10-13、クラウドの Linux / .NET 8 で計算）。
-        private const string ExpectedChecksum = "9538afe0e18ba2e4";
+        // Checksum_IsStableAcrossRunsAndMachines の期待値（形式の版 5。2026-10-13、クラウドの Linux / .NET 8 で計算）。
+        private const string ExpectedChecksum = "930d5deee3ff610c";
 
         [Test]
         public void EveryField_RoundTripsAndChangesTheChecksum()
@@ -85,6 +85,10 @@ namespace Degunatsu.Core.Tests.Replay
             if (type == typeof(int))
             {
                 return seed;
+            }
+            if (type == typeof(uint))
+            {
+                return (uint)seed + 1u;
             }
             if (type == typeof(bool))
             {

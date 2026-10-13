@@ -166,6 +166,42 @@ namespace Degunatsu.Core.Tests.Wire
                 "下限の期間が終わったら、巻き取りの速さに戻る");
         }
 
+        [Test]
+        public void HoldingDown_KeepsTheRopeLength_WhileSwinging()
+        {
+            // 下（斜め下を含む）を押し続けると巻き取らず、接続直後の引きもしない。左右で振ることはできる（D-41）。
+            var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
+            var harness = new SimHarness(new BoxTerrain(), config);
+            WireTestSetup.AttachAt(harness, Anchor + new Vector3(6f, -8f, 0f), Anchor);
+            float rope = harness.State.Wire.RopeLength;
+
+            harness.Step(Inputs.Wire(0f, -1f));
+            Assert.That(harness.State.Velocity.Length(), Is.LessThan(1f), "接続直後の引きがかかった");
+            float minX = harness.State.Position.X;
+            for (int i = 0; i < 300; i++)
+            {
+                harness.Step(Inputs.Wire(i % 120 < 60 ? -1f : 1f, -1f));
+                Assert.That(harness.State.Wire.RopeLength, Is.EqualTo(rope), $"ティック {i}: ロープが縮んだ");
+                Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.LessThanOrEqualTo(rope + 1e-3f), $"ティック {i}");
+                minX = MathF.Min(minX, harness.State.Position.X);
+            }
+            Assert.That(minX, Is.LessThan(0f), "振れていない（接続点の左側まで行かない）");
+        }
+
+        [Test]
+        public void HoldingUp_ReelsFast()
+        {
+            var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
+            var harness = new SimHarness(new BoxTerrain(), config);
+            WireTestSetup.AttachAt(harness, Anchor + new Vector3(0f, -11f, 0f), Anchor);
+            float rope = harness.State.Wire.RopeLength;
+
+            harness.Step(Inputs.Wire(0f, 1f), 3);
+
+            Assert.That(config.Wire.Inertial.FastReelSpeed, Is.GreaterThan(config.Wire.Inertial.StartPullSpeed), "前提: 接続直後の引きより速い");
+            Assert.That(rope - harness.State.Wire.RopeLength, Is.EqualTo(3 * config.Wire.Inertial.FastReelSpeed / 60f).Within(1e-4f));
+        }
+
         // 接続点の右下（止まった状態）で接続し、1ティック後の速さ。
         private static float SpeedAfterAttachFromRest(float startPullSpeed)
         {

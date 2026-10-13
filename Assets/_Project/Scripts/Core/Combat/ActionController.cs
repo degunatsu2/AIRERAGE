@@ -10,9 +10,9 @@ namespace Degunatsu.Core.Combat
     /// アクション状態の遷移を1か所で決める（docs/01_game_design.md 6.2、6.3）。今は攻撃の開始と終了、のけぞりの終了。
     /// のけぞりに入るのは命中のとき（HitResolver）。
     /// - 攻撃は Free のときに攻撃ボタンを押すと始まる。ワイヤーを射出中・接続中は始められない
-    ///   （ワイヤー→攻撃のキャンセルは docs/11_combat_plan.md の T3-3 で作る）。
+    ///   （ワイヤー→攻撃のキャンセルは docs/11_combat_plan.md の T3-4 で作る）。
     /// - 種類は、地上なら方向に関係なく地上技、空中なら移動のスティックの向きで決める（上下を優先。【仮】。D-35）。
-    /// - 攻撃中の移動・ジャンプ・ワイヤーの入力は無視する（ControlInput）。攻撃のデータが決める移動（踏み込み、飛び出し）は ApplyMotion。
+    /// - 攻撃中の移動・ジャンプ・ワイヤーの入力は無視する（ControlInput）。攻撃のデータが決める動き（踏み込み、飛び出し、飛び込み）は ApplyMotion。
     /// </summary>
     public static class ActionController
     {
@@ -56,8 +56,8 @@ namespace Degunatsu.Core.Combat
         }
 
         /// <summary>
-        /// 通常の移動の計算の後に呼ぶ。攻撃のデータが決める速度を当てる: 持続の間の踏み込み（DashWhileActive）と、
-        /// 硬直に入るティックの飛び出し（LaunchAtRecovery。地上技は必ず上へ）。X は向いている方向を正とする。
+        /// 通常の移動の計算の後に呼ぶ。攻撃のデータが決める速度を当てる（踏み込み、飛び出し、飛び込み。X は向いている方向が正）。
+        /// 決めていない間は慣性のまま。撃破技なら、最初の判定が出るティックに、その時点の（慣性の）速さを覚える（D-38）。
         /// </summary>
         public static void ApplyMotion(ref CharacterState state, CombatTuning combat)
         {
@@ -67,15 +67,17 @@ namespace Degunatsu.Core.Combat
             }
             AttackData attack = combat.Get(state.Action.Attack);
             int ticks = state.Action.Ticks;
-            if (attack.DashWhileActive && attack.PhaseAt(ticks) == AttackPhase.Active)
+            if (state.Action.Attack == combat.KoAttack && ticks == attack.FirstHitTick)
             {
-                state.Velocity.X = attack.DashVelocityX * state.Facing;
-                state.Velocity.Y = attack.DashVelocityY;
+                state.Action.StrikeSpeed = state.Velocity.Length();
             }
-            if (attack.LaunchAtRecovery && ticks == attack.StartupTicks + attack.ActiveTicks)
+            foreach (AttackMotion motion in attack.Motions)
             {
-                state.Velocity.X = attack.LaunchVelocityX * state.Facing;
-                state.Velocity.Y = attack.LaunchVelocityY;
+                if (motion.IsActiveAt(ticks))
+                {
+                    state.Velocity.X = motion.VelocityX * state.Facing;
+                    state.Velocity.Y = motion.VelocityY;
+                }
             }
         }
 

@@ -54,15 +54,21 @@ namespace Degunatsu.Core.Combat
         /// <summary>今のアクションの長さ（ティック）。のけぞりの長さに使う（攻撃の長さは攻撃のデータから決まる）。</summary>
         public int Duration;
 
-        /// <summary>今の攻撃がすでに当たった相手（ビットがキャラクターの番号）。同じ攻撃は同じ相手に1回だけ当たる。</summary>
-        public byte HitMask;
+        /// <summary>
+        /// 今の攻撃がすでに当たった相手。判定 h（0〜3）がキャラクター v（0〜7）に当たったら、ビット h × 8 + v を立てる
+        /// （同じ判定は同じ相手に1回だけ当たる。0 でなければ、この攻撃は何かに当たった）。
+        /// </summary>
+        public uint HitMask;
+
+        /// <summary>撃破技を打つ直前の速さ（m/s）。吹き飛びの倍率に使う（D-38）。</summary>
+        public float StrikeSpeed;
 
         public bool IsFree => Kind == ActionKind.Free;
 
         public bool Equals(ActionState other)
         {
             return Kind == other.Kind && Attack == other.Attack && Ticks == other.Ticks
-                && Duration == other.Duration && HitMask == other.HitMask;
+                && Duration == other.Duration && HitMask == other.HitMask && StrikeSpeed.Equals(other.StrikeSpeed);
         }
 
         public override bool Equals(object obj)
@@ -72,14 +78,14 @@ namespace Degunatsu.Core.Combat
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask);
+            return HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed);
         }
 
         public override string ToString()
         {
             switch (Kind)
             {
-                case ActionKind.Attack: return $"{Kind}({Attack}, {Ticks}, hit={HitMask})";
+                case ActionKind.Attack: return $"{Kind}({Attack}, {Ticks}, hit={HitMask:x})";
                 case ActionKind.Hitstun: return $"{Kind}({Ticks}/{Duration})";
                 default: return Kind.ToString();
             }

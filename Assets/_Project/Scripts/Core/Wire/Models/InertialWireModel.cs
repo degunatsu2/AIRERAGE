@@ -8,6 +8,7 @@ namespace Degunatsu.Core.Wire.Models
     /// タイプA: 物理・慣性重視。ロープ長の拘束と重力による振り子運動。
     /// 巻き取るとロープが縮み、角運動量の保存で振りが速くなる（上限は共通の MaxAttachedSpeed）。
     /// 遅い状態で接続した直後は、速さが下限（StartPullSpeed）に届くように接続点の方向へ強く引く。
+    /// 上下の入力で巻き取りを変える（D-41）: 下を押し続けるとロープの長さを保ち（接続直後の引きもしない）、上なら素早く縮める。
     /// </summary>
     public sealed class InertialWireModel : IWireMotionModel
     {
@@ -43,8 +44,10 @@ namespace Degunatsu.Core.Wire.Models
             // 接続直後で遅いときは、速さが下限に届くように巻き取りを速くする。
             float radialSpeed = Vector3.Dot(velocity, radial);
             Vector3 tangential = velocity - radial * radialSpeed;
-            float reelSpeed = tuning.ReelSpeed;
-            float startPull = StartPullInSpeed(context, tuning, tangential.Length());
+            bool holdLength = context.Stick.Y <= -tuning.ReelInputThreshold;
+            float reelSpeed = holdLength ? 0f
+                : context.Stick.Y >= tuning.ReelInputThreshold ? tuning.FastReelSpeed : tuning.ReelSpeed;
+            float startPull = holdLength ? 0f : StartPullInSpeed(context, tuning, tangential.Length());
             bool pullingAtStart = startPull > reelSpeed;
             if (pullingAtStart)
             {

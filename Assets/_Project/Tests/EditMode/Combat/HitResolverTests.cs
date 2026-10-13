@@ -17,13 +17,23 @@ namespace Degunatsu.Core.Tests.Combat
         private static readonly PlayerInput Attack = new PlayerInput(0, 0, InputButtons.Attack);
         private static readonly CombatTuning Combat = new CombatTuning();
 
-        // 地面の上に、指定した位置と向きでキャラクターを並べる。
+        // 命中の仕組みを確かめるテストでは、地上技を1段目だけにする（二段技は GroundAttack_HitsTwice で確かめる）。
+        private static readonly AttackHit Ground1 = Combat.Ground.Hits[0];
+
+        private static CharacterConfig SingleHitConfig()
+        {
+            var config = new CharacterConfig();
+            config.Combat.Ground.Hits = new[] { config.Combat.Ground.Hits[0] };
+            return config;
+        }
+
+        // 地面の上に、指定した位置と向きでキャラクターを並べる（地上技は1段目だけ）。
         private static SimWorld World(params (float X, int Facing)[] characters)
         {
             var world = new SimWorld(TestArenas.Ground());
             foreach (var c in characters)
             {
-                world.AddCharacter(new CharacterConfig(), new Vector3(c.X, GroundY, 0f), c.Facing);
+                world.AddCharacter(SingleHitConfig(), new Vector3(c.X, GroundY, 0f), c.Facing);
             }
             world.Step(new PlayerInput[characters.Length]);
             return world;
@@ -62,14 +72,14 @@ namespace Degunatsu.Core.Tests.Combat
 
             CharacterState attacker = world.GetState(0);
             CharacterState victim = world.GetState(1);
-            Assert.That(attacker.Action.HitMask, Is.EqualTo(1 << 1), "当てた相手を覚える");
-            Assert.That(victim.Action.Duration, Is.EqualTo(Combat.Ground.HitstunTicks));
+            Assert.That(attacker.Action.HitMask, Is.EqualTo(HitResolver.HitBit(0, 1)), "当てた判定と相手を覚える");
+            Assert.That(victim.Action.Duration, Is.EqualTo(Ground1.HitstunTicks));
             Assert.That(victim.Combat.HasLastAttacker, Is.True);
             Assert.That(victim.Combat.LastAttacker, Is.EqualTo(0));
             Assert.That(victim.Combat.LastDamagedTick, Is.EqualTo(world.Tick));
             Assert.That(victim.Combat.ComboCount, Is.EqualTo(1));
-            Assert.That(victim.Combat.ComboDamage, Is.EqualTo(Combat.Ground.Damage));
-            Assert.That(victim.Velocity, Is.EqualTo(new Vector3(Combat.Ground.KnockbackX, Combat.Ground.KnockbackY, 0f)),
+            Assert.That(victim.Combat.ComboDamage, Is.EqualTo(Ground1.Damage));
+            Assert.That(victim.Velocity, Is.EqualTo(new Vector3(Ground1.KnockbackX, Ground1.KnockbackY, 0f)),
                 "攻撃した側の向きに吹き飛ぶ");
         }
 
@@ -82,10 +92,10 @@ namespace Degunatsu.Core.Tests.Combat
 
             CharacterState attacker = world.GetState(0);
             CharacterState victim = world.GetState(1);
-            Assert.That(attacker.Combat.HitstopTicksLeft, Is.EqualTo(Combat.Ground.HitstopTicks));
-            Assert.That(victim.Combat.HitstopTicksLeft, Is.EqualTo(Combat.Ground.HitstopTicks));
+            Assert.That(attacker.Combat.HitstopTicksLeft, Is.EqualTo(Ground1.HitstopTicks));
+            Assert.That(victim.Combat.HitstopTicksLeft, Is.EqualTo(Ground1.HitstopTicks));
 
-            Step(world, Combat.Ground.HitstopTicks, default, default);
+            Step(world, Ground1.HitstopTicks, default, default);
             Assert.That(world.GetState(0).Position, Is.EqualTo(attacker.Position), "当てた側はヒットストップの間止まる");
             Assert.That(world.GetState(1).Position, Is.EqualTo(victim.Position), "当たった側もヒットストップの間止まる");
             Assert.That(world.GetState(0).Action.Ticks, Is.EqualTo(attacker.Action.Ticks), "止まっている間は攻撃も進まない");
@@ -116,7 +126,7 @@ namespace Degunatsu.Core.Tests.Combat
             CharacterState hit = world.GetState(1);
 
             var mash = PlayerInput.FromAxes(-1f, 0f, InputButtons.Jump | InputButtons.Wire | InputButtons.Attack);
-            int ticks = Combat.Ground.HitstopTicks + Combat.Ground.HitstunTicks;
+            int ticks = Ground1.HitstopTicks + Ground1.HitstunTicks;
             for (int t = 0; t < ticks; t++)
             {
                 world.Step(new[] { default(PlayerInput), mash });
@@ -138,22 +148,68 @@ namespace Degunatsu.Core.Tests.Combat
             world.Step(new[] { Attack, default });
             StepUntilHit(world, 1, Combat.Ground.TotalTicks, default, default);
 
-            Assert.That(world.GetState(1).Velocity.X, Is.EqualTo(-Combat.Ground.KnockbackX), "左を向いた攻撃は左へ飛ばす");
+            Assert.That(world.GetState(1).Velocity.X, Is.EqualTo(-Ground1.KnockbackX), "左を向いた攻撃は左へ飛ばす");
+        }
+
+        // 空中で、攻撃する側（横の速さ vx）と、その斜め下にいる相手を置き、空中・下（撃破技）を当てる。相手の吹き飛びの速さを返す。
+        private static Vector3 KoHit(float vx, out CharacterState attacker)
+        {
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, 12f, 0f), 1);
+            float lead = vx * Combat.AirDown.FirstHitTick / 60f;
+            world.AddCharacter(new CharacterConfig(), new Vector3(lead + 0.5f, 10.4f, 0f), 1);
+            CharacterState start = world.GetState(0);
+            start.Velocity = new Vector3(vx, 0f, 0f);
+            world.SetState(0, start);
+            world.Step(new[] { PlayerInput.FromAxes(0f, -1f, InputButtons.Attack), default });
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirDown), "前提: 空中・下（撃破技）");
+
+            StepUntilHit(world, 1, Combat.AirDown.TotalTicks, default, default);
+            attacker = world.GetState(0);
+            return world.GetState(1).Velocity;
         }
 
         [Test]
-        public void AirDown_SpikesTheTargetDownward()
+        public void KoMove_SpikesDownward_ScaledByTheStrikeSpeed()
         {
+            AttackHit hit = Combat.AirDown.Hits[0];
+            Vector3 velocity = KoHit(8f, out CharacterState attacker);
+
+            float scale = Combat.KoKnockbackScale(attacker.Action.StrikeSpeed);
+            Assert.That(attacker.Action.StrikeSpeed, Is.GreaterThan(7f), "前提: 打つ直前の速さを覚えている");
+            Assert.That(velocity.X, Is.EqualTo(hit.KnockbackX * scale).Within(1e-3f));
+            Assert.That(velocity.Y, Is.EqualTo(hit.KnockbackY * scale).Within(1e-3f), "斜め下へたたき落とす");
+            Assert.That(velocity.Y, Is.LessThan(0f));
+        }
+
+        [Test]
+        public void KoMove_KnocksFarther_WhenStrikingFaster()
+        {
+            Vector3 slow = KoHit(0f, out _);
+            Vector3 fast = KoHit(14f, out _);
+
+            Assert.That(fast.Length(), Is.GreaterThan(slow.Length() * 1.5f), "速く打つほど遠くへ飛ばす（D-38）");
+        }
+
+        [Test]
+        public void GroundAttack_HitsTwice()
+        {
+            // デフォルトの地上技は二段技: 踏み込みの1段目と、斜め上へ飛び出す2段目が、同じ相手に1回ずつ当たる。
             var world = new SimWorld(TestArenas.Ground());
-            world.AddCharacter(new CharacterConfig(), new Vector3(0f, 8f, 0f), 1);
-            world.AddCharacter(new CharacterConfig(), new Vector3(0.1f, 6.2f, 0f), 1);
-            world.Step(new[] { PlayerInput.FromAxes(0f, -1f, InputButtons.Attack), default });
-            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirDown), "前提: 空中の下攻撃");
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(1.6f, GroundY, 0f), -1);
+            world.Step(new PlayerInput[2]);
+            world.Step(new[] { Attack, default });
 
-            StepUntilHit(world, 1, Combat.AirDown.TotalTicks, default, default);
+            int maxCombo = 0;
+            for (int t = 0; t < Combat.Ground.TotalTicks + 20; t++)
+            {
+                world.Step(new PlayerInput[2]);
+                maxCombo = System.Math.Max(maxCombo, world.GetState(1).Combat.ComboCount);
+            }
 
-            Assert.That(world.GetState(1).Velocity.Y, Is.EqualTo(Combat.AirDown.KnockbackY), "真下へたたき落とす");
-            Assert.That(Combat.AirDown.KnockbackY, Is.LessThan(0f));
+            Assert.That(maxCombo, Is.EqualTo(2), "2段とも当たる");
+            Assert.That(world.GetState(1).Combat.ComboDamage, Is.EqualTo(Combat.Ground.Hits[0].Damage + Combat.Ground.Hits[1].Damage));
         }
 
         [Test]
@@ -222,7 +278,7 @@ namespace Degunatsu.Core.Tests.Combat
 
             CharacterState victim = world.GetState(1);
             Assert.That(victim.Combat.ComboCount, Is.EqualTo(2));
-            Assert.That(victim.Combat.ComboDamage, Is.EqualTo(2 * Combat.Ground.Damage));
+            Assert.That(victim.Combat.ComboDamage, Is.EqualTo(2 * Ground1.Damage));
             Assert.That(victim.Combat.LastAttacker, Is.EqualTo(2), "最後にダメージを与えた人");
         }
 
@@ -247,7 +303,7 @@ namespace Degunatsu.Core.Tests.Combat
             StepUntilHit(world, 1, Combat.Ground.TotalTicks, default, default);
 
             Assert.That(world.GetState(1).Combat.ComboCount, Is.EqualTo(1), "のけぞりが切れた後の命中は、新しいコンボ");
-            Assert.That(world.GetState(1).Combat.ComboDamage, Is.EqualTo(Combat.Ground.Damage));
+            Assert.That(world.GetState(1).Combat.ComboDamage, Is.EqualTo(Ground1.Damage));
         }
 
         [Test]

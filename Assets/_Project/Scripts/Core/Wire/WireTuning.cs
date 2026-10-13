@@ -138,6 +138,12 @@ namespace Degunatsu.Core.Wire
         /// <summary>ロープを巻き取る速さ（m/s）。縮むほど角運動量の保存で振りが速くなる。</summary>
         public float ReelSpeed = 8f;
 
+        /// <summary>上を押し続けているときの巻き取りの速さ（m/s。D-41）。下を押し続けているときは巻き取らない（ロープの長さを保つ）。</summary>
+        public float FastReelSpeed = 20f;
+
+        /// <summary>上下の入力とみなすスティックの縦の大きさ（0〜1。D-41）。斜めの入力（約 0.71）も上下に数える。</summary>
+        public float ReelInputThreshold = 0.5f;
+
         /// <summary>スティックでロープに垂直な方向へ加える力（m/s²）。</summary>
         public float SwingAcceleration = 10f;
 
@@ -161,6 +167,8 @@ namespace Degunatsu.Core.Wire
         {
             var v = new TuningValidator(nameof(InertialWireTuning));
             v.NonNegative(nameof(ReelSpeed), ReelSpeed);
+            v.NonNegative(nameof(FastReelSpeed), FastReelSpeed);
+            v.InRange(nameof(ReelInputThreshold), ReelInputThreshold, 0.1f, 1f);
             v.NonNegative(nameof(SwingAcceleration), SwingAcceleration);
             v.NonNegative(nameof(Damping), Damping);
             v.NonNegative(nameof(StartPullSpeed), StartPullSpeed);

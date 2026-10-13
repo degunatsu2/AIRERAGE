@@ -4,43 +4,26 @@ using Degunatsu.Core.Common;
 namespace Degunatsu.Core.Combat
 {
     /// <summary>
-    /// 1つの攻撃のデータ（docs/01_game_design.md 6.4）。フレームデータ（発生・持続・硬直）、攻撃中の移動、命中（T3-2）。
-    /// キャンセル窓などは、作るときに加える（docs/11_combat_plan.md）。
-    /// 位置と速度の X は向いている方向を正とする（左を向いていれば反転する）。
+    /// 攻撃の判定1つ（docs/01_game_design.md 6.4）。攻撃を始めてから StartTick ティック目から ActiveTicks ティックの間だけ出る、
+    /// 軸平行の箱（D-37）。1つの攻撃に複数持てる（二段技）。同じ判定は同じ相手に1回だけ当たる。
+    /// 位置と吹き飛びの X は、攻撃した側の向いている方向を正とする。
     /// </summary>
     [Serializable]
-    public sealed class AttackData
+    public sealed class AttackHit
     {
-        /// <summary>発生（ティック）。押してから判定が出るまで。</summary>
-        public int StartupTicks = 5;
+        /// <summary>判定が出始めるティック（攻撃を始めたティックが 0）。</summary>
+        public int StartTick = 5;
 
-        /// <summary>持続（ティック）。判定が出ている長さ。</summary>
+        /// <summary>判定が出ている長さ（ティック）。</summary>
         public int ActiveTicks = 3;
 
-        /// <summary>硬直（ティック）。判定が消えてから動けるようになるまで。</summary>
-        public int RecoveryTicks = 10;
+        /// <summary>判定の箱の、キャラクターの中心からの位置（m）。</summary>
+        public float OffsetX = 0.9f;
+        public float OffsetY;
 
-        /// <summary>持続の間、速度を DashVelocity にするか（しないなら、それまでの勢いのまま）。</summary>
-        public bool DashWhileActive;
-
-        /// <summary>持続の間の速度（m/s）。</summary>
-        public float DashVelocityX;
-        public float DashVelocityY;
-
-        /// <summary>硬直に入るティックに、速度を LaunchVelocity にするか。地上技は必ず上向きに飛び出す（D-35）。</summary>
-        public bool LaunchAtRecovery;
-
-        /// <summary>硬直に入るときの速度（m/s）。</summary>
-        public float LaunchVelocityX;
-        public float LaunchVelocityY;
-
-        /// <summary>攻撃の判定（持続の間だけ出る軸平行の箱。D-37）の、キャラクターの中心からの位置（m）。</summary>
-        public float HitboxOffsetX = 0.9f;
-        public float HitboxOffsetY;
-
-        /// <summary>攻撃の判定の半分の大きさ（m）。</summary>
-        public float HitboxHalfWidth = 0.6f;
-        public float HitboxHalfHeight = 0.6f;
+        /// <summary>判定の箱の半分の大きさ（m）。</summary>
+        public float HalfWidth = 0.6f;
+        public float HalfHeight = 0.6f;
 
         /// <summary>ダメージ。HP はなく（D-23）、コインへの変換（Phase 4）とコンボの表示に使う。</summary>
         public int Damage = 5;
@@ -51,42 +34,26 @@ namespace Degunatsu.Core.Combat
         /// <summary>のけぞり（ティック）。当たった側が入力を受け付けない。ヒットストップの後から数える。</summary>
         public int HitstunTicks = 20;
 
-        /// <summary>当たった側の吹き飛びの速度（m/s。X は攻撃した側の向いている方向が正）。攻撃ごとに固定（D-38 の (a)）。</summary>
+        /// <summary>当たった側の吹き飛びの速度（m/s）。撃破技なら、打つ直前の速さで倍率がかかる（D-38）。</summary>
         public float KnockbackX = 8f;
         public float KnockbackY = 6f;
 
-        public AttackData()
+        public bool IsActiveAt(int ticks)
         {
+            return ticks >= StartTick && ticks < StartTick + ActiveTicks;
         }
 
-        public AttackData(int startupTicks, int activeTicks, int recoveryTicks)
-        {
-            StartupTicks = startupTicks;
-            ActiveTicks = activeTicks;
-            RecoveryTicks = recoveryTicks;
-        }
-
-        /// <summary>攻撃の全体の長さ（ティック）。</summary>
-        public int TotalTicks => StartupTicks + ActiveTicks + RecoveryTicks;
-
-        /// <summary>攻撃を始めてから ticks ティック目の段階。</summary>
-        public AttackPhase PhaseAt(int ticks)
-        {
-            if (ticks < StartupTicks)
-            {
-                return AttackPhase.Startup;
-            }
-            return ticks < StartupTicks + ActiveTicks ? AttackPhase.Active : AttackPhase.Recovery;
-        }
-
-        public TuningValidator Validate(string name)
+        public TuningValidator Validate(string name, int totalTicks)
         {
             var v = new TuningValidator(name);
-            v.Positive(nameof(StartupTicks), StartupTicks);
+            v.NonNegative(nameof(StartTick), StartTick);
             v.Positive(nameof(ActiveTicks), ActiveTicks);
-            v.NonNegative(nameof(RecoveryTicks), RecoveryTicks);
-            v.Positive(nameof(HitboxHalfWidth), HitboxHalfWidth);
-            v.Positive(nameof(HitboxHalfHeight), HitboxHalfHeight);
+            if (StartTick + ActiveTicks > totalTicks)
+            {
+                v.Fail($"判定（{StartTick}〜{StartTick + ActiveTicks} ティック）が攻撃の長さ（{totalTicks}）を超えています");
+            }
+            v.Positive(nameof(HalfWidth), HalfWidth);
+            v.Positive(nameof(HalfHeight), HalfHeight);
             v.NonNegative(nameof(Damage), Damage);
             v.NonNegative(nameof(HitstopTicks), HitstopTicks);
             v.NonNegative(nameof(HitstunTicks), HitstunTicks);
@@ -95,54 +62,217 @@ namespace Degunatsu.Core.Combat
     }
 
     /// <summary>
+    /// 攻撃中の動き1つ。攻撃を始めてから StartTick ティック目から Ticks ティックの間、速度をこの値にする（踏み込み、飛び出し、
+    /// 飛び込み）。決めていない間は慣性のまま動く。X は向いている方向を正とする。
+    /// </summary>
+    [Serializable]
+    public sealed class AttackMotion
+    {
+        public int StartTick;
+        public int Ticks = 1;
+        public float VelocityX;
+        public float VelocityY;
+
+        public bool IsActiveAt(int ticks)
+        {
+            return ticks >= StartTick && ticks < StartTick + Ticks;
+        }
+
+        public TuningValidator Validate(string name, int totalTicks)
+        {
+            var v = new TuningValidator(name);
+            v.NonNegative(nameof(StartTick), StartTick);
+            v.Positive(nameof(Ticks), Ticks);
+            if (StartTick + Ticks > totalTicks)
+            {
+                v.Fail($"動き（{StartTick}〜{StartTick + Ticks} ティック）が攻撃の長さ（{totalTicks}）を超えています");
+            }
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// 1つの攻撃のデータ（docs/01_game_design.md 6.4）。全体の長さ、判定（1〜4つ）、攻撃中の動き。
+    /// 段階（表示用）は判定から決まる: 最初の判定の前が発生、判定が出ている間が持続、それ以外が硬直。
+    /// </summary>
+    [Serializable]
+    public sealed class AttackData
+    {
+        /// <summary>1つの攻撃が持てる判定の数の上限（当てた相手の記録のビット数による）。</summary>
+        public const int MaxHits = 4;
+
+        /// <summary>攻撃の全体の長さ（ティック）。終わったティックから次の行動ができる。</summary>
+        public int TotalTicks = 18;
+
+        public AttackHit[] Hits = { new AttackHit() };
+        public AttackMotion[] Motions = new AttackMotion[0];
+
+        /// <summary>最初の判定が出るティック（発生）。</summary>
+        public int FirstHitTick
+        {
+            get
+            {
+                int first = int.MaxValue;
+                foreach (AttackHit hit in Hits)
+                {
+                    first = Math.Min(first, hit.StartTick);
+                }
+                return first;
+            }
+        }
+
+        /// <summary>攻撃を始めてから ticks ティック目の段階。</summary>
+        public AttackPhase PhaseAt(int ticks)
+        {
+            foreach (AttackHit hit in Hits)
+            {
+                if (hit.IsActiveAt(ticks))
+                {
+                    return AttackPhase.Active;
+                }
+            }
+            return ticks < FirstHitTick ? AttackPhase.Startup : AttackPhase.Recovery;
+        }
+
+        public TuningValidator Validate(string name)
+        {
+            var v = new TuningValidator(name);
+            v.Positive(nameof(TotalTicks), TotalTicks);
+            v.NotNull(nameof(Hits), Hits);
+            v.NotNull(nameof(Motions), Motions);
+            if (Hits != null)
+            {
+                if (Hits.Length < 1 || Hits.Length > MaxHits)
+                {
+                    v.Fail($"判定は 1〜{MaxHits} つ（{Hits.Length} つ）");
+                }
+                for (int i = 0; i < Hits.Length; i++)
+                {
+                    v.NotNull($"Hits[{i}]", Hits[i]);
+                    if (Hits[i] != null)
+                    {
+                        v.Merge(Hits[i].Validate($"{name}.Hits[{i}]", TotalTicks));
+                    }
+                }
+            }
+            if (Motions != null)
+            {
+                for (int i = 0; i < Motions.Length; i++)
+                {
+                    v.NotNull($"Motions[{i}]", Motions[i]);
+                    if (Motions[i] != null)
+                    {
+                        v.Merge(Motions[i].Validate($"{name}.Motions[{i}]", TotalTicks));
+                    }
+                }
+            }
+            return v;
+        }
+    }
+
+    /// <summary>
     /// 戦闘の調整値（攻撃のセット）。初期値はすべて【仮】（docs/11_combat_plan.md）。
-    /// 地上技1つと、空中のニュートラル／横／上／下の4つ（D-35）。
+    /// 地上技1つと、空中のニュートラル／横／上／下の4つ（D-35）。そのうち1つが撃破技（D-38）。
     /// </summary>
     [Serializable]
     public sealed class CombatTuning
     {
         /// <summary>
-        /// 地上技。前へ大きく踏み込み（持続）、硬直に入るときに必ず上へ飛び出して空中に移る（D-35。空中戦がテーマのため、
-        /// 地上に居座る利点を与えず、「素早く空中を動くために一度地上に降りる」選択肢にする）。
+        /// 地上技（デフォルトのキャラクター）: 前へ大きく踏み込みながら1段目、斜め上へ飛び出しながら2段目の二段技。
+        /// 最後に地面を離れて空中に移る（キャラクターを作るときの方針。D-35）。
         /// </summary>
-        public AttackData Ground = new AttackData(5, 8, 14)
+        public AttackData Ground = new AttackData
         {
-            DashWhileActive = true,
-            DashVelocityX = 16f,
-            LaunchAtRecovery = true,
-            LaunchVelocityX = 9f,
-            LaunchVelocityY = 11f,
-            HitboxOffsetX = 0.8f, HitboxHalfWidth = 0.7f, HitboxHalfHeight = 0.7f,
-            Damage = 6, HitstopTicks = 6, HitstunTicks = 22, KnockbackX = 10f, KnockbackY = 9f,
+            TotalTicks = 28,
+            Hits = new[]
+            {
+                new AttackHit
+                {
+                    StartTick = 5, ActiveTicks = 8, OffsetX = 0.8f, HalfWidth = 0.7f, HalfHeight = 0.7f,
+                    Damage = 4, HitstopTicks = 5, HitstunTicks = 20, KnockbackX = 9f, KnockbackY = 3f,
+                },
+                new AttackHit
+                {
+                    StartTick = 13, ActiveTicks = 5, OffsetX = 0.6f, OffsetY = 0.9f, HalfWidth = 0.8f, HalfHeight = 0.8f,
+                    Damage = 4, HitstopTicks = 6, HitstunTicks = 24, KnockbackX = 6f, KnockbackY = 12f,
+                },
+            },
+            Motions = new[]
+            {
+                new AttackMotion { StartTick = 5, Ticks = 8, VelocityX = 18f },
+                new AttackMotion { StartTick = 13, Ticks = 1, VelocityX = 10.5f, VelocityY = 12.5f },
+            },
         };
 
         /// <summary>空中・ニュートラル: 体の周りを広く。軽く浮かせる（コンボの始動）。</summary>
-        public AttackData AirNeutral = new AttackData(5, 4, 10)
+        public AttackData AirNeutral = new AttackData
         {
-            HitboxOffsetX = 0f, HitboxHalfWidth = 1.1f, HitboxHalfHeight = 1.1f,
-            Damage = 4, HitstopTicks = 5, HitstunTicks = 20, KnockbackX = 5f, KnockbackY = 7f,
+            TotalTicks = 19,
+            Hits = new[]
+            {
+                new AttackHit
+                {
+                    StartTick = 5, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 1.1f, HalfHeight = 1.1f,
+                    Damage = 4, HitstopTicks = 5, HitstunTicks = 20, KnockbackX = 5f, KnockbackY = 7f,
+                },
+            },
         };
 
         /// <summary>空中・横: 前へ長く。横へ大きく飛ばす（横からステージの外へ）。</summary>
-        public AttackData AirSide = new AttackData(7, 4, 14)
+        public AttackData AirSide = new AttackData
         {
-            HitboxOffsetX = 1.1f, HitboxOffsetY = 0.1f, HitboxHalfWidth = 0.8f, HitboxHalfHeight = 0.5f,
-            Damage = 6, HitstopTicks = 7, HitstunTicks = 24, KnockbackX = 14f, KnockbackY = 4f,
+            TotalTicks = 25,
+            Hits = new[]
+            {
+                new AttackHit
+                {
+                    StartTick = 7, ActiveTicks = 4, OffsetX = 1.1f, OffsetY = 0.1f, HalfWidth = 0.8f, HalfHeight = 0.5f,
+                    Damage = 6, HitstopTicks = 7, HitstunTicks = 24, KnockbackX = 14f, KnockbackY = 4f,
+                },
+            },
         };
 
         /// <summary>空中・上: 頭上。真上へ打ち上げる（追撃の始動）。</summary>
-        public AttackData AirUp = new AttackData(6, 4, 14)
+        public AttackData AirUp = new AttackData
         {
-            HitboxOffsetX = 0.2f, HitboxOffsetY = 1.1f, HitboxHalfWidth = 0.7f, HitboxHalfHeight = 0.7f,
-            Damage = 5, HitstopTicks = 6, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 14f,
+            TotalTicks = 24,
+            Hits = new[]
+            {
+                new AttackHit
+                {
+                    StartTick = 6, ActiveTicks = 4, OffsetX = 0.2f, OffsetY = 1.1f, HalfWidth = 0.7f, HalfHeight = 0.7f,
+                    Damage = 5, HitstopTicks = 6, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 14f,
+                },
+            },
         };
 
-        /// <summary>空中・下: 足元。真下へたたき落とす（下からステージの外へ）。発生が遅い。</summary>
-        public AttackData AirDown = new AttackData(9, 4, 16)
+        /// <summary>
+        /// 空中・下（デフォルトのキャラクターの撃破技。D-38）: 発生（チャージ）が遅く、その間は慣性のまま。チャージの後、
+        /// 斜め下へ飛び込みながら攻撃し、相手を斜め下へたたき落とす。
+        /// </summary>
+        public AttackData AirDown = new AttackData
         {
-            HitboxOffsetX = 0.1f, HitboxOffsetY = -1.1f, HitboxHalfWidth = 0.6f, HitboxHalfHeight = 0.7f,
-            Damage = 7, HitstopTicks = 9, HitstunTicks = 26, KnockbackX = 2f, KnockbackY = -16f,
+            TotalTicks = 40,
+            Hits = new[]
+            {
+                new AttackHit
+                {
+                    StartTick = 16, ActiveTicks = 12, OffsetX = 0.4f, OffsetY = -0.8f, HalfWidth = 0.7f, HalfHeight = 0.8f,
+                    Damage = 8, HitstopTicks = 10, HitstunTicks = 28, KnockbackX = 6f, KnockbackY = -12f,
+                },
+            },
+            Motions = new[]
+            {
+                new AttackMotion { StartTick = 16, Ticks = 12, VelocityX = 9f, VelocityY = -15f },
+            },
         };
+
+        /// <summary>撃破技にする攻撃（キャラクターごとに1つ。D-38）。</summary>
+        public AttackSlot KoAttack = AttackSlot.AirDown;
+
+        /// <summary>撃破技の吹き飛びの倍率 = KoKnockbackBase + KoKnockbackPerSpeed × 打つ直前の速さ（m/s）。【仮】</summary>
+        public float KoKnockbackBase = 0.5f;
+        public float KoKnockbackPerSpeed = 0.1f;
 
         public AttackData Get(AttackSlot slot)
         {
@@ -157,6 +287,12 @@ namespace Degunatsu.Core.Combat
             }
         }
 
+        /// <summary>撃破技の吹き飛びの倍率（打つ直前の速さ speed から）。</summary>
+        public float KoKnockbackScale(float speed)
+        {
+            return KoKnockbackBase + KoKnockbackPerSpeed * speed;
+        }
+
         public TuningValidator Validate()
         {
             var v = new TuningValidator(nameof(CombatTuning));
@@ -169,10 +305,12 @@ namespace Degunatsu.Core.Combat
                     v.Merge(attack.Validate($"{nameof(CombatTuning)}.{slot}"));
                 }
             }
-            if (Ground != null && !(Ground.LaunchAtRecovery && Ground.LaunchVelocityY > 0f))
+            if (!Enum.IsDefined(typeof(AttackSlot), KoAttack))
             {
-                v.Fail("Ground: 地上技は、硬直に入るときに必ず上向きに飛び出す（LaunchAtRecovery と正の LaunchVelocityY が必要。D-35）");
+                v.Fail($"{nameof(KoAttack)} が攻撃の種類ではありません（{KoAttack}）");
             }
+            v.NonNegative(nameof(KoKnockbackBase), KoKnockbackBase);
+            v.NonNegative(nameof(KoKnockbackPerSpeed), KoKnockbackPerSpeed);
             return v;
         }
     }
