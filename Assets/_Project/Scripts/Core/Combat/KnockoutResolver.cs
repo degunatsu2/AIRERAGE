@@ -38,7 +38,8 @@ namespace Degunatsu.Core.Combat
         }
 
         /// <summary>
-        /// 出現したときの状態に戻し、復帰を待たせる。撃破の数（撃破された数は +1）、ゲージ、前のティックのボタン、ギミックの数を引き継ぐ。
+        /// 出現したときの状態に戻し、復帰を待たせる。撃破の数（撃破された数は +1）、ゲージ、前のティックのボタン、ギミックの数、
+        /// コインを引き継ぐ。
         /// 無敵は、待つ間と復帰した後の両方の長さにする。
         /// </summary>
         private static CharacterState Respawn(in CharacterState state, in CharacterState spawn, MatchRules rules)
@@ -53,6 +54,8 @@ namespace Degunatsu.Core.Combat
             respawned.PreviousButtons = state.PreviousButtons;
             respawned.JumpPadCount = state.JumpPadCount;
             respawned.BoostRingCount = state.BoostRingCount;
+            // コインはなくさない（撃破のドロップは T4-6 で、台帳を通して落とす）。
+            respawned.Coins = state.Coins;
             return respawned;
         }
     }

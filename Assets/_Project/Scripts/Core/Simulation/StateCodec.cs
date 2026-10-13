@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using Degunatsu.Core.Economy;
 using Degunatsu.Core.Combat;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Wire;
@@ -17,7 +18,7 @@ namespace Degunatsu.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 14;
+        public const int FormatVersion = 15;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -64,15 +65,48 @@ namespace Degunatsu.Core.Simulation
             return hash;
         }
 
-        /// <summary>ワールドの全状態（ティック数と全キャラクターの状態）のチェックサム。</summary>
-        public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states)
+        /// <summary>ワールドの全状態（ティック数、全キャラクターの状態、ワールド全体のコイン）のチェックサム。</summary>
+        public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states, CoinField coins)
         {
             ulong hash = Mix(FnvOffsetBasis, tick);
             for (int i = 0; i < states.Count; i++)
             {
                 hash = Mix(hash, Checksum(states[i]));
             }
-            return hash;
+            return Mix(hash, Checksum(coins));
+        }
+
+        /// <summary>ワールド全体のコイン（フィールドのコイン、次の番号、生成・破棄の枚数）のチェックサム。</summary>
+        public static ulong Checksum(CoinField coins)
+        {
+            if (coins == null)
+            {
+                throw new ArgumentNullException(nameof(coins));
+            }
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write(coins.Coins.Count);
+                foreach (FieldCoin coin in coins.Coins)
+                {
+                    writer.Write(coin.Id);
+                    writer.Write(coin.Position.X);
+                    writer.Write(coin.Position.Y);
+                    writer.Write(coin.Value);
+                    writer.Write(coin.PickableFromTick);
+                    writer.Write(coin.ExpireTick);
+                }
+                writer.Write(coins.NextCoinId);
+                writer.Write(coins.Generated);
+                writer.Write(coins.Destroyed);
+                writer.Flush();
+                ulong hash = FnvOffsetBasis;
+                foreach (byte b in stream.ToArray())
+                {
+                    hash = MixByte(hash, b);
+                }
+                return hash;
+            }
         }
 
         /// <summary>チェックサム hash に 64bit の値を加える（下位のバイトから順に FNV-1a で混ぜる）。</summary>
@@ -170,6 +204,8 @@ namespace Degunatsu.Core.Simulation
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
+            writer.Write(state.Coins.Held);
+            writer.Write(state.Coins.Banked);
         }
 
         public static CharacterState Read(BinaryReader reader)
@@ -248,6 +284,7 @@ namespace Degunatsu.Core.Simulation
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();
+            state.Coins = new CoinPurse { Held = reader.ReadInt32(), Banked = reader.ReadInt32() };
             return state;
         }
 

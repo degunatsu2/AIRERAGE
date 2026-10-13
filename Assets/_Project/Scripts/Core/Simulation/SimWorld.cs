@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Degunatsu.Core.Economy;
 using Degunatsu.Core.Combat;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Match;
@@ -19,6 +20,7 @@ namespace Degunatsu.Core.Simulation
         private readonly List<CharacterState> _states = new List<CharacterState>();
         private readonly List<CharacterConfig> _configs = new List<CharacterConfig>();
         private readonly List<CharacterState> _spawns = new List<CharacterState>();
+        private readonly CoinField _coins = new CoinField();
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
         /// <param name="zones">ステージのギミック（ジャンプ台など）。渡した順によらず、決まった順（StageZone.CompareTo）に並べて効かせる。</param>
@@ -34,6 +36,7 @@ namespace Degunatsu.Core.Simulation
                 sorted.Sort((a, b) => a.CompareTo(b));
             }
             Zones = sorted;
+            Coins = new CoinLedger(_coins);
             _simulator = new CharacterSimulator(collision, sorted);
             Bounds = bounds;
         }
@@ -46,6 +49,9 @@ namespace Degunatsu.Core.Simulation
 
         /// <summary>試合のルール。</summary>
         public MatchRules Rules { get; }
+
+        /// <summary>コイン台帳（コインの増減はすべてここを通す。docs/12 T4-3）。状態は CoinField と各キャラクターの Coins。</summary>
+        public CoinLedger Coins { get; }
 
         /// <summary>次に進めるティックの、試合の段階（ティック数だけから決まる）。</summary>
         public MatchPhase Phase => Rules.PhaseAt(Tick);
@@ -80,14 +86,14 @@ namespace Degunatsu.Core.Simulation
             _states[index] = state;
         }
 
-        /// <summary>全状態（ティック数と全キャラクターの状態）を snapshot に書き写す（ロールバックの保存）。</summary>
+        /// <summary>全状態（ティック数、全キャラクターの状態、ワールド全体のコイン）を snapshot に書き写す（ロールバックの保存）。</summary>
         public void SaveTo(WorldSnapshot snapshot)
         {
             if (snapshot == null)
             {
                 throw new ArgumentNullException(nameof(snapshot));
             }
-            snapshot.Capture(Tick, _states);
+            snapshot.Capture(Tick, _states, _coins);
         }
 
         /// <summary>snapshot の全状態に戻す（ロールバックの巻き戻し）。キャラクターの数が違えば ArgumentException。</summary>
@@ -106,13 +112,14 @@ namespace Degunatsu.Core.Simulation
             {
                 _states[i] = snapshot.GetState(i);
             }
+            _coins.CopyFrom(snapshot.Coins);
             Tick = snapshot.Tick;
         }
 
         /// <summary>今の全状態のチェックサム（WorldSnapshot.Checksum と同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states);
+            return StateCodec.WorldChecksum(Tick, _states, _coins);
         }
 
         public CharacterConfig GetConfig(int index)
@@ -144,6 +151,7 @@ namespace Degunatsu.Core.Simulation
             }
 
             MatchPhase phase = Phase;
+            Coins.BeginTick(Tick + 1);
             if (phase == MatchPhase.Finished)
             {
                 _hits.Clear();

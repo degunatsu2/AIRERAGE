@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using Degunatsu.Core.Economy;
 using Degunatsu.Core.Combat;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Wire;
@@ -39,6 +40,9 @@ namespace Degunatsu.Core.Simulation
         /// <summary>加速リングで加速した数（表示と音に使う。StageZones）。</summary>
         public int BoostRingCount;
 
+        /// <summary>コイン（所持と確定。docs/12 T4-3）。増減は CoinLedger だけが行う。</summary>
+        public CoinPurse Coins;
+
         public static CharacterState Spawn(Vector3 position, int facing)
         {
             return new CharacterState
@@ -62,7 +66,8 @@ namespace Degunatsu.Core.Simulation
                 && Action.Equals(other.Action)
                 && Combat.Equals(other.Combat)
                 && JumpPadCount == other.JumpPadCount
-                && BoostRingCount == other.BoostRingCount;
+                && BoostRingCount == other.BoostRingCount
+                && Coins.Equals(other.Coins);
         }
 
         public override bool Equals(object obj)
@@ -86,12 +91,13 @@ namespace Degunatsu.Core.Simulation
             hash.Add(Combat);
             hash.Add(JumpPadCount);
             hash.Add(BoostRingCount);
+            hash.Add(Coins);
             return hash.ToHashCode();
         }
 
         public override string ToString()
         {
-            return $"pos={Position} vel={Velocity} grounded={Grounded} wire={Wire.Phase} action={Action} {Combat}";
+            return $"pos={Position} vel={Velocity} grounded={Grounded} wire={Wire.Phase} action={Action} {Combat} coins=({Coins})";
         }
     }
 }

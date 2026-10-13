@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using Degunatsu.Core.Economy;
 
 namespace Degunatsu.Core.Simulation
 {
     /// <summary>
-    /// SimWorld の全状態（ティック数と全キャラクターの状態）の写し（docs/10_online_plan.md T2-1）。
+    /// SimWorld の全状態（ティック数、全キャラクターの状態、ワールド全体のコイン）の写し（docs/10_online_plan.md T2-1）。
     /// ロールバックで巻き戻すために保存する。毎ティック作り直さずに済むよう、同じインスタンスに上書きして使い回せる。
     /// 調整値は試合中に変わらない前提なので含めない。
     /// </summary>
@@ -16,6 +17,9 @@ namespace Degunatsu.Core.Simulation
         public int Tick { get; private set; }
 
         public int CharacterCount => _states.Length;
+
+        /// <summary>ワールド全体のコイン（フィールドのコインなど）の写し。</summary>
+        public CoinField Coins { get; } = new CoinField();
 
         public CharacterState GetState(int index)
         {
@@ -29,11 +33,12 @@ namespace Degunatsu.Core.Simulation
         /// <summary>全状態のチェックサム（ティック数と全キャラクターの状態。PC が違っても同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states);
+            return StateCodec.WorldChecksum(Tick, _states, Coins);
         }
 
-        internal void Capture(int tick, IReadOnlyList<CharacterState> states)
+        internal void Capture(int tick, IReadOnlyList<CharacterState> states, CoinField coins)
         {
+            Coins.CopyFrom(coins);
             if (_states.Length != states.Count)
             {
                 _states = new CharacterState[states.Count];

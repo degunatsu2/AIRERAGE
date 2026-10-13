@@ -80,7 +80,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Core/Replay | 入力の記録と再生（開始時の状態＋入力列＋最後の状態のチェックサム。テキストで保存） | `InputRecorder`, `InputRecording` | 1 |
 | Core/Rollback | ロールバックの層（入力の管理、入力遅延、予測、巻き戻しと再計算、確定ティック）と入力の送受信の規則（冗長送信、確認応答、メッセージのバイト列）。通信はしない。docs/10 | `RollbackSession`, `RollbackSettings`, `InputExchange`, `InputMessage`, `InputNormalizer`, `TimeSync`（状態の保存は Simulation の `WorldSnapshot`） | 2 |
 | Core/Combat | アクション状態（Free / Attack など）と遷移、攻撃のデータ（フレームデータ）、キャンセル規則、命中判定、ガード。docs/11 | `ActionController`, `ActionState`, `CombatState`, `CombatTuning`, `AttackData`（判定 `AttackHit` と動き `AttackMotion` の並び）, `HitResolver`, `KnockoutResolver`（ステージの外に出たら撃破） | 3 |
-| Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
+| Core/Economy | コイン台帳（コインの増減はすべてここを通す。イベント ID で同じティックの二重の取引を拒否、総量の保存）。所持・確定はキャラクターの状態、フィールドのコインはワールド全体の状態（どちらも巻き戻しとチェックサムに乗る）。docs/12 T4-3 | `CoinLedger`, `CoinField`（ワールド全体）, `CoinPurse`（`CharacterState.Coins`）, `FieldCoin`, `CoinEventId`, `CoinTotals` | 4 |
 | Core/Match | 試合のルールと進行（カウントダウン、制限時間、終了。段階はティック数とルールだけから決まる）、復帰、順位。docs/12 | `MatchRules`（`PhaseAt` / `TicksLeftAt`）, `MatchResults` | 4 |
 | Runtime/Simulation | ティックループ、シーンの地形・ステージの範囲・ギミックの読み込み、表示と効果音のための状態の読み取り口（オフラインとオンラインで共通） | `SimulationRunner`, `SceneTerrainBuilder`, `KnockoutBounds`, `StageZoneAuthoring`, `ISimulationFeed` | 1 |
 | Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
