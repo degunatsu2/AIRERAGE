@@ -9,6 +9,7 @@ namespace Degunatsu.Core.Input
         None = 0,
         Jump = 1 << 0,
         Wire = 1 << 1,
+        Attack = 1 << 2,
     }
 
     /// <summary>

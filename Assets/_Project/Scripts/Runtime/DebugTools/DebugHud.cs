@@ -1,4 +1,5 @@
 using System.Text;
+using Degunatsu.Core.Combat;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Core.Wire;
 using Degunatsu.Runtime.Simulation;
@@ -105,9 +106,16 @@ namespace Degunatsu.Runtime.DebugTools
                 _text.Append("  Cooldown ").Append(w.CooldownTicksLeft).Append('t');
             }
             _text.Append('\n');
-            _text.Append("Last release ").Append(w.LastReleaseReason).Append("  Last miss ").Append(w.LastMissReason);
+            _text.Append("Last release ").Append(w.LastReleaseReason).Append("  Last miss ").Append(w.LastMissReason).Append('\n');
+            _text.Append("Action ").Append(s.Action.Kind);
+            if (s.Action.Kind == ActionKind.Attack)
+            {
+                AttackData attack = _runner.PlayerConfig.Combat.Get(s.Action.Attack);
+                _text.Append(' ').Append(s.Action.Attack).Append(' ').Append(attack.PhaseAt(s.Action.Ticks))
+                    .Append(" (").Append(s.Action.Ticks + 1).Append('/').Append(attack.TotalTicks).Append("t)");
+            }
 
-            const int lines = 9;
+            const int lines = 10;
             GUI.Box(new Rect(Screen.width - Width - 10f, 10f, Width, 12f + 21f * lines), _text.ToString(), _style);
         }
     }

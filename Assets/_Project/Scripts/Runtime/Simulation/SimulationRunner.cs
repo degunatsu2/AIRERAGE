@@ -175,6 +175,7 @@ namespace Degunatsu.Runtime.Simulation
             if (_characterView != null)
             {
                 _characterView.Render(_previous, current, alpha, _character.Config.Movement.HalfExtents.ToUnity());
+                _characterView.RenderAction(current, _character.Config.Combat);
             }
             if (_wireView != null)
             {

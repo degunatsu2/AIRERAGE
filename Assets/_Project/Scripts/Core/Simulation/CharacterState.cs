@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using Degunatsu.Core.Combat;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Wire;
 
@@ -26,6 +27,9 @@ namespace Degunatsu.Core.Simulation
 
         public WireState Wire;
 
+        /// <summary>アクション状態（Free / 攻撃など。docs/01_game_design.md 6.2）。</summary>
+        public ActionState Action;
+
         public static CharacterState Spawn(Vector3 position, int facing)
         {
             return new CharacterState
@@ -45,7 +49,8 @@ namespace Degunatsu.Core.Simulation
                 && JumpBufferTicksLeft == other.JumpBufferTicksLeft
                 && AirJumpsUsed == other.AirJumpsUsed
                 && PreviousButtons == other.PreviousButtons
-                && Wire.Equals(other.Wire);
+                && Wire.Equals(other.Wire)
+                && Action.Equals(other.Action);
         }
 
         public override bool Equals(object obj)
@@ -65,12 +70,13 @@ namespace Degunatsu.Core.Simulation
             hash.Add(AirJumpsUsed);
             hash.Add(PreviousButtons);
             hash.Add(Wire);
+            hash.Add(Action);
             return hash.ToHashCode();
         }
 
         public override string ToString()
         {
-            return $"pos={Position} vel={Velocity} grounded={Grounded} wire={Wire.Phase}";
+            return $"pos={Position} vel={Velocity} grounded={Grounded} wire={Wire.Phase} action={Action}";
         }
     }
 }

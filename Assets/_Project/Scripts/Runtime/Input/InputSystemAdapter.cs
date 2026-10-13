@@ -9,7 +9,7 @@ namespace Degunatsu.Runtime.Input
     /// <summary>
     /// Input System を読み、ティックごとの PlayerInput を作る（docs/03_architecture.md 4.5）。
     /// Input System を直接読むのはここだけで、シミュレーションは PlayerInput だけを見る。
-    /// アクションは DegunatsuControls.inputactions の "Player" マップ（Move / Jump / Wire / Reset / Point / Aim）。
+    /// アクションは DegunatsuControls.inputactions の "Player" マップ（Move / Jump / Wire / Attack / Reset / Point / Aim）。
     ///
     /// 照準（D-08）: 最後に使った機器がキーボードかマウスなら、マウスポインターの方向に照準する（PlayerInput の照準の方向）。
     /// ゲームパッドなら、右スティックを倒しているときはその方向に照準する。倒していなければ照準の方向を指定せず、
@@ -23,6 +23,7 @@ namespace Degunatsu.Runtime.Input
         private readonly InputAction _move;
         private readonly InputAction _jump;
         private readonly InputAction _wire;
+        private readonly InputAction _attack;
         private readonly InputAction _reset;
         private readonly InputAction _point;
         private readonly InputAction _aim;
@@ -45,10 +46,11 @@ namespace Degunatsu.Runtime.Input
             _move = _map.FindAction("Move", throwIfNotFound: true);
             _jump = _map.FindAction("Jump", throwIfNotFound: true);
             _wire = _map.FindAction("Wire", throwIfNotFound: true);
+            _attack = _map.FindAction("Attack", throwIfNotFound: true);
             _reset = _map.FindAction("Reset", throwIfNotFound: true);
             _point = _map.FindAction("Point", throwIfNotFound: true);
             _aim = _map.FindAction("Aim", throwIfNotFound: true);
-            _deviceActions = new[] { _move, _jump, _wire, _reset, _aim };
+            _deviceActions = new[] { _move, _jump, _wire, _attack, _reset, _aim };
             UsingPointer = Mouse.current != null;
         }
 
@@ -82,6 +84,10 @@ namespace Degunatsu.Runtime.Input
             if (_wire.WasPressedThisFrame())
             {
                 _pressedSinceLastTick |= InputButtons.Wire;
+            }
+            if (_attack.WasPressedThisFrame())
+            {
+                _pressedSinceLastTick |= InputButtons.Attack;
             }
             ResetRequested = _reset.WasPressedThisFrame();
 
@@ -141,6 +147,10 @@ namespace Degunatsu.Runtime.Input
             if (_wire.IsPressed())
             {
                 buttons |= InputButtons.Wire;
+            }
+            if (_attack.IsPressed())
+            {
+                buttons |= InputButtons.Attack;
             }
 
             Vector2 move = _move.ReadValue<Vector2>();

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using Degunatsu.Core.Combat;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Wire;
 
@@ -16,7 +17,7 @@ namespace Degunatsu.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 2;
+        public const int FormatVersion = 3;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -132,6 +133,11 @@ namespace Degunatsu.Core.Simulation
             writer.Write(wire.CooldownTicksLeft);
             writer.Write((byte)wire.LastReleaseReason);
             writer.Write((byte)wire.LastMissReason);
+
+            ActionState action = state.Action;
+            writer.Write((byte)action.Kind);
+            writer.Write((byte)action.Attack);
+            writer.Write(action.Ticks);
         }
 
         public static CharacterState Read(BinaryReader reader)
@@ -171,6 +177,12 @@ namespace Degunatsu.Core.Simulation
                 CooldownTicksLeft = reader.ReadInt32(),
                 LastReleaseReason = (WireReleaseReason)reader.ReadByte(),
                 LastMissReason = (WireMissReason)reader.ReadByte(),
+            };
+            state.Action = new ActionState
+            {
+                Kind = (ActionKind)reader.ReadByte(),
+                Attack = (AttackSlot)reader.ReadByte(),
+                Ticks = reader.ReadInt32(),
             };
             return state;
         }

@@ -1,4 +1,5 @@
 using System;
+using Degunatsu.Core.Combat;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Movement;
@@ -9,7 +10,8 @@ namespace Degunatsu.Core.Simulation
 {
     /// <summary>
     /// キャラクター1人分の1ティックの処理の順序を決める。
-    /// 入力 → ワイヤーのフェーズ → 速度（ワイヤーまたは通常移動）→ 移動と衝突 → ロープ長の補正 → 接地。
+    /// 入力 → アクション（攻撃）→ ワイヤーのフェーズ → 速度（ワイヤーまたは通常移動）→ 移動と衝突 → ロープ長の補正 → 接地。
+    /// アクション中（攻撃中）は、移動・ジャンプ・ワイヤーの入力を無視し、向きも変えない（ActionController.ControlInput）。
     /// </summary>
     public sealed class CharacterSimulator
     {
@@ -33,7 +35,17 @@ namespace Degunatsu.Core.Simulation
             var halfExtents = movement.HalfExtents;
 
             _motor.Depenetrate(ref state.Position, halfExtents);
-            UpdateFacing(ref state, frame, movement);
+            if (state.Action.IsFree)
+            {
+                UpdateFacing(ref state, frame, movement);
+            }
+
+            ActionController.Update(ref state, frame, config.Combat, movement.MoveDeadzone);
+            if (!state.Action.IsFree)
+            {
+                frame = new InputFrame(ActionController.ControlInput(state, input), state.PreviousButtons);
+                state.JumpBufferTicksLeft = 0;
+            }
 
             _wire.UpdatePhase(ref state, frame, config.Wire);
 
