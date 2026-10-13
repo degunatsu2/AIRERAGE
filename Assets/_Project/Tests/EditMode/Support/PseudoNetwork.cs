@@ -29,26 +29,36 @@ namespace Degunatsu.Core.Tests.Support
         private readonly List<Packet> _inFlight = new List<Packet>();
         private readonly int[] _waitFrames;
         private readonly int[] _stalledByPeer;
+        private readonly int[] _freezeRun;
+        private readonly Vector3[] _beforeReconcile;
         private long _spreadSum;
         private int _spreadSamples;
 
         public PseudoNetwork(int players, RollbackSettings settings, int latencyFrames, int jitterFrames, double lossRate, int seed)
+            : this(MakeScripts(players, seed), settings, latencyFrames, jitterFrames, lossRate, seed)
         {
+        }
+
+        /// <param name="scripts">プレイヤーごとの入力列（目標のティック＋入力遅延より長いこと）。</param>
+        public PseudoNetwork(PlayerInput[][] scripts, RollbackSettings settings, int latencyFrames, int jitterFrames, double lossRate, int seed)
+        {
+            int players = scripts.Length;
             _random = new Random(seed);
             _latency = latencyFrames;
             _jitter = jitterFrames;
             _loss = lossRate;
             Settings = settings;
-            Scripts = new PlayerInput[players][];
+            Scripts = scripts;
             Normalized = new PlayerInput[players][];
             Sessions = new RollbackSession[players];
             Exchanges = new InputExchange[players];
             _waitFrames = new int[players];
             _stalledByPeer = new int[players];
+            _freezeRun = new int[players];
+            _beforeReconcile = new Vector3[players];
             Worlds = new SimWorld[players];
             for (int p = 0; p < players; p++)
             {
-                Scripts[p] = MakeScript(seed * 31 + p, 4000);
                 Worlds[p] = MakeWorld(players);
                 Sessions[p] = new RollbackSession(Worlds[p], p, settings);
                 Exchanges[p] = new InputExchange(Sessions[p], settings);
@@ -92,6 +102,25 @@ namespace Degunatsu.Core.Tests.Support
 
         /// <summary>全員が進んでいる間の、最も進んだプレイヤーと最も遅れたプレイヤーのティックの差の平均。</summary>
         public double AverageTickSpread => _spreadSamples == 0 ? 0.0 : _spreadSum / (double)_spreadSamples;
+
+        /// <summary>巻き戻しで、相手のキャラクターの今の位置が変わった回数（見ている人と見られているキャラクターの組ごと）。</summary>
+        public int CorrectionCount { get; private set; }
+
+        /// <summary>そのうち、VisibleCorrectionDistance 以上動いた（ワープに見える）回数。</summary>
+        public int VisibleCorrectionCount { get; private set; }
+
+        /// <summary>ワープに見えるとみなす位置の変化（m）。</summary>
+        public float VisibleCorrectionDistance { get; set; } = 0.25f;
+
+        /// <summary>巻き戻しで位置が変わった量の合計と最大（m）。</summary>
+        public double CorrectionDistanceSum { get; private set; }
+        public float LargestCorrection { get; private set; }
+
+        /// <summary>
+        /// 自分のティックが進まなかった（予測の上限で止まったか、時刻の同期で待った）フレームが続いた最長の長さ。
+        /// 自分のキャラクターがその間止まって見える。
+        /// </summary>
+        public int LongestFreeze { get; private set; }
 
         /// <summary>同じティックについて、プレイヤーによって確定した状態のチェックサムが違った回数。</summary>
         public int ChecksumMismatches { get; private set; }
@@ -161,6 +190,8 @@ namespace Degunatsu.Core.Tests.Support
             for (int p = 0; p < Sessions.Length; p++)
             {
                 RollbackSession session = Sessions[p];
+                ReconcileAndMeasure(p);
+                int tickBefore = session.CurrentTick;
                 if (session.CurrentTick >= targetTick)
                 {
                     session.Reconcile();
@@ -170,7 +201,7 @@ namespace Degunatsu.Core.Tests.Support
                 {
                     _waitFrames[p]--;
                     TimeSyncWaitFrames++;
-                    session.Reconcile();
+                    MeasureFreeze(p, false);
                     continue;
                 }
                 int steps = p == FastPeer && ExtraStepEvery > 0 && Frame % ExtraStepEvery == 0 ? 2 : 1;
@@ -189,11 +220,49 @@ namespace Degunatsu.Core.Tests.Support
                 {
                     _waitFrames[p] += Exchanges[p].RecommendWaitFrames();
                 }
+                MeasureFreeze(p, session.CurrentTick > tickBefore);
             }
             Send();
             CompareConfirmedChecksums();
             MeasureSpread(targetTick);
             Frame++;
+        }
+
+        // 届いた入力で巻き戻し、相手のキャラクターの今の位置が変わった量を記録する（表示ではワープに見える）。
+        private void ReconcileAndMeasure(int observer)
+        {
+            SimWorld world = Worlds[observer];
+            int rollbacks = Sessions[observer].RollbackCount;
+            for (int q = 0; q < world.CharacterCount; q++)
+            {
+                _beforeReconcile[q] = world.GetState(q).Position;
+            }
+            Sessions[observer].Reconcile();
+            if (Sessions[observer].RollbackCount == rollbacks)
+            {
+                return;
+            }
+            for (int q = 0; q < world.CharacterCount; q++)
+            {
+                float distance = Vector3.Distance(world.GetState(q).Position, _beforeReconcile[q]);
+                if (q == observer || distance == 0f)
+                {
+                    continue;
+                }
+                CorrectionCount++;
+                CorrectionDistanceSum += distance;
+                LargestCorrection = Math.Max(LargestCorrection, distance);
+                if (distance >= VisibleCorrectionDistance)
+                {
+                    VisibleCorrectionCount++;
+                }
+            }
+        }
+
+        private void MeasureFreeze(int p, bool advanced)
+        {
+            _freezeRun[p] = advanced ? 0 : _freezeRun[p] + 1;
+            LongestFreeze = Math.Max(LongestFreeze, _freezeRun[p]);
         }
 
         private void MeasureSpread(int targetTick)
@@ -298,6 +367,16 @@ namespace Degunatsu.Core.Tests.Support
                 world.AddCharacter(config, Spawns[p], p % 2 == 0 ? 1 : -1);
             }
             return world;
+        }
+
+        private static PlayerInput[][] MakeScripts(int players, int seed)
+        {
+            var scripts = new PlayerInput[players][];
+            for (int p = 0; p < players; p++)
+            {
+                scripts[p] = MakeScript(seed * 31 + p, 4000);
+            }
+            return scripts;
         }
 
         // 人の操作に似せた入力列: ランダムな長さ（3〜40ティック）だけ同じ入力を続ける。
