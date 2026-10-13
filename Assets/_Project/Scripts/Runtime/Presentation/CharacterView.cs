@@ -10,6 +10,7 @@ namespace Degunatsu.Runtime.Presentation
     /// 戦闘の状態を色で示す（判定と見た目ができるまでの仮の表示。docs/11_combat_plan.md）: 攻撃の段階（発生・持続・硬直。
     /// 撃破技の発生は金色のチャージ）、ヒットストップ、のけぞり。攻撃の判定が出ている間は、その箱を線で描く（_hitboxLine があれば）。
     /// 撃破技のチャージの間は、チャージのエフェクトと「CHARGE!」を出す（_chargeEffect があれば）。
+    /// ワイヤーキャンセルのクールタイムの間は、周りに円形のゲージと「WIRE CANCEL」を出す（_wireCancelGauge があれば。P-1）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
@@ -38,6 +39,8 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private LineRenderer _hitboxLine;
         [Tooltip("撃破技のチャージのエフェクト（なくてもよい）")]
         [SerializeField] private ChargeEffectView _chargeEffect;
+        [Tooltip("ワイヤーキャンセルのクールタイムのゲージ（なくてもよい）")]
+        [SerializeField] private RingGaugeView _wireCancelGauge;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
@@ -69,6 +72,9 @@ namespace Degunatsu.Runtime.Presentation
         /// <summary>撃破技のチャージのエフェクト（なければ null）。</summary>
         public ChargeEffectView ChargeEffect => _chargeEffect;
 
+        /// <summary>ワイヤーキャンセルのクールタイムのゲージ（なければ null）。</summary>
+        public RingGaugeView WireCancelGauge => _wireCancelGauge;
+
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
             transform.position = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
@@ -81,6 +87,7 @@ namespace Degunatsu.Runtime.Presentation
             RenderHitbox(current, combat);
             Tint tint = TintOf(current, combat);
             RenderCharge(current, combat, tint == Tint.Charge);
+            RenderWireCancelCooldown(current, combat);
             if (tint == _shown)
             {
                 return;
@@ -101,6 +108,24 @@ namespace Degunatsu.Runtime.Presentation
             }
             _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        private void RenderWireCancelCooldown(in CharacterState state, CombatTuning combat)
+        {
+            if (_wireCancelGauge == null)
+            {
+                return;
+            }
+            int left = state.Combat.WireCancelCooldownTicksLeft;
+            if (left <= 0 || combat.WireCancelCooldownTicks <= 0)
+            {
+                if (_wireCancelGauge.IsShowing)
+                {
+                    _wireCancelGauge.Hide();
+                }
+                return;
+            }
+            _wireCancelGauge.Show(transform.position, (float)left / combat.WireCancelCooldownTicks);
         }
 
         private void RenderCharge(in CharacterState state, CombatTuning combat, bool charging)

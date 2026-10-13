@@ -191,7 +191,7 @@ namespace Degunatsu.Editor
             dummySpawn.position = DummySpawnPosition;
             CharacterView dummyView = CreateCharacterView("Dummy", LoadDummyMaterial(), DummySpawnPosition);
 
-            WireView wireView = CreateWireView(wireMaterial, attachedAnchorMaterial);
+            WireView wireView = CreateWireView("Wire", null, wireMaterial, attachedAnchorMaterial);
 
             CreateFollowCamera(characterView.transform, inputActions);
             AimIndicatorView aimIndicator = CreateAimIndicator();
@@ -268,6 +268,25 @@ namespace Degunatsu.Editor
             var view = go.AddComponent<CharacterView>();
             SetReference(view, "_hitboxLine", CreateHitboxLine(name + "Hitbox"));
             SetReference(view, "_chargeEffect", CreateChargeEffect(name + "Charge"));
+            SetReference(view, "_wireCancelGauge", CreateRingGauge(name + "WireCancelGauge", null, "WIRE CANCEL", 1.3f));
+            return view;
+        }
+
+        /// <summary>
+        /// 円形のゲージ（薄い輪、残りの弧、先端の火花）。label が空でなければ、シーンのカメラで画面に写して上に出す。
+        /// 大きさの影響を受けないように、キャラクターの子にしない。
+        /// </summary>
+        internal static RingGaugeView CreateRingGauge(string name, Transform parent, string label, float radius)
+        {
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            var view = root.AddComponent<RingGaugeView>();
+            view.Configure(label, radius);
+            SetReference(view, "_track", CreateIndicatorLine(root.transform, "Track", material, 0.08f));
+            SetReference(view, "_fuse", CreateIndicatorLine(root.transform, "Fuse", material, 0.12f));
+            SetReference(view, "_spark", CreateIndicatorLine(root.transform, "Spark", material, 0.1f));
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
             return view;
         }
 
@@ -293,10 +312,11 @@ namespace Degunatsu.Editor
             return LoadOrCreateMaterial("Dummy", new Color(0.55f, 0.5f, 0.6f));
         }
 
-        /// <summary>ワイヤーの線と、接続点の印。</summary>
-        internal static WireView CreateWireView(Material wireMaterial, Material attachedAnchorMaterial)
+        /// <summary>ワイヤーの線と、接続点の印、接続を保てる残り時間のゲージ（接続点の周り）。</summary>
+        internal static WireView CreateWireView(string name, Transform parent, Material wireMaterial, Material attachedAnchorMaterial)
         {
-            var wireGo = new GameObject("Wire");
+            var wireGo = new GameObject(name);
+            wireGo.transform.SetParent(parent, false);
             var line = wireGo.AddComponent<LineRenderer>();
             line.sharedMaterial = wireMaterial;
             line.widthMultiplier = 0.06f;
@@ -307,6 +327,7 @@ namespace Degunatsu.Editor
             anchorMarker.transform.SetParent(wireGo.transform, false);
             var wireView = wireGo.AddComponent<WireView>();
             SetReference(wireView, "_anchorMarker", anchorMarker.transform);
+            SetReference(wireView, "_attachGauge", CreateRingGauge(name + "AttachGauge", wireGo.transform, string.Empty, 0.55f));
             return wireView;
         }
 

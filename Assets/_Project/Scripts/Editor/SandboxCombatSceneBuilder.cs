@@ -110,7 +110,7 @@ namespace Degunatsu.Editor
                 dummyViews[i] = SandboxWireSceneBuilder.CreateCharacterView($"Dummy{i + 1}", dummyMaterial, DummySpawnPositions[i]);
             }
 
-            WireView wireView = SandboxWireSceneBuilder.CreateWireView(wireMaterial, attachedAnchorMaterial);
+            WireView wireView = SandboxWireSceneBuilder.CreateWireView("Wire", null, wireMaterial, attachedAnchorMaterial);
             SandboxWireSceneBuilder.CreateFollowCamera(characterView.transform, inputActions);
             AimIndicatorView aimIndicator = SandboxWireSceneBuilder.CreateAimIndicator();
             Camera camera = Object.FindFirstObjectByType<Camera>();

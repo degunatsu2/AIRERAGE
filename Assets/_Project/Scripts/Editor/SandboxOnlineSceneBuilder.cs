@@ -6,7 +6,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
@@ -83,7 +82,9 @@ namespace Degunatsu.Editor
                 characterViews[p] = characterGo.AddComponent<CharacterView>();
                 SandboxWireSceneBuilder.SetReference(characterViews[p], "_hitboxLine", SandboxWireSceneBuilder.CreateHitboxLine($"Player{p + 1}Hitbox"));
                 SandboxWireSceneBuilder.SetReference(characterViews[p], "_chargeEffect", SandboxWireSceneBuilder.CreateChargeEffect($"Player{p + 1}Charge"));
-                wireViews[p] = CreateWire(playersRoot, $"Player{p + 1}Wire", wireMaterial, attachedAnchorMaterial);
+                SandboxWireSceneBuilder.SetReference(characterViews[p], "_wireCancelGauge",
+                    SandboxWireSceneBuilder.CreateRingGauge($"Player{p + 1}WireCancelGauge", playersRoot, "WIRE CANCEL", 1.3f));
+                wireViews[p] = SandboxWireSceneBuilder.CreateWireView($"Player{p + 1}Wire", playersRoot, wireMaterial, attachedAnchorMaterial);
             }
 
             var followCamera = SandboxWireSceneBuilder.CreateFollowCamera(spawn, inputActions);
@@ -106,23 +107,6 @@ namespace Degunatsu.Editor
             }
             SandboxWireSceneBuilder.AddToBuildSettings(ScenePath);
             Debug.Log($"SandboxOnlineSceneBuilder: {ScenePath} を作った");
-        }
-
-        private static WireView CreateWire(Transform parent, string name, Material wireMaterial, Material anchorMaterial)
-        {
-            var wireGo = new GameObject(name);
-            wireGo.transform.SetParent(parent, false);
-            var line = wireGo.AddComponent<LineRenderer>();
-            line.sharedMaterial = wireMaterial;
-            line.widthMultiplier = 0.06f;
-            line.numCapVertices = 2;
-            line.shadowCastingMode = ShadowCastingMode.Off;
-            line.receiveShadows = false;
-            GameObject anchorMarker = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Sphere, "AttachedAnchor", anchorMaterial, Vector3.one * 0.3f);
-            anchorMarker.transform.SetParent(wireGo.transform, false);
-            var wireView = wireGo.AddComponent<WireView>();
-            SandboxWireSceneBuilder.SetReference(wireView, "_anchorMarker", anchorMarker.transform);
-            return wireView;
         }
     }
 }

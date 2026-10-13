@@ -9,14 +9,21 @@ namespace Degunatsu.Runtime.Presentation
     /// ワイヤーを線で表示する（プロトタイプ用）。フックが飛んでいる間はフックまで、接続中は接続点まで線を引き、接続点に印を置く。
     /// ロープが地形の角に巻き付いているときは、角（支点）で折れ曲がった線にする（D-33）。
     /// 外れたフックを回収している間は、外れた位置からキャラクターへ戻ってくるフックまで線を引く。
+    /// 接続中は、接続点の周りに、接続を保てる残り時間（MaxAttachTicks まで）を円形のゲージで示す（_attachGauge があれば。
+    /// ユーザーの要望、2026-10-13）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     [RequireComponent(typeof(LineRenderer))]
     public sealed class WireView : MonoBehaviour
     {
         [SerializeField] private Transform _anchorMarker;
+        [Tooltip("接続を保てる残り時間のゲージ（なくてもよい）")]
+        [SerializeField] private RingGaugeView _attachGauge;
 
         private LineRenderer _line;
+
+        /// <summary>接続を保てる残り時間のゲージ（なければ null）。</summary>
+        public RingGaugeView AttachGauge => _attachGauge;
 
         private void Awake()
         {
@@ -79,6 +86,17 @@ namespace Degunatsu.Runtime.Presentation
                 _anchorMarker.gameObject.SetActive(wire.Phase == WirePhase.Attached);
                 _anchorMarker.position = to;
             }
+            if (_attachGauge != null)
+            {
+                if (wire.Phase == WirePhase.Attached && tuning.MaxAttachTicks > 0)
+                {
+                    _attachGauge.Show(to, 1f - (wire.PhaseTicks + alpha) / tuning.MaxAttachTicks);
+                }
+                else if (_attachGauge.IsShowing)
+                {
+                    _attachGauge.Hide();
+                }
+            }
         }
 
         private void Hide()
@@ -87,6 +105,10 @@ namespace Degunatsu.Runtime.Presentation
             if (_anchorMarker != null)
             {
                 _anchorMarker.gameObject.SetActive(false);
+            }
+            if (_attachGauge != null && _attachGauge.IsShowing)
+            {
+                _attachGauge.Hide();
             }
         }
     }
