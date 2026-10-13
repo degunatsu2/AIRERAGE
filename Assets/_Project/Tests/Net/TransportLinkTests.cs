@@ -88,6 +88,39 @@ namespace Degunatsu.Net.Tests
         }
 
         [Test]
+        public void SimulatedDelay_HoldsSentPacketsBack()
+        {
+            Connect();
+            const int delayMs = 150;
+            _client.SetSimulatedConditions(delayMs, 0, 0);
+            Assert.That(_client.SimulatedDelayMs, Is.EqualTo(delayMs));
+
+            var watch = Stopwatch.StartNew();
+            Assert.That(_client.Send(0, new byte[] { 1 }, reliable: false), Is.True);
+            Assert.That(_client.Send(0, new byte[] { 2 }, reliable: true), Is.True);
+            WaitForData(_hostEvents, 2);
+
+            // 早く届くことはない（遅く届くのは、テストの実行環境の都合でありうるので、下限だけを確かめる）。
+            Assert.That(watch.ElapsedMilliseconds, Is.GreaterThanOrEqualTo(delayMs - 10));
+
+            // 戻せば、すぐ届く。
+            _client.SetSimulatedConditions(0, 0, 0);
+            _hostEvents.Clear();
+            watch.Restart();
+            Assert.That(_client.Send(0, new byte[] { 3 }, reliable: false), Is.True);
+            WaitForData(_hostEvents, 1);
+            Assert.That(watch.ElapsedMilliseconds, Is.LessThan(delayMs - 10));
+        }
+
+        [Test]
+        public void SimulatedConditions_RejectInvalidValues()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => _client.SetSimulatedConditions(-1, 0, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => _client.SetSimulatedConditions(10, 20, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => _client.SetSimulatedConditions(10, 0, 101));
+        }
+
+        [Test]
         public void Connect_RejectsUnreadableAddress()
         {
             Assert.Throws<ArgumentException>(() => TransportLink.Connect("not an address", 7777).Dispose());

@@ -82,6 +82,35 @@ namespace Degunatsu.Net.Tests
         }
 
         [Test]
+        public void TwoPlayers_WithSimulatedDelayAndLoss_StayInSync_AndReportCorrections()
+        {
+            // 片道 40ms（往復 80ms）、揺らぎ ±5ms、欠落 5%。入力が遅れて届くので、予測が外れて巻き戻し、表示中の位置が変わる。
+            const int ticks = 240;
+            OnlineSession host = Host();
+            OnlineSession client = Join(host);
+            PumpUntil(() => client.LocalPlayer >= 0);
+            host.Link.SetSimulatedConditions(40, 5, 5);
+            client.Link.SetSimulatedConditions(40, 5, 5);
+            host.StartMatch();
+            PumpUntil(() => client.State == OnlineSession.SessionState.Running);
+            host.TickLimit = ticks;
+            client.TickLimit = ticks;
+
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == ticks && s.Session.ConfirmedTick >= ticks - 1));
+            PumpFrames(2);
+
+            Assert.That(client.World.Checksum(), Is.EqualTo(host.World.Checksum()));
+            Assert.That(host.Desyncs, Is.Empty);
+            int corrections = host.CorrectionCount + client.CorrectionCount;
+            Assert.That(corrections, Is.GreaterThan(0), "前提: 予測が外れて位置が変わっている");
+            Assert.That(Math.Max(host.LargestCorrection, client.LargestCorrection), Is.GreaterThan(0f));
+
+            // 位置が変わった量は、取り出すと 0 に戻る。
+            host.ConsumeCorrection(1);
+            Assert.That(host.ConsumeCorrection(1), Is.EqualTo(Vector3.Zero));
+        }
+
+        [Test]
         public void ClientsReceiveHostConfig()
         {
             var config = new CharacterConfig();

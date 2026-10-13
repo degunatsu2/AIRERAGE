@@ -87,7 +87,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
 | Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom` | 1 |
 | Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム）、入力の記録と再生 | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels`, `ReplayControls` | 1 |
-| Net | 通信路（Unity Transport）、セッション（参加、開始、入力の中継、不一致の検出）、オンラインの検証用の画面。ロールバックの本体は Core/Rollback | `TransportLink`, `NetMessages`, `OnlineSession`, `OnlineRunner` | 2 |
+| Net | 通信路（Unity Transport。検証用の遅延の模擬つき）、セッション（参加、開始、入力の中継、不一致の検出）、巻き戻しの表示の補正、オンラインの検証用の画面。ロールバックの本体は Core/Rollback | `TransportLink`, `NetMessages`, `OnlineSession`, `CorrectionSmoother`, `OnlineRunner` | 2 |
 
 ---
 

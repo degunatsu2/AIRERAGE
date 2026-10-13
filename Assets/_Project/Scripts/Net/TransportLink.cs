@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Unity.Collections;
 using Unity.Networking.Transport;
-using UnityEngine;
+using Unity.Networking.Transport.Utilities;
+using Debug = UnityEngine.Debug;
 
 namespace Degunatsu.Net
 {
@@ -10,6 +12,7 @@ namespace Degunatsu.Net
     /// Unity Transport の薄い包み（docs/10_online_plan.md T2-7）。通信のライブラリへの依存はここに閉じ込める。
     /// ホストは待ち受け、クライアントはホストに接続する。接続ごとに番号（peer）を振る（クライアントから見たホストは 0）。
     /// 経路は2つ: 信頼性なし（入力。失われても次のメッセージで送り直す）と、信頼性あり・順序あり・分割あり（参加や開始などの制御）。
+    /// 検証用に、自分が送るパケットに遅延・揺らぎ・欠落を加えられる（SetSimulatedConditions。Unity Transport のシミュレーター。T2-8、T2-9）。
     /// </summary>
     public sealed class TransportLink : IDisposable
     {
@@ -34,7 +37,11 @@ namespace Degunatsu.Net
             }
         }
 
+        // 遅延の模擬で、送るのを遅らせて覚えておけるパケットの数（入力は相手1人につき毎秒60個）。
+        private const int SimulatorMaxPackets = 512;
+
         private NetworkDriver _driver;
+        private readonly NetworkPipeline _unreliable;
         private readonly NetworkPipeline _reliable;
         private readonly List<NetworkConnection> _connections = new List<NetworkConnection>();
         private bool _disposed;
@@ -42,11 +49,50 @@ namespace Degunatsu.Net
         private TransportLink(bool isHost)
         {
             IsHost = isHost;
-            _driver = NetworkDriver.Create();
-            _reliable = _driver.CreatePipeline(typeof(FragmentationPipelineStage), typeof(ReliableSequencedPipelineStage));
+            // 遅延の模擬（シミュレーター）は、どちらの経路にも入れておき、使わないときは止めておく。
+            var settings = new NetworkSettings(Allocator.Temp);
+            settings.WithSimulatorStageParameters(
+                maxPacketCount: SimulatorMaxPackets, mode: ApplyMode.Off, randomSeed: (uint)Stopwatch.GetTimestamp());
+            _driver = NetworkDriver.Create(settings);
+            _unreliable = _driver.CreatePipeline(typeof(SimulatorPipelineStage));
+            _reliable = _driver.CreatePipeline(
+                typeof(FragmentationPipelineStage), typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
         }
 
         public bool IsHost { get; }
+
+        /// <summary>自分が送るパケットに加えている遅延（ミリ秒）。</summary>
+        public int SimulatedDelayMs { get; private set; }
+
+        /// <summary>自分が送るパケットに加えている遅延の揺らぎ（ミリ秒。遅延 ± この値）。</summary>
+        public int SimulatedJitterMs { get; private set; }
+
+        /// <summary>自分が送るパケットを捨てる割合（%）。</summary>
+        public int SimulatedDropPercent { get; private set; }
+
+        /// <summary>
+        /// 自分が送るパケットに、遅延・揺らぎ・欠落を加える（検証用。すべて 0 なら加えない）。
+        /// 往復の遅延を模擬するには、全員が同じ値にする（往復 = 自分の遅延 + 相手の遅延）。
+        /// </summary>
+        public void SetSimulatedConditions(int delayMs, int jitterMs, int dropPercent)
+        {
+            if (delayMs < 0 || jitterMs < 0 || jitterMs > delayMs || dropPercent < 0 || dropPercent > 100)
+            {
+                throw new ArgumentOutOfRangeException(nameof(delayMs),
+                    $"遅延 {delayMs}ms、揺らぎ {jitterMs}ms、欠落 {dropPercent}%（遅延・揺らぎは 0 以上で、揺らぎは遅延以下。欠落は 0〜100）");
+            }
+            NetworkSettings current = _driver.CurrentSettings;
+            SimulatorUtility.Parameters parameters = current.GetSimulatorStageParameters();
+            bool active = delayMs > 0 || dropPercent > 0;
+            parameters.Mode = active ? ApplyMode.SentPacketsOnly : ApplyMode.Off;
+            parameters.PacketDelayMs = delayMs;
+            parameters.PacketJitterMs = jitterMs;
+            parameters.PacketDropPercentage = dropPercent;
+            _driver.ModifySimulatorStageParameters(parameters);
+            SimulatedDelayMs = delayMs;
+            SimulatedJitterMs = jitterMs;
+            SimulatedDropPercent = dropPercent;
+        }
 
         /// <summary>待ち受けているポート（ホスト）。0 を指定して作ったときは、実際に割り当てられたポート。</summary>
         public ushort LocalPort => _driver.GetLocalEndpoint().Port;
@@ -156,7 +202,7 @@ namespace Degunatsu.Net
             {
                 return false;
             }
-            NetworkPipeline pipeline = reliable ? _reliable : NetworkPipeline.Null;
+            NetworkPipeline pipeline = reliable ? _reliable : _unreliable;
             int status = _driver.BeginSend(pipeline, _connections[peer], out DataStreamWriter writer);
             if (status != 0)
             {

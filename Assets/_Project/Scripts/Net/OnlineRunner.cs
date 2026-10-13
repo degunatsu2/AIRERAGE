@@ -21,6 +21,8 @@ namespace Degunatsu.Net
     /// 画面左上のボタンで、ホストとして待ち受けるか、アドレスを指定して参加する。ホストが「Start」を押すと、
     /// そのとき参加している全員（最大4人）で始まる。通信とロールバックは OnlineSession が受け持ち、ここは入力と表示だけを扱う。
     /// 位置のリセットはできない（全員のシミュレーションを同じに保つため、入力以外で状態を変えない）。
+    /// 巻き戻しでキャラクターの位置が飛んだときは、表示だけを少しずつ寄せる（CorrectionSmoother。T2-8）。
+    /// 検証のため、自分が送るパケットに遅延と欠落を加えられる（往復の遅延を模擬するには全員で同じ値を選ぶ）。
     /// </summary>
     public sealed class OnlineRunner : MonoBehaviour
     {
@@ -41,14 +43,31 @@ namespace Degunatsu.Net
         [SerializeField] private ushort _port = 7777;
         [Tooltip("ロールバックの設定（すべて【仮】。T2-9 で決める）")]
         [SerializeField] private RollbackSettings _rollback = new RollbackSettings();
+        [Tooltip("巻き戻しで位置が飛んだときの表示の補正（すべて【仮】）")]
+        [SerializeField] private CorrectionSmoothingSettings _smoothing = new CorrectionSmoothingSettings();
+
+        // 遅延の模擬の選択肢（docs/10_online_plan.md T2-9 の評価の条件）。自分が送る側の遅延なので、往復はこの2倍。
+        private static readonly (string Label, int DelayMs, int JitterMs)[] DelayPresets =
+        {
+            ("Off", 0, 0),
+            ("RTT 50", 25, 3),
+            ("RTT 100", 50, 5),
+            ("RTT 150", 75, 8),
+        };
+        private static readonly int[] DropPresets = { 0, 2, 5 };
+        private static readonly string[] DelayLabels = Array.ConvertAll(DelayPresets, preset => preset.Label);
+        private static readonly string[] DropLabels = Array.ConvertAll(DropPresets, percent => $"Loss {percent}%");
 
         private readonly List<string> _errors = new List<string>();
         private BoxTerrain _terrain;
         private InputSystemAdapter _input;
         private OnlineSession _session;
         private string _portText;
+        private CorrectionSmoother _smoother;
         private string _message = string.Empty;
         private GUIStyle _style;
+        private int _delayPreset;
+        private int _dropPreset;
 
         /// <summary>今のセッション（始めていなければ null）。</summary>
         public OnlineSession Session => _session;
@@ -76,6 +95,9 @@ namespace Degunatsu.Net
         {
             _session?.Dispose();
             _session = null;
+            _smoother = null;
+            _delayPreset = 0;
+            _dropPreset = 0;
             UpdateViews();
         }
 
@@ -94,6 +116,7 @@ namespace Degunatsu.Net
                 return;
             }
             _rollback.Validate();
+            _smoothing.Validate();
 
             // 複数のプレイヤーを同じ PC で動かすとき（Multiplayer Play Mode）、操作していないウィンドウも止めない。
             Application.runInBackground = true;
@@ -137,7 +160,39 @@ namespace Degunatsu.Net
                 _input.Poll(_camera, _character.Config.Wire.AimDeadzone);
             }
             _session.Update(Time.deltaTime, ConsumeLocalInput);
+            UpdateSmoothing(Time.deltaTime);
             UpdateViews();
+        }
+
+        private void UpdateSmoothing(float deltaTime)
+        {
+            if (_session.World == null)
+            {
+                return;
+            }
+            if (_smoother == null)
+            {
+                _smoother = new CorrectionSmoother(_session.PlayerCount, _smoothing);
+            }
+            for (int p = 0; p < _session.PlayerCount; p++)
+            {
+                _smoother.AddCorrection(p, _session.ConsumeCorrection(p).ToUnity());
+            }
+            _smoother.Update(deltaTime);
+        }
+
+        // 表示に使う、直前と今のティックの状態（表示の補正のずれを足す）。
+        private void DisplayedStates(int player, out CharacterState previous, out CharacterState current)
+        {
+            previous = _session.PreviousStates[player];
+            current = _session.World.GetState(player);
+            if (_smoother == null)
+            {
+                return;
+            }
+            System.Numerics.Vector3 offset = _smoother.Offset(player).ToNumerics();
+            previous.Position += offset;
+            current.Position += offset;
         }
 
         private SimInput ConsumeLocalInput(int tick)
@@ -196,8 +251,7 @@ namespace Degunatsu.Net
             Vector3 halfExtents = _session.World.GetConfig(_session.LocalPlayer).Movement.HalfExtents.ToUnity();
             for (int p = 0; p < count; p++)
             {
-                CharacterState previous = _session.PreviousStates[p];
-                CharacterState current = _session.World.GetState(p);
+                DisplayedStates(p, out CharacterState previous, out CharacterState current);
                 _characterViews[p].Render(previous, current, alpha, halfExtents);
                 _wireViews[p].Render(previous, current, alpha, wire);
             }
@@ -217,8 +271,7 @@ namespace Degunatsu.Net
                 return;
             }
             // 表示の位置（補間した位置）から、今の入力で射出したときの結果を予測して示す。
-            CharacterState previous = _session.PreviousStates[_session.LocalPlayer];
-            CharacterState current = _session.World.GetState(_session.LocalPlayer);
+            DisplayedStates(_session.LocalPlayer, out CharacterState previous, out CharacterState current);
             Vector3 origin = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
             System.Numerics.Vector3 simOrigin = origin.ToNumerics();
             var frame = new InputFrame(_input.Peek(simOrigin), current.PreviousButtons);
@@ -234,7 +287,7 @@ namespace Degunatsu.Net
                 _style.normal.textColor = Color.white;
             }
 
-            GUILayout.BeginArea(new Rect(10f, 10f, 420f, 400f), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(10f, 10f, 460f, 560f), GUI.skin.box);
             if (_session == null)
             {
                 DrawConnectPanel();
@@ -302,6 +355,7 @@ namespace Degunatsu.Net
                 GUILayout.Label($"Delay {_rollback.InputDelayTicks}F  Max prediction {_rollback.MaxPredictionTicks}F", _style);
                 GUILayout.Label($"Rollbacks {rollback.RollbackCount}  Longest {rollback.LongestRollback}F  Resimulated {rollback.ResimulatedTicks}F", _style);
                 GUILayout.Label($"Stalled {_session.StalledFrames}F  Time sync waits {_session.TimeSyncWaitFrames}F  Ahead {_session.Exchange.TicksAhead:0.0}F", _style);
+                GUILayout.Label($"Corrections {_session.CorrectionCount}  Largest {_session.LargestCorrection:0.00}m", _style);
                 if (_session.IsHost)
                 {
                     GUILayout.Label($"Checksums compared {_session.ComparedChecksums}  Desyncs {_session.Desyncs.Count}", _style);
@@ -312,11 +366,29 @@ namespace Degunatsu.Net
                 }
             }
 
+            DrawTestControls();
+
             if (GUILayout.Button("Leave"))
             {
                 Leave();
                 ExitGui();
             }
+        }
+
+        // 検証用: 表示の補正の切り替えと、自分が送るパケットの遅延・欠落の模擬。
+        private void DrawTestControls()
+        {
+            _smoothing.Enabled = GUILayout.Toggle(_smoothing.Enabled, "Smooth corrections");
+            int delay = GUILayout.Toolbar(_delayPreset, DelayLabels);
+            int drop = GUILayout.Toolbar(_dropPreset, DropLabels);
+            if (delay != _delayPreset || drop != _dropPreset)
+            {
+                _delayPreset = delay;
+                _dropPreset = drop;
+                var (_, delayMs, jitterMs) = DelayPresets[delay];
+                _session.Link.SetSimulatedConditions(delayMs, jitterMs, DropPresets[drop]);
+            }
+            GUILayout.Label($"Sending: +{_session.Link.SimulatedDelayMs}±{_session.Link.SimulatedJitterMs}ms, loss {_session.Link.SimulatedDropPercent}% (set the same on every player)", _style);
         }
 
         // 画面の項目が変わったので、このイベントでの描画をやめる（IMGUI の配置の計算と食い違わないように）。

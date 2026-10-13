@@ -53,6 +53,8 @@ namespace Degunatsu.Net
         private readonly Dictionary<int, ChecksumRow> _checksums = new Dictionary<int, ChecksumRow>();
 
         private CharacterState[] _previous = new CharacterState[0];
+        private NVector3[] _corrections = new NVector3[0];
+        private NVector3[] _beforeReconcile = new NVector3[0];
         private float _accumulator;
         private int _waitFrames;
         private int _nextChecksumTick = ChecksumIntervalTicks;
@@ -110,6 +112,15 @@ namespace Degunatsu.Net
         public int StalledFrames { get; private set; }
         public int TimeSyncWaitFrames { get; private set; }
 
+        /// <summary>巻き戻しで、表示中のキャラクターの位置が変わった回数（キャラクターごとに数える）。</summary>
+        public int CorrectionCount { get; private set; }
+
+        /// <summary>巻き戻しで位置が変わった量の最大（m）。</summary>
+        public float LargestCorrection { get; private set; }
+
+        /// <summary>通信路（遅延の模擬の設定に使う）。</summary>
+        public TransportLink Link => _link;
+
         /// <summary>これより先のティックへは進めない（テストとデバッグ用）。</summary>
         public int TickLimit { get; set; } = int.MaxValue;
 
@@ -143,6 +154,18 @@ namespace Degunatsu.Net
             };
             session.Status = $"Connecting to {address}:{port}";
             return session;
+        }
+
+        /// <summary>
+        /// 前に呼んでから、巻き戻しでプレイヤー player の位置が変わった量（m）を返し、0 に戻す。
+        /// 表示の補正（CorrectionSmoother）に使う。補間に使う直前のティックの位置も同じだけずらしてあるので、
+        /// 表示の位置はちょうどこの量だけ飛ぶ。
+        /// </summary>
+        public NVector3 ConsumeCorrection(int player)
+        {
+            NVector3 correction = _corrections[player];
+            _corrections[player] = NVector3.Zero;
+            return correction;
         }
 
         /// <summary>出現位置（人数に合わせて左右に並べる）。</summary>
@@ -196,6 +219,8 @@ namespace Degunatsu.Net
 
         private void Advance(float deltaTime, Func<int, PlayerInput> localInput)
         {
+            // 届いた入力で予測が外れていたら、ここで巻き戻す（この後の AdvanceFrame の中では巻き戻しは起きない）。
+            ReconcileAndMeasure();
             _accumulator += deltaTime;
             int ticks = 0;
             while (_accumulator >= SimTime.DeltaTime && ticks < MaxTicksPerFrame)
@@ -231,7 +256,34 @@ namespace Degunatsu.Net
             {
                 _accumulator = 0f;
             }
+        }
+
+        // 巻き戻して計算し直し、各キャラクターの今の位置が変わった量を記録する。
+        private void ReconcileAndMeasure()
+        {
+            int rollbacks = Session.RollbackCount;
+            for (int p = 0; p < PlayerCount; p++)
+            {
+                _beforeReconcile[p] = World.GetState(p).Position;
+            }
             Session.Reconcile();
+            if (Session.RollbackCount == rollbacks)
+            {
+                return;
+            }
+            for (int p = 0; p < PlayerCount; p++)
+            {
+                NVector3 change = World.GetState(p).Position - _beforeReconcile[p];
+                if (change == NVector3.Zero)
+                {
+                    continue;
+                }
+                _corrections[p] += change;
+                // 補間に使う直前のティックの位置も同じだけずらす（表示がちょうど change だけ飛ぶようにする）。
+                _previous[p].Position += change;
+                CorrectionCount++;
+                LargestCorrection = Math.Max(LargestCorrection, change.Length());
+            }
         }
 
         private void SendInputs()
@@ -324,6 +376,8 @@ namespace Degunatsu.Net
             Session = new RollbackSession(World, LocalPlayer, _settings);
             Exchange = new InputExchange(Session, _settings);
             _previous = new CharacterState[playerCount];
+            _corrections = new NVector3[playerCount];
+            _beforeReconcile = new NVector3[playerCount];
             for (int p = 0; p < playerCount; p++)
             {
                 _previous[p] = World.GetState(p);
