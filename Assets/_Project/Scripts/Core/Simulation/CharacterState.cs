@@ -33,6 +33,12 @@ namespace Degunatsu.Core.Simulation
         /// <summary>ヒットストップ、最後にダメージを与えた人、コンボなど（docs/11_combat_plan.md T3-2）。</summary>
         public CombatState Combat;
 
+        /// <summary>ジャンプ台で打ち上がった数（表示と音に使う。StageZones）。</summary>
+        public int JumpPadCount;
+
+        /// <summary>加速リングで加速した数（表示と音に使う。StageZones）。</summary>
+        public int BoostRingCount;
+
         public static CharacterState Spawn(Vector3 position, int facing)
         {
             return new CharacterState
@@ -54,7 +60,9 @@ namespace Degunatsu.Core.Simulation
                 && PreviousButtons == other.PreviousButtons
                 && Wire.Equals(other.Wire)
                 && Action.Equals(other.Action)
-                && Combat.Equals(other.Combat);
+                && Combat.Equals(other.Combat)
+                && JumpPadCount == other.JumpPadCount
+                && BoostRingCount == other.BoostRingCount;
         }
 
         public override bool Equals(object obj)
@@ -76,6 +84,8 @@ namespace Degunatsu.Core.Simulation
             hash.Add(Wire);
             hash.Add(Action);
             hash.Add(Combat);
+            hash.Add(JumpPadCount);
+            hash.Add(BoostRingCount);
             return hash.ToHashCode();
         }
 

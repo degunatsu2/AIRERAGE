@@ -303,6 +303,10 @@ namespace Degunatsu.Editor
             BurstEffectView bounce = CreateBurst(name + "BounceBurst", parent);
             bounce.Configure(new Color(0.85f, 0.95f, 1f, 1f), false, 0.3f, 0.5f, 2f, 8, 0.8f, 0.14f, string.Empty, 0, 0f);
             SetReference(view, "_bounceBurst", bounce);
+            // ジャンプ台・加速リングが効いた（明るい緑。短い）。
+            BurstEffectView gimmick = CreateBurst(name + "GimmickBurst", parent);
+            gimmick.Configure(new Color(0.55f, 1f, 0.6f, 1f), false, 0.3f, 0.4f, 1.6f, 8, 0.7f, 0.1f, string.Empty, 0, 0f);
+            SetReference(view, "_gimmickBurst", gimmick);
         }
 
         /// <summary>一瞬の光（輪 2 つと光の筋。文字はシーンのカメラで画面に写す）。値は呼んだ側が Configure で決める。</summary>
@@ -319,11 +323,11 @@ namespace Degunatsu.Editor
             return view;
         }
 
-        /// <summary>操作するキャラクターのコンボの表示（T3-7）。</summary>
-        internal static void CreateComboHud(SimulationRunner runner)
+        /// <summary>操作するキャラクターのコンボの表示（T3-7）。source は SimulationRunner か OnlineRunner（ISimulationFeed）。</summary>
+        internal static void CreateComboHud(MonoBehaviour source)
         {
             var hud = new GameObject("ComboHud").AddComponent<ComboHud>();
-            SetReference(hud, "_runner", runner);
+            SetReference(hud, "_source", source);
         }
 
         /// <summary>ガードとジャストガードの表示（光る輪、広がる輪、光の筋。文字はシーンのカメラで画面に写す）。</summary>
@@ -448,14 +452,15 @@ namespace Degunatsu.Editor
         }
 
         /// <summary>
-        /// 仮の BGM と効果音（音はその場で合成する。ユーザーの要望、2026-10-13）。状態の変化から効果音を鳴らす部品も付ける。
+        /// 仮の BGM と効果音（音はその場で合成する。ユーザーの要望、2026-10-13）。状態の変化から効果音を鳴らす部品も付ける
+        /// （source は SimulationRunner か OnlineRunner。ISimulationFeed）。
         /// </summary>
-        internal static GameAudio CreateAudio(SimulationRunner runner)
+        internal static GameAudio CreateAudio(MonoBehaviour source)
         {
             var go = new GameObject("Audio");
             var audio = go.AddComponent<GameAudio>();
             var events = go.AddComponent<CombatSoundEvents>();
-            SetReference(events, "_runner", runner);
+            SetReference(events, "_source", source);
             SetReference(events, "_audio", audio);
             return audio;
         }

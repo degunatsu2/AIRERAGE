@@ -42,6 +42,12 @@ namespace Degunatsu.Runtime.Audio
 
         /// <summary>のけぞり中に地形で跳ね返った（ドンという鈍い音）。</summary>
         Bounce,
+
+        /// <summary>ジャンプ台で打ち上がった（ばねの音）。</summary>
+        JumpPad,
+
+        /// <summary>加速リングで加速した（風を切って加速する音）。</summary>
+        Boost,
     }
 
     /// <summary>
@@ -171,6 +177,21 @@ namespace Degunatsu.Runtime.Audio
                     AddTone(b, r, 0f, 0.28f, 95f, 45f, Wave.Sine, 1f, 0.001f, 0.09f);
                     AddNoise(b, r, rng, 0f, 0.08f, 0.6f, 0.001f, 0.025f, 1800f, 600f, 80f);
                     AddTone(b, r, 0f, 0.04f, 600f, 300f, Wave.Triangle, 0.3f, 0.001f, 0.012f);
+                    break;
+                case SoundId.JumpPad:
+                    // 低い音から一気に上がる「ビョン」に、揺れ（ばねの震え）を加える。
+                    b = new float[Samples(0.4f, r)];
+                    AddTone(b, r, 0f, 0.38f, 140f, 900f, Wave.Triangle, 0.6f, 0.002f, 0.15f);
+                    AddTone(b, r, 0f, 0.3f, 280f, 1800f, Wave.Sine, 0.25f, 0.002f, 0.1f);
+                    ApplyTremolo(b, r, 18f, 0.35f);
+                    AddTone(b, r, 0f, 0.05f, 90f, 60f, Wave.Sine, 0.7f, 0.001f, 0.02f);
+                    break;
+                case SoundId.Boost:
+                    // 風（帯域が上がるノイズ）と、上がっていく明るい音。
+                    b = new float[Samples(0.45f, r)];
+                    AddNoise(b, r, rng, 0f, 0.42f, 0.6f, 0.01f, 0.18f, 800f, 6000f, 500f);
+                    AddTone(b, r, 0f, 0.35f, NoteFrequency(72), NoteFrequency(84), Wave.Pulse25, 0.18f, 0.005f, 0.12f);
+                    AddTone(b, r, 0.06f, 0.3f, NoteFrequency(79), NoteFrequency(91), Wave.Pulse25, 0.14f, 0.005f, 0.1f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

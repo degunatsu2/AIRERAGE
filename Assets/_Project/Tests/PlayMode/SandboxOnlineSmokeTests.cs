@@ -1,5 +1,8 @@
 using System.Collections;
+using System.Linq;
+using Degunatsu.Core.Simulation;
 using Degunatsu.Net;
+using Degunatsu.Runtime.Audio;
 using Degunatsu.Runtime.Presentation;
 using NUnit.Framework;
 using Unity.Cinemachine;
@@ -62,6 +65,106 @@ namespace Degunatsu.PlayMode.Tests
             runner.Leave();
             Assert.That(runner.Session, Is.Null);
             Assert.That(shown.gameObject.activeSelf, Is.False, "抜けた後もキャラクターが表示されている");
+        }
+
+        [UnityTest]
+        public IEnumerator Stage_HasBoundsGimmicksAndFourSpawns()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            var runner = Object.FindFirstObjectByType<OnlineRunner>();
+
+            OnlineStage stage = runner.Stage;
+            Assert.That(stage.Bounds.HasValue, Is.True, "ステージの範囲（撃破）がない");
+            Assert.That(stage.Spawns.Count, Is.EqualTo(OnlineSession.MaxPlayers), "出現位置が4人分ない");
+            Assert.That(stage.Zones.Count(z => z.Kind == StageZoneKind.JumpPad), Is.GreaterThanOrEqualTo(1), "ジャンプ台がない");
+            Assert.That(stage.Zones.Count(z => z.Kind == StageZoneKind.Updraft), Is.GreaterThanOrEqualTo(1), "上昇気流がない");
+            Assert.That(stage.Zones.Count(z => z.Kind == StageZoneKind.BoostRing), Is.GreaterThanOrEqualTo(1), "加速リングがない");
+            foreach (System.Numerics.Vector3 spawn in stage.Spawns)
+            {
+                Assert.That(stage.Bounds.Value.Contains(spawn), Is.True, $"出現位置 {spawn} がステージの外");
+            }
+            Assert.That(Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.None).Length, Is.EqualTo(stage.Zones.Count), "ギミックの見た目がない");
+
+            Assert.That(Object.FindFirstObjectByType<ComboHud>().enabled, Is.True, "コンボの表示が OnlineRunner を読めていない");
+            Assert.That(Object.FindFirstObjectByType<CombatSoundEvents>().enabled, Is.True, "効果音が OnlineRunner を読めていない");
+
+            Assert.That(runner.StartHost(0), Is.True);
+            runner.StartMatch();
+            yield return null;
+            Assert.That(runner.Session.World.Bounds, Is.EqualTo(stage.Bounds), "試合のワールドにステージの範囲が渡っていない");
+            Assert.That(runner.Session.World.Zones.Count, Is.EqualTo(stage.Zones.Count), "試合のワールドにギミックが渡っていない");
+            runner.Leave();
+        }
+
+        [UnityTest]
+        public IEnumerator JumpPad_LaunchesThePlayer_WithALightAndASound()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            var runner = Object.FindFirstObjectByType<OnlineRunner>();
+            var audio = Object.FindFirstObjectByType<GameAudio>();
+            runner.StartHost(0);
+            runner.StartMatch();
+            yield return WaitSeconds(0.3f);
+
+            // 中央のジャンプ台の上に置く（1人なので巻き戻しは起きない）。
+            StageZone pad = runner.Stage.Zones.First(z => z.Kind == StageZoneKind.JumpPad && z.MinX < 0f && z.MaxX > 0f);
+            CharacterState state = runner.Session.World.GetState(0);
+            state.Position = new System.Numerics.Vector3((pad.MinX + pad.MaxX) * 0.5f, pad.MinY + 1f, 0f);
+            state.Velocity = System.Numerics.Vector3.Zero;
+            runner.Session.World.SetState(0, state);
+
+            CharacterView view = Object.FindObjectsByType<CharacterView>(FindObjectsSortMode.None).First(v => v.gameObject.activeSelf);
+            bool sawLight = false;
+            float highest = 0f;
+            float start = Time.time;
+            while (Time.time - start < 1f)
+            {
+                sawLight |= view.GimmickBurst.IsPlaying;
+                highest = Mathf.Max(highest, runner.Session.World.GetState(0).Position.Y);
+                yield return null;
+            }
+
+            Assert.That(runner.Session.World.GetState(0).JumpPadCount, Is.GreaterThanOrEqualTo(1), "ジャンプ台で打ち上がらない");
+            Assert.That(highest, Is.GreaterThan(8f), "高く上がらない");
+            Assert.That(sawLight, Is.True, "ギミックの光が出ない");
+            Assert.That(audio.History.Contains(SoundId.JumpPad), Is.True, "ジャンプ台の音が鳴らない");
+            runner.Leave();
+        }
+
+        [UnityTest]
+        public IEnumerator FallingOut_IsAKnockout_AndRespawns()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            var runner = Object.FindFirstObjectByType<OnlineRunner>();
+            var audio = Object.FindFirstObjectByType<GameAudio>();
+            runner.StartHost(0);
+            runner.StartMatch();
+            yield return WaitSeconds(0.3f);
+
+            StageBounds bounds = runner.Stage.Bounds.Value;
+            CharacterState state = runner.Session.World.GetState(0);
+            state.Position = new System.Numerics.Vector3(0f, bounds.MinY + 0.5f, 0f);
+            state.Velocity = new System.Numerics.Vector3(0f, -10f, 0f);
+            runner.Session.World.SetState(0, state);
+            yield return WaitSeconds(0.3f);
+
+            CharacterState after = runner.Session.World.GetState(0);
+            Assert.That(after.Combat.Falls, Is.EqualTo(1), "ステージの下に出ても撃破にならない");
+            Assert.That(after.Position.Y, Is.GreaterThan(0f), "出現位置に戻っていない");
+            Assert.That(audio.History.Contains(SoundId.Knockout), Is.True, "撃破の音が鳴らない");
+            runner.Leave();
+        }
+
+        private static IEnumerator WaitSeconds(float seconds)
+        {
+            float start = Time.time;
+            while (Time.time - start < seconds)
+            {
+                yield return null;
+            }
         }
     }
 }

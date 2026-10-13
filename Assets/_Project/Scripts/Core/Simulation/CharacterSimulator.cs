@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Degunatsu.Core.Combat;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Input;
@@ -10,7 +11,8 @@ namespace Degunatsu.Core.Simulation
 {
     /// <summary>
     /// キャラクター1人分の1ティックの処理の順序を決める。
-    /// 入力 → アクション（攻撃）→ ワイヤーのフェーズ → 速度（ワイヤーまたは通常移動）→ 移動と衝突 → ロープ長の補正 → 接地。
+    /// 入力 → アクション（攻撃）→ ワイヤーのフェーズ → 速度（ワイヤーまたは通常移動）→ 移動と衝突 → ロープ長の補正 → 接地
+    /// → のけぞり中の跳ね返り → ステージのギミック（StageZones）。
     /// アクション中（攻撃中・のけぞり中）は、移動・ジャンプ・ワイヤーの入力を無視し、向きも変えない（ActionController.ControlInput）。
     /// キャンセル（攻撃→ジャンプ、攻撃→ワイヤー）で Free に戻ったティックは、入力をそのまま使い、このティックにジャンプ・射出する。
     /// ヒットストップの間は、何も進めずに止まる（ボタンの前の状態も変えないので、押し続けたボタンは止まりが解けてから効く。
@@ -20,8 +22,10 @@ namespace Degunatsu.Core.Simulation
     {
         private readonly KinematicMotor _motor;
         private readonly WireController _wire;
+        private readonly IReadOnlyList<StageZone> _zones;
 
-        public CharacterSimulator(ICollisionQuery collision)
+        /// <param name="zones">ステージのギミック（効かせる順に並べたもの）。null ならない。</param>
+        public CharacterSimulator(ICollisionQuery collision, IReadOnlyList<StageZone> zones = null)
         {
             if (collision == null)
             {
@@ -29,6 +33,7 @@ namespace Degunatsu.Core.Simulation
             }
             _motor = new KinematicMotor(collision);
             _wire = new WireController(collision, _motor);
+            _zones = zones;
         }
 
         public void Step(ref CharacterState state, PlayerInput input, CharacterConfig config)
@@ -45,6 +50,7 @@ namespace Degunatsu.Core.Simulation
             var halfExtents = movement.HalfExtents;
 
             _motor.Depenetrate(ref state.Position, halfExtents);
+            System.Numerics.Vector3 startPosition = state.Position;
             if (state.Action.IsFree)
             {
                 UpdateFacing(ref state, frame, movement);
@@ -83,6 +89,7 @@ namespace Degunatsu.Core.Simulation
 
             Locomotion.ApplyGroundState(ref state, _motor.ProbeGround(state.Position, halfExtents), movement);
             Bounce(ref state, velocityBeforeMove, config.Combat);
+            StageZones.Apply(ref state, startPosition, new System.Numerics.Vector2(halfExtents.X, halfExtents.Y), _zones);
 
             // ゲームプレイは XY 平面（docs/01_game_design.md 4章）。
             state.Position.Z = 0f;

@@ -13,7 +13,7 @@ namespace Degunatsu.Runtime.Presentation
     /// ワイヤーキャンセルのクールタイムの間は、周りに円形のゲージと「WIRE CANCEL」を出す（_wireCancelGauge があれば。P-1）。
     /// ガード中・ジャストガードの成功は _guardEffect、ガードのクールタイムは _guardGauge で示す（T3-5。あれば）。
     /// 攻撃を受けた瞬間は火花（_hitSpark）、FATAL を受けた瞬間は虹色の光と「FATAL!」（_fatalBurst）、攻撃をワイヤーで
-    /// キャンセルした瞬間は紫の光（_wireCancelBurst）を出す（T3-7。あれば）。
+    /// キャンセルした瞬間は紫の光（_wireCancelBurst）を出す（T3-7。あれば）。ジャンプ台・加速リングが効いた瞬間は _gimmickBurst。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
@@ -56,6 +56,8 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private BurstEffectView _wireCancelBurst;
         [Tooltip("のけぞり中に地形で跳ね返った瞬間の光（なくてもよい）")]
         [SerializeField] private BurstEffectView _bounceBurst;
+        [Tooltip("ジャンプ台・加速リングが効いた瞬間の光（なくてもよい）")]
+        [SerializeField] private BurstEffectView _gimmickBurst;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
@@ -66,6 +68,7 @@ namespace Degunatsu.Runtime.Presentation
         private int _shownFatalHits;
         private int _shownWireCancelCooldown;
         private int _shownBounces;
+        private int _shownGimmicks;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
         public AttackPhase? ShownPhase
@@ -106,6 +109,7 @@ namespace Degunatsu.Runtime.Presentation
         public BurstEffectView FatalBurst => _fatalBurst;
         public BurstEffectView WireCancelBurst => _wireCancelBurst;
         public BurstEffectView BounceBurst => _bounceBurst;
+        public BurstEffectView GimmickBurst => _gimmickBurst;
 
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
@@ -165,6 +169,12 @@ namespace Degunatsu.Runtime.Presentation
             {
                 _bounceBurst.Play(center);
             }
+            int gimmicks = state.JumpPadCount + state.BoostRingCount;
+            if (gimmicks > _shownGimmicks && _gimmickBurst != null)
+            {
+                _gimmickBurst.Play(center);
+            }
+            _shownGimmicks = gimmicks;
             _shownBounces = c.BounceCount;
             _shownFatalHits = c.FatalHitCount;
             _shownDamagedTick = c.LastDamagedTick;

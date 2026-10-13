@@ -21,8 +21,9 @@ namespace Degunatsu.Runtime.Simulation
     /// プロトタイプでは、操作するキャラクター1人と、攻撃を当てて試すためのダミー（入力なしでその場に立つ。
     /// docs/11_combat_plan.md T3-2）を動かす。位置のリセット（R）でダミーも出現位置に戻す。
     /// シーンにステージの範囲（KnockoutBounds）があれば、外に出たキャラクターは撃破されて出現位置に戻る（T3-3）。
+    /// シーンにギミック（StageZoneAuthoring）があれば、それも効かせる。
     /// </summary>
-    public sealed class SimulationRunner : MonoBehaviour
+    public sealed class SimulationRunner : MonoBehaviour, ISimulationFeed
     {
         // 1フレームで進める最大のティック数。処理が遅れたときに追いつこうとして、さらに遅れるのを防ぐ（技術的な上限）。
         private const int MaxTicksPerFrame = 5;
@@ -89,6 +90,13 @@ namespace Degunatsu.Runtime.Simulation
         /// <summary>これまでに進めたティック数。</summary>
         public int CurrentTick => _world.Tick;
 
+        // 表示と効果音の読み取り口（ISimulationFeed）。番号 0 が操作するキャラクター、1 からがダミー。
+        int ISimulationFeed.CharacterCount => _world == null ? 0 : _world.CharacterCount;
+        int ISimulationFeed.LocalCharacter => _world == null ? -1 : _player;
+        CharacterState ISimulationFeed.GetState(int index) => _world.GetState(index);
+        CharacterConfig ISimulationFeed.GetConfig(int index) => _world.GetConfig(index);
+        string ISimulationFeed.LabelOf(int index) => index == _player ? "PLAYER" : $"DUMMY {index - _player}";
+
         /// <summary>ステージの範囲があるか（外に出ると撃破になるか。T3-3）。</summary>
         public bool HasStageBounds => _world.Bounds.HasValue;
 
@@ -150,13 +158,14 @@ namespace Degunatsu.Runtime.Simulation
             var errors = new List<string>();
             BoxTerrain terrain = SceneTerrainBuilder.Build(_terrainMask, errors);
             StageBounds? bounds = KnockoutBounds.Find(errors);
+            List<StageZone> zones = StageZoneAuthoring.Collect(errors);
             foreach (string error in errors)
             {
                 Debug.LogError(error, this);
             }
 
             _terrain = terrain;
-            _world = new SimWorld(terrain, bounds);
+            _world = new SimWorld(terrain, bounds, zones);
             _player = _world.AddCharacter(_character.Config, _spawnPoint.position.ToNumerics());
             _previous = _world.GetState(_player);
             if (_dummyViews.Length != _dummySpawns.Length)

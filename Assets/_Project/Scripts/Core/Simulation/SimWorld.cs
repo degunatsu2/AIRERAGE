@@ -20,14 +20,25 @@ namespace Degunatsu.Core.Simulation
         private readonly List<CharacterState> _spawns = new List<CharacterState>();
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
-        public SimWorld(ICollisionQuery collision, StageBounds? bounds = null)
+        /// <param name="zones">ステージのギミック（ジャンプ台など）。渡した順によらず、決まった順（StageZone.CompareTo）に並べて効かせる。</param>
+        public SimWorld(ICollisionQuery collision, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null)
         {
-            _simulator = new CharacterSimulator(collision);
+            var sorted = new List<StageZone>();
+            if (zones != null)
+            {
+                sorted.AddRange(zones);
+                sorted.Sort((a, b) => a.CompareTo(b));
+            }
+            Zones = sorted;
+            _simulator = new CharacterSimulator(collision, sorted);
             Bounds = bounds;
         }
 
         /// <summary>ステージの範囲（null なら撃破はない）。</summary>
         public StageBounds? Bounds { get; }
+
+        /// <summary>ステージのギミック（効かせる順）。</summary>
+        public IReadOnlyList<StageZone> Zones { get; }
 
         /// <summary>直前の Step で当たった命中（表示とデバッグ用。状態ではないので、巻き戻しでは戻らない）。</summary>
         public IReadOnlyList<HitRecord> LastHits => _hits.LastHits;

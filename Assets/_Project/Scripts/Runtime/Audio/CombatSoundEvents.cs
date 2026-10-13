@@ -17,61 +17,59 @@ namespace Degunatsu.Runtime.Audio
         // これより速く吹き飛んだ命中は、強い命中の音にする（m/s）。
         private const float HeavyKnockbackSpeed = 20f;
 
-        [SerializeField] private SimulationRunner _runner;
+        [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
+        [SerializeField] private MonoBehaviour _source;
         [SerializeField] private GameAudio _audio;
 
         private CharacterState[] _previous = new CharacterState[0];
+        private ISimulationFeed _feed;
 
         private void Awake()
         {
-            if (_runner == null || _audio == null)
+            _feed = _source as ISimulationFeed;
+            if (_feed == null || _audio == null)
             {
-                Debug.LogError($"{name}: SimulationRunner か GameAudio が設定されていません", this);
+                Debug.LogError($"{name}: 状態を読む相手（ISimulationFeed）か GameAudio が設定されていません", this);
                 enabled = false;
             }
         }
 
         private void OnEnable()
         {
-            if (_runner != null)
+            if (_feed != null)
             {
-                _runner.Ticked += OnTicked;
+                _feed.Ticked += OnTicked;
             }
         }
 
         private void OnDisable()
         {
-            if (_runner != null)
+            if (_feed != null)
             {
-                _runner.Ticked -= OnTicked;
+                _feed.Ticked -= OnTicked;
             }
         }
 
         private void OnTicked()
         {
-            int count = 1 + _runner.DummyCount;
+            int count = _feed.CharacterCount;
             if (_previous.Length != count)
             {
+                // 人数が変わった（オンラインの試合の始まりと終わり）。比べる元だけを取り直す。
                 _previous = new CharacterState[count];
                 for (int i = 0; i < count; i++)
                 {
-                    _previous[i] = StateOf(i);
+                    _previous[i] = _feed.GetState(i);
                 }
                 return;
             }
-            float jumpSpeed = _runner.PlayerConfig.Movement.JumpSpeed;
-            AttackSlot koAttack = _runner.PlayerConfig.Combat.KoAttack;
             for (int i = 0; i < count; i++)
             {
-                CharacterState current = StateOf(i);
-                Compare(_previous[i], current, jumpSpeed, koAttack);
+                CharacterState current = _feed.GetState(i);
+                CharacterConfig config = _feed.GetConfig(i);
+                Compare(_previous[i], current, config.Movement.JumpSpeed, config.Combat.KoAttack);
                 _previous[i] = current;
             }
-        }
-
-        private CharacterState StateOf(int index)
-        {
-            return index == 0 ? _runner.PlayerState : _runner.GetDummyState(index - 1);
         }
 
         private void Compare(in CharacterState before, in CharacterState now, float jumpSpeed, AttackSlot koAttack)
@@ -105,8 +103,9 @@ namespace Degunatsu.Runtime.Audio
                 _audio.Play(heavy ? SoundId.HeavyHit : SoundId.Hit, 1f, 0.06f);
             }
 
-            bool attackStarted = now.Action.Kind == ActionKind.Attack && now.Action.Ticks == 0
-                && !(before.Action.Kind == ActionKind.Attack && before.Action.Ticks == 0);
+            // 攻撃の始まり: 攻撃でなかったか、別の攻撃だったか、同じ攻撃の初めに戻った（攻撃→攻撃のキャンセル）。
+            bool attackStarted = now.Action.Kind == ActionKind.Attack
+                && (before.Action.Kind != ActionKind.Attack || now.Action.Attack != before.Action.Attack || now.Action.Ticks < before.Action.Ticks);
             if (attackStarted)
             {
                 _audio.Play(now.Action.Attack == koAttack ? SoundId.Charge : SoundId.Swing, 0.8f, 0.08f);
@@ -116,9 +115,18 @@ namespace Degunatsu.Runtime.Audio
                 _audio.Play(SoundId.GuardUp, 0.8f);
             }
 
+            bool pad = now.JumpPadCount > before.JumpPadCount;
+            if (pad)
+            {
+                _audio.Play(SoundId.JumpPad, 0.9f, 0.05f);
+            }
+            if (now.BoostRingCount > before.BoostRingCount)
+            {
+                _audio.Play(SoundId.Boost, 0.9f, 0.05f);
+            }
             bool airJump = now.AirJumpsUsed > before.AirJumpsUsed;
             bool groundJump = before.Grounded && !now.Grounded && now.Action.IsFree && now.Velocity.Y >= jumpSpeed * 0.8f;
-            if (airJump || groundJump)
+            if (!pad && (airJump || groundJump))
             {
                 _audio.Play(SoundId.Jump, 0.6f, 0.05f);
             }

@@ -17,6 +17,7 @@ namespace Degunatsu.Net
     /// - 参加: クライアントがつながると、ホストが番号を振る（Welcome）。ホストが StartMatch を呼ぶと、人数と調整値を
     ///   全員に送り（Start）、全員が同じワールドで始める。試合中の参加はできない。
     /// - 不一致の検出: 確定した状態のチェックサムを ChecksumIntervalTicks ごとにホストへ送り、ホストが自分の値と比べる。
+    /// - ステージ（OnlineStage）: 地形、出現位置、ステージの範囲（撃破）、ギミック。全員が自分のシーンから作る。
     /// </summary>
     public sealed class OnlineSession : IDisposable
     {
@@ -36,12 +37,8 @@ namespace Degunatsu.Net
         // 1フレームで進める最大のティック数（処理落ちのときに追いつこうとして、さらに遅れるのを防ぐ）。
         private const int MaxTicksPerFrame = 5;
 
-        // 出現位置の間隔（m）。
-        private const float SpawnSpacing = 2.5f;
-
         private readonly TransportLink _link;
-        private readonly ICollisionQuery _terrain;
-        private readonly NVector3 _spawnBase;
+        private readonly OnlineStage _stage;
         private readonly RollbackSettings _settings;
         private readonly CharacterConfig _hostConfig;
         private readonly List<TransportLink.Event> _events = new List<TransportLink.Event>();
@@ -59,11 +56,10 @@ namespace Degunatsu.Net
         private int _waitFrames;
         private int _nextChecksumTick = ChecksumIntervalTicks;
 
-        private OnlineSession(TransportLink link, ICollisionQuery terrain, NVector3 spawnBase, RollbackSettings settings, CharacterConfig hostConfig)
+        private OnlineSession(TransportLink link, OnlineStage stage, RollbackSettings settings, CharacterConfig hostConfig)
         {
             _link = link;
-            _terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
-            _spawnBase = spawnBase;
+            _stage = stage;
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _hostConfig = hostConfig;
             for (int p = 0; p < MaxPlayers; p++)
@@ -128,15 +124,25 @@ namespace Degunatsu.Net
         public IReadOnlyList<CharacterState> PreviousStates => _previous;
         public float Alpha => _accumulator / SimTime.DeltaTime;
 
-        /// <summary>ホストとして port で待ち受ける（0 なら空いているポート）。config は全員が使う調整値。</summary>
+        /// <summary>ホストとして port で待ち受ける（0 なら空いているポート）。地形と出現位置だけのステージ（撃破とギミックはない）。</summary>
         public static OnlineSession Host(ushort port, ICollisionQuery terrain, NVector3 spawnBase, CharacterConfig config, RollbackSettings settings)
         {
+            return Host(port, new OnlineStage(terrain, new[] { spawnBase }), config, settings);
+        }
+
+        /// <summary>ホストとして port で待ち受ける（0 なら空いているポート）。config は全員が使う調整値。</summary>
+        public static OnlineSession Host(ushort port, OnlineStage stage, CharacterConfig config, RollbackSettings settings)
+        {
+            if (stage == null)
+            {
+                throw new ArgumentNullException(nameof(stage));
+            }
             if (config == null)
             {
                 throw new ArgumentNullException(nameof(config));
             }
             config.Validate();
-            var session = new OnlineSession(TransportLink.Host(port), terrain, spawnBase, settings, config)
+            var session = new OnlineSession(TransportLink.Host(port), stage, settings, config)
             {
                 LocalPlayer = 0,
                 State = SessionState.Lobby,
@@ -145,10 +151,20 @@ namespace Degunatsu.Net
             return session;
         }
 
-        /// <summary>address:port のホストに参加する。</summary>
+        /// <summary>address:port のホストに参加する。地形と出現位置だけのステージ（撃破とギミックはない）。</summary>
         public static OnlineSession Join(string address, ushort port, ICollisionQuery terrain, NVector3 spawnBase, RollbackSettings settings)
         {
-            var session = new OnlineSession(TransportLink.Connect(address, port), terrain, spawnBase, settings, null)
+            return Join(address, port, new OnlineStage(terrain, new[] { spawnBase }), settings);
+        }
+
+        /// <summary>address:port のホストに参加する。stage はホストと同じものにする（同じシーンから作る）。</summary>
+        public static OnlineSession Join(string address, ushort port, OnlineStage stage, RollbackSettings settings)
+        {
+            if (stage == null)
+            {
+                throw new ArgumentNullException(nameof(stage));
+            }
+            var session = new OnlineSession(TransportLink.Connect(address, port), stage, settings, null)
             {
                 State = SessionState.Connecting,
             };
@@ -168,10 +184,10 @@ namespace Degunatsu.Net
             return correction;
         }
 
-        /// <summary>出現位置（人数に合わせて左右に並べる）。</summary>
+        /// <summary>出現位置が1つのときの出現位置（人数に合わせて左右に並べる）。</summary>
         public static NVector3 SpawnPosition(NVector3 spawnBase, int player, int playerCount)
         {
-            return spawnBase + new NVector3((player - (playerCount - 1) * 0.5f) * SpawnSpacing, 0f, 0f);
+            return spawnBase + new NVector3((player - (playerCount - 1) * 0.5f) * OnlineStage.SpawnSpacing, 0f, 0f);
         }
 
         /// <summary>試合を始める（ホストのみ、ロビーで）。今いる全員で始める。</summary>
@@ -368,10 +384,10 @@ namespace Degunatsu.Net
         private void Begin(int playerCount, CharacterConfig config)
         {
             PlayerCount = playerCount;
-            World = new SimWorld(_terrain);
+            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones);
             for (int p = 0; p < playerCount; p++)
             {
-                World.AddCharacter(config, SpawnPosition(_spawnBase, p, playerCount), p % 2 == 0 ? 1 : -1);
+                World.AddCharacter(config, _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));
             }
             Session = new RollbackSession(World, LocalPlayer, _settings);
             Exchange = new InputExchange(Session, _settings);

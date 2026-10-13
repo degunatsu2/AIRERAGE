@@ -12,13 +12,15 @@ namespace Degunatsu.Runtime.Presentation
     /// - 大きな数字でコンボの数と、コンボ中に攻撃で得たコイン（今は威力の合計【仮】。コインは Phase 4）を出し、
     ///   その下に、相手ののけぞりが終わるまでの残りをゲージで示す（格闘ゲームでよくある表示）。
     /// - コンボが切れたら（相手ののけぞりが終わったら）、最後の数を少しの間残して消す。
-    /// 状態を読むだけで、書き換えない。
+    /// オフライン（SimulationRunner。相手はダミー）とオンライン（OnlineRunner。相手はほかのプレイヤー）のどちらでも使う
+    /// （ISimulationFeed。T3-8）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class ComboHud : MonoBehaviour
     {
         public const int MaxShown = 3;
 
-        [SerializeField] private SimulationRunner _runner;
+        [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
+        [SerializeField] private MonoBehaviour _source;
         [Tooltip("コンボが切れた後に表示を残す時間（秒）")]
         [SerializeField] private float _lingerSeconds = 1.2f;
         [SerializeField] private Color _countColor = new Color(1f, 0.85f, 0.25f);
@@ -26,6 +28,7 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private Color _gaugeColor = new Color(1f, 0.45f, 0.3f);
 
         private readonly List<Entry> _entries = new List<Entry>();
+        private ISimulationFeed _feed;
         private GUIStyle _big;
         private GUIStyle _small;
 
@@ -34,7 +37,9 @@ namespace Degunatsu.Runtime.Presentation
 
         public sealed class Entry
         {
+            /// <summary>相手のキャラクターの番号（ワールドの番号）。</summary>
             public int Target;
+            public string Label;
             public int Count;
             public int Coins;
             public float HitstunLeft;
@@ -45,28 +50,36 @@ namespace Degunatsu.Runtime.Presentation
 
         private void Awake()
         {
-            if (_runner == null)
+            _feed = _source as ISimulationFeed;
+            if (_feed == null)
             {
-                Debug.LogError($"{name}: SimulationRunner が設定されていません", this);
+                Debug.LogError($"{name}: 状態を読む相手（ISimulationFeed）が設定されていません", this);
                 enabled = false;
             }
         }
 
         private void Update()
         {
-            // 操作するキャラクター（番号 0）が当てているコンボを、相手（ダミー）ごとに更新する。
-            for (int i = 0; i < _runner.DummyCount; i++)
+            // この PC で操作しているキャラクターが当てているコンボを、相手ごとに更新する。
+            int local = _feed.LocalCharacter;
+            int count = _feed.CharacterCount;
+            for (int i = 0; i < count; i++)
             {
-                CharacterState target = _runner.GetDummyState(i);
+                if (i == local)
+                {
+                    continue;
+                }
+                CharacterState target = _feed.GetState(i);
                 CombatState c = target.Combat;
-                bool active = target.Action.Kind == ActionKind.Hitstun && c.HasLastAttacker && c.LastAttacker == 0 && c.ComboCount >= 2;
+                bool active = local >= 0 && target.Action.Kind == ActionKind.Hitstun && c.HasLastAttacker && c.LastAttacker == local
+                    && c.ComboCount >= 2;
                 Entry entry = Find(i);
                 if (active)
                 {
                     if (entry == null || !entry.Active || c.ComboCount < entry.Count)
                     {
                         _entries.Remove(entry);
-                        entry = new Entry { Target = i };
+                        entry = new Entry { Target = i, Label = _feed.LabelOf(i) };
                         _entries.Insert(0, entry);
                     }
                     entry.Count = c.ComboCount;
@@ -77,8 +90,15 @@ namespace Degunatsu.Runtime.Presentation
                 }
                 else if (entry != null && entry.Active)
                 {
-                    entry.EndedAt = Time.time;
-                    entry.HitstunLeft = 0f;
+                    End(entry);
+                }
+            }
+            // 相手がいなくなった（オンラインの試合が終わった）コンボも終える。
+            foreach (Entry entry in _entries)
+            {
+                if (entry.Active && (entry.Target >= count || entry.Target == local))
+                {
+                    End(entry);
                 }
             }
             _entries.RemoveAll(e => !e.Active && Time.time - e.EndedAt > _lingerSeconds);
@@ -86,6 +106,12 @@ namespace Degunatsu.Runtime.Presentation
             {
                 _entries.RemoveAt(_entries.Count - 1);
             }
+        }
+
+        private static void End(Entry entry)
+        {
+            entry.EndedAt = Time.time;
+            entry.HitstunLeft = 0f;
         }
 
         private Entry Find(int target)
@@ -126,7 +152,7 @@ namespace Degunatsu.Runtime.Presentation
         {
             Shadowed(new Rect(x, y, 130f, 64f), entry.Count.ToString(), _big, _countColor, alpha);
             Shadowed(new Rect(x + 128f, y + 8f, 160f, 30f), "COMBO", _small, Color.white, alpha);
-            Shadowed(new Rect(x + 128f, y + 34f, 200f, 26f), $"vs DUMMY {entry.Target + 1}", _small, new Color(0.8f, 0.8f, 0.85f), alpha * 0.8f);
+            Shadowed(new Rect(x + 128f, y + 34f, 200f, 26f), $"vs {entry.Label}", _small, new Color(0.8f, 0.8f, 0.85f), alpha * 0.8f);
             // コイン（今は威力の合計【仮】）。大きめの数字で。
             Shadowed(new Rect(x, y + 58f, 300f, 50f), $"+{entry.Coins} COIN", _big, _coinColor, alpha, 0.7f);
 

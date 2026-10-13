@@ -33,7 +33,7 @@ namespace Degunatsu.Core.Combat
             }
         }
 
-        /// <summary>出現したときの状態に戻す。撃破の数（撃破された数は +1）、ゲージ、前のティックのボタンを引き継ぐ。</summary>
+        /// <summary>出現したときの状態に戻す。撃破の数（撃破された数は +1）、ゲージ、前のティックのボタン、ギミックの数を引き継ぐ。</summary>
         private static CharacterState Respawn(in CharacterState state, in CharacterState spawn)
         {
             CharacterState respawned = spawn;
@@ -42,6 +42,8 @@ namespace Degunatsu.Core.Combat
             respawned.Combat.Gauge = state.Combat.Gauge;
             // 押し続けているボタンを、戻った直後に押したとみなさない（ワイヤーの射出などが勝手に起きないように）。
             respawned.PreviousButtons = state.PreviousButtons;
+            respawned.JumpPadCount = state.JumpPadCount;
+            respawned.BoostRingCount = state.BoostRingCount;
             return respawned;
         }
     }

@@ -24,11 +24,15 @@ namespace Degunatsu.Net.Tests
 
         private readonly List<OnlineSession> _sessions = new List<OnlineSession>();
         private BoxTerrain _terrain;
+        private OnlineStage _stage;
+        private Func<int, int, PlayerInput> _input;
 
         [SetUp]
         public void SetUp()
         {
             _terrain = TestArenas.Playground();
+            _stage = null;
+            _input = Scripted;
         }
 
         [TearDown]
@@ -111,6 +115,45 @@ namespace Degunatsu.Net.Tests
         }
 
         [Test]
+        public void TwoPlayers_OnAStageWithGimmicksAndKnockouts_StayInSync()
+        {
+            // 床の上のジャンプ台、上昇気流、加速リング、低い天井の撃破（ジャンプ台で打ち上がると上の外に出る）。
+            // 攻撃も押し、遅延と欠落で巻き戻しを起こす（docs/11_combat_plan.md T3-8）。
+            const int ticks = 360;
+            BoxTerrain floor = new BoxTerrain().AddBox(-12f, -1f, 12f, 0f, true);
+            StageZone[] zones =
+            {
+                new StageZone(StageZoneKind.JumpPad, -6f, 0f, -2f, 0.4f, System.Numerics.Vector2.UnitY, 24f),
+                new StageZone(StageZoneKind.Updraft, 2f, 0f, 5f, 6f, System.Numerics.Vector2.Zero, 45f, 8f),
+                new StageZone(StageZoneKind.BoostRing, -1f, 2f, 1f, 5f, System.Numerics.Vector2.UnitX, 18f),
+            };
+            _stage = new OnlineStage(floor, new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f) }, new StageBounds(-20f, -10f, 20f, 8f), zones);
+            _input = (player, tick) =>
+            {
+                PlayerInput input = Scripted(player, tick);
+                return (tick + player * 11) % 60 < 2 ? PlayerInput.FromAxes(input.Move.X, 0f, input.Buttons | InputButtons.Attack) : input;
+            };
+            OnlineSession host = Host();
+            OnlineSession client = Join(host);
+            PumpUntil(() => client.LocalPlayer >= 0);
+            host.Link.SetSimulatedConditions(40, 5, 5);
+            client.Link.SetSimulatedConditions(40, 5, 5);
+            host.StartMatch();
+            PumpUntil(() => client.State == OnlineSession.SessionState.Running);
+            host.TickLimit = ticks;
+            client.TickLimit = ticks;
+
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == ticks && s.Session.ConfirmedTick >= ticks - 1));
+            PumpFrames(2);
+
+            Assert.That(client.World.Checksum(), Is.EqualTo(host.World.Checksum()));
+            Assert.That(host.Desyncs, Is.Empty);
+            Assert.That(host.Session.RollbackCount + client.Session.RollbackCount, Is.GreaterThan(0), "前提: 巻き戻した");
+            Assert.That(host.World.GetState(0).JumpPadCount, Is.GreaterThan(0), "前提: ジャンプ台が効いた");
+            Assert.That(host.World.GetState(0).Combat.Falls + host.World.GetState(1).Combat.Falls, Is.GreaterThan(0), "前提: 撃破が起きた");
+        }
+
+        [Test]
         public void ClientsReceiveHostConfig()
         {
             var config = new CharacterConfig();
@@ -188,14 +231,18 @@ namespace Degunatsu.Net.Tests
 
         private OnlineSession Host(CharacterConfig config = null)
         {
-            OnlineSession host = OnlineSession.Host(0, _terrain, SpawnBase, config ?? new CharacterConfig(), new RollbackSettings());
+            OnlineSession host = _stage != null
+                ? OnlineSession.Host(0, _stage, config ?? new CharacterConfig(), new RollbackSettings())
+                : OnlineSession.Host(0, _terrain, SpawnBase, config ?? new CharacterConfig(), new RollbackSettings());
             _sessions.Add(host);
             return host;
         }
 
         private OnlineSession Join(OnlineSession host)
         {
-            OnlineSession client = OnlineSession.Join("127.0.0.1", host.Port, _terrain, SpawnBase, new RollbackSettings());
+            OnlineSession client = _stage != null
+                ? OnlineSession.Join("127.0.0.1", host.Port, _stage, new RollbackSettings())
+                : OnlineSession.Join("127.0.0.1", host.Port, _terrain, SpawnBase, new RollbackSettings());
             _sessions.Add(client);
             return client;
         }
@@ -222,7 +269,7 @@ namespace Degunatsu.Net.Tests
                 foreach (OnlineSession session in _sessions)
                 {
                     OnlineSession current = session;
-                    current.Update(FrameSeconds, tick => Scripted(current.LocalPlayer, tick));
+                    current.Update(FrameSeconds, tick => _input(current.LocalPlayer, tick));
                 }
             }
         }

@@ -93,7 +93,7 @@ namespace Degunatsu.Editor
             Material attachedAnchorMaterial = SandboxWireSceneBuilder.LoadOrCreateMaterial("WireAnchor", new Color(1f, 0.5f, 0f), unlit: true);
 
             SandboxWireSceneBuilder.CreateTerrain(Terrain, AnchorPoints, terrainMaterial, attachableMaterial, anchorMaterial);
-            CreateBounds();
+            CreateBounds(BoundsMin, BoundsMax);
 
             var spawn = new GameObject("SpawnPoint").transform;
             spawn.position = SpawnPosition;
@@ -139,21 +139,21 @@ namespace Degunatsu.Editor
             Debug.Log($"SandboxCombatSceneBuilder: {ScenePath} を作った");
         }
 
-        /// <summary>ステージの範囲（KnockoutBounds）と、その枠の線（赤）を作る。</summary>
-        private static void CreateBounds()
+        /// <summary>ステージの範囲（KnockoutBounds）と、その枠の線（赤）を作る。オンライン用のシーンでも使う。</summary>
+        internal static void CreateBounds(Vector2 min, Vector2 max)
         {
             var go = new GameObject("KnockoutBounds");
-            go.AddComponent<KnockoutBounds>().Configure(BoundsMin, BoundsMax);
+            go.AddComponent<KnockoutBounds>().Configure(min, max);
 
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             LineRenderer frame = SandboxWireSceneBuilder.CreateIndicatorLine(go.transform, "Frame", material, 0.2f);
             frame.startColor = frame.endColor = new Color(1f, 0.25f, 0.25f, 0.8f);
             frame.loop = true;
             frame.positionCount = 4;
-            frame.SetPosition(0, new Vector3(BoundsMin.x, BoundsMin.y, 0f));
-            frame.SetPosition(1, new Vector3(BoundsMax.x, BoundsMin.y, 0f));
-            frame.SetPosition(2, new Vector3(BoundsMax.x, BoundsMax.y, 0f));
-            frame.SetPosition(3, new Vector3(BoundsMin.x, BoundsMax.y, 0f));
+            frame.SetPosition(0, new Vector3(min.x, min.y, 0f));
+            frame.SetPosition(1, new Vector3(max.x, min.y, 0f));
+            frame.SetPosition(2, new Vector3(max.x, max.y, 0f));
+            frame.SetPosition(3, new Vector3(min.x, max.y, 0f));
         }
     }
 }

@@ -5,6 +5,7 @@ using Degunatsu.Core.Physics;
 using Degunatsu.Core.Rollback;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Core.Wire;
+using Degunatsu.Runtime.Audio;
 using Degunatsu.Runtime.Data;
 using Degunatsu.Runtime.Input;
 using Degunatsu.Runtime.Presentation;
@@ -23,12 +24,21 @@ namespace Degunatsu.Net
     /// 位置のリセットはできない（全員のシミュレーションを同じに保つため、入力以外で状態を変えない）。
     /// 巻き戻しでキャラクターの位置が飛んだときは、表示だけを少しずつ寄せる（CorrectionSmoother。T2-8）。
     /// 検証のため、自分が送るパケットに遅延と欠落を加えられる（往復の遅延を模擬するには全員で同じ値を選ぶ）。
+    /// ステージ（T3-8）: シーンのステージの範囲（KnockoutBounds）、ギミック（StageZoneAuthoring）、出現位置（_spawnPoints）を使う。
+    /// 試合中は、右上に全員の撃破の数（KO）と撃破された数（Fall）を出す。コンボの表示と効果音は ISimulationFeed で読ませる。
     /// </summary>
-    public sealed class OnlineRunner : MonoBehaviour
+    public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed
     {
         [SerializeField] private CharacterConfigAsset _character;
         [SerializeField] private InputActionAsset _inputActions;
+        [Tooltip("試合の前にカメラを向ける位置。_spawnPoints がなければ、ここを中心に横に並べて出す")]
         [SerializeField] private Transform _spawnPoint;
+        [Tooltip("プレイヤーごとの出現位置（番号の順）。人数より少なければ _spawnPoint を中心に横に並べる")]
+        [SerializeField] private Transform[] _spawnPoints = new Transform[0];
+        [Tooltip("プレイヤーごとの色（右上の表示に使う）")]
+        [SerializeField] private Color[] _playerColors = new Color[0];
+        [Tooltip("BGM の切り替えに使う（なくてもよい）")]
+        [SerializeField] private GameAudio _audio;
         [Tooltip("地形として読み込むコライダーの層")]
         [SerializeField] private LayerMask _terrainMask = 1;
         [Tooltip("マウスポインターでの照準に使うカメラ")]
@@ -60,6 +70,10 @@ namespace Degunatsu.Net
 
         private readonly List<string> _errors = new List<string>();
         private BoxTerrain _terrain;
+        private OnlineStage _stage;
+        private int _notifiedTick = -1;
+        private bool _showDetails;
+        private GUIStyle _scoreStyle;
         private InputSystemAdapter _input;
         private OnlineSession _session;
         private string _portText;
@@ -72,16 +86,31 @@ namespace Degunatsu.Net
         /// <summary>今のセッション（始めていなければ null）。</summary>
         public OnlineSession Session => _session;
 
+        /// <summary>このシーンのステージ（地形、出現位置、ステージの範囲、ギミック）。</summary>
+        public OnlineStage Stage => _stage;
+
+        /// <summary>シミュレーションが進んだときに通知する（ISimulationFeed。巻き戻しで計算し直したときも含む）。</summary>
+        public event Action Ticked;
+
+        private bool Running => _session != null && _session.World != null;
+
+        // 表示と効果音の読み取り口（ISimulationFeed）。番号はプレイヤーの番号。
+        int ISimulationFeed.CharacterCount => Running ? _session.PlayerCount : 0;
+        int ISimulationFeed.LocalCharacter => Running ? _session.LocalPlayer : -1;
+        CharacterState ISimulationFeed.GetState(int index) => _session.World.GetState(index);
+        CharacterConfig ISimulationFeed.GetConfig(int index) => _session.World.GetConfig(index);
+        string ISimulationFeed.LabelOf(int index) => $"P{index + 1}";
+
         /// <summary>ホストとして待ち受ける（port が 0 なら空いているポート）。失敗したら false で、理由を画面に出す。</summary>
         public bool StartHost(ushort port)
         {
-            return Open(() => OnlineSession.Host(port, _terrain, _spawnPoint.position.ToNumerics(), _character.Config, _rollback));
+            return Open(() => OnlineSession.Host(port, _stage, _character.Config, _rollback));
         }
 
         /// <summary>address:port のホストに参加する。失敗したら false で、理由を画面に出す。</summary>
         public bool StartJoin(string address, ushort port)
         {
-            return Open(() => OnlineSession.Join(address, port, _terrain, _spawnPoint.position.ToNumerics(), _rollback));
+            return Open(() => OnlineSession.Join(address, port, _stage, _rollback));
         }
 
         /// <summary>試合を始める（ホストのみ）。</summary>
@@ -98,7 +127,9 @@ namespace Degunatsu.Net
             _smoother = null;
             _delayPreset = 0;
             _dropPreset = 0;
+            _notifiedTick = -1;
             UpdateViews();
+            Ticked?.Invoke();
         }
 
         private void Awake()
@@ -122,6 +153,9 @@ namespace Degunatsu.Net
             Application.runInBackground = true;
 
             _terrain = SceneTerrainBuilder.Build(_terrainMask, _errors);
+            StageBounds? bounds = KnockoutBounds.Find(_errors);
+            List<StageZone> zones = StageZoneAuthoring.Collect(_errors);
+            _stage = new OnlineStage(_terrain, SpawnPositions(), bounds, zones);
             foreach (string error in _errors)
             {
                 Debug.LogError(error, this);
@@ -162,6 +196,30 @@ namespace Degunatsu.Net
             _session.Update(Time.deltaTime, ConsumeLocalInput);
             UpdateSmoothing(Time.deltaTime);
             UpdateViews();
+            if (Running && _session.World.Tick != _notifiedTick)
+            {
+                _notifiedTick = _session.World.Tick;
+                Ticked?.Invoke();
+            }
+        }
+
+        // 出現位置（_spawnPoints が人数分なければ、_spawnPoint を中心に横に並べる。OnlineStage.SpawnPosition）。
+        private List<System.Numerics.Vector3> SpawnPositions()
+        {
+            var spawns = new List<System.Numerics.Vector3>();
+            foreach (Transform spawn in _spawnPoints)
+            {
+                if (spawn != null)
+                {
+                    spawns.Add(spawn.position.ToNumerics());
+                }
+            }
+            if (spawns.Count < OnlineSession.MaxPlayers)
+            {
+                spawns.Clear();
+                spawns.Add(_spawnPoint.position.ToNumerics());
+            }
+            return spawns;
         }
 
         private void UpdateSmoothing(float deltaTime)
@@ -288,16 +346,46 @@ namespace Degunatsu.Net
                 _style.normal.textColor = Color.white;
             }
 
-            GUILayout.BeginArea(new Rect(10f, 10f, 460f, 560f), GUI.skin.box);
+            // 試合中は小さくして、コンボの表示（左）と重ならないようにする（詳細は「Details」で開く）。
+            bool compact = Running && !_showDetails;
+            GUILayout.BeginArea(new Rect(10f, 10f, 460f, compact ? 120f : 600f), GUI.skin.box);
             if (_session == null)
             {
                 DrawConnectPanel();
             }
             else
             {
-                DrawSessionPanel();
+                DrawSessionPanel(compact);
             }
             GUILayout.EndArea();
+            DrawScoreboard();
+        }
+
+        // 右上に全員の撃破の数（KO）と撃破された数（Fall）。自分の行には印をつける。
+        private void DrawScoreboard()
+        {
+            if (!Running)
+            {
+                return;
+            }
+            if (_scoreStyle == null)
+            {
+                _scoreStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold };
+            }
+            int count = _session.PlayerCount;
+            var area = new Rect(Screen.width - 250f, 10f, 240f, 34f + count * 28f);
+            GUI.Box(area, GUIContent.none);
+            Color previous = GUI.color;
+            GUI.color = Color.white;
+            GUI.Label(new Rect(area.x + 10f, area.y + 4f, 220f, 26f), "     KO  Fall", _scoreStyle);
+            for (int p = 0; p < count; p++)
+            {
+                Degunatsu.Core.Combat.CombatState combat = _session.World.GetState(p).Combat;
+                GUI.color = p < _playerColors.Length ? Color.Lerp(_playerColors[p], Color.white, 0.25f) : Color.white;
+                string mark = p == _session.LocalPlayer ? ">" : " ";
+                GUI.Label(new Rect(area.x + 10f, area.y + 30f + p * 28f, 220f, 26f), $"{mark}P{p + 1}  {combat.Knockouts,3} {combat.Falls,4}", _scoreStyle);
+            }
+            GUI.color = previous;
         }
 
         private void DrawConnectPanel()
@@ -336,9 +424,36 @@ namespace Degunatsu.Net
             }
         }
 
-        private void DrawSessionPanel()
+        private void DrawSessionPanel(bool compact)
         {
             GUILayout.Label(_session.Status, _style);
+            if (Running)
+            {
+                GUILayout.BeginHorizontal();
+                _showDetails = GUILayout.Toggle(_showDetails, "Details");
+                if (_audio != null)
+                {
+                    bool bgm = GUILayout.Toggle(_audio.BgmEnabled, "BGM");
+                    if (bgm != _audio.BgmEnabled)
+                    {
+                        _audio.BgmOn = bgm;
+                    }
+                }
+                if (GUILayout.Button("Leave"))
+                {
+                    Leave();
+                    ExitGui();
+                }
+                GUILayout.EndHorizontal();
+                if (compact)
+                {
+                    if (_session.IsHost && _session.Desyncs.Count > 0)
+                    {
+                        GUILayout.Label($"Desyncs {_session.Desyncs.Count}", _style);
+                    }
+                    return;
+                }
+            }
             if (_session.IsHost && _session.State == OnlineSession.SessionState.Lobby)
             {
                 GUILayout.Label($"Players: {_session.LobbyPlayerCount} / {OnlineSession.MaxPlayers}", _style);
@@ -369,7 +484,7 @@ namespace Degunatsu.Net
 
             DrawTestControls();
 
-            if (GUILayout.Button("Leave"))
+            if (!Running && GUILayout.Button("Leave"))
             {
                 Leave();
                 ExitGui();
