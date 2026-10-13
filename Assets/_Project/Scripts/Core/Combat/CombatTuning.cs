@@ -283,9 +283,19 @@ namespace Degunatsu.Core.Combat
         /// <summary>撃破技にする攻撃（キャラクターごとに1つ。D-38）。</summary>
         public AttackSlot KoAttack = AttackSlot.AirDown;
 
-        /// <summary>撃破技の吹き飛びの倍率 = KoKnockbackBase + KoKnockbackPerSpeed × 打つ直前の速さ（m/s）。【仮】</summary>
+        /// <summary>
+        /// 撃破技の倍率 = KoKnockbackBase + KoKnockbackPerSpeed × 打つ直前の速さ（m/s）。吹き飛びと威力（ダメージ）の両方にかける
+        /// （D-38。速さの係数は、うまく速さを乗せて当てたときに爽快に飛ぶよう 0.1 から 3 倍の 0.3 にした。ユーザーの要望、2026-10-13）。【仮】
+        /// </summary>
         public float KoKnockbackBase = 0.5f;
-        public float KoKnockbackPerSpeed = 0.1f;
+        public float KoKnockbackPerSpeed = 0.3f;
+
+        /// <summary>
+        /// 撃破技をこの速さ（m/s）以上で打って当てると「FATAL」: ヒットストップが FatalHitstopMultiplier 倍になり、派手な演出を出す
+        /// （ユーザーの要望、2026-10-13）。【仮】
+        /// </summary>
+        public float FatalStrikeSpeed = 14f;
+        public int FatalHitstopMultiplier = 3;
 
         /// <summary>
         /// 攻撃をワイヤーでキャンセルした後、もう一度ワイヤーでキャンセルできるまでのティック数（P-1。永久コンボを止める）。
@@ -355,7 +365,7 @@ namespace Degunatsu.Core.Combat
             }
         }
 
-        /// <summary>撃破技の吹き飛びの倍率（打つ直前の速さ speed から）。</summary>
+        /// <summary>撃破技の倍率（吹き飛びと威力。打つ直前の速さ speed から）。</summary>
         public float KoKnockbackScale(float speed)
         {
             return KoKnockbackBase + KoKnockbackPerSpeed * speed;
@@ -379,6 +389,8 @@ namespace Degunatsu.Core.Combat
             }
             v.NonNegative(nameof(KoKnockbackBase), KoKnockbackBase);
             v.NonNegative(nameof(KoKnockbackPerSpeed), KoKnockbackPerSpeed);
+            v.NonNegative(nameof(FatalStrikeSpeed), FatalStrikeSpeed);
+            v.Positive(nameof(FatalHitstopMultiplier), FatalHitstopMultiplier);
             v.NonNegative(nameof(WireCancelCooldownTicks), WireCancelCooldownTicks);
             v.NonNegative(nameof(AttackBufferTicks), AttackBufferTicks);
             v.Positive(nameof(GuardTicks), GuardTicks);

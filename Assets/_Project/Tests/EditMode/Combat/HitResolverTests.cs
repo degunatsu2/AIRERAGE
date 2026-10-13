@@ -154,6 +154,14 @@ namespace Degunatsu.Core.Tests.Combat
         // 空中で、攻撃する側（横の速さ vx）と、その斜め下にいる相手を置き、空中・下（撃破技）を当てる。相手の吹き飛びの速さを返す。
         private static Vector3 KoHit(float vx, out CharacterState attacker)
         {
+            SimWorld world = KoWorld(vx);
+            attacker = world.GetState(0);
+            return world.GetState(1).Velocity;
+        }
+
+        // 横の速さ vx で空中を動いている 0 が撃破技（空中・下）を出し、下にいる 1 に当てる。当たったティックの直後のワールド。
+        private static SimWorld KoWorld(float vx)
+        {
             var world = new SimWorld(TestArenas.Ground());
             world.AddCharacter(new CharacterConfig(), new Vector3(0f, 12f, 0f), 1);
             float lead = vx * Combat.AirDown.FirstHitTick / 60f;
@@ -165,8 +173,44 @@ namespace Degunatsu.Core.Tests.Combat
             Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirDown), "前提: 空中・下（撃破技）");
 
             StepUntilHit(world, 1, Combat.AirDown.TotalTicks, default, default);
-            attacker = world.GetState(0);
-            return world.GetState(1).Velocity;
+            return world;
+        }
+
+        [Test]
+        public void KoMove_PowerIsScaledByTheStrikeSpeed_LikeTheKnockback()
+        {
+            // 撃破技の威力（ダメージ）にも、吹き飛びと同じ倍率をかける（ユーザーの要望、2026-10-13）。
+            SimWorld world = KoWorld(8f);
+
+            float scale = Combat.KoKnockbackScale(world.GetState(0).Action.StrikeSpeed);
+            int expected = (int)System.MathF.Round(Combat.AirDown.Hits[0].Damage * scale);
+            Assert.That(expected, Is.GreaterThan(Combat.AirDown.Hits[0].Damage), "前提: 倍率が 1 より大きい");
+            Assert.That(world.LastHits[0].Damage, Is.EqualTo(expected));
+            Assert.That(world.GetState(1).Combat.ComboDamage, Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void FastKoMove_IsFatal_WithTripleHitstop()
+        {
+            SimWorld world = KoWorld(14f);
+
+            Assert.That(world.GetState(0).Action.StrikeSpeed, Is.GreaterThanOrEqualTo(Combat.FatalStrikeSpeed), "前提: 速く打った");
+            Assert.That(world.LastHits[0].IsFatalHit, Is.True);
+            int hitstop = Combat.AirDown.Hits[0].HitstopTicks * Combat.FatalHitstopMultiplier;
+            Assert.That(world.GetState(0).Combat.HitstopTicksLeft, Is.EqualTo(hitstop), "攻撃した側のヒットストップが 3 倍でない");
+            Assert.That(world.GetState(1).Combat.HitstopTicksLeft, Is.EqualTo(hitstop), "当たった側のヒットストップが 3 倍でない");
+            Assert.That(world.GetState(1).Combat.FatalHitCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void SlowKoMove_IsNotFatal()
+        {
+            SimWorld world = KoWorld(0f);
+
+            Assert.That(world.GetState(0).Action.StrikeSpeed, Is.LessThan(Combat.FatalStrikeSpeed), "前提: 遅く打った");
+            Assert.That(world.LastHits[0].IsFatalHit, Is.False);
+            Assert.That(world.GetState(1).Combat.HitstopTicksLeft, Is.EqualTo(Combat.AirDown.Hits[0].HitstopTicks));
+            Assert.That(world.GetState(1).Combat.FatalHitCount, Is.EqualTo(0));
         }
 
         [Test]

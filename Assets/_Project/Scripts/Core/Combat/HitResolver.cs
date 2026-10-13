@@ -12,6 +12,8 @@ namespace Degunatsu.Core.Combat
     /// - 先に全員分の命中を集めてから、攻撃した側の番号、判定の順、当たった側の番号の順に当てる（同じティックの相打ちが順番で変わらない）。
     /// - 同じ判定は同じ相手に1回だけ当たる（二段技は、それぞれの判定が1回ずつ当たる）。ヒットストップ中の攻撃は新しく当たらない。
     /// - 当たった側: ワイヤーを外し、のけぞり（Hitstun）にして、吹き飛ばす（攻撃ごとに固定。撃破技は打つ直前の速さで倍率。D-38）。
+    ///   撃破技の倍率は威力（ダメージ）にもかかる。FatalStrikeSpeed 以上で打った撃破技が当たると「FATAL」で、ヒットストップが
+    ///   FatalHitstopMultiplier 倍になり、当たった側の FatalHitCount が増える（表示と効果音。ガードされたら FATAL にならない）。
     ///   最後にダメージを与えた人と時刻、コンボの数とダメージを記録する。HP はない（D-23）。
     ///   コンボは当てた人ごとで、のけぞりが終わるまで続く（別の人が当てると、その人の新しいコンボになる）。
     /// - 当たった側がガード中なら（T3-5。D-21）:
@@ -55,7 +57,9 @@ namespace Degunatsu.Core.Combat
                 }
                 CombatTuning combat = configs[a].Combat;
                 AttackData attack = combat.Get(attacker.Action.Attack);
-                float scale = attacker.Action.Attack == combat.KoAttack ? combat.KoKnockbackScale(attacker.Action.StrikeSpeed) : 1f;
+                bool ko = attacker.Action.Attack == combat.KoAttack;
+                float scale = ko ? combat.KoKnockbackScale(attacker.Action.StrikeSpeed) : 1f;
+                bool fatal = ko && attacker.Action.StrikeSpeed >= combat.FatalStrikeSpeed;
                 for (int h = 0; h < attack.Hits.Length; h++)
                 {
                     AttackHit hitData = attack.Hits[h];
@@ -75,7 +79,7 @@ namespace Degunatsu.Core.Combat
                         if (MathF.Abs(target.X - center.X) < half.X + targetHalf.X
                             && MathF.Abs(target.Y - center.Y) < half.Y + targetHalf.Y)
                         {
-                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, scale));
+                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, scale, fatal));
                         }
                     }
                 }
@@ -114,14 +118,17 @@ namespace Degunatsu.Core.Combat
                 result = victim.Action.Ticks < configs[hit.Victim].Combat.JustGuardTicks ? HitResult.JustGuarded : HitResult.Guarded;
             }
 
+            CombatTuning attackerCombat = configs[hit.Attacker].Combat;
+            bool fatal = hit.Fatal && result == HitResult.Hit;
+            int hitstop = data.HitstopTicks * (fatal ? attackerCombat.FatalHitstopMultiplier : 1);
+
             CharacterState attacker = states[hit.Attacker];
             if (attacker.Action.Kind == ActionKind.Attack)
             {
                 attacker.Action.HitMask |= HitBit(hit.HitIndex, hit.Victim);
                 attacker.Action.Connected |= result == HitResult.Hit;
             }
-            attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, data.HitstopTicks);
-            CombatTuning attackerCombat = configs[hit.Attacker].Combat;
+            attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, hitstop);
             AddGauge(ref attacker.Combat, attackerCombat,
                 result == HitResult.Hit ? attackerCombat.GaugeOnHit : result == HitResult.Guarded ? attackerCombat.GaugeOnGuarded : 0);
             states[hit.Attacker] = attacker;
@@ -131,7 +138,11 @@ namespace Degunatsu.Core.Combat
             AddGauge(ref victim.Combat, victimCombat,
                 result == HitResult.Hit ? victimCombat.GaugeOnDamaged
                 : result == HitResult.Guarded ? victimCombat.GaugeOnGuard : victimCombat.GaugeOnJustGuard);
-            victim.Combat.HitstopTicksLeft = Math.Max(victim.Combat.HitstopTicksLeft, data.HitstopTicks);
+            victim.Combat.HitstopTicksLeft = Math.Max(victim.Combat.HitstopTicksLeft, hitstop);
+            if (fatal)
+            {
+                victim.Combat.FatalHitCount++;
+            }
             switch (result)
             {
                 case HitResult.JustGuarded:
@@ -172,7 +183,7 @@ namespace Degunatsu.Core.Combat
             victim.Combat.LastAttacker = (byte)hit.Attacker;
             victim.Combat.LastDamagedTick = tick;
             victim.Combat.ComboCount = comboContinues ? victim.Combat.ComboCount + 1 : 1;
-            victim.Combat.ComboDamage = (comboContinues ? victim.Combat.ComboDamage : 0) + data.Damage;
+            victim.Combat.ComboDamage = (comboContinues ? victim.Combat.ComboDamage : 0) + hit.Damage;
         }
 
         // ふつうのガード: ガードのまま（ガード硬直の分だけ延ばす）、弱く吹き飛ぶ。削りとして最後にダメージを与えた人を記録する【仮】。
@@ -236,14 +247,17 @@ namespace Degunatsu.Core.Combat
         public readonly AttackHit Data;
         public readonly int Facing;
 
-        /// <summary>吹き飛びの倍率（撃破技は打つ直前の速さによる。それ以外は 1。D-38）。</summary>
+        /// <summary>吹き飛びと威力の倍率（撃破技は打つ直前の速さによる。それ以外は 1。D-38）。</summary>
         public readonly float KnockbackScale;
+
+        /// <summary>FatalStrikeSpeed 以上で打った撃破技か（当たれば FATAL。ガードされたら FATAL にならない）。</summary>
+        public readonly bool Fatal;
 
         /// <summary>結果（命中、ガード、ジャストガード）。</summary>
         public readonly HitResult Result;
 
         public HitRecord(int attacker, int victim, AttackSlot attack, int hitIndex, AttackHit data, int facing, float knockbackScale,
-            HitResult result = HitResult.Hit)
+            bool fatal = false, HitResult result = HitResult.Hit)
         {
             Attacker = attacker;
             Victim = victim;
@@ -252,15 +266,22 @@ namespace Degunatsu.Core.Combat
             Data = data;
             Facing = facing;
             KnockbackScale = knockbackScale;
+            Fatal = fatal;
             Result = result;
         }
 
         public HitRecord WithResult(HitResult result)
         {
-            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, result);
+            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, Fatal, result);
         }
 
         /// <summary>当たった側の吹き飛びの速度（m/s、X は右が正）。</summary>
         public Vector2 Knockback => new Vector2(Data.KnockbackX * Facing, Data.KnockbackY) * KnockbackScale;
+
+        /// <summary>威力（ダメージ。撃破技は倍率をかけて四捨五入）。コインへの変換は Phase 4。</summary>
+        public int Damage => (int)MathF.Round(Data.Damage * KnockbackScale);
+
+        /// <summary>FATAL として当たったか。</summary>
+        public bool IsFatalHit => Fatal && Result == HitResult.Hit;
     }
 }

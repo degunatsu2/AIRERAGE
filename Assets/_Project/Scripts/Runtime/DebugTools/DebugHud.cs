@@ -166,7 +166,11 @@ namespace Degunatsu.Runtime.DebugTools
                 _text.Append(" #").Append(hit.HitIndex + 1);
             }
             _text.Append("  KB (").Append(hit.Knockback.X.ToString("0.0")).Append(", ").Append(hit.Knockback.Y.ToString("0.0"))
-                .Append(") x").Append(hit.KnockbackScale.ToString("0.00")).Append("  Power ").Append(hit.Data.Damage);
+                .Append(") x").Append(hit.KnockbackScale.ToString("0.00")).Append("  Power ").Append(hit.Damage);
+            if (hit.IsFatalHit)
+            {
+                _text.Append("  FATAL");
+            }
             if (hit.Result != HitResult.Hit)
             {
                 _text.Append("  ").Append(hit.Result == HitResult.JustGuarded ? "PARRIED" : "GUARDED");
