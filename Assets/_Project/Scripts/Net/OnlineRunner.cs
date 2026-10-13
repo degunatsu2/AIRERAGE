@@ -109,6 +109,7 @@ namespace Degunatsu.Net
         int ISimulationFeed.CurrentTick => Running ? _session.World.Tick : 0;
         MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
         CoinField ISimulationFeed.Coins => Running ? _session.World.Coins.Field : null;
+        IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => Running ? _session.World.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
         Color ISimulationFeed.ColorOf(int index) => index < _playerColors.Length ? _playerColors[index] : Color.white;
 
         /// <summary>ホストとして待ち受ける（port が 0 なら空いているポート）。失敗したら false で、理由を画面に出す。</summary>
@@ -126,7 +127,7 @@ namespace Degunatsu.Net
         /// <summary>試合を始める（ホストのみ）。ロビーの選択で、時間の制限ありか、なしか。</summary>
         public void StartMatch()
         {
-            _session.StartMatch(_timedMatch ? _match : FreePlay(_match));
+            _session.StartMatch(RulesForNextMatch());
         }
 
         /// <summary>結果の画面の「Restart」を押せるか（ホストだけ。IMatchControls）。</summary>
@@ -139,7 +140,7 @@ namespace Degunatsu.Net
             {
                 return;
             }
-            _session.RestartMatch(_timedMatch ? _match : FreePlay(_match));
+            _session.RestartMatch(RulesForNextMatch());
             _smoother = null;
             _notifiedTick = -1;
         }
@@ -165,16 +166,16 @@ namespace Degunatsu.Net
             set => _timedMatch = value;
         }
 
-        // 時間の制限だけをなくしたルール（カウントダウンと復帰は同じ）。
-        private static MatchRules FreePlay(MatchRules rules)
+        // 次の試合のルール: ロビーの選択（時間の制限なしなら制限だけをなくす）と、試合ごとの乱数の種（100 枚のコインの場所など）。
+        private MatchRules RulesForNextMatch()
         {
-            return new MatchRules
+            MatchRules rules = _match.Clone();
+            if (!_timedMatch)
             {
-                CountdownTicks = rules.CountdownTicks,
-                DurationTicks = 0,
-                RespawnDelayTicks = rules.RespawnDelayTicks,
-                InvincibleTicks = rules.InvincibleTicks,
-            };
+                rules.DurationTicks = 0;
+            }
+            rules.Seed = Environment.TickCount;
+            return rules;
         }
 
         /// <summary>セッションを閉じて、最初の画面に戻る。</summary>
@@ -215,7 +216,8 @@ namespace Degunatsu.Net
             StageBounds? bounds = KnockoutBounds.Find(_errors);
             List<StageZone> zones = StageZoneAuthoring.Collect(_errors);
             List<CoinSpawnPoint> coinSpawns = CoinSpawnAuthoring.Collect(_errors);
-            _stage = new OnlineStage(_terrain, SpawnPositions(), bounds, zones, coinSpawns);
+            List<BankSpot> bankSpots = BankSpotAuthoring.Collect(_errors);
+            _stage = new OnlineStage(_terrain, SpawnPositions(), bounds, zones, coinSpawns, bankSpots);
             foreach (string error in _errors)
             {
                 Debug.LogError(error, this);
@@ -421,7 +423,7 @@ namespace Degunatsu.Net
             DrawScoreboard();
         }
 
-        // 右上に全員の撃破の数（KO）、撃破された数（Fall）、所持コイン（Coin）。自分の行には印をつける。
+        // 右上に全員のスコア（確定コイン。Bank）、所持コイン（Coin）、撃破の数（KO）、撃破された数（Fall）。自分の行には印をつける。
         private void DrawScoreboard()
         {
             if (!Running)
@@ -433,18 +435,19 @@ namespace Degunatsu.Net
                 _scoreStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold };
             }
             int count = _session.PlayerCount;
-            var area = new Rect(Screen.width - 320f, 10f, 310f, 34f + count * 28f);
+            var area = new Rect(Screen.width - 370f, 10f, 360f, 34f + count * 28f);
             GUI.Box(area, GUIContent.none);
             Color previous = GUI.color;
             GUI.color = Color.white;
-            GUI.Label(new Rect(area.x + 10f, area.y + 4f, 300f, 26f), "     KO  Fall  Coin", _scoreStyle);
+            GUI.Label(new Rect(area.x + 10f, area.y + 4f, 350f, 26f), "     Bank  Coin  KO Fall", _scoreStyle);
             for (int p = 0; p < count; p++)
             {
                 Degunatsu.Core.Combat.CombatState combat = _session.World.GetState(p).Combat;
                 GUI.color = p < _playerColors.Length ? Color.Lerp(_playerColors[p], Color.white, 0.25f) : Color.white;
                 string mark = p == _session.LocalPlayer ? ">" : " ";
-                int held = _session.World.GetState(p).Coins.Held;
-                GUI.Label(new Rect(area.x + 10f, area.y + 30f + p * 28f, 300f, 26f), $"{mark}P{p + 1}  {combat.Knockouts,3} {combat.Falls,4} {held,5}", _scoreStyle);
+                Degunatsu.Core.Economy.CoinPurse coins = _session.World.GetState(p).Coins;
+                GUI.Label(new Rect(area.x + 10f, area.y + 30f + p * 28f, 350f, 26f),
+                    $"{mark}P{p + 1} {coins.Banked,5} {coins.Held,5} {combat.Knockouts,3} {combat.Falls,4}", _scoreStyle);
             }
             GUI.color = previous;
         }

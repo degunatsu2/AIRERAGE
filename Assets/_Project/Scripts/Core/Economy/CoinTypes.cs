@@ -185,6 +185,19 @@ namespace Degunatsu.Core.Economy
         }
     }
 
+    /// <summary>コインの出現地点の種類。</summary>
+    public enum CoinSpawnKind : byte
+    {
+        /// <summary>ふつうの地点。コインが拾われてから MatchRules.CoinSpawnIntervalTicks たつと、また出る。</summary>
+        Regular = 0,
+
+        /// <summary>
+        /// 100 枚のコインの候補の地点（ユーザーの要望、2026-10-13）。残り 1 分のときに、候補の中から1つを選んで1回だけ出す
+        /// （選び方は試合の種で決まる）。ふつうには出さない。
+        /// </summary>
+        Jackpot = 1,
+    }
+
     /// <summary>コインの出現地点（ステージに置く。docs/12 T4-4）。基本は空中に置き、取りにくい場所ほど高額にする。</summary>
     public readonly struct CoinSpawnPoint : IEquatable<CoinSpawnPoint>
     {
@@ -193,7 +206,9 @@ namespace Degunatsu.Core.Economy
         /// <summary>出すコインの枚数。</summary>
         public readonly int Value;
 
-        public CoinSpawnPoint(Vector2 position, int value)
+        public readonly CoinSpawnKind Kind;
+
+        public CoinSpawnPoint(Vector2 position, int value, CoinSpawnKind kind = CoinSpawnKind.Regular)
         {
             if (value <= 0)
             {
@@ -205,12 +220,17 @@ namespace Degunatsu.Core.Economy
             }
             Position = position;
             Value = value;
+            Kind = kind;
         }
 
         /// <summary>並べ替えの順（シーンから集めた順によらず、同じ番号になるように）。</summary>
         public int CompareTo(CoinSpawnPoint other)
         {
-            int c = Position.X.CompareTo(other.Position.X);
+            int c = Kind.CompareTo(other.Kind);
+            if (c == 0)
+            {
+                c = Position.X.CompareTo(other.Position.X);
+            }
             if (c == 0)
             {
                 c = Position.Y.CompareTo(other.Position.Y);
@@ -220,7 +240,7 @@ namespace Degunatsu.Core.Economy
 
         public bool Equals(CoinSpawnPoint other)
         {
-            return Position.Equals(other.Position) && Value == other.Value;
+            return Position.Equals(other.Position) && Value == other.Value && Kind == other.Kind;
         }
 
         public override bool Equals(object obj)
@@ -230,12 +250,12 @@ namespace Degunatsu.Core.Economy
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Position, Value);
+            return HashCode.Combine(Position, Value, Kind);
         }
 
         public override string ToString()
         {
-            return $"{Value} at {Position}";
+            return $"{Kind} {Value} at {Position}";
         }
     }
 }

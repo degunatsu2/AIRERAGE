@@ -5,12 +5,14 @@ namespace Degunatsu.Core.Economy
 {
     /// <summary>
     /// ワールド全体のコインの状態（docs/12_match_plan.md T4-3）: フィールドのコイン（番号の順）、次のコインの番号、
-    /// これまでに生成・破棄した枚数（総量の検査に使う）。巻き戻しのため、スナップショットに写し、チェックサムに含める。
+    /// これまでに生成・破棄した枚数（総量の検査に使う）、出現地点ごとの「次に出せるティック」（拾われたティックから数える。T4-4）。
+    /// 巻き戻しのため、スナップショットに写し、チェックサムに含める。
     /// 増減は CoinLedger だけが行う。
     /// </summary>
     public sealed class CoinField
     {
         private readonly List<FieldCoin> _coins = new List<FieldCoin>();
+        private readonly List<int> _spawnReadyTicks = new List<int>();
 
         /// <summary>フィールドのコイン（番号の小さい順）。</summary>
         public IReadOnlyList<FieldCoin> Coins => _coins;
@@ -23,6 +25,15 @@ namespace Degunatsu.Core.Economy
 
         /// <summary>これまでに破棄した枚数（消滅）。</summary>
         public long Destroyed { get; internal set; }
+
+        /// <summary>出現地点ごとの、次にコインを出せるティック（拾われたティック ＋ 間隔。まだ拾われていなければ 0）。</summary>
+        public IReadOnlyList<int> SpawnReadyTicks => _spawnReadyTicks;
+
+        /// <summary>出現地点 point から、次にコインを出せるティック。</summary>
+        public int SpawnReadyTick(int point)
+        {
+            return point < _spawnReadyTicks.Count ? _spawnReadyTicks[point] : 0;
+        }
 
         /// <summary>フィールドのコインの枚数の合計。</summary>
         public long FieldTotal
@@ -60,6 +71,8 @@ namespace Degunatsu.Core.Economy
             }
             _coins.Clear();
             _coins.AddRange(other._coins);
+            _spawnReadyTicks.Clear();
+            _spawnReadyTicks.AddRange(other._spawnReadyTicks);
             NextCoinId = other.NextCoinId;
             Generated = other.Generated;
             Destroyed = other.Destroyed;
@@ -69,9 +82,16 @@ namespace Degunatsu.Core.Economy
         public bool SameAs(CoinField other)
         {
             if (other == null || _coins.Count != other._coins.Count || NextCoinId != other.NextCoinId
-                || Generated != other.Generated || Destroyed != other.Destroyed)
+                || Generated != other.Generated || Destroyed != other.Destroyed || _spawnReadyTicks.Count != other._spawnReadyTicks.Count)
             {
                 return false;
+            }
+            for (int i = 0; i < _spawnReadyTicks.Count; i++)
+            {
+                if (_spawnReadyTicks[i] != other._spawnReadyTicks[i])
+                {
+                    return false;
+                }
             }
             for (int i = 0; i < _coins.Count; i++)
             {
@@ -91,6 +111,15 @@ namespace Degunatsu.Core.Economy
         internal void RemoveAt(int index)
         {
             _coins.RemoveAt(index);
+        }
+
+        internal void SetSpawnReady(int point, int tick)
+        {
+            while (_spawnReadyTicks.Count <= point)
+            {
+                _spawnReadyTicks.Add(0);
+            }
+            _spawnReadyTicks[point] = tick;
         }
     }
 }

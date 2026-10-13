@@ -60,6 +60,9 @@ namespace Degunatsu.Runtime.Audio
 
         /// <summary>コインを拾った（「チャリン」）。</summary>
         CoinPickup,
+
+        /// <summary>拠点で所持コインを確定した（上がっていく明るい和音と、コインの音）。</summary>
+        Bank,
     }
 
     /// <summary>
@@ -231,6 +234,19 @@ namespace Degunatsu.Runtime.Audio
                     AddTone(b, r, 0f, 0.12f, NoteFrequency(88), NoteFrequency(88), Wave.Square, 0.22f, 0.001f, 0.04f);
                     AddTone(b, r, 0.06f, 0.28f, NoteFrequency(95), NoteFrequency(95), Wave.Sine, 0.4f, 0.001f, 0.1f);
                     AddTone(b, r, 0.06f, 0.2f, NoteFrequency(107), NoteFrequency(107), Wave.Sine, 0.12f, 0.001f, 0.06f);
+                    break;
+                case SoundId.Bank:
+                    // C5 E5 G5 C6 を速く上がり、最後に高いコインの音を重ねる。
+                    b = new float[Samples(0.8f, r)];
+                    int[] rise = { 72, 76, 79, 84 };
+                    for (int i = 0; i < rise.Length; i++)
+                    {
+                        float f = NoteFrequency(rise[i]);
+                        AddTone(b, r, i * 0.06f, 0.5f, f, f, Wave.Triangle, 0.35f, 0.002f, 0.18f);
+                        AddTone(b, r, i * 0.06f, 0.3f, f * 2f, f * 2f, Wave.Pulse25, 0.08f, 0.002f, 0.1f);
+                    }
+                    AddTone(b, r, 0.24f, 0.4f, NoteFrequency(96), NoteFrequency(96), Wave.Sine, 0.3f, 0.001f, 0.14f);
+                    AddTone(b, r, 0.24f, 0.3f, NoteFrequency(103), NoteFrequency(103), Wave.Sine, 0.12f, 0.001f, 0.08f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

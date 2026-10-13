@@ -23,7 +23,7 @@ namespace Degunatsu.Runtime.Simulation
     /// プロトタイプでは、操作するキャラクター1人と、攻撃を当てて試すためのダミー（入力なしでその場に立つ。
     /// docs/11_combat_plan.md T3-2）を動かす。位置のリセット（R）でダミーも出現位置に戻す。
     /// シーンにステージの範囲（KnockoutBounds）があれば、外に出たキャラクターは撃破されて出現位置に戻る（T3-3）。
-    /// シーンにギミック（StageZoneAuthoring）やコインの出現地点（CoinSpawnAuthoring）があれば、それも使う。
+    /// シーンにギミック（StageZoneAuthoring）、コインの出現地点（CoinSpawnAuthoring）、拠点の候補（BankSpotAuthoring）があれば、それも使う。
     /// </summary>
     public sealed class SimulationRunner : MonoBehaviour, ISimulationFeed
     {
@@ -100,6 +100,7 @@ namespace Degunatsu.Runtime.Simulation
         string ISimulationFeed.LabelOf(int index) => index == _player ? "PLAYER" : $"DUMMY {index - _player}";
         MatchRules ISimulationFeed.Rules => _world?.Rules;
         CoinField ISimulationFeed.Coins => _world?.Coins.Field;
+        IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => _world != null ? _world.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
         Color ISimulationFeed.ColorOf(int index) => index == _player ? new Color(0.95f, 0.55f, 0.2f) : new Color(0.7f, 0.7f, 0.75f);
 
         /// <summary>ステージの範囲があるか（外に出ると撃破になるか。T3-3）。</summary>
@@ -165,13 +166,14 @@ namespace Degunatsu.Runtime.Simulation
             StageBounds? bounds = KnockoutBounds.Find(errors);
             List<StageZone> zones = StageZoneAuthoring.Collect(errors);
             List<CoinSpawnPoint> coinSpawns = CoinSpawnAuthoring.Collect(errors);
+            List<BankSpot> bankSpots = BankSpotAuthoring.Collect(errors);
             foreach (string error in errors)
             {
                 Debug.LogError(error, this);
             }
 
             _terrain = terrain;
-            _world = new SimWorld(terrain, bounds, zones, null, coinSpawns);
+            _world = new SimWorld(terrain, bounds, zones, null, coinSpawns, bankSpots);
             _player = _world.AddCharacter(_character.Config, _spawnPoint.position.ToNumerics());
             _previous = _world.GetState(_player);
             if (_dummyViews.Length != _dummySpawns.Length)

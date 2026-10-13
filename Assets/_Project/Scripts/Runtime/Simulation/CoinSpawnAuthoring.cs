@@ -12,21 +12,25 @@ namespace Degunatsu.Runtime.Simulation
     public sealed class CoinSpawnAuthoring : MonoBehaviour
     {
         [Tooltip("出すコインの枚数")]
-        [SerializeField] private int _value = 5;
+        [SerializeField] private int _value = 1;
+        [Tooltip("Regular: ふつうの地点。Jackpot: 残り 1 分に 100 枚のコインが出る候補の地点（候補の中から1つ）")]
+        [SerializeField] private CoinSpawnKind _kind = CoinSpawnKind.Regular;
 
         public int Value => _value;
+        public CoinSpawnKind Kind => _kind;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(int value)
+        public void Configure(int value, CoinSpawnKind kind = CoinSpawnKind.Regular)
         {
             _value = value;
+            _kind = kind;
         }
 
         /// <summary>Core の出現地点にする。値が不正なら ArgumentException。</summary>
         public CoinSpawnPoint ToSpawnPoint()
         {
             Vector3 p = transform.position;
-            return new CoinSpawnPoint(new System.Numerics.Vector2(p.x, p.y), _value);
+            return new CoinSpawnPoint(new System.Numerics.Vector2(p.x, p.y), _value, _kind);
         }
 
         /// <summary>
@@ -51,8 +55,8 @@ namespace Degunatsu.Runtime.Simulation
 
         private void OnDrawGizmos()
         {
-            Gizmos.color = new Color(1f, 0.85f, 0.2f);
-            Gizmos.DrawWireSphere(transform.position, 0.5f);
+            Gizmos.color = _kind == CoinSpawnKind.Jackpot ? new Color(1f, 0.3f, 1f) : new Color(1f, 0.85f, 0.2f);
+            Gizmos.DrawWireSphere(transform.position, _kind == CoinSpawnKind.Jackpot ? 1f : 0.5f);
         }
     }
 }

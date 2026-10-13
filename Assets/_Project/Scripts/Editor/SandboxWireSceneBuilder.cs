@@ -349,11 +349,14 @@ namespace Degunatsu.Editor
             }
         }
 
+        // 100 枚のコインの枚数（ユーザーの要望、2026-10-13）。
+        internal const int JackpotValue = 100;
+
         /// <summary>
         /// コインの出現地点（docs/12 T4-4）と、コインの表示（回る金色のコイン）、所持コインと「+n」の表示を作る。
         /// source は ISimulationFeed。
         /// </summary>
-        internal static void CreateCoins((Vector2 Position, int Value)[] spawns, MonoBehaviour source)
+        internal static void CreateCoins((Vector2 Position, int Value)[] spawns, Vector2[] jackpotSpots, MonoBehaviour source)
         {
             var root = new GameObject("CoinSpawns").transform;
             for (int i = 0; i < spawns.Length; i++)
@@ -363,18 +366,77 @@ namespace Degunatsu.Editor
                 point.transform.position = new Vector3(spawns[i].Position.x, spawns[i].Position.y, 0f);
                 point.AddComponent<CoinSpawnAuthoring>().Configure(spawns[i].Value);
             }
+            // 100 枚のコインの候補の地点（残り 1 分に、この中の1つに出る）。
+            for (int i = 0; i < jackpotSpots.Length; i++)
+            {
+                var point = new GameObject($"JackpotSpot{i + 1}");
+                point.transform.SetParent(root, false);
+                point.transform.position = new Vector3(jackpotSpots[i].x, jackpotSpots[i].y, 0f);
+                point.AddComponent<CoinSpawnAuthoring>().Configure(JackpotValue, Degunatsu.Core.Economy.CoinSpawnKind.Jackpot);
+            }
 
-            Material coinMaterial = LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f));
+            // 見た目の見本（CoinLook の順: 1 枚は金色、3 枚は金色のピラミッド、5 枚は赤、100 枚は虹色に光る）。
+            Material gold = LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f));
+            Material red = LoadOrCreateMaterial("CoinRed", new Color(0.9f, 0.12f, 0.1f));
+            Material rainbow = LoadOrCreateMaterial("CoinRainbow", Color.white, unlit: true);
             var view = new GameObject("Coins").AddComponent<CoinView>();
-            GameObject template = CreateVisual(PrimitiveType.Cylinder, "CoinTemplate", coinMaterial, new Vector3(0.7f, 0.05f, 0.7f));
-            template.transform.SetParent(view.transform, false);
-            template.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            GameObject single = CreateCoinTemplate("CoinSingle", view.transform, gold, 0.7f, new[] { Vector2.zero });
+            GameObject triple = CreateCoinTemplate("CoinTriple", view.transform, gold, 0.6f,
+                new[] { new Vector2(0f, 0.29f), new Vector2(-0.33f, -0.28f), new Vector2(0.33f, -0.28f) });
+            GameObject redCoin = CreateCoinTemplate("CoinRed", view.transform, red, 0.75f, new[] { Vector2.zero });
+            GameObject jackpot = CreateCoinTemplate("CoinRainbow", view.transform, rainbow, 1.1f, new[] { Vector2.zero });
+            var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            jackpot.AddComponent<RainbowCoinGlow>().Configure(
+                jackpot.GetComponentsInChildren<MeshRenderer>(),
+                CreateIndicatorLine(jackpot.transform, "Halo", lineMaterial, 0.14f),
+                CreateIndicatorLine(jackpot.transform, "Wave", lineMaterial, 0.08f));
             SetReference(view, "_source", source);
-            SetReference(view, "_template", template);
+            SetReferenceArray(view, "_templates", new Object[] { single, triple, redCoin, jackpot });
 
             var hud = new GameObject("CoinHud").AddComponent<CoinHud>();
             SetReference(hud, "_source", source);
             SetReference(hud, "_camera", Object.FindFirstObjectByType<Camera>());
+        }
+
+        /// <summary>
+        /// 拠点の候補の地点（BankSpotAuthoring。spots[0] が試合の始まりの拠点）と、拠点の表示（BankView。輪、回る弧、光の柱、
+        /// 次の地点の輪）を作る（docs/12 T4-7）。
+        /// </summary>
+        internal static void CreateBank(Vector2[] spots, MonoBehaviour source)
+        {
+            var root = new GameObject("BankSpots").transform;
+            for (int i = 0; i < spots.Length; i++)
+            {
+                var point = new GameObject(i == 0 ? "BankSpot1_First" : $"BankSpot{i + 1}");
+                point.transform.SetParent(root, false);
+                point.transform.position = new Vector3(spots[i].x, spots[i].y, 0f);
+                point.AddComponent<BankSpotAuthoring>().Configure(i == 0);
+            }
+
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var view = new GameObject("Bank").AddComponent<BankView>();
+            SetReference(view, "_source", source);
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            SetReference(view, "_ring", CreateIndicatorLine(view.transform, "Ring", material, 0.22f));
+            SetReference(view, "_sweep", CreateIndicatorLine(view.transform, "Sweep", material, 0.14f));
+            SetReference(view, "_beam", CreateIndicatorLine(view.transform, "Beam", material, 1.6f));
+            SetReference(view, "_next", CreateIndicatorLine(view.transform, "Next", material, 0.14f));
+        }
+
+        // コインの見た目の見本: 空の親の下に、面をカメラに向けたコイン（円柱）を faces の位置に置く。
+        private static GameObject CreateCoinTemplate(string name, Transform parent, Material material, float diameter, Vector2[] faces)
+        {
+            var root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            for (int i = 0; i < faces.Length; i++)
+            {
+                GameObject face = CreateVisual(PrimitiveType.Cylinder, $"Face{i + 1}", material, new Vector3(diameter, 0.05f, diameter));
+                face.transform.SetParent(root.transform, false);
+                face.transform.localPosition = new Vector3(faces[i].x, faces[i].y, 0f);
+                face.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                face.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            }
+            return root;
         }
 
         /// <summary>ガードとジャストガードの表示（光る輪、広がる輪、光の筋。文字はシーンのカメラで画面に写す）。</summary>

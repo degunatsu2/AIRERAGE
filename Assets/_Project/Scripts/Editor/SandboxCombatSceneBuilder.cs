@@ -47,12 +47,35 @@ namespace Degunatsu.Editor
         // コインの出現地点（docs/12 T4-4）【仮】。
         private static readonly (Vector2 Position, int Value)[] CoinSpawns =
         {
-            (new Vector2(0f, 4f), 5),
-            (new Vector2(-13.5f, 8f), 5),
-            (new Vector2(13.5f, 8f), 5),
-            (new Vector2(0f, 13f), 10),
-            (new Vector2(-21f, 13f), 15),
-            (new Vector2(21f, 13f), 15),
+            (new Vector2(0f, 3f), 1),
+            (new Vector2(-4f, 3f), 1),
+            (new Vector2(4f, 3f), 1),
+            (new Vector2(-13.5f, 7f), 1),
+            (new Vector2(13.5f, 7f), 1),
+            (new Vector2(0f, 11.5f), 1),
+            (new Vector2(-7f, 7f), 3),
+            (new Vector2(7f, 7f), 3),
+            (new Vector2(0f, 15f), 3),
+            (new Vector2(-21f, 12f), 5),
+            (new Vector2(21f, 12f), 5),
+        };
+
+        // 100 枚のコインの候補の地点（残り 1 分に出る。ここは時間の制限がないので出ない）【仮】。
+        private static readonly Vector2[] JackpotSpots =
+        {
+            new Vector2(0f, 20f),
+            new Vector2(-25f, 2f),
+            new Vector2(25f, 2f),
+        };
+
+        // 拠点の候補の地点（docs/12 T4-7）【仮】。最初は中央の足場の上空。
+        private static readonly Vector2[] BankSpots =
+        {
+            new Vector2(0f, 6f),
+            new Vector2(-13.5f, 10.5f),
+            new Vector2(13.5f, 10.5f),
+            new Vector2(-21f, 6f),
+            new Vector2(21f, 6f),
         };
 
         // ステージの範囲（外に出ると撃破）【仮】。足場から下へ 16m、左右へ 18m ほど。
@@ -143,7 +166,8 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.CreateDebugTools(runner, inputActions, audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
-            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, runner);
+            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner);
+            SandboxWireSceneBuilder.CreateBank(BankSpots, runner);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

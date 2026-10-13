@@ -9,7 +9,7 @@ namespace Degunatsu.Net
 {
     /// <summary>
     /// オンラインの試合のステージ（docs/11_combat_plan.md T3-8）: 地形、出現位置、ステージの範囲（外に出ると撃破）、ギミック、
-    /// コインの出現地点（docs/12 T4-4）。
+    /// コインの出現地点（docs/12 T4-4）、拠点の候補の地点（T4-7）。
     /// 全員が同じシーンから作るので、通信では送らない（違うビルドどうしでは、状態のチェックサムの比較で不一致として見つかる）。
     /// </summary>
     public sealed class OnlineStage
@@ -21,7 +21,7 @@ namespace Degunatsu.Net
 
         /// <param name="spawns">出現位置（1つ以上）。人数より少なければ、最初の位置を中心に横に並べる。</param>
         public OnlineStage(ICollisionQuery terrain, IReadOnlyList<NVector3> spawns, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null,
-            IReadOnlyList<CoinSpawnPoint> coinSpawns = null)
+            IReadOnlyList<CoinSpawnPoint> coinSpawns = null, IReadOnlyList<BankSpot> bankSpots = null)
         {
             Terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
             if (spawns == null || spawns.Count == 0)
@@ -36,12 +36,14 @@ namespace Degunatsu.Net
             Bounds = bounds;
             Zones = zones ?? Array.Empty<StageZone>();
             CoinSpawns = coinSpawns ?? Array.Empty<CoinSpawnPoint>();
+            BankSpots = bankSpots ?? Array.Empty<BankSpot>();
         }
 
         public ICollisionQuery Terrain { get; }
         public StageBounds? Bounds { get; }
         public IReadOnlyList<StageZone> Zones { get; }
         public IReadOnlyList<CoinSpawnPoint> CoinSpawns { get; }
+        public IReadOnlyList<BankSpot> BankSpots { get; }
         public IReadOnlyList<NVector3> Spawns => _spawns;
 
         /// <summary>プレイヤー player（全員で playerCount 人）の出現位置。</summary>

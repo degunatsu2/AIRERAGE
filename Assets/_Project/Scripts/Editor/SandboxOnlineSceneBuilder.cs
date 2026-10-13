@@ -20,7 +20,7 @@ namespace Degunatsu.Editor
     /// オンライン対戦のシーン（Sandbox_Online）を作る（docs/10_online_plan.md T2-7、docs/11_combat_plan.md T3-8）。
     /// 友達と遊べる、空中戦のアスレチックステージ（ユーザーの要望、2026-10-13）: 地上の部分は少なく、浮いた足場、飛び石、
     /// ジャンプ台、加速リング、上昇気流、ワイヤーのアンカーを置く。ステージの範囲の外に出ると撃破。4人分の出現位置。
-    /// コインの出現地点（空中。docs/12 T4-4）。
+    /// コインの出現地点（空中。docs/12 T4-4）と、拠点の候補の地点（T4-7）。
     /// 4人分のキャラクターとワイヤーの表示を置き、OnlineRunner が人数に合わせて表示する。
     /// 地形とギミックの配置と値はこのコードで決め、シーンは生成物として扱う【仮】。
     ///
@@ -100,28 +100,80 @@ namespace Degunatsu.Editor
             ("UpdraftRight", StageZoneKind.Updraft, new Vector2(13.5f, -8f), new Vector2(7f, 20f), Vector2.up, 45f, 10f),
         };
 
-        // コインの出現地点（基本は空中。取りにくい・危ない場所ほど高額）【仮】。
+        // コインの出現地点（基本は空中。1 枚はよく通る道に多く、3 枚・5 枚は取りにくい・危ない場所）【仮】。
+        // 拾われてから CoinSpawnIntervalTicks 後に、同じ地点に出直す（docs/12 3.5）。
         internal static readonly (Vector2 Position, int Value)[] CoinSpawns =
         {
-            // 中央のジャンプ台の上（打ち上がると取れる）。
-            (new Vector2(0f, 11f), 5),
-            // 左右の加速リングを抜けた先。
-            (new Vector2(-8f, 11f), 5),
-            (new Vector2(8f, 11f), 5),
-            // 最上段の足場の上。
-            (new Vector2(-7f, 23f), 10),
-            (new Vector2(7f, 23f), 10),
-            // 中央のリングのさらに上（ジャンプ台→リング→空中ジャンプ）。
-            (new Vector2(0f, 26f), 15),
-            // 外側の飛び石の横。
-            (new Vector2(-27.5f, 13f), 10),
-            (new Vector2(27.5f, 13f), 10),
-            // 島の間の上昇気流の下（落ちると危ない）。
-            (new Vector2(-13.5f, -6f), 15),
-            (new Vector2(13.5f, -6f), 15),
-            // ステージの外の近く（いちばん危ない）。
-            (new Vector2(-38f, 16f), 20),
-            (new Vector2(38f, 16f), 20),
+            // 中央のジャンプ台から真上へ（打ち上がると続けて取れる）。
+            (new Vector2(0f, 4f), 1),
+            (new Vector2(0f, 10f), 1),
+            (new Vector2(0f, 13f), 1),
+            // 中央の加速リングの上。
+            (new Vector2(0f, 20f), 1),
+            (new Vector2(0f, 23f), 1),
+            // 左右の島のジャンプ台の上。
+            (new Vector2(-20f, 6f), 1),
+            (new Vector2(-20f, 9f), 1),
+            (new Vector2(20f, 6f), 1),
+            (new Vector2(20f, 9f), 1),
+            // 左右の加速リングを抜けた先（中央へ向かう道）。
+            (new Vector2(-11f, 11.3f), 1),
+            (new Vector2(-7f, 10.5f), 1),
+            (new Vector2(-4f, 9f), 1),
+            (new Vector2(11f, 11.3f), 1),
+            (new Vector2(7f, 10.5f), 1),
+            (new Vector2(4f, 9f), 1),
+            // 中段の足場の上。
+            (new Vector2(-13f, 8.5f), 1),
+            (new Vector2(13f, 8.5f), 1),
+            // 外側の飛び石の上（跳んで渡ると続けて取れる）。
+            (new Vector2(-23.25f, 8.5f), 1),
+            (new Vector2(-27.75f, 12.5f), 1),
+            (new Vector2(-23.25f, 16.5f), 1),
+            (new Vector2(-17.75f, 20.5f), 1),
+            (new Vector2(23.25f, 8.5f), 1),
+            (new Vector2(27.75f, 12.5f), 1),
+            (new Vector2(23.25f, 16.5f), 1),
+            (new Vector2(17.75f, 20.5f), 1),
+            // 3 枚: 最上段の足場の上、島の間の上、左右の島の外側の端。
+            (new Vector2(-7f, 22.5f), 3),
+            (new Vector2(7f, 22.5f), 3),
+            (new Vector2(-13.5f, 3f), 3),
+            (new Vector2(13.5f, 3f), 3),
+            (new Vector2(-27f, 5f), 3),
+            (new Vector2(27f, 5f), 3),
+            // 5 枚: ステージのいちばん上、上昇気流の下（落ちると危ない）、ステージの外の近く、上の端。
+            (new Vector2(0f, 27f), 5),
+            (new Vector2(-13.5f, -8f), 5),
+            (new Vector2(13.5f, -8f), 5),
+            (new Vector2(-38f, 14f), 5),
+            (new Vector2(38f, 14f), 5),
+            (new Vector2(-14f, 28f), 5),
+            (new Vector2(14f, 28f), 5),
+        };
+
+        // 100 枚のコインの候補の地点（残り 1 分に、試合ごとの種で選んだ1つに出る。どこも遠いか危ない）【仮】。
+        internal static readonly Vector2[] JackpotSpots =
+        {
+            new Vector2(0f, 33f),
+            new Vector2(-40f, 4f),
+            new Vector2(40f, 4f),
+            new Vector2(-25f, 30f),
+            new Vector2(25f, 30f),
+            new Vector2(0f, -12f),
+        };
+
+        // 拠点の候補の地点（docs/12 T4-7）【仮】。最初は中央の島の上空（中央のジャンプ台で打ち上がると通る）。
+        // コインの出現地点と重ならないように置く（中に出たコインは、拾うとすぐ確定してしまうため）。
+        internal static readonly Vector2[] BankSpots =
+        {
+            new Vector2(0f, 8f),
+            new Vector2(-13.5f, 15f),
+            new Vector2(13.5f, 15f),
+            new Vector2(-27f, 16f),
+            new Vector2(27f, 16f),
+            new Vector2(-7f, 26f),
+            new Vector2(7f, 26f),
         };
 
         // ステージの範囲（外に出ると撃破）【仮】。
@@ -225,7 +277,8 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.SetReference(runner, "_audio", audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
-            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, runner);
+            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner);
+            SandboxWireSceneBuilder.CreateBank(BankSpots, runner);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

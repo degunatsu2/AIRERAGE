@@ -4,8 +4,8 @@ using Degunatsu.Core.Simulation;
 namespace Degunatsu.Core.Match
 {
     /// <summary>
-    /// 試合の順位（docs/12_match_plan.md T4-1）。今は仮の決め方【仮】: 撃破した数が多い順、同じなら撃破された数が少ない順、
-    /// それも同じなら番号の小さい順。コイン（T4-3 以降）ができたら、スコア（コイン）の順に置き換える（勝利条件。docs/01 1章）。
+    /// 試合の順位（docs/12_match_plan.md T4-1、T4-7）: スコア（確定コイン。D-25）が多い順。同じなら仮に【仮】、撃破した数が
+    /// 多い順、撃破された数が少ない順、番号の小さい順（同点のときのアディショナルタイムは T4-8 で作る。D-45）。
     /// 状態だけから決まるので、全員の画面で同じ順位になる。
     /// </summary>
     public static class MatchResults
@@ -36,6 +36,10 @@ namespace Degunatsu.Core.Match
         /// <summary>a が b より上の順位か。</summary>
         private static bool Before(in CharacterState a, int aIndex, in CharacterState b, int bIndex)
         {
+            if (a.Coins.Banked != b.Coins.Banked)
+            {
+                return a.Coins.Banked > b.Coins.Banked;
+            }
             if (a.Combat.Knockouts != b.Combat.Knockouts)
             {
                 return a.Combat.Knockouts > b.Combat.Knockouts;

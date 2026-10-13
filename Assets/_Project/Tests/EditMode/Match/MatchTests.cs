@@ -143,6 +143,19 @@ namespace Degunatsu.Core.Tests.Match
         }
 
         [Test]
+        public void Rank_ByBankedCoins_First()
+        {
+            // スコアは確定コインだけ（D-25）。所持コインは数えない。
+            var states = new CharacterState[3];
+            states[0].Combat.Knockouts = 5;
+            states[0].Coins.Held = 50;
+            states[1].Coins.Banked = 12;
+            states[2].Coins.Banked = 30;
+
+            Assert.That(MatchResults.Rank(states), Is.EqualTo(new[] { 2, 1, 0 }));
+        }
+
+        [Test]
         public void InvalidRules_AreRejected()
         {
             Assert.Throws<InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { DurationTicks = -1 }));

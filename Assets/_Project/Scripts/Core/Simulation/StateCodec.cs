@@ -97,6 +97,11 @@ namespace Degunatsu.Core.Simulation
                     writer.Write(coin.ExpireTick);
                     writer.Write(coin.Source);
                 }
+                writer.Write(coins.SpawnReadyTicks.Count);
+                foreach (int ready in coins.SpawnReadyTicks)
+                {
+                    writer.Write(ready);
+                }
                 writer.Write(coins.NextCoinId);
                 writer.Write(coins.Generated);
                 writer.Write(coins.Destroyed);

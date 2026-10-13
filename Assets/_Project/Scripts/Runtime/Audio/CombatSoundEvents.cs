@@ -81,7 +81,11 @@ namespace Degunatsu.Runtime.Audio
                 _audio.Play(SoundId.Knockout);
                 return;
             }
-            if (now.Coins.Held > before.Coins.Held)
+            if (now.Coins.Banked > before.Coins.Banked)
+            {
+                _audio.Play(SoundId.Bank);
+            }
+            else if (now.Coins.Held > before.Coins.Held)
             {
                 _audio.Play(SoundId.CoinPickup, 0.8f, 0.04f);
             }

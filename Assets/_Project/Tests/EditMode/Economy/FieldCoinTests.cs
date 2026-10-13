@@ -92,6 +92,107 @@ namespace Degunatsu.Core.Tests.Economy
         }
 
         [Test]
+        public void TheRespawnTime_CountsFromThePickup()
+        {
+            // 間隔ごとではなく、拾われてから数える（ユーザーの要望、2026-10-13）。
+            SimWorld world = World(Rules(interval: 60), Far);
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
+            Step(world, 30);
+            CharacterState state = world.GetState(0);
+            state.Position = new Vector3(Far.Position.X, Far.Position.Y, 0f);
+            world.SetState(0, state);
+            Step(world, 1);
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(10), "前提: ティック 31 で拾った");
+            state = world.GetState(0);
+            state.Position = new Vector3(0f, GroundY, 0f);
+            world.SetState(0, state);
+
+            Step(world, 59);
+            Assert.That(world.Coins.Field.Coins, Is.Empty, "拾われてから 60 ティックたつ前に出た");
+            Step(world, 1);
+            Assert.That(world.Coins.Field.Coins.Count, Is.EqualTo(1), "拾われてから 60 ティックで出ない");
+        }
+
+        private static readonly CoinSpawnPoint[] JackpotSpots =
+        {
+            new CoinSpawnPoint(new Vector2(-30f, 10f), 100, CoinSpawnKind.Jackpot),
+            new CoinSpawnPoint(new Vector2(30f, 10f), 100, CoinSpawnKind.Jackpot),
+            new CoinSpawnPoint(new Vector2(0f, 30f), 100, CoinSpawnKind.Jackpot),
+        };
+
+        private static int CountJackpots(SimWorld world)
+        {
+            int count = 0;
+            foreach (FieldCoin coin in world.Coins.Field.Coins)
+            {
+                count += coin.Value == 100 ? 1 : 0;
+            }
+            return count;
+        }
+
+        [Test]
+        public void TheJackpot_Appears_WhenOneMinuteIsLeft_Once()
+        {
+            var rules = new MatchRules { CountdownTicks = 0, DurationTicks = 600, JackpotTicksBeforeEnd = 120 };
+            var points = new List<CoinSpawnPoint>(JackpotSpots) { Far };
+            SimWorld world = World(rules, points.ToArray());
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
+
+            Step(world, 480);
+            Assert.That(CountJackpots(world), Is.EqualTo(0), "残り 1 分の前に出た（候補の地点がふつうに出た）");
+            Step(world, 1);
+            Assert.That(CountJackpots(world), Is.EqualTo(1), "残り 1 分で出ない");
+            FieldCoin jackpot = default;
+            foreach (FieldCoin coin in world.Coins.Field.Coins)
+            {
+                if (coin.Value == 100)
+                {
+                    jackpot = coin;
+                }
+            }
+
+            // 拾っても、もう出ない。
+            CharacterState state = world.GetState(0);
+            state.Position = new Vector3(jackpot.Position.X, jackpot.Position.Y, 0f);
+            world.SetState(0, state);
+            Step(world, 1);
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(100));
+            Step(world, 110);
+            Assert.That(CountJackpots(world), Is.EqualTo(0), "100 枚のコインが2回出た");
+        }
+
+        [Test]
+        public void TheJackpotSpot_DependsOnTheSeed()
+        {
+            var spots = new HashSet<Vector2>();
+            for (int seed = 0; seed < 30; seed++)
+            {
+                var rules = new MatchRules { CountdownTicks = 0, DurationTicks = 20, JackpotTicksBeforeEnd = 10, Seed = seed };
+                SimWorld world = World(rules, JackpotSpots);
+                world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
+                Step(world, 11);
+                Assert.That(world.Coins.Field.Coins.Count, Is.EqualTo(1), $"種 {seed} で出ない");
+                spots.Add(world.Coins.Field.Coins[0].Position);
+
+                SimWorld again = World(rules, JackpotSpots);
+                again.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
+                Step(again, 11);
+                Assert.That(again.Coins.Field.Coins[0].Position, Is.EqualTo(world.Coins.Field.Coins[0].Position), "同じ種で場所が違う");
+            }
+            Assert.That(spots.Count, Is.GreaterThanOrEqualTo(2), "種を変えても、いつも同じ場所");
+        }
+
+        [Test]
+        public void WithoutATimeLimit_TheJackpotNeverAppears()
+        {
+            SimWorld world = World(Rules(), JackpotSpots);
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
+            Step(world, 1000);
+
+            Assert.That(world.Coins.Field.Coins, Is.Empty);
+        }
+
+        [Test]
         public void TheClosestCharacter_PicksUpTheCoin()
         {
             SimWorld world = World(Rules(), new CoinSpawnPoint(new Vector2(0.3f, 1f), 5));

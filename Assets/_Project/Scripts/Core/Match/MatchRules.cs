@@ -17,7 +17,7 @@ namespace Degunatsu.Core.Match
     }
 
     /// <summary>
-    /// 試合のルール（docs/12_match_plan.md T4-1、T4-2）。値はすべて【仮】（docs/01_game_design.md 1章、2章、6.8）。
+    /// 試合のルール（docs/12_match_plan.md T4-1、T4-2、T4-4、T4-7）。値はすべて【仮】（docs/01_game_design.md 1章、2章、6.8）。
     /// 試合の段階はティック数だけから決まる（状態を持たないので、巻き戻しても全員で同じになる）。
     /// オンラインでは、ホストが試合の開始のときに全員へ送る。
     /// </summary>
@@ -36,8 +36,26 @@ namespace Degunatsu.Core.Match
         /// <summary>復帰した後の無敵（ティック）。攻撃を受けない。自分が攻撃を出すと、そこで無敵が終わる【仮】。</summary>
         public int InvincibleTicks = 90;
 
-        /// <summary>コインが出現する間隔（ティック。docs/12 T4-4）。試合が始まったティックと、その後この間隔ごとに、コインが残っていない出現地点に出す。</summary>
+        /// <summary>
+        /// コインが拾われてから、同じ出現地点にまた出るまで（ティック。docs/12 T4-4）。試合が始まったときは全部の地点に出す。
+        /// 拾われてから数える（ユーザーの要望、2026-10-13）。
+        /// </summary>
         public int CoinSpawnIntervalTicks = 600;
+
+        /// <summary>100 枚のコイン（候補の地点の1つ）が出る、試合の残り（ティック。残り 1 分。ユーザーの要望）。時間の制限がなければ出ない。</summary>
+        public int JackpotTicksBeforeEnd = 3600;
+
+        /// <summary>拠点（バンク。docs/12 T4-7）が次の地点へ移る間隔（ティック。40 秒）【仮】。試合が始まってから数える。</summary>
+        public int BankMoveIntervalTicks = 2400;
+
+        /// <summary>拠点が移る何ティック前から、次の地点を予告するか（10 秒）【仮】。表示だけに使う。</summary>
+        public int BankNoticeTicks = 600;
+
+        /// <summary>拠点の円の半径（m）【仮】。キャラクターの箱が触れていれば、所持コインを確定する。</summary>
+        public float BankRadius = 2f;
+
+        /// <summary>試合ごとの乱数の種（100 枚のコインの場所、拠点の移動先を選ぶ。ホストが試合を始めるたびに決めて全員へ送る）。</summary>
+        public int Seed;
 
         /// <summary>コインを拾える距離（m。キャラクターの箱をこれだけ広げて、コインの中心が入れば拾う）。</summary>
         public float CoinPickupRadius = 0.7f;
@@ -46,6 +64,12 @@ namespace Degunatsu.Core.Match
         public static MatchRules FreePlay()
         {
             return new MatchRules { CountdownTicks = 0, DurationTicks = 0 };
+        }
+
+        /// <summary>同じ値の写し（ホストが種や時間の制限だけを変えて送るときに使う）。</summary>
+        public MatchRules Clone()
+        {
+            return (MatchRules)MemberwiseClone();
         }
 
         /// <summary>時間の制限があるか。</summary>
@@ -90,6 +114,10 @@ namespace Degunatsu.Core.Match
             v.NonNegative(nameof(InvincibleTicks), InvincibleTicks);
             v.Positive(nameof(CoinSpawnIntervalTicks), CoinSpawnIntervalTicks);
             v.Positive(nameof(CoinPickupRadius), CoinPickupRadius);
+            v.NonNegative(nameof(JackpotTicksBeforeEnd), JackpotTicksBeforeEnd);
+            v.Positive(nameof(BankMoveIntervalTicks), BankMoveIntervalTicks);
+            v.NonNegative(nameof(BankNoticeTicks), BankNoticeTicks);
+            v.Positive(nameof(BankRadius), BankRadius);
             return v;
         }
     }

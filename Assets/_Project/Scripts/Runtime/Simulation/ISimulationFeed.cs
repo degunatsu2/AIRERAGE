@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Degunatsu.Core.Economy;
 using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
@@ -37,6 +38,9 @@ namespace Degunatsu.Runtime.Simulation
 
         /// <summary>フィールドのコイン（始まっていなければ null）。</summary>
         CoinField Coins { get; }
+
+        /// <summary>拠点の候補の地点（番号の順。始まっていなければ空）。今の拠点は BankRules.SpotAt(Rules, BankSpots.Count, CurrentTick)。</summary>
+        IReadOnlyList<BankSpot> BankSpots { get; }
 
         /// <summary>
         /// シミュレーションが進んだときに通知する。1回の通知で進んだティックの数は決まっていない（オンラインでは、

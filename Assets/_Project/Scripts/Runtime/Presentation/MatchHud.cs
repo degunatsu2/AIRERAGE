@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Combat;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
@@ -307,7 +306,7 @@ namespace Degunatsu.Runtime.Presentation
 
         private void DrawResults()
         {
-            float width = 560f;
+            float width = 640f;
             bool buttons = _matchControls != null;
             float height = 110f + Ranking.Count * 44f + (buttons ? 64f : 0f);
             var area = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
@@ -318,15 +317,15 @@ namespace Degunatsu.Runtime.Presentation
             for (int i = 0; i < Ranking.Count; i++)
             {
                 int index = Ranking[i];
-                CombatState combat = _feed.GetState(index).Combat;
+                CharacterState state = _feed.GetState(index);
                 string mark = index == local ? ">" : " ";
-                string text = $"{mark}{i + 1}.  {_feed.LabelOf(index),-8}  KO {combat.Knockouts,2}   Fall {combat.Falls,2}";
+                string text = $"{mark}{i + 1}.  {_feed.LabelOf(index),-8}  {state.Coins.Banked,4} COIN   KO {state.Combat.Knockouts,2}  Fall {state.Combat.Falls,2}";
                 Shadowed(new Rect(area.x + 40f, area.y + 60f + i * 44f, width - 60f, 40f), text, _row, i == 0 ? new Color(1f, 0.9f, 0.4f) : Color.white);
             }
-            // 順位は撃破の数で仮に決めている（コインができたら、確定コインの数で決める。D-25）。
+            // 順位は確定コインの数（D-25）。同じなら仮に撃破の数（同点のアディショナルタイムは T4-8。D-45）。
             GUI.color = new Color(0.8f, 0.8f, 0.85f);
             float noteY = area.y + 64f + Ranking.Count * 44f;
-            GUI.Label(new Rect(area.x + 20f, noteY, width - 40f, 28f), "Ranked by KO, then fewer falls (until coins are added)");
+            GUI.Label(new Rect(area.x + 20f, noteY, width - 40f, 28f), "Ranked by banked coins (ties: KO, then fewer falls)");
             if (!buttons)
             {
                 return;

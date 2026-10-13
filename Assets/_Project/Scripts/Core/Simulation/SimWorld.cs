@@ -26,9 +26,17 @@ namespace Degunatsu.Core.Simulation
         /// <param name="zones">ステージのギミック（ジャンプ台など）。渡した順によらず、決まった順（StageZone.CompareTo）に並べて効かせる。</param>
         /// <param name="rules">試合のルール（カウントダウン、制限時間、復帰、コインの出現。docs/12）。null なら MatchRules.FreePlay()。不正なら InvalidTuningException。</param>
         /// <param name="coinSpawns">コインの出現地点（docs/12 T4-4）。渡した順によらず、決まった順（CoinSpawnPoint.CompareTo）に並べて番号をつける。</param>
+        /// <param name="bankSpots">拠点の候補の地点（docs/12 T4-7）。渡した順によらず、決まった順（BankSpot.CompareTo）に並べて番号をつける。</param>
         public SimWorld(ICollisionQuery collision, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null, MatchRules rules = null,
-            IReadOnlyList<CoinSpawnPoint> coinSpawns = null)
+            IReadOnlyList<CoinSpawnPoint> coinSpawns = null, IReadOnlyList<BankSpot> bankSpots = null)
         {
+            var banks = new List<BankSpot>();
+            if (bankSpots != null)
+            {
+                banks.AddRange(bankSpots);
+                banks.Sort((a, b) => a.CompareTo(b));
+            }
+            BankSpots = banks;
             var spawnPoints = new List<CoinSpawnPoint>();
             if (coinSpawns != null)
             {
@@ -64,6 +72,9 @@ namespace Degunatsu.Core.Simulation
 
         /// <summary>コインの出現地点（番号の順）。</summary>
         public IReadOnlyList<CoinSpawnPoint> CoinSpawns { get; }
+
+        /// <summary>拠点の候補の地点（番号の順。先頭が試合の始まりの拠点）。今の拠点は BankRules.SpotAt(Rules, BankSpots.Count, Tick)。</summary>
+        public IReadOnlyList<BankSpot> BankSpots { get; }
 
         /// <summary>次に進めるティックの、試合の段階（ティック数だけから決まる）。</summary>
         public MatchPhase Phase => Rules.PhaseAt(Tick);
@@ -148,7 +159,8 @@ namespace Degunatsu.Core.Simulation
         /// <summary>
         /// 1ティック進める。inputs はキャラクターの番号順で、数が一致しなければ ArgumentException。
         /// 全員を進めた後に、攻撃の命中を決めて当て（HitResolver）、ステージの外に出たキャラクターを撃破にする（KnockoutResolver）。
-        /// 最後に、フィールドのコインの出現・拾得・消滅を決める（FieldCoinRules。docs/12 T4-4）。
+        /// 最後に、フィールドのコインの出現・拾得・消滅を決め（FieldCoinRules。docs/12 T4-4）、拠点に触れている人の所持コインを
+        /// 確定する（BankRules。T4-7）。
         /// 試合の段階（Phase）がカウントダウンの間は入力を無視し、終わった後は全員を止める（ティック数だけ進める）。
         /// </summary>
         public void Step(IReadOnlyList<PlayerInput> inputs)
@@ -184,6 +196,7 @@ namespace Degunatsu.Core.Simulation
                 KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules);
             }
             FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, phase == MatchPhase.Playing);
+            BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, phase == MatchPhase.Playing);
         }
 
         private static void ValidateConfig(CharacterConfig config)
