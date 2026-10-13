@@ -76,6 +76,15 @@ namespace Degunatsu.Core.Combat
         /// <summary>ヒットストップ中に押したジャンプ。止まりが解けたティックに押したとみなす（先行入力。攻撃は AttackBufferTicksLeft）。</summary>
         public InputButtons HitstopPresses;
 
+        /// <summary>撃破されてから復帰するまでの残り（ティック。docs/12 T4-2）。0 より大きい間は出現位置で待ち、動かず、攻撃も受けない。</summary>
+        public int RespawnTicksLeft;
+
+        /// <summary>無敵の残り（ティック。攻撃を受けない）。復帰を待つ間と、復帰した後の MatchRules.InvincibleTicks の間。</summary>
+        public int InvincibleTicksLeft;
+
+        /// <summary>撃破されて、復帰を待っているか。</summary>
+        public bool IsWaitingToRespawn => RespawnTicksLeft > 0;
+
         public bool Equals(CombatState other)
         {
             return HitstopTicksLeft == other.HitstopTicksLeft
@@ -97,7 +106,9 @@ namespace Degunatsu.Core.Combat
                 && FatalHitCount == other.FatalHitCount
                 && JustGuardCount == other.JustGuardCount
                 && GuardedCount == other.GuardedCount
-                && HitstopPresses == other.HitstopPresses;
+                && HitstopPresses == other.HitstopPresses
+                && RespawnTicksLeft == other.RespawnTicksLeft
+                && InvincibleTicksLeft == other.InvincibleTicksLeft;
         }
 
         public override bool Equals(object obj)
@@ -110,14 +121,15 @@ namespace Degunatsu.Core.Combat
             return HashCode.Combine(
                 HashCode.Combine(HitstopTicksLeft, HasLastAttacker, LastAttacker, LastDamagedTick, ComboCount, ComboDamage, Knockouts, Falls),
                 HashCode.Combine(AttackCancelUsed, WireCancelCooldownTicksLeft, AttackBufferTicksLeft, BufferedAirAttack, BufferedFacing),
-                HashCode.Combine(Gauge, GuardCooldownTicksLeft, BounceCount, FatalHitCount, JustGuardCount, GuardedCount, HitstopPresses));
+                HashCode.Combine(Gauge, GuardCooldownTicksLeft, BounceCount, FatalHitCount, JustGuardCount, GuardedCount, HitstopPresses),
+                HashCode.Combine(RespawnTicksLeft, InvincibleTicksLeft));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAirAttack},{BufferedFacing}) gauge={Gauge} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAirAttack},{BufferedFacing}) gauge={Gauge} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft}";
         }
     }
 }

@@ -17,6 +17,7 @@ namespace Degunatsu.Core.Simulation
     /// キャンセル（攻撃→ジャンプ、攻撃→ワイヤー）で Free に戻ったティックは、入力をそのまま使い、このティックにジャンプ・射出する。
     /// ヒットストップの間は、何も進めずに止まる（ボタンの前の状態も変えないので、押し続けたボタンは止まりが解けてから効く。
     /// 止まっている間に押して離した攻撃（押したときの向き）とジャンプも、止まりが解けてから効く）。
+    /// 撃破されて復帰を待っている間も、何も進めない（docs/12 T4-2）。
     /// </summary>
     public sealed class CharacterSimulator
     {
@@ -38,6 +39,14 @@ namespace Degunatsu.Core.Simulation
 
         public void Step(ref CharacterState state, PlayerInput input, CharacterConfig config)
         {
+            if (state.Combat.IsWaitingToRespawn)
+            {
+                // 撃破されて復帰を待っている間は動かない（ボタンの前の状態だけ更新し、待ち終わった直後に押したとみなさない）。
+                state.Combat.RespawnTicksLeft--;
+                CountDownInvincibility(ref state);
+                state.PreviousButtons = input.Buttons;
+                return;
+            }
             if (state.Combat.HitstopTicksLeft > 0)
             {
                 state.Combat.HitstopTicksLeft--;
@@ -56,7 +65,13 @@ namespace Degunatsu.Core.Simulation
                 UpdateFacing(ref state, frame, movement);
             }
 
+            CountDownInvincibility(ref state);
             ActionController.Update(ref state, frame, config);
+            if (state.Action.Kind == ActionKind.Attack)
+            {
+                // 復帰した後の無敵は、自分が攻撃を出すと終わる【仮】（無敵のまま一方的に攻撃できないように）。
+                state.Combat.InvincibleTicksLeft = 0;
+            }
             if (!state.Action.IsFree)
             {
                 frame = new InputFrame(ActionController.ControlInput(state, effectiveInput), state.PreviousButtons);
@@ -126,6 +141,14 @@ namespace Degunatsu.Core.Simulation
             if (bounced)
             {
                 state.Combat.BounceCount++;
+            }
+        }
+
+        private static void CountDownInvincibility(ref CharacterState state)
+        {
+            if (state.Combat.InvincibleTicksLeft > 0)
+            {
+                state.Combat.InvincibleTicksLeft--;
             }
         }
 

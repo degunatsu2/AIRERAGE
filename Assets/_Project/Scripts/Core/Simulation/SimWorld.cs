@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Degunatsu.Core.Combat;
 using Degunatsu.Core.Input;
+using Degunatsu.Core.Match;
 using Degunatsu.Core.Physics;
 
 namespace Degunatsu.Core.Simulation
@@ -21,8 +22,11 @@ namespace Degunatsu.Core.Simulation
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
         /// <param name="zones">ステージのギミック（ジャンプ台など）。渡した順によらず、決まった順（StageZone.CompareTo）に並べて効かせる。</param>
-        public SimWorld(ICollisionQuery collision, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null)
+        /// <param name="rules">試合のルール（カウントダウン、制限時間、復帰。docs/12）。null なら MatchRules.FreePlay()。不正なら InvalidTuningException。</param>
+        public SimWorld(ICollisionQuery collision, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null, MatchRules rules = null)
         {
+            Rules = rules ?? MatchRules.FreePlay();
+            Rules.Validate().ThrowIfInvalid();
             var sorted = new List<StageZone>();
             if (zones != null)
             {
@@ -39,6 +43,12 @@ namespace Degunatsu.Core.Simulation
 
         /// <summary>ステージのギミック（効かせる順）。</summary>
         public IReadOnlyList<StageZone> Zones { get; }
+
+        /// <summary>試合のルール。</summary>
+        public MatchRules Rules { get; }
+
+        /// <summary>次に進めるティックの、試合の段階（ティック数だけから決まる）。</summary>
+        public MatchPhase Phase => Rules.PhaseAt(Tick);
 
         /// <summary>直前の Step で当たった命中（表示とデバッグ用。状態ではないので、巻き戻しでは戻らない）。</summary>
         public IReadOnlyList<HitRecord> LastHits => _hits.LastHits;
@@ -119,6 +129,7 @@ namespace Degunatsu.Core.Simulation
         /// <summary>
         /// 1ティック進める。inputs はキャラクターの番号順で、数が一致しなければ ArgumentException。
         /// 全員を進めた後に、攻撃の命中を決めて当て（HitResolver）、ステージの外に出たキャラクターを撃破にする（KnockoutResolver）。
+        /// 試合の段階（Phase）がカウントダウンの間は入力を無視し、終わった後は全員を止める（ティック数だけ進める）。
         /// </summary>
         public void Step(IReadOnlyList<PlayerInput> inputs)
         {
@@ -132,17 +143,24 @@ namespace Degunatsu.Core.Simulation
                     $"入力の数（{inputs.Count}）がキャラクターの数（{_states.Count}）と一致しません", nameof(inputs));
             }
 
+            MatchPhase phase = Phase;
+            if (phase == MatchPhase.Finished)
+            {
+                _hits.Clear();
+                Tick++;
+                return;
+            }
             for (int i = 0; i < _states.Count; i++)
             {
                 CharacterState state = _states[i];
-                _simulator.Step(ref state, inputs[i], _configs[i]);
+                _simulator.Step(ref state, phase == MatchPhase.Countdown ? default : inputs[i], _configs[i]);
                 _states[i] = state;
             }
             Tick++;
             _hits.Resolve(_states, _configs, Tick);
             if (Bounds.HasValue)
             {
-                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value);
+                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules);
             }
         }
 

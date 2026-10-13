@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Degunatsu.Core.Common;
 using Degunatsu.Core.Input;
+using Degunatsu.Core.Match;
 using Degunatsu.Core.Physics;
 using Degunatsu.Core.Rollback;
 using Degunatsu.Core.Simulation;
@@ -55,6 +57,8 @@ namespace Degunatsu.Net
         [SerializeField] private RollbackSettings _rollback = new RollbackSettings();
         [Tooltip("巻き戻しで位置が飛んだときの表示の補正（すべて【仮】）")]
         [SerializeField] private CorrectionSmoothingSettings _smoothing = new CorrectionSmoothingSettings();
+        [Tooltip("試合のルール（すべて【仮】。docs/12）。ホストのものを全員が使う。ロビーで「Timed match」を外すと時間の制限なし")]
+        [SerializeField] private MatchRules _match = new MatchRules();
 
         // 遅延の模擬の選択肢（docs/10_online_plan.md T2-9 の評価の条件）。自分が送る側の遅延なので、往復はこの2倍。
         private static readonly (string Label, int DelayMs, int JitterMs)[] DelayPresets =
@@ -73,6 +77,7 @@ namespace Degunatsu.Net
         private OnlineStage _stage;
         private int _notifiedTick = -1;
         private bool _showDetails;
+        private bool _timedMatch = true;
         private GUIStyle _scoreStyle;
         private InputSystemAdapter _input;
         private OnlineSession _session;
@@ -100,6 +105,8 @@ namespace Degunatsu.Net
         CharacterState ISimulationFeed.GetState(int index) => _session.World.GetState(index);
         CharacterConfig ISimulationFeed.GetConfig(int index) => _session.World.GetConfig(index);
         string ISimulationFeed.LabelOf(int index) => $"P{index + 1}";
+        int ISimulationFeed.CurrentTick => Running ? _session.World.Tick : 0;
+        MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
 
         /// <summary>ホストとして待ち受ける（port が 0 なら空いているポート）。失敗したら false で、理由を画面に出す。</summary>
         public bool StartHost(ushort port)
@@ -113,10 +120,32 @@ namespace Degunatsu.Net
             return Open(() => OnlineSession.Join(address, port, _stage, _rollback));
         }
 
-        /// <summary>試合を始める（ホストのみ）。</summary>
+        /// <summary>試合を始める（ホストのみ）。ロビーの選択で、時間の制限ありか、なしか。</summary>
         public void StartMatch()
         {
-            _session.StartMatch();
+            _session.StartMatch(_timedMatch ? _match : FreePlay(_match));
+        }
+
+        /// <summary>ホストが使う試合のルール（値はシーンの設定。テストで短くするのに使う）。</summary>
+        public MatchRules HostRules => _match;
+
+        /// <summary>時間の制限ありで始めるか（ホストのロビーの選択。テスト用に公開）。</summary>
+        public bool TimedMatch
+        {
+            get => _timedMatch;
+            set => _timedMatch = value;
+        }
+
+        // 時間の制限だけをなくしたルール（カウントダウンと復帰は同じ）。
+        private static MatchRules FreePlay(MatchRules rules)
+        {
+            return new MatchRules
+            {
+                CountdownTicks = rules.CountdownTicks,
+                DurationTicks = 0,
+                RespawnDelayTicks = rules.RespawnDelayTicks,
+                InvincibleTicks = rules.InvincibleTicks,
+            };
         }
 
         /// <summary>セッションを閉じて、最初の画面に戻る。</summary>
@@ -148,6 +177,7 @@ namespace Degunatsu.Net
             }
             _rollback.Validate();
             _smoothing.Validate();
+            _match.Validate().ThrowIfInvalid();
 
             // 複数のプレイヤーを同じ PC で動かすとき（Multiplayer Play Mode）、操作していないウィンドウも止めない。
             Application.runInBackground = true;
@@ -457,6 +487,8 @@ namespace Degunatsu.Net
             if (_session.IsHost && _session.State == OnlineSession.SessionState.Lobby)
             {
                 GUILayout.Label($"Players: {_session.LobbyPlayerCount} / {OnlineSession.MaxPlayers}", _style);
+                int seconds = _match.DurationTicks / SimTime.TicksPerSecond;
+                _timedMatch = GUILayout.Toggle(_timedMatch, $"Timed match ({seconds / 60}:{seconds % 60:00}). Off = free play");
                 if (GUILayout.Button("Start"))
                 {
                     StartMatch();

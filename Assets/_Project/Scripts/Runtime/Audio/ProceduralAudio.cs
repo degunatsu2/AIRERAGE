@@ -48,6 +48,15 @@ namespace Degunatsu.Runtime.Audio
 
         /// <summary>加速リングで加速した（風を切って加速する音）。</summary>
         Boost,
+
+        /// <summary>試合の始まる前のカウントダウン（3, 2, 1 の短い電子音）。</summary>
+        CountdownBeep,
+
+        /// <summary>試合の開始（GO!。高く明るい音）。</summary>
+        Go,
+
+        /// <summary>試合の終了（FINISH!。下がっていく和音）。</summary>
+        Finish,
     }
 
     /// <summary>
@@ -192,6 +201,25 @@ namespace Degunatsu.Runtime.Audio
                     AddNoise(b, r, rng, 0f, 0.42f, 0.6f, 0.01f, 0.18f, 800f, 6000f, 500f);
                     AddTone(b, r, 0f, 0.35f, NoteFrequency(72), NoteFrequency(84), Wave.Pulse25, 0.18f, 0.005f, 0.12f);
                     AddTone(b, r, 0.06f, 0.3f, NoteFrequency(79), NoteFrequency(91), Wave.Pulse25, 0.14f, 0.005f, 0.1f);
+                    break;
+                case SoundId.CountdownBeep:
+                    b = new float[Samples(0.25f, r)];
+                    AddTone(b, r, 0f, 0.22f, NoteFrequency(81), NoteFrequency(81), Wave.Square, 0.35f, 0.002f, 0.08f);
+                    break;
+                case SoundId.Go:
+                    b = new float[Samples(0.7f, r)];
+                    AddTone(b, r, 0f, 0.65f, NoteFrequency(93), NoteFrequency(93), Wave.Square, 0.35f, 0.002f, 0.25f);
+                    AddTone(b, r, 0f, 0.65f, NoteFrequency(88), NoteFrequency(88), Wave.Pulse25, 0.2f, 0.002f, 0.25f);
+                    break;
+                case SoundId.Finish:
+                    b = new float[Samples(1.3f, r)];
+                    int[] chord = { 84, 79, 76, 72 }; // C6 G5 E5 C5 を順に下がる
+                    for (int i = 0; i < chord.Length; i++)
+                    {
+                        float f = NoteFrequency(chord[i]);
+                        AddTone(b, r, i * 0.12f, 0.9f, f, f, Wave.Triangle, 0.4f, 0.003f, 0.35f);
+                        AddTone(b, r, i * 0.12f, 0.6f, f * 2f, f * 2f, Wave.Pulse25, 0.1f, 0.003f, 0.2f);
+                    }
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

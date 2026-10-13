@@ -1,4 +1,5 @@
 using System;
+using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
 
 namespace Degunatsu.Runtime.Simulation
@@ -22,6 +23,12 @@ namespace Degunatsu.Runtime.Simulation
 
         /// <summary>表示用の名前（"DUMMY 1"、"P2" など）。</summary>
         string LabelOf(int index);
+
+        /// <summary>これまでに進めたティック数（試合の段階と残り時間を、Rules から求めるのに使う）。</summary>
+        int CurrentTick { get; }
+
+        /// <summary>試合のルール（始まっていなければ null）。</summary>
+        MatchRules Rules { get; }
 
         /// <summary>
         /// シミュレーションが進んだときに通知する。1回の通知で進んだティックの数は決まっていない（オンラインでは、

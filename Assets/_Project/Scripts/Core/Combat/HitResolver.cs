@@ -40,6 +40,12 @@ namespace Degunatsu.Core.Combat
         /// </summary>
         public IReadOnlyList<HitRecord> LastHits => _hits;
 
+        /// <summary>LastHits を空にする（命中を決めないティック。試合が終わった後など）。</summary>
+        public void Clear()
+        {
+            _hits.Clear();
+        }
+
         /// <summary>このティックの命中を決めて当てる。tick は進めた後のティック（記録に使う）。</summary>
         public void Resolve(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick)
         {
@@ -70,7 +76,8 @@ namespace Degunatsu.Core.Combat
                     Hitbox(attacker, hitData, out Vector2 center, out Vector2 half);
                     for (int v = 0; v < states.Count; v++)
                     {
-                        if (v == a || (attacker.Action.HitMask & HitBit(h, v)) != 0)
+                        // 無敵（復帰を待つ間と、復帰した後。docs/12 T4-2）の相手には当たらない。
+                        if (v == a || (attacker.Action.HitMask & HitBit(h, v)) != 0 || states[v].Combat.InvincibleTicksLeft > 0)
                         {
                             continue;
                         }

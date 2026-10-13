@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Input;
+using Degunatsu.Core.Match;
 using Degunatsu.Core.Physics;
 using Degunatsu.Core.Rollback;
 using Degunatsu.Core.Simulation;
@@ -190,16 +191,21 @@ namespace Degunatsu.Net
             return spawnBase + new NVector3((player - (playerCount - 1) * 0.5f) * OnlineStage.SpawnSpacing, 0f, 0f);
         }
 
-        /// <summary>試合を始める（ホストのみ、ロビーで）。今いる全員で始める。</summary>
-        public void StartMatch()
+        /// <summary>
+        /// 試合を始める（ホストのみ、ロビーで）。今いる全員で始める。rules は試合のルール（null なら時間の制限なし。
+        /// MatchRules.FreePlay()）で、調整値といっしょに全員へ送る。不正なら InvalidTuningException。
+        /// </summary>
+        public void StartMatch(MatchRules rules = null)
         {
             if (!IsHost || State != SessionState.Lobby)
             {
                 throw new InvalidOperationException("試合を始められるのは、ロビーにいるホストだけです");
             }
+            rules = rules ?? MatchRules.FreePlay();
+            rules.Validate().ThrowIfInvalid();
             int count = LobbyPlayerCount;
-            // ホストも送ったものと同じ JSON から作った調整値を使う（全員が同じ値になり、試合中にアセットを編集しても影響しない）。
-            string json = JsonUtility.ToJson(_hostConfig);
+            // ホストも送ったものと同じ JSON から作った値を使う（全員が同じ値になり、試合中にアセットを編集しても影響しない）。
+            string json = JsonUtility.ToJson(new StartSettings { Character = _hostConfig, Match = rules });
             byte[] start = NetMessages.Start(count, json);
             for (int p = 1; p < MaxPlayers; p++)
             {
@@ -208,7 +214,7 @@ namespace Degunatsu.Net
                     _link.Send(_playerPeer[p], start, reliable: true);
                 }
             }
-            Begin(count, ConfigFromJson(json));
+            Begin(count, SettingsFromJson(json));
         }
 
         /// <summary>
@@ -381,13 +387,13 @@ namespace Degunatsu.Net
             }
         }
 
-        private void Begin(int playerCount, CharacterConfig config)
+        private void Begin(int playerCount, StartSettings settings)
         {
             PlayerCount = playerCount;
-            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones);
+            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match);
             for (int p = 0; p < playerCount; p++)
             {
-                World.AddCharacter(config, _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));
+                World.AddCharacter(settings.Character, _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));
             }
             Session = new RollbackSession(World, LocalPlayer, _settings);
             Exchange = new InputExchange(Session, _settings);
@@ -529,7 +535,7 @@ namespace Degunatsu.Net
                             break;
                         case NetKind.Start:
                             NetMessages.ReadStart(e.Data, out int count, out string json);
-                            Begin(count, ConfigFromJson(json));
+                            Begin(count, SettingsFromJson(json));
                             break;
                         case NetKind.Input:
                             if (State == SessionState.Running && NetMessages.InputTarget(e.Data) == LocalPlayer)
@@ -554,12 +560,21 @@ namespace Degunatsu.Net
             }
         }
 
-        private static CharacterConfig ConfigFromJson(string json)
+        private static StartSettings SettingsFromJson(string json)
         {
-            var config = new CharacterConfig();
-            JsonUtility.FromJsonOverwrite(json, config);
-            config.Validate();
-            return config;
+            var settings = new StartSettings { Character = new CharacterConfig(), Match = new MatchRules() };
+            JsonUtility.FromJsonOverwrite(json, settings);
+            settings.Character.Validate();
+            settings.Match.Validate().ThrowIfInvalid();
+            return settings;
+        }
+
+        /// <summary>試合の開始のときに、ホストが全員へ送る値（調整値と試合のルール）。</summary>
+        [Serializable]
+        private sealed class StartSettings
+        {
+            public CharacterConfig Character;
+            public MatchRules Match;
         }
 
         private int FreePlayer()

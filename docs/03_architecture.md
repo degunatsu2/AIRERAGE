@@ -81,11 +81,11 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Core/Rollback | ロールバックの層（入力の管理、入力遅延、予測、巻き戻しと再計算、確定ティック）と入力の送受信の規則（冗長送信、確認応答、メッセージのバイト列）。通信はしない。docs/10 | `RollbackSession`, `RollbackSettings`, `InputExchange`, `InputMessage`, `InputNormalizer`, `TimeSync`（状態の保存は Simulation の `WorldSnapshot`） | 2 |
 | Core/Combat | アクション状態（Free / Attack など）と遷移、攻撃のデータ（フレームデータ）、キャンセル規則、命中判定、ガード。docs/11 | `ActionController`, `ActionState`, `CombatState`, `CombatTuning`, `AttackData`（判定 `AttackHit` と動き `AttackMotion` の並び）, `HitResolver`, `KnockoutResolver`（ステージの外に出たら撃破） | 3 |
 | Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
-| Core/Match | 試合進行、タイマー、出現、復帰、勝敗 | `MatchRules`, `MatchState` | 4 |
+| Core/Match | 試合のルールと進行（カウントダウン、制限時間、終了。段階はティック数とルールだけから決まる）、復帰、順位。docs/12 | `MatchRules`（`PhaseAt` / `TicksLeftAt`）, `MatchResults` | 4 |
 | Runtime/Simulation | ティックループ、シーンの地形・ステージの範囲・ギミックの読み込み、表示と効果音のための状態の読み取り口（オフラインとオンラインで共通） | `SimulationRunner`, `SceneTerrainBuilder`, `KnockoutBounds`, `StageZoneAuthoring`, `ISimulationFeed` | 1 |
 | Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
-| Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom`, `ChargeEffectView`, `RingGaugeView`, `GuardEffectView`, `BurstEffectView`, `ComboHud`, `StageZoneView`（ギミックの動く見た目） | 1 |
+| Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom`, `ChargeEffectView`, `RingGaugeView`, `GuardEffectView`, `BurstEffectView`, `ComboHud`, `StageZoneView`（ギミックの動く見た目）, `MatchHud`（カウントダウン、残り時間、結果、復帰までの秒数） | 1 |
 | Runtime/Audio | 仮の BGM と効果音（音声ファイルを使わず、その場で合成する。状態の変化から鳴らす。差し替え可能） | `GameAudio`, `ProceduralAudio`, `CombatSoundEvents` | 3 |
 | Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム）、入力の記録と再生 | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels`, `ReplayControls` | 1 |
 | Net | 通信路（Unity Transport。検証用の遅延の模擬つき）、セッション（参加、開始、入力の中継、不一致の検出）、試合のステージ（地形・出現位置・撃破の範囲・ギミック）、巻き戻しの表示の補正、オンラインの画面（撃破の数の表示） | `TransportLink`, `NetMessages`, `OnlineSession`, `OnlineStage`, `CorrectionSmoother`, `OnlineRunner` | 2 |

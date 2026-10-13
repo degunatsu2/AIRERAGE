@@ -213,8 +213,10 @@ namespace Degunatsu.Editor
             var courseTimer = new GameObject("CourseTimer").AddComponent<CourseTimerHud>();
             SetReference(courseTimer, "_runner", runner);
 
-            CreateDebugTools(runner, inputActions, CreateAudio(runner));
+            GameAudio audio = CreateAudio(runner);
+            CreateDebugTools(runner, inputActions, audio);
             CreateComboHud(runner);
+            CreateMatchHud(runner, audio);
 
             EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
@@ -328,6 +330,14 @@ namespace Degunatsu.Editor
         {
             var hud = new GameObject("ComboHud").AddComponent<ComboHud>();
             SetReference(hud, "_source", source);
+        }
+
+        /// <summary>試合の表示（カウントダウン、残り時間、結果、復帰までの秒数。docs/12）。source は ISimulationFeed。</summary>
+        internal static void CreateMatchHud(MonoBehaviour source, GameAudio audio)
+        {
+            var hud = new GameObject("MatchHud").AddComponent<MatchHud>();
+            SetReference(hud, "_source", source);
+            SetReference(hud, "_audio", audio);
         }
 
         /// <summary>ガードとジャストガードの表示（光る輪、広がる輪、光の筋。文字はシーンのカメラで画面に写す）。</summary>

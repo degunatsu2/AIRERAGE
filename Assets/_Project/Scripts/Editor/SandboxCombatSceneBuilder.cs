@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Degunatsu.Runtime.Audio;
 using Degunatsu.Runtime.Presentation;
 using Degunatsu.Runtime.Simulation;
 using UnityEditor;
@@ -127,8 +128,10 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.SetReferenceArray(runner, "_dummyViews", dummyViews);
 
             SandboxWireSceneBuilder.CreateMissIndicator(runner, camera);
-            SandboxWireSceneBuilder.CreateDebugTools(runner, inputActions, SandboxWireSceneBuilder.CreateAudio(runner));
+            GameAudio audio = SandboxWireSceneBuilder.CreateAudio(runner);
+            SandboxWireSceneBuilder.CreateDebugTools(runner, inputActions, audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
+            SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

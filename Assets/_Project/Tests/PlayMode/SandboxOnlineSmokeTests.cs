@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Linq;
+using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Net;
 using Degunatsu.Runtime.Audio;
@@ -155,6 +156,92 @@ namespace Degunatsu.PlayMode.Tests
             Assert.That(after.Combat.Falls, Is.EqualTo(1), "ステージの下に出ても撃破にならない");
             Assert.That(after.Position.Y, Is.GreaterThan(0f), "出現位置に戻っていない");
             Assert.That(audio.History.Contains(SoundId.Knockout), Is.True, "撃破の音が鳴らない");
+            runner.Leave();
+        }
+
+        [UnityTest]
+        public IEnumerator TimedMatch_CountsDown_Plays_AndFinishes_WithResults()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            var runner = Object.FindFirstObjectByType<OnlineRunner>();
+            var hud = Object.FindFirstObjectByType<MatchHud>();
+            var audio = Object.FindFirstObjectByType<GameAudio>();
+            Assert.That(hud, Is.Not.Null, "試合の表示がない");
+            // 短くする（カウントダウン 1 秒、試合 2 秒）。
+            runner.HostRules.CountdownTicks = 60;
+            runner.HostRules.DurationTicks = 120;
+            runner.TimedMatch = true;
+            runner.StartHost(0);
+            runner.StartMatch();
+
+            bool sawCount = false;
+            bool sawGo = false;
+            bool sawTimer = false;
+            bool sawFinish = false;
+            float start = Time.time;
+            while (!hud.ShowingResults && Time.time - start < 8f)
+            {
+                sawCount |= hud.CenterText == "1";
+                sawGo |= hud.CenterText == "GO!";
+                sawTimer |= hud.TimerText == "0:02" || hud.TimerText == "0:01";
+                sawFinish |= hud.CenterText == "FINISH!";
+                yield return null;
+            }
+
+            Assert.That(runner.Session.World.Phase, Is.EqualTo(MatchPhase.Finished), "試合が終わらない");
+            Assert.That(sawCount, Is.True, "カウントダウンが出ない");
+            Assert.That(sawGo, Is.True, "GO! が出ない");
+            Assert.That(sawTimer, Is.True, "残り時間が出ない");
+            Assert.That(sawFinish, Is.True, "FINISH! が出ない");
+            Assert.That(hud.ShowingResults, Is.True, "結果が出ない");
+            Assert.That(hud.Ranking, Is.EqualTo(new[] { 0 }));
+            Assert.That(audio.History.Contains(SoundId.CountdownBeep), Is.True);
+            Assert.That(audio.History.Contains(SoundId.Go), Is.True);
+            Assert.That(audio.History.Contains(SoundId.Finish), Is.True);
+            runner.Leave();
+            yield return null;
+            Assert.That(hud.ShowingResults, Is.False, "抜けた後も結果が出ている");
+        }
+
+        [UnityTest]
+        public IEnumerator KnockedOut_IsHidden_ShowsRespawn_ThenBlinks()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            var runner = Object.FindFirstObjectByType<OnlineRunner>();
+            var hud = Object.FindFirstObjectByType<MatchHud>();
+            runner.HostRules.CountdownTicks = 0;
+            runner.HostRules.RespawnDelayTicks = 60;
+            runner.HostRules.InvincibleTicks = 60;
+            runner.TimedMatch = false;
+            runner.StartHost(0);
+            runner.StartMatch();
+            yield return WaitSeconds(0.2f);
+
+            StageBounds bounds = runner.Stage.Bounds.Value;
+            CharacterState state = runner.Session.World.GetState(0);
+            state.Position = new System.Numerics.Vector3(0f, bounds.MinY + 0.5f, 0f);
+            state.Velocity = new System.Numerics.Vector3(0f, -10f, 0f);
+            runner.Session.World.SetState(0, state);
+            CharacterView view = Object.FindObjectsByType<CharacterView>(FindObjectsSortMode.None).First(v => v.gameObject.activeSelf);
+            yield return WaitSeconds(0.2f);
+
+            Assert.That(runner.Session.World.GetState(0).Combat.IsWaitingToRespawn, Is.True, "前提: 撃破されて待っている");
+            Assert.That(view.HiddenForRespawn, Is.True, "待っている間に見えている");
+            Assert.That(hud.CenterText, Does.StartWith("RESPAWN"), "復帰までの秒数が出ない");
+
+            // 待ち 1 秒と無敵 1 秒が終わるまで（余裕を見て 3 秒まで）見る。
+            float start = Time.time;
+            bool sawBlink = false;
+            while ((!sawBlink || view.Blinking || view.HiddenForRespawn) && Time.time - start < 3f)
+            {
+                sawBlink |= view.Blinking;
+                yield return null;
+            }
+            Assert.That(sawBlink, Is.True, "復帰した後の無敵で点滅しない");
+            Assert.That(view.HiddenForRespawn, Is.False);
+            Assert.That(view.Blinking, Is.False, "無敵が終わっても点滅している");
             runner.Leave();
         }
 

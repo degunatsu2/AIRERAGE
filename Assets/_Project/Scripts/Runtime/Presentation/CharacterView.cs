@@ -14,10 +14,14 @@ namespace Degunatsu.Runtime.Presentation
     /// ガード中・ジャストガードの成功は _guardEffect、ガードのクールタイムは _guardGauge で示す（T3-5。あれば）。
     /// 攻撃を受けた瞬間は火花（_hitSpark）、FATAL を受けた瞬間は虹色の光と「FATAL!」（_fatalBurst）、攻撃をワイヤーで
     /// キャンセルした瞬間は紫の光（_wireCancelBurst）を出す（T3-7。あれば）。ジャンプ台・加速リングが効いた瞬間は _gimmickBurst。
+    /// 撃破されて復帰を待っている間は見えなくし、復帰した後の無敵の間は点滅させる（docs/12 T4-2）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
     {
+        // 無敵の間の点滅の速さ（回/秒）。
+        private const float BlinkPerSecond = 10f;
+
         private enum Tint
         {
             None,
@@ -111,6 +115,12 @@ namespace Degunatsu.Runtime.Presentation
         public BurstEffectView BounceBurst => _bounceBurst;
         public BurstEffectView GimmickBurst => _gimmickBurst;
 
+        /// <summary>撃破されて復帰を待っているので、見えなくしているか。</summary>
+        public bool HiddenForRespawn { get; private set; }
+
+        /// <summary>無敵なので点滅させているか。</summary>
+        public bool Blinking { get; private set; }
+
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
             transform.position = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
@@ -126,6 +136,7 @@ namespace Degunatsu.Runtime.Presentation
             RenderWireCancelCooldown(current, combat);
             RenderGuard(current, combat);
             RenderBursts(current);
+            RenderVisibility(current);
             if (tint == _shown)
             {
                 return;
@@ -146,6 +157,17 @@ namespace Degunatsu.Runtime.Presentation
             }
             _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        private void RenderVisibility(in CharacterState state)
+        {
+            HiddenForRespawn = state.Combat.IsWaitingToRespawn;
+            Blinking = !HiddenForRespawn && state.Combat.InvincibleTicksLeft > 0;
+            if (_renderer == null && !TryGetComponent(out _renderer))
+            {
+                return;
+            }
+            _renderer.enabled = !HiddenForRespawn && !(Blinking && Mathf.Repeat(Time.time * BlinkPerSecond, 1f) >= 0.5f);
         }
 
         // 状態の変化（受けた時刻、FATAL を受けた数、ワイヤーキャンセルのクールタイムの始まり）から、一瞬の光を出す。

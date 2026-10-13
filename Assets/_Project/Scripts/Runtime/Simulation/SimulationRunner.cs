@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Degunatsu.Core.Combat;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Input;
+using Degunatsu.Core.Match;
 using Degunatsu.Core.Physics;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Core.Wire;
@@ -96,6 +97,7 @@ namespace Degunatsu.Runtime.Simulation
         CharacterState ISimulationFeed.GetState(int index) => _world.GetState(index);
         CharacterConfig ISimulationFeed.GetConfig(int index) => _world.GetConfig(index);
         string ISimulationFeed.LabelOf(int index) => index == _player ? "PLAYER" : $"DUMMY {index - _player}";
+        MatchRules ISimulationFeed.Rules => _world?.Rules;
 
         /// <summary>ステージの範囲があるか（外に出ると撃破になるか。T3-3）。</summary>
         public bool HasStageBounds => _world.Bounds.HasValue;

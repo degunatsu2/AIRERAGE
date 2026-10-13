@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
 using Degunatsu.Core.Input;
+using Degunatsu.Core.Match;
 using Degunatsu.Core.Physics;
 using Degunatsu.Core.Rollback;
 using Degunatsu.Core.Simulation;
@@ -170,6 +171,37 @@ namespace Degunatsu.Net.Tests
             // ホストの元の設定を後から変えても、試合の値は変わらない（全員の値がずれない）。
             config.Wire.MaxLength = 3f;
             Assert.That(host.World.GetConfig(0).Wire.MaxLength, Is.EqualTo(9.5f));
+        }
+
+        [Test]
+        public void ClientsReceiveTheMatchRules()
+        {
+            OnlineSession host = Host();
+            OnlineSession client = Join(host);
+            PumpUntil(() => client.LocalPlayer >= 0);
+
+            host.StartMatch(new MatchRules { CountdownTicks = 30, DurationTicks = 90, RespawnDelayTicks = 20, InvincibleTicks = 10 });
+            PumpUntil(() => client.State == OnlineSession.SessionState.Running);
+            MatchRules rules = client.World.Rules;
+            Assert.That(rules.CountdownTicks, Is.EqualTo(30));
+            Assert.That(rules.DurationTicks, Is.EqualTo(90));
+            Assert.That(rules.RespawnDelayTicks, Is.EqualTo(20));
+            Assert.That(rules.InvincibleTicks, Is.EqualTo(10));
+
+            // 全員が終わりまで進み、同じ状態で止まる。
+            PumpUntil(() => _sessions.TrueForAll(s => s.World.Phase == MatchPhase.Finished && s.Session.ConfirmedTick >= 125));
+            PumpFrames(2);
+            Assert.That(client.World.Checksum(), Is.EqualTo(host.World.Checksum()));
+            Assert.That(host.Desyncs, Is.Empty);
+        }
+
+        [Test]
+        public void StartMatch_WithoutRules_HasNoTimeLimit()
+        {
+            OnlineSession host = Host();
+            host.StartMatch();
+            Assert.That(host.World.Rules.HasTimeLimit, Is.False);
+            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => Host().StartMatch(new MatchRules { CountdownTicks = -1 }));
         }
 
         [Test]
