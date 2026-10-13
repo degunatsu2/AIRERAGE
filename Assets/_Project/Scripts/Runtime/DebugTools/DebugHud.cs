@@ -142,12 +142,13 @@ namespace Degunatsu.Runtime.DebugTools
             }
         }
 
-        // ガードの状態（T3-5）: クールタイム、ジャストガードとふつうのガードの数。
+        // ガードの状態（T3-5）: クールタイム、ジャストガードとふつうのガードの数。ゲージ（T3-6）。
         private void AppendGuard(in CharacterState s)
         {
             CombatState c = s.Combat;
             _text.Append("Guard ").Append(c.GuardCooldownTicksLeft > 0 ? "cooldown " + c.GuardCooldownTicksLeft + "t" : "ready")
-                .Append("  Parry ").Append(c.JustGuardCount).Append("  Guarded ").Append(c.GuardedCount);
+                .Append("  Parry ").Append(c.JustGuardCount).Append("  Guarded ").Append(c.GuardedCount)
+                .Append("  Gauge ").Append(c.Gauge).Append('/').Append(_runner.PlayerConfig.Combat.MaxGauge);
         }
 
         // 最後に当てた攻撃の吹き飛び（倍率をかけた後の速度）と威力（今はダメージの値。コインへの変換は Phase 4）。

@@ -8,7 +8,7 @@ namespace Degunatsu.Core.Combat
     /// - 撃破の手柄は、最後にダメージを与えたキャラクター（D-23）。期限はなく、どれだけ前の攻撃でも手柄になる（D-40）。
     ///   だれにも攻撃されていなければ、手柄はだれにもつかない（扱いは Phase 4 で決める）。
     /// - 撃破されたキャラクターは、すぐに出現位置に戻る（確認用の復帰。復帰後の無敵などは Phase 4）。
-    ///   撃破の数だけを引き継ぎ、ワイヤー、攻撃、最後にダメージを与えた人などは戻す。
+    ///   撃破の数とゲージ【仮】を引き継ぎ、ワイヤー、攻撃、最後にダメージを与えた人などは戻す。
     /// - 番号の順に調べる（同じティックに複数が外に出ても、結果が順番で変わらない）。
     /// </summary>
     public static class KnockoutResolver
@@ -33,12 +33,13 @@ namespace Degunatsu.Core.Combat
             }
         }
 
-        /// <summary>出現したときの状態に戻す。撃破の数（撃破された数は +1）と、前のティックのボタンを引き継ぐ。</summary>
+        /// <summary>出現したときの状態に戻す。撃破の数（撃破された数は +1）、ゲージ、前のティックのボタンを引き継ぐ。</summary>
         private static CharacterState Respawn(in CharacterState state, in CharacterState spawn)
         {
             CharacterState respawned = spawn;
             respawned.Combat.Knockouts = state.Combat.Knockouts;
             respawned.Combat.Falls = state.Combat.Falls + 1;
+            respawned.Combat.Gauge = state.Combat.Gauge;
             // 押し続けているボタンを、戻った直後に押したとみなさない（ワイヤーの射出などが勝手に起きないように）。
             respawned.PreviousButtons = state.PreviousButtons;
             return respawned;

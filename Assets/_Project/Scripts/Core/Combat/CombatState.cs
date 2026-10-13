@@ -52,6 +52,12 @@ namespace Degunatsu.Core.Combat
         /// <summary>先行入力したときの横の向き（-1、0、1。0 なら向きを変えない）。</summary>
         public sbyte BufferedFacing;
 
+        /// <summary>
+        /// ゲージ（0〜CombatTuning.MaxGauge。docs/01_game_design.md 6.7、docs/11_combat_plan.md T3-6）。攻撃の命中・被弾・ガード・
+        /// ジャストガードで増える。撃破されて戻っても引き継ぐ【仮】。消費は Phase 5。
+        /// </summary>
+        public int Gauge;
+
         /// <summary>次のガードができるまでの残り（ティック。ガードが終わってから数える。D-21）。</summary>
         public int GuardCooldownTicksLeft;
 
@@ -79,6 +85,7 @@ namespace Degunatsu.Core.Combat
                 && AttackBufferTicksLeft == other.AttackBufferTicksLeft
                 && BufferedAirAttack == other.BufferedAirAttack
                 && BufferedFacing == other.BufferedFacing
+                && Gauge == other.Gauge
                 && GuardCooldownTicksLeft == other.GuardCooldownTicksLeft
                 && JustGuardCount == other.JustGuardCount
                 && GuardedCount == other.GuardedCount
@@ -95,14 +102,14 @@ namespace Degunatsu.Core.Combat
             return HashCode.Combine(
                 HashCode.Combine(HitstopTicksLeft, HasLastAttacker, LastAttacker, LastDamagedTick, ComboCount, ComboDamage, Knockouts, Falls),
                 HashCode.Combine(AttackCancelUsed, WireCancelCooldownTicksLeft, AttackBufferTicksLeft, BufferedAirAttack, BufferedFacing),
-                GuardCooldownTicksLeft, JustGuardCount, GuardedCount, HitstopPresses);
+                Gauge, GuardCooldownTicksLeft, JustGuardCount, GuardedCount, HitstopPresses);
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAirAttack},{BufferedFacing}) guardCd={GuardCooldownTicksLeft} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAirAttack},{BufferedFacing}) gauge={Gauge} guardCd={GuardCooldownTicksLeft} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses}";
         }
     }
 }

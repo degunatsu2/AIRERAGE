@@ -22,6 +22,8 @@ namespace Degunatsu.Core.Combat
     ///   どちらも、攻撃した側の「当たった」（ActionState.Connected）にはならない（攻撃→攻撃などのキャンセルはできない）。
     ///   ガードの値は、当たった側の調整値を使う。
     /// - 両者にヒットストップを与える。
+    /// - ゲージ（T3-6）: 当たれば当てた側が GaugeOnHit・受けた側が GaugeOnDamaged、ふつうのガードなら攻撃した側が GaugeOnGuarded・
+    ///   守った側が GaugeOnGuard、ジャストガードなら守った側が GaugeOnJustGuard を得る（それぞれ自分の調整値。上限 MaxGauge）。
     /// </summary>
     public sealed class HitResolver
     {
@@ -119,9 +121,16 @@ namespace Degunatsu.Core.Combat
                 attacker.Action.Connected |= result == HitResult.Hit;
             }
             attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, data.HitstopTicks);
+            CombatTuning attackerCombat = configs[hit.Attacker].Combat;
+            AddGauge(ref attacker.Combat, attackerCombat,
+                result == HitResult.Hit ? attackerCombat.GaugeOnHit : result == HitResult.Guarded ? attackerCombat.GaugeOnGuarded : 0);
             states[hit.Attacker] = attacker;
 
             victim = states[hit.Victim];
+            CombatTuning victimCombat = configs[hit.Victim].Combat;
+            AddGauge(ref victim.Combat, victimCombat,
+                result == HitResult.Hit ? victimCombat.GaugeOnDamaged
+                : result == HitResult.Guarded ? victimCombat.GaugeOnGuard : victimCombat.GaugeOnJustGuard);
             victim.Combat.HitstopTicksLeft = Math.Max(victim.Combat.HitstopTicksLeft, data.HitstopTicks);
             switch (result)
             {
@@ -137,6 +146,11 @@ namespace Degunatsu.Core.Combat
             }
             states[hit.Victim] = victim;
             return hit.WithResult(result);
+        }
+
+        private static void AddGauge(ref CombatState combat, CombatTuning tuning, int amount)
+        {
+            combat.Gauge = Math.Min(tuning.MaxGauge, combat.Gauge + amount);
         }
 
         private static void Hit(WireTuning wire, ref CharacterState victim, HitRecord hit, int tick)

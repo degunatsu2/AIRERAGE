@@ -324,6 +324,24 @@ namespace Degunatsu.Core.Combat
         public float ParriedPushbackX = 4f;
         public float ParriedPushbackY = 6f;
 
+        /// <summary>ゲージの最大（docs/01_game_design.md 6.7）。消費（方向転換、必殺技）は Phase 5。</summary>
+        public int MaxGauge = 100;
+
+        /// <summary>攻撃が当たったときに、当てた側が得るゲージ（大）。【仮】</summary>
+        public int GaugeOnHit = 8;
+
+        /// <summary>攻撃がふつうのガードをされたときに、攻撃した側が得るゲージ。【仮】</summary>
+        public int GaugeOnGuarded = 3;
+
+        /// <summary>攻撃を受けた（のけぞった）ときに得るゲージ（小）。【仮】</summary>
+        public int GaugeOnDamaged = 4;
+
+        /// <summary>攻撃をふつうのガードで受けたときに得るゲージ。【仮】</summary>
+        public int GaugeOnGuard = 2;
+
+        /// <summary>ジャストガードに成功したときに得るゲージ（大。D-21）。【仮】</summary>
+        public int GaugeOnJustGuard = 20;
+
         public AttackData Get(AttackSlot slot)
         {
             switch (slot)
@@ -371,6 +389,12 @@ namespace Degunatsu.Core.Combat
             v.InRange(nameof(GuardKnockbackScale), GuardKnockbackScale, 0f, 1f);
             v.NonNegative(nameof(ParriedStunTicks), ParriedStunTicks);
             v.NonNegative(nameof(ParriedPushbackX), ParriedPushbackX);
+            v.Positive(nameof(MaxGauge), MaxGauge);
+            v.NonNegative(nameof(GaugeOnHit), GaugeOnHit);
+            v.NonNegative(nameof(GaugeOnGuarded), GaugeOnGuarded);
+            v.NonNegative(nameof(GaugeOnDamaged), GaugeOnDamaged);
+            v.NonNegative(nameof(GaugeOnGuard), GaugeOnGuard);
+            v.NonNegative(nameof(GaugeOnJustGuard), GaugeOnJustGuard);
             return v;
         }
     }
