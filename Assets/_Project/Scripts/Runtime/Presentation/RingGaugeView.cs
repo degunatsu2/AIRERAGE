@@ -158,7 +158,10 @@ namespace Degunatsu.Runtime.Presentation
             Color previous = GUI.color;
             GUI.color = new Color(0.1f, 0f, 0.15f, 0.8f);
             GUI.Label(new Rect(rect.x + 1.5f, rect.y + 1.5f, rect.width, rect.height), _label, _style);
-            GUI.color = new Color(0.85f, 0.7f, 1f, 0.95f);
+            // 文字はゲージと同じ色を明るくしたもの（ユーザーの指摘: 文字の色をゲージの色に合わせる）。
+            Color text = Color.Lerp(_color, Color.white, 0.35f);
+            text.a = 0.95f;
+            GUI.color = text;
             GUI.Label(rect, _label, _style);
             GUI.color = previous;
         }

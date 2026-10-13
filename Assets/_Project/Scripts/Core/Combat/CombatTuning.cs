@@ -314,8 +314,15 @@ namespace Degunatsu.Core.Combat
         /// <summary>ふつうのガードで受けたときの吹き飛びの倍率（攻撃の吹き飛びにかける。ノックバック）。【仮】</summary>
         public float GuardKnockbackScale = 0.4f;
 
-        /// <summary>ジャストガードされた攻撃側の隙（のけぞりの長さ。ティック。吹き飛びはなく、勢いのまま）。【仮】</summary>
+        /// <summary>ジャストガードされた攻撃側の隙（のけぞりの長さ。ティック）。【仮】</summary>
         public int ParriedStunTicks = 30;
+
+        /// <summary>
+        /// ジャストガードされた攻撃側が弾かれる速度（m/s。X は守った側から離れる向き、Y は上）。少しだけ斜め上に押し戻す
+        /// （ユーザーの要望、2026-10-13）。【仮】
+        /// </summary>
+        public float ParriedPushbackX = 4f;
+        public float ParriedPushbackY = 6f;
 
         public AttackData Get(AttackSlot slot)
         {
@@ -363,6 +370,7 @@ namespace Degunatsu.Core.Combat
             v.NonNegative(nameof(GuardStunTicks), GuardStunTicks);
             v.InRange(nameof(GuardKnockbackScale), GuardKnockbackScale, 0f, 1f);
             v.NonNegative(nameof(ParriedStunTicks), ParriedStunTicks);
+            v.NonNegative(nameof(ParriedPushbackX), ParriedPushbackX);
             return v;
         }
     }

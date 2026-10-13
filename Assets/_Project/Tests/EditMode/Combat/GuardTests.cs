@@ -116,6 +116,18 @@ namespace Degunatsu.Core.Tests.Combat
         }
 
         [Test]
+        public void JustGuard_PushesTheAttackerBack_SlightlyUpward()
+        {
+            // ジャストガードされた側は、守った側から離れる向きへ少しだけ斜め上に弾かれる（ユーザーの要望、2026-10-13）。
+            SimWorld world = AttackIntoGuard(-3);
+
+            CharacterState attacker = world.GetState(0);
+            Assert.That(attacker.Position.X, Is.LessThan(world.GetState(1).Position.X), "前提: 攻撃した側は左");
+            Assert.That(attacker.Velocity.X, Is.EqualTo(-Combat.ParriedPushbackX), "守った側から離れる向きに弾かれない");
+            Assert.That(attacker.Velocity.Y, Is.EqualTo(Combat.ParriedPushbackY), "上に弾かれない");
+        }
+
+        [Test]
         public void JustGuard_LetsTheDefenderGuardAgainRightAway()
         {
             SimWorld world = AttackIntoGuard(-3);
@@ -173,6 +185,64 @@ namespace Degunatsu.Core.Tests.Combat
 
             Assert.That(guarding, Is.EqualTo(Combat.GuardStunTicks + 1), "ガード硬直の間、ガードが続かない");
             Assert.That(world.GetState(1).Combat.GuardCooldownTicksLeft, Is.EqualTo(Combat.GuardCooldownTicks));
+        }
+
+        [Test]
+        public void Guard_CanBeCancelledIntoAnAttack()
+        {
+            // ガードの途中でも、攻撃でキャンセルして動ける（ユーザーの要望、2026-10-13）。ガードは終わり、クールタイムが始まる。
+            SimWorld world = OneCharacter();
+            world.Step(new[] { Guard });
+            for (int i = 0; i < 5; i++)
+            {
+                world.Step(new PlayerInput[1]);
+            }
+
+            world.Step(new[] { Attack });
+
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Action.Kind, Is.EqualTo(ActionKind.Attack), "ガードを攻撃でキャンセルできない");
+            Assert.That(state.Action.Attack, Is.EqualTo(AttackSlot.Ground));
+            Assert.That(state.Combat.GuardCooldownTicksLeft, Is.EqualTo(Combat.GuardCooldownTicks));
+        }
+
+        [Test]
+        public void Guard_CanBeCancelledIntoTheWire()
+        {
+            var harness = new SimHarness(TestArenas.Playground(), WireTestSetup.LongAttachConfig(WireModelType.Inertial));
+            harness.Step(Inputs.None, 30);
+            harness.Step(Guard);
+            harness.Step(Inputs.None, 3);
+
+            harness.Step(Inputs.Wire(0f, 1f));
+
+            Assert.That(harness.State.Action.IsFree, Is.True, "ガードをワイヤーでキャンセルできない");
+            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Firing), "このティックに射出しない");
+            Assert.That(harness.State.Combat.GuardCooldownTicksLeft, Is.EqualTo(Combat.GuardCooldownTicks));
+        }
+
+        [Test]
+        public void Guard_CannotBeCancelled_DuringTheGuardStun()
+        {
+            // 攻撃をガードした後のガード硬直の間はキャンセルできない（ふつうのガードがジャストガードより強くならないように）。
+            SimWorld world = AttackIntoGuard(4);
+            Assert.That(world.LastHits[0].Result, Is.EqualTo(HitResult.Guarded), "前提: ふつうのガード");
+            int cancelFrom = world.GetState(1).Action.CancelFromTick;
+            while (world.GetState(1).Combat.HitstopTicksLeft > 0)
+            {
+                world.Step(new PlayerInput[2]);
+            }
+
+            world.Step(new[] { default, Attack });
+            Assert.That(world.GetState(1).Action.Kind, Is.EqualTo(ActionKind.Guard), "ガード硬直の間にキャンセルできた");
+
+            while (world.GetState(1).Action.Kind == ActionKind.Guard && world.GetState(1).Action.Ticks < cancelFrom)
+            {
+                world.Step(new PlayerInput[2]);
+            }
+            Assert.That(world.GetState(1).Action.Kind, Is.EqualTo(ActionKind.Guard), "前提: ガード硬直の後もガードが残っている");
+            world.Step(new[] { default, Attack });
+            Assert.That(world.GetState(1).Action.Kind, Is.EqualTo(ActionKind.Attack), "ガード硬直の後にキャンセルできない");
         }
 
         [Test]

@@ -25,6 +25,8 @@ namespace Degunatsu.Core.Combat
     /// - ガード（T3-5。D-21）: Free のときにガードボタンを押すと、GuardTicks の間ガードする（全方向・空中可）。
     ///   クールタイム中・射出中はできない。接続中に押すと、ワイヤーを解除して慣性を引き継ぐ【仮】。攻撃とガードを同時に押したらガード。
     ///   ガードが終わってから GuardCooldownTicks の間は次のガードができない。攻撃を受けたときの結果は HitResolver が決める。
+    ///   ガードの途中でも、攻撃・ワイヤーでキャンセルして動ける（ユーザーの要望、2026-10-13）。ただし攻撃をガードした後の
+    ///   ガード硬直の間はできない（CancelFromTick）。キャンセルしてもガードは終わったことになり、クールタイムが始まる。
     /// - 攻撃中・のけぞり中・ガード中の移動・ジャンプ・ワイヤーの入力は無視する（ControlInput）。攻撃のデータが決める動きは ApplyMotion。
     /// </summary>
     public static class ActionController
@@ -71,10 +73,13 @@ namespace Degunatsu.Core.Combat
                     state.Action.Ticks++;
                     if (state.Action.Ticks < state.Action.Duration)
                     {
+                        if (state.Action.Ticks >= state.Action.CancelFromTick)
+                        {
+                            TryCancelGuard(ref state, input, config);
+                        }
                         return;
                     }
-                    state.Action = default;
-                    state.Combat.GuardCooldownTicksLeft = combat.GuardCooldownTicks;
+                    EndGuard(ref state, combat);
                     break;
             }
 
@@ -216,6 +221,27 @@ namespace Degunatsu.Core.Combat
             }
         }
 
+        // ガードを攻撃・ワイヤーでキャンセルする。ワイヤーはこのティックの移動とワイヤーの処理で射出する。
+        private static void TryCancelGuard(ref CharacterState state, in InputFrame input, CharacterConfig config)
+        {
+            if (input.WasPressed(InputButtons.Wire) && state.Wire.Phase == WirePhase.Ready)
+            {
+                EndGuard(ref state, config.Combat);
+                return;
+            }
+            if (state.Combat.AttackBufferTicksLeft > 0)
+            {
+                EndGuard(ref state, config.Combat);
+                StartAttack(ref state, state.Grounded ? AttackSlot.Ground : state.Combat.BufferedAirAttack);
+            }
+        }
+
+        private static void EndGuard(ref CharacterState state, CombatTuning combat)
+        {
+            state.Action = default;
+            state.Combat.GuardCooldownTicksLeft = combat.GuardCooldownTicks;
+        }
+
         // ガードを始める。接続中ならワイヤーを解除する。攻撃の先行入力は捨てる（ガードの後に勝手に攻撃しないように）。
         private static void StartGuard(ref CharacterState state, CharacterConfig config)
         {
@@ -227,6 +253,7 @@ namespace Degunatsu.Core.Combat
             {
                 Kind = ActionKind.Guard,
                 Duration = config.Combat.GuardTicks,
+                CancelFromTick = 1,
             };
             state.Combat.AttackBufferTicksLeft = 0;
         }

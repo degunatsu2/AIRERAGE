@@ -16,7 +16,7 @@ namespace Degunatsu.Core.Combat
     ///   コンボは当てた人ごとで、のけぞりが終わるまで続く（別の人が当てると、その人の新しいコンボになる）。
     /// - 当たった側がガード中なら（T3-5。D-21）:
     ///   - ガードを始めてから JustGuardTicks 以内ならジャストガード: 当たった側は吹き飛ばず、すぐに動ける（Free）。ガードの
-    ///     クールタイムが戻る（D-39）。攻撃した側は ParriedStunTicks の間のけぞる（隙。吹き飛びはない）。
+    ///     クールタイムが戻る（D-39）。攻撃した側は ParriedStunTicks の間のけぞり（隙）、少しだけ斜め上に弾かれる。
     ///   - それ以外はふつうのガード: 当たった側はガードのまま（ガード硬直の分だけ延びる）、吹き飛びは GuardKnockbackScale 倍。
     ///     のけぞらず、コンボにならない。最後にダメージを与えた人は記録する（削り。撃破の手柄になる）【仮】。
     ///   どちらも、攻撃した側の「当たった」（ActionState.Connected）にはならない（攻撃→攻撃などのキャンセルはできない）。
@@ -164,7 +164,9 @@ namespace Degunatsu.Core.Combat
         // ふつうのガード: ガードのまま（ガード硬直の分だけ延ばす）、弱く吹き飛ぶ。削りとして最後にダメージを与えた人を記録する【仮】。
         private static void Guard(CombatTuning combat, ref CharacterState defender, HitRecord hit, int tick)
         {
-            defender.Action.Duration = Math.Max(defender.Action.Duration, defender.Action.Ticks + combat.GuardStunTicks + 1);
+            int stunEnd = defender.Action.Ticks + combat.GuardStunTicks + 1;
+            defender.Action.Duration = Math.Max(defender.Action.Duration, stunEnd);
+            defender.Action.CancelFromTick = Math.Max(defender.Action.CancelFromTick, stunEnd);
             defender.Velocity = new Vector3(hit.Knockback.X, hit.Knockback.Y, 0f) * combat.GuardKnockbackScale;
             defender.Combat.GuardedCount++;
             defender.Combat.HasLastAttacker = true;
@@ -185,6 +187,10 @@ namespace Degunatsu.Core.Combat
                 Kind = ActionKind.Hitstun,
                 Duration = combat.ParriedStunTicks,
             };
+            // 守った側から離れる向きへ、少しだけ斜め上に弾く（同じ位置なら、向いている方向の逆へ）。
+            float away = attacker.Position.X > defender.Position.X ? 1f
+                : attacker.Position.X < defender.Position.X ? -1f : -attacker.Facing;
+            attacker.Velocity = new Vector3(away * combat.ParriedPushbackX, combat.ParriedPushbackY, 0f);
             attacker.JumpBufferTicksLeft = 0;
             states[hit.Attacker] = attacker;
         }

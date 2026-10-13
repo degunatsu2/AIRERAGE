@@ -71,13 +71,19 @@ namespace Degunatsu.Core.Combat
         /// <summary>今の攻撃が相手に当たったか（ガードされたものは含まない）。攻撃→攻撃などのキャンセルの条件（D-17、D-42）。</summary>
         public bool Connected;
 
+        /// <summary>
+        /// ガードを攻撃・ワイヤーでキャンセルできるようになる Ticks（ユーザーの要望、2026-10-13）。ガードを始めた次のティックから
+        /// できるが、攻撃をガードするとガード硬直が終わるまでできない。
+        /// </summary>
+        public int CancelFromTick;
+
         public bool IsFree => Kind == ActionKind.Free;
 
         public bool Equals(ActionState other)
         {
             return Kind == other.Kind && Attack == other.Attack && Ticks == other.Ticks
                 && Duration == other.Duration && HitMask == other.HitMask && StrikeSpeed.Equals(other.StrikeSpeed)
-                && Connected == other.Connected;
+                && Connected == other.Connected && CancelFromTick == other.CancelFromTick;
         }
 
         public override bool Equals(object obj)
@@ -87,7 +93,7 @@ namespace Degunatsu.Core.Combat
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed, Connected);
+            return HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed, Connected, CancelFromTick);
         }
 
         public override string ToString()
