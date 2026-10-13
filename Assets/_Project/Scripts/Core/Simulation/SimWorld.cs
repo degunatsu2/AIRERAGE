@@ -24,9 +24,18 @@ namespace Degunatsu.Core.Simulation
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
         /// <param name="zones">ステージのギミック（ジャンプ台など）。渡した順によらず、決まった順（StageZone.CompareTo）に並べて効かせる。</param>
-        /// <param name="rules">試合のルール（カウントダウン、制限時間、復帰。docs/12）。null なら MatchRules.FreePlay()。不正なら InvalidTuningException。</param>
-        public SimWorld(ICollisionQuery collision, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null, MatchRules rules = null)
+        /// <param name="rules">試合のルール（カウントダウン、制限時間、復帰、コインの出現。docs/12）。null なら MatchRules.FreePlay()。不正なら InvalidTuningException。</param>
+        /// <param name="coinSpawns">コインの出現地点（docs/12 T4-4）。渡した順によらず、決まった順（CoinSpawnPoint.CompareTo）に並べて番号をつける。</param>
+        public SimWorld(ICollisionQuery collision, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null, MatchRules rules = null,
+            IReadOnlyList<CoinSpawnPoint> coinSpawns = null)
         {
+            var spawnPoints = new List<CoinSpawnPoint>();
+            if (coinSpawns != null)
+            {
+                spawnPoints.AddRange(coinSpawns);
+                spawnPoints.Sort((a, b) => a.CompareTo(b));
+            }
+            CoinSpawns = spawnPoints;
             Rules = rules ?? MatchRules.FreePlay();
             Rules.Validate().ThrowIfInvalid();
             var sorted = new List<StageZone>();
@@ -52,6 +61,9 @@ namespace Degunatsu.Core.Simulation
 
         /// <summary>コイン台帳（コインの増減はすべてここを通す。docs/12 T4-3）。状態は CoinField と各キャラクターの Coins。</summary>
         public CoinLedger Coins { get; }
+
+        /// <summary>コインの出現地点（番号の順）。</summary>
+        public IReadOnlyList<CoinSpawnPoint> CoinSpawns { get; }
 
         /// <summary>次に進めるティックの、試合の段階（ティック数だけから決まる）。</summary>
         public MatchPhase Phase => Rules.PhaseAt(Tick);
@@ -136,6 +148,7 @@ namespace Degunatsu.Core.Simulation
         /// <summary>
         /// 1ティック進める。inputs はキャラクターの番号順で、数が一致しなければ ArgumentException。
         /// 全員を進めた後に、攻撃の命中を決めて当て（HitResolver）、ステージの外に出たキャラクターを撃破にする（KnockoutResolver）。
+        /// 最後に、フィールドのコインの出現・拾得・消滅を決める（FieldCoinRules。docs/12 T4-4）。
         /// 試合の段階（Phase）がカウントダウンの間は入力を無視し、終わった後は全員を止める（ティック数だけ進める）。
         /// </summary>
         public void Step(IReadOnlyList<PlayerInput> inputs)
@@ -170,6 +183,7 @@ namespace Degunatsu.Core.Simulation
             {
                 KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules);
             }
+            FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, phase == MatchPhase.Playing);
         }
 
         private static void ValidateConfig(CharacterConfig config)

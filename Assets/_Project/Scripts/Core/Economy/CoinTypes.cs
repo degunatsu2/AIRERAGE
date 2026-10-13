@@ -53,19 +53,23 @@ namespace Degunatsu.Core.Economy
         /// <summary>このティックで消える（寿命）。int.MaxValue なら消えない。</summary>
         public readonly int ExpireTick;
 
-        public FieldCoin(int id, Vector2 position, int value, int pickableFromTick, int expireTick)
+        /// <summary>出した出現地点の番号（ドロップなら -1）。同じ地点からは、前のコインが拾われるまで出さない。</summary>
+        public readonly int Source;
+
+        public FieldCoin(int id, Vector2 position, int value, int pickableFromTick, int expireTick, int source = -1)
         {
             Id = id;
             Position = position;
             Value = value;
             PickableFromTick = pickableFromTick;
             ExpireTick = expireTick;
+            Source = source;
         }
 
         public bool Equals(FieldCoin other)
         {
             return Id == other.Id && Position.Equals(other.Position) && Value == other.Value
-                && PickableFromTick == other.PickableFromTick && ExpireTick == other.ExpireTick;
+                && PickableFromTick == other.PickableFromTick && ExpireTick == other.ExpireTick && Source == other.Source;
         }
 
         public override bool Equals(object obj)
@@ -75,7 +79,7 @@ namespace Degunatsu.Core.Economy
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Id, Position, Value, PickableFromTick, ExpireTick);
+            return HashCode.Combine(Id, Position, Value, PickableFromTick, ExpireTick, Source);
         }
 
         public override string ToString()
@@ -178,6 +182,60 @@ namespace Degunatsu.Core.Economy
         public override string ToString()
         {
             return $"{Id} char={Character} coin={CoinId} amount={Amount}";
+        }
+    }
+
+    /// <summary>コインの出現地点（ステージに置く。docs/12 T4-4）。基本は空中に置き、取りにくい場所ほど高額にする。</summary>
+    public readonly struct CoinSpawnPoint : IEquatable<CoinSpawnPoint>
+    {
+        public readonly Vector2 Position;
+
+        /// <summary>出すコインの枚数。</summary>
+        public readonly int Value;
+
+        public CoinSpawnPoint(Vector2 position, int value)
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentException($"コインの出現地点の枚数は 1 以上にします（{value}）");
+            }
+            if (float.IsNaN(position.X) || float.IsNaN(position.Y) || float.IsInfinity(position.X) || float.IsInfinity(position.Y))
+            {
+                throw new ArgumentException($"コインの出現地点の位置が不正です（{position}）");
+            }
+            Position = position;
+            Value = value;
+        }
+
+        /// <summary>並べ替えの順（シーンから集めた順によらず、同じ番号になるように）。</summary>
+        public int CompareTo(CoinSpawnPoint other)
+        {
+            int c = Position.X.CompareTo(other.Position.X);
+            if (c == 0)
+            {
+                c = Position.Y.CompareTo(other.Position.Y);
+            }
+            return c != 0 ? c : Value.CompareTo(other.Value);
+        }
+
+        public bool Equals(CoinSpawnPoint other)
+        {
+            return Position.Equals(other.Position) && Value == other.Value;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is CoinSpawnPoint other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Position, Value);
+        }
+
+        public override string ToString()
+        {
+            return $"{Value} at {Position}";
         }
     }
 }

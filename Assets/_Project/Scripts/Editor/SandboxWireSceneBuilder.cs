@@ -349,6 +349,34 @@ namespace Degunatsu.Editor
             }
         }
 
+        /// <summary>
+        /// コインの出現地点（docs/12 T4-4）と、コインの表示（回る金色のコイン）、所持コインと「+n」の表示を作る。
+        /// source は ISimulationFeed。
+        /// </summary>
+        internal static void CreateCoins((Vector2 Position, int Value)[] spawns, MonoBehaviour source)
+        {
+            var root = new GameObject("CoinSpawns").transform;
+            for (int i = 0; i < spawns.Length; i++)
+            {
+                var point = new GameObject($"CoinSpawn{i + 1}_{spawns[i].Value}");
+                point.transform.SetParent(root, false);
+                point.transform.position = new Vector3(spawns[i].Position.x, spawns[i].Position.y, 0f);
+                point.AddComponent<CoinSpawnAuthoring>().Configure(spawns[i].Value);
+            }
+
+            Material coinMaterial = LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f));
+            var view = new GameObject("Coins").AddComponent<CoinView>();
+            GameObject template = CreateVisual(PrimitiveType.Cylinder, "CoinTemplate", coinMaterial, new Vector3(0.7f, 0.05f, 0.7f));
+            template.transform.SetParent(view.transform, false);
+            template.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            SetReference(view, "_source", source);
+            SetReference(view, "_template", template);
+
+            var hud = new GameObject("CoinHud").AddComponent<CoinHud>();
+            SetReference(hud, "_source", source);
+            SetReference(hud, "_camera", Object.FindFirstObjectByType<Camera>());
+        }
+
         /// <summary>ガードとジャストガードの表示（光る輪、広がる輪、光の筋。文字はシーンのカメラで画面に写す）。</summary>
         internal static GuardEffectView CreateGuardEffect(string name, Transform parent, Color playerColor)
         {

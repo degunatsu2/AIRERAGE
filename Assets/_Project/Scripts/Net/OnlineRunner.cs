@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Degunatsu.Core.Common;
+using Degunatsu.Core.Economy;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Match;
 using Degunatsu.Core.Physics;
@@ -107,6 +108,7 @@ namespace Degunatsu.Net
         string ISimulationFeed.LabelOf(int index) => $"P{index + 1}";
         int ISimulationFeed.CurrentTick => Running ? _session.World.Tick : 0;
         MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
+        CoinField ISimulationFeed.Coins => Running ? _session.World.Coins.Field : null;
         Color ISimulationFeed.ColorOf(int index) => index < _playerColors.Length ? _playerColors[index] : Color.white;
 
         /// <summary>ホストとして待ち受ける（port が 0 なら空いているポート）。失敗したら false で、理由を画面に出す。</summary>
@@ -212,7 +214,8 @@ namespace Degunatsu.Net
             _terrain = SceneTerrainBuilder.Build(_terrainMask, _errors);
             StageBounds? bounds = KnockoutBounds.Find(_errors);
             List<StageZone> zones = StageZoneAuthoring.Collect(_errors);
-            _stage = new OnlineStage(_terrain, SpawnPositions(), bounds, zones);
+            List<CoinSpawnPoint> coinSpawns = CoinSpawnAuthoring.Collect(_errors);
+            _stage = new OnlineStage(_terrain, SpawnPositions(), bounds, zones, coinSpawns);
             foreach (string error in _errors)
             {
                 Debug.LogError(error, this);
@@ -418,7 +421,7 @@ namespace Degunatsu.Net
             DrawScoreboard();
         }
 
-        // 右上に全員の撃破の数（KO）と撃破された数（Fall）。自分の行には印をつける。
+        // 右上に全員の撃破の数（KO）、撃破された数（Fall）、所持コイン（Coin）。自分の行には印をつける。
         private void DrawScoreboard()
         {
             if (!Running)
@@ -430,17 +433,18 @@ namespace Degunatsu.Net
                 _scoreStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold };
             }
             int count = _session.PlayerCount;
-            var area = new Rect(Screen.width - 250f, 10f, 240f, 34f + count * 28f);
+            var area = new Rect(Screen.width - 320f, 10f, 310f, 34f + count * 28f);
             GUI.Box(area, GUIContent.none);
             Color previous = GUI.color;
             GUI.color = Color.white;
-            GUI.Label(new Rect(area.x + 10f, area.y + 4f, 220f, 26f), "     KO  Fall", _scoreStyle);
+            GUI.Label(new Rect(area.x + 10f, area.y + 4f, 300f, 26f), "     KO  Fall  Coin", _scoreStyle);
             for (int p = 0; p < count; p++)
             {
                 Degunatsu.Core.Combat.CombatState combat = _session.World.GetState(p).Combat;
                 GUI.color = p < _playerColors.Length ? Color.Lerp(_playerColors[p], Color.white, 0.25f) : Color.white;
                 string mark = p == _session.LocalPlayer ? ">" : " ";
-                GUI.Label(new Rect(area.x + 10f, area.y + 30f + p * 28f, 220f, 26f), $"{mark}P{p + 1}  {combat.Knockouts,3} {combat.Falls,4}", _scoreStyle);
+                int held = _session.World.GetState(p).Coins.Held;
+                GUI.Label(new Rect(area.x + 10f, area.y + 30f + p * 28f, 300f, 26f), $"{mark}P{p + 1}  {combat.Knockouts,3} {combat.Falls,4} {held,5}", _scoreStyle);
             }
             GUI.color = previous;
         }

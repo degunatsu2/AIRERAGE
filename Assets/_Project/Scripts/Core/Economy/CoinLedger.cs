@@ -43,15 +43,17 @@ namespace Degunatsu.Core.Economy
             _events.Clear();
         }
 
-        /// <summary>出現（生成）。フィールドにコインを1つ出し、その番号を返す（拒否したら -1）。</summary>
-        public int Spawn(CoinEventId id, Vector2 position, int value, int pickableFromTick, int expireTick)
+        /// <summary>
+        /// 出現（生成）。フィールドにコインを1つ出し、その番号を返す（拒否したら -1）。source は出現地点の番号（なければ -1）。
+        /// </summary>
+        public int Spawn(CoinEventId id, Vector2 position, int value, int pickableFromTick, int expireTick, int source = -1)
         {
             if (!Accept(id, value))
             {
                 return -1;
             }
             int coinId = Field.NextCoinId++;
-            Field.Add(new FieldCoin(coinId, position, value, pickableFromTick, expireTick));
+            Field.Add(new FieldCoin(coinId, position, value, pickableFromTick, expireTick, source));
             Field.Generated += value;
             Record(id, -1, coinId, value, position);
             return coinId;

@@ -20,6 +20,7 @@ namespace Degunatsu.Editor
     /// オンライン対戦のシーン（Sandbox_Online）を作る（docs/10_online_plan.md T2-7、docs/11_combat_plan.md T3-8）。
     /// 友達と遊べる、空中戦のアスレチックステージ（ユーザーの要望、2026-10-13）: 地上の部分は少なく、浮いた足場、飛び石、
     /// ジャンプ台、加速リング、上昇気流、ワイヤーのアンカーを置く。ステージの範囲の外に出ると撃破。4人分の出現位置。
+    /// コインの出現地点（空中。docs/12 T4-4）。
     /// 4人分のキャラクターとワイヤーの表示を置き、OnlineRunner が人数に合わせて表示する。
     /// 地形とギミックの配置と値はこのコードで決め、シーンは生成物として扱う【仮】。
     ///
@@ -97,6 +98,30 @@ namespace Degunatsu.Editor
             // 島の間の上昇気流（落ちた人を島の高さまで押し上げる。強く吹き飛ばされると下まで落ちる）。
             ("UpdraftLeft", StageZoneKind.Updraft, new Vector2(-13.5f, -8f), new Vector2(7f, 20f), Vector2.up, 45f, 10f),
             ("UpdraftRight", StageZoneKind.Updraft, new Vector2(13.5f, -8f), new Vector2(7f, 20f), Vector2.up, 45f, 10f),
+        };
+
+        // コインの出現地点（基本は空中。取りにくい・危ない場所ほど高額）【仮】。
+        internal static readonly (Vector2 Position, int Value)[] CoinSpawns =
+        {
+            // 中央のジャンプ台の上（打ち上がると取れる）。
+            (new Vector2(0f, 11f), 5),
+            // 左右の加速リングを抜けた先。
+            (new Vector2(-8f, 11f), 5),
+            (new Vector2(8f, 11f), 5),
+            // 最上段の足場の上。
+            (new Vector2(-7f, 23f), 10),
+            (new Vector2(7f, 23f), 10),
+            // 中央のリングのさらに上（ジャンプ台→リング→空中ジャンプ）。
+            (new Vector2(0f, 26f), 15),
+            // 外側の飛び石の横。
+            (new Vector2(-27.5f, 13f), 10),
+            (new Vector2(27.5f, 13f), 10),
+            // 島の間の上昇気流の下（落ちると危ない）。
+            (new Vector2(-13.5f, -6f), 15),
+            (new Vector2(13.5f, -6f), 15),
+            // ステージの外の近く（いちばん危ない）。
+            (new Vector2(-38f, 16f), 20),
+            (new Vector2(38f, 16f), 20),
         };
 
         // ステージの範囲（外に出ると撃破）【仮】。
@@ -200,6 +225,7 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.SetReference(runner, "_audio", audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
+            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, runner);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

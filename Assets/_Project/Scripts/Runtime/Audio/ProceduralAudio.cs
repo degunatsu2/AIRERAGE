@@ -57,6 +57,9 @@ namespace Degunatsu.Runtime.Audio
 
         /// <summary>試合の終了（FINISH!。下がっていく和音）。</summary>
         Finish,
+
+        /// <summary>コインを拾った（「チャリン」）。</summary>
+        CoinPickup,
     }
 
     /// <summary>
@@ -222,6 +225,12 @@ namespace Degunatsu.Runtime.Audio
                         AddTone(b, r, i * 0.12f, 0.9f, f, f, Wave.Triangle, 0.4f, 0.003f, 0.35f);
                         AddTone(b, r, i * 0.12f, 0.6f, f * 2f, f * 2f, Wave.Pulse25, 0.1f, 0.003f, 0.2f);
                     }
+                    break;
+                case SoundId.CoinPickup:
+                    b = new float[Samples(0.35f, r)];
+                    AddTone(b, r, 0f, 0.12f, NoteFrequency(88), NoteFrequency(88), Wave.Square, 0.22f, 0.001f, 0.04f);
+                    AddTone(b, r, 0.06f, 0.28f, NoteFrequency(95), NoteFrequency(95), Wave.Sine, 0.4f, 0.001f, 0.1f);
+                    AddTone(b, r, 0.06f, 0.2f, NoteFrequency(107), NoteFrequency(107), Wave.Sine, 0.12f, 0.001f, 0.06f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

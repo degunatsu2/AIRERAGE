@@ -44,6 +44,17 @@ namespace Degunatsu.Editor
             new Vector2(21f, 9f),
         };
 
+        // コインの出現地点（docs/12 T4-4）【仮】。
+        private static readonly (Vector2 Position, int Value)[] CoinSpawns =
+        {
+            (new Vector2(0f, 4f), 5),
+            (new Vector2(-13.5f, 8f), 5),
+            (new Vector2(13.5f, 8f), 5),
+            (new Vector2(0f, 13f), 10),
+            (new Vector2(-21f, 13f), 15),
+            (new Vector2(21f, 13f), 15),
+        };
+
         // ステージの範囲（外に出ると撃破）【仮】。足場から下へ 16m、左右へ 18m ほど。
         private static readonly Vector2 BoundsMin = new Vector2(-34f, -16f);
         private static readonly Vector2 BoundsMax = new Vector2(34f, 36f);
@@ -132,6 +143,7 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.CreateDebugTools(runner, inputActions, audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
+            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, runner);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

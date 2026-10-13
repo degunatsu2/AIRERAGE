@@ -95,6 +95,7 @@ namespace Degunatsu.Core.Simulation
                     writer.Write(coin.Value);
                     writer.Write(coin.PickableFromTick);
                     writer.Write(coin.ExpireTick);
+                    writer.Write(coin.Source);
                 }
                 writer.Write(coins.NextCoinId);
                 writer.Write(coins.Generated);

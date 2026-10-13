@@ -419,7 +419,7 @@ namespace Degunatsu.Net
             _waitFrames = 0;
             _nextChecksumTick = ChecksumIntervalTicks;
             _checksums.Clear();
-            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match);
+            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match, _stage.CoinSpawns);
             for (int p = 0; p < playerCount; p++)
             {
                 World.AddCharacter(settings.Character, _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));

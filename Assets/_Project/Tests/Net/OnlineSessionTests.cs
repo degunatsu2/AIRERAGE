@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
+using Degunatsu.Core.Economy;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Match;
 using Degunatsu.Core.Physics;
@@ -118,7 +119,7 @@ namespace Degunatsu.Net.Tests
         [Test]
         public void TwoPlayers_OnAStageWithGimmicksAndKnockouts_StayInSync()
         {
-            // 床の上のジャンプ台、上昇気流、加速リング、低い天井の撃破（ジャンプ台で打ち上がると上の外に出る）。
+            // 床の上のジャンプ台、上昇気流、加速リング、低い天井の撃破（ジャンプ台で打ち上がると上の外に出る）、コイン。
             // 攻撃も押し、遅延と欠落で巻き戻しを起こす（docs/11_combat_plan.md T3-8）。
             const int ticks = 360;
             BoxTerrain floor = new BoxTerrain().AddBox(-12f, -1f, 12f, 0f, true);
@@ -128,7 +129,14 @@ namespace Degunatsu.Net.Tests
                 new StageZone(StageZoneKind.Updraft, 2f, 0f, 5f, 6f, System.Numerics.Vector2.Zero, 45f, 8f),
                 new StageZone(StageZoneKind.BoostRing, -1f, 2f, 1f, 5f, System.Numerics.Vector2.UnitX, 18f),
             };
-            _stage = new OnlineStage(floor, new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f) }, new StageBounds(-20f, -10f, 20f, 8f), zones);
+            CoinSpawnPoint[] coins =
+            {
+                new CoinSpawnPoint(new System.Numerics.Vector2(-4f, 1f), 5),
+                new CoinSpawnPoint(new System.Numerics.Vector2(4f, 1f), 5),
+                new CoinSpawnPoint(new System.Numerics.Vector2(0f, 3f), 10),
+                new CoinSpawnPoint(new System.Numerics.Vector2(8f, 2f), 10),
+            };
+            _stage = new OnlineStage(floor, new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f) }, new StageBounds(-20f, -10f, 20f, 8f), zones, coins);
             _input = (player, tick) =>
             {
                 PlayerInput input = Scripted(player, tick);
@@ -152,6 +160,7 @@ namespace Degunatsu.Net.Tests
             Assert.That(host.Session.RollbackCount + client.Session.RollbackCount, Is.GreaterThan(0), "前提: 巻き戻した");
             Assert.That(host.World.GetState(0).JumpPadCount, Is.GreaterThan(0), "前提: ジャンプ台が効いた");
             Assert.That(host.World.GetState(0).Combat.Falls + host.World.GetState(1).Combat.Falls, Is.GreaterThan(0), "前提: 撃破が起きた");
+            Assert.That(host.World.GetState(0).Coins.Held + host.World.GetState(1).Coins.Held, Is.GreaterThan(0), "前提: コインを拾った");
         }
 
         [Test]

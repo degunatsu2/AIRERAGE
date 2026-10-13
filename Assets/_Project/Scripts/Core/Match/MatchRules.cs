@@ -36,6 +36,12 @@ namespace Degunatsu.Core.Match
         /// <summary>復帰した後の無敵（ティック）。攻撃を受けない。自分が攻撃を出すと、そこで無敵が終わる【仮】。</summary>
         public int InvincibleTicks = 90;
 
+        /// <summary>コインが出現する間隔（ティック。docs/12 T4-4）。試合が始まったティックと、その後この間隔ごとに、コインが残っていない出現地点に出す。</summary>
+        public int CoinSpawnIntervalTicks = 600;
+
+        /// <summary>コインを拾える距離（m。キャラクターの箱をこれだけ広げて、コインの中心が入れば拾う）。</summary>
+        public float CoinPickupRadius = 0.7f;
+
         /// <summary>時間の制限もカウントダウンもない（検証用のシーン、入力の記録の再生）。撃破と復帰のルールは同じ。</summary>
         public static MatchRules FreePlay()
         {
@@ -82,6 +88,8 @@ namespace Degunatsu.Core.Match
             v.NonNegative(nameof(DurationTicks), DurationTicks);
             v.NonNegative(nameof(RespawnDelayTicks), RespawnDelayTicks);
             v.NonNegative(nameof(InvincibleTicks), InvincibleTicks);
+            v.Positive(nameof(CoinSpawnIntervalTicks), CoinSpawnIntervalTicks);
+            v.Positive(nameof(CoinPickupRadius), CoinPickupRadius);
             return v;
         }
     }
