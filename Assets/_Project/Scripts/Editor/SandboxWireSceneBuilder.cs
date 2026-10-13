@@ -96,6 +96,9 @@ namespace Degunatsu.Editor
 
         internal static readonly Vector3 SpawnPosition = new Vector3(0f, 1f, 0f);
 
+        // 攻撃を当てて試すダミーの出現位置（docs/11_combat_plan.md T3-2）。出現位置の右、計測のスタートの範囲の外。
+        private static readonly Vector3 DummySpawnPosition = new Vector3(4f, 1f, 0f);
+
         private readonly struct Zone
         {
             public readonly CourseZone.ZoneKind Kind;
@@ -184,6 +187,15 @@ namespace Degunatsu.Editor
 
             GameObject characterGo = CreateVisual(PrimitiveType.Cube, "Character", characterMaterial, Vector3.one);
             var characterView = characterGo.AddComponent<CharacterView>();
+            SetReference(characterView, "_hitboxLine", CreateHitboxLine("CharacterHitbox"));
+
+            Material dummyMaterial = LoadOrCreateMaterial("Dummy", new Color(0.55f, 0.5f, 0.6f));
+            var dummySpawn = new GameObject("DummySpawn").transform;
+            dummySpawn.position = DummySpawnPosition;
+            GameObject dummyGo = CreateVisual(PrimitiveType.Cube, "Dummy", dummyMaterial, Vector3.one);
+            dummyGo.transform.position = DummySpawnPosition;
+            var dummyView = dummyGo.AddComponent<CharacterView>();
+            SetReference(dummyView, "_hitboxLine", CreateHitboxLine("DummyHitbox"));
 
             var wireGo = new GameObject("Wire");
             var line = wireGo.AddComponent<LineRenderer>();
@@ -208,6 +220,8 @@ namespace Degunatsu.Editor
             SetReference(runner, "_wireView", wireView);
             SetReference(runner, "_aimIndicator", aimIndicator);
             SetReference(runner, "_camera", Object.FindFirstObjectByType<Camera>());
+            SetReferenceArray(runner, "_dummySpawns", new Object[] { dummySpawn });
+            SetReferenceArray(runner, "_dummyViews", new Object[] { dummyView });
 
             CreateMissIndicator(runner, Object.FindFirstObjectByType<Camera>());
 
@@ -353,6 +367,17 @@ namespace Degunatsu.Editor
             SetReference(view, "_camera", camera);
         }
 
+        /// <summary>攻撃の判定を描く線（キャラクターの子にしない。大きさの影響を受けないように）。</summary>
+        internal static LineRenderer CreateHitboxLine(string name)
+        {
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            LineRenderer line = CreateIndicatorLine(null, name, material, 0.05f);
+            line.startColor = line.endColor = new Color(1f, 0.2f, 0.2f, 0.9f);
+            line.loop = true;
+            line.enabled = false;
+            return line;
+        }
+
         internal static LineRenderer CreateIndicatorLine(Transform parent, string name, Material material, float width)
         {
             var go = new GameObject(name);
@@ -454,6 +479,22 @@ namespace Degunatsu.Editor
             {
                 throw new InvalidOperationException($"{target.GetType().Name}.{field} に参照を設定できなかった");
             }
+        }
+
+        internal static void SetReferenceArray(Object target, string field, Object[] values)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(field);
+            if (property == null || !property.isArray)
+            {
+                throw new InvalidOperationException($"{target.GetType().Name} に配列 {field} がない");
+            }
+            property.arraySize = values.Length;
+            for (int i = 0; i < values.Length; i++)
+            {
+                property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+            }
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         internal static void EnsureFolder(string folder)

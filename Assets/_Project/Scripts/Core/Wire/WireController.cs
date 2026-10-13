@@ -151,6 +151,21 @@ namespace Degunatsu.Core.Wire
             EnterCooldown(ref state, tuning.ReleaseCooldownTicks);
         }
 
+        /// <summary>
+        /// 攻撃を受けたときに呼ぶ。フックが飛んでいればやめ（外れた扱い）、接続していれば解除する【仮】（docs/11_combat_plan.md T3-2）。
+        /// </summary>
+        public static void Interrupt(ref CharacterState state, WireTuning tuning)
+        {
+            if (state.Wire.Phase == WirePhase.Firing)
+            {
+                Miss(ref state, WireMissReason.Interrupted);
+            }
+            else if (state.Wire.Phase == WirePhase.Attached)
+            {
+                Release(ref state, WireReleaseReason.Hit, tuning);
+            }
+        }
+
         private void UpdateAttached(ref CharacterState state, in InputFrame input, WireTuning tuning)
         {
             if (tuning.ButtonMode == WireButtonMode.Hold && !input.IsHeld(InputButtons.Wire))

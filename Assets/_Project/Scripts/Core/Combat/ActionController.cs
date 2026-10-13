@@ -7,7 +7,8 @@ using Degunatsu.Core.Wire;
 namespace Degunatsu.Core.Combat
 {
     /// <summary>
-    /// アクション状態の遷移を1か所で決める（docs/01_game_design.md 6.2、6.3）。今は攻撃の開始と終了だけ。
+    /// アクション状態の遷移を1か所で決める（docs/01_game_design.md 6.2、6.3）。今は攻撃の開始と終了、のけぞりの終了。
+    /// のけぞりに入るのは命中のとき（HitResolver）。
     /// - 攻撃は Free のときに攻撃ボタンを押すと始まる。ワイヤーを射出中・接続中は始められない
     ///   （ワイヤー→攻撃のキャンセルは docs/11_combat_plan.md の T3-3 で作る）。
     /// - 種類は、地上なら方向に関係なく地上技、空中なら移動のスティックの向きで決める（上下を優先。【仮】。D-35）。
@@ -15,13 +16,15 @@ namespace Degunatsu.Core.Combat
     /// </summary>
     public static class ActionController
     {
-        /// <summary>移動の前に呼ぶ。攻撃中ならティックを進めて、終わったら Free に戻す。Free なら攻撃を始めるかを決める。</summary>
+        /// <summary>
+        /// 移動の前に呼ぶ。攻撃中・のけぞり中ならティックを進めて、終わったら Free に戻す。Free なら攻撃を始めるかを決める。
+        /// </summary>
         public static void Update(ref CharacterState state, in InputFrame input, CombatTuning combat, float moveDeadzone)
         {
-            if (state.Action.Kind == ActionKind.Attack)
+            if (state.Action.Kind != ActionKind.Free)
             {
                 state.Action.Ticks++;
-                if (state.Action.Ticks < combat.Get(state.Action.Attack).TotalTicks)
+                if (state.Action.Ticks < EndTick(state.Action, combat))
                 {
                     return;
                 }
@@ -40,8 +43,8 @@ namespace Degunatsu.Core.Combat
         }
 
         /// <summary>
-        /// アクション中にシミュレーションへ渡す入力。攻撃中は移動・ジャンプ・ワイヤーの入力を無視する
-        /// （地上では止まり、空中では勢いのまま落ちる）。Free ならそのまま。
+        /// アクション中にシミュレーションへ渡す入力。攻撃中・のけぞり中は移動・ジャンプ・ワイヤーの入力を無視する
+        /// （空中では勢いのまま動く）。Free ならそのまま。
         /// </summary>
         public static PlayerInput ControlInput(in CharacterState state, PlayerInput input)
         {
@@ -103,6 +106,13 @@ namespace Degunatsu.Core.Combat
                 return move.Y > 0f ? AttackSlot.AirUp : AttackSlot.AirDown;
             }
             return x >= deadzone ? AttackSlot.AirSide : AttackSlot.AirNeutral;
+        }
+
+        // Free に戻る Ticks。攻撃は始めたティック（Ticks = 0）から数える。のけぞりは、命中したティック（すでに動いた後）の
+        // 次から数えるので、ヒットストップの後ちょうど Duration ティックの間のけぞる。
+        private static int EndTick(in ActionState action, CombatTuning combat)
+        {
+            return action.Kind == ActionKind.Attack ? combat.Get(action.Attack).TotalTicks : action.Duration + 1;
         }
 
         private static bool CanStartAttack(in CharacterState state)

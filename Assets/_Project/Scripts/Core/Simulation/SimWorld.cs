@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Degunatsu.Core.Combat;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Physics;
 
@@ -13,6 +14,7 @@ namespace Degunatsu.Core.Simulation
     public sealed class SimWorld
     {
         private readonly CharacterSimulator _simulator;
+        private readonly HitResolver _hits = new HitResolver();
         private readonly List<CharacterState> _states = new List<CharacterState>();
         private readonly List<CharacterConfig> _configs = new List<CharacterConfig>();
 
@@ -94,6 +96,7 @@ namespace Degunatsu.Core.Simulation
 
         /// <summary>
         /// 1ティック進める。inputs はキャラクターの番号順で、数が一致しなければ ArgumentException。
+        /// 全員を進めた後に、攻撃の命中を決めて当てる（HitResolver）。
         /// </summary>
         public void Step(IReadOnlyList<PlayerInput> inputs)
         {
@@ -114,6 +117,7 @@ namespace Degunatsu.Core.Simulation
                 _states[i] = state;
             }
             Tick++;
+            _hits.Resolve(_states, _configs, Tick);
         }
 
         private static void ValidateConfig(CharacterConfig config)

@@ -17,7 +17,8 @@ namespace Degunatsu.Runtime.Simulation
     /// <summary>
     /// シミュレーションを固定ティック（60Hz）で進め、表示を更新する（docs/03_architecture.md 4.1）。
     /// Update で経過時間をためて、1/60 秒ごとに SimWorld.Step を呼ぶ。表示は直前と現在のティックの状態を補間する。
-    /// プロトタイプでは、操作するキャラクター1人を動かす。
+    /// プロトタイプでは、操作するキャラクター1人と、攻撃を当てて試すためのダミー（入力なしでその場に立つ。
+    /// docs/11_combat_plan.md T3-2）を動かす。位置のリセット（R）でダミーも出現位置に戻す。
     /// </summary>
     public sealed class SimulationRunner : MonoBehaviour
     {
@@ -34,8 +35,13 @@ namespace Degunatsu.Runtime.Simulation
         [SerializeField] private CharacterView _characterView;
         [SerializeField] private WireView _wireView;
         [SerializeField] private AimIndicatorView _aimIndicator;
+        [Tooltip("ダミーの出現位置（攻撃を当てて試す相手。入力なし）")]
+        [SerializeField] private Transform[] _dummySpawns = new Transform[0];
+        [Tooltip("ダミーの表示（出現位置と同じ数・順番）")]
+        [SerializeField] private CharacterView[] _dummyViews = new CharacterView[0];
 
-        private readonly SimInput[] _inputs = new SimInput[1];
+        private SimInput[] _inputs = new SimInput[1];
+        private CharacterState[] _previousDummies = new CharacterState[0];
         private SimWorld _world;
         private BoxTerrain _terrain;
         private InputSystemAdapter _input;
@@ -57,6 +63,18 @@ namespace Degunatsu.Runtime.Simulation
 
         /// <summary>最後のティックで使った入力。</summary>
         public SimInput LastInput { get; private set; }
+
+        /// <summary>操作するキャラクターの表示。</summary>
+        public CharacterView PlayerView => _characterView;
+
+        /// <summary>ダミーの数。</summary>
+        public int DummyCount => _previousDummies.Length;
+
+        /// <summary>ダミー index の今の状態。</summary>
+        public CharacterState GetDummyState(int index)
+        {
+            return _world.GetState(_player + 1 + index);
+        }
 
         /// <summary>これまでに進めたティック数。</summary>
         public int CurrentTick => _world.Tick;
@@ -104,6 +122,18 @@ namespace Degunatsu.Runtime.Simulation
             _world = new SimWorld(terrain);
             _player = _world.AddCharacter(_character.Config, _spawnPoint.position.ToNumerics());
             _previous = _world.GetState(_player);
+            if (_dummyViews.Length != _dummySpawns.Length)
+            {
+                Debug.LogError($"{name}: ダミーの出現位置（{_dummySpawns.Length}）と表示（{_dummyViews.Length}）の数が違います", this);
+            }
+            int dummies = Mathf.Min(_dummySpawns.Length, _dummyViews.Length);
+            _previousDummies = new CharacterState[dummies];
+            for (int i = 0; i < dummies; i++)
+            {
+                _world.AddCharacter(_character.Config, _dummySpawns[i].position.ToNumerics(), -1);
+                _previousDummies[i] = GetDummyState(i);
+            }
+            _inputs = new SimInput[1 + dummies];
             _input = new InputSystemAdapter(_inputActions);
         }
 
@@ -151,6 +181,10 @@ namespace Degunatsu.Runtime.Simulation
         private void StepTick()
         {
             _previous = _world.GetState(_player);
+            for (int i = 0; i < _previousDummies.Length; i++)
+            {
+                _previousDummies[i] = GetDummyState(i);
+            }
             SimInput input = _input.ConsumeTick(_previous.Position);
             if (InputOverride != null)
             {
@@ -176,6 +210,12 @@ namespace Degunatsu.Runtime.Simulation
             {
                 _characterView.Render(_previous, current, alpha, _character.Config.Movement.HalfExtents.ToUnity());
                 _characterView.RenderAction(current, _character.Config.Combat);
+            }
+            for (int i = 0; i < _previousDummies.Length; i++)
+            {
+                CharacterState dummy = GetDummyState(i);
+                _dummyViews[i].Render(_previousDummies[i], dummy, alpha, _character.Config.Movement.HalfExtents.ToUnity());
+                _dummyViews[i].RenderAction(dummy, _character.Config.Combat);
             }
             if (_wireView != null)
             {
@@ -206,8 +246,22 @@ namespace Degunatsu.Runtime.Simulation
             PlayerReset?.Invoke();
         }
 
+        /// <summary>
+        /// ダミーを出現位置に戻す。入力の記録と再生の始めにも呼ぶ（ダミーに当てた記録を、同じ条件で再生するため。
+        /// ただし、ダミーのいない照合のテスト（RecordedReplayTests）とは一致しない）。
+        /// </summary>
+        public void ResetDummies()
+        {
+            for (int i = 0; i < _previousDummies.Length; i++)
+            {
+                _world.SetState(_player + 1 + i, CharacterState.Spawn(_dummySpawns[i].position.ToNumerics(), -1));
+                _previousDummies[i] = GetDummyState(i);
+            }
+        }
+
         private void ResetPlayer()
         {
+            ResetDummies();
             SetPlayerState(CharacterState.Spawn(_spawnPoint.position.ToNumerics(), 1));
         }
     }

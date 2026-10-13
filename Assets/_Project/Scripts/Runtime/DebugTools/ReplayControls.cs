@@ -139,6 +139,7 @@ namespace Degunatsu.Runtime.DebugTools
                 Message = "Stop the replay first (F6)";
                 return;
             }
+            _runner.ResetDummies();
             _recorder.Restart(_runner.PlayerState, _runner.PlayerConfig.Wire.ModelType);
             _recording = true;
             Message = "Recording... (F5: stop and save)";
@@ -219,6 +220,7 @@ namespace Degunatsu.Runtime.DebugTools
             }
 
             StopReplay();
+            _runner.ResetDummies();
             _runner.SetPlayerState(recording.StartState);
             _playback = new Playback(recording, Path.GetFileName(path), sameConfig);
             _runner.InputOverride = _playback;

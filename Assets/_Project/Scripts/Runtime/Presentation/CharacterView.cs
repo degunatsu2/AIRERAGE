@@ -7,22 +7,56 @@ namespace Degunatsu.Runtime.Presentation
 {
     /// <summary>
     /// キャラクターの状態を箱で表示する（プロトタイプ用）。直前と現在のティックの状態を補間する。
-    /// 攻撃中は、攻撃の段階（発生・持続・硬直）で箱の色を変える（命中の判定と見た目ができるまでの仮の表示。docs/11_combat_plan.md T3-1）。
+    /// 戦闘の状態を色で示す（判定と見た目ができるまでの仮の表示。docs/11_combat_plan.md）: 攻撃の段階（発生・持続・硬直）、
+    /// ヒットストップ、のけぞり。攻撃の判定が出ている間は、その箱を線で描く（_hitboxLine があれば）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
     {
+        private enum Tint
+        {
+            None,
+            Startup,
+            Active,
+            Recovery,
+            Hitstop,
+            Hitstun,
+        }
+
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         [SerializeField] private Color _startupColor = new Color(1f, 0.85f, 0.2f);
         [SerializeField] private Color _activeColor = new Color(0.95f, 0.15f, 0.15f);
         [SerializeField] private Color _recoveryColor = new Color(0.45f, 0.5f, 0.8f);
+        [SerializeField] private Color _hitstopColor = Color.white;
+        [SerializeField] private Color _hitstunColor = new Color(1f, 0.55f, 0.85f);
+        [Tooltip("攻撃の判定を描く線（4辺。なくてもよい）")]
+        [SerializeField] private LineRenderer _hitboxLine;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
+        private Tint _shown;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
-        public AttackPhase? ShownPhase { get; private set; }
+        public AttackPhase? ShownPhase
+        {
+            get
+            {
+                switch (_shown)
+                {
+                    case Tint.Startup: return AttackPhase.Startup;
+                    case Tint.Active: return AttackPhase.Active;
+                    case Tint.Recovery: return AttackPhase.Recovery;
+                    default: return null;
+                }
+            }
+        }
+
+        /// <summary>のけぞり（ヒットストップを含む）を表示しているか。</summary>
+        public bool ShowingHit => _shown == Tint.Hitstop || _shown == Tint.Hitstun;
+
+        /// <summary>攻撃の判定を描いているか。</summary>
+        public bool ShowingHitbox => _hitboxLine != null && _hitboxLine.enabled;
 
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
@@ -30,20 +64,21 @@ namespace Degunatsu.Runtime.Presentation
             transform.localScale = halfExtents * 2f;
         }
 
-        /// <summary>アクション状態（攻撃の段階）を色で示す。</summary>
+        /// <summary>アクション状態（攻撃の段階、ヒットストップ、のけぞり）を色で示し、攻撃の判定を描く。</summary>
         public void RenderAction(in CharacterState current, CombatTuning combat)
         {
-            AttackPhase? phase = ActionController.CurrentPhase(current, combat);
-            if (phase == ShownPhase)
+            RenderHitbox(current, combat);
+            Tint tint = TintOf(current, combat);
+            if (tint == _shown)
             {
                 return;
             }
-            ShownPhase = phase;
+            _shown = tint;
             if (_renderer == null && !TryGetComponent(out _renderer))
             {
                 return;
             }
-            if (phase == null)
+            if (tint == Tint.None)
             {
                 _renderer.SetPropertyBlock(null);
                 return;
@@ -52,8 +87,65 @@ namespace Degunatsu.Runtime.Presentation
             {
                 _block = new MaterialPropertyBlock();
             }
-            _block.SetColor(BaseColorId, phase == AttackPhase.Startup ? _startupColor : phase == AttackPhase.Active ? _activeColor : _recoveryColor);
+            _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        private static Tint TintOf(in CharacterState state, CombatTuning combat)
+        {
+            if (state.Combat.HitstopTicksLeft > 0 && state.Action.Kind == ActionKind.Hitstun)
+            {
+                return Tint.Hitstop;
+            }
+            switch (state.Action.Kind)
+            {
+                case ActionKind.Hitstun:
+                    return Tint.Hitstun;
+                case ActionKind.Attack:
+                    switch (combat.Get(state.Action.Attack).PhaseAt(state.Action.Ticks))
+                    {
+                        case AttackPhase.Startup: return Tint.Startup;
+                        case AttackPhase.Active: return Tint.Active;
+                        default: return Tint.Recovery;
+                    }
+                default:
+                    return Tint.None;
+            }
+        }
+
+        private Color ColorOf(Tint tint)
+        {
+            switch (tint)
+            {
+                case Tint.Startup: return _startupColor;
+                case Tint.Active: return _activeColor;
+                case Tint.Recovery: return _recoveryColor;
+                case Tint.Hitstop: return _hitstopColor;
+                default: return _hitstunColor;
+            }
+        }
+
+        private void RenderHitbox(in CharacterState state, CombatTuning combat)
+        {
+            if (_hitboxLine == null)
+            {
+                return;
+            }
+            bool active = state.Action.Kind == ActionKind.Attack
+                && combat.Get(state.Action.Attack).PhaseAt(state.Action.Ticks) == AttackPhase.Active;
+            _hitboxLine.enabled = active;
+            if (!active)
+            {
+                return;
+            }
+            HitResolver.Hitbox(state, combat.Get(state.Action.Attack), out System.Numerics.Vector2 center, out System.Numerics.Vector2 half);
+            const float z = -0.6f; // キャラクターの手前に描く
+            _hitboxLine.loop = true;
+            _hitboxLine.positionCount = 4;
+            _hitboxLine.SetPosition(0, new Vector3(center.X - half.X, center.Y - half.Y, z));
+            _hitboxLine.SetPosition(1, new Vector3(center.X + half.X, center.Y - half.Y, z));
+            _hitboxLine.SetPosition(2, new Vector3(center.X + half.X, center.Y + half.Y, z));
+            _hitboxLine.SetPosition(3, new Vector3(center.X - half.X, center.Y + half.Y, z));
         }
     }
 }

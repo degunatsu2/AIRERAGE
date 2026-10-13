@@ -78,7 +78,8 @@ namespace Degunatsu.Runtime.Presentation
             {
                 return;
             }
-            bool canceled = wire.LastMissReason == WireMissReason.ButtonReleased || wire.LastMissReason == WireMissReason.ButtonToggled;
+            bool canceled = wire.LastMissReason == WireMissReason.ButtonReleased || wire.LastMissReason == WireMissReason.ButtonToggled
+                || wire.LastMissReason == WireMissReason.Interrupted;
             Show(wire.HookPosition.ToUnity(), canceled ? "CANCEL" : "MISS", canceled ? _cancelColor : _missColor);
         }
 

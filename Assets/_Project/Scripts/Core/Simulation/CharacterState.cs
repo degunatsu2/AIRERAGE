@@ -30,6 +30,9 @@ namespace Degunatsu.Core.Simulation
         /// <summary>アクション状態（Free / 攻撃など。docs/01_game_design.md 6.2）。</summary>
         public ActionState Action;
 
+        /// <summary>ヒットストップ、最後にダメージを与えた人、コンボなど（docs/11_combat_plan.md T3-2）。</summary>
+        public CombatState Combat;
+
         public static CharacterState Spawn(Vector3 position, int facing)
         {
             return new CharacterState
@@ -50,7 +53,8 @@ namespace Degunatsu.Core.Simulation
                 && AirJumpsUsed == other.AirJumpsUsed
                 && PreviousButtons == other.PreviousButtons
                 && Wire.Equals(other.Wire)
-                && Action.Equals(other.Action);
+                && Action.Equals(other.Action)
+                && Combat.Equals(other.Combat);
         }
 
         public override bool Equals(object obj)
@@ -71,12 +75,13 @@ namespace Degunatsu.Core.Simulation
             hash.Add(PreviousButtons);
             hash.Add(Wire);
             hash.Add(Action);
+            hash.Add(Combat);
             return hash.ToHashCode();
         }
 
         public override string ToString()
         {
-            return $"pos={Position} vel={Velocity} grounded={Grounded} wire={Wire.Phase} action={Action}";
+            return $"pos={Position} vel={Velocity} grounded={Grounded} wire={Wire.Phase} action={Action} {Combat}";
         }
     }
 }

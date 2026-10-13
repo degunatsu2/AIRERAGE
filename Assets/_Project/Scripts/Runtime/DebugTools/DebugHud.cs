@@ -14,7 +14,7 @@ namespace Degunatsu.Runtime.DebugTools
     /// </summary>
     public sealed class DebugHud : MonoBehaviour
     {
-        private const float Width = 360f;
+        private const float Width = 420f;
 
         [SerializeField] private SimulationRunner _runner;
 
@@ -107,16 +107,37 @@ namespace Degunatsu.Runtime.DebugTools
             }
             _text.Append('\n');
             _text.Append("Last release ").Append(w.LastReleaseReason).Append("  Last miss ").Append(w.LastMissReason).Append('\n');
-            _text.Append("Action ").Append(s.Action.Kind);
+            AppendAction("Action ", s);
+            int lines = 10;
+            if (_runner.DummyCount > 0)
+            {
+                CharacterState dummy = _runner.GetDummyState(0);
+                _text.Append('\n');
+                AppendAction("Dummy ", dummy);
+                _text.Append("  Combo ").Append(dummy.Combat.ComboCount).Append(" (dmg ").Append(dummy.Combat.ComboDamage).Append(')');
+                lines++;
+            }
+            GUI.Box(new Rect(Screen.width - Width - 10f, 10f, Width, 12f + 21f * lines), _text.ToString(), _style);
+        }
+
+        // アクション状態の1行（攻撃なら種類と段階、のけぞりなら残り。ヒットストップ中ならその残り）。
+        private void AppendAction(string label, in CharacterState s)
+        {
+            _text.Append(label).Append(s.Action.Kind);
             if (s.Action.Kind == ActionKind.Attack)
             {
                 AttackData attack = _runner.PlayerConfig.Combat.Get(s.Action.Attack);
                 _text.Append(' ').Append(s.Action.Attack).Append(' ').Append(attack.PhaseAt(s.Action.Ticks))
                     .Append(" (").Append(s.Action.Ticks + 1).Append('/').Append(attack.TotalTicks).Append("t)");
             }
-
-            const int lines = 10;
-            GUI.Box(new Rect(Screen.width - Width - 10f, 10f, Width, 12f + 21f * lines), _text.ToString(), _style);
+            else if (s.Action.Kind == ActionKind.Hitstun)
+            {
+                _text.Append(" (").Append(s.Action.Ticks).Append('/').Append(s.Action.Duration).Append("t)");
+            }
+            if (s.Combat.HitstopTicksLeft > 0)
+            {
+                _text.Append("  Hitstop ").Append(s.Combat.HitstopTicksLeft).Append('t');
+            }
         }
     }
 }

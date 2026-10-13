@@ -34,6 +34,9 @@ namespace Degunatsu.Core.Wire
         ButtonToggled,
         MaxDuration,
         LineBlocked,
+
+        /// <summary>攻撃を受けて外れた（docs/11_combat_plan.md T3-2）。</summary>
+        Hit,
     }
 
     /// <summary>
@@ -46,6 +49,9 @@ namespace Degunatsu.Core.Wire
         HitNonAttachable,
         ButtonReleased,
         ButtonToggled,
+
+        /// <summary>フックが飛んでいる間に攻撃を受けて、やめた（docs/11_combat_plan.md T3-2）。</summary>
+        Interrupted,
     }
 
     /// <summary>

@@ -28,7 +28,7 @@ namespace Degunatsu.PlayMode.Tests
             yield return null;
 
             var runner = Object.FindFirstObjectByType<SimulationRunner>();
-            var view = Object.FindFirstObjectByType<CharacterView>();
+            CharacterView view = runner != null ? runner.PlayerView : null;
             Assert.That(runner, Is.Not.Null, "SimulationRunner がない");
             Assert.That(runner.enabled, Is.True, "SimulationRunner が無効になっている（設定の不足）");
             Assert.That(view, Is.Not.Null, "CharacterView がない");

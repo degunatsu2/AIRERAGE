@@ -17,7 +17,7 @@ namespace Degunatsu.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 3;
+        public const int FormatVersion = 4;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -138,6 +138,16 @@ namespace Degunatsu.Core.Simulation
             writer.Write((byte)action.Kind);
             writer.Write((byte)action.Attack);
             writer.Write(action.Ticks);
+            writer.Write(action.Duration);
+            writer.Write(action.HitMask);
+
+            CombatState combat = state.Combat;
+            writer.Write(combat.HitstopTicksLeft);
+            writer.Write(combat.HasLastAttacker);
+            writer.Write(combat.LastAttacker);
+            writer.Write(combat.LastDamagedTick);
+            writer.Write(combat.ComboCount);
+            writer.Write(combat.ComboDamage);
         }
 
         public static CharacterState Read(BinaryReader reader)
@@ -183,6 +193,17 @@ namespace Degunatsu.Core.Simulation
                 Kind = (ActionKind)reader.ReadByte(),
                 Attack = (AttackSlot)reader.ReadByte(),
                 Ticks = reader.ReadInt32(),
+                Duration = reader.ReadInt32(),
+                HitMask = reader.ReadByte(),
+            };
+            state.Combat = new CombatState
+            {
+                HitstopTicksLeft = reader.ReadInt32(),
+                HasLastAttacker = reader.ReadBoolean(),
+                LastAttacker = reader.ReadByte(),
+                LastDamagedTick = reader.ReadInt32(),
+                ComboCount = reader.ReadInt32(),
+                ComboDamage = reader.ReadInt32(),
             };
             return state;
         }

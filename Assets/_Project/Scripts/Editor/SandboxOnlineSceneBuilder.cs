@@ -81,6 +81,7 @@ namespace Degunatsu.Editor
                 characterGo.transform.SetParent(playersRoot, false);
                 characterGo.transform.position = spawn.position;
                 characterViews[p] = characterGo.AddComponent<CharacterView>();
+                SandboxWireSceneBuilder.SetReference(characterViews[p], "_hitboxLine", SandboxWireSceneBuilder.CreateHitboxLine($"Player{p + 1}Hitbox"));
                 wireViews[p] = CreateWire(playersRoot, $"Player{p + 1}Wire", wireMaterial, attachedAnchorMaterial);
             }
 
@@ -94,8 +95,8 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.SetReference(runner, "_camera", Object.FindFirstObjectByType<Camera>());
             SandboxWireSceneBuilder.SetReference(runner, "_followCamera", followCamera);
             SandboxWireSceneBuilder.SetReference(runner, "_aimIndicator", aimIndicator);
-            SetReferenceArray(runner, "_characterViews", characterViews);
-            SetReferenceArray(runner, "_wireViews", wireViews);
+            SandboxWireSceneBuilder.SetReferenceArray(runner, "_characterViews", characterViews);
+            SandboxWireSceneBuilder.SetReferenceArray(runner, "_wireViews", wireViews);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
@@ -121,22 +122,6 @@ namespace Degunatsu.Editor
             var wireView = wireGo.AddComponent<WireView>();
             SandboxWireSceneBuilder.SetReference(wireView, "_anchorMarker", anchorMarker.transform);
             return wireView;
-        }
-
-        private static void SetReferenceArray(Object target, string field, Object[] values)
-        {
-            var serialized = new SerializedObject(target);
-            SerializedProperty property = serialized.FindProperty(field);
-            if (property == null || !property.isArray)
-            {
-                throw new InvalidOperationException($"{target.GetType().Name} に配列 {field} がない");
-            }
-            property.arraySize = values.Length;
-            for (int i = 0; i < values.Length; i++)
-            {
-                property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
-            }
-            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
     }
 }

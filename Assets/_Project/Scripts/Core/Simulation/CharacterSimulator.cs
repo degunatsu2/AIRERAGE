@@ -11,7 +11,8 @@ namespace Degunatsu.Core.Simulation
     /// <summary>
     /// キャラクター1人分の1ティックの処理の順序を決める。
     /// 入力 → アクション（攻撃）→ ワイヤーのフェーズ → 速度（ワイヤーまたは通常移動）→ 移動と衝突 → ロープ長の補正 → 接地。
-    /// アクション中（攻撃中）は、移動・ジャンプ・ワイヤーの入力を無視し、向きも変えない（ActionController.ControlInput）。
+    /// アクション中（攻撃中・のけぞり中）は、移動・ジャンプ・ワイヤーの入力を無視し、向きも変えない（ActionController.ControlInput）。
+    /// ヒットストップの間は、何も進めずに止まる（ボタンの前の状態も変えないので、止まっている間に押したボタンは止まりが解けてから効く）。
     /// </summary>
     public sealed class CharacterSimulator
     {
@@ -30,6 +31,12 @@ namespace Degunatsu.Core.Simulation
 
         public void Step(ref CharacterState state, PlayerInput input, CharacterConfig config)
         {
+            if (state.Combat.HitstopTicksLeft > 0)
+            {
+                state.Combat.HitstopTicksLeft--;
+                return;
+            }
+
             var frame = new InputFrame(input, state.PreviousButtons);
             MovementTuning movement = config.Movement;
             var halfExtents = movement.HalfExtents;
