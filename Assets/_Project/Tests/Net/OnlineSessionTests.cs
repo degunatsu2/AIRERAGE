@@ -196,6 +196,47 @@ namespace Degunatsu.Net.Tests
         }
 
         [Test]
+        public void Restart_StartsANewMatch_ForEveryone_AndStaysInSync()
+        {
+            // 遅延と欠落があっても、前の試合の入力やチェックサムが新しい試合に混ざらない（試合の番号で分ける）。
+            OnlineSession host = Host();
+            OnlineSession client = Join(host);
+            PumpUntil(() => client.LocalPlayer >= 0);
+            host.Link.SetSimulatedConditions(40, 5, 5);
+            client.Link.SetSimulatedConditions(40, 5, 5);
+            var rules = new MatchRules { CountdownTicks = 20, DurationTicks = 100 };
+            host.StartMatch(rules);
+            PumpUntil(() => _sessions.TrueForAll(s => s.World != null && s.World.Phase == MatchPhase.Finished));
+            int firstMatch = host.MatchNumber;
+
+            host.RestartMatch(rules);
+            PumpUntil(() => client.MatchNumber == host.MatchNumber);
+            Assert.That(host.MatchNumber, Is.EqualTo(firstMatch + 1));
+            foreach (OnlineSession session in _sessions)
+            {
+                session.TickLimit = 200;
+            }
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == 200 && s.Session.ConfirmedTick >= 199));
+            PumpFrames(2);
+
+            Assert.That(client.World.Checksum(), Is.EqualTo(host.World.Checksum()), "始め直した後に状態が違う");
+            Assert.That(host.Desyncs, Is.Empty, "前の試合のチェックサムが混ざった");
+            Assert.That(client.World.Phase, Is.EqualTo(MatchPhase.Finished));
+        }
+
+        [Test]
+        public void RestartMatch_OnlyForTheHostDuringAMatch()
+        {
+            OnlineSession host = Host();
+            Assert.Throws<InvalidOperationException>(() => host.RestartMatch(), "ロビーで始め直せた");
+            OnlineSession client = Join(host);
+            PumpUntil(() => client.LocalPlayer >= 0);
+            host.StartMatch();
+            PumpUntil(() => client.State == OnlineSession.SessionState.Running);
+            Assert.Throws<InvalidOperationException>(() => client.RestartMatch(), "クライアントが始め直せた");
+        }
+
+        [Test]
         public void StartMatch_WithoutRules_HasNoTimeLimit()
         {
             OnlineSession host = Host();

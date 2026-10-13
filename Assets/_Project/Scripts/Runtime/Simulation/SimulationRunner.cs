@@ -98,6 +98,7 @@ namespace Degunatsu.Runtime.Simulation
         CharacterConfig ISimulationFeed.GetConfig(int index) => _world.GetConfig(index);
         string ISimulationFeed.LabelOf(int index) => index == _player ? "PLAYER" : $"DUMMY {index - _player}";
         MatchRules ISimulationFeed.Rules => _world?.Rules;
+        Color ISimulationFeed.ColorOf(int index) => index == _player ? new Color(0.95f, 0.55f, 0.2f) : new Color(0.7f, 0.7f, 0.75f);
 
         /// <summary>ステージの範囲があるか（外に出ると撃破になるか。T3-3）。</summary>
         public bool HasStageBounds => _world.Bounds.HasValue;

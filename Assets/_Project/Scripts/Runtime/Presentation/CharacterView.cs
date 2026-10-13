@@ -22,6 +22,11 @@ namespace Degunatsu.Runtime.Presentation
         // 無敵の間の点滅の速さ（回/秒）。
         private const float BlinkPerSecond = 10f;
 
+        // ワイヤーキャンセルとガードのクールタイムのゲージを同時に出すときの半径（m）。内側の文字は下、外側の文字は上に出す
+        // （ゲージと文字が重ならないように。ユーザーの指摘、2026-10-13）。
+        private const float StackedInnerRadius = 1.2f;
+        private const float StackedOuterRadius = 2.3f;
+
         private enum Tint
         {
             None,
@@ -141,8 +146,8 @@ namespace Degunatsu.Runtime.Presentation
             RenderHitbox(current, combat);
             Tint tint = TintOf(current, combat);
             RenderCharge(current, combat, tint == Tint.Charge);
-            RenderWireCancelCooldown(current, combat);
-            RenderGuard(current, combat);
+            RenderCooldownGauges(current, combat);
+            RenderGuard(current);
             RenderBursts(current);
             RenderVisibility(current);
             RenderRespawn(current, respawnDelayTicks);
@@ -231,7 +236,7 @@ namespace Degunatsu.Runtime.Presentation
             _shownWireCancelCooldown = c.WireCancelCooldownTicksLeft;
         }
 
-        private void RenderGuard(in CharacterState state, CombatTuning combat)
+        private void RenderGuard(in CharacterState state)
         {
             if (_guardEffect != null)
             {
@@ -248,37 +253,41 @@ namespace Degunatsu.Runtime.Presentation
             }
             _shownJustGuards = state.Combat.JustGuardCount;
             _shownGuarded = state.Combat.GuardedCount;
+        }
 
+        // ワイヤーキャンセルとガードのクールタイムのゲージ。両方を出すときは、半径を離し、文字を上と下に分ける。
+        private void RenderCooldownGauges(in CharacterState state, CombatTuning combat)
+        {
+            float wire = Fraction(state.Combat.WireCancelCooldownTicksLeft, combat.WireCancelCooldownTicks);
+            float guard = Fraction(state.Combat.GuardCooldownTicksLeft, combat.GuardCooldownTicks);
+            bool both = wire > 0f && guard > 0f && _wireCancelGauge != null && _guardGauge != null;
+            if (_wireCancelGauge != null)
+            {
+                _wireCancelGauge.SetLayout(both ? StackedInnerRadius : (float?)null, both);
+                ShowOrHide(_wireCancelGauge, wire);
+            }
             if (_guardGauge != null)
             {
-                int left = state.Combat.GuardCooldownTicksLeft;
-                if (left > 0 && combat.GuardCooldownTicks > 0)
-                {
-                    _guardGauge.Show(transform.position, (float)left / combat.GuardCooldownTicks);
-                }
-                else if (_guardGauge.IsShowing)
-                {
-                    _guardGauge.Hide();
-                }
+                _guardGauge.SetLayout(both ? StackedOuterRadius : (float?)null, false);
+                ShowOrHide(_guardGauge, guard);
             }
         }
 
-        private void RenderWireCancelCooldown(in CharacterState state, CombatTuning combat)
+        private void ShowOrHide(RingGaugeView gauge, float fraction)
         {
-            if (_wireCancelGauge == null)
+            if (fraction > 0f)
             {
-                return;
+                gauge.Show(transform.position, fraction);
             }
-            int left = state.Combat.WireCancelCooldownTicksLeft;
-            if (left <= 0 || combat.WireCancelCooldownTicks <= 0)
+            else if (gauge.IsShowing)
             {
-                if (_wireCancelGauge.IsShowing)
-                {
-                    _wireCancelGauge.Hide();
-                }
-                return;
+                gauge.Hide();
             }
-            _wireCancelGauge.Show(transform.position, (float)left / combat.WireCancelCooldownTicks);
+        }
+
+        private static float Fraction(int left, int total)
+        {
+            return left > 0 && total > 0 ? (float)left / total : 0f;
         }
 
         private void RenderCharge(in CharacterState state, CombatTuning combat, bool charging)

@@ -19,6 +19,8 @@ namespace Degunatsu.Net
     ///   全員に送り（Start）、全員が同じワールドで始める。試合中の参加はできない。
     /// - 不一致の検出: 確定した状態のチェックサムを ChecksumIntervalTicks ごとにホストへ送り、ホストが自分の値と比べる。
     /// - ステージ（OnlineStage）: 地形、出現位置、ステージの範囲（撃破）、ギミック。全員が自分のシーンから作る。
+    /// - 再戦: ホストが RestartMatch を呼ぶと、同じ人で、新しい試合の番号で始め直す。入力とチェックサムのメッセージには
+    ///   試合の番号をつけ、今の試合のものだけを使う（前の試合のメッセージが遅れて届いても混ざらない）。
     /// </summary>
     public sealed class OnlineSession : IDisposable
     {
@@ -77,6 +79,9 @@ namespace Degunatsu.Net
 
         /// <summary>試合の人数（始まるまで 0）。</summary>
         public int PlayerCount { get; private set; }
+
+        /// <summary>今の試合の番号（始まるたびに 1 増える。0〜255 を繰り返す。始まるまで 0）。</summary>
+        public int MatchNumber { get; private set; }
 
         /// <summary>ロビーにいるプレイヤーの数（ホストのみ。自分を含む）。</summary>
         public int LobbyPlayerCount
@@ -201,12 +206,30 @@ namespace Degunatsu.Net
             {
                 throw new InvalidOperationException("試合を始められるのは、ロビーにいるホストだけです");
             }
+            SendStartAndBegin(LobbyPlayerCount, rules);
+        }
+
+        /// <summary>
+        /// 同じ人で試合を始め直す（ホストのみ、試合中か試合が終わった後。結果の画面の「Restart」）。rules は StartMatch と同じ。
+        /// 試合の番号が変わり、全員が新しいワールドで始める。
+        /// </summary>
+        public void RestartMatch(MatchRules rules = null)
+        {
+            if (!IsHost || State != SessionState.Running)
+            {
+                throw new InvalidOperationException("試合を始め直せるのは、試合中のホストだけです");
+            }
+            SendStartAndBegin(PlayerCount, rules);
+        }
+
+        private void SendStartAndBegin(int count, MatchRules rules)
+        {
             rules = rules ?? MatchRules.FreePlay();
             rules.Validate().ThrowIfInvalid();
-            int count = LobbyPlayerCount;
+            int match = (MatchNumber + 1) & 0xFF;
             // ホストも送ったものと同じ JSON から作った値を使う（全員が同じ値になり、試合中にアセットを編集しても影響しない）。
             string json = JsonUtility.ToJson(new StartSettings { Character = _hostConfig, Match = rules });
-            byte[] start = NetMessages.Start(count, json);
+            byte[] start = NetMessages.Start(count, match, json);
             for (int p = 1; p < MaxPlayers; p++)
             {
                 if (_playerPeer[p] >= 0)
@@ -214,7 +237,7 @@ namespace Degunatsu.Net
                     _link.Send(_playerPeer[p], start, reliable: true);
                 }
             }
-            Begin(count, SettingsFromJson(json));
+            Begin(count, match, SettingsFromJson(json));
         }
 
         /// <summary>
@@ -316,7 +339,7 @@ namespace Degunatsu.Net
                 {
                     continue;
                 }
-                byte[] data = NetMessages.Input(p, Exchange.BuildMessage(p).ToBytes());
+                byte[] data = NetMessages.Input(MatchNumber, p, Exchange.BuildMessage(p).ToBytes());
                 if (IsHost)
                 {
                     _link.Send(_playerPeer[p], data, reliable: false);
@@ -347,7 +370,7 @@ namespace Degunatsu.Net
             }
             else
             {
-                _link.Send(0, NetMessages.Checksum(LocalPlayer, _nextChecksumTick, checksum), reliable: true);
+                _link.Send(0, NetMessages.Checksum(MatchNumber, LocalPlayer, _nextChecksumTick, checksum), reliable: true);
             }
             _nextChecksumTick += ChecksumIntervalTicks;
         }
@@ -387,9 +410,15 @@ namespace Degunatsu.Net
             }
         }
 
-        private void Begin(int playerCount, StartSettings settings)
+        private void Begin(int playerCount, int match, StartSettings settings)
         {
             PlayerCount = playerCount;
+            MatchNumber = match;
+            // 前の試合（再戦の前）の進み具合を残さない。
+            _accumulator = 0f;
+            _waitFrames = 0;
+            _nextChecksumTick = ChecksumIntervalTicks;
+            _checksums.Clear();
             World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match);
             for (int p = 0; p < playerCount; p++)
             {
@@ -483,8 +512,9 @@ namespace Degunatsu.Net
             switch (NetMessages.KindOf(e.Data))
             {
                 case NetKind.Input:
-                    if (State != SessionState.Running)
+                    if (State != SessionState.Running || NetMessages.InputMatch(e.Data) != MatchNumber)
                     {
+                        // 試合の前か、前の試合のメッセージ（再戦の前に送られて遅れて届いた）。
                         return;
                     }
                     int target = NetMessages.InputTarget(e.Data);
@@ -499,8 +529,8 @@ namespace Degunatsu.Net
                     break;
 
                 case NetKind.Checksum:
-                    NetMessages.ReadChecksum(e.Data, out int player, out int tick, out ulong checksum);
-                    if (State == SessionState.Running && player > 0 && player < PlayerCount)
+                    NetMessages.ReadChecksum(e.Data, out int checksumMatch, out int player, out int tick, out ulong checksum);
+                    if (State == SessionState.Running && checksumMatch == MatchNumber && player > 0 && player < PlayerCount)
                     {
                         RecordChecksum(player, tick, checksum);
                     }
@@ -534,11 +564,12 @@ namespace Degunatsu.Net
                             Status = "The host refused (full or already playing)";
                             break;
                         case NetKind.Start:
-                            NetMessages.ReadStart(e.Data, out int count, out string json);
-                            Begin(count, SettingsFromJson(json));
+                            NetMessages.ReadStart(e.Data, out int count, out int match, out string json);
+                            Begin(count, match, SettingsFromJson(json));
                             break;
                         case NetKind.Input:
-                            if (State == SessionState.Running && NetMessages.InputTarget(e.Data) == LocalPlayer)
+                            if (State == SessionState.Running && NetMessages.InputMatch(e.Data) == MatchNumber
+                                && NetMessages.InputTarget(e.Data) == LocalPlayer)
                             {
                                 Exchange.Receive(Degunatsu.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data)));
                             }

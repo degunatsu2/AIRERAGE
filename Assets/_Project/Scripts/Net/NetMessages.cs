@@ -10,7 +10,7 @@ namespace Degunatsu.Net
         /// <summary>ホスト → クライアント: あなたのプレイヤーの番号。</summary>
         Welcome = 1,
 
-        /// <summary>ホスト → 全員: 試合の開始（人数と調整値）。</summary>
+        /// <summary>ホスト → 全員: 試合の開始（人数、試合の番号、調整値とルール）。再戦のときも送る。</summary>
         Start = 2,
 
         /// <summary>入力のメッセージ（InputMessage）。宛先のプレイヤーの番号つき。ホストが中継する。</summary>
@@ -54,53 +54,68 @@ namespace Degunatsu.Net
             return new[] { (byte)NetKind.Refused };
         }
 
-        public static byte[] Start(int playerCount, string configJson)
+        /// <summary>試合の開始（人数、試合の番号、調整値とルールの JSON）。同じ人で再戦するときも送る（番号が変わる）。</summary>
+        public static byte[] Start(int playerCount, int match, string configJson)
         {
             byte[] config = Encoding.UTF8.GetBytes(configJson ?? string.Empty);
-            var data = new byte[2 + config.Length];
+            var data = new byte[3 + config.Length];
             data[0] = (byte)NetKind.Start;
             data[1] = (byte)playerCount;
-            Array.Copy(config, 0, data, 2, config.Length);
+            data[2] = (byte)match;
+            Array.Copy(config, 0, data, 3, config.Length);
             return data;
         }
 
-        public static void ReadStart(byte[] data, out int playerCount, out string configJson)
+        public static void ReadStart(byte[] data, out int playerCount, out int match, out string configJson)
         {
-            Expect(data, NetKind.Start, 2);
+            Expect(data, NetKind.Start, 3);
             playerCount = data[1];
-            configJson = Encoding.UTF8.GetString(data, 2, data.Length - 2);
+            match = data[2];
+            configJson = Encoding.UTF8.GetString(data, 3, data.Length - 3);
         }
 
-        /// <summary>宛先 target への入力のメッセージ（InputMessage.ToBytes）を包む。</summary>
-        public static byte[] Input(int target, byte[] inputMessage)
+        /// <summary>
+        /// 宛先 target への入力のメッセージ（InputMessage.ToBytes）を包む。試合の番号 match をつける
+        /// （再戦の後に、前の試合の入力が遅れて届いても使わないように）。
+        /// </summary>
+        public static byte[] Input(int match, int target, byte[] inputMessage)
         {
-            var data = new byte[2 + inputMessage.Length];
+            var data = new byte[3 + inputMessage.Length];
             data[0] = (byte)NetKind.Input;
-            data[1] = (byte)target;
-            Array.Copy(inputMessage, 0, data, 2, inputMessage.Length);
+            data[1] = (byte)match;
+            data[2] = (byte)target;
+            Array.Copy(inputMessage, 0, data, 3, inputMessage.Length);
             return data;
+        }
+
+        public static int InputMatch(byte[] data)
+        {
+            Expect(data, NetKind.Input, 3);
+            return data[1];
         }
 
         public static int InputTarget(byte[] data)
         {
-            Expect(data, NetKind.Input, 2);
-            return data[1];
+            Expect(data, NetKind.Input, 3);
+            return data[2];
         }
 
         public static byte[] InputPayload(byte[] data)
         {
-            Expect(data, NetKind.Input, 2);
-            var payload = new byte[data.Length - 2];
-            Array.Copy(data, 2, payload, 0, payload.Length);
+            Expect(data, NetKind.Input, 3);
+            var payload = new byte[data.Length - 3];
+            Array.Copy(data, 3, payload, 0, payload.Length);
             return payload;
         }
 
-        public static byte[] Checksum(int player, int tick, ulong checksum)
+        /// <summary>確定した状態のチェックサム（試合の番号つき）。</summary>
+        public static byte[] Checksum(int match, int player, int tick, ulong checksum)
         {
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream))
             {
                 writer.Write((byte)NetKind.Checksum);
+                writer.Write((byte)match);
                 writer.Write((byte)player);
                 writer.Write(tick);
                 writer.Write(checksum);
@@ -109,12 +124,13 @@ namespace Degunatsu.Net
             }
         }
 
-        public static void ReadChecksum(byte[] data, out int player, out int tick, out ulong checksum)
+        public static void ReadChecksum(byte[] data, out int match, out int player, out int tick, out ulong checksum)
         {
-            Expect(data, NetKind.Checksum, 1 + 1 + 4 + 8);
+            Expect(data, NetKind.Checksum, 1 + 1 + 1 + 4 + 8);
             using (var reader = new BinaryReader(new MemoryStream(data)))
             {
                 reader.ReadByte();
+                match = reader.ReadByte();
                 player = reader.ReadByte();
                 tick = reader.ReadInt32();
                 checksum = reader.ReadUInt64();

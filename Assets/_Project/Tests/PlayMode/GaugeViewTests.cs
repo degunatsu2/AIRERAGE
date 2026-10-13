@@ -54,6 +54,37 @@ namespace Degunatsu.PlayMode.Tests
         }
 
         [UnityTest]
+        public IEnumerator TwoCooldownGauges_AreSpacedApart_WithLabelsAboveAndBelow()
+        {
+            // ワイヤーキャンセルとガードのクールタイムが同時に出ると、半径を離し、文字を上と下に分ける（ユーザーの指摘、2026-10-13）。
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            RingGaugeView wire = runner.PlayerView.WireCancelGauge;
+            RingGaugeView guard = runner.PlayerView.GuardGauge;
+            yield return WaitSeconds(0.3f);
+
+            var state = runner.PlayerState;
+            state.Combat.WireCancelCooldownTicksLeft = 150;
+            state.Combat.GuardCooldownTicksLeft = 100;
+            runner.SetPlayerState(state);
+            yield return null;
+            yield return null;
+
+            Assert.That(wire.IsShowing && guard.IsShowing, Is.True, "前提: 両方のゲージが出ている");
+            Assert.That(guard.Radius - wire.Radius, Is.GreaterThanOrEqualTo(1f), "半径が近く、ゲージどうしが重なる");
+            Assert.That(wire.LabelBelow, Is.True, "内側の文字が下に出ていない");
+            Assert.That(guard.LabelBelow, Is.False);
+
+            yield return WaitUntil(() => runner.PlayerState.Combat.GuardCooldownTicksLeft == 0, 3f);
+            yield return null;
+            Assert.That(guard.IsShowing, Is.False);
+            Assert.That(wire.IsShowing, Is.True, "前提: ワイヤーキャンセルのゲージだけが残っている");
+            Assert.That(wire.LabelBelow, Is.False, "1つだけのときは文字を上に戻す");
+            Assert.That(wire.Radius, Is.EqualTo(1.3f).Within(1e-4f), "1つだけのときは元の半径に戻す");
+        }
+
+        [UnityTest]
         public IEnumerator Attach_ShowsTheRemainingTimeGauge_AroundTheAnchor()
         {
             SceneManager.LoadScene("Sandbox_Wire");

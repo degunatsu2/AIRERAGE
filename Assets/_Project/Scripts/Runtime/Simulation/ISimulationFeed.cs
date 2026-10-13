@@ -1,6 +1,7 @@
 using System;
 using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
+using UnityEngine;
 
 namespace Degunatsu.Runtime.Simulation
 {
@@ -23,6 +24,9 @@ namespace Degunatsu.Runtime.Simulation
 
         /// <summary>表示用の名前（"DUMMY 1"、"P2" など）。</summary>
         string LabelOf(int index);
+
+        /// <summary>表示用の色（プレイヤーの色）。</summary>
+        Color ColorOf(int index);
 
         /// <summary>これまでに進めたティック数（試合の段階と残り時間を、Rules から求めるのに使う）。</summary>
         int CurrentTick { get; }

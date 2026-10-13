@@ -35,6 +35,8 @@ namespace Degunatsu.Runtime.Presentation
 
         private GUIStyle _style;
         private Vector3 _center;
+        private float _layoutRadius = -1f;
+        private bool _labelBelow;
 
         /// <summary>今表示しているか。</summary>
         public bool IsShowing { get; private set; }
@@ -46,6 +48,22 @@ namespace Degunatsu.Runtime.Presentation
 
         /// <summary>最後に描いたゲージの中心。</summary>
         public Vector3 Center => _center;
+
+        /// <summary>今の半径（SetLayout で変えていなければ、設定した半径）。</summary>
+        public float Radius => _layoutRadius > 0f ? _layoutRadius : _radius;
+
+        /// <summary>文字をゲージの下に出しているか（ふつうは上）。</summary>
+        public bool LabelBelow => _labelBelow;
+
+        /// <summary>
+        /// 同じキャラクターの周りに複数のゲージを出すときの配置（ユーザーの指摘: 重なって見にくい）。radius が null なら設定した半径に戻す。
+        /// labelBelow なら文字をゲージの下に出す。
+        /// </summary>
+        public void SetLayout(float? radius, bool labelBelow)
+        {
+            _layoutRadius = radius ?? -1f;
+            _labelBelow = labelBelow;
+        }
 
         private void Awake()
         {
@@ -131,7 +149,7 @@ namespace Degunatsu.Runtime.Presentation
             for (int i = 0; i < points; i++)
             {
                 float angle = Mathf.PI * 0.5f - Mathf.PI * 2f * fraction * i / (points - 1);
-                tip = center + new Vector3(Mathf.Cos(angle) * _radius, Mathf.Sin(angle) * _radius, Z);
+                tip = center + new Vector3(Mathf.Cos(angle) * Radius, Mathf.Sin(angle) * Radius, Z);
                 line.SetPosition(i, tip);
             }
             line.widthMultiplier = width;
@@ -154,7 +172,8 @@ namespace Degunatsu.Runtime.Presentation
             {
                 return;
             }
-            Vector3 screen = _camera.WorldToScreenPoint(_center + new Vector3(0f, _radius + 0.35f, 0f));
+            float labelY = _labelBelow ? -(Radius + 0.35f) : Radius + 0.35f;
+            Vector3 screen = _camera.WorldToScreenPoint(_center + new Vector3(0f, labelY, 0f));
             if (screen.z <= 0f)
             {
                 return;

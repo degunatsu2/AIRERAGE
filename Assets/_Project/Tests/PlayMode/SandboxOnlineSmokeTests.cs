@@ -160,7 +160,7 @@ namespace Degunatsu.PlayMode.Tests
         }
 
         [UnityTest]
-        public IEnumerator TimedMatch_CountsDown_Plays_AndFinishes_WithResults()
+        public IEnumerator TimedMatch_ShowsTheIntro_Plays_AndFinishes_WithResults()
         {
             SceneManager.LoadScene(SceneName);
             yield return null;
@@ -168,40 +168,73 @@ namespace Degunatsu.PlayMode.Tests
             var hud = Object.FindFirstObjectByType<MatchHud>();
             var audio = Object.FindFirstObjectByType<GameAudio>();
             Assert.That(hud, Is.Not.Null, "試合の表示がない");
-            // 短くする（カウントダウン 1 秒、試合 2 秒）。
+            // 短くする（始まる前 1 秒、試合 2 秒）。
             runner.HostRules.CountdownTicks = 60;
             runner.HostRules.DurationTicks = 120;
             runner.TimedMatch = true;
             runner.StartHost(0);
             runner.StartMatch();
 
-            bool sawCount = false;
-            bool sawGo = false;
+            bool sawIntro = false;
+            bool sawOpening = false;
             bool sawTimer = false;
             bool sawFinish = false;
             float start = Time.time;
             while (!hud.ShowingResults && Time.time - start < 8f)
             {
-                sawCount |= hud.CenterText == "1";
-                sawGo |= hud.CenterText == "GO!";
+                sawIntro |= hud.ShowingIntro;
+                sawOpening |= hud.OpeningIntro;
                 sawTimer |= hud.TimerText == "0:02" || hud.TimerText == "0:01";
                 sawFinish |= hud.CenterText == "FINISH!";
+                Assert.That(hud.CenterText, Is.Not.EqualTo("GO!").And.Not.EqualTo("1"), "カウントダウンの数字を出している（演出を変えた）");
                 yield return null;
             }
 
             Assert.That(runner.Session.World.Phase, Is.EqualTo(MatchPhase.Finished), "試合が終わらない");
-            Assert.That(sawCount, Is.True, "カウントダウンが出ない");
-            Assert.That(sawGo, Is.True, "GO! が出ない");
+            Assert.That(sawIntro, Is.True, "始まる前の演出（黒い帯と名前）が出ない");
+            Assert.That(hud.PlatesShown, Is.EqualTo(1), "名前が滑り込まない");
+            Assert.That(sawOpening, Is.True, "始まったときに帯が開かない");
             Assert.That(sawTimer, Is.True, "残り時間が出ない");
             Assert.That(sawFinish, Is.True, "FINISH! が出ない");
             Assert.That(hud.ShowingResults, Is.True, "結果が出ない");
             Assert.That(hud.Ranking, Is.EqualTo(new[] { 0 }));
-            Assert.That(audio.History.Contains(SoundId.CountdownBeep), Is.True);
-            Assert.That(audio.History.Contains(SoundId.Go), Is.True);
+            Assert.That(audio.History.Contains(SoundId.IntroWhoosh), Is.True);
+            Assert.That(audio.History.Contains(SoundId.IntroSlash), Is.True);
             Assert.That(audio.History.Contains(SoundId.Finish), Is.True);
             runner.Leave();
             yield return null;
             Assert.That(hud.ShowingResults, Is.False, "抜けた後も結果が出ている");
+        }
+
+        [UnityTest]
+        public IEnumerator Restart_FromTheResults_StartsANewMatch()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            var runner = Object.FindFirstObjectByType<OnlineRunner>();
+            var hud = Object.FindFirstObjectByType<MatchHud>();
+            runner.HostRules.CountdownTicks = 30;
+            runner.HostRules.DurationTicks = 60;
+            runner.TimedMatch = true;
+            runner.StartHost(0);
+            runner.StartMatch();
+            float start = Time.time;
+            while (!hud.ShowingResults && Time.time - start < 6f)
+            {
+                yield return null;
+            }
+            Assert.That(hud.ShowingResults, Is.True, "前提: 結果が出た");
+            Assert.That(runner.CanRestart, Is.True, "ホストなのに Restart を押せない");
+            int match = runner.Session.MatchNumber;
+
+            runner.Restart();
+            yield return null;
+
+            Assert.That(runner.Session.MatchNumber, Is.EqualTo(match + 1), "試合の番号が変わらない");
+            Assert.That(runner.Session.World.Phase, Is.Not.EqualTo(MatchPhase.Finished), "新しい試合になっていない");
+            Assert.That(runner.Session.World.Tick, Is.LessThan(10));
+            Assert.That(hud.ShowingResults, Is.False, "始め直した後も結果が出ている");
+            runner.Leave();
         }
 
         [UnityTest]

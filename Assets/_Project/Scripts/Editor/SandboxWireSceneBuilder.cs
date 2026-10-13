@@ -337,12 +337,16 @@ namespace Degunatsu.Editor
             SetReference(hud, "_source", source);
         }
 
-        /// <summary>試合の表示（カウントダウン、残り時間、結果、復帰までの秒数。docs/12）。source は ISimulationFeed。</summary>
-        internal static void CreateMatchHud(MonoBehaviour source, GameAudio audio)
+        /// <summary>試合の表示（始まる前の演出、残り時間、結果。docs/12）。source は ISimulationFeed、controls は結果のボタン（IMatchControls）。</summary>
+        internal static void CreateMatchHud(MonoBehaviour source, GameAudio audio, MonoBehaviour controls = null)
         {
             var hud = new GameObject("MatchHud").AddComponent<MatchHud>();
             SetReference(hud, "_source", source);
             SetReference(hud, "_audio", audio);
+            if (controls != null)
+            {
+                SetReference(hud, "_controls", controls);
+            }
         }
 
         /// <summary>ガードとジャストガードの表示（光る輪、広がる輪、光の筋。文字はシーンのカメラで画面に写す）。</summary>

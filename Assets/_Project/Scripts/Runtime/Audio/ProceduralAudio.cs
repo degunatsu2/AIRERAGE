@@ -49,11 +49,11 @@ namespace Degunatsu.Runtime.Audio
         /// <summary>加速リングで加速した（風を切って加速する音）。</summary>
         Boost,
 
-        /// <summary>試合の始まる前のカウントダウン（3, 2, 1 の短い電子音）。</summary>
-        CountdownBeep,
+        /// <summary>始まる前の演出で、名前が滑り込む（風を切る柔らかい音）。</summary>
+        IntroWhoosh,
 
-        /// <summary>試合の開始（GO!。高く明るい音）。</summary>
-        Go,
+        /// <summary>試合の開始（黒い帯を切り裂く鋭い音）。</summary>
+        IntroSlash,
 
         /// <summary>試合の終了（FINISH!。下がっていく和音）。</summary>
         Finish,
@@ -202,14 +202,16 @@ namespace Degunatsu.Runtime.Audio
                     AddTone(b, r, 0f, 0.35f, NoteFrequency(72), NoteFrequency(84), Wave.Pulse25, 0.18f, 0.005f, 0.12f);
                     AddTone(b, r, 0.06f, 0.3f, NoteFrequency(79), NoteFrequency(91), Wave.Pulse25, 0.14f, 0.005f, 0.1f);
                     break;
-                case SoundId.CountdownBeep:
-                    b = new float[Samples(0.25f, r)];
-                    AddTone(b, r, 0f, 0.22f, NoteFrequency(81), NoteFrequency(81), Wave.Square, 0.35f, 0.002f, 0.08f);
+                case SoundId.IntroWhoosh:
+                    b = new float[Samples(0.4f, r)];
+                    AddNoise(b, r, rng, 0f, 0.38f, 0.45f, 0.06f, 0.14f, 500f, 3200f, 300f);
+                    AddTone(b, r, 0f, 0.3f, 180f, 260f, Wave.Sine, 0.25f, 0.05f, 0.12f);
                     break;
-                case SoundId.Go:
-                    b = new float[Samples(0.7f, r)];
-                    AddTone(b, r, 0f, 0.65f, NoteFrequency(93), NoteFrequency(93), Wave.Square, 0.35f, 0.002f, 0.25f);
-                    AddTone(b, r, 0f, 0.65f, NoteFrequency(88), NoteFrequency(88), Wave.Pulse25, 0.2f, 0.002f, 0.25f);
+                case SoundId.IntroSlash:
+                    b = new float[Samples(0.6f, r)];
+                    AddNoise(b, r, rng, 0f, 0.22f, 0.9f, 0.001f, 0.06f, 9000f, 4000f, 2500f);
+                    AddTone(b, r, 0f, 0.5f, 2600f, 1700f, Wave.Sine, 0.25f, 0.001f, 0.18f);
+                    AddTone(b, r, 0f, 0.35f, 110f, 60f, Wave.Sine, 0.6f, 0.002f, 0.12f);
                     break;
                 case SoundId.Finish:
                     b = new float[Samples(1.3f, r)];

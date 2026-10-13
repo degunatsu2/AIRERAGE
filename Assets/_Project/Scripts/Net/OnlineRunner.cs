@@ -29,7 +29,7 @@ namespace Degunatsu.Net
     /// ステージ（T3-8）: シーンのステージの範囲（KnockoutBounds）、ギミック（StageZoneAuthoring）、出現位置（_spawnPoints）を使う。
     /// 試合中は、右上に全員の撃破の数（KO）と撃破された数（Fall）を出す。コンボの表示と効果音は ISimulationFeed で読ませる。
     /// </summary>
-    public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed
+    public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls
     {
         [SerializeField] private CharacterConfigAsset _character;
         [SerializeField] private InputActionAsset _inputActions;
@@ -107,6 +107,7 @@ namespace Degunatsu.Net
         string ISimulationFeed.LabelOf(int index) => $"P{index + 1}";
         int ISimulationFeed.CurrentTick => Running ? _session.World.Tick : 0;
         MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
+        Color ISimulationFeed.ColorOf(int index) => index < _playerColors.Length ? _playerColors[index] : Color.white;
 
         /// <summary>ホストとして待ち受ける（port が 0 なら空いているポート）。失敗したら false で、理由を画面に出す。</summary>
         public bool StartHost(ushort port)
@@ -124,6 +125,32 @@ namespace Degunatsu.Net
         public void StartMatch()
         {
             _session.StartMatch(_timedMatch ? _match : FreePlay(_match));
+        }
+
+        /// <summary>結果の画面の「Restart」を押せるか（ホストだけ。IMatchControls）。</summary>
+        public bool CanRestart => _session != null && _session.IsHost && _session.State == OnlineSession.SessionState.Running;
+
+        /// <summary>同じ人で試合を始め直す（ホストのみ。ロビーで選んだルールで）。</summary>
+        public void Restart()
+        {
+            if (!CanRestart)
+            {
+                return;
+            }
+            _session.RestartMatch(_timedMatch ? _match : FreePlay(_match));
+            _smoother = null;
+            _notifiedTick = -1;
+        }
+
+        /// <summary>ゲームを終える（エディタでは再生を止める）。</summary>
+        public void Quit()
+        {
+            Leave();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         /// <summary>ホストが使う試合のルール（値はシーンの設定。テストで短くするのに使う）。</summary>
