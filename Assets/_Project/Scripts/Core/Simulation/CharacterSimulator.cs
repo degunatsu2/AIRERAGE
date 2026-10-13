@@ -72,6 +72,7 @@ namespace Degunatsu.Core.Simulation
             }
 
             System.Numerics.Vector3 beforeMove = state.Position;
+            System.Numerics.Vector3 velocityBeforeMove = state.Velocity;
             _motor.Move(ref state.Position, ref state.Velocity, halfExtents, state.Velocity * SimTime.DeltaTime);
 
             if (attached)
@@ -81,11 +82,44 @@ namespace Degunatsu.Core.Simulation
             }
 
             Locomotion.ApplyGroundState(ref state, _motor.ProbeGround(state.Position, halfExtents), movement);
+            Bounce(ref state, velocityBeforeMove, config.Combat);
 
             // ゲームプレイは XY 平面（docs/01_game_design.md 4章）。
             state.Position.Z = 0f;
             state.Velocity.Z = 0f;
             state.PreviousButtons = input.Buttons;
+        }
+
+        /// <summary>
+        /// のけぞり中に床・壁・天井へ勢いよくぶつかったら跳ね返る（ユーザーの要望、2026-10-13）。地形は軸平行の箱なので、
+        /// ぶつかると速度の X か Y が消える（床は、移動の衝突か接地のどちらかで消える）。消えた成分が BounceMinSpeed 以上なら、
+        /// 逆向きに BounceRestitution 倍で返す。床で跳ね返ったら接地をやめる。接地の後に呼ぶ。
+        /// </summary>
+        private static void Bounce(ref CharacterState state, System.Numerics.Vector3 before, CombatTuning combat)
+        {
+            if (state.Action.Kind != ActionKind.Hitstun)
+            {
+                return;
+            }
+            bool bounced = false;
+            if (MathF.Abs(before.X) >= combat.BounceMinSpeed && MathF.Abs(state.Velocity.X) < MathF.Abs(before.X) * 0.5f)
+            {
+                state.Velocity.X = -before.X * combat.BounceRestitution;
+                bounced = true;
+            }
+            if (MathF.Abs(before.Y) >= combat.BounceMinSpeed && MathF.Abs(state.Velocity.Y) < MathF.Abs(before.Y) * 0.5f)
+            {
+                state.Velocity.Y = -before.Y * combat.BounceRestitution;
+                if (state.Velocity.Y > 0f)
+                {
+                    state.Grounded = false;
+                }
+                bounced = true;
+            }
+            if (bounced)
+            {
+                state.Combat.BounceCount++;
+            }
         }
 
         private static void UpdateFacing(ref CharacterState state, in InputFrame input, MovementTuning movement)

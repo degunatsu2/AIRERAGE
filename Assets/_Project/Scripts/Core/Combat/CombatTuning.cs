@@ -298,6 +298,14 @@ namespace Degunatsu.Core.Combat
         public int FatalHitstopMultiplier = 3;
 
         /// <summary>
+        /// のけぞり中に床・壁・天井へぶつかったとき、ぶつかった向きの速さがこれ以上（m/s）なら跳ね返る（ユーザーの要望、2026-10-13）。【仮】
+        /// </summary>
+        public float BounceMinSpeed = 10f;
+
+        /// <summary>跳ね返るときの速さの倍率（0〜1）。【仮】</summary>
+        public float BounceRestitution = 0.6f;
+
+        /// <summary>
         /// 攻撃をワイヤーでキャンセルした後、もう一度ワイヤーでキャンセルできるまでのティック数（P-1。永久コンボを止める）。
         /// 通常のワイヤーの射出には影響しない。【仮】
         /// </summary>
@@ -391,6 +399,8 @@ namespace Degunatsu.Core.Combat
             v.NonNegative(nameof(KoKnockbackPerSpeed), KoKnockbackPerSpeed);
             v.NonNegative(nameof(FatalStrikeSpeed), FatalStrikeSpeed);
             v.Positive(nameof(FatalHitstopMultiplier), FatalHitstopMultiplier);
+            v.NonNegative(nameof(BounceMinSpeed), BounceMinSpeed);
+            v.InRange(nameof(BounceRestitution), BounceRestitution, 0f, 1f);
             v.NonNegative(nameof(WireCancelCooldownTicks), WireCancelCooldownTicks);
             v.NonNegative(nameof(AttackBufferTicks), AttackBufferTicks);
             v.Positive(nameof(GuardTicks), GuardTicks);

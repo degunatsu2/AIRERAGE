@@ -91,6 +91,10 @@ namespace Degunatsu.Runtime.Audio
             {
                 _audio.Play(SoundId.Guard, 1f, 0.04f);
             }
+            if (n.BounceCount > b.BounceCount)
+            {
+                _audio.Play(SoundId.Bounce, 1f, 0.06f);
+            }
             if (n.FatalHitCount > b.FatalHitCount)
             {
                 _audio.Play(SoundId.Fatal);

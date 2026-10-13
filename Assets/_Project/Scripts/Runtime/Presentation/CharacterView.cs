@@ -54,6 +54,8 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private BurstEffectView _fatalBurst;
         [Tooltip("攻撃をワイヤーでキャンセルした瞬間の光（なくてもよい）")]
         [SerializeField] private BurstEffectView _wireCancelBurst;
+        [Tooltip("のけぞり中に地形で跳ね返った瞬間の光（なくてもよい）")]
+        [SerializeField] private BurstEffectView _bounceBurst;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
@@ -63,6 +65,7 @@ namespace Degunatsu.Runtime.Presentation
         private int _shownDamagedTick;
         private int _shownFatalHits;
         private int _shownWireCancelCooldown;
+        private int _shownBounces;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
         public AttackPhase? ShownPhase
@@ -102,6 +105,7 @@ namespace Degunatsu.Runtime.Presentation
         public BurstEffectView HitSpark => _hitSpark;
         public BurstEffectView FatalBurst => _fatalBurst;
         public BurstEffectView WireCancelBurst => _wireCancelBurst;
+        public BurstEffectView BounceBurst => _bounceBurst;
 
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
@@ -157,6 +161,11 @@ namespace Degunatsu.Runtime.Presentation
             {
                 _wireCancelBurst.Play(center);
             }
+            if (c.BounceCount > _shownBounces && _bounceBurst != null)
+            {
+                _bounceBurst.Play(center);
+            }
+            _shownBounces = c.BounceCount;
             _shownFatalHits = c.FatalHitCount;
             _shownDamagedTick = c.LastDamagedTick;
             _shownWireCancelCooldown = c.WireCancelCooldownTicksLeft;

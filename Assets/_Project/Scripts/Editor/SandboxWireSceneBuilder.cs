@@ -299,6 +299,10 @@ namespace Degunatsu.Editor
             BurstEffectView wireCancel = CreateBurst(name + "WireCancelBurst", parent);
             wireCancel.Configure(new Color(0.75f, 0.45f, 1f, 1f), false, 0.35f, 0.4f, 1.9f, 10, 1.2f, 0.12f, string.Empty, 0, 0f);
             SetReference(view, "_wireCancelBurst", wireCancel);
+            // のけぞり中に地形で跳ね返った（白っぽい水色。土ぼこりのような短い光）。
+            BurstEffectView bounce = CreateBurst(name + "BounceBurst", parent);
+            bounce.Configure(new Color(0.85f, 0.95f, 1f, 1f), false, 0.3f, 0.5f, 2f, 8, 0.8f, 0.14f, string.Empty, 0, 0f);
+            SetReference(view, "_bounceBurst", bounce);
         }
 
         /// <summary>一瞬の光（輪 2 つと光の筋。文字はシーンのカメラで画面に写す）。値は呼んだ側が Configure で決める。</summary>
