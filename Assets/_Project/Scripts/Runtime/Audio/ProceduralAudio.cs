@@ -1,0 +1,352 @@
+using System;
+using UnityEngine;
+
+namespace Degunatsu.Runtime.Audio
+{
+    /// <summary>効果音の種類。</summary>
+    public enum SoundId
+    {
+        /// <summary>攻撃を出した（風を切る音）。</summary>
+        Swing,
+
+        /// <summary>攻撃が当たった。</summary>
+        Hit,
+
+        /// <summary>強い攻撃が当たった（大きく吹き飛んだ）。</summary>
+        HeavyHit,
+
+        /// <summary>ふつうのガードで受けた（金属音）。</summary>
+        Guard,
+
+        /// <summary>ジャストガードに成功した（明るいチャイム）。</summary>
+        Parry,
+
+        /// <summary>ガードを構えた。</summary>
+        GuardUp,
+
+        /// <summary>撃破技のチャージ（上がっていく音）。</summary>
+        Charge,
+
+        Jump,
+        WireFire,
+        WireAttach,
+
+        /// <summary>攻撃をワイヤーでキャンセルした。</summary>
+        WireCancel,
+
+        /// <summary>ステージの外に出た（撃破）。</summary>
+        Knockout,
+    }
+
+    /// <summary>
+    /// 仮の効果音と BGM を、音声ファイルを使わずにその場で合成する（ユーザーの要望、2026-10-13）。
+    /// 簡単な波形（正弦波、矩形波、三角波、のこぎり波、ノイズ）と減衰の組み合わせで作る。乱数は種を固定するので、毎回同じ音になる。
+    /// 表示（演出）のためのもので、シミュレーションには関係しない。本番の音ができたら GameAudio の差し替えで置き換える。
+    /// </summary>
+    public static class ProceduralAudio
+    {
+        public const int SeSampleRate = 44100;
+        public const int BgmSampleRate = 22050;
+
+        /// <summary>BGM のテンポ（拍/分）と長さ（小節。4/4 拍子）。</summary>
+        public const float BgmTempo = 140f;
+        public const int BgmBars = 8;
+
+        private enum Wave
+        {
+            Sine,
+            Square,
+            Pulse25,
+            Triangle,
+            Saw,
+        }
+
+        public static AudioClip CreateClip(SoundId id)
+        {
+            return ToClip("SE_" + id, Synthesize(id), SeSampleRate);
+        }
+
+        public static AudioClip CreateBgm()
+        {
+            return ToClip("BGM_Temporary", SynthesizeBgm(), BgmSampleRate);
+        }
+
+        /// <summary>効果音の波形（SeSampleRate、モノラル、-1〜1）。</summary>
+        public static float[] Synthesize(SoundId id)
+        {
+            var rng = new System.Random(1000 + (int)id);
+            const int r = SeSampleRate;
+            float[] b;
+            switch (id)
+            {
+                case SoundId.Swing:
+                    b = new float[Samples(0.16f, r)];
+                    AddNoise(b, r, rng, 0f, 0.16f, 0.5f, 0.05f, 0.05f, 900f, 3500f, 400f);
+                    break;
+                case SoundId.Hit:
+                    b = new float[Samples(0.22f, r)];
+                    AddNoise(b, r, rng, 0f, 0.12f, 0.9f, 0.001f, 0.03f, 5000f, 5000f, 200f);
+                    AddTone(b, r, 0f, 0.2f, 190f, 55f, Wave.Sine, 0.9f, 0.002f, 0.07f);
+                    AddTone(b, r, 0f, 0.03f, 1400f, 900f, Wave.Square, 0.15f, 0.001f, 0.01f);
+                    break;
+                case SoundId.HeavyHit:
+                    b = new float[Samples(0.5f, r)];
+                    AddNoise(b, r, rng, 0f, 0.35f, 1f, 0.001f, 0.08f, 3500f, 1200f, 60f);
+                    AddTone(b, r, 0f, 0.45f, 140f, 38f, Wave.Sine, 1f, 0.002f, 0.16f);
+                    AddTone(b, r, 0f, 0.05f, 900f, 300f, Wave.Saw, 0.25f, 0.001f, 0.02f);
+                    break;
+                case SoundId.Guard:
+                    b = new float[Samples(0.3f, r)];
+                    AddTone(b, r, 0f, 0.3f, 1250f, 1250f, Wave.Sine, 0.45f, 0.001f, 0.07f);
+                    AddTone(b, r, 0f, 0.3f, 1873f, 1873f, Wave.Sine, 0.35f, 0.001f, 0.06f);
+                    AddTone(b, r, 0f, 0.3f, 2461f, 2461f, Wave.Sine, 0.25f, 0.001f, 0.05f);
+                    AddNoise(b, r, rng, 0f, 0.03f, 0.6f, 0.001f, 0.008f, 8000f, 8000f, 2000f);
+                    break;
+                case SoundId.Parry:
+                    b = new float[Samples(0.9f, r)];
+                    int[] notes = { 88, 92, 95, 100 }; // E6 G#6 B6 E7
+                    for (int i = 0; i < notes.Length; i++)
+                    {
+                        float f = NoteFrequency(notes[i]);
+                        AddTone(b, r, i * 0.05f, 0.7f, f, f, Wave.Sine, 0.45f, 0.002f, 0.22f);
+                        AddTone(b, r, i * 0.05f, 0.5f, f * 2f, f * 2f, Wave.Sine, 0.12f, 0.002f, 0.12f);
+                    }
+                    AddNoise(b, r, rng, 0f, 0.5f, 0.25f, 0.005f, 0.15f, 12000f, 12000f, 6000f);
+                    break;
+                case SoundId.GuardUp:
+                    b = new float[Samples(0.12f, r)];
+                    AddNoise(b, r, rng, 0f, 0.1f, 0.35f, 0.005f, 0.03f, 9000f, 9000f, 3000f);
+                    AddTone(b, r, 0f, 0.1f, 900f, 1100f, Wave.Sine, 0.3f, 0.003f, 0.04f);
+                    break;
+                case SoundId.Charge:
+                    // 撃破技のチャージ（16 ティック = 約 0.27 秒）に合わせて上がっていく音。
+                    b = new float[Samples(0.3f, r)];
+                    AddTone(b, r, 0f, 0.3f, 220f, 1100f, Wave.Pulse25, 0.35f, 0.02f, 0.5f);
+                    AddTone(b, r, 0f, 0.3f, 440f, 2200f, Wave.Sine, 0.2f, 0.02f, 0.5f);
+                    ApplyTremolo(b, r, 28f, 0.5f);
+                    break;
+                case SoundId.Jump:
+                    b = new float[Samples(0.12f, r)];
+                    AddTone(b, r, 0f, 0.12f, 320f, 760f, Wave.Square, 0.3f, 0.002f, 0.05f);
+                    break;
+                case SoundId.WireFire:
+                    b = new float[Samples(0.14f, r)];
+                    AddTone(b, r, 0f, 0.14f, 1800f, 500f, Wave.Saw, 0.25f, 0.002f, 0.05f);
+                    AddNoise(b, r, rng, 0f, 0.1f, 0.25f, 0.002f, 0.04f, 6000f, 2000f, 1000f);
+                    break;
+                case SoundId.WireAttach:
+                    b = new float[Samples(0.12f, r)];
+                    AddTone(b, r, 0f, 0.12f, 260f, 110f, Wave.Sine, 0.7f, 0.001f, 0.035f);
+                    AddNoise(b, r, rng, 0f, 0.02f, 0.5f, 0.001f, 0.006f, 7000f, 7000f, 1500f);
+                    break;
+                case SoundId.WireCancel:
+                    b = new float[Samples(0.3f, r)];
+                    AddNoise(b, r, rng, 0f, 0.15f, 0.45f, 0.01f, 0.05f, 2000f, 7000f, 600f);
+                    AddTone(b, r, 0.03f, 0.25f, NoteFrequency(79), NoteFrequency(79), Wave.Pulse25, 0.2f, 0.002f, 0.06f);
+                    AddTone(b, r, 0.09f, 0.2f, NoteFrequency(86), NoteFrequency(86), Wave.Pulse25, 0.2f, 0.002f, 0.06f);
+                    break;
+                case SoundId.Knockout:
+                    b = new float[Samples(1.1f, r)];
+                    AddTone(b, r, 0f, 0.8f, 900f, 70f, Wave.Square, 0.35f, 0.005f, 0.4f);
+                    AddNoise(b, r, rng, 0.25f, 0.85f, 0.9f, 0.01f, 0.25f, 1500f, 300f, 40f);
+                    AddTone(b, r, 0.25f, 0.8f, 90f, 35f, Wave.Sine, 0.9f, 0.005f, 0.3f);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");
+            }
+            Finish(b, 0.9f);
+            return b;
+        }
+
+        /// <summary>
+        /// BGM の波形（BgmSampleRate、モノラル、-1〜1。繰り返して鳴らす）。140 拍/分、8 小節のチップチューン風:
+        /// ベース（三角波）、和音のアルペジオ（細い矩形波）、後半のメロディ（矩形波）、ドラム（キック、スネア、ハイハット）。
+        /// </summary>
+        public static float[] SynthesizeBgm()
+        {
+            const int r = BgmSampleRate;
+            float step = 60f / BgmTempo / 4f; // 16 分音符
+            int steps = BgmBars * 16;
+            var b = new float[Samples(step * steps, r)];
+            var rng = new System.Random(7);
+
+            // コード（ルートの MIDI 番号と、短調・長調）: Am F C G | Am F G E。
+            int[] roots = { 57, 53, 60, 55, 57, 53, 55, 52 };
+            bool[] minor = { true, false, false, false, true, false, false, false };
+            // 後半 4 小節のメロディ（4 分音符。0 は休み）。
+            int[] melody =
+            {
+                76, 72, 69, 72,
+                77, 76, 72, 69,
+                79, 76, 72, 74,
+                71, 74, 76, 0,
+            };
+
+            for (int s = 0; s < steps; s++)
+            {
+                int bar = s / 16;
+                int inBar = s % 16;
+                float t = s * step;
+                int root = roots[bar];
+                int third = root + (minor[bar] ? 3 : 4);
+                int fifth = root + 7;
+
+                // ベース: 8 分音符でルート（裏はオクターブ上）。
+                if (inBar % 2 == 0)
+                {
+                    int note = root - 24 + (inBar % 4 == 2 ? 12 : 0);
+                    AddTone(b, r, t, step * 2f, NoteFrequency(note), NoteFrequency(note), Wave.Triangle, 0.32f, 0.003f, 0.12f);
+                }
+
+                // アルペジオ: 16 分音符で和音の音を上がっていく。
+                int[] arp = { root + 12, third + 12, fifth + 12, root + 24 };
+                int arpNote = arp[inBar % 4];
+                AddTone(b, r, t, step, NoteFrequency(arpNote), NoteFrequency(arpNote), Wave.Pulse25, 0.07f, 0.002f, 0.05f);
+
+                // メロディ（後半）。
+                if (bar >= 4 && inBar % 4 == 0)
+                {
+                    int note = melody[(bar - 4) * 4 + inBar / 4];
+                    if (note > 0)
+                    {
+                        AddTone(b, r, t, step * 4f, NoteFrequency(note), NoteFrequency(note), Wave.Square, 0.1f, 0.005f, 0.25f);
+                    }
+                }
+
+                // ドラム。
+                bool kick = inBar == 0 || inBar == 8 || (bar % 2 == 1 && inBar == 10);
+                if (kick)
+                {
+                    AddTone(b, r, t, 0.16f, 150f, 45f, Wave.Sine, 0.7f, 0.001f, 0.06f);
+                }
+                if (inBar == 4 || inBar == 12)
+                {
+                    AddNoise(b, r, rng, t, 0.14f, 0.3f, 0.001f, 0.04f, 6000f, 6000f, 900f);
+                    AddTone(b, r, t, 0.08f, 200f, 170f, Wave.Triangle, 0.2f, 0.001f, 0.03f);
+                }
+                if (inBar % 2 == 0)
+                {
+                    float open = inBar == 14 ? 0.05f : 0.012f;
+                    AddNoise(b, r, rng, t, 0.08f, 0.09f, 0.001f, open, 11000f, 11000f, 7000f);
+                }
+            }
+            Finish(b, 0.8f);
+            return b;
+        }
+
+        /// <summary>MIDI のノート番号の周波数（69 = A4 = 440Hz）。</summary>
+        public static float NoteFrequency(int note)
+        {
+            return 440f * Mathf.Pow(2f, (note - 69) / 12f);
+        }
+
+        private static int Samples(float seconds, int rate)
+        {
+            return Mathf.Max(1, Mathf.CeilToInt(seconds * rate));
+        }
+
+        private static AudioClip ToClip(string name, float[] samples, int rate)
+        {
+            AudioClip clip = AudioClip.Create(name, samples.Length, 1, rate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        // 周波数を f0 から f1 へ指数的に変えながら鳴らす。音量は attack 秒で立ち上がり、時定数 decay 秒で減っていく。
+        private static void AddTone(float[] b, int rate, float start, float duration, float f0, float f1, Wave wave, float amp,
+            float attack, float decay)
+        {
+            int from = Mathf.Max(0, (int)(start * rate));
+            int to = Mathf.Min(b.Length, from + Samples(duration, rate));
+            double phase = 0;
+            for (int i = from; i < to; i++)
+            {
+                float t = (float)(i - from) / rate;
+                float k = duration > 0f ? t / duration : 0f;
+                float f = f0 * Mathf.Pow(f1 / f0, k);
+                phase += f / rate;
+                float p = (float)(phase - Math.Floor(phase));
+                b[i] += WaveValue(wave, p) * amp * Envelope(t, attack, decay);
+            }
+        }
+
+        // ノイズを鳴らす。ローパスのカットオフは lowpass0 から lowpass1 へ変わる。highpass より低い音を削る。
+        private static void AddNoise(float[] b, int rate, System.Random rng, float start, float duration, float amp,
+            float attack, float decay, float lowpass0, float lowpass1, float highpass)
+        {
+            int from = Mathf.Max(0, (int)(start * rate));
+            int to = Mathf.Min(b.Length, from + Samples(duration, rate));
+            float low = 0f;
+            float lowForHigh = 0f;
+            float highCoefficient = OnePole(highpass, rate);
+            for (int i = from; i < to; i++)
+            {
+                float t = (float)(i - from) / rate;
+                float k = duration > 0f ? t / duration : 0f;
+                float cutoff = Mathf.Lerp(lowpass0, lowpass1, k);
+                float x = (float)(rng.NextDouble() * 2.0 - 1.0);
+                low += (x - low) * OnePole(cutoff, rate);
+                lowForHigh += (low - lowForHigh) * highCoefficient;
+                b[i] += (low - lowForHigh) * amp * Envelope(t, attack, decay);
+            }
+        }
+
+        private static void ApplyTremolo(float[] b, int rate, float hz, float depth)
+        {
+            for (int i = 0; i < b.Length; i++)
+            {
+                float t = (float)i / rate;
+                b[i] *= 1f - depth * (0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * hz * t));
+            }
+        }
+
+        // 1 次のローパスの係数（カットオフ周波数から）。
+        private static float OnePole(float cutoff, int rate)
+        {
+            return 1f - Mathf.Exp(-2f * Mathf.PI * Mathf.Clamp(cutoff, 10f, rate * 0.45f) / rate);
+        }
+
+        private static float Envelope(float t, float attack, float decay)
+        {
+            if (t < attack)
+            {
+                return attack > 0f ? t / attack : 1f;
+            }
+            return decay > 0f ? Mathf.Exp(-(t - attack) / decay) : 0f;
+        }
+
+        private static float WaveValue(Wave wave, float p)
+        {
+            switch (wave)
+            {
+                case Wave.Sine: return Mathf.Sin(2f * Mathf.PI * p);
+                case Wave.Square: return p < 0.5f ? 0.8f : -0.8f;
+                case Wave.Pulse25: return p < 0.25f ? 0.8f : -0.8f;
+                case Wave.Triangle: return p < 0.5f ? 4f * p - 1f : 3f - 4f * p;
+                default: return 2f * p - 1f;
+            }
+        }
+
+        // 大きさを peak にそろえ、やわらかく丸める（音割れを防ぐ）。終わりの数ミリ秒を消していく（ぷつっと鳴らないように）。
+        private static void Finish(float[] b, float peak)
+        {
+            float max = 0f;
+            for (int i = 0; i < b.Length; i++)
+            {
+                max = Mathf.Max(max, Mathf.Abs(b[i]));
+            }
+            float gain = max > 1e-6f ? 1.4f / max : 0f;
+            float norm = peak / (float)Math.Tanh(1.4);
+            int fade = Mathf.Min(b.Length, 64);
+            for (int i = 0; i < b.Length; i++)
+            {
+                float v = (float)Math.Tanh(b[i] * gain) * norm;
+                if (i >= b.Length - fade)
+                {
+                    v *= (float)(b.Length - 1 - i) / fade;
+                }
+                b[i] = v;
+            }
+        }
+    }
+}

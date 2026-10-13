@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Degunatsu.Runtime.Audio;
 using Degunatsu.Runtime.Data;
 using Degunatsu.Runtime.DebugTools;
 using Degunatsu.Runtime.Presentation;
@@ -212,7 +213,7 @@ namespace Degunatsu.Editor
             var courseTimer = new GameObject("CourseTimer").AddComponent<CourseTimerHud>();
             SetReference(courseTimer, "_runner", runner);
 
-            CreateDebugTools(runner, inputActions);
+            CreateDebugTools(runner, inputActions, CreateAudio(runner));
 
             EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
@@ -407,13 +408,27 @@ namespace Degunatsu.Editor
             bar.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
         }
 
+        /// <summary>
+        /// 仮の BGM と効果音（音はその場で合成する。ユーザーの要望、2026-10-13）。状態の変化から効果音を鳴らす部品も付ける。
+        /// </summary>
+        internal static GameAudio CreateAudio(SimulationRunner runner)
+        {
+            var go = new GameObject("Audio");
+            var audio = go.AddComponent<GameAudio>();
+            var events = go.AddComponent<CombatSoundEvents>();
+            SetReference(events, "_runner", runner);
+            SetReference(events, "_audio", audio);
+            return audio;
+        }
+
         /// <summary>デバッグ機能（操作、表示、入力の記録と再生、軌跡）。docs/06_prototype_plan.md T1-9。</summary>
-        internal static void CreateDebugTools(SimulationRunner runner, InputActionAsset inputActions)
+        internal static void CreateDebugTools(SimulationRunner runner, InputActionAsset inputActions, GameAudio audio)
         {
             var root = new GameObject("DebugTools");
             var controls = root.AddComponent<DebugControls>();
             SetReference(controls, "_runner", runner);
             SetReference(controls, "_inputActions", inputActions);
+            SetReference(controls, "_audio", audio);
             var hud = root.AddComponent<DebugHud>();
             SetReference(hud, "_runner", runner);
             var replay = root.AddComponent<ReplayControls>();

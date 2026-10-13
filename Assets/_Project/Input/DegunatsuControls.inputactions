@@ -437,6 +437,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleBgm",
+                    "type": "Button",
+                    "id": "41cb0b70-dd8e-4ebe-b116-3b165785a2be",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -569,6 +578,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "ToggleDummyAttack",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "35d64928-0ee5-4138-b92d-d58d4729bf65",
+                    "path": "<Keyboard>/f9",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleBgm",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

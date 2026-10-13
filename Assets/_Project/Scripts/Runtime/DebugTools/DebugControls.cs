@@ -1,4 +1,5 @@
 using Degunatsu.Core.Wire;
+using Degunatsu.Runtime.Audio;
 using Degunatsu.Runtime.Simulation;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -12,6 +13,7 @@ namespace Degunatsu.Runtime.DebugTools
     /// - StepTick（F2 / 十字キー右）: 一時停止中に1ティックだけ進める
     /// - ToggleDummyWalk（F7）: ダミーを向いている方向へ歩かせる／止める（足場から落として撃破の手柄を確かめる）
     /// - ToggleDummyAttack（F8）: ダミーに一定の間隔で攻撃させる／止める（ガードとジャストガードを試す）
+    /// - ToggleBgm（F9）: 仮の BGM を止める／鳴らす（_audio があれば）
     /// 同じマップの SaveRecording（F5）と PlayRecording（F6）は ReplayControls が読む。
     /// </summary>
     public sealed class DebugControls : MonoBehaviour
@@ -23,6 +25,8 @@ namespace Degunatsu.Runtime.DebugTools
 
         [SerializeField] private SimulationRunner _runner;
         [SerializeField] private InputActionAsset _inputActions;
+        [Tooltip("BGM の切り替えに使う（なくてもよい）")]
+        [SerializeField] private GameAudio _audio;
 
         private InputActionMap _map;
         private InputAction _toggleWireType;
@@ -30,6 +34,7 @@ namespace Degunatsu.Runtime.DebugTools
         private InputAction _stepTick;
         private InputAction _toggleDummyWalk;
         private InputAction _toggleDummyAttack;
+        private InputAction _toggleBgm;
         private int _speedIndex;
 
         private void Awake()
@@ -46,6 +51,7 @@ namespace Degunatsu.Runtime.DebugTools
             _stepTick = _map.FindAction("StepTick", throwIfNotFound: true);
             _toggleDummyWalk = _map.FindAction("ToggleDummyWalk", throwIfNotFound: true);
             _toggleDummyAttack = _map.FindAction("ToggleDummyAttack", throwIfNotFound: true);
+            _toggleBgm = _map.FindAction("ToggleBgm", throwIfNotFound: true);
         }
 
         private void OnEnable()
@@ -79,6 +85,10 @@ namespace Degunatsu.Runtime.DebugTools
             if (_toggleDummyAttack.WasPressedThisFrame())
             {
                 _runner.DummiesAttack = !_runner.DummiesAttack;
+            }
+            if (_toggleBgm.WasPressedThisFrame() && _audio != null)
+            {
+                _audio.BgmOn = !_audio.BgmEnabled;
             }
         }
 

@@ -62,6 +62,9 @@ namespace Degunatsu.Runtime.Simulation
         /// <summary>操作するキャラクターの位置をリセットしたときに通知する。</summary>
         public event Action PlayerReset;
 
+        /// <summary>1ティック進めるたびに、全員を進めた後に通知する（効果音など、状態の変化を見る表示用）。</summary>
+        public event Action Ticked;
+
         /// <summary>操作するキャラクターの調整値（値はシミュレーションと共有している）。</summary>
         public CharacterConfig PlayerConfig => _character.Config;
 
@@ -247,6 +250,7 @@ namespace Degunatsu.Runtime.Simulation
                 }
             }
             PlayerTicked?.Invoke(_world.GetState(_player));
+            Ticked?.Invoke();
         }
 
         private void Render(float alpha)

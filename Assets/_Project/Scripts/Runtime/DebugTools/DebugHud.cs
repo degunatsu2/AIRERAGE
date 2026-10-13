@@ -80,7 +80,7 @@ namespace Degunatsu.Runtime.DebugTools
 
             _text.Clear();
             _text.Append("Debug  Tab: type  F1: speed  F2: step  F7: walk ").Append(_runner.DummiesWalk ? "on" : "off")
-                .Append("  F8: attack ").Append(_runner.DummiesAttack ? "on" : "off").Append('\n');
+                .Append("  F8: attack ").Append(_runner.DummiesAttack ? "on" : "off").Append("  F9: BGM").Append('\n');
             _text.Append("Type ").Append(WireTypeLabels.Long(tuning.ModelType))
                 .Append("   Speed ").Append(_runner.SpeedScale > 0f ? "x" + _runner.SpeedScale.ToString("0.##") : "PAUSED")
                 .Append("   Tick ").Append(_runner.CurrentTick).Append('\n');
