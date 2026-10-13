@@ -14,7 +14,7 @@ namespace Degunatsu.Runtime.DebugTools
     /// </summary>
     public sealed class DebugHud : MonoBehaviour
     {
-        private const float Width = 420f;
+        private const float Width = 500f;
 
         [SerializeField] private SimulationRunner _runner;
 
@@ -108,16 +108,27 @@ namespace Degunatsu.Runtime.DebugTools
             _text.Append('\n');
             _text.Append("Last release ").Append(w.LastReleaseReason).Append("  Last miss ").Append(w.LastMissReason).Append('\n');
             AppendAction("Action ", s);
+            AppendKnockouts(s);
             int lines = 10;
-            if (_runner.DummyCount > 0)
+            for (int i = 0; i < _runner.DummyCount; i++)
             {
-                CharacterState dummy = _runner.GetDummyState(0);
+                CharacterState dummy = _runner.GetDummyState(i);
                 _text.Append('\n');
-                AppendAction("Dummy ", dummy);
+                AppendAction(_runner.DummyCount > 1 ? $"Dummy{i + 1} " : "Dummy ", dummy);
                 _text.Append("  Combo ").Append(dummy.Combat.ComboCount).Append(" (dmg ").Append(dummy.Combat.ComboDamage).Append(')');
+                AppendKnockouts(dummy);
                 lines++;
             }
             GUI.Box(new Rect(Screen.width - Width - 10f, 10f, Width, 12f + 21f * lines), _text.ToString(), _style);
+        }
+
+        // 撃破した数と、ステージの外に出た数（ステージの範囲があるシーンだけ。T3-3）。
+        private void AppendKnockouts(in CharacterState s)
+        {
+            if (_runner.HasStageBounds)
+            {
+                _text.Append("  KO ").Append(s.Combat.Knockouts).Append(" Fall ").Append(s.Combat.Falls);
+            }
         }
 
         // アクション状態の1行（攻撃なら種類と段階、のけぞりなら残り。ヒットストップ中ならその残り）。

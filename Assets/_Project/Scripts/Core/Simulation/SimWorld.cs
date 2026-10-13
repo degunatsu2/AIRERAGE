@@ -17,11 +17,17 @@ namespace Degunatsu.Core.Simulation
         private readonly HitResolver _hits = new HitResolver();
         private readonly List<CharacterState> _states = new List<CharacterState>();
         private readonly List<CharacterConfig> _configs = new List<CharacterConfig>();
+        private readonly List<CharacterState> _spawns = new List<CharacterState>();
 
-        public SimWorld(ICollisionQuery collision)
+        /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
+        public SimWorld(ICollisionQuery collision, StageBounds? bounds = null)
         {
             _simulator = new CharacterSimulator(collision);
+            Bounds = bounds;
         }
+
+        /// <summary>ステージの範囲（null なら撃破はない）。</summary>
+        public StageBounds? Bounds { get; }
 
         /// <summary>これまでに進めたティック数。</summary>
         public int Tick { get; private set; }
@@ -33,7 +39,9 @@ namespace Degunatsu.Core.Simulation
         {
             ValidateConfig(config);
             _configs.Add(config);
-            _states.Add(CharacterState.Spawn(spawnPosition, facing));
+            CharacterState spawn = CharacterState.Spawn(spawnPosition, facing);
+            _spawns.Add(spawn);
+            _states.Add(spawn);
             return _states.Count - 1;
         }
 
@@ -96,7 +104,7 @@ namespace Degunatsu.Core.Simulation
 
         /// <summary>
         /// 1ティック進める。inputs はキャラクターの番号順で、数が一致しなければ ArgumentException。
-        /// 全員を進めた後に、攻撃の命中を決めて当てる（HitResolver）。
+        /// 全員を進めた後に、攻撃の命中を決めて当て（HitResolver）、ステージの外に出たキャラクターを撃破にする（KnockoutResolver）。
         /// </summary>
         public void Step(IReadOnlyList<PlayerInput> inputs)
         {
@@ -118,6 +126,10 @@ namespace Degunatsu.Core.Simulation
             }
             Tick++;
             _hits.Resolve(_states, _configs, Tick);
+            if (Bounds.HasValue)
+            {
+                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value);
+            }
         }
 
         private static void ValidateConfig(CharacterConfig config)

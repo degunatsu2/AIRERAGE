@@ -32,7 +32,7 @@ namespace Degunatsu.Editor
         // 地形の奥行き（見た目のため）。キャラクターの奥行きより大きければよい。
         private const float TerrainDepth = 4f;
 
-        private readonly struct TerrainBox
+        internal readonly struct TerrainBox
         {
             public readonly string Name;
             public readonly Vector2 Min;
@@ -185,31 +185,15 @@ namespace Degunatsu.Editor
             var spawn = new GameObject("SpawnPoint").transform;
             spawn.position = SpawnPosition;
 
-            GameObject characterGo = CreateVisual(PrimitiveType.Cube, "Character", characterMaterial, Vector3.one);
-            var characterView = characterGo.AddComponent<CharacterView>();
-            SetReference(characterView, "_hitboxLine", CreateHitboxLine("CharacterHitbox"));
+            CharacterView characterView = CreateCharacterView("Character", characterMaterial, SpawnPosition);
 
-            Material dummyMaterial = LoadOrCreateMaterial("Dummy", new Color(0.55f, 0.5f, 0.6f));
             var dummySpawn = new GameObject("DummySpawn").transform;
             dummySpawn.position = DummySpawnPosition;
-            GameObject dummyGo = CreateVisual(PrimitiveType.Cube, "Dummy", dummyMaterial, Vector3.one);
-            dummyGo.transform.position = DummySpawnPosition;
-            var dummyView = dummyGo.AddComponent<CharacterView>();
-            SetReference(dummyView, "_hitboxLine", CreateHitboxLine("DummyHitbox"));
+            CharacterView dummyView = CreateCharacterView("Dummy", LoadDummyMaterial(), DummySpawnPosition);
 
-            var wireGo = new GameObject("Wire");
-            var line = wireGo.AddComponent<LineRenderer>();
-            line.sharedMaterial = wireMaterial;
-            line.widthMultiplier = 0.06f;
-            line.numCapVertices = 2;
-            line.shadowCastingMode = ShadowCastingMode.Off;
-            line.receiveShadows = false;
-            GameObject anchorMarker = CreateVisual(PrimitiveType.Sphere, "AttachedAnchor", attachedAnchorMaterial, Vector3.one * 0.3f);
-            anchorMarker.transform.SetParent(wireGo.transform, false);
-            var wireView = wireGo.AddComponent<WireView>();
-            SetReference(wireView, "_anchorMarker", anchorMarker.transform);
+            WireView wireView = CreateWireView(wireMaterial, attachedAnchorMaterial);
 
-            CreateFollowCamera(characterGo.transform, inputActions);
+            CreateFollowCamera(characterView.transform, inputActions);
             AimIndicatorView aimIndicator = CreateAimIndicator();
 
             var runner = new GameObject("Simulation").AddComponent<SimulationRunner>();
@@ -242,8 +226,15 @@ namespace Degunatsu.Editor
         /// <summary>検証用アリーナの地形（BoxCollider）とアンカーポイントを作る。オンライン用のシーンでも使う。</summary>
         internal static void CreateArena(Material terrainMaterial, Material attachableMaterial, Material anchorMaterial)
         {
+            CreateTerrain(Terrain, AnchorPoints, terrainMaterial, attachableMaterial, anchorMaterial);
+        }
+
+        /// <summary>地形（BoxCollider）とアンカーポイントを作る。</summary>
+        internal static void CreateTerrain(
+            TerrainBox[] boxes, Vector2[] anchorPoints, Material terrainMaterial, Material attachableMaterial, Material anchorMaterial)
+        {
             var terrainRoot = new GameObject("Terrain").transform;
-            foreach (TerrainBox box in Terrain)
+            foreach (TerrainBox box in boxes)
             {
                 GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.name = box.Name;
@@ -260,13 +251,46 @@ namespace Degunatsu.Editor
             }
 
             var anchorRoot = new GameObject("AnchorPoints").transform;
-            foreach (Vector2 point in AnchorPoints)
+            foreach (Vector2 point in anchorPoints)
             {
                 GameObject go = CreateVisual(PrimitiveType.Sphere, "AnchorPoint", anchorMaterial, Vector3.one * 0.5f);
                 go.transform.SetParent(anchorRoot, false);
                 go.transform.localPosition = new Vector3(point.x, point.y, 0f);
                 go.AddComponent<WireAnchorPoint>();
             }
+        }
+
+        /// <summary>キャラクターの箱の表示と、攻撃の判定を描く線を作る。</summary>
+        internal static CharacterView CreateCharacterView(string name, Material material, Vector3 position)
+        {
+            GameObject go = CreateVisual(PrimitiveType.Cube, name, material, Vector3.one);
+            go.transform.position = position;
+            var view = go.AddComponent<CharacterView>();
+            SetReference(view, "_hitboxLine", CreateHitboxLine(name + "Hitbox"));
+            return view;
+        }
+
+        /// <summary>ダミー（攻撃を当てて試す相手）の色。</summary>
+        internal static Material LoadDummyMaterial()
+        {
+            return LoadOrCreateMaterial("Dummy", new Color(0.55f, 0.5f, 0.6f));
+        }
+
+        /// <summary>ワイヤーの線と、接続点の印。</summary>
+        internal static WireView CreateWireView(Material wireMaterial, Material attachedAnchorMaterial)
+        {
+            var wireGo = new GameObject("Wire");
+            var line = wireGo.AddComponent<LineRenderer>();
+            line.sharedMaterial = wireMaterial;
+            line.widthMultiplier = 0.06f;
+            line.numCapVertices = 2;
+            line.shadowCastingMode = ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            GameObject anchorMarker = CreateVisual(PrimitiveType.Sphere, "AttachedAnchor", attachedAnchorMaterial, Vector3.one * 0.3f);
+            anchorMarker.transform.SetParent(wireGo.transform, false);
+            var wireView = wireGo.AddComponent<WireView>();
+            SetReference(wireView, "_anchorMarker", anchorMarker.transform);
+            return wireView;
         }
 
         /// <summary>ビルド設定のシーン一覧に加える（PlayMode テストで名前から読み込むため）。</summary>
@@ -317,7 +341,7 @@ namespace Degunatsu.Editor
         }
 
         /// <summary>デバッグ機能（操作、表示、入力の記録と再生、軌跡）。docs/06_prototype_plan.md T1-9。</summary>
-        private static void CreateDebugTools(SimulationRunner runner, InputActionAsset inputActions)
+        internal static void CreateDebugTools(SimulationRunner runner, InputActionAsset inputActions)
         {
             var root = new GameObject("DebugTools");
             var controls = root.AddComponent<DebugControls>();
@@ -357,7 +381,7 @@ namespace Degunatsu.Editor
         }
 
         /// <summary>ワイヤーが外れたときの表示（×印と MISS）。半透明にするため Sprites-Default を使う。</summary>
-        private static void CreateMissIndicator(SimulationRunner runner, Camera camera)
+        internal static void CreateMissIndicator(SimulationRunner runner, Camera camera)
         {
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             var root = new GameObject("MissIndicator");

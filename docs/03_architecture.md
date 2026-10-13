@@ -76,10 +76,10 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
 | Core/Movement | 走行、ジャンプ、重力、地形との衝突解決（すり抜け防止の連続判定） | `KinematicMotor`, `MovementConfig` | 1 |
 | Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン、ロープの巻き付き（D-33） | `WireController`, `WireState`, `WireTargeting`, `RopeWrapping`, `RopePivots` | 1 |
 | Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
-| Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態、状態のバイト列とチェックサム（PC 間で同じ値） | `SimWorld`, `CharacterState`, `StateCodec` | 1 |
+| Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態、状態のバイト列とチェックサム（PC 間で同じ値）、ステージの範囲 | `SimWorld`, `CharacterState`, `StateCodec`, `StageBounds` | 1 |
 | Core/Replay | 入力の記録と再生（開始時の状態＋入力列＋最後の状態のチェックサム。テキストで保存） | `InputRecorder`, `InputRecording` | 1 |
 | Core/Rollback | ロールバックの層（入力の管理、入力遅延、予測、巻き戻しと再計算、確定ティック）と入力の送受信の規則（冗長送信、確認応答、メッセージのバイト列）。通信はしない。docs/10 | `RollbackSession`, `RollbackSettings`, `InputExchange`, `InputMessage`, `InputNormalizer`, `TimeSync`（状態の保存は Simulation の `WorldSnapshot`） | 2 |
-| Core/Combat | アクション状態（Free / Attack など）と遷移、攻撃のデータ（フレームデータ）、キャンセル規則、命中判定、ガード。docs/11 | `ActionController`, `ActionState`, `CombatState`, `CombatTuning`, `AttackData`（判定 `AttackHit` と動き `AttackMotion` の並び）, `HitResolver` | 3 |
+| Core/Combat | アクション状態（Free / Attack など）と遷移、攻撃のデータ（フレームデータ）、キャンセル規則、命中判定、ガード。docs/11 | `ActionController`, `ActionState`, `CombatState`, `CombatTuning`, `AttackData`（判定 `AttackHit` と動き `AttackMotion` の並び）, `HitResolver`, `KnockoutResolver`（ステージの外に出たら撃破） | 3 |
 | Core/Economy | コイン台帳（イベントIDで冪等、総量保存） | `CoinLedger`, `CoinTransaction` | 4 |
 | Core/Match | 試合進行、タイマー、出現、復帰、勝敗 | `MatchRules`, `MatchState` | 4 |
 | Runtime/Simulation | ティックループ、シーンの地形の読み込み | `SimulationRunner`, `SceneTerrainBuilder` | 1 |
@@ -112,6 +112,7 @@ Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを
   - 理由: PhysX の `BoxCast` は形状を約2mm膨らませて扱い（距離が短くなる、表面から2mm以内で始めると当たらない）、テストの結果と一致しなかった（2026-10-12 の計測）。純C#なら決定的で、テスト（`dotnet test`）と同じ結果になる。
   - 制約: 地形は軸平行の箱だけ（斜面や回転した形は未対応。必要になったら `BoxTerrain` を拡張する）。
 - アリーナには「細長い壁」があるため、高速移動時のすり抜けを**連続判定（スイープ）**で防ぐ。これを自動テストで保証する。
+- ステージの範囲（外に出ると撃破。docs/11 T3-3）は Core の `StageBounds`（長方形）で、`SimWorld` に渡す。シーンでは `KnockoutBounds` を1つ置く（なければ撃破はない）。
 
 ### 4.3 ワイヤー: 共通の制御＋差し替え可能な運動モデル
 
@@ -224,7 +225,7 @@ degunatsu/
 │     │  └─ Rules/
 │     ├─ Input/                  # .inputactions
 │     ├─ Prefabs/
-│     ├─ Scenes/                 # Sandbox_Wire.unity、Sandbox_Online.unity（どちらも Editor のビルダーで生成する）
+│     ├─ Scenes/                 # Sandbox_Wire.unity、Sandbox_Online.unity、Sandbox_Combat.unity（どれも Editor のビルダーで生成する）
 │     ├─ Art/
 │     ├─ Materials/
 │     ├─ Audio/

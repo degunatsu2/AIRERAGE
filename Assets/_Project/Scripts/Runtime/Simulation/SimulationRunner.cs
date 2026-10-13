@@ -19,6 +19,7 @@ namespace Degunatsu.Runtime.Simulation
     /// Update で経過時間をためて、1/60 秒ごとに SimWorld.Step を呼ぶ。表示は直前と現在のティックの状態を補間する。
     /// プロトタイプでは、操作するキャラクター1人と、攻撃を当てて試すためのダミー（入力なしでその場に立つ。
     /// docs/11_combat_plan.md T3-2）を動かす。位置のリセット（R）でダミーも出現位置に戻す。
+    /// シーンにステージの範囲（KnockoutBounds）があれば、外に出たキャラクターは撃破されて出現位置に戻る（T3-3）。
     /// </summary>
     public sealed class SimulationRunner : MonoBehaviour
     {
@@ -79,6 +80,9 @@ namespace Degunatsu.Runtime.Simulation
         /// <summary>これまでに進めたティック数。</summary>
         public int CurrentTick => _world.Tick;
 
+        /// <summary>ステージの範囲があるか（外に出ると撃破になるか。T3-3）。</summary>
+        public bool HasStageBounds => _world.Bounds.HasValue;
+
         /// <summary>マウスポインターで照準しているか。</summary>
         public bool UsingPointer => _input != null && _input.UsingPointer;
 
@@ -113,13 +117,14 @@ namespace Degunatsu.Runtime.Simulation
 
             var errors = new List<string>();
             BoxTerrain terrain = SceneTerrainBuilder.Build(_terrainMask, errors);
+            StageBounds? bounds = KnockoutBounds.Find(errors);
             foreach (string error in errors)
             {
                 Debug.LogError(error, this);
             }
 
             _terrain = terrain;
-            _world = new SimWorld(terrain);
+            _world = new SimWorld(terrain, bounds);
             _player = _world.AddCharacter(_character.Config, _spawnPoint.position.ToNumerics());
             _previous = _world.GetState(_player);
             if (_dummyViews.Length != _dummySpawns.Length)
