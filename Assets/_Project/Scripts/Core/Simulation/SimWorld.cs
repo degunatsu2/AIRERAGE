@@ -29,6 +29,9 @@ namespace Degunatsu.Core.Simulation
         /// <summary>ステージの範囲（null なら撃破はない）。</summary>
         public StageBounds? Bounds { get; }
 
+        /// <summary>直前の Step で当たった命中（表示とデバッグ用。状態ではないので、巻き戻しでは戻らない）。</summary>
+        public IReadOnlyList<HitRecord> LastHits => _hits.LastHits;
+
         /// <summary>これまでに進めたティック数。</summary>
         public int Tick { get; private set; }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Degunatsu.Core.Combat;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Physics;
@@ -82,6 +83,15 @@ namespace Degunatsu.Runtime.Simulation
 
         /// <summary>ステージの範囲があるか（外に出ると撃破になるか。T3-3）。</summary>
         public bool HasStageBounds => _world.Bounds.HasValue;
+
+        /// <summary>操作するキャラクターが最後に当てた命中（なければ null。デバッグ表示用）。</summary>
+        public HitRecord? LastPlayerHit { get; private set; }
+
+        /// <summary>
+        /// ダミーを向いている方向へ歩かせるか（デバッグ用。F7）。ダミーを足場から落として、撃破の手柄を確かめるため。
+        /// 位置のリセット、入力の記録と再生の始めに止める。
+        /// </summary>
+        public bool DummiesWalk { get; set; }
 
         /// <summary>マウスポインターで照準しているか。</summary>
         public bool UsingPointer => _input != null && _input.UsingPointer;
@@ -204,7 +214,18 @@ namespace Degunatsu.Runtime.Simulation
             }
             _inputs[0] = input;
             LastInput = input;
+            for (int i = 0; i < _previousDummies.Length; i++)
+            {
+                _inputs[1 + i] = DummiesWalk ? SimInput.FromAxes(_previousDummies[i].Facing, 0f, InputButtons.None) : default;
+            }
             _world.Step(_inputs);
+            foreach (HitRecord hit in _world.LastHits)
+            {
+                if (hit.Attacker == _player)
+                {
+                    LastPlayerHit = hit;
+                }
+            }
             PlayerTicked?.Invoke(_world.GetState(_player));
         }
 
@@ -257,6 +278,7 @@ namespace Degunatsu.Runtime.Simulation
         /// </summary>
         public void ResetDummies()
         {
+            DummiesWalk = false;
             for (int i = 0; i < _previousDummies.Length; i++)
             {
                 _world.SetState(_player + 1 + i, CharacterState.Spawn(_dummySpawns[i].position.ToNumerics(), -1));

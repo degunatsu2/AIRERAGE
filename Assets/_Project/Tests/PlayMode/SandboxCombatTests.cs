@@ -93,6 +93,23 @@ namespace Degunatsu.PlayMode.Tests
             runner.InputOverride = null;
         }
 
+        [UnityTest]
+        public IEnumerator WalkingDummies_FallOff_WithoutCredit()
+        {
+            // F7（DummiesWalk）でダミーを歩かせると、足場から落ちて撃破される。だれも当てていなければ手柄はつかない。
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            yield return WaitSeconds(0.5f);
+
+            runner.DummiesWalk = true;
+            yield return WaitUntil(() => runner.GetDummyState(0).Combat.Falls > 0, 6f);
+            runner.DummiesWalk = false;
+
+            Assert.That(runner.GetDummyState(0).Combat.Falls, Is.GreaterThan(0), "ダミーが落ちなかった");
+            Assert.That(runner.PlayerState.Combat.Knockouts, Is.EqualTo(0));
+        }
+
         private static Vector3 ToUnity(System.Numerics.Vector3 v)
         {
             return new Vector3(v.X, v.Y, v.Z);

@@ -388,6 +388,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleDummyWalk",
+                    "type": "Button",
+                    "id": "e9a7fab1-cee7-4c96-bc9f-5597e87887d4",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -498,6 +507,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "PlayRecording",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "792e8162-9220-4d8b-8593-f8eba63c5edb",
+                    "path": "<Keyboard>/f7",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleDummyWalk",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

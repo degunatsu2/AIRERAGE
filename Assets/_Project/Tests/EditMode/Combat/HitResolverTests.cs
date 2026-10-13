@@ -183,6 +183,51 @@ namespace Degunatsu.Core.Tests.Combat
         }
 
         [Test]
+        public void LastHits_ReportsTheHitOfTheLastTickOnly()
+        {
+            SimWorld world = World((0f, 1), (1.6f, -1));
+            world.Step(new[] { Attack, default });
+            StepUntilHit(world, 1, Combat.Ground.TotalTicks, default, default);
+
+            Assert.That(world.LastHits.Count, Is.EqualTo(1));
+            HitRecord hit = world.LastHits[0];
+            Assert.That(hit.Attacker, Is.EqualTo(0));
+            Assert.That(hit.Victim, Is.EqualTo(1));
+            Assert.That(hit.Attack, Is.EqualTo(AttackSlot.Ground));
+            Assert.That(hit.HitIndex, Is.EqualTo(0));
+            Assert.That(hit.KnockbackScale, Is.EqualTo(1f));
+            Assert.That(hit.Knockback, Is.EqualTo(new Vector2(Ground1.KnockbackX, Ground1.KnockbackY)));
+            Assert.That(world.GetState(1).Velocity, Is.EqualTo(new Vector3(hit.Knockback.X, hit.Knockback.Y, 0f)));
+
+            world.Step(new PlayerInput[2]);
+            Assert.That(world.LastHits.Count, Is.EqualTo(0), "次のティックには残らない");
+        }
+
+        [Test]
+        public void Hitstun_KeepsKnockbackFasterThanTheMaxFallSpeed()
+        {
+            // のけぞり中は、落下の上限速度より速い下向きの吹き飛びを切らない（重力では加速しない）。のけぞりが終わると上限に戻る（D-43）。
+            var config = new CharacterConfig();
+            var world = new SimWorld(new BoxTerrain());
+            world.AddCharacter(config, new Vector3(0f, 200f, 0f));
+            CharacterState state = world.GetState(0);
+            state.Action = new ActionState { Kind = ActionKind.Hitstun, Duration = 10 };
+            float knockback = -(config.Movement.MaxFallSpeed + 10f);
+            state.Velocity = new Vector3(0f, knockback, 0f);
+            world.SetState(0, state);
+
+            Step(world, 5, default(PlayerInput));
+            Assert.That(world.GetState(0).Velocity.Y, Is.EqualTo(knockback), "のけぞり中に上限で切られた");
+
+            for (int i = 0; i < 20 && !world.GetState(0).Action.IsFree; i++)
+            {
+                world.Step(new PlayerInput[1]);
+            }
+            world.Step(new PlayerInput[1]);
+            Assert.That(world.GetState(0).Velocity.Y, Is.EqualTo(-config.Movement.MaxFallSpeed), "のけぞりが終わっても上限に戻らない");
+        }
+
+        [Test]
         public void KoMove_KnocksFarther_WhenStrikingFaster()
         {
             Vector3 slow = KoHit(0f, out _);
@@ -191,13 +236,17 @@ namespace Degunatsu.Core.Tests.Combat
             Assert.That(fast.Length(), Is.GreaterThan(slow.Length() * 1.5f), "速く打つほど遠くへ飛ばす（D-38）");
         }
 
-        [Test]
-        public void GroundAttack_HitsTwice()
+        [TestCase(0.4f)]
+        [TestCase(1.0f)]
+        [TestCase(1.6f)]
+        [TestCase(2.6f)]
+        public void GroundAttack_HitsTwice(float distance)
         {
             // デフォルトの地上技は二段技: 踏み込みの1段目と、斜め上へ飛び出す2段目が、同じ相手に1回ずつ当たる。
+            // 近くから出しても、1段目で飛ばした相手を踏み込みで追い越さない（ユーザーのプレイテスト、2026-10-13）。
             var world = new SimWorld(TestArenas.Ground());
             world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f), 1);
-            world.AddCharacter(new CharacterConfig(), new Vector3(1.6f, GroundY, 0f), -1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(distance, GroundY, 0f), -1);
             world.Step(new PlayerInput[2]);
             world.Step(new[] { Attack, default });
 
@@ -210,6 +259,36 @@ namespace Degunatsu.Core.Tests.Combat
 
             Assert.That(maxCombo, Is.EqualTo(2), "2段とも当たる");
             Assert.That(world.GetState(1).Combat.ComboDamage, Is.EqualTo(Combat.Ground.Hits[0].Damage + Combat.Ground.Hits[1].Damage));
+        }
+
+        [TestCase(0.4f, 0f)]
+        [TestCase(1.0f, 0f)]
+        [TestCase(1.6f, 0f)]
+        [TestCase(2.6f, 0f)]
+        [TestCase(1.0f, 1f)]
+        [TestCase(1.6f, 1f)]
+        public void GroundAttack_ThenAnAirAttack_Connects(float distance, float up)
+        {
+            // 地上技（二段）の後、すぐに空中技（ニュートラル、または上）を出すと、のけぞっている相手にもう一度当たる
+            // （キャンセルなしでつながる。ユーザーのプレイテスト、2026-10-13）。
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(distance, GroundY, 0f), -1);
+            world.Step(new PlayerInput[2]);
+            world.Step(new[] { Attack, default });
+            for (int t = 0; t < 60 && !world.GetState(0).Action.IsFree; t++)
+            {
+                world.Step(new PlayerInput[2]);
+            }
+            Assert.That(world.GetState(1).Combat.ComboCount, Is.EqualTo(2), "前提: 2段とも当たる");
+
+            world.Step(new[] { PlayerInput.FromAxes(0f, up, InputButtons.Attack), default });
+            for (int t = 0; t < 30; t++)
+            {
+                world.Step(new PlayerInput[2]);
+            }
+
+            Assert.That(world.GetState(1).Combat.ComboCount, Is.EqualTo(3), "空中技がつながらない");
         }
 
         [Test]

@@ -8,12 +8,18 @@ namespace Degunatsu.Core.Wire.Models
     /// タイプA: 物理・慣性重視。ロープ長の拘束と重力による振り子運動。
     /// 巻き取るとロープが縮み、角運動量の保存で振りが速くなる（上限は共通の MaxAttachedSpeed）。
     /// 遅い状態で接続した直後は、速さが下限（StartPullSpeed）に届くように接続点の方向へ強く引く。
-    /// 上下の入力で巻き取りを変える（D-41）: 下を押し続けるとロープの長さを保ち（接続直後の引きもしない）、上なら素早く縮める。
+    /// 上下の入力で巻き取りを変える（D-41）:
+    /// - 上（真上に近い入力）: 素早く縮める（FastReelSpeed）。
+    /// - 下（斜め下を含む）: ロープの長さを保ち、左右の入力だけで振る（HoldSwingAcceleration）。接続直後に遅ければ、
+    ///   接続点の方向へ引く代わりに、振りの方向の速さを下限まで上げる。
     /// </summary>
     public sealed class InertialWireModel : IWireMotionModel
     {
         // ロープが張っているとみなす余裕（m）。
         private const float TautTolerance = 1e-3f;
+
+        // 下を押しているとき、斜め下（45°）の入力で左右いっぱいの力になるようにする。
+        private const float Cos45 = 0.70710678f;
 
         public WireMotionResult Step(in WireMotionContext context)
         {
@@ -33,25 +39,45 @@ namespace Degunatsu.Core.Wire.Models
             Vector3 radial = fromAnchor / distance;
             Vector3 tangent = SimMath.PerpendicularXY(radial);
 
-            float stickAlongTangent = Vector3.Dot(new Vector3(context.Stick.X, context.Stick.Y, 0f), tangent);
-            velocity += tangent * (stickAlongTangent * tuning.SwingAcceleration * dt);
+            bool holdLength = context.Stick.Y <= -tuning.HoldLengthInputThreshold;
+            if (holdLength)
+            {
+                float swingX = Math.Clamp(context.Stick.X / Cos45, -1f, 1f);
+                velocity += tangent * (swingX * tangent.X * tuning.HoldSwingAcceleration * dt);
+            }
+            else
+            {
+                float stickAlongTangent = Vector3.Dot(new Vector3(context.Stick.X, context.Stick.Y, 0f), tangent);
+                velocity += tangent * (stickAlongTangent * tuning.SwingAcceleration * dt);
+            }
 
             if (tuning.Damping > 0f)
             {
                 velocity *= MathMax(0f, 1f - tuning.Damping * dt);
             }
 
-            // 接続直後で遅いときは、速さが下限に届くように巻き取りを速くする。
             float radialSpeed = Vector3.Dot(velocity, radial);
             Vector3 tangential = velocity - radial * radialSpeed;
-            bool holdLength = context.Stick.Y <= -tuning.ReelInputThreshold;
-            float reelSpeed = holdLength ? 0f
-                : context.Stick.Y >= tuning.ReelInputThreshold ? tuning.FastReelSpeed : tuning.ReelSpeed;
-            float startPull = holdLength ? 0f : StartPullInSpeed(context, tuning, tangential.Length());
-            bool pullingAtStart = startPull > reelSpeed;
-            if (pullingAtStart)
+            float floor = StartSpeedFloor(context, tuning);
+            float reelSpeed;
+            bool pullingAtStart = false;
+            if (holdLength)
             {
-                reelSpeed = startPull;
+                // ロープの長さを保つ。接続直後に遅ければ、振りの方向の速さを下限まで上げる。
+                reelSpeed = 0f;
+                tangential = RaiseToFloor(tangential, tangent, context.Stick.X, floor);
+                velocity = tangential + radial * radialSpeed;
+            }
+            else
+            {
+                // 接続直後で遅いときは、速さが下限に届くように巻き取りを速くする。
+                reelSpeed = context.Stick.Y >= tuning.FastReelInputThreshold ? tuning.FastReelSpeed : tuning.ReelSpeed;
+                float startPull = PullInSpeed(floor, tangential.Length());
+                pullingAtStart = startPull > reelSpeed;
+                if (pullingAtStart)
+                {
+                    reelSpeed = startPull;
+                }
             }
 
             float lengthBefore = context.RopeLength;
@@ -80,11 +106,11 @@ namespace Degunatsu.Core.Wire.Models
         }
 
         /// <summary>
-        /// 接続直後の速さの下限に届くのに必要な、接続点の方向の速さ（不要なら 0）。
-        /// 接続した瞬間の速さが StartPullSpeed より遅いときだけ使う。下限は StartPullTicks の間 StartPullSpeed で、
-        /// その後 StartPullFadeTicks で ReelSpeed まで直線的に下がる（通常の巻き取りへ切れ目なく戻る）。
+        /// 接続直後の速さの下限（m/s。使わないときは 0）。接続した瞬間の速さが StartPullSpeed より遅いときだけ使う。
+        /// 下限は StartPullTicks の間 StartPullSpeed で、その後 StartPullFadeTicks で ReelSpeed まで直線的に下がる
+        /// （通常の巻き取りへ切れ目なく戻る）。
         /// </summary>
-        private static float StartPullInSpeed(in WireMotionContext context, InertialWireTuning tuning, float tangentialSpeed)
+        private static float StartSpeedFloor(in WireMotionContext context, InertialWireTuning tuning)
         {
             int ticks = context.AttachedTicks;
             if (tuning.StartPullSpeed <= 0f || context.AttachSpeed >= tuning.StartPullSpeed
@@ -98,11 +124,40 @@ namespace Degunatsu.Core.Wire.Models
                 float fade = (float)(ticks - tuning.StartPullTicks) / tuning.StartPullFadeTicks;
                 floor += (tuning.ReelSpeed - tuning.StartPullSpeed) * fade;
             }
+            return floor;
+        }
+
+        /// <summary>速さが下限 floor に届くのに必要な、接続点の方向の速さ（不要なら 0）。</summary>
+        private static float PullInSpeed(float floor, float tangentialSpeed)
+        {
             if (tangentialSpeed >= floor)
             {
                 return 0f;
             }
             return MathF.Sqrt(floor * floor - tangentialSpeed * tangentialSpeed);
+        }
+
+        /// <summary>
+        /// 振りの方向の速度 tangential を、速さが floor に届くまで上げる。向きは今の振りの向き。止まっていれば、
+        /// 左右の入力の向き（なければ上げない）。
+        /// </summary>
+        private static Vector3 RaiseToFloor(Vector3 tangential, Vector3 tangent, float stickX, float floor)
+        {
+            float speed = tangential.Length();
+            if (speed >= floor)
+            {
+                return tangential;
+            }
+            if (speed > SimMath.Epsilon)
+            {
+                return tangential * (floor / speed);
+            }
+            float side = stickX * tangent.X;
+            if (MathF.Abs(side) <= SimMath.Epsilon)
+            {
+                return tangential;
+            }
+            return tangent * (side > 0f ? floor : -floor);
         }
 
         private static float MathMax(float a, float b)

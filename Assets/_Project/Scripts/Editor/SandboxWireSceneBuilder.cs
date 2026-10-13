@@ -260,13 +260,30 @@ namespace Degunatsu.Editor
             }
         }
 
-        /// <summary>キャラクターの箱の表示と、攻撃の判定を描く線を作る。</summary>
+        /// <summary>キャラクターの箱の表示と、攻撃の判定を描く線、撃破技のチャージのエフェクトを作る。</summary>
         internal static CharacterView CreateCharacterView(string name, Material material, Vector3 position)
         {
             GameObject go = CreateVisual(PrimitiveType.Cube, name, material, Vector3.one);
             go.transform.position = position;
             var view = go.AddComponent<CharacterView>();
             SetReference(view, "_hitboxLine", CreateHitboxLine(name + "Hitbox"));
+            SetReference(view, "_chargeEffect", CreateChargeEffect(name + "Charge"));
+            return view;
+        }
+
+        /// <summary>
+        /// 撃破技のチャージのエフェクト（輪2つと光の筋。キャラクターの子にしない。大きさの影響を受けないように）。
+        /// 「CHARGE!」の文字はシーンのカメラで画面に写す。
+        /// </summary>
+        internal static ChargeEffectView CreateChargeEffect(string name)
+        {
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var root = new GameObject(name);
+            var view = root.AddComponent<ChargeEffectView>();
+            SetReference(view, "_ring", CreateIndicatorLine(root.transform, "Ring", material, 0.1f));
+            SetReference(view, "_pulse", CreateIndicatorLine(root.transform, "Pulse", material, 0.08f));
+            SetReference(view, "_rays", CreateIndicatorLine(root.transform, "Rays", material, 0.06f));
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
             return view;
         }
 

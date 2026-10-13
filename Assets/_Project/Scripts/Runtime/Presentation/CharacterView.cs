@@ -9,6 +9,7 @@ namespace Degunatsu.Runtime.Presentation
     /// キャラクターの状態を箱で表示する（プロトタイプ用）。直前と現在のティックの状態を補間する。
     /// 戦闘の状態を色で示す（判定と見た目ができるまでの仮の表示。docs/11_combat_plan.md）: 攻撃の段階（発生・持続・硬直。
     /// 撃破技の発生は金色のチャージ）、ヒットストップ、のけぞり。攻撃の判定が出ている間は、その箱を線で描く（_hitboxLine があれば）。
+    /// 撃破技のチャージの間は、チャージのエフェクトと「CHARGE!」を出す（_chargeEffect があれば）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
@@ -35,6 +36,8 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private Color _hitstunColor = new Color(1f, 0.55f, 0.85f);
         [Tooltip("攻撃の判定を描く線（4辺。なくてもよい）")]
         [SerializeField] private LineRenderer _hitboxLine;
+        [Tooltip("撃破技のチャージのエフェクト（なくてもよい）")]
+        [SerializeField] private ChargeEffectView _chargeEffect;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
@@ -63,6 +66,9 @@ namespace Degunatsu.Runtime.Presentation
         /// <summary>攻撃の判定を描いているか。</summary>
         public bool ShowingHitbox => _hitboxLine != null && _hitboxLine.enabled;
 
+        /// <summary>撃破技のチャージのエフェクト（なければ null）。</summary>
+        public ChargeEffectView ChargeEffect => _chargeEffect;
+
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
             transform.position = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
@@ -74,6 +80,7 @@ namespace Degunatsu.Runtime.Presentation
         {
             RenderHitbox(current, combat);
             Tint tint = TintOf(current, combat);
+            RenderCharge(current, combat, tint == Tint.Charge);
             if (tint == _shown)
             {
                 return;
@@ -94,6 +101,24 @@ namespace Degunatsu.Runtime.Presentation
             }
             _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        private void RenderCharge(in CharacterState state, CombatTuning combat, bool charging)
+        {
+            if (_chargeEffect == null)
+            {
+                return;
+            }
+            if (!charging)
+            {
+                if (_chargeEffect.IsShowing)
+                {
+                    _chargeEffect.Hide();
+                }
+                return;
+            }
+            int chargeTicks = combat.Get(state.Action.Attack).FirstHitTick;
+            _chargeEffect.Show(transform.position, (state.Action.Ticks + 1f) / chargeTicks);
         }
 
         private static Tint TintOf(in CharacterState state, CombatTuning combat)

@@ -79,7 +79,7 @@ namespace Degunatsu.Runtime.DebugTools
             WireState w = s.Wire;
 
             _text.Clear();
-            _text.Append("Debug  Tab: type  F1: speed  F2: step\n");
+            _text.Append("Debug  Tab: type  F1: speed  F2: step  F7: dummies ").Append(_runner.DummiesWalk ? "walking" : "stop").Append('\n');
             _text.Append("Type ").Append(WireTypeLabels.Long(tuning.ModelType))
                 .Append("   Speed ").Append(_runner.SpeedScale > 0f ? "x" + _runner.SpeedScale.ToString("0.##") : "PAUSED")
                 .Append("   Tick ").Append(_runner.CurrentTick).Append('\n');
@@ -109,7 +109,9 @@ namespace Degunatsu.Runtime.DebugTools
             _text.Append("Last release ").Append(w.LastReleaseReason).Append("  Last miss ").Append(w.LastMissReason).Append('\n');
             AppendAction("Action ", s);
             AppendKnockouts(s);
-            int lines = 10;
+            _text.Append('\n');
+            AppendLastHit();
+            int lines = 11;
             for (int i = 0; i < _runner.DummyCount; i++)
             {
                 CharacterState dummy = _runner.GetDummyState(i);
@@ -120,6 +122,24 @@ namespace Degunatsu.Runtime.DebugTools
                 lines++;
             }
             GUI.Box(new Rect(Screen.width - Width - 10f, 10f, Width, 12f + 21f * lines), _text.ToString(), _style);
+        }
+
+        // 最後に当てた攻撃の吹き飛び（倍率をかけた後の速度）と威力（今はダメージの値。コインへの変換は Phase 4）。
+        private void AppendLastHit()
+        {
+            if (!_runner.LastPlayerHit.HasValue)
+            {
+                _text.Append("Last hit --");
+                return;
+            }
+            HitRecord hit = _runner.LastPlayerHit.Value;
+            _text.Append("Last hit ").Append(hit.Attack);
+            if (_runner.PlayerConfig.Combat.Get(hit.Attack).Hits.Length > 1)
+            {
+                _text.Append(" #").Append(hit.HitIndex + 1);
+            }
+            _text.Append("  KB (").Append(hit.Knockback.X.ToString("0.0")).Append(", ").Append(hit.Knockback.Y.ToString("0.0"))
+                .Append(") x").Append(hit.KnockbackScale.ToString("0.00")).Append("  Power ").Append(hit.Data.Damage);
         }
 
         // 撃破した数と、ステージの外に出た数（ステージの範囲があるシーンだけ。T3-3）。

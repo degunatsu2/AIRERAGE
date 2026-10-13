@@ -179,7 +179,8 @@ namespace Degunatsu.Core.Combat
     {
         /// <summary>
         /// 地上技（デフォルトのキャラクター）: 前へ大きく踏み込みながら1段目、斜め上へ飛び出しながら2段目の二段技。
-        /// 最後に地面を離れて空中に移る（キャラクターを作るときの方針。D-35）。
+        /// 最後に地面を離れて空中に移る（キャラクターを作るときの方針。D-35）。1段目は踏み込みに追い越されないように前へ飛ばし、
+        /// 2段目は飛び出しとほぼ同じ速度で飛ばす（空中技につなげやすいように。相手との距離 0.4〜2.6m で2段とも当たる）。
         /// </summary>
         public AttackData Ground = new AttackData
         {
@@ -189,12 +190,12 @@ namespace Degunatsu.Core.Combat
                 new AttackHit
                 {
                     StartTick = 5, ActiveTicks = 8, OffsetX = 0.8f, HalfWidth = 0.7f, HalfHeight = 0.7f,
-                    Damage = 4, HitstopTicks = 5, HitstunTicks = 20, KnockbackX = 9f, KnockbackY = 3f,
+                    Damage = 4, HitstopTicks = 5, HitstunTicks = 20, KnockbackX = 13f, KnockbackY = 5f,
                 },
                 new AttackHit
                 {
                     StartTick = 13, ActiveTicks = 5, OffsetX = 0.6f, OffsetY = 0.9f, HalfWidth = 0.8f, HalfHeight = 0.8f,
-                    Damage = 4, HitstopTicks = 6, HitstunTicks = 24, KnockbackX = 6f, KnockbackY = 12f,
+                    Damage = 4, HitstopTicks = 6, HitstunTicks = 24, KnockbackX = 10.5f, KnockbackY = 13.5f,
                 },
             },
             Motions = new[]

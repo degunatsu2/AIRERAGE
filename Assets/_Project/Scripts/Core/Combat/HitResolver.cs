@@ -20,7 +20,13 @@ namespace Degunatsu.Core.Combat
         /// <summary>命中を決められるキャラクターの数の上限（当てた相手の記録のビット数による）。</summary>
         public const int MaxCharacters = 8;
 
-        private readonly List<Hit> _hits = new List<Hit>();
+        private readonly List<HitRecord> _hits = new List<HitRecord>();
+
+        /// <summary>
+        /// 直前の Resolve で当たった命中（当てた順）。表示とデバッグ用で、シミュレーションの状態ではない
+        /// （巻き戻しでは戻らない。次の Resolve で置き換わる）。
+        /// </summary>
+        public IReadOnlyList<HitRecord> LastHits => _hits;
 
         /// <summary>このティックの命中を決めて当てる。tick は進めた後のティック（記録に使う）。</summary>
         public void Resolve(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick)
@@ -59,13 +65,13 @@ namespace Degunatsu.Core.Combat
                         if (MathF.Abs(target.X - center.X) < half.X + targetHalf.X
                             && MathF.Abs(target.Y - center.Y) < half.Y + targetHalf.Y)
                         {
-                            _hits.Add(new Hit(a, v, h, hitData, attacker.Facing, scale));
+                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, scale));
                         }
                     }
                 }
             }
 
-            foreach (Hit hit in _hits)
+            foreach (HitRecord hit in _hits)
             {
                 Apply(states, configs, hit, tick);
             }
@@ -87,7 +93,7 @@ namespace Degunatsu.Core.Combat
         }
 
         // 判定のデータ、向き、倍率は、集めたときのものを使う（相打ちで、先に当てた命中が攻撃した側をのけぞらせていることがある）。
-        private static void Apply(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, Hit hit, int tick)
+        private static void Apply(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, HitRecord hit, int tick)
         {
             AttackHit data = hit.Data;
             CharacterState attacker = states[hit.Attacker];
@@ -106,7 +112,7 @@ namespace Degunatsu.Core.Combat
                 Kind = ActionKind.Hitstun,
                 Duration = data.HitstunTicks,
             };
-            victim.Velocity = new Vector3(data.KnockbackX * hit.Facing, data.KnockbackY, 0f) * hit.KnockbackScale;
+            victim.Velocity = new Vector3(hit.Knockback.X, hit.Knockback.Y, 0f);
             victim.JumpBufferTicksLeft = 0;
             victim.Combat.HitstopTicksLeft = Math.Max(victim.Combat.HitstopTicksLeft, data.HitstopTicks);
             victim.Combat.HasLastAttacker = true;
@@ -116,25 +122,36 @@ namespace Degunatsu.Core.Combat
             victim.Combat.ComboDamage = (comboContinues ? victim.Combat.ComboDamage : 0) + data.Damage;
             states[hit.Victim] = victim;
         }
+    }
 
-        private readonly struct Hit
+    /// <summary>当たった命中1つ（HitResolver.LastHits）。判定のデータ、向き、倍率は、命中を集めたときのもの。</summary>
+    public readonly struct HitRecord
+    {
+        public readonly int Attacker;
+        public readonly int Victim;
+        public readonly AttackSlot Attack;
+
+        /// <summary>攻撃の何番目の判定か（0 から）。</summary>
+        public readonly int HitIndex;
+
+        public readonly AttackHit Data;
+        public readonly int Facing;
+
+        /// <summary>吹き飛びの倍率（撃破技は打つ直前の速さによる。それ以外は 1。D-38）。</summary>
+        public readonly float KnockbackScale;
+
+        public HitRecord(int attacker, int victim, AttackSlot attack, int hitIndex, AttackHit data, int facing, float knockbackScale)
         {
-            public readonly int Attacker;
-            public readonly int Victim;
-            public readonly int HitIndex;
-            public readonly AttackHit Data;
-            public readonly int Facing;
-            public readonly float KnockbackScale;
-
-            public Hit(int attacker, int victim, int hitIndex, AttackHit data, int facing, float knockbackScale)
-            {
-                Attacker = attacker;
-                Victim = victim;
-                HitIndex = hitIndex;
-                Data = data;
-                Facing = facing;
-                KnockbackScale = knockbackScale;
-            }
+            Attacker = attacker;
+            Victim = victim;
+            Attack = attack;
+            HitIndex = hitIndex;
+            Data = data;
+            Facing = facing;
+            KnockbackScale = knockbackScale;
         }
+
+        /// <summary>当たった側の吹き飛びの速度（m/s、X は右が正）。</summary>
+        public Vector2 Knockback => new Vector2(Data.KnockbackX * Facing, Data.KnockbackY) * KnockbackScale;
     }
 }

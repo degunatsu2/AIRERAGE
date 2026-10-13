@@ -82,6 +82,7 @@ namespace Degunatsu.Editor
                 characterGo.transform.position = spawn.position;
                 characterViews[p] = characterGo.AddComponent<CharacterView>();
                 SandboxWireSceneBuilder.SetReference(characterViews[p], "_hitboxLine", SandboxWireSceneBuilder.CreateHitboxLine($"Player{p + 1}Hitbox"));
+                SandboxWireSceneBuilder.SetReference(characterViews[p], "_chargeEffect", SandboxWireSceneBuilder.CreateChargeEffect($"Player{p + 1}Charge"));
                 wireViews[p] = CreateWire(playersRoot, $"Player{p + 1}Wire", wireMaterial, attachedAnchorMaterial);
             }
 

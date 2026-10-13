@@ -10,6 +10,7 @@ namespace Degunatsu.Runtime.DebugTools
     /// - ToggleWireType（Tab / Select）: ワイヤーのタイプ A / B を切り替える（調整値のアセットの値を変える）
     /// - CycleSpeed（F1 / 十字キー下）: シミュレーションの速さを 1 → 1/2 → 1/4 → 一時停止 → 1 の順に変える
     /// - StepTick（F2 / 十字キー右）: 一時停止中に1ティックだけ進める
+    /// - ToggleDummyWalk（F7）: ダミーを向いている方向へ歩かせる／止める（足場から落として撃破の手柄を確かめる）
     /// 同じマップの SaveRecording（F5）と PlayRecording（F6）は ReplayControls が読む。
     /// </summary>
     public sealed class DebugControls : MonoBehaviour
@@ -26,6 +27,7 @@ namespace Degunatsu.Runtime.DebugTools
         private InputAction _toggleWireType;
         private InputAction _cycleSpeed;
         private InputAction _stepTick;
+        private InputAction _toggleDummyWalk;
         private int _speedIndex;
 
         private void Awake()
@@ -40,6 +42,7 @@ namespace Degunatsu.Runtime.DebugTools
             _toggleWireType = _map.FindAction("ToggleWireType", throwIfNotFound: true);
             _cycleSpeed = _map.FindAction("CycleSpeed", throwIfNotFound: true);
             _stepTick = _map.FindAction("StepTick", throwIfNotFound: true);
+            _toggleDummyWalk = _map.FindAction("ToggleDummyWalk", throwIfNotFound: true);
         }
 
         private void OnEnable()
@@ -65,6 +68,10 @@ namespace Degunatsu.Runtime.DebugTools
             if (_stepTick.WasPressedThisFrame() && _runner.SpeedScale <= 0f)
             {
                 _runner.StepOnce();
+            }
+            if (_toggleDummyWalk.WasPressedThisFrame())
+            {
+                _runner.DummiesWalk = !_runner.DummiesWalk;
             }
         }
 

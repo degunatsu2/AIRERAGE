@@ -1,4 +1,5 @@
 using System;
+using Degunatsu.Core.Combat;
 using Degunatsu.Core.Common;
 using Degunatsu.Core.Input;
 using Degunatsu.Core.Simulation;
@@ -18,10 +19,13 @@ namespace Degunatsu.Core.Movement
 
             state.Velocity.X = ComputeHorizontalVelocity(state.Velocity.X, inputX, state.Grounded, tuning, dt);
 
+            float fallSpeedBefore = state.Velocity.Y;
             state.Velocity.Y -= tuning.Gravity * dt;
             if (state.Velocity.Y < -tuning.MaxFallSpeed)
             {
-                state.Velocity.Y = -tuning.MaxFallSpeed;
+                // のけぞり中は、吹き飛びの下向きの速さを上限で切らない（重力で上限より速くならないだけ。D-43）。
+                bool keepKnockback = state.Action.Kind == ActionKind.Hitstun;
+                state.Velocity.Y = keepKnockback ? MathF.Min(fallSpeedBefore, -tuning.MaxFallSpeed) : -tuning.MaxFallSpeed;
             }
 
             UpdateJump(ref state, input, tuning);

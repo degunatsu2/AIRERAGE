@@ -100,6 +100,51 @@ namespace Degunatsu.PlayMode.Tests
             Assert.That(dummy.Combat.HasLastAttacker, Is.True, "ダミーに当たっていない");
             Assert.That(dummy.Combat.LastAttacker, Is.EqualTo(0), "当てたのはプレイヤー（番号 0）");
             Assert.That(dummy.Position.X, Is.GreaterThan(4.5f), "ダミーが吹き飛んでいない");
+            Assert.That(runner.LastPlayerHit.HasValue, Is.True, "最後に当てた命中を覚えていない（デバッグ表示用）");
+            Assert.That(runner.LastPlayerHit.Value.Attack, Is.EqualTo(AttackSlot.Ground));
+        }
+
+        [UnityTest]
+        public IEnumerator KoMove_ShowsTheChargeEffect_OnlyWhileCharging()
+        {
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            ChargeEffectView charge = runner.PlayerView.ChargeEffect;
+            Assert.That(charge, Is.Not.Null, "チャージのエフェクトがない");
+            yield return WaitSeconds(0.5f);
+
+            // ジャンプして、上昇中に下＋攻撃（デフォルトのキャラクターの撃破技。ダミーのいない左を向く）。
+            var inputs = new List<SimInput>();
+            inputs.Add(SimInput.FromAxes(-1f, 0f, InputButtons.Jump));
+            for (int i = 0; i < 4; i++)
+            {
+                inputs.Add(default);
+            }
+            inputs.Add(SimInput.FromAxes(0f, -1f, InputButtons.Attack));
+            for (int i = 0; i < 60; i++)
+            {
+                inputs.Add(default);
+            }
+            runner.InputOverride = new Script(inputs);
+
+            bool sawCharge = false;
+            bool chargeOutsideStartup = false;
+            float start = Time.time;
+            while (runner.InputOverride != null && Time.time - start < 3f)
+            {
+                CharacterState state = runner.PlayerState;
+                bool charging = state.Action.Kind == ActionKind.Attack && state.Action.Attack == AttackSlot.AirDown
+                    && runner.PlayerView.ShownPhase == AttackPhase.Startup;
+                sawCharge |= charge.IsShowing;
+                chargeOutsideStartup |= charge.IsShowing && !charging;
+                yield return null;
+            }
+
+            Assert.That(sawCharge, Is.True, "チャージのエフェクトが出なかった");
+            Assert.That(chargeOutsideStartup, Is.False, "チャージの後もエフェクトが残った");
+            Assert.That(charge.IsShowing, Is.False);
         }
 
         private static IEnumerator WaitSeconds(float seconds)

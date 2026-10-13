@@ -141,8 +141,19 @@ namespace Degunatsu.Core.Wire
         /// <summary>上を押し続けているときの巻き取りの速さ（m/s。D-41）。下を押し続けているときは巻き取らない（ロープの長さを保つ）。</summary>
         public float FastReelSpeed = 20f;
 
-        /// <summary>上下の入力とみなすスティックの縦の大きさ（0〜1。D-41）。斜めの入力（約 0.71）も上下に数える。</summary>
-        public float ReelInputThreshold = 0.5f;
+        /// <summary>
+        /// 上とみなすスティックの縦の大きさ（0〜1。D-41）。真上に近い入力だけを数え、斜め上（約 0.71）は数えない
+        /// （ユーザーの記録では、振っている間に斜め上を押し続けることが多いため。2026-10-13）。
+        /// </summary>
+        public float FastReelInputThreshold = 0.9f;
+
+        /// <summary>下とみなすスティックの縦の大きさ（0〜1。D-41）。斜め下（約 0.71）も数える（下を押したまま左右で振れるように）。</summary>
+        public float HoldLengthInputThreshold = 0.5f;
+
+        /// <summary>
+        /// 下を押してロープの長さを保っている間に、左右の入力で振る力（m/s²）。縦の入力は使わない（斜め下でも左右いっぱいの力になる）。
+        /// </summary>
+        public float HoldSwingAcceleration = 16f;
 
         /// <summary>スティックでロープに垂直な方向へ加える力（m/s²）。</summary>
         public float SwingAcceleration = 10f;
@@ -154,6 +165,7 @@ namespace Degunatsu.Core.Wire
         /// 接続直後の速さの下限（m/s。0 なら使わない）。止まっている状態から接続したときの初速の遅さを補う
         /// （ユーザーの指示、2026-10-12）。接続した瞬間の速さがこれより遅いときだけ、速さがこの値に届くように
         /// 接続点の方向へ強く引く（巻き取りも速くなる）。振りの速さが育てば、通常の巻き取りに戻る。
+        /// 下を押してロープの長さを保っているときは、引かずに、振りの方向（ロープに垂直）の速さをこの値まで上げる（D-41）。
         /// </summary>
         public float StartPullSpeed = 14f;
 
@@ -168,7 +180,9 @@ namespace Degunatsu.Core.Wire
             var v = new TuningValidator(nameof(InertialWireTuning));
             v.NonNegative(nameof(ReelSpeed), ReelSpeed);
             v.NonNegative(nameof(FastReelSpeed), FastReelSpeed);
-            v.InRange(nameof(ReelInputThreshold), ReelInputThreshold, 0.1f, 1f);
+            v.InRange(nameof(FastReelInputThreshold), FastReelInputThreshold, 0.1f, 1f);
+            v.InRange(nameof(HoldLengthInputThreshold), HoldLengthInputThreshold, 0.1f, 1f);
+            v.NonNegative(nameof(HoldSwingAcceleration), HoldSwingAcceleration);
             v.NonNegative(nameof(SwingAcceleration), SwingAcceleration);
             v.NonNegative(nameof(Damping), Damping);
             v.NonNegative(nameof(StartPullSpeed), StartPullSpeed);
