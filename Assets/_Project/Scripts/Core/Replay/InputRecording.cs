@@ -62,7 +62,7 @@ namespace Degunatsu.Core.Replay
         /// 地形 collision と調整値 config で記録を再生し、最後の状態を返す。
         /// config のワイヤーのタイプが記録と違えば ArgumentException（違うタイプで再生しても同じ動きにならないため）。
         /// </summary>
-        public CharacterState Simulate(ICollisionQuery collision, CharacterConfig config)
+        public CharacterState Simulate(ICollisionQuery collision, CharacterConfig config, Action<CharacterState> onTick = null)
         {
             if (config == null)
             {
@@ -81,6 +81,7 @@ namespace Degunatsu.Core.Replay
             {
                 inputs[0] = input;
                 world.Step(inputs);
+                onTick?.Invoke(world.GetState(0));
             }
             return world.GetState(0);
         }

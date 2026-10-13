@@ -48,11 +48,21 @@ namespace Degunatsu.Runtime.Tests
                 var config = new CharacterConfig();
                 JsonUtility.FromJsonOverwrite(recording.ConfigText, config);
 
-                CharacterState final = recording.Simulate(terrain, config);
+                // 記録がどこまでの動きを含むかの目安（ワイヤーの接続の回数と、ロープが巻き付いた支点の最大の数）。
+                int attaches = 0;
+                int maxPivots = 0;
+                bool wasAttached = false;
+                CharacterState final = recording.Simulate(terrain, config, state =>
+                {
+                    bool attached = state.Wire.Phase == Degunatsu.Core.Wire.WirePhase.Attached;
+                    attaches += attached && !wasAttached ? 1 : 0;
+                    wasAttached = attached;
+                    maxPivots = Mathf.Max(maxPivots, state.Wire.Pivots.Count);
+                });
                 ulong checksum = StateCodec.Checksum(final);
                 if (checksum == recording.FinalChecksum)
                 {
-                    Debug.Log($"RecordedReplayTests: {fileName} は一致（{recording.Inputs.Count} ティック、{checksum:x16}）");
+                    Debug.Log($"RecordedReplayTests: {fileName} は一致（{recording.Inputs.Count} ティック、{checksum:x16}、接続 {attaches} 回、巻き付きの支点は最大 {maxPivots}）");
                 }
                 else
                 {
