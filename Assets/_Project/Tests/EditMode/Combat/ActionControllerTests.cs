@@ -10,7 +10,7 @@ using NUnit.Framework;
 
 namespace Degunatsu.Core.Tests.Combat
 {
-    /// <summary>攻撃の状態とフレームデータ（docs/11_combat_plan.md T3-1）。</summary>
+    /// <summary>攻撃の状態とフレームデータ、地上技の動き（docs/11_combat_plan.md T3-1）。</summary>
     public class ActionControllerTests
     {
         private static PlayerInput Attack(float x = 0f, float y = 0f, InputButtons extra = InputButtons.None)
@@ -26,15 +26,22 @@ namespace Degunatsu.Core.Tests.Combat
             return harness;
         }
 
-        [Test]
-        public void GroundAttack_GoesThroughStartupActiveRecovery_ThenFree()
+        private static SimHarness InAir()
         {
-            SimHarness harness = OnGround();
-            AttackData data = harness.Config.Combat.GroundNeutral;
+            var harness = new SimHarness(TestArenas.Ground(), spawn: new Vector3(0f, 8f, 0f));
+            Assert.That(harness.State.Grounded, Is.False, "前提: 空中にいる");
+            return harness;
+        }
+
+        [Test]
+        public void AirAttack_GoesThroughStartupActiveRecovery_ThenFree()
+        {
+            SimHarness harness = InAir();
+            AttackData data = harness.Config.Combat.AirNeutral;
 
             harness.Step(Attack());
             Assert.That(harness.State.Action.Kind, Is.EqualTo(ActionKind.Attack));
-            Assert.That(harness.State.Action.Attack, Is.EqualTo(AttackSlot.GroundNeutral));
+            Assert.That(harness.State.Action.Attack, Is.EqualTo(AttackSlot.AirNeutral));
 
             int startup = 0, active = 0, recovery = 0;
             int ticks = 0;
@@ -63,8 +70,8 @@ namespace Degunatsu.Core.Tests.Combat
         [Test]
         public void NextAttack_CanStartRightAfterRecovery()
         {
-            SimHarness harness = OnGround();
-            int total = harness.Config.Combat.GroundNeutral.TotalTicks;
+            SimHarness harness = InAir();
+            int total = harness.Config.Combat.AirNeutral.TotalTicks;
 
             harness.Step(Attack());
             harness.Step(Inputs.None, total - 1);
@@ -75,18 +82,18 @@ namespace Degunatsu.Core.Tests.Combat
             Assert.That(harness.State.Action.Ticks, Is.EqualTo(0), "硬直が終わったティックに、次の攻撃を始められる");
         }
 
-        [TestCase(0f, 0f, true, AttackSlot.GroundNeutral)]
-        [TestCase(1f, 0f, true, AttackSlot.GroundSide)]
-        [TestCase(-1f, 0f, true, AttackSlot.GroundSide)]
-        [TestCase(0f, 1f, true, AttackSlot.GroundUp)]
-        [TestCase(0f, -1f, true, AttackSlot.GroundDown)]
-        [TestCase(0.7f, 0.7f, true, AttackSlot.GroundUp)]
-        [TestCase(0.9f, 0.5f, true, AttackSlot.GroundSide)]
-        [TestCase(0.1f, 0.1f, true, AttackSlot.GroundNeutral)]
+        [TestCase(0f, 0f, true, AttackSlot.Ground)]
+        [TestCase(1f, 0f, true, AttackSlot.Ground)]
+        [TestCase(0f, 1f, true, AttackSlot.Ground)]
+        [TestCase(0f, -1f, true, AttackSlot.Ground)]
         [TestCase(0f, 0f, false, AttackSlot.AirNeutral)]
         [TestCase(1f, 0f, false, AttackSlot.AirSide)]
+        [TestCase(-1f, 0f, false, AttackSlot.AirSide)]
         [TestCase(0f, 1f, false, AttackSlot.AirUp)]
         [TestCase(0f, -1f, false, AttackSlot.AirDown)]
+        [TestCase(0.7f, 0.7f, false, AttackSlot.AirUp)]
+        [TestCase(0.9f, 0.5f, false, AttackSlot.AirSide)]
+        [TestCase(0.1f, 0.1f, false, AttackSlot.AirNeutral)]
         public void Stick_SelectsTheAttack(float x, float y, bool grounded, AttackSlot expected)
         {
             Assert.That(ActionController.SelectAttack(grounded, new Vector2(x, y), 0.2f), Is.EqualTo(expected));
@@ -99,7 +106,7 @@ namespace Degunatsu.Core.Tests.Combat
             Assert.That(harness.State.Facing, Is.EqualTo(1), "前提: 右を向いている");
 
             harness.Step(Attack(-1f, 0f));
-            Assert.That(harness.State.Action.Attack, Is.EqualTo(AttackSlot.GroundSide));
+            Assert.That(harness.State.Action.Attack, Is.EqualTo(AttackSlot.Ground));
             Assert.That(harness.State.Facing, Is.EqualTo(-1), "左に入れて攻撃すると左を向く");
 
             harness.Step(Inputs.Right, 3);
@@ -107,26 +114,68 @@ namespace Degunatsu.Core.Tests.Combat
         }
 
         [Test]
-        public void DuringAttack_MoveJumpAndWireAreIgnored()
+        public void GroundAttack_DashesFarther_ThanRunning_AndEndsInTheAir()
+        {
+            AttackData ground = new CombatTuning().Ground;
+            int total = ground.TotalTicks;
+
+            SimHarness attacking = OnGround();
+            float startX = attacking.State.Position.X;
+            attacking.Step(Attack());
+            bool leftGround = false;
+            for (int t = 1; t < total; t++)
+            {
+                attacking.Step(Inputs.None);
+                if (attacking.State.Action.Ticks == ground.StartupTicks + ground.ActiveTicks)
+                {
+                    Assert.That(attacking.State.Velocity.Y, Is.GreaterThan(0f), "硬直に入るときに上へ飛び出す");
+                }
+                leftGround |= !attacking.State.Grounded;
+            }
+            Assert.That(leftGround, Is.True, "地上技は地面を離れる");
+            Assert.That(attacking.State.Grounded, Is.False, "地上技が終わったときは空中にいる");
+
+            SimHarness running = OnGround();
+            running.Step(Inputs.Right, total);
+            float attackDistance = attacking.State.Position.X - startX;
+            float runDistance = running.State.Position.X - startX;
+            Assert.That(attackDistance, Is.GreaterThan(runDistance), "止まった状態からの地上技は、同じ時間走るより遠くへ動く");
+
+            // 終わった後は空中で動ける（空中ジャンプが残っている）。
+            attacking.Step(Inputs.Jump);
+            Assert.That(attacking.State.AirJumpsUsed, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void GroundAttack_GoesInTheFacingDirection()
         {
             SimHarness harness = OnGround();
-            harness.Step(Inputs.Right, 30);
-            Assert.That(harness.State.Velocity.X, Is.GreaterThan(7f), "前提: 走っている");
+            float startX = harness.State.Position.X;
 
-            harness.Step(Attack(1f, 0f));
+            harness.Step(Attack(-1f, 0f));
+            harness.Step(Inputs.None, harness.Config.Combat.Ground.TotalTicks);
+
+            Assert.That(harness.State.Position.X, Is.LessThan(startX - 2f), "左を向いて出すと左へ進む");
+        }
+
+        [Test]
+        public void DuringAttack_MoveJumpAndWireAreIgnored()
+        {
+            SimHarness harness = InAir();
+            harness.Step(Attack());
             var everything = PlayerInput.FromAxes(1f, 0f, InputButtons.Attack | InputButtons.Jump | InputButtons.Wire);
-            harness.Step(everything, 10);
+            harness.Step(everything, 5);
 
             CharacterState state = harness.State;
             Assert.That(state.Action.Kind, Is.EqualTo(ActionKind.Attack), "前提: まだ攻撃中");
-            Assert.That(state.Velocity.X, Is.EqualTo(0f).Within(1e-4f), "地上の攻撃中は走れず、止まる");
-            Assert.That(state.Grounded, Is.True, "攻撃中はジャンプできない");
+            Assert.That(state.AirJumpsUsed, Is.EqualTo(0), "攻撃中は空中ジャンプできない");
             Assert.That(state.Wire.Phase, Is.EqualTo(WirePhase.Ready), "攻撃中はワイヤーを撃てない");
+            Assert.That(state.Velocity.X, Is.EqualTo(0f).Within(1e-4f), "攻撃中は横に入れても加速しない");
 
             // 攻撃が終わっても、押し続けているジャンプやワイヤーは出ない（もう一度押すと出る）。
-            harness.Step(everything, harness.Config.Combat.GroundSide.TotalTicks);
+            harness.Step(everything, harness.Config.Combat.AirNeutral.TotalTicks);
             Assert.That(harness.State.Action.IsFree, Is.True);
-            Assert.That(harness.State.Grounded, Is.True);
+            Assert.That(harness.State.AirJumpsUsed, Is.EqualTo(0));
             Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Ready));
         }
 
@@ -180,6 +229,18 @@ namespace Degunatsu.Core.Tests.Combat
             config.Combat.AirUp.ActiveTicks = 0;
 
             Assert.Throws<InvalidTuningException>(() => config.Validate());
+        }
+
+        [Test]
+        public void Validate_RejectsGroundAttackThatStaysOnTheGround()
+        {
+            var config = new CharacterConfig();
+            config.Combat.Ground.LaunchVelocityY = 0f;
+            Assert.Throws<InvalidTuningException>(() => config.Validate(), "上へ飛び出さない地上技");
+
+            config = new CharacterConfig();
+            config.Combat.Ground.LaunchAtRecovery = false;
+            Assert.Throws<InvalidTuningException>(() => config.Validate(), "飛び出しのない地上技");
         }
 
         [Test]

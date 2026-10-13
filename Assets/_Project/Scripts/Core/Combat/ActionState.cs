@@ -12,13 +12,12 @@ namespace Degunatsu.Core.Combat
         Attack,
     }
 
-    /// <summary>攻撃の種類（地上／空中 × ニュートラル／横／上／下。docs/01_game_design.md 6.1）。</summary>
+    /// <summary>
+    /// 攻撃の種類（docs/01_game_design.md 6.1）。地上は方向に関係なく「地上技」1つ、空中はニュートラル／横／上／下（D-35）。
+    /// </summary>
     public enum AttackSlot : byte
     {
-        GroundNeutral,
-        GroundSide,
-        GroundUp,
-        GroundDown,
+        Ground,
         AirNeutral,
         AirSide,
         AirUp,

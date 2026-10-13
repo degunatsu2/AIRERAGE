@@ -58,6 +58,7 @@ namespace Degunatsu.Core.Simulation
             else
             {
                 Locomotion.UpdateVelocity(ref state, frame, movement);
+                ActionController.ApplyMotion(ref state, config.Combat);
             }
 
             System.Numerics.Vector3 beforeMove = state.Position;
