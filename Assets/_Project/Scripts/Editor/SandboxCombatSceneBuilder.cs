@@ -128,6 +128,7 @@ namespace Degunatsu.Editor
 
             SandboxWireSceneBuilder.CreateMissIndicator(runner, camera);
             SandboxWireSceneBuilder.CreateDebugTools(runner, inputActions, SandboxWireSceneBuilder.CreateAudio(runner));
+            SandboxWireSceneBuilder.CreateComboHud(runner);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

@@ -91,7 +91,11 @@ namespace Degunatsu.Runtime.Audio
             {
                 _audio.Play(SoundId.Guard, 1f, 0.04f);
             }
-            if (now.Action.Kind == ActionKind.Hitstun && n.LastDamagedTick != b.LastDamagedTick && n.GuardedCount == b.GuardedCount)
+            if (n.FatalHitCount > b.FatalHitCount)
+            {
+                _audio.Play(SoundId.Fatal);
+            }
+            else if (now.Action.Kind == ActionKind.Hitstun && n.LastDamagedTick != b.LastDamagedTick && n.GuardedCount == b.GuardedCount)
             {
                 bool heavy = now.Velocity.Length() >= HeavyKnockbackSpeed;
                 _audio.Play(heavy ? SoundId.HeavyHit : SoundId.Hit, 1f, 0.06f);

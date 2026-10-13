@@ -214,6 +214,7 @@ namespace Degunatsu.Editor
             SetReference(courseTimer, "_runner", runner);
 
             CreateDebugTools(runner, inputActions, CreateAudio(runner));
+            CreateComboHud(runner);
 
             EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
@@ -285,6 +286,40 @@ namespace Degunatsu.Editor
             SetReference(view, "_wireCancelGauge", CreateRingGauge(name + "WireCancelGauge", parent, "WIRE CANCEL", 1.3f));
             SetReference(view, "_guardGauge", CreateRingGauge(name + "GuardGauge", parent, "GUARD", 1.6f, GuardGaugeColor));
             SetReference(view, "_guardEffect", CreateGuardEffect(name + "GuardEffect", parent, playerColor));
+
+            // 命中の火花（白っぽい黄色。短い）。
+            BurstEffectView spark = CreateBurst(name + "HitSpark", parent);
+            spark.Configure(new Color(1f, 0.95f, 0.6f, 1f), false, 0.2f, 0.2f, 1.1f, 6, 0.9f, 0.1f, string.Empty, 0, 0f);
+            SetReference(view, "_hitSpark", spark);
+            // FATAL（虹色の大きな光、「FATAL!」、画面の閃光。ユーザーの要望、2026-10-13）。
+            BurstEffectView fatal = CreateBurst(name + "FatalBurst", parent);
+            fatal.Configure(Color.white, true, 1.1f, 0.4f, 5f, 14, 3.2f, 0.28f, "FATAL!", 64, 0.45f);
+            SetReference(view, "_fatalBurst", fatal);
+            // ワイヤーキャンセル（紫。クールタイムのゲージと同じ色）。
+            BurstEffectView wireCancel = CreateBurst(name + "WireCancelBurst", parent);
+            wireCancel.Configure(new Color(0.75f, 0.45f, 1f, 1f), false, 0.35f, 0.4f, 1.9f, 10, 1.2f, 0.12f, string.Empty, 0, 0f);
+            SetReference(view, "_wireCancelBurst", wireCancel);
+        }
+
+        /// <summary>一瞬の光（輪 2 つと光の筋。文字はシーンのカメラで画面に写す）。値は呼んだ側が Configure で決める。</summary>
+        internal static BurstEffectView CreateBurst(string name, Transform parent)
+        {
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            var view = root.AddComponent<BurstEffectView>();
+            SetReference(view, "_ring", CreateIndicatorLine(root.transform, "Ring", material, 0.12f));
+            SetReference(view, "_innerRing", CreateIndicatorLine(root.transform, "InnerRing", material, 0.1f));
+            SetReference(view, "_rays", CreateIndicatorLine(root.transform, "Rays", material, 0.1f));
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            return view;
+        }
+
+        /// <summary>操作するキャラクターのコンボの表示（T3-7）。</summary>
+        internal static void CreateComboHud(SimulationRunner runner)
+        {
+            var hud = new GameObject("ComboHud").AddComponent<ComboHud>();
+            SetReference(hud, "_runner", runner);
         }
 
         /// <summary>ガードとジャストガードの表示（光る輪、広がる輪、光の筋。文字はシーンのカメラで画面に写す）。</summary>

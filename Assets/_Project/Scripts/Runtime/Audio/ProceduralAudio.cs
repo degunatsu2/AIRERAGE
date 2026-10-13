@@ -36,6 +36,9 @@ namespace Degunatsu.Runtime.Audio
 
         /// <summary>ステージの外に出た（撃破）。</summary>
         Knockout,
+
+        /// <summary>FATAL（速く打った撃破技）が当たった（とても重い打撃音。ユーザーの要望、2026-10-13）。</summary>
+        Fatal,
     }
 
     /// <summary>
@@ -150,6 +153,15 @@ namespace Degunatsu.Runtime.Audio
                     AddTone(b, r, 0f, 0.8f, 900f, 70f, Wave.Square, 0.35f, 0.005f, 0.4f);
                     AddNoise(b, r, rng, 0.25f, 0.85f, 0.9f, 0.01f, 0.25f, 1500f, 300f, 40f);
                     AddTone(b, r, 0.25f, 0.8f, 90f, 35f, Wave.Sine, 0.9f, 0.005f, 0.3f);
+                    break;
+                case SoundId.Fatal:
+                    // 鋭い当たりの瞬間、深く長い低音、割れたような中音、重いノイズを重ねる。
+                    b = new float[Samples(1.4f, r)];
+                    AddNoise(b, r, rng, 0f, 0.06f, 1f, 0.0005f, 0.015f, 12000f, 12000f, 3000f);
+                    AddTone(b, r, 0f, 1.3f, 130f, 24f, Wave.Sine, 1f, 0.002f, 0.45f);
+                    AddTone(b, r, 0f, 0.5f, 420f, 70f, Wave.Saw, 0.45f, 0.002f, 0.15f);
+                    AddTone(b, r, 0f, 0.35f, 2600f, 1900f, Wave.Sine, 0.25f, 0.001f, 0.08f);
+                    AddNoise(b, r, rng, 0f, 1.2f, 1f, 0.002f, 0.3f, 2500f, 150f, 30f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

@@ -12,6 +12,8 @@ namespace Degunatsu.Runtime.Presentation
     /// 撃破技のチャージの間は、チャージのエフェクトと「CHARGE!」を出す（_chargeEffect があれば）。
     /// ワイヤーキャンセルのクールタイムの間は、周りに円形のゲージと「WIRE CANCEL」を出す（_wireCancelGauge があれば。P-1）。
     /// ガード中・ジャストガードの成功は _guardEffect、ガードのクールタイムは _guardGauge で示す（T3-5。あれば）。
+    /// 攻撃を受けた瞬間は火花（_hitSpark）、FATAL を受けた瞬間は虹色の光と「FATAL!」（_fatalBurst）、攻撃をワイヤーで
+    /// キャンセルした瞬間は紫の光（_wireCancelBurst）を出す（T3-7。あれば）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
@@ -46,12 +48,21 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private GuardEffectView _guardEffect;
         [Tooltip("ガードのクールタイムのゲージ（なくてもよい）")]
         [SerializeField] private RingGaugeView _guardGauge;
+        [Tooltip("攻撃を受けた瞬間の火花（なくてもよい）")]
+        [SerializeField] private BurstEffectView _hitSpark;
+        [Tooltip("FATAL を受けた瞬間の虹色の光と「FATAL!」（なくてもよい）")]
+        [SerializeField] private BurstEffectView _fatalBurst;
+        [Tooltip("攻撃をワイヤーでキャンセルした瞬間の光（なくてもよい）")]
+        [SerializeField] private BurstEffectView _wireCancelBurst;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
         private Tint _shown;
         private int _shownJustGuards;
         private int _shownGuarded;
+        private int _shownDamagedTick;
+        private int _shownFatalHits;
+        private int _shownWireCancelCooldown;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
         public AttackPhase? ShownPhase
@@ -88,6 +99,10 @@ namespace Degunatsu.Runtime.Presentation
         /// <summary>ガードのクールタイムのゲージ（なければ null）。</summary>
         public RingGaugeView GuardGauge => _guardGauge;
 
+        public BurstEffectView HitSpark => _hitSpark;
+        public BurstEffectView FatalBurst => _fatalBurst;
+        public BurstEffectView WireCancelBurst => _wireCancelBurst;
+
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
             transform.position = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
@@ -102,6 +117,7 @@ namespace Degunatsu.Runtime.Presentation
             RenderCharge(current, combat, tint == Tint.Charge);
             RenderWireCancelCooldown(current, combat);
             RenderGuard(current, combat);
+            RenderBursts(current);
             if (tint == _shown)
             {
                 return;
@@ -122,6 +138,28 @@ namespace Degunatsu.Runtime.Presentation
             }
             _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        // 状態の変化（受けた時刻、FATAL を受けた数、ワイヤーキャンセルのクールタイムの始まり）から、一瞬の光を出す。
+        private void RenderBursts(in CharacterState state)
+        {
+            CombatState c = state.Combat;
+            Vector3 center = transform.position;
+            if (c.FatalHitCount > _shownFatalHits && _fatalBurst != null)
+            {
+                _fatalBurst.Play(center);
+            }
+            else if (c.LastDamagedTick != _shownDamagedTick && state.Action.Kind == ActionKind.Hitstun && _hitSpark != null)
+            {
+                _hitSpark.Play(center);
+            }
+            if (c.WireCancelCooldownTicksLeft > _shownWireCancelCooldown && _wireCancelBurst != null)
+            {
+                _wireCancelBurst.Play(center);
+            }
+            _shownFatalHits = c.FatalHitCount;
+            _shownDamagedTick = c.LastDamagedTick;
+            _shownWireCancelCooldown = c.WireCancelCooldownTicksLeft;
         }
 
         private void RenderGuard(in CharacterState state, CombatTuning combat)
