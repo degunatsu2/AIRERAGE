@@ -110,8 +110,10 @@ namespace Degunatsu.Runtime.DebugTools
             AppendAction("Action ", s);
             AppendKnockouts(s);
             _text.Append('\n');
+            AppendCancel(s);
+            _text.Append('\n');
             AppendLastHit();
-            int lines = 11;
+            int lines = 12;
             for (int i = 0; i < _runner.DummyCount; i++)
             {
                 CharacterState dummy = _runner.GetDummyState(i);
@@ -122,6 +124,19 @@ namespace Degunatsu.Runtime.DebugTools
                 lines++;
             }
             GUI.Box(new Rect(Screen.width - Width - 10f, 10f, Width, 12f + 21f * lines), _text.ToString(), _style);
+        }
+
+        // キャンセルの状態（T3-4）: 攻撃→攻撃を今の連携で使ったか、ワイヤーキャンセルのクールタイム、攻撃の先行入力。
+        private void AppendCancel(in CharacterState s)
+        {
+            CombatState c = s.Combat;
+            _text.Append("Cancel atk ").Append(c.AttackCancelUsed ? "used" : "ready")
+                .Append("  wire ").Append(c.WireCancelCooldownTicksLeft > 0 ? c.WireCancelCooldownTicksLeft + "t" : "ready")
+                .Append("  buffer ").Append(c.AttackBufferTicksLeft).Append('t');
+            if (s.Action.Kind == ActionKind.Attack && s.Action.HitMask != 0)
+            {
+                _text.Append("  HIT");
+            }
         }
 
         // 最後に当てた攻撃の吹き飛び（倍率をかけた後の速度）と威力（今はダメージの値。コインへの変換は Phase 4）。

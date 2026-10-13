@@ -37,6 +37,9 @@ namespace Degunatsu.Core.Wire
 
         /// <summary>攻撃を受けて外れた（docs/11_combat_plan.md T3-2）。</summary>
         Hit,
+
+        /// <summary>攻撃でキャンセルした（ワイヤー→攻撃。慣性を引き継ぐ。D-19）。</summary>
+        Attack,
     }
 
     /// <summary>

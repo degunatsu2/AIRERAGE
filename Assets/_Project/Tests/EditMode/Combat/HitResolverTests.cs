@@ -341,24 +341,25 @@ namespace Degunatsu.Core.Tests.Combat
         }
 
         [Test]
-        public void HitDuringHitstun_ContinuesTheCombo()
+        public void HitByAnotherAttackerDuringHitstun_StartsTheirOwnCombo()
         {
-            // 0 と 2 で 1 を挟み、2 は少し遅れて攻撃する。1 がのけぞっている間に当たれば、コンボがつながる。
+            // 0 と 2 で 1 を挟み、2 は少し遅れて攻撃する。1 がのけぞっている間に 2 が当てると、2 の新しいコンボになる
+            // （コンボは当てた人ごと。ユーザーの指示、2026-10-13）。同じ人が当て続けるとつながる（GroundAttack_HitsTwice）。
             SimWorld world = World((-1.6f, 1), (0f, 1), (1.6f, -1));
             world.Step(new[] { Attack, default, default });
             Step(world, 3, default, default, default);
             world.Step(new[] { default, default, Attack });
 
             StepUntilHit(world, 1, Combat.Ground.TotalTicks, default, default, default);
-            for (int t = 0; t < Combat.Ground.TotalTicks && world.GetState(1).Combat.ComboCount < 2; t++)
+            for (int t = 0; t < Combat.Ground.TotalTicks && world.GetState(1).Combat.LastAttacker != 2; t++)
             {
                 world.Step(new PlayerInput[3]);
             }
 
             CharacterState victim = world.GetState(1);
-            Assert.That(victim.Combat.ComboCount, Is.EqualTo(2));
-            Assert.That(victim.Combat.ComboDamage, Is.EqualTo(2 * Ground1.Damage));
-            Assert.That(victim.Combat.LastAttacker, Is.EqualTo(2), "最後にダメージを与えた人");
+            Assert.That(victim.Combat.LastAttacker, Is.EqualTo(2), "前提: 2 がのけぞっている 1 に当てた");
+            Assert.That(victim.Combat.ComboCount, Is.EqualTo(1), "別の人のコンボはつながらない");
+            Assert.That(victim.Combat.ComboDamage, Is.EqualTo(Ground1.Damage));
         }
 
         [Test]

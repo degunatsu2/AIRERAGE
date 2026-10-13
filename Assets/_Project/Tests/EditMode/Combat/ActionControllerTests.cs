@@ -211,16 +211,37 @@ namespace Degunatsu.Core.Tests.Combat
         }
 
         [Test]
-        public void CannotAttack_WhileWireIsAttached()
+        public void AttackWhileAttached_ReleasesTheWire_AndKeepsTheMomentum()
         {
+            // ワイヤー→攻撃（D-18、D-19）: 接続中に攻撃を押すと、ワイヤーを解除して慣性を引き継ぎ、空中の攻撃を始める。
             var harness = new SimHarness(TestArenas.Playground(), WireTestSetup.LongAttachConfig(WireModelType.Inertial));
-            WireTestSetup.AttachAt(harness, new Vector3(0f, 5f, 0f), new Vector3(3f, 7f, 0f));
+            WireTestSetup.AttachAt(harness, new Vector3(0f, 5f, 0f), new Vector3(3f, 7f, 0f), new Vector3(0f, 6f, 0f));
+            harness.Step(Inputs.Wire(), 5);
             Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Attached), "前提: 接続している");
+            Vector3 swing = harness.State.Velocity;
 
-            harness.Step(Attack(0f, 0f, InputButtons.Wire));
+            harness.Step(Attack(0f, -1f, InputButtons.Wire));
 
-            Assert.That(harness.State.Action.IsFree, Is.True, "ワイヤー→攻撃のキャンセルはまだない（T3-3）");
-            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Attached));
+            Assert.That(harness.State.Wire.Phase, Is.Not.EqualTo(WirePhase.Attached), "ワイヤーが外れていない");
+            Assert.That(harness.State.Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.Attack));
+            Assert.That(harness.State.Action.Kind, Is.EqualTo(ActionKind.Attack));
+            Assert.That(harness.State.Action.Attack, Is.EqualTo(AttackSlot.AirDown), "下＋攻撃（撃破技）");
+            Assert.That(Vector3.Dot(harness.State.Velocity, swing), Is.GreaterThan(0f), "振りの勢いを引き継いでいない");
+            Assert.That(harness.State.Velocity.Length(), Is.GreaterThan(5f));
+        }
+
+        [Test]
+        public void CannotAttack_WhileTheHookIsFlying()
+        {
+            // 射出中（フックが飛んでいる間）は攻撃できない（D-18）。
+            var harness = new SimHarness(TestArenas.Playground(), WireTestSetup.LongAttachConfig(WireModelType.Inertial));
+            harness.Step(Inputs.Wire(0f, 1f));
+            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Firing), "前提: フックが飛んでいる");
+
+            harness.Step(Attack(0f, 1f, InputButtons.Wire));
+
+            Assert.That(harness.State.Action.IsFree, Is.True);
+            Assert.That(harness.State.Wire.Phase, Is.EqualTo(WirePhase.Firing));
         }
 
         [Test]

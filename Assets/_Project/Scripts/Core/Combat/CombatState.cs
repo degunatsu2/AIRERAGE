@@ -1,4 +1,5 @@
 using System;
+using Degunatsu.Core.Input;
 
 namespace Degunatsu.Core.Combat
 {
@@ -33,6 +34,27 @@ namespace Degunatsu.Core.Combat
         /// <summary>ステージの外に出た（撃破された）数。だれにも攻撃されずに出た場合も数える。</summary>
         public int Falls;
 
+        /// <summary>
+        /// 今の連携で、攻撃→攻撃のキャンセル（1回まで。D-17）を使ったか。地上技→空中の攻撃は数えない（D-42）。
+        /// ワイヤーで接続したとき、攻撃がキャンセルされずに最後まで終わったとき、のけぞったとき、Free で着地しているときに戻る。
+        /// </summary>
+        public bool AttackCancelUsed;
+
+        /// <summary>攻撃をワイヤーでキャンセルできるまでの残り（ティック。P-1）。</summary>
+        public int WireCancelCooldownTicksLeft;
+
+        /// <summary>攻撃ボタンの先行入力の残り（ティック）。0 でなければ、攻撃を始められるようになったときに出る。</summary>
+        public int AttackBufferTicksLeft;
+
+        /// <summary>先行入力した攻撃の、空中での種類（押したときのスティックの向きで決める。地上なら地上技になる）。</summary>
+        public AttackSlot BufferedAirAttack;
+
+        /// <summary>先行入力したときの横の向き（-1、0、1。0 なら向きを変えない）。</summary>
+        public sbyte BufferedFacing;
+
+        /// <summary>ヒットストップ中に押したジャンプ。止まりが解けたティックに押したとみなす（先行入力。攻撃は AttackBufferTicksLeft）。</summary>
+        public InputButtons HitstopPresses;
+
         public bool Equals(CombatState other)
         {
             return HitstopTicksLeft == other.HitstopTicksLeft
@@ -42,7 +64,13 @@ namespace Degunatsu.Core.Combat
                 && ComboCount == other.ComboCount
                 && ComboDamage == other.ComboDamage
                 && Knockouts == other.Knockouts
-                && Falls == other.Falls;
+                && Falls == other.Falls
+                && AttackCancelUsed == other.AttackCancelUsed
+                && WireCancelCooldownTicksLeft == other.WireCancelCooldownTicksLeft
+                && AttackBufferTicksLeft == other.AttackBufferTicksLeft
+                && BufferedAirAttack == other.BufferedAirAttack
+                && BufferedFacing == other.BufferedFacing
+                && HitstopPresses == other.HitstopPresses;
         }
 
         public override bool Equals(object obj)
@@ -52,13 +80,16 @@ namespace Degunatsu.Core.Combat
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(HitstopTicksLeft, HasLastAttacker, LastAttacker, LastDamagedTick, ComboCount, ComboDamage, Knockouts, Falls);
+            return HashCode.Combine(
+                HashCode.Combine(HitstopTicksLeft, HasLastAttacker, LastAttacker, LastDamagedTick, ComboCount, ComboDamage, Knockouts, Falls),
+                AttackCancelUsed, WireCancelCooldownTicksLeft, AttackBufferTicksLeft, BufferedAirAttack, BufferedFacing, HitstopPresses);
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
-            return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}";
+            return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAirAttack},{BufferedFacing}) held={HitstopPresses}";
         }
     }
 }

@@ -12,7 +12,9 @@ namespace Degunatsu.Core.Simulation
     /// キャラクター1人分の1ティックの処理の順序を決める。
     /// 入力 → アクション（攻撃）→ ワイヤーのフェーズ → 速度（ワイヤーまたは通常移動）→ 移動と衝突 → ロープ長の補正 → 接地。
     /// アクション中（攻撃中・のけぞり中）は、移動・ジャンプ・ワイヤーの入力を無視し、向きも変えない（ActionController.ControlInput）。
-    /// ヒットストップの間は、何も進めずに止まる（ボタンの前の状態も変えないので、止まっている間に押したボタンは止まりが解けてから効く）。
+    /// キャンセル（攻撃→ジャンプ、攻撃→ワイヤー）で Free に戻ったティックは、入力をそのまま使い、このティックにジャンプ・射出する。
+    /// ヒットストップの間は、何も進めずに止まる（ボタンの前の状態も変えないので、押し続けたボタンは止まりが解けてから効く。
+    /// 止まっている間に押して離した攻撃（押したときの向き）とジャンプも、止まりが解けてから効く）。
     /// </summary>
     public sealed class CharacterSimulator
     {
@@ -34,10 +36,11 @@ namespace Degunatsu.Core.Simulation
             if (state.Combat.HitstopTicksLeft > 0)
             {
                 state.Combat.HitstopTicksLeft--;
+                ActionController.RecordHitstopPresses(ref state, input, config);
                 return;
             }
 
-            var frame = new InputFrame(input, state.PreviousButtons);
+            InputFrame frame = ActionController.TakeHitstopPresses(ref state, input, out PlayerInput effectiveInput);
             MovementTuning movement = config.Movement;
             var halfExtents = movement.HalfExtents;
 
@@ -47,10 +50,10 @@ namespace Degunatsu.Core.Simulation
                 UpdateFacing(ref state, frame, movement);
             }
 
-            ActionController.Update(ref state, frame, config.Combat, movement.MoveDeadzone);
+            ActionController.Update(ref state, frame, config);
             if (!state.Action.IsFree)
             {
-                frame = new InputFrame(ActionController.ControlInput(state, input), state.PreviousButtons);
+                frame = new InputFrame(ActionController.ControlInput(state, effectiveInput), state.PreviousButtons);
                 state.JumpBufferTicksLeft = 0;
             }
 

@@ -104,6 +104,12 @@ namespace Degunatsu.Core.Combat
         /// <summary>攻撃の全体の長さ（ティック）。終わったティックから次の行動ができる。</summary>
         public int TotalTicks = 18;
 
+        /// <summary>
+        /// ワイヤーでキャンセルできるようになるティック（攻撃を始めたティックが 0）。攻撃の終わりまでできる（D-20）。
+        /// 既定は最初の判定が出るティック（持続の開始から硬直の終わりまで。発生中にできるとフェイントとして強すぎるため）。
+        /// </summary>
+        public int WireCancelFromTick = 5;
+
         public AttackHit[] Hits = { new AttackHit() };
         public AttackMotion[] Motions = new AttackMotion[0];
 
@@ -138,6 +144,7 @@ namespace Degunatsu.Core.Combat
         {
             var v = new TuningValidator(name);
             v.Positive(nameof(TotalTicks), TotalTicks);
+            v.InRange(nameof(WireCancelFromTick), WireCancelFromTick, 0f, TotalTicks);
             v.NotNull(nameof(Hits), Hits);
             v.NotNull(nameof(Motions), Motions);
             if (Hits != null)
@@ -185,6 +192,7 @@ namespace Degunatsu.Core.Combat
         public AttackData Ground = new AttackData
         {
             TotalTicks = 28,
+            WireCancelFromTick = 5,
             Hits = new[]
             {
                 new AttackHit
@@ -209,6 +217,7 @@ namespace Degunatsu.Core.Combat
         public AttackData AirNeutral = new AttackData
         {
             TotalTicks = 19,
+            WireCancelFromTick = 5,
             Hits = new[]
             {
                 new AttackHit
@@ -223,6 +232,7 @@ namespace Degunatsu.Core.Combat
         public AttackData AirSide = new AttackData
         {
             TotalTicks = 25,
+            WireCancelFromTick = 7,
             Hits = new[]
             {
                 new AttackHit
@@ -237,6 +247,7 @@ namespace Degunatsu.Core.Combat
         public AttackData AirUp = new AttackData
         {
             TotalTicks = 24,
+            WireCancelFromTick = 6,
             Hits = new[]
             {
                 new AttackHit
@@ -254,6 +265,7 @@ namespace Degunatsu.Core.Combat
         public AttackData AirDown = new AttackData
         {
             TotalTicks = 40,
+            WireCancelFromTick = 16,
             Hits = new[]
             {
                 new AttackHit
@@ -274,6 +286,18 @@ namespace Degunatsu.Core.Combat
         /// <summary>撃破技の吹き飛びの倍率 = KoKnockbackBase + KoKnockbackPerSpeed × 打つ直前の速さ（m/s）。【仮】</summary>
         public float KoKnockbackBase = 0.5f;
         public float KoKnockbackPerSpeed = 0.1f;
+
+        /// <summary>
+        /// 攻撃をワイヤーでキャンセルした後、もう一度ワイヤーでキャンセルできるまでのティック数（P-1。永久コンボを止める）。
+        /// 通常のワイヤーの射出には影響しない。【仮】
+        /// </summary>
+        public int WireCancelCooldownTicks = 180;
+
+        /// <summary>
+        /// 攻撃ボタンの先行入力（ティック）。押してからこの間に攻撃を始められる・キャンセルできるようになれば、そのときに出る。【仮】
+        /// 地上技の1段目が当たった瞬間に押しても、空中に出たとき（2段目の始め）に空中の攻撃へキャンセルできる長さにする。
+        /// </summary>
+        public int AttackBufferTicks = 10;
 
         public AttackData Get(AttackSlot slot)
         {
@@ -312,6 +336,8 @@ namespace Degunatsu.Core.Combat
             }
             v.NonNegative(nameof(KoKnockbackBase), KoKnockbackBase);
             v.NonNegative(nameof(KoKnockbackPerSpeed), KoKnockbackPerSpeed);
+            v.NonNegative(nameof(WireCancelCooldownTicks), WireCancelCooldownTicks);
+            v.NonNegative(nameof(AttackBufferTicks), AttackBufferTicks);
             return v;
         }
     }

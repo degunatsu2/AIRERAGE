@@ -13,6 +13,7 @@ namespace Degunatsu.Core.Combat
     /// - 同じ判定は同じ相手に1回だけ当たる（二段技は、それぞれの判定が1回ずつ当たる）。ヒットストップ中の攻撃は新しく当たらない。
     /// - 当たった側: ワイヤーを外し、のけぞり（Hitstun）にして、吹き飛ばす（攻撃ごとに固定。撃破技は打つ直前の速さで倍率。D-38）。
     ///   最後にダメージを与えた人と時刻、コンボの数とダメージを記録する。HP はない（D-23）。
+    ///   コンボは当てた人ごとで、のけぞりが終わるまで続く（別の人が当てると、その人の新しいコンボになる）。
     /// - 両者にヒットストップを与える。
     /// </summary>
     public sealed class HitResolver
@@ -106,7 +107,10 @@ namespace Degunatsu.Core.Combat
 
             CharacterState victim = states[hit.Victim];
             WireController.Interrupt(ref victim, configs[hit.Victim].Wire);
-            bool comboContinues = victim.Action.Kind == ActionKind.Hitstun;
+            // コンボは当てた人ごと。のけぞっている間に同じ人が当てるとつながり、別の人が当てるとその人の新しいコンボになる
+            // （コンボが切れるのは、のけぞりが終わったときだけ。ユーザーの指示、2026-10-13）。
+            bool comboContinues = victim.Action.Kind == ActionKind.Hitstun && victim.Combat.HasLastAttacker
+                && victim.Combat.LastAttacker == hit.Attacker;
             victim.Action = new ActionState
             {
                 Kind = ActionKind.Hitstun,
