@@ -42,6 +42,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "Guard",
+                    "type": "Button",
+                    "id": "8f20363d-95de-4c22-af82-aac88e09d03c",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Reset",
                     "type": "Button",
                     "id": "dad61f81-6dba-44a6-87a9-a12213bdc312",
@@ -226,6 +235,28 @@
                 },
                 {
                     "name": "",
+                    "id": "8a0d6f75-6e88-475c-a42f-b9fb05fb789f",
+                    "path": "<Keyboard>/shift",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Guard",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "05d91e78-6c55-42eb-b168-ae5e6802a2a4",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Guard",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "6709d512-9236-49b3-bca0-09d85456ac24",
                     "path": "<Gamepad>/start",
                     "interactions": "",
@@ -397,6 +428,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleDummyAttack",
+                    "type": "Button",
+                    "id": "8e2597b4-2cb8-485c-a2ec-817603355aa1",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -518,6 +558,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "ToggleDummyWalk",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8fa6c9d4-f166-4576-9bee-cbcf23b9c2c0",
+                    "path": "<Keyboard>/f8",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleDummyAttack",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

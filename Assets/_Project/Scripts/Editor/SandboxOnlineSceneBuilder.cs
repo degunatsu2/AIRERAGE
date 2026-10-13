@@ -82,8 +82,7 @@ namespace Degunatsu.Editor
                 characterViews[p] = characterGo.AddComponent<CharacterView>();
                 SandboxWireSceneBuilder.SetReference(characterViews[p], "_hitboxLine", SandboxWireSceneBuilder.CreateHitboxLine($"Player{p + 1}Hitbox"));
                 SandboxWireSceneBuilder.SetReference(characterViews[p], "_chargeEffect", SandboxWireSceneBuilder.CreateChargeEffect($"Player{p + 1}Charge"));
-                SandboxWireSceneBuilder.SetReference(characterViews[p], "_wireCancelGauge",
-                    SandboxWireSceneBuilder.CreateRingGauge($"Player{p + 1}WireCancelGauge", playersRoot, "WIRE CANCEL", 1.3f));
+                SandboxWireSceneBuilder.AddCombatIndicators(characterViews[p], $"Player{p + 1}", playersRoot, PlayerColors[p].Color);
                 wireViews[p] = SandboxWireSceneBuilder.CreateWireView($"Player{p + 1}Wire", playersRoot, wireMaterial, attachedAnchorMaterial);
             }
 

@@ -10,6 +10,9 @@ namespace Degunatsu.Core.Input
         Jump = 1 << 0,
         Wire = 1 << 1,
         Attack = 1 << 2,
+
+        /// <summary>ガード（Shift ／ ゲームパッドの B。D-35）。</summary>
+        Guard = 1 << 3,
     }
 
     /// <summary>

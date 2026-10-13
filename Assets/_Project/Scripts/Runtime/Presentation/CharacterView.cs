@@ -11,6 +11,7 @@ namespace Degunatsu.Runtime.Presentation
     /// 撃破技の発生は金色のチャージ）、ヒットストップ、のけぞり。攻撃の判定が出ている間は、その箱を線で描く（_hitboxLine があれば）。
     /// 撃破技のチャージの間は、チャージのエフェクトと「CHARGE!」を出す（_chargeEffect があれば）。
     /// ワイヤーキャンセルのクールタイムの間は、周りに円形のゲージと「WIRE CANCEL」を出す（_wireCancelGauge があれば。P-1）。
+    /// ガード中・ジャストガードの成功は _guardEffect、ガードのクールタイムは _guardGauge で示す（T3-5。あれば）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
@@ -41,10 +42,16 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private ChargeEffectView _chargeEffect;
         [Tooltip("ワイヤーキャンセルのクールタイムのゲージ（なくてもよい）")]
         [SerializeField] private RingGaugeView _wireCancelGauge;
+        [Tooltip("ガードとジャストガードの表示（なくてもよい）")]
+        [SerializeField] private GuardEffectView _guardEffect;
+        [Tooltip("ガードのクールタイムのゲージ（なくてもよい）")]
+        [SerializeField] private RingGaugeView _guardGauge;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
         private Tint _shown;
+        private int _shownJustGuards;
+        private int _shownGuarded;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
         public AttackPhase? ShownPhase
@@ -75,6 +82,12 @@ namespace Degunatsu.Runtime.Presentation
         /// <summary>ワイヤーキャンセルのクールタイムのゲージ（なければ null）。</summary>
         public RingGaugeView WireCancelGauge => _wireCancelGauge;
 
+        /// <summary>ガードとジャストガードの表示（なければ null）。</summary>
+        public GuardEffectView GuardEffect => _guardEffect;
+
+        /// <summary>ガードのクールタイムのゲージ（なければ null）。</summary>
+        public RingGaugeView GuardGauge => _guardGauge;
+
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
             transform.position = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
@@ -88,6 +101,7 @@ namespace Degunatsu.Runtime.Presentation
             Tint tint = TintOf(current, combat);
             RenderCharge(current, combat, tint == Tint.Charge);
             RenderWireCancelCooldown(current, combat);
+            RenderGuard(current, combat);
             if (tint == _shown)
             {
                 return;
@@ -108,6 +122,38 @@ namespace Degunatsu.Runtime.Presentation
             }
             _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        private void RenderGuard(in CharacterState state, CombatTuning combat)
+        {
+            if (_guardEffect != null)
+            {
+                // 数が増えたら成功した瞬間（巻き戻しや位置のリセットで減ったときは何もしない）。
+                if (state.Combat.JustGuardCount > _shownJustGuards)
+                {
+                    _guardEffect.OnJustGuard();
+                }
+                if (state.Combat.GuardedCount > _shownGuarded)
+                {
+                    _guardEffect.OnGuarded();
+                }
+                _guardEffect.Render(transform.position, state.Action.Kind == ActionKind.Guard);
+            }
+            _shownJustGuards = state.Combat.JustGuardCount;
+            _shownGuarded = state.Combat.GuardedCount;
+
+            if (_guardGauge != null)
+            {
+                int left = state.Combat.GuardCooldownTicksLeft;
+                if (left > 0 && combat.GuardCooldownTicks > 0)
+                {
+                    _guardGauge.Show(transform.position, (float)left / combat.GuardCooldownTicks);
+                }
+                else if (_guardGauge.IsShowing)
+                {
+                    _guardGauge.Hide();
+                }
+            }
         }
 
         private void RenderWireCancelCooldown(in CharacterState state, CombatTuning combat)

@@ -14,8 +14,8 @@ namespace Degunatsu.Core.Tests.Replay
     /// </summary>
     public class StateCodecTests
     {
-        // Checksum_IsStableAcrossRunsAndMachines の期待値（形式の版 7。2026-10-13、クラウドの Linux / .NET 8 で計算）。
-        private const string ExpectedChecksum = "c7fc4c5e0a70c8a4";
+        // Checksum_IsStableAcrossRunsAndMachines の期待値（形式の版 8。2026-10-13、クラウドの Linux / .NET 8 で計算）。
+        private const string ExpectedChecksum = "c6f41b7ab9a6a4ec";
 
         [Test]
         public void EveryField_RoundTripsAndChangesTheChecksum()

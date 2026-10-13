@@ -43,6 +43,7 @@ namespace Degunatsu.Core.Tests.Combat
         {
             CharacterState state = world.GetState(0);
             state.Action.HitMask = HitResolver.HitBit(0, 1);
+            state.Action.Connected = true;
             world.SetState(0, state);
         }
 
@@ -105,11 +106,11 @@ namespace Degunatsu.Core.Tests.Combat
             world.AddCharacter(new CharacterConfig(), new Vector3(1.0f, GroundY, 0f), -1);
             world.Step(new PlayerInput[2]);
             world.Step(new[] { Press(InputButtons.Attack), default });
-            for (int t = 0; t < 40 && world.GetState(0).Action.HitMask == 0; t++)
+            for (int t = 0; t < 40 && !world.GetState(0).Action.Connected; t++)
             {
                 world.Step(new PlayerInput[2]);
             }
-            Assert.That(world.GetState(0).Action.HitMask, Is.Not.EqualTo(0u), "前提: 地上技が当たった");
+            Assert.That(world.GetState(0).Action.Connected, Is.True, "前提: 地上技が当たった");
 
             // 1段目が当たった瞬間（地上にいる間）に押しても（先行入力）、空中に出てからキャンセルする。
             world.Step(new[] { Press(InputButtons.Attack, 0f, 1f), default });

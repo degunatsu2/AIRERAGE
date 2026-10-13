@@ -40,6 +40,9 @@ namespace Degunatsu.Core.Wire
 
         /// <summary>攻撃でキャンセルした（ワイヤー→攻撃。慣性を引き継ぐ。D-19）。</summary>
         Attack,
+
+        /// <summary>ガードした（接続中にガードすると、ワイヤーを解除して慣性を引き継ぐ。【仮】T3-5）。</summary>
+        Guard,
     }
 
     /// <summary>

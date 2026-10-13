@@ -27,6 +27,9 @@ namespace Degunatsu.Runtime.Simulation
         // 1フレームで進める最大のティック数。処理が遅れたときに追いつこうとして、さらに遅れるのを防ぐ（技術的な上限）。
         private const int MaxTicksPerFrame = 5;
 
+        // ダミーに攻撃させるときの間隔（ティック。デバッグ用。ガードを試すため）。
+        public const int DummyAttackIntervalTicks = 90;
+
         [SerializeField] private CharacterConfigAsset _character;
         [SerializeField] private InputActionAsset _inputActions;
         [SerializeField] private Transform _spawnPoint;
@@ -50,6 +53,8 @@ namespace Degunatsu.Runtime.Simulation
         private int _player;
         private CharacterState _previous;
         private float _accumulator;
+        private bool _dummiesAttack;
+        private int _dummyAttackTicks;
 
         /// <summary>操作するキャラクターの1ティックが終わるたびに、その状態を通知する（計測などのデバッグ機能用）。</summary>
         public event Action<CharacterState> PlayerTicked;
@@ -92,6 +97,20 @@ namespace Degunatsu.Runtime.Simulation
         /// 位置のリセット、入力の記録と再生の始めに止める。
         /// </summary>
         public bool DummiesWalk { get; set; }
+
+        /// <summary>
+        /// ダミーに、操作するキャラクターの方を向いて DummyAttackIntervalTicks ごとに攻撃させるか（デバッグ用。F8。ガードを試すため）。
+        /// 有効にしたティックに最初の攻撃を押す。位置のリセット、入力の記録と再生の始めに止める。
+        /// </summary>
+        public bool DummiesAttack
+        {
+            get => _dummiesAttack;
+            set
+            {
+                _dummiesAttack = value;
+                _dummyAttackTicks = 0;
+            }
+        }
 
         /// <summary>マウスポインターで照準しているか。</summary>
         public bool UsingPointer => _input != null && _input.UsingPointer;
@@ -214,9 +233,10 @@ namespace Degunatsu.Runtime.Simulation
             }
             _inputs[0] = input;
             LastInput = input;
+            bool dummyAttack = _dummiesAttack && _dummyAttackTicks++ % DummyAttackIntervalTicks == 0;
             for (int i = 0; i < _previousDummies.Length; i++)
             {
-                _inputs[1 + i] = DummiesWalk ? SimInput.FromAxes(_previousDummies[i].Facing, 0f, InputButtons.None) : default;
+                _inputs[1 + i] = DummyInput(_previousDummies[i], dummyAttack);
             }
             _world.Step(_inputs);
             foreach (HitRecord hit in _world.LastHits)
@@ -261,6 +281,17 @@ namespace Degunatsu.Runtime.Simulation
             }
         }
 
+        // ダミーの入力（デバッグ用）。攻撃するティックは操作するキャラクターの方へ向いて押し、それ以外は歩くか止まる。
+        private SimInput DummyInput(in CharacterState dummy, bool attack)
+        {
+            if (attack)
+            {
+                float toPlayer = _previous.Position.X >= dummy.Position.X ? 1f : -1f;
+                return SimInput.FromAxes(toPlayer, 0f, InputButtons.Attack);
+            }
+            return DummiesWalk ? SimInput.FromAxes(dummy.Facing, 0f, InputButtons.None) : default;
+        }
+
         /// <summary>
         /// 操作するキャラクターの状態を置き換える（入力の再生の開始など、デバッグ用）。
         /// 入力以外で状態が変わったことを PlayerReset で知らせる。
@@ -279,6 +310,7 @@ namespace Degunatsu.Runtime.Simulation
         public void ResetDummies()
         {
             DummiesWalk = false;
+            DummiesAttack = false;
             for (int i = 0; i < _previousDummies.Length; i++)
             {
                 _world.SetState(_player + 1 + i, CharacterState.Spawn(_dummySpawns[i].position.ToNumerics(), -1));

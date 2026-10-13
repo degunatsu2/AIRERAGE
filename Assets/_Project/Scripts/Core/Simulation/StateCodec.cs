@@ -17,7 +17,7 @@ namespace Degunatsu.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 7;
+        public const int FormatVersion = 8;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -141,6 +141,7 @@ namespace Degunatsu.Core.Simulation
             writer.Write(action.Duration);
             writer.Write(action.HitMask);
             writer.Write(action.StrikeSpeed);
+            writer.Write(action.Connected);
 
             CombatState combat = state.Combat;
             writer.Write(combat.HitstopTicksLeft);
@@ -156,6 +157,9 @@ namespace Degunatsu.Core.Simulation
             writer.Write(combat.AttackBufferTicksLeft);
             writer.Write((byte)combat.BufferedAirAttack);
             writer.Write(combat.BufferedFacing);
+            writer.Write(combat.GuardCooldownTicksLeft);
+            writer.Write(combat.JustGuardCount);
+            writer.Write(combat.GuardedCount);
             writer.Write((ushort)combat.HitstopPresses);
         }
 
@@ -205,6 +209,7 @@ namespace Degunatsu.Core.Simulation
                 Duration = reader.ReadInt32(),
                 HitMask = reader.ReadUInt32(),
                 StrikeSpeed = reader.ReadSingle(),
+                Connected = reader.ReadBoolean(),
             };
             state.Combat = new CombatState
             {
@@ -221,6 +226,9 @@ namespace Degunatsu.Core.Simulation
                 AttackBufferTicksLeft = reader.ReadInt32(),
                 BufferedAirAttack = (AttackSlot)reader.ReadByte(),
                 BufferedFacing = reader.ReadSByte(),
+                GuardCooldownTicksLeft = reader.ReadInt32(),
+                JustGuardCount = reader.ReadInt32(),
+                GuardedCount = reader.ReadInt32(),
                 HitstopPresses = (InputButtons)reader.ReadUInt16(),
             };
             return state;

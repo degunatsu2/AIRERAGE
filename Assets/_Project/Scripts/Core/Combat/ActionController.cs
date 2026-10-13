@@ -22,7 +22,10 @@ namespace Degunatsu.Core.Combat
     ///   - 攻撃→攻撃: その攻撃が当たっていて、今の連携でまだ使っていないとき（1回まで。D-17）。地上技→地上技はできない。
     /// - 連携（攻撃→攻撃の回数）は、ワイヤーで接続したとき、攻撃がキャンセルされずに最後まで終わったとき、のけぞったとき、
     ///   Free で着地しているときに戻る。ジャンプのキャンセルでは戻らない（ユーザーとの合意、2026-10-13）。
-    /// - 攻撃中・のけぞり中の移動・ジャンプ・ワイヤーの入力は無視する（ControlInput）。攻撃のデータが決める動きは ApplyMotion。
+    /// - ガード（T3-5。D-21）: Free のときにガードボタンを押すと、GuardTicks の間ガードする（全方向・空中可）。
+    ///   クールタイム中・射出中はできない。接続中に押すと、ワイヤーを解除して慣性を引き継ぐ【仮】。攻撃とガードを同時に押したらガード。
+    ///   ガードが終わってから GuardCooldownTicks の間は次のガードができない。攻撃を受けたときの結果は HitResolver が決める。
+    /// - 攻撃中・のけぞり中・ガード中の移動・ジャンプ・ワイヤーの入力は無視する（ControlInput）。攻撃のデータが決める動きは ApplyMotion。
     /// </summary>
     public static class ActionController
     {
@@ -34,7 +37,7 @@ namespace Degunatsu.Core.Combat
         public static void Update(ref CharacterState state, in InputFrame input, CharacterConfig config)
         {
             CombatTuning combat = config.Combat;
-            UpdateBuffer(ref state, input, combat, config.Movement.MoveDeadzone);
+            UpdateTimers(ref state, input, combat, config.Movement.MoveDeadzone);
             if (state.Wire.Phase == WirePhase.Attached)
             {
                 state.Combat.AttackCancelUsed = false;
@@ -63,11 +66,26 @@ namespace Degunatsu.Core.Combat
                     state.Action = default;
                     state.Combat.AttackCancelUsed = false;
                     break;
+
+                case ActionKind.Guard:
+                    state.Action.Ticks++;
+                    if (state.Action.Ticks < state.Action.Duration)
+                    {
+                        return;
+                    }
+                    state.Action = default;
+                    state.Combat.GuardCooldownTicksLeft = combat.GuardCooldownTicks;
+                    break;
             }
 
             if (state.Grounded)
             {
                 state.Combat.AttackCancelUsed = false;
+            }
+            if (input.WasPressed(InputButtons.Guard) && state.Combat.GuardCooldownTicksLeft == 0 && state.Wire.Phase != WirePhase.Firing)
+            {
+                StartGuard(ref state, config);
+                return;
             }
             if (state.Combat.AttackBufferTicksLeft == 0)
             {
@@ -177,8 +195,8 @@ namespace Degunatsu.Core.Combat
             return x >= deadzone ? AttackSlot.AirSide : AttackSlot.AirNeutral;
         }
 
-        // 攻撃ボタンの先行入力（押したときのスティックの向きも覚える）と、ワイヤーキャンセルのクールタイムを進める。
-        private static void UpdateBuffer(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone)
+        // 攻撃ボタンの先行入力（押したときのスティックの向きも覚える）と、ワイヤーキャンセル・ガードのクールタイムを進める。
+        private static void UpdateTimers(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone)
         {
             if (input.WasPressed(InputButtons.Attack))
             {
@@ -192,6 +210,25 @@ namespace Degunatsu.Core.Combat
             {
                 state.Combat.WireCancelCooldownTicksLeft--;
             }
+            if (state.Combat.GuardCooldownTicksLeft > 0)
+            {
+                state.Combat.GuardCooldownTicksLeft--;
+            }
+        }
+
+        // ガードを始める。接続中ならワイヤーを解除する。攻撃の先行入力は捨てる（ガードの後に勝手に攻撃しないように）。
+        private static void StartGuard(ref CharacterState state, CharacterConfig config)
+        {
+            if (state.Wire.Phase == WirePhase.Attached)
+            {
+                WireController.Release(ref state, WireReleaseReason.Guard, config.Wire);
+            }
+            state.Action = new ActionState
+            {
+                Kind = ActionKind.Guard,
+                Duration = config.Combat.GuardTicks,
+            };
+            state.Combat.AttackBufferTicksLeft = 0;
         }
 
         private static void BufferAttack(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone)
@@ -207,7 +244,7 @@ namespace Degunatsu.Core.Combat
         {
             CombatTuning combat = config.Combat;
             AttackData attack = combat.Get(state.Action.Attack);
-            bool hit = state.Action.HitMask != 0;
+            bool hit = state.Action.Connected;
 
             if (hit && input.WasPressed(InputButtons.Jump) && CanJump(state, config.Movement))
             {

@@ -52,6 +52,15 @@ namespace Degunatsu.Core.Combat
         /// <summary>先行入力したときの横の向き（-1、0、1。0 なら向きを変えない）。</summary>
         public sbyte BufferedFacing;
 
+        /// <summary>次のガードができるまでの残り（ティック。ガードが終わってから数える。D-21）。</summary>
+        public int GuardCooldownTicksLeft;
+
+        /// <summary>ジャストガードに成功した数（表示の「PARRY!」と記録に使う）。</summary>
+        public int JustGuardCount;
+
+        /// <summary>ふつうのガードで攻撃を受けた数（表示の「GUARD!」と記録に使う）。</summary>
+        public int GuardedCount;
+
         /// <summary>ヒットストップ中に押したジャンプ。止まりが解けたティックに押したとみなす（先行入力。攻撃は AttackBufferTicksLeft）。</summary>
         public InputButtons HitstopPresses;
 
@@ -70,6 +79,9 @@ namespace Degunatsu.Core.Combat
                 && AttackBufferTicksLeft == other.AttackBufferTicksLeft
                 && BufferedAirAttack == other.BufferedAirAttack
                 && BufferedFacing == other.BufferedFacing
+                && GuardCooldownTicksLeft == other.GuardCooldownTicksLeft
+                && JustGuardCount == other.JustGuardCount
+                && GuardedCount == other.GuardedCount
                 && HitstopPresses == other.HitstopPresses;
         }
 
@@ -82,14 +94,15 @@ namespace Degunatsu.Core.Combat
         {
             return HashCode.Combine(
                 HashCode.Combine(HitstopTicksLeft, HasLastAttacker, LastAttacker, LastDamagedTick, ComboCount, ComboDamage, Knockouts, Falls),
-                AttackCancelUsed, WireCancelCooldownTicksLeft, AttackBufferTicksLeft, BufferedAirAttack, BufferedFacing, HitstopPresses);
+                HashCode.Combine(AttackCancelUsed, WireCancelCooldownTicksLeft, AttackBufferTicksLeft, BufferedAirAttack, BufferedFacing),
+                GuardCooldownTicksLeft, JustGuardCount, GuardedCount, HitstopPresses);
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAirAttack},{BufferedFacing}) held={HitstopPresses}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAirAttack},{BufferedFacing}) guardCd={GuardCooldownTicksLeft} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses}";
         }
     }
 }

@@ -268,7 +268,36 @@ namespace Degunatsu.Editor
             var view = go.AddComponent<CharacterView>();
             SetReference(view, "_hitboxLine", CreateHitboxLine(name + "Hitbox"));
             SetReference(view, "_chargeEffect", CreateChargeEffect(name + "Charge"));
-            SetReference(view, "_wireCancelGauge", CreateRingGauge(name + "WireCancelGauge", null, "WIRE CANCEL", 1.3f));
+            AddCombatIndicators(view, name, null, material.GetColor("_BaseColor"));
+            return view;
+        }
+
+        // ガードのクールタイムのゲージの色（ワイヤーキャンセルの紫と区別する）。
+        private static readonly Color GuardGaugeColor = new Color(0.3f, 0.8f, 1f, 0.55f);
+
+        /// <summary>
+        /// キャラクターの表示に、戦闘の表示を付ける: ワイヤーキャンセルとガードのクールタイムのゲージ、ガードとジャストガードの表示
+        /// （playerColor でガードの光を出す）。オンライン用のシーンでも使う。
+        /// </summary>
+        internal static void AddCombatIndicators(CharacterView view, string name, Transform parent, Color playerColor)
+        {
+            SetReference(view, "_wireCancelGauge", CreateRingGauge(name + "WireCancelGauge", parent, "WIRE CANCEL", 1.3f));
+            SetReference(view, "_guardGauge", CreateRingGauge(name + "GuardGauge", parent, "GUARD", 1.6f, GuardGaugeColor));
+            SetReference(view, "_guardEffect", CreateGuardEffect(name + "GuardEffect", parent, playerColor));
+        }
+
+        /// <summary>ガードとジャストガードの表示（光る輪、広がる輪、光の筋。文字はシーンのカメラで画面に写す）。</summary>
+        internal static GuardEffectView CreateGuardEffect(string name, Transform parent, Color playerColor)
+        {
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            var view = root.AddComponent<GuardEffectView>();
+            view.Configure(playerColor);
+            SetReference(view, "_glow", CreateIndicatorLine(root.transform, "Glow", material, 0.14f));
+            SetReference(view, "_burst", CreateIndicatorLine(root.transform, "Burst", material, 0.3f));
+            SetReference(view, "_rays", CreateIndicatorLine(root.transform, "Rays", material, 0.1f));
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
             return view;
         }
 
@@ -276,13 +305,13 @@ namespace Degunatsu.Editor
         /// 円形のゲージ（薄い輪、残りの弧、先端の火花）。label が空でなければ、シーンのカメラで画面に写して上に出す。
         /// 大きさの影響を受けないように、キャラクターの子にしない。
         /// </summary>
-        internal static RingGaugeView CreateRingGauge(string name, Transform parent, string label, float radius)
+        internal static RingGaugeView CreateRingGauge(string name, Transform parent, string label, float radius, Color? color = null)
         {
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             var root = new GameObject(name);
             root.transform.SetParent(parent, false);
             var view = root.AddComponent<RingGaugeView>();
-            view.Configure(label, radius);
+            view.Configure(label, radius, color);
             SetReference(view, "_track", CreateIndicatorLine(root.transform, "Track", material, 0.08f));
             SetReference(view, "_fuse", CreateIndicatorLine(root.transform, "Fuse", material, 0.12f));
             SetReference(view, "_spark", CreateIndicatorLine(root.transform, "Spark", material, 0.1f));

@@ -79,7 +79,8 @@ namespace Degunatsu.Runtime.DebugTools
             WireState w = s.Wire;
 
             _text.Clear();
-            _text.Append("Debug  Tab: type  F1: speed  F2: step  F7: dummies ").Append(_runner.DummiesWalk ? "walking" : "stop").Append('\n');
+            _text.Append("Debug  Tab: type  F1: speed  F2: step  F7: walk ").Append(_runner.DummiesWalk ? "on" : "off")
+                .Append("  F8: attack ").Append(_runner.DummiesAttack ? "on" : "off").Append('\n');
             _text.Append("Type ").Append(WireTypeLabels.Long(tuning.ModelType))
                 .Append("   Speed ").Append(_runner.SpeedScale > 0f ? "x" + _runner.SpeedScale.ToString("0.##") : "PAUSED")
                 .Append("   Tick ").Append(_runner.CurrentTick).Append('\n');
@@ -112,8 +113,10 @@ namespace Degunatsu.Runtime.DebugTools
             _text.Append('\n');
             AppendCancel(s);
             _text.Append('\n');
+            AppendGuard(s);
+            _text.Append('\n');
             AppendLastHit();
-            int lines = 12;
+            int lines = 13;
             for (int i = 0; i < _runner.DummyCount; i++)
             {
                 CharacterState dummy = _runner.GetDummyState(i);
@@ -133,10 +136,18 @@ namespace Degunatsu.Runtime.DebugTools
             _text.Append("Cancel atk ").Append(c.AttackCancelUsed ? "used" : "ready")
                 .Append("  wire ").Append(c.WireCancelCooldownTicksLeft > 0 ? c.WireCancelCooldownTicksLeft + "t" : "ready")
                 .Append("  buffer ").Append(c.AttackBufferTicksLeft).Append('t');
-            if (s.Action.Kind == ActionKind.Attack && s.Action.HitMask != 0)
+            if (s.Action.Kind == ActionKind.Attack && s.Action.Connected)
             {
                 _text.Append("  HIT");
             }
+        }
+
+        // ガードの状態（T3-5）: クールタイム、ジャストガードとふつうのガードの数。
+        private void AppendGuard(in CharacterState s)
+        {
+            CombatState c = s.Combat;
+            _text.Append("Guard ").Append(c.GuardCooldownTicksLeft > 0 ? "cooldown " + c.GuardCooldownTicksLeft + "t" : "ready")
+                .Append("  Parry ").Append(c.JustGuardCount).Append("  Guarded ").Append(c.GuardedCount);
         }
 
         // 最後に当てた攻撃の吹き飛び（倍率をかけた後の速度）と威力（今はダメージの値。コインへの変換は Phase 4）。
@@ -155,6 +166,10 @@ namespace Degunatsu.Runtime.DebugTools
             }
             _text.Append("  KB (").Append(hit.Knockback.X.ToString("0.0")).Append(", ").Append(hit.Knockback.Y.ToString("0.0"))
                 .Append(") x").Append(hit.KnockbackScale.ToString("0.00")).Append("  Power ").Append(hit.Data.Damage);
+            if (hit.Result != HitResult.Hit)
+            {
+                _text.Append("  ").Append(hit.Result == HitResult.JustGuarded ? "PARRIED" : "GUARDED");
+            }
         }
 
         // 撃破した数と、ステージの外に出た数（ステージの範囲があるシーンだけ。T3-3）。
@@ -176,7 +191,7 @@ namespace Degunatsu.Runtime.DebugTools
                 _text.Append(' ').Append(s.Action.Attack).Append(' ').Append(attack.PhaseAt(s.Action.Ticks))
                     .Append(" (").Append(s.Action.Ticks + 1).Append('/').Append(attack.TotalTicks).Append("t)");
             }
-            else if (s.Action.Kind == ActionKind.Hitstun)
+            else if (s.Action.Kind == ActionKind.Hitstun || s.Action.Kind == ActionKind.Guard)
             {
                 _text.Append(" (").Append(s.Action.Ticks).Append('/').Append(s.Action.Duration).Append("t)");
             }

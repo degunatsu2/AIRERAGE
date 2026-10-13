@@ -51,11 +51,15 @@ namespace Degunatsu.Runtime.Presentation
             Hide();
         }
 
-        /// <summary>文字と半径を設定する（シーンのビルダー用）。</summary>
-        public void Configure(string label, float radius)
+        /// <summary>文字と半径（と色）を設定する（シーンのビルダー用）。</summary>
+        public void Configure(string label, float radius, Color? color = null)
         {
             _label = label ?? string.Empty;
             _radius = radius;
+            if (color.HasValue)
+            {
+                _color = color.Value;
+            }
         }
 
         /// <summary>center の周りに、残りの割合 fraction（0〜1）のゲージを描く。0 以下なら隠す。</summary>

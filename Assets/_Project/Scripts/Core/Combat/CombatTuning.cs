@@ -299,6 +299,24 @@ namespace Degunatsu.Core.Combat
         /// </summary>
         public int AttackBufferTicks = 10;
 
+        /// <summary>ガードの持続（ティック。D-21: 0.5 秒）。</summary>
+        public int GuardTicks = 30;
+
+        /// <summary>ガードを始めてから、ジャストガードになる長さ（ティック。D-21: 0.1 秒）。</summary>
+        public int JustGuardTicks = 6;
+
+        /// <summary>ガードが終わってから、次のガードができるまで（ティック。D-21: 2 秒）。ジャストガードに成功したら 0 に戻る（D-39）。</summary>
+        public int GuardCooldownTicks = 120;
+
+        /// <summary>ふつうのガードで攻撃を受けたとき、ガードが少なくともこの後まで続く（ガード硬直。ティック）。【仮】</summary>
+        public int GuardStunTicks = 12;
+
+        /// <summary>ふつうのガードで受けたときの吹き飛びの倍率（攻撃の吹き飛びにかける。ノックバック）。【仮】</summary>
+        public float GuardKnockbackScale = 0.4f;
+
+        /// <summary>ジャストガードされた攻撃側の隙（のけぞりの長さ。ティック。吹き飛びはなく、勢いのまま）。【仮】</summary>
+        public int ParriedStunTicks = 30;
+
         public AttackData Get(AttackSlot slot)
         {
             switch (slot)
@@ -338,6 +356,13 @@ namespace Degunatsu.Core.Combat
             v.NonNegative(nameof(KoKnockbackPerSpeed), KoKnockbackPerSpeed);
             v.NonNegative(nameof(WireCancelCooldownTicks), WireCancelCooldownTicks);
             v.NonNegative(nameof(AttackBufferTicks), AttackBufferTicks);
+            v.Positive(nameof(GuardTicks), GuardTicks);
+            v.NonNegative(nameof(JustGuardTicks), JustGuardTicks);
+            v.AtMost(nameof(JustGuardTicks), JustGuardTicks, nameof(GuardTicks), GuardTicks);
+            v.NonNegative(nameof(GuardCooldownTicks), GuardCooldownTicks);
+            v.NonNegative(nameof(GuardStunTicks), GuardStunTicks);
+            v.InRange(nameof(GuardKnockbackScale), GuardKnockbackScale, 0f, 1f);
+            v.NonNegative(nameof(ParriedStunTicks), ParriedStunTicks);
             return v;
         }
     }

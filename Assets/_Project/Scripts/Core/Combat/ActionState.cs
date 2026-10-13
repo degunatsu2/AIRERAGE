@@ -4,7 +4,6 @@ namespace Degunatsu.Core.Combat
 {
     /// <summary>
     /// アクション状態の種類（docs/01_game_design.md 6.2。排他的でどれか1つ）。
-    /// ガードなどは、作るときに加える（docs/11_combat_plan.md）。
     /// </summary>
     public enum ActionKind : byte
     {
@@ -13,6 +12,9 @@ namespace Degunatsu.Core.Combat
 
         /// <summary>のけぞり（攻撃を受けた後、入力を受け付けない）。</summary>
         Hitstun,
+
+        /// <summary>ガード（全方向。始めの JustGuardTicks がジャストガード。D-21。docs/11_combat_plan.md T3-5）。</summary>
+        Guard,
     }
 
     /// <summary>
@@ -51,7 +53,10 @@ namespace Degunatsu.Core.Combat
         /// <summary>今のアクションを始めてからのティック数（始めたティックが 0）。</summary>
         public int Ticks;
 
-        /// <summary>今のアクションの長さ（ティック）。のけぞりの長さに使う（攻撃の長さは攻撃のデータから決まる）。</summary>
+        /// <summary>
+        /// 今のアクションの長さ（ティック）。のけぞりとガードの長さに使う（攻撃の長さは攻撃のデータから決まる）。
+        /// ガードは、攻撃をガードするとガード硬直の分だけ延びる。
+        /// </summary>
         public int Duration;
 
         /// <summary>
@@ -63,12 +68,16 @@ namespace Degunatsu.Core.Combat
         /// <summary>撃破技を打つ直前の速さ（m/s）。吹き飛びの倍率に使う（D-38）。</summary>
         public float StrikeSpeed;
 
+        /// <summary>今の攻撃が相手に当たったか（ガードされたものは含まない）。攻撃→攻撃などのキャンセルの条件（D-17、D-42）。</summary>
+        public bool Connected;
+
         public bool IsFree => Kind == ActionKind.Free;
 
         public bool Equals(ActionState other)
         {
             return Kind == other.Kind && Attack == other.Attack && Ticks == other.Ticks
-                && Duration == other.Duration && HitMask == other.HitMask && StrikeSpeed.Equals(other.StrikeSpeed);
+                && Duration == other.Duration && HitMask == other.HitMask && StrikeSpeed.Equals(other.StrikeSpeed)
+                && Connected == other.Connected;
         }
 
         public override bool Equals(object obj)
@@ -78,15 +87,17 @@ namespace Degunatsu.Core.Combat
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed);
+            return HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed, Connected);
         }
 
         public override string ToString()
         {
             switch (Kind)
             {
-                case ActionKind.Attack: return $"{Kind}({Attack}, {Ticks}, hit={HitMask:x})";
-                case ActionKind.Hitstun: return $"{Kind}({Ticks}/{Duration})";
+                case ActionKind.Attack: return $"{Kind}({Attack}, {Ticks}, hit={HitMask:x}{(Connected ? " connected" : "")})";
+                case ActionKind.Hitstun:
+                case ActionKind.Guard:
+                    return $"{Kind}({Ticks}/{Duration})";
                 default: return Kind.ToString();
             }
         }
