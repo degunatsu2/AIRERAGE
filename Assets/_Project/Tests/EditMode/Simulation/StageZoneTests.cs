@@ -217,16 +217,31 @@ namespace Degunatsu.Core.Tests.Simulation
         }
 
         [Test]
-        public void BoostRing_IsOneWay()
+        public void BoostRing_WorksBothWays()
         {
-            // 左向きに通り抜ける（リングは右向き）。
+            // 左向きに通り抜ける（リングの向きは右）。左向きに加速する（ユーザーの要望、2026-10-13）。
             SimWorld world = World(new StageZone(StageZoneKind.BoostRing, 2f, 3f, 3f, 7f, Vector2.UnitX, 20f));
             SetState(world, new Vector3(5f, 5f, 0f), new Vector3(-10f, 3f, 0f));
-            Step(world, 30);
+            for (int i = 0; i < 30 && world.GetState(0).BoostRingCount == 0; i++)
+            {
+                Step(world, 1);
+            }
 
-            Assert.That(world.GetState(0).Position.X, Is.LessThan(1f), "前提: リングを通り抜けた");
-            Assert.That(world.GetState(0).BoostRingCount, Is.EqualTo(0), "逆向きに通っても効いた");
-            Assert.That(world.GetState(0).Velocity.X, Is.LessThan(0f), "押し戻された");
+            Assert.That(world.GetState(0).BoostRingCount, Is.EqualTo(1), "逆向きに通っても効かない");
+            Assert.That(world.GetState(0).Velocity.X, Is.EqualTo(-20f).Within(1e-3f), "通っている向きに加速しない");
+        }
+
+        [Test]
+        public void BoostRing_DoesNothing_WhenEnteredSideways()
+        {
+            // 右向きのリングに、真上から真下へ入る（横の速さ 0）。どちらへ加速するか決まらないので効かない。
+            SimWorld world = World(new StageZone(StageZoneKind.BoostRing, -1f, 3f, 1f, 5f, Vector2.UnitX, 20f));
+            SetState(world, new Vector3(0f, 8f, 0f), new Vector3(0f, -5f, 0f));
+            Step(world, 40);
+
+            Assert.That(world.GetState(0).Position.Y, Is.LessThan(3f), "前提: リングを通り抜けた");
+            Assert.That(world.GetState(0).BoostRingCount, Is.EqualTo(0));
+            Assert.That(world.GetState(0).Velocity.X, Is.EqualTo(0f));
         }
 
         [Test]

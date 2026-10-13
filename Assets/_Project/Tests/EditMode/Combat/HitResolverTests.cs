@@ -389,7 +389,8 @@ namespace Degunatsu.Core.Tests.Combat
         {
             // 0 と 2 で 1 を挟み、2 は少し遅れて攻撃する。1 がのけぞっている間に 2 が当てると、2 の新しいコンボになる
             // （コンボは当てた人ごと。ユーザーの指示、2026-10-13）。同じ人が当て続けるとつながる（GroundAttack_HitsTwice）。
-            SimWorld world = World((-1.6f, 1), (0f, 1), (1.6f, -1));
+            // 0 と 2 の判定がお互いに届かない間隔にする。
+            SimWorld world = World((-2.4f, 1), (0f, 1), (2.4f, -1));
             world.Step(new[] { Attack, default, default });
             Step(world, 3, default, default, default);
             world.Step(new[] { default, default, Attack });

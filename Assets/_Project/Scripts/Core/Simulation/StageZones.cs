@@ -82,13 +82,17 @@ namespace Degunatsu.Core.Simulation
         private static void Boost(ref CharacterState state, StageZone zone)
         {
             float along = Along(state.Velocity, zone.Direction);
-            if (along <= 0f)
+            if (along == 0f)
             {
+                // 向きに対して真横に入った（どちら向きに加速するか決まらない）。
                 return;
             }
-            if (along < zone.Power)
+            // 通っている向き（Direction か、その逆）に加速する（両方向。ユーザーの要望、2026-10-13）。
+            Vector2 axis = along > 0f ? zone.Direction : -zone.Direction;
+            float speed = MathF.Abs(along);
+            if (speed < zone.Power)
             {
-                SetAlong(ref state.Velocity, zone.Direction, along, zone.Power);
+                SetAlong(ref state.Velocity, axis, speed, zone.Power);
             }
             if (state.Velocity.Y > 0f)
             {

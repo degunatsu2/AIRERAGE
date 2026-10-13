@@ -180,6 +180,9 @@ namespace Degunatsu.Core.Combat
     /// <summary>
     /// 戦闘の調整値（攻撃のセット）。初期値はすべて【仮】（docs/11_combat_plan.md）。
     /// 地上技1つと、空中のニュートラル／横／上／下の4つ（D-35）。そのうち1つが撃破技（D-38）。
+    /// 友達との対戦の結果（ワイヤーで動きながらだと当てにくい。ユーザーの要望、2026-10-13）で、判定の箱を縦横とも約 2.5 倍に
+    /// （体の近くも含むように、キャラクターの側の端はおおむね残して前へ広げた）、ヒットストップを 2 倍にした（最初の攻撃から
+    /// コンボへ行きやすいように）。
     /// </summary>
     [Serializable]
     public sealed class CombatTuning
@@ -187,7 +190,7 @@ namespace Degunatsu.Core.Combat
         /// <summary>
         /// 地上技（デフォルトのキャラクター）: 前へ大きく踏み込みながら1段目、斜め上へ飛び出しながら2段目の二段技。
         /// 最後に地面を離れて空中に移る（キャラクターを作るときの方針。D-35）。1段目は踏み込みに追い越されないように前へ飛ばし、
-        /// 2段目は飛び出しとほぼ同じ速度で飛ばす（空中技につなげやすいように。相手との距離 0.4〜2.6m で2段とも当たる）。
+        /// 2段目は飛び出しとほぼ同じ速度で飛ばす（空中技につなげやすいように。相手との距離 0〜6m で2段とも当たる）。
         /// </summary>
         public AttackData Ground = new AttackData
         {
@@ -197,13 +200,13 @@ namespace Degunatsu.Core.Combat
             {
                 new AttackHit
                 {
-                    StartTick = 5, ActiveTicks = 8, OffsetX = 0.8f, HalfWidth = 0.7f, HalfHeight = 0.7f,
-                    Damage = 4, HitstopTicks = 5, HitstunTicks = 20, KnockbackX = 13f, KnockbackY = 5f,
+                    StartTick = 5, ActiveTicks = 8, OffsetX = 1.6f, HalfWidth = 1.75f, HalfHeight = 1.75f,
+                    Damage = 4, HitstopTicks = 10, HitstunTicks = 20, KnockbackX = 13f, KnockbackY = 5f,
                 },
                 new AttackHit
                 {
-                    StartTick = 13, ActiveTicks = 5, OffsetX = 0.6f, OffsetY = 0.9f, HalfWidth = 0.8f, HalfHeight = 0.8f,
-                    Damage = 4, HitstopTicks = 6, HitstunTicks = 24, KnockbackX = 10.5f, KnockbackY = 13.5f,
+                    StartTick = 13, ActiveTicks = 5, OffsetX = 1.6f, OffsetY = 1.5f, HalfWidth = 2f, HalfHeight = 2f,
+                    Damage = 4, HitstopTicks = 12, HitstunTicks = 24, KnockbackX = 10.5f, KnockbackY = 13.5f,
                 },
             },
             Motions = new[]
@@ -222,8 +225,8 @@ namespace Degunatsu.Core.Combat
             {
                 new AttackHit
                 {
-                    StartTick = 5, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 1.1f, HalfHeight = 1.1f,
-                    Damage = 4, HitstopTicks = 5, HitstunTicks = 20, KnockbackX = 5f, KnockbackY = 7f,
+                    StartTick = 5, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 2.75f, HalfHeight = 2.75f,
+                    Damage = 4, HitstopTicks = 10, HitstunTicks = 20, KnockbackX = 5f, KnockbackY = 7f,
                 },
             },
         };
@@ -237,8 +240,8 @@ namespace Degunatsu.Core.Combat
             {
                 new AttackHit
                 {
-                    StartTick = 7, ActiveTicks = 4, OffsetX = 1.1f, OffsetY = 0.1f, HalfWidth = 0.8f, HalfHeight = 0.5f,
-                    Damage = 6, HitstopTicks = 7, HitstunTicks = 24, KnockbackX = 14f, KnockbackY = 4f,
+                    StartTick = 7, ActiveTicks = 4, OffsetX = 2f, OffsetY = 0.1f, HalfWidth = 2f, HalfHeight = 1.25f,
+                    Damage = 6, HitstopTicks = 14, HitstunTicks = 24, KnockbackX = 14f, KnockbackY = 4f,
                 },
             },
         };
@@ -252,8 +255,8 @@ namespace Degunatsu.Core.Combat
             {
                 new AttackHit
                 {
-                    StartTick = 6, ActiveTicks = 4, OffsetX = 0.2f, OffsetY = 1.1f, HalfWidth = 0.7f, HalfHeight = 0.7f,
-                    Damage = 5, HitstopTicks = 6, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 14f,
+                    StartTick = 6, ActiveTicks = 4, OffsetX = 0.2f, OffsetY = 1.75f, HalfWidth = 1.75f, HalfHeight = 1.75f,
+                    Damage = 5, HitstopTicks = 12, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 14f,
                 },
             },
         };
@@ -270,8 +273,8 @@ namespace Degunatsu.Core.Combat
             {
                 new AttackHit
                 {
-                    StartTick = 16, ActiveTicks = 12, OffsetX = 0.4f, OffsetY = -0.8f, HalfWidth = 0.7f, HalfHeight = 0.8f,
-                    Damage = 8, HitstopTicks = 10, HitstunTicks = 28, KnockbackX = 6f, KnockbackY = -12f,
+                    StartTick = 16, ActiveTicks = 12, OffsetX = 1f, OffsetY = -2f, HalfWidth = 1.75f, HalfHeight = 2f,
+                    Damage = 8, HitstopTicks = 20, HitstunTicks = 28, KnockbackX = 6f, KnockbackY = -12f,
                 },
             },
             Motions = new[]

@@ -9,7 +9,7 @@ namespace Degunatsu.Runtime.Presentation
     /// ギミック（StageZoneAuthoring）の動く見た目（表示だけ。シミュレーションには関係しない）。
     /// - ジャンプ台: 向きへ流れる「^」の印。
     /// - 上昇気流: 下から上へ流れる筋。
-    /// - 加速リング: 輪と、向きへ流れる「&gt;」の印。
+    /// - 加速リング: 輪と、中心から両方向へ流れる「&lt; &gt;」の印（両方向に効く）。
     /// 線は起動時にこの物体の子として作る。動きは Time.time で決める（巻き戻しとは関係ない）。
     /// </summary>
     [RequireComponent(typeof(StageZoneAuthoring))]
@@ -56,7 +56,7 @@ namespace Degunatsu.Runtime.Presentation
                 case StageZoneKind.BoostRing:
                     _ring = CreateLine("Ring", RingSegments, 0.16f);
                     _ring.loop = true;
-                    for (int i = 0; i < 2; i++)
+                    for (int i = 0; i < 4; i++)
                     {
                         _marks.Add(CreateLine($"Arrow{i + 1}", 3, 0.14f));
                     }
@@ -131,7 +131,7 @@ namespace Degunatsu.Runtime.Presentation
             }
         }
 
-        // 輪（範囲に収まる楕円）と、中を向きへ流れる「>」。輪は少し脈打つ。
+        // 輪（範囲に収まる楕円）と、中心から両方向へ流れる「<」「>」。輪は少し脈打つ。
         private void RenderRing(Vector3 center, Vector2 half, float time)
         {
             float pulse = 1f + 0.06f * Mathf.Sin(time * Mathf.PI * 2f);
@@ -146,9 +146,11 @@ namespace Degunatsu.Runtime.Presentation
             float reach = Mathf.Min(half.x, half.y) * 0.8f;
             for (int i = 0; i < _marks.Count; i++)
             {
-                float phase = Mathf.Repeat(time * 1.5f + i / (float)_marks.Count, 1f);
-                Vector2 tip = new Vector2(center.x, center.y) + _direction * Mathf.Lerp(-reach, reach, phase);
-                Chevron(_marks[i], tip, _direction, side, reach * 0.6f, reach * 0.45f, Fade(phase));
+                // 偶数番は向きへ、奇数番は逆へ、中心から流れる。
+                Vector2 forward = i % 2 == 0 ? _direction : -_direction;
+                float phase = Mathf.Repeat(time * 1.5f + (i / 2) * 0.5f, 1f);
+                Vector2 tip = new Vector2(center.x, center.y) + forward * Mathf.Lerp(reach * 0.3f, reach, phase);
+                Chevron(_marks[i], tip, forward, side, reach * 0.6f, reach * 0.45f, Fade(phase));
             }
         }
 

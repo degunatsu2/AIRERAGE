@@ -27,10 +27,16 @@ namespace Degunatsu.Core.Tests.Combat
 
         // 0 が右向きで攻撃し、1（左向き）が受ける。guardLead: 1 がガードを押してから、0 が攻撃を押すまでのティック数
         // （負なら、0 が攻撃を押してから -guardLead ティック後に 1 がガードを押す）。当たるかガードされるまで進める。
-        private static SimWorld AttackIntoGuard(int guardLead)
+        // singleHit: 攻撃する側の地上技を1段目だけにする（2段目もガードに当たると、1回のガードの硬直を調べられないため）。
+        private static SimWorld AttackIntoGuard(int guardLead, bool singleHit = false)
         {
             var world = new SimWorld(TestArenas.Ground());
-            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f), 1);
+            var attackerConfig = new CharacterConfig();
+            if (singleHit)
+            {
+                attackerConfig.Combat.Ground.Hits = new[] { attackerConfig.Combat.Ground.Hits[0] };
+            }
+            world.AddCharacter(attackerConfig, new Vector3(0f, GroundY, 0f), 1);
             world.AddCharacter(new CharacterConfig(), new Vector3(1.6f, GroundY, 0f), -1);
             world.Step(new PlayerInput[2]);
             int attackTick = guardLead > 0 ? guardLead : 0;
@@ -167,7 +173,7 @@ namespace Degunatsu.Core.Tests.Combat
         {
             // ガードが終わる直前に受けても、ガード硬直（GuardStunTicks）の間はガードのまま（その間の攻撃も防げる）。
             int lead = Combat.GuardTicks - Combat.Ground.FirstHitTick - 4;
-            SimWorld world = AttackIntoGuard(lead);
+            SimWorld world = AttackIntoGuard(lead, singleHit: true);
             Assert.That(world.LastHits[0].Result, Is.EqualTo(HitResult.Guarded), "前提: ふつうのガード");
             int guardTicksAtHit = world.GetState(1).Action.Ticks;
             Assert.That(guardTicksAtHit + Combat.GuardStunTicks, Is.GreaterThan(Combat.GuardTicks), "前提: 硬直がなければ先に終わる");
@@ -225,7 +231,7 @@ namespace Degunatsu.Core.Tests.Combat
         public void Guard_CannotBeCancelled_DuringTheGuardStun()
         {
             // 攻撃をガードした後のガード硬直の間はキャンセルできない（ふつうのガードがジャストガードより強くならないように）。
-            SimWorld world = AttackIntoGuard(4);
+            SimWorld world = AttackIntoGuard(4, singleHit: true);
             Assert.That(world.LastHits[0].Result, Is.EqualTo(HitResult.Guarded), "前提: ふつうのガード");
             int cancelFrom = world.GetState(1).Action.CancelFromTick;
             while (world.GetState(1).Combat.HitstopTicksLeft > 0)

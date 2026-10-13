@@ -13,8 +13,8 @@ namespace Degunatsu.Core.Simulation
         Updraft = 1,
 
         /// <summary>
-        /// 加速リング。Direction の向きに進みながら外から入ったとき、その向きの速さを Power 以上にする（一方通行。
-        /// 逆向きや真横から入ったときは効かない。吹き飛ばされた相手を押し戻したり、落ちてくる人を打ち上げたりしないため）。
+        /// 加速リング。外から入ったとき、通っている向き（Direction の向きか、その逆）の速さを Power 以上にする（両方向。
+        /// ユーザーの要望、2026-10-13。速い人を遅くはしない）。Direction に対して真横に入ったときは効かない。
         /// </summary>
         BoostRing = 2,
     }
@@ -31,7 +31,7 @@ namespace Degunatsu.Core.Simulation
         public readonly float MaxX;
         public readonly float MaxY;
 
-        /// <summary>向き（長さ 1。上昇気流では使わない）。</summary>
+        /// <summary>向き（長さ 1。上昇気流では使わない。加速リングでは、この向きとその逆の両方に効く）。</summary>
         public readonly Vector2 Direction;
 
         /// <summary>ジャンプ台・加速リングでは速さ（m/s）、上昇気流では加速度（m/s²）。</summary>
