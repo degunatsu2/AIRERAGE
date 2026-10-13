@@ -5,7 +5,8 @@ namespace Degunatsu.Runtime.Presentation
     /// <summary>
     /// 残り時間を、円の周りの導火線のように短くなっていくゲージで示す（ユーザーの要望、2026-10-13）。
     /// 上（12 時）から時計回りに残りの分だけ弧を描き、燃えている先端に火花を置く。全体の長さを薄い輪で示す。
-    /// ワイヤーキャンセルのクールタイム（キャラクターの周り。「WIRE CANCEL」）と、ワイヤーの接続の残り時間（接続点の周り）に使う。
+    /// ワイヤーキャンセルのクールタイム（キャラクターの周り。「WIRE CANCEL」）、ワイヤーの接続の残り時間（接続点の周り）、
+    /// 撃破された後の復帰までの残り（出現位置の周りに大きく。「RESPAWN」。docs/12 T4-2）に使う。
     /// 呼ぶ側が毎フレーム Show / Hide を呼ぶ。状態は読むだけ。
     /// </summary>
     public sealed class RingGaugeView : MonoBehaviour
@@ -51,14 +52,22 @@ namespace Degunatsu.Runtime.Presentation
             Hide();
         }
 
-        /// <summary>文字と半径（と色）を設定する（シーンのビルダー用）。</summary>
-        public void Configure(string label, float radius, Color? color = null)
+        /// <summary>文字と半径（と色、太さ、文字の大きさ）を設定する（シーンのビルダー用）。</summary>
+        public void Configure(string label, float radius, Color? color = null, float? width = null, int? fontSize = null)
         {
             _label = label ?? string.Empty;
             _radius = radius;
             if (color.HasValue)
             {
                 _color = color.Value;
+            }
+            if (width.HasValue)
+            {
+                _width = width.Value;
+            }
+            if (fontSize.HasValue)
+            {
+                _fontSize = fontSize.Value;
             }
         }
 

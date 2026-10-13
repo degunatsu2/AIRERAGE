@@ -309,6 +309,11 @@ namespace Degunatsu.Editor
             BurstEffectView gimmick = CreateBurst(name + "GimmickBurst", parent);
             gimmick.Configure(new Color(0.55f, 1f, 0.6f, 1f), false, 0.3f, 0.4f, 1.6f, 8, 0.7f, 0.1f, string.Empty, 0, 0f);
             SetReference(view, "_gimmickBurst", gimmick);
+            // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。
+            RingGaugeView respawn = CreateRingGauge(name + "RespawnGauge", parent, "RESPAWN", 2.6f,
+                new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f));
+            respawn.Configure("RESPAWN", 2.6f, new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f), 0.24f, 28);
+            SetReference(view, "_respawnGauge", respawn);
         }
 
         /// <summary>一瞬の光（輪 2 つと光の筋。文字はシーンのカメラで画面に写す）。値は呼んだ側が Configure で決める。</summary>

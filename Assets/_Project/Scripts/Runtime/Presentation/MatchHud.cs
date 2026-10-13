@@ -11,9 +11,9 @@ namespace Degunatsu.Runtime.Presentation
 {
     /// <summary>
     /// 試合の表示（docs/12_match_plan.md T4-1、T4-2）: 始まる前の「3」「2」「1」と「GO!」、上の中央の残り時間、
-    /// 終わったときの「FINISH!」と結果（順位）、自分が撃破されたときの「RESPAWN n」。
+    /// 終わったときの「FINISH!」と結果（順位）。復帰までの残りは、出現位置の周りのゲージで示す（CharacterView。ユーザーの要望）。
     /// 試合の段階と残りは、ティック数と MatchRules から求める（ISimulationFeed）。状態を読むだけで、書き換えない。
-    /// 時間の制限がないとき（検証用のシーン）は、復帰までの秒数だけを出す。
+    /// 始まる前の演出は、ユーザーが案から選ぶまでの仮（docs/12 3.1）。
     /// </summary>
     public sealed class MatchHud : MonoBehaviour
     {
@@ -130,19 +130,6 @@ namespace Degunatsu.Runtime.Presentation
                     break;
             }
             _lastPhase = phase;
-
-            if (CenterText.Length == 0 && phase != MatchPhase.Finished)
-            {
-                int local = _feed.LocalCharacter;
-                if (local >= 0 && local < _feed.CharacterCount)
-                {
-                    CombatState combat = _feed.GetState(local).Combat;
-                    if (combat.IsWaitingToRespawn)
-                    {
-                        CenterText = $"RESPAWN {Seconds(combat.RespawnTicksLeft)}";
-                    }
-                }
-            }
         }
 
         private CharacterState[] States()

@@ -341,7 +341,7 @@ namespace Degunatsu.Net
             {
                 DisplayedStates(p, out CharacterState previous, out CharacterState current);
                 _characterViews[p].Render(previous, current, alpha, halfExtents);
-                _characterViews[p].RenderAction(current, _session.World.GetConfig(p).Combat);
+                _characterViews[p].RenderAction(current, _session.World.GetConfig(p).Combat, _session.World.Rules.RespawnDelayTicks);
                 _wireViews[p].Render(previous, current, alpha, wire);
             }
 

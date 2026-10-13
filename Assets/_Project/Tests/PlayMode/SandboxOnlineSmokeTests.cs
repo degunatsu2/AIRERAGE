@@ -205,7 +205,7 @@ namespace Degunatsu.PlayMode.Tests
         }
 
         [UnityTest]
-        public IEnumerator KnockedOut_IsHidden_ShowsRespawn_ThenBlinks()
+        public IEnumerator KnockedOut_IsHidden_ShowsTheRespawnGauge_ThenBlinks()
         {
             SceneManager.LoadScene(SceneName);
             yield return null;
@@ -229,7 +229,10 @@ namespace Degunatsu.PlayMode.Tests
 
             Assert.That(runner.Session.World.GetState(0).Combat.IsWaitingToRespawn, Is.True, "前提: 撃破されて待っている");
             Assert.That(view.HiddenForRespawn, Is.True, "待っている間に見えている");
-            Assert.That(hud.CenterText, Does.StartWith("RESPAWN"), "復帰までの秒数が出ない");
+            Assert.That(view.RespawnGauge.IsShowing, Is.True, "復帰までのゲージが出ない");
+            Assert.That(view.RespawnGauge.Label, Is.EqualTo("RESPAWN"));
+            Assert.That(view.RespawnGauge.Fraction, Is.GreaterThan(0f).And.LessThan(1f), "残りの割合");
+            Assert.That(hud.CenterText, Is.Empty, "復帰までを数字で出している（ゲージにした）");
 
             // 待ち 1 秒と無敵 1 秒が終わるまで（余裕を見て 3 秒まで）見る。
             float start = Time.time;
@@ -241,6 +244,7 @@ namespace Degunatsu.PlayMode.Tests
             }
             Assert.That(sawBlink, Is.True, "復帰した後の無敵で点滅しない");
             Assert.That(view.HiddenForRespawn, Is.False);
+            Assert.That(view.RespawnGauge.IsShowing, Is.False, "戻った後もゲージが出ている");
             Assert.That(view.Blinking, Is.False, "無敵が終わっても点滅している");
             runner.Leave();
         }

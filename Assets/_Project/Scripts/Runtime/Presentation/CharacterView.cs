@@ -62,6 +62,8 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private BurstEffectView _bounceBurst;
         [Tooltip("ジャンプ台・加速リングが効いた瞬間の光（なくてもよい）")]
         [SerializeField] private BurstEffectView _gimmickBurst;
+        [Tooltip("撃破されて復帰を待つ間の、出現位置の周りの大きなゲージ（なくてもよい）")]
+        [SerializeField] private RingGaugeView _respawnGauge;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
@@ -115,6 +117,9 @@ namespace Degunatsu.Runtime.Presentation
         public BurstEffectView BounceBurst => _bounceBurst;
         public BurstEffectView GimmickBurst => _gimmickBurst;
 
+        /// <summary>復帰までの残りのゲージ（なければ null）。</summary>
+        public RingGaugeView RespawnGauge => _respawnGauge;
+
         /// <summary>撃破されて復帰を待っているので、見えなくしているか。</summary>
         public bool HiddenForRespawn { get; private set; }
 
@@ -127,8 +132,11 @@ namespace Degunatsu.Runtime.Presentation
             transform.localScale = halfExtents * 2f;
         }
 
-        /// <summary>アクション状態（攻撃の段階、ヒットストップ、のけぞり）を色で示し、攻撃の判定を描く。</summary>
-        public void RenderAction(in CharacterState current, CombatTuning combat)
+        /// <summary>
+        /// アクション状態（攻撃の段階、ヒットストップ、のけぞり）を色で示し、攻撃の判定を描く。
+        /// respawnDelayTicks は復帰を待つ長さ（MatchRules.RespawnDelayTicks。復帰までのゲージの全体の長さに使う）。
+        /// </summary>
+        public void RenderAction(in CharacterState current, CombatTuning combat, int respawnDelayTicks = 0)
         {
             RenderHitbox(current, combat);
             Tint tint = TintOf(current, combat);
@@ -137,6 +145,7 @@ namespace Degunatsu.Runtime.Presentation
             RenderGuard(current, combat);
             RenderBursts(current);
             RenderVisibility(current);
+            RenderRespawn(current, respawnDelayTicks);
             if (tint == _shown)
             {
                 return;
@@ -157,6 +166,25 @@ namespace Degunatsu.Runtime.Presentation
             }
             _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        // 復帰を待つ間、出現位置の周りに大きなゲージ（残りの割合）を出す（数字ではなくゲージで。ユーザーの要望、2026-10-13）。
+        private void RenderRespawn(in CharacterState state, int respawnDelayTicks)
+        {
+            if (_respawnGauge == null)
+            {
+                return;
+            }
+            int left = state.Combat.RespawnTicksLeft;
+            if (left <= 0)
+            {
+                if (_respawnGauge.IsShowing)
+                {
+                    _respawnGauge.Hide();
+                }
+                return;
+            }
+            _respawnGauge.Show(transform.position, (float)left / Mathf.Max(respawnDelayTicks, left));
         }
 
         private void RenderVisibility(in CharacterState state)

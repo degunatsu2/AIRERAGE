@@ -295,10 +295,10 @@ namespace Degunatsu.Core.Combat
 
         /// <summary>
         /// 撃破技をこの速さ（m/s）以上で打って当てると「FATAL」: ヒットストップが FatalHitstopMultiplier 倍になり、派手な演出を出す
-        /// （ユーザーの要望、2026-10-13）。【仮】
+        /// （ユーザーの要望、2026-10-13。倍率は 3 倍で長すぎたので 2 倍にした。撃破技のヒットストップ 20 ティックの 2 倍で 40 ティック）。【仮】
         /// </summary>
         public float FatalStrikeSpeed = 14f;
-        public int FatalHitstopMultiplier = 3;
+        public int FatalHitstopMultiplier = 2;
 
         /// <summary>
         /// のけぞり中に床・壁・天井へぶつかったとき、ぶつかった向きの速さがこれ以上（m/s）なら跳ね返る（ユーザーの要望、2026-10-13）。【仮】
