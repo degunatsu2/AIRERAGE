@@ -111,13 +111,18 @@ namespace Airerage.Core.Wire
         public float ExitSpeedCap = 18f;
 
         /// <summary>
-        /// 接続した瞬間に接続点から遠ざかる向きに動いていたとき、ロープに止められて失われる速さのうち、振りの向き（ロープに垂直な向き。
-        /// 今の動きに近い方）に曲げて残す割合（0〜1）【試行】。1 なら速さを保ったまま向きだけが振りの向きに変わる
-        /// （SpeedRunners のように、勢いを落とさずに方向転換する。ユーザーの要望、2026-10-14）。0 なら以前のとおり、遠ざかる向きの
-        /// 速さはロープが止める。真後ろへ遠ざかっているとき（振りの向きが決まらない）は曲げない。両タイプ共通。
-        /// 以前の「遠ざかる向きの速さを接続点へ向かう向きに反転させる」（AttachReverseOutward）は、挙動がおかしくなることがあり廃止した。
+        /// フックを今の横の動きと逆の側に刺したとき（AttachTurnBehind を参照）、速さのこの割合を保ったまま、フックの側へ向かう
+        /// 振りの向き（ロープに垂直）に向きを変える（0〜1。0 なら使わない）【仮】。慣性に負けてフックと逆の方へ振られないように
+        /// （ユーザーの指摘、2026-10-14）。向きはフックの左右の側（ロープがほぼ水平なら下）。速さを振りの向きに変えるので、ロープは
+        /// たるまない（以前の「接続点の方へ反転させる」は、たるんで跳ねたので廃止した）。両タイプ共通。
         /// </summary>
-        public float AttachRedirect = 0f;
+        public float AttachTurnSpeed = 1f;
+
+        /// <summary>
+        /// 「逆の側に刺した」とみなす、フックの向きの横の成分（後ろ向き。0〜1）【仮】。0.5 なら、フックが真上から後ろへ 30° より
+        /// 傾いているとき。真上に近いフック（走りながら上へ刺す）は、今までどおり前へ振れる。上下の動き（落下など）は数えない。
+        /// </summary>
+        public float AttachTurnBehind = 0.5f;
 
         public InertialWireTuning Inertial = new InertialWireTuning();
         public ResponsiveWireTuning Responsive = new ResponsiveWireTuning();
@@ -139,7 +144,8 @@ namespace Airerage.Core.Wire
             v.Positive(nameof(MaxAttachedSpeed), MaxAttachedSpeed);
             v.Positive(nameof(ExitSpeedCap), ExitSpeedCap);
             v.InRange(nameof(AttachedInputInfluence), AttachedInputInfluence, 0f, 1f);
-            v.InRange(nameof(AttachRedirect), AttachRedirect, 0f, 1f);
+            v.InRange(nameof(AttachTurnSpeed), AttachTurnSpeed, 0f, 1f);
+            v.InRange(nameof(AttachTurnBehind), AttachTurnBehind, 0f, 1f);
             v.NotNull(nameof(Inertial), Inertial);
             v.NotNull(nameof(Responsive), Responsive);
             if (Inertial != null)

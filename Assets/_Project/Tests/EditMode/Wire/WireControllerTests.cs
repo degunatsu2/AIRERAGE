@@ -267,21 +267,17 @@ namespace Airerage.Core.Tests.Wire
             Assert.That(state.Wire.Phase, Is.EqualTo(WirePhase.Ready));
         }
 
-        [TestCase(0f)]
-        [TestCase(1f)]
-        public void Attach_MovingAway_KeepsOnlyTheRedirectedShare_OfTheSpeed(float redirect)
+        // 速度 velocity で飛んでいる間に、照準 aim の向きの壁や天井へフックを刺し、接続した瞬間の速度と、その後 ticks ティックの位置を返す。
+        private static (Vector3 Before, Vector3 After, CharacterState Attached, Vector3 Later) HookWhileFlying(
+            BoxTerrain world, Vector3 velocity, float aimX, float aimY, float turnSpeed, int ticks = 30)
         {
-            // 右へ速く飛んでいる間に、左上の壁へフックを刺す（接続点から遠ざかる向きに動いている）。
-            // 標準（AttachRedirect 0）は、遠ざかる向きの速さをロープが止める。1 なら速さを保ったまま、振りの向きに曲がる。
-            // どちらも、接続点の方へ跳ね返らない（以前の「反転」は廃止した）。
-            var world = new BoxTerrain().AddBox(-7f, -20f, -6f, 30f, attachable: true);
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
-            config.Wire.AttachRedirect = redirect;
+            config.Wire.AttachTurnSpeed = turnSpeed;
             config.Wire.Inertial.StartPullSpeed = 0f;
-            var harness = new SimHarness(world, config, new Vector3(0f, 5f, 0f));
+            var harness = new SimHarness(world, config, new Vector3(0f, 6f, 0f));
             var state = harness.State;
             state.Grounded = false;
-            state.Velocity = new Vector3(12f, 4f, 0f);
+            state.Velocity = velocity;
             harness.State = state;
 
             Vector3 before = harness.State.Velocity;
@@ -293,20 +289,58 @@ namespace Airerage.Core.Tests.Wire
                     return false;
                 }
                 return true;
-            }, Inputs.Wire(-1f, 0.6f), 30);
+            }, Inputs.Wire(aimX, aimY), 30);
+            CharacterState attached = harness.State;
+            harness.Step(Inputs.Wire(), ticks);
+            return (before, attached.Velocity, attached, harness.State.Position);
+        }
 
-            Vector3 after = harness.State.Velocity;
-            Vector3 radial = Vector3.Normalize(harness.State.Position - harness.State.Wire.Anchor);
-            Assert.That(Vector3.Dot(after, radial), Is.GreaterThan(-1f), $"接続点の方へ跳ね返った: 前 {before}、後 {after}");
-            if (redirect > 0f)
-            {
-                Assert.That(after.Length(), Is.EqualTo(before.Length()).Within(1f), $"速さが保たれない: 前 {before}、後 {after}");
-                Assert.That(MathF.Abs(Vector3.Dot(after, radial)), Is.LessThan(1f), "振りの向き（ロープに垂直）になっていない");
-            }
-            else
-            {
-                Assert.That(after.Length(), Is.LessThan(before.Length() * 0.6f), $"遠ざかる向きの速さが残る: 前 {before}、後 {after}");
-            }
+        [Test]
+        public void HookingBehindTheMotion_TurnsTowardTheHook_KeepingTheSpeed()
+        {
+            // 右へ速く飛んでいる間に、左上の天井へフックを刺す。慣性に負けて右（フックと逆）へ振られず、速さを保ったまま
+            // フックの側（左下へ、接続点の下をくぐる振り）へ向きを変える（ユーザーの指摘、2026-10-14）。
+            var world = new BoxTerrain().AddBox(-40f, 12f, 40f, 13f, attachable: true);
+            var (before, after, attached, later) = HookWhileFlying(world, new Vector3(16f, 0f, 0f), -1f, 1f, 1f);
+
+            Vector3 radial = Vector3.Normalize(attached.Position - attached.Wire.Anchor);
+            Assert.That(attached.Wire.Anchor.X, Is.LessThan(attached.Position.X), "前提: フックは左にある");
+            Assert.That(after.X, Is.LessThan(0f), $"フックの側へ向かない: 前 {before}、後 {after}");
+            // 接続したティックの重力の分だけ違う。
+            Assert.That(after.Length(), Is.EqualTo(before.Length()).Within(1f), $"速さが保たれない: 前 {before}、後 {after}");
+            Assert.That(MathF.Abs(Vector3.Dot(after, radial)), Is.LessThan(0.5f), "振りの向き（ロープに垂直）になっていない（たるむ・跳ねる）");
+            Assert.That(later.X, Is.LessThan(attached.Position.X), "その後もフックの側へ振れていない");
+        }
+
+        [Test]
+        public void HookingBehindTheMotion_WithTheTurnOff_IsCarriedAwayByTheMomentum()
+        {
+            // 向きを変えない設定（AttachTurnSpeed 0）では、遠ざかる向きの速さをロープが止め、残りの勢いでフックと逆の側へ振られる（以前の動き）。
+            var world = new BoxTerrain().AddBox(-40f, 12f, 40f, 13f, attachable: true);
+            var (before, after, _, _) = HookWhileFlying(world, new Vector3(16f, 0f, 0f), -1f, 1f, 0f);
+
+            Assert.That(after.X, Is.GreaterThanOrEqualTo(0f), $"前提が違う: 前 {before}、後 {after}");
+            Assert.That(after.Length(), Is.LessThan(before.Length() * 0.8f));
+        }
+
+        [Test]
+        public void HookingNearlyStraightUp_WhileRunning_StillSwingsForward()
+        {
+            // 右へ動きながら（落ちながら）真上に近いところへ刺したとき（逆の側ではない）は、今までどおり前（右）へ振れる。
+            var world = new BoxTerrain().AddBox(-40f, 12f, 40f, 13f, attachable: true);
+            var (before, after, _, _) = HookWhileFlying(world, new Vector3(12f, 0f, 0f), -0.15f, 1f, 1f);
+
+            Assert.That(after.X, Is.GreaterThan(0f), $"前へ振れない: 前 {before}、後 {after}");
+        }
+
+        [Test]
+        public void HookingSideways_AgainstTheMotion_SwingsDownUnderTheAnchor()
+        {
+            // 右へ飛んでいる間に、真横（左）の壁へ刺す（ロープがほぼ水平）。上ではなく下へ向きを変え、接続点の下をくぐって振れる。
+            var world = new BoxTerrain().AddBox(-12f, -30f, -11f, 40f, attachable: true);
+            var (before, after, _, _) = HookWhileFlying(world, new Vector3(14f, 0f, 0f), -1f, 0f, 1f);
+
+            Assert.That(after.Y, Is.LessThan(-before.Length() * 0.8f), $"下へ向かない: 前 {before}、後 {after}");
         }
 
         [TestCase(true)]

@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using Airerage.Core.Common;
 using Airerage.Core.Input;
@@ -264,20 +265,32 @@ namespace Airerage.Core.Wire
             state.Wire.RopeLength = ropeLength > tuning.MaxLength ? tuning.MaxLength : ropeLength;
             state.Wire.AttachSpeed = state.Velocity.Length();
 
-            // 接続点から遠ざかる向きに動いていたら、ロープに止められる速さの AttachRedirect の割合を、振りの向きに曲げて残す。
-            if (tuning.AttachRedirect > 0f && distance > SimMath.Epsilon)
+            TurnTowardTheHook(ref state, toAnchor, distance, tuning);
+        }
+
+        // フックを今の横の動きと逆の側に刺したら、速さを保ったまま、フックの側へ向かう振りの向き（ロープに垂直）に向きを変える
+        // （AttachTurnSpeed、AttachTurnBehind。慣性に負けてフックと逆へ振られないように）。
+        private static void TurnTowardTheHook(ref CharacterState state, Vector3 toAnchor, float distance, WireTuning tuning)
+        {
+            float speed = state.Velocity.Length();
+            if (tuning.AttachTurnSpeed <= 0f || distance <= SimMath.Epsilon || MathF.Abs(state.Velocity.X) <= SimMath.Epsilon)
             {
-                Vector3 outward = -toAnchor / distance;
-                float away = Vector3.Dot(state.Velocity, outward);
-                Vector3 along = state.Velocity - outward * away;
-                float alongSpeed = along.Length();
-                if (away > 0f && alongSpeed > SimMath.Epsilon)
-                {
-                    float speed = state.Velocity.Length();
-                    float kept = alongSpeed + (speed - alongSpeed) * tuning.AttachRedirect;
-                    state.Velocity = along * (kept / alongSpeed);
-                }
+                return;
             }
+            Vector3 toHook = toAnchor / distance;
+            float behind = state.Velocity.X > 0f ? -toHook.X : toHook.X;
+            if (behind <= tuning.AttachTurnBehind)
+            {
+                return;
+            }
+            Vector3 swing = SimMath.PerpendicularXY(toHook);
+            // フックの左右の側へ向かう向き。ロープがほぼ水平（振りの向きがほぼ上下）なら、下へ（接続点の下をくぐって振れる）。
+            float side = MathF.Abs(swing.X) < 0.2f ? -swing.Y : swing.X * toHook.X;
+            if (side < 0f)
+            {
+                swing = -swing;
+            }
+            state.Velocity = swing * (speed * tuning.AttachTurnSpeed);
         }
 
         private static void Miss(ref CharacterState state, WireMissReason reason)

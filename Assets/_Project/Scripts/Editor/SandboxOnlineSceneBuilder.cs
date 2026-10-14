@@ -96,8 +96,9 @@ namespace Airerage.Editor
             ("SideRingLeft", StageZoneKind.BoostRing, new Vector2(-16f, 11f), new Vector2(2.5f, 3f), new Vector2(1f, 0.1f), 18f, 0f),
             ("SideRingRight", StageZoneKind.BoostRing, new Vector2(16f, 11f), new Vector2(2.5f, 3f), new Vector2(-1f, 0.1f), 18f, 0f),
             // 島の間の上昇気流（落ちた人を島の高さまで押し上げる。強く吹き飛ばされると下まで落ちる）。
-            ("UpdraftLeft", StageZoneKind.Updraft, new Vector2(-13.5f, -8f), new Vector2(7f, 20f), Vector2.up, 45f, 10f),
-            ("UpdraftRight", StageZoneKind.Updraft, new Vector2(13.5f, -8f), new Vector2(7f, 20f), Vector2.up, 45f, 10f),
+            // 強さ 45 → 60 m/s²、上限 10 → 13 m/s（少し弱いという指摘、2026-10-14）。
+            ("UpdraftLeft", StageZoneKind.Updraft, new Vector2(-13.5f, -8f), new Vector2(7f, 20f), Vector2.up, 60f, 13f),
+            ("UpdraftRight", StageZoneKind.Updraft, new Vector2(13.5f, -8f), new Vector2(7f, 20f), Vector2.up, 60f, 13f),
         };
 
         // コインの出現地点（基本は空中。1 枚はよく通る道に多く、3 枚・20 枚（赤）は取りにくい・危ない場所）【仮】。

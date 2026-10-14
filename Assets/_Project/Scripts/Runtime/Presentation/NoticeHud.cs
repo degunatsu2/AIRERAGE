@@ -10,11 +10,12 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 試合中のお知らせ（ユーザーの選択、2026-10-14。案 C ＋ 大きな出来事だけ案 B）。
-    /// - タイマーの下に積む札（GuidePlate。左に絵、右に見出しと小さな説明、右の端に出来事までの秒）:
-    ///   拠点の移動の予告「BANK MOVES」（水色。移るまでの秒）、100 枚のコインの予告「JACKPOT」（虹色。出るまでの秒）と、
-    ///   出た直後の「JACKPOT 100」（JackpotChipTicks の間）。札は上から落ちるように出て、終わるとつぶれて消える。重なれば縦に積む。
-    /// - 画面を横切る帯（斜めの黒い帯が開き、大きな文字が右から走り抜けて閉じる）: 100 枚のコインの予告の始まり
-    ///   「JACKPOT INCOMING」（虹色）と、COIN RUSH の始まり（金色。短いファンファーレ）。
+    /// - タイマーの右に伸びる札（GuidePlate。左に絵、右に見出し、右の端に出来事までの秒。プレイの邪魔にならないように、画面の
+    ///   上の端に。ユーザーの指摘、2026-10-14）: 拠点の移動の予告「BANK MOVES」（水色。移るまでの秒）、100 枚のコインの予告
+    ///   「JACKPOT」（虹色。出るまでの秒）と、出た直後の「JACKPOT 100」（JackpotChipTicks の間）。札はタイマーの後ろから右へ
+    ///   伸びるように出て、終わると縮んで消える。重なれば縦に積む。画面が狭くて右の表と重なるときは、タイマーの下に出す。
+    /// - 画面を横切る帯（BannerStrip）: 100 枚のコインの予告の始まり「JACKPOT INCOMING」（虹色）と、COIN RUSH の始まり
+    ///   （金色。短いファンファーレ）。
     /// 出来事の時刻は、ティック数とルールだけから決まる（BankRules、FieldCoinRules、MatchRules）。巻き戻しでもずれない。
     /// 拠点の予告の呼び鈴は BankView、100 枚のコインの警報は MatchAtmosphere が鳴らす。状態を読むだけで、書き換えない。
     /// </summary>
@@ -23,9 +24,13 @@ namespace Airerage.Runtime.Presentation
         /// <summary>100 枚のコインが出た後に「JACKPOT 100」の札を残すティック（2 秒）。</summary>
         public const int JackpotChipTicks = 120;
 
-        private const int ChipWidth = 300;
-        private const int ChipHeight = 46;
-        private const float ChipGap = 6f;
+        private const int ChipWidth = 260;
+        private const int ChipHeight = 36;
+        private const float ChipGap = 4f;
+        private const float ChipTop = 4f;
+
+        // 右上の全員の表（ScoreboardHud）と王冠の分として、画面の右に空けておく幅（ピクセル）。
+        private const float ScoreboardReserve = 370f;
         private const float ChipInSeconds = 0.3f;
         private const float ChipOutSeconds = 0.3f;
 
@@ -33,8 +38,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private MonoBehaviour _source;
         [Tooltip("COIN RUSH のファンファーレ（なくてもよい）")]
         [SerializeField] private GameAudio _audio;
-        [Tooltip("札を積み始める高さ（ピクセル。タイマーの札と流れのバーの下）")]
-        [SerializeField] private float _top = 106f;
+        [Tooltip("画面が狭くてタイマーの右に札が入らないとき、札を積み始める高さ（ピクセル。タイマーの札と流れのバーの下）")]
+        [SerializeField] private float _fallbackTop = 106f;
         [Tooltip("帯を出す秒数")]
         [SerializeField] private float _bandSeconds = 2.6f;
         [SerializeField] private Color _bankColor = new Color(0.31f, 0.84f, 1f);
@@ -49,17 +54,14 @@ namespace Airerage.Runtime.Presentation
         private Texture2D _bankIcon;
         private Texture2D _jackpotIcon;
         private GUIStyle _title;
-        private GUIStyle _sub;
         private GUIStyle _seconds;
-        private GUIStyle _bandTitle;
-        private GUIStyle _bandSub;
+        private readonly BannerStrip _strip = new BannerStrip();
         private Band _band;
 
         private sealed class Chip
         {
             public string Key;
             public string Title;
-            public string Sub;
             public int Seconds = -1;
             public bool Rainbow;
             public Color Color;
@@ -102,6 +104,9 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>これまでに出した帯の数（テスト用）。</summary>
         public int BandsShown { get; private set; }
+
+        /// <summary>札をタイマーの右に出しているか（画面が狭ければ、タイマーの下。テスト用）。</summary>
+        public bool ChipsBesideTheTimer { get; private set; } = true;
 
         private void Awake()
         {
@@ -196,7 +201,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (BankRules.NextSpotAt(rules, spots.Count, tick, out int ticksUntilMove) >= 0 && ticksUntilMove <= rules.BankNoticeTicks)
             {
-                Chip chip = Show("bank", "BANK MOVES", "NEW SPOT", false, _bankColor);
+                Chip chip = Show("bank", "BANK MOVES", false, _bankColor);
                 chip.Seconds = Seconds(ticksUntilMove);
             }
         }
@@ -212,18 +217,18 @@ namespace Airerage.Runtime.Presentation
             }
             if (tick <= spawn)
             {
-                Chip chip = Show("jackpot", "JACKPOT", $"{CoinView.RainbowValue} COINS", true, Color.white);
+                Chip chip = Show("jackpot", "JACKPOT", true, Color.white);
                 chip.Seconds = Seconds(spawn + 1 - tick);
             }
             else
             {
-                Chip chip = Show("jackpot", $"JACKPOT {CoinView.RainbowValue}", "APPEARED", true, Color.white);
+                Chip chip = Show("jackpot", $"JACKPOT {CoinView.RainbowValue}", true, Color.white);
                 chip.Seconds = -1;
             }
         }
 
-        // 札を出す（もう出ていれば、見出しと説明だけを変える）。
-        private Chip Show(string key, string title, string sub, bool jackpot, Color color)
+        // 札を出す（もう出ていれば、見出しだけを変える）。
+        private Chip Show(string key, string title, bool jackpot, Color color)
         {
             _activeKeys.Add(key);
             Chip chip = null;
@@ -241,7 +246,6 @@ namespace Airerage.Runtime.Presentation
                 _chips.Add(chip);
             }
             chip.Title = title;
-            chip.Sub = sub;
             chip.Jackpot = jackpot;
             chip.Rainbow = jackpot;
             chip.Color = color;
@@ -263,10 +267,15 @@ namespace Airerage.Runtime.Presentation
             EnsureResources();
             if (BandTitle.Length > 0)
             {
-                DrawBand(_band, (Time.time - _band.StartedAt) / _bandSeconds);
+                _strip.Draw(_band.Title, _band.Sub, _band.Color, _band.Rainbow, (Time.time - _band.StartedAt) / _bandSeconds, Screen.height * 0.3f);
             }
-            float top = _top;
-            if (_rules != null && MatchFlow.PhaseAt(_rules, _feed.Match, _feed.CurrentTick) == MatchPhase.Overtime)
+
+            // タイマーの右（流れのバーより右）に、上の端から積む。右の表と重なるほど画面が狭ければ、タイマーの下に積む。
+            float besideX = Screen.width * 0.5f + TimerPlate.TimelineWidth * 0.5f + 8f;
+            ChipsBesideTheTimer = besideX + ChipWidth <= Screen.width - ScoreboardReserve;
+            float x = ChipsBesideTheTimer ? besideX : (Screen.width - ChipWidth) * 0.5f;
+            float top = ChipsBesideTheTimer ? ChipTop : _fallbackTop;
+            if (!ChipsBesideTheTimer && _rules != null && MatchFlow.PhaseAt(_rules, _feed.Match, _feed.CurrentTick) == MatchPhase.Overtime)
             {
                 // アディショナルタイムは、タイマーの下に「BANK = WIN」の行がある（MatchHud）。
                 top += 34f;
@@ -276,10 +285,10 @@ namespace Airerage.Runtime.Presentation
             foreach (Chip chip in _chips)
             {
                 chip.Y = chip.Y < 0f ? y : Mathf.Lerp(chip.Y, y, blend);
-                float squash = chip.Active
+                float extend = chip.Active
                     ? Ease((Time.time - chip.AppearedAt) / ChipInSeconds)
                     : 1f - Mathf.Clamp01((Time.time - chip.LeftAt) / ChipOutSeconds);
-                DrawChip(chip, chip.Y, squash);
+                DrawChip(chip, new Rect(x, chip.Y, ChipWidth, ChipHeight), extend);
                 if (chip.Active)
                 {
                     y += ChipHeight + ChipGap;
@@ -287,66 +296,31 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        private void DrawChip(Chip chip, float y, float appear)
+        // 札を、左の端から右へ extend（0〜1）の割合まで伸ばして描く（見えている部分だけを切り出す）。
+        private void DrawChip(Chip chip, Rect rect, float extend)
         {
-            if (appear <= 0f)
+            if (extend <= 0f)
             {
                 return;
             }
-            Matrix4x4 matrix = GUI.matrix;
-            var rect = new Rect((Screen.width - ChipWidth) * 0.5f, y - (1f - appear) * ChipHeight * 0.6f, ChipWidth, ChipHeight);
-            GUIUtility.ScaleAroundPivot(new Vector2(1f, Mathf.Max(0.05f, appear)), new Vector2(rect.center.x, rect.y));
+            GUI.BeginGroup(new Rect(rect.x, rect.y, rect.width * extend, rect.height));
+            var local = new Rect(0f, 0f, rect.width, rect.height);
             Texture2D icon = chip.Jackpot ? _jackpotIcon : _bankIcon;
             if (chip.Rainbow)
             {
-                _plate.DrawRainbow(rect, Time.time, icon, null, _title, appear);
+                _plate.DrawRainbow(local, Time.time, icon, null, _title);
             }
             else
             {
-                _plate.Draw(rect, chip.Color, icon, null, _title, appear);
+                _plate.Draw(local, chip.Color, icon, null, _title);
             }
-            Rect right = _plate.RightRect(rect);
-            var text = new Rect(right.x + 6f, right.y + 4f, right.width - 56f, right.height * 0.55f);
-            GuidePlate.DrawText(text, chip.Title, _title, new Color(1f, 1f, 1f, appear));
-            GuidePlate.DrawText(new Rect(text.x, text.yMax - 4f, text.width, right.height * 0.4f), chip.Sub, _sub, new Color(1f, 1f, 1f, 0.7f * appear));
+            Rect right = _plate.RightRect(local);
+            GuidePlate.DrawText(new Rect(right.x + 6f, right.y, right.width - 46f, right.height), chip.Title, _title, Color.white);
             if (chip.Seconds >= 0)
             {
-                GuidePlate.DrawText(new Rect(right.xMax - 50f, right.y, 44f, right.height), chip.Seconds.ToString(), _seconds, new Color(1f, 1f, 1f, appear));
+                GuidePlate.DrawText(new Rect(right.xMax - 40f, right.y, 34f, right.height), chip.Seconds.ToString(), _seconds, Color.white);
             }
-            GUI.matrix = matrix;
-        }
-
-        // 画面を横切る斜めの帯。progress は 0〜1（開く → 文字が走り込む → 止まる → 走り去って閉じる）。
-        private void DrawBand(Band band, float progress)
-        {
-            float open = progress < 0.1f ? Ease(progress / 0.1f) : progress > 0.85f ? 1f - Ease((progress - 0.85f) / 0.15f) : 1f;
-            if (open <= 0f)
-            {
-                return;
-            }
-            float slide = progress < 0.2f ? 1f - Ease(progress / 0.2f) : progress > 0.75f ? -Ease((progress - 0.75f) / 0.17f) : 0f;
-            float height = 118f * open;
-            float centerY = Screen.height * 0.3f;
-            Matrix4x4 matrix = GUI.matrix;
-            Color previous = GUI.color;
-            GUIUtility.RotateAroundPivot(-3f, new Vector2(Screen.width * 0.5f, centerY));
-            var bar = new Rect(-Screen.width * 0.1f, centerY - height * 0.5f, Screen.width * 1.2f, height);
-            GUI.color = new Color(0.02f, 0.03f, 0.07f, 0.82f);
-            GUI.DrawTexture(bar, Texture2D.whiteTexture);
-            Color edge = band.Rainbow ? Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f, 1f), 0.7f, 1f) : band.Color;
-            GUI.color = edge;
-            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width, 5f), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(bar.x, bar.yMax - 5f, bar.width, 5f), Texture2D.whiteTexture);
-            GUI.color = previous;
-            GUI.matrix = matrix;
-
-            float alpha = 1f - Mathf.Abs(slide);
-            float offset = slide * Screen.width * 0.6f;
-            Color titleColor = band.Rainbow ? Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f + 0.3f, 1f), 0.55f, 1f) : band.Color;
-            titleColor.a = alpha;
-            GuidePlate.DrawText(new Rect(offset, centerY - 50f, Screen.width, 76f), band.Title, _bandTitle, titleColor);
-            GuidePlate.DrawText(new Rect(offset, centerY + 22f, Screen.width, 28f), band.Sub, _bandSub, new Color(1f, 1f, 1f, alpha));
-            GUI.color = previous;
+            GUI.EndGroup();
         }
 
         private static float Ease(float t)
@@ -364,15 +338,11 @@ namespace Airerage.Runtime.Presentation
             _plate = new GuidePlate(ChipWidth, ChipHeight);
             _bankIcon = GuideIcons.Bank(64, _bankColor);
             _jackpotIcon = GuideIcons.RainbowCoin(64);
-            _title = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip };
-            _sub = new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip };
-            _seconds = new GUIStyle(GUI.skin.label) { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
-            _bandTitle = new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
-            _bandSub = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            foreach (GUIStyle style in new[] { _title, _sub, _seconds, _bandTitle, _bandSub })
-            {
-                style.normal.textColor = Color.white;
-            }
+            // 折り返さない（狭いと 2 行になって見切れていた。ユーザーの指摘、2026-10-14）。
+            _title = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false, clipping = TextClipping.Clip };
+            _seconds = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, wordWrap = false };
+            _title.normal.textColor = Color.white;
+            _seconds.normal.textColor = Color.white;
         }
     }
 }

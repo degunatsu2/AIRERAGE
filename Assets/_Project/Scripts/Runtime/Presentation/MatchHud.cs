@@ -15,6 +15,8 @@ namespace Airerage.Runtime.Presentation
     /// 左右から滑り込む。始まると、帯が斜めに切り裂かれるように開く。
     /// 残り時間は、上の辺に付いた台形の札と、その下の試合の流れのバー（TimerPlate。ユーザーの選択、2026-10-14）。残り 10 秒は
     /// 赤く脈打ち、1 秒ごとに短い音。アディショナルタイムは橙色。お知らせ（拠点の移動、100 枚のコイン、COIN RUSH）は NoticeHud。
+    /// アディショナルタイムの始まり（OVERTIME）と試合の終わり（FINISH! / 名前 WINS!）は、お知らせと同じ画面を横切る帯（BannerStrip。
+    /// ユーザーの要望、2026-10-14）。
     /// 試合の段階と残りは、ティック数と MatchRules から求める（ISimulationFeed）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class MatchHud : MonoBehaviour
@@ -35,7 +37,7 @@ namespace Airerage.Runtime.Presentation
         [Tooltip("始まったときに、帯が開く時間（秒）")]
         [SerializeField] private float _openSeconds = 0.5f;
         [Tooltip("「FINISH!」を出してから結果を出すまで（秒）")]
-        [SerializeField] private float _finishSeconds = 1.5f;
+        [SerializeField] private float _finishSeconds = 2f;
         [Tooltip("残り時間を目立たせる秒数")]
         [SerializeField] private int _warningSeconds = 10;
         [Tooltip("「OVERTIME」を大きく出す秒数")]
@@ -53,7 +55,10 @@ namespace Airerage.Runtime.Presentation
         private int _lastWarningSecond = -1;
         private readonly List<float> _bankMoves = new List<float>();
         private TimerPlate _timerPlate;
-        private GUIStyle _center;
+        private readonly BannerStrip _strip = new BannerStrip();
+        private string _centerSub = string.Empty;
+        private Color _centerColor = Color.white;
+        private float _centerProgress;
         private GUIStyle _timer;
         private GUIStyle _plate;
         private GUIStyle _small;
@@ -127,6 +132,7 @@ namespace Airerage.Runtime.Presentation
                 _lastWarningSecond = -1;
             }
             CenterText = string.Empty;
+            _centerSub = string.Empty;
             TimerText = string.Empty;
             TimerLabel = string.Empty;
             TimerDigits = string.Empty;
@@ -187,6 +193,9 @@ namespace Airerage.Runtime.Presentation
                     if (Time.time - _overtimeAt < _bannerSeconds)
                     {
                         CenterText = "OVERTIME";
+                        _centerSub = "REACH THE BANK TO WIN";
+                        _centerColor = new Color(1f, 0.6f, 0.15f);
+                        _centerProgress = (Time.time - _overtimeAt) / _bannerSeconds;
                     }
                     ChallengersText = Challengers();
                     break;
@@ -202,6 +211,9 @@ namespace Airerage.Runtime.Presentation
                     if (Time.time - _finishAt < _finishSeconds)
                     {
                         CenterText = match.Winner >= 0 ? $"{_feed.LabelOf(match.Winner)} WINS!" : "FINISH!";
+                        _centerSub = match.Winner >= 0 ? "REACHED THE BANK IN OVERTIME" : "TIME UP";
+                        _centerColor = match.Winner >= 0 ? _feed.ColorOf(match.Winner) : new Color(1f, 0.85f, 0.3f);
+                        _centerProgress = (Time.time - _finishAt) / _finishSeconds;
                     }
                     else
                     {
@@ -270,9 +282,8 @@ namespace Airerage.Runtime.Presentation
 
         private void OnGUI()
         {
-            if (_center == null)
+            if (_timer == null)
             {
-                _center = new GUIStyle(GUI.skin.label) { fontSize = 96, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _timer = new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _plate = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
                 _small = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
@@ -294,7 +305,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (CenterText.Length > 0)
             {
-                Shadowed(new Rect(0f, Screen.height * 0.5f - 90f, Screen.width, 140f), CenterText, _center, new Color(1f, 0.5f, 0.3f));
+                _strip.Draw(CenterText, _centerSub, _centerColor, false, _centerProgress, Screen.height * 0.42f);
             }
             if (ShowingResults)
             {
