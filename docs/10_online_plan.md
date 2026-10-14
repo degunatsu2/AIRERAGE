@@ -179,4 +179,4 @@
 1. ビルドを配って（または Multiplayer Play Mode で）、1 人がホスト、ほかの人が Join する。
 2. 待機所: ホストとクライアントの両方の画面の中央に「WAITING ROOM」と 4 つの札が出る。つながった人の札はプレイヤーの色で名前が出て、自分の札に「YOU」、1 番に「HOST」。まだいない番号は「WAITING...」が明滅する。だれかが名前を変える・抜けると、全員の札がすぐ変わるか。
 3. 途中の番号の人が抜けてから「START」→ 残った人で始まり、全員が動けるか（番号が詰まる）。
-4. 再戦: 試合を最後まで（短くするなら「Match」→「Duration Ticks」を 3600）遊び、結果の「Restart」を何回か押す → 毎回、全員の画面で新しい試合が始まるか。止まったら、ホストとクライアントの `Player.log`（Windows は `%USERPROFILE%\AppData\LocalLow\<会社名>\<製品名>\Player.log`）の「OnlineSession:」の行を送ってほしい。
+4. 再戦: 試合を最後まで（短くするなら「Match」→「Duration Ticks」を 3600）遊び、結果の「Restart」を何回か押す → 毎回、全員の画面で新しい試合が始まるか。止まったら、ホストとクライアントの `Player.log`（Windows は `%USERPROFILE%\AppData\LocalLow\DefaultCompany\degunatsu\Player.log`）の「OnlineSession:」の行を送ってほしい。
