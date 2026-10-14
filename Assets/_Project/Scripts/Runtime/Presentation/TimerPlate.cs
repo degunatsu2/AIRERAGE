@@ -17,7 +17,11 @@ namespace Airerage.Runtime.Presentation
         public const int Height = 78;
         public const float TimelineWidth = 300f;
         private const int Border = 3;
-        private const float Slant = 0.12f;
+        /// <summary>台形の下の辺の両端が、上の辺より内側に入る割合（幅に対して）。</summary>
+        public const float Slant = 0.12f;
+
+        /// <summary>台形の右の斜めの縁が、1 ピクセル下がるごとに左へ寄る量（ピクセル）。お知らせの札の斜めの縁を合わせるのに使う。</summary>
+        public const float EdgeSlope = Width * Slant / Height;
 
         private static readonly Color Frame = new Color(0.62f, 0.68f, 0.8f, 0.9f);
         private static readonly Color Fill = new Color(0.03f, 0.05f, 0.09f, 0.82f);
@@ -91,6 +95,12 @@ namespace Airerage.Runtime.Presentation
         /// 札を、上の辺の中央 centerX に描く。label は見出し、digits は数字、remaining は試合全体の残り（0〜1。負なら線を出さない）、
         /// scale は数字の脈打ち（1 がふつう）。返り値は札の下の y。
         /// </summary>
+        /// <summary>上の辺の中央が centerX のときの、高さ y（OnGUI の座標）での台形の右の縁の x。</summary>
+        public static float RightEdgeAt(float centerX, float y)
+        {
+            return centerX + Width * 0.5f - EdgeSlope * Mathf.Clamp(y, 0f, Height);
+        }
+
         public float Draw(float centerX, string label, string digits, Color digitsColor, float remaining, float scale, Timeline timeline)
         {
             EnsureStyles();
@@ -198,7 +208,7 @@ namespace Airerage.Runtime.Presentation
             _digits.normal.textColor = Color.white;
         }
 
-        private static Texture2D Create(string name, int width, int height, System.Func<int, int, float> alpha)
+        internal static Texture2D Create(string name, int width, int height, System.Func<int, int, float> alpha)
         {
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
