@@ -263,6 +263,17 @@ namespace Degunatsu.Core.Wire
             float ropeLength = distance < tuning.MinRopeLength ? tuning.MinRopeLength : distance;
             state.Wire.RopeLength = ropeLength > tuning.MaxLength ? tuning.MaxLength : ropeLength;
             state.Wire.AttachSpeed = state.Velocity.Length();
+
+            // 接続点から遠ざかる向きに動いていたら、その向きの速さを接続点へ向かう向きに反転させる（速さを保つ。D-50）。
+            if (tuning.AttachReverseOutward > 0f && distance > SimMath.Epsilon)
+            {
+                Vector3 outward = -toAnchor / distance;
+                float away = Vector3.Dot(state.Velocity, outward);
+                if (away > 0f)
+                {
+                    state.Velocity -= outward * (away * (1f + tuning.AttachReverseOutward));
+                }
+            }
         }
 
         private static void Miss(ref CharacterState state, WireMissReason reason)

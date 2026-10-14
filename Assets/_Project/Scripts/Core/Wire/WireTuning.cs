@@ -13,6 +13,19 @@ namespace Degunatsu.Core.Wire
         Responsive,
     }
 
+    /// <summary>接続中のロープの長さの扱い（上下の入力ごとに選ぶ。InertialWireTuning。D-41、D-50）。</summary>
+    public enum WireLengthMode : byte
+    {
+        /// <summary>巻き取って縮める（ReelSpeed。接続直後に遅ければ接続点の方向へ強く引く）。スティックはロープに垂直な方向へ振る。</summary>
+        Reel = 0,
+
+        /// <summary>長さを保つ（張力を保ったまま振る）。左右の入力だけで振る（HoldSwingAcceleration）。</summary>
+        Hold = 1,
+
+        /// <summary>伸ばしながら振る（ReelOutSpeed。最大長まで）。左右の入力で振る。</summary>
+        ReelOut = 2,
+    }
+
     /// <summary>ワイヤーボタンの操作方式（D-07）。</summary>
     public enum WireButtonMode : byte
     {
@@ -97,6 +110,13 @@ namespace Degunatsu.Core.Wire
         /// <summary>解除時の速度の上限（m/s）。両タイプ共通の上限。</summary>
         public float ExitSpeedCap = 18f;
 
+        /// <summary>
+        /// 接続した瞬間に接続点から遠ざかる向きに動いていたとき、その向きの速さを接続点へ向かう向きに反転させる割合（0〜1）
+        /// （ユーザーの要望、2026-10-14。D-50）。1 なら速さを保ったまま反転する（慣性が乗っている方向と逆にフックを刺すと、
+        /// 同じ速さで逆へ向かう）。0 なら以前のとおり、ロープが遠ざかる向きの速さを止める。両タイプ共通【仮】。
+        /// </summary>
+        public float AttachReverseOutward = 1f;
+
         public InertialWireTuning Inertial = new InertialWireTuning();
         public ResponsiveWireTuning Responsive = new ResponsiveWireTuning();
 
@@ -117,6 +137,7 @@ namespace Degunatsu.Core.Wire
             v.Positive(nameof(MaxAttachedSpeed), MaxAttachedSpeed);
             v.Positive(nameof(ExitSpeedCap), ExitSpeedCap);
             v.InRange(nameof(AttachedInputInfluence), AttachedInputInfluence, 0f, 1f);
+            v.InRange(nameof(AttachReverseOutward), AttachReverseOutward, 0f, 1f);
             v.NotNull(nameof(Inertial), Inertial);
             v.NotNull(nameof(Responsive), Responsive);
             if (Inertial != null)
@@ -135,23 +156,35 @@ namespace Degunatsu.Core.Wire
     [Serializable]
     public sealed class InertialWireTuning
     {
-        /// <summary>ロープを巻き取る速さ（m/s）。縮むほど角運動量の保存で振りが速くなる。</summary>
+        /// <summary>
+        /// 縦の入力がないときのロープの長さの扱い。長さを保つ（張力を保ったまま振る。以前は下を押したときの動き。
+        /// ユーザーの要望で標準にした、2026-10-14。D-50）。
+        /// </summary>
+        public WireLengthMode NeutralMode = WireLengthMode.Hold;
+
+        /// <summary>上（UpInputThreshold 以上）を押しているときの扱い。巻き取る（以前の標準の動き。D-50）。</summary>
+        public WireLengthMode UpMode = WireLengthMode.Reel;
+
+        /// <summary>下（DownInputThreshold 以下）を押しているときの扱い。伸ばしながら振る（D-50）。</summary>
+        public WireLengthMode DownMode = WireLengthMode.ReelOut;
+
+        /// <summary>ロープを巻き取る速さ（m/s。Reel）。縮むほど角運動量の保存で振りが速くなる。</summary>
         public float ReelSpeed = 8f;
 
-        /// <summary>上を押し続けているときの巻き取りの速さ（m/s。D-41）。下を押し続けているときは巻き取らない（ロープの長さを保つ）。</summary>
-        public float FastReelSpeed = 20f;
+        /// <summary>ロープを伸ばす速さ（m/s。ReelOut。最大長まで）【仮】。</summary>
+        public float ReelOutSpeed = 6f;
 
         /// <summary>
         /// 上とみなすスティックの縦の大きさ（0〜1。D-41）。真上に近い入力だけを数え、斜め上（約 0.71）は数えない
         /// （ユーザーの記録では、振っている間に斜め上を押し続けることが多いため。2026-10-13）。
         /// </summary>
-        public float FastReelInputThreshold = 0.9f;
+        public float UpInputThreshold = 0.9f;
 
         /// <summary>下とみなすスティックの縦の大きさ（0〜1。D-41）。斜め下（約 0.71）も数える（下を押したまま左右で振れるように）。</summary>
-        public float HoldLengthInputThreshold = 0.5f;
+        public float DownInputThreshold = 0.5f;
 
         /// <summary>
-        /// 下を押してロープの長さを保っている間に、左右の入力で振る力（m/s²）。縦の入力は使わない（斜め下でも左右いっぱいの力になる）。
+        /// 長さを保つ・伸ばす間に、左右の入力で振る力（m/s²）。縦の入力は使わない（斜め下でも左右いっぱいの力になる）。
         /// </summary>
         public float HoldSwingAcceleration = 16f;
 
@@ -163,11 +196,11 @@ namespace Degunatsu.Core.Wire
 
         /// <summary>
         /// 接続直後の速さの下限（m/s。0 なら使わない）。止まっている状態から接続したときの初速の遅さを補う
-        /// （ユーザーの指示、2026-10-12）。接続した瞬間の速さがこれより遅いときだけ、速さがこの値に届くように
+        /// （ユーザーの指示、2026-10-12。2026-10-14 に 14 から 16 へ少し速くした）。接続した瞬間の速さがこれより遅いときだけ、速さがこの値に届くように
         /// 接続点の方向へ強く引く（巻き取りも速くなる）。振りの速さが育てば、通常の巻き取りに戻る。
-        /// 下を押してロープの長さを保っているときは、引かずに、振りの方向（ロープに垂直）の速さをこの値まで上げる（D-41）。
+        /// ロープの長さを保つ・伸ばすときは、引かずに、振りの方向（ロープに垂直）の速さをこの値まで上げる（D-41）。
         /// </summary>
-        public float StartPullSpeed = 14f;
+        public float StartPullSpeed = 16f;
 
         /// <summary>接続してから、StartPullSpeed の下限を保つティック数。</summary>
         public int StartPullTicks = 20;
@@ -179,9 +212,9 @@ namespace Degunatsu.Core.Wire
         {
             var v = new TuningValidator(nameof(InertialWireTuning));
             v.NonNegative(nameof(ReelSpeed), ReelSpeed);
-            v.NonNegative(nameof(FastReelSpeed), FastReelSpeed);
-            v.InRange(nameof(FastReelInputThreshold), FastReelInputThreshold, 0.1f, 1f);
-            v.InRange(nameof(HoldLengthInputThreshold), HoldLengthInputThreshold, 0.1f, 1f);
+            v.NonNegative(nameof(ReelOutSpeed), ReelOutSpeed);
+            v.InRange(nameof(UpInputThreshold), UpInputThreshold, 0.1f, 1f);
+            v.InRange(nameof(DownInputThreshold), DownInputThreshold, 0.1f, 1f);
             v.NonNegative(nameof(HoldSwingAcceleration), HoldSwingAcceleration);
             v.NonNegative(nameof(SwingAcceleration), SwingAcceleration);
             v.NonNegative(nameof(Damping), Damping);

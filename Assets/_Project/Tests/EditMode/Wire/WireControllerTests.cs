@@ -267,6 +267,46 @@ namespace Degunatsu.Core.Tests.Wire
             Assert.That(state.Wire.Phase, Is.EqualTo(WirePhase.Ready));
         }
 
+        [TestCase(1f)]
+        [TestCase(0f)]
+        public void Attach_BehindTheMotion_ReversesTheMomentum_KeepingTheSpeed(float reverse)
+        {
+            // 右へ速く飛んでいる間に、左の壁へフックを刺す。接続点から遠ざかる向きの速さは、接続点へ向かう向きに反転する（D-50）。
+            var world = new BoxTerrain().AddBox(-7f, -20f, -6f, 30f, attachable: true);
+            var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
+            config.Wire.AttachReverseOutward = reverse;
+            config.Wire.Inertial.StartPullSpeed = 0f;
+            var harness = new SimHarness(world, config, new Vector3(0f, 5f, 0f));
+            var state = harness.State;
+            state.Grounded = false;
+            state.Velocity = new Vector3(12f, 0f, 0f);
+            harness.State = state;
+
+            Vector3 before = harness.State.Velocity;
+            harness.StepUntil(s =>
+            {
+                if (s.Wire.Phase != WirePhase.Attached)
+                {
+                    before = s.Velocity;
+                    return false;
+                }
+                return true;
+            }, Inputs.Wire(-1f, 0f), 30);
+
+            Vector3 after = harness.State.Velocity;
+            if (reverse > 0f)
+            {
+                Assert.That(after.X, Is.LessThan(-before.X + 1f), $"反転しない: 前 {before}、後 {after}");
+                Assert.That(after.X, Is.LessThan(0f), "接続点の方へ向かわない");
+                Assert.That(after.Length(), Is.EqualTo(before.Length()).Within(0.6f), $"速さが変わる: 前 {before}、後 {after}");
+            }
+            else
+            {
+                // 反転を切ると（以前の挙動）、遠ざかる向きの速さはロープに止められて失われる。
+                Assert.That(after.Length(), Is.LessThan(before.Length() * 0.5f), $"反転を切っても速さが残る: 前 {before}、後 {after}");
+            }
+        }
+
         [TestCase(true)]
         [TestCase(false)]
         public void LineBlocked_WhileAttached_ReleasesOnlyWhenEnabled(bool releaseWhenBlocked)

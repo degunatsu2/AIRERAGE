@@ -10,10 +10,14 @@ namespace Degunatsu.Core.Tests.Wire
 {
     /// <summary>
     /// タイプA（物理・慣性重視）のモデル（docs/06_prototype_plan.md T1-4）。
+    /// 上下の入力（D-50）: 標準は長さを保つ、上は巻き取る（以前の標準）、下は伸ばす。
     /// </summary>
     public class InertialWireModelTests
     {
         private static readonly Vector3 Anchor = new Vector3(0f, 20f, 0f);
+
+        // 上（巻き取る）。
+        private static PlayerInput Up(float x = 0f) => Inputs.Wire(x, 1f);
 
         [Test]
         public void Swing_DistanceNeverExceedsRopeLength()
@@ -75,7 +79,7 @@ namespace Degunatsu.Core.Tests.Wire
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(0f, -8f, 0f), Anchor);
 
             float seconds = (8f - config.Wire.MinRopeLength) / config.Wire.Inertial.ReelSpeed;
-            harness.Step(Inputs.Wire(), (int)MathF.Ceiling(seconds * 60f) + 5);
+            harness.Step(Up(), (int)MathF.Ceiling(seconds * 60f) + 5);
 
             Assert.That(harness.State.Wire.RopeLength, Is.EqualTo(config.Wire.MinRopeLength));
             Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.LessThanOrEqualTo(config.Wire.MinRopeLength + 1e-3f));
@@ -91,7 +95,7 @@ namespace Degunatsu.Core.Tests.Wire
             // 半径 8m の円周上を接線方向に 5 m/s で動いている状態から、半径 4m まで巻き取る。
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(0f, -8f, 0f), Anchor, new Vector3(5f, 0f, 0f));
 
-            harness.StepUntil(s => s.Wire.RopeLength <= 4f, Inputs.Wire(), 120);
+            harness.StepUntil(s => s.Wire.RopeLength <= 4f, Up(), 120);
 
             Vector3 radial = Vector3.Normalize(harness.State.Position - Anchor);
             Vector3 velocity = harness.State.Velocity;
@@ -102,10 +106,10 @@ namespace Degunatsu.Core.Tests.Wire
         [Test]
         public void FromRest_StartsAtStartPullSpeed()
         {
-            float boosted = SpeedAfterAttachFromRest(startPullSpeed: 14f);
+            float boosted = SpeedAfterAttachFromRest(startPullSpeed: 16f);
             float plain = SpeedAfterAttachFromRest(startPullSpeed: 0f);
 
-            Assert.That(boosted, Is.EqualTo(14f).Within(0.5f), "止まっている状態から接続した直後の速さ");
+            Assert.That(boosted, Is.EqualTo(16f).Within(0.5f), "止まっている状態から接続した直後の速さ（巻き取るとき）");
             Assert.That(plain, Is.LessThan(boosted - 4f), "前提: 下限がなければ遅い（巻き取りの速さ程度）");
         }
 
@@ -120,7 +124,7 @@ namespace Degunatsu.Core.Tests.Wire
             int ticks = config.Wire.Inertial.StartPullTicks + config.Wire.Inertial.StartPullFadeTicks;
             for (int i = 0; i < ticks; i++)
             {
-                harness.Step(Inputs.Wire());
+                harness.Step(Up());
                 Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.EqualTo(harness.State.Wire.RopeLength).Within(1e-3f),
                     $"ティック {i}: ロープがたるんだ");
                 if (i < config.Wire.Inertial.StartPullTicks)
@@ -146,8 +150,8 @@ namespace Degunatsu.Core.Tests.Wire
 
             for (int i = 0; i < 60; i++)
             {
-                a.Step(Inputs.Wire());
-                b.Step(Inputs.Wire());
+                a.Step(Up());
+                b.Step(Up());
                 Assert.That(a.State, Is.EqualTo(b.State), $"ティック {i}");
             }
         }
@@ -159,18 +163,18 @@ namespace Degunatsu.Core.Tests.Wire
             var harness = new SimHarness(new BoxTerrain(), config);
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(0f, -11f, 0f), Anchor);
 
-            harness.Step(Inputs.Wire(), config.Wire.Inertial.StartPullTicks + config.Wire.Inertial.StartPullFadeTicks + 1);
+            harness.Step(Up(), config.Wire.Inertial.StartPullTicks + config.Wire.Inertial.StartPullFadeTicks + 1);
             float before = harness.State.Wire.RopeLength;
-            harness.Step(Inputs.Wire());
+            harness.Step(Up());
 
             Assert.That(before - harness.State.Wire.RopeLength, Is.EqualTo(config.Wire.Inertial.ReelSpeed / 60f).Within(1e-4f),
                 "下限の期間が終わったら、巻き取りの速さに戻る");
         }
 
         [Test]
-        public void HoldingDown_KeepsTheRopeLength_WhileSwinging()
+        public void Neutral_KeepsTheRopeLength_WhileSwinging()
         {
-            // 下（斜め下を含む）を押し続けると巻き取らない。左右で振ることはできる（D-41）。
+            // 縦の入力がなければ（標準）巻き取らない。左右で振ることはできる（D-50。以前は下を押したときの動き）。
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
             var harness = new SimHarness(new BoxTerrain(), config);
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(6f, -8f, 0f), Anchor);
@@ -179,7 +183,7 @@ namespace Degunatsu.Core.Tests.Wire
             float minX = harness.State.Position.X;
             for (int i = 0; i < 300; i++)
             {
-                harness.Step(Inputs.Wire(i % 120 < 60 ? -1f : 1f, -1f));
+                harness.Step(Inputs.Wire(i % 120 < 60 ? -1f : 1f, 0f));
                 Assert.That(harness.State.Wire.RopeLength, Is.EqualTo(rope), $"ティック {i}: ロープが縮んだ");
                 Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.LessThanOrEqualTo(rope + 1e-3f), $"ティック {i}");
                 minX = MathF.Min(minX, harness.State.Position.X);
@@ -188,7 +192,7 @@ namespace Degunatsu.Core.Tests.Wire
         }
 
         [Test]
-        public void HoldingDown_FromRest_StartsAtStartPullSpeed_AlongTheSwing()
+        public void Neutral_FromRest_StartsAtStartPullSpeed_AlongTheSwing()
         {
             // 止まった状態で接続しても、振りの方向（ロープに垂直）に下限の速さが出る。ロープは縮まない。
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
@@ -196,7 +200,7 @@ namespace Degunatsu.Core.Tests.Wire
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(6f, -8f, 0f), Anchor);
             float rope = harness.State.Wire.RopeLength;
 
-            harness.Step(Inputs.Wire(0f, -1f));
+            harness.Step(Inputs.Wire());
 
             Vector3 radial = Vector3.Normalize(harness.State.Position - Anchor);
             float radialSpeed = Vector3.Dot(harness.State.Velocity, radial);
@@ -207,60 +211,77 @@ namespace Degunatsu.Core.Tests.Wire
         }
 
         [Test]
-        public void HoldingDown_DiagonalInput_SwingsHarderThanTheNormalSwing()
+        public void HoldingTheLength_SwingsHarderThanReeling()
         {
-            // 下を押しているときは、斜め下でも左右いっぱいの力（HoldSwingAcceleration）で振れる。
-            float held = SwingSpeedAfterPumping(Inputs.Wire(1f, -1f));
-            float normal = SwingSpeedAfterPumping(Inputs.Wire(1f, 0f), reelSpeed: 0f);
+            // 長さを保っているときは、左右いっぱいの力（HoldSwingAcceleration）で振れる。巻き取るとき（上）はロープに垂直な力（SwingAcceleration）。
+            // 比べるため、巻き取る速さを 0 にした「巻き取り」を左右だけの入力で使う（斜め上は「上」に数えないため）。
+            float held = SwingSpeedAfterPumping(WireLengthMode.Hold);
+            float reeling = SwingSpeedAfterPumping(WireLengthMode.Reel);
 
-            Assert.That(held, Is.GreaterThan(normal + 1f), $"下: {held:0.00} m/s、ふつう: {normal:0.00} m/s");
+            Assert.That(held, Is.GreaterThan(reeling + 1f), $"標準: {held:0.00} m/s、上: {reeling:0.00} m/s");
         }
 
         [Test]
-        public void HoldingUp_ReelsFast()
+        public void HoldingUp_Reels()
         {
-            var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
-            var harness = new SimHarness(new BoxTerrain(), config);
-            WireTestSetup.AttachAt(harness, Anchor + new Vector3(0f, -11f, 0f), Anchor);
-            float rope = harness.State.Wire.RopeLength;
-
-            harness.Step(Inputs.Wire(0f, 1f), 3);
-
-            Assert.That(config.Wire.Inertial.FastReelSpeed, Is.GreaterThan(config.Wire.Inertial.StartPullSpeed), "前提: 接続直後の引きより速い");
-            Assert.That(rope - harness.State.Wire.RopeLength, Is.EqualTo(3 * config.Wire.Inertial.FastReelSpeed / 60f).Within(1e-4f));
-        }
-
-        [Test]
-        public void DiagonalUp_IsTheNormalSwing()
-        {
-            // 斜め上は「上」に数えない（振っている間に斜め上を押し続けることが多いため）。何も押さないときと同じ速さで巻き取る。
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
             var harness = new SimHarness(new BoxTerrain(), config);
             Vector3 start = Anchor + new Vector3(0f, -11f, 0f);
             WireTestSetup.AttachAt(harness, start, Anchor, new Vector3(config.Wire.Inertial.StartPullSpeed + 1f, 0f, 0f));
             float rope = harness.State.Wire.RopeLength;
 
-            harness.Step(Inputs.Wire(1f, 1f));
+            harness.Step(Up(), 3);
 
-            Assert.That(rope - harness.State.Wire.RopeLength, Is.EqualTo(config.Wire.Inertial.ReelSpeed / 60f).Within(1e-4f));
+            Assert.That(rope - harness.State.Wire.RopeLength, Is.EqualTo(3 * config.Wire.Inertial.ReelSpeed / 60f).Within(1e-4f));
         }
 
-        // 接続点の真下で止まった状態から、入力 input で 20 ティック振ったときの速さ（接続直後の下限は使わない）。
-        private static float SwingSpeedAfterPumping(PlayerInput input, float? reelSpeed = null)
+        [Test]
+        public void DiagonalUp_KeepsTheLength_LikeNeutral()
+        {
+            // 斜め上は「上」に数えない（振っている間に斜め上を押し続けることが多いため）。何も押さないときと同じく長さを保つ。
+            var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
+            var harness = new SimHarness(new BoxTerrain(), config);
+            Vector3 start = Anchor + new Vector3(0f, -11f, 0f);
+            WireTestSetup.AttachAt(harness, start, Anchor, new Vector3(config.Wire.Inertial.StartPullSpeed + 1f, 0f, 0f));
+            float rope = harness.State.Wire.RopeLength;
+
+            harness.Step(Inputs.Wire(1f, 1f), 3);
+
+            Assert.That(harness.State.Wire.RopeLength, Is.EqualTo(rope));
+        }
+
+        [Test]
+        public void HoldingDown_ReelsOut_UpToTheMaxLength()
+        {
+            // 下（斜め下を含む）を押すと、伸ばしながら振れる（D-50）。最大長より長くはならない。
+            var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
+            var harness = new SimHarness(new BoxTerrain(), config);
+            WireTestSetup.AttachAt(harness, Anchor + new Vector3(3f, -4f, 0f), Anchor);
+            float rope = harness.State.Wire.RopeLength;
+
+            harness.Step(Inputs.Wire(1f, -1f), 10);
+            Assert.That(harness.State.Wire.RopeLength, Is.EqualTo(rope + 10 * config.Wire.Inertial.ReelOutSpeed / 60f).Within(1e-3f), "伸びない");
+            Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.LessThanOrEqualTo(harness.State.Wire.RopeLength + 1e-3f));
+
+            harness.Step(Inputs.Wire(0f, -1f), 200);
+            Assert.That(harness.State.Wire.RopeLength, Is.EqualTo(config.Wire.MaxLength), "最大長で止まらない");
+        }
+
+        // 接続点の真下で止まった状態から、何も押さないときの長さの扱いを mode にして、右に 20 ティック振ったときの速さ
+        // （接続直後の下限は使わない。巻き取りの速さは 0）。
+        private static float SwingSpeedAfterPumping(WireLengthMode mode)
         {
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
             config.Wire.Inertial.StartPullSpeed = 0f;
-            if (reelSpeed.HasValue)
-            {
-                config.Wire.Inertial.ReelSpeed = reelSpeed.Value;
-            }
+            config.Wire.Inertial.ReelSpeed = 0f;
+            config.Wire.Inertial.NeutralMode = mode;
             var harness = new SimHarness(new BoxTerrain(), config);
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(0f, -8f, 0f), Anchor);
-            harness.Step(input, 20);
+            harness.Step(Inputs.Wire(1f, 0f), 20);
             return harness.State.Velocity.Length();
         }
 
-        // 接続点の右下（止まった状態）で接続し、1ティック後の速さ。
+        // 接続点の右下（止まった状態）で接続し、巻き取りながら1ティック後の速さ。
         private static float SpeedAfterAttachFromRest(float startPullSpeed)
         {
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
@@ -268,7 +289,7 @@ namespace Degunatsu.Core.Tests.Wire
             var harness = new SimHarness(new BoxTerrain(), config);
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(6f, -8f, 0f), Anchor);
 
-            harness.Step(Inputs.Wire());
+            harness.Step(Up());
             return harness.State.Velocity.Length();
         }
     }
