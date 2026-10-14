@@ -98,16 +98,32 @@ namespace Degunatsu.Runtime.Presentation
             GUI.color = previous;
         }
 
-        /// <summary>左の部分の、絵を置く正方形（札の大きさに合わせて伸び縮みする）。</summary>
+        /// <summary>
+        /// 左の部分の、絵を置く正方形（札の大きさに合わせて伸び縮みする）。左の部分は斜めの線で台形になっているので、高さの真ん中での
+        /// 左の端と斜めの線の中央に置き、下の角が斜めの線にかからない大きさにする（以前は狭い下の端に合わせていて、左に寄っていた）。
+        /// </summary>
         public Rect IconRect(Rect rect)
         {
             float scaleX = rect.width / _width;
             float scaleY = rect.height / _height;
-            // 斜めの線のいちばん左（下の端）より左に収める。
-            float leftWidth = (SlantX(_height) - _border * 2.5f) * scaleX;
-            float size = Mathf.Max(1f, Mathf.Min(leftWidth - 4f * scaleX, rect.height - (_border * 2f + 6f) * scaleY));
-            float centerX = rect.x + _border * scaleX + leftWidth * 0.5f;
-            return new Rect(centerX - size * 0.5f, rect.y + (rect.height - size) * 0.5f, size, size);
+            float half = _height * 0.5f;
+            float centerX = (_border + SlantX(half) - _border * 0.5f) * 0.5f;
+            float size = _height - _border * 2f - 6f;
+            while (size > 4f && (centerX + size * 0.5f > SlantX(half + size * 0.5f) - _border || centerX - size * 0.5f < _border + 2f))
+            {
+                size -= 1f;
+            }
+            return new Rect(rect.x + (centerX - size * 0.5f) * scaleX, rect.y + (half - size * 0.5f) * scaleY, size * scaleX, size * scaleY);
+        }
+
+        /// <summary>札の形（左と右の部分）を、1 色で塗る（光らせる、暗くするなど）。</summary>
+        public void DrawFill(Rect rect, Color color)
+        {
+            Color previous = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, _left);
+            GUI.DrawTexture(rect, _right);
+            GUI.color = previous;
         }
 
         /// <summary>右の部分（文字を置く）。斜めの線の、いちばん右（上の端）より右。</summary>

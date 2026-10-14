@@ -201,7 +201,7 @@ namespace Degunatsu.Core.Simulation
             if (Bounds.HasValue)
             {
                 KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts);
-                CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, Rules, Tick);
+                CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, CoinSpawns, Rules, Tick);
             }
             FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, phase == MatchPhase.Playing);
             BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, phase == MatchPhase.Playing);

@@ -21,6 +21,9 @@ namespace Degunatsu.Net
 
         /// <summary>ホスト → クライアント: 満員か、試合中なので参加できない。</summary>
         Refused = 5,
+
+        /// <summary>クライアント → ホスト: 自分のプレイヤーネーム（ロビーで。変えるたびに送る）。</summary>
+        Hello = 6,
     }
 
     /// <summary>
@@ -52,6 +55,22 @@ namespace Degunatsu.Net
         public static byte[] Refused()
         {
             return new[] { (byte)NetKind.Refused };
+        }
+
+        /// <summary>プレイヤーネーム（UTF-8）。</summary>
+        public static byte[] Hello(string name)
+        {
+            byte[] text = Encoding.UTF8.GetBytes(name ?? string.Empty);
+            var data = new byte[1 + text.Length];
+            data[0] = (byte)NetKind.Hello;
+            Array.Copy(text, 0, data, 1, text.Length);
+            return data;
+        }
+
+        public static string ReadHello(byte[] data)
+        {
+            Expect(data, NetKind.Hello, 1);
+            return Encoding.UTF8.GetString(data, 1, data.Length - 1);
         }
 
         /// <summary>試合の開始（人数、試合の番号、調整値とルールの JSON）。同じ人で再戦するときも送る（番号が変わる）。</summary>

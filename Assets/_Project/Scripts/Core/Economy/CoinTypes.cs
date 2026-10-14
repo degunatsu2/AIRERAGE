@@ -56,7 +56,11 @@ namespace Degunatsu.Core.Economy
         /// <summary>出した出現地点の番号（ドロップなら -1）。同じ地点からは、前のコインが拾われるまで出さない。</summary>
         public readonly int Source;
 
-        public FieldCoin(int id, Vector2 position, int value, int pickableFromTick, int expireTick, int source = -1)
+        /// <summary>どうやってフィールドに出たか（Spawn、HitDrop、KoDrop）。表示が、撃破ドロップのかたまりを示すのに使う。</summary>
+        public readonly CoinEventKind Origin;
+
+        public FieldCoin(int id, Vector2 position, int value, int pickableFromTick, int expireTick, int source = -1,
+            CoinEventKind origin = CoinEventKind.Spawn)
         {
             Id = id;
             Position = position;
@@ -64,12 +68,14 @@ namespace Degunatsu.Core.Economy
             PickableFromTick = pickableFromTick;
             ExpireTick = expireTick;
             Source = source;
+            Origin = origin;
         }
 
         public bool Equals(FieldCoin other)
         {
             return Id == other.Id && Position.Equals(other.Position) && Value == other.Value
-                && PickableFromTick == other.PickableFromTick && ExpireTick == other.ExpireTick && Source == other.Source;
+                && PickableFromTick == other.PickableFromTick && ExpireTick == other.ExpireTick && Source == other.Source
+                && Origin == other.Origin;
         }
 
         public override bool Equals(object obj)
@@ -79,7 +85,7 @@ namespace Degunatsu.Core.Economy
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Id, Position, Value, PickableFromTick, ExpireTick, Source);
+            return HashCode.Combine(Id, Position, Value, PickableFromTick, ExpireTick, Source, Origin);
         }
 
         public override string ToString()

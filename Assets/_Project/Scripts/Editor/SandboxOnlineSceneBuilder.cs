@@ -277,8 +277,10 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.SetReference(runner, "_audio", audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
-            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner);
-            SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio);
+            EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
+            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner, guides);
+            SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio, guides);
+            SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
             SandboxWireSceneBuilder.CreateScoreboard(runner);
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
 

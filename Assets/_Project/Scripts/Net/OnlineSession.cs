@@ -19,6 +19,8 @@ namespace Degunatsu.Net
     ///   全員に送り（Start）、全員が同じワールドで始める。試合中の参加はできない。
     /// - 不一致の検出: 確定した状態のチェックサムを ChecksumIntervalTicks ごとにホストへ送り、ホストが自分の値と比べる。
     /// - ステージ（OnlineStage）: 地形、出現位置、ステージの範囲（撃破）、ギミック。全員が自分のシーンから作る。
+    /// - プレイヤーネーム: 各自が LocalName を決める（ロビーで）。クライアントは変えるたびにホストへ送り（Hello）、ホストが試合の
+    ///   開始のときに全員の名前を開始のメッセージに入れて送る（PlayerNames）。名前はシミュレーションに関係しない（表示だけ）。
     /// - 再戦: ホストが RestartMatch を呼ぶと、同じ人で、新しい試合の番号で始め直す。入力とチェックサムのメッセージには
     ///   試合の番号をつけ、今の試合のものだけを使う（前の試合のメッセージが遅れて届いても混ざらない）。
     /// </summary>
@@ -34,6 +36,9 @@ namespace Degunatsu.Net
 
         public const int MaxPlayers = 4;
 
+        /// <summary>プレイヤーネームの最大の文字数。</summary>
+        public const int MaxNameLength = 12;
+
         /// <summary>チェックサムを比べる間隔（ティック）。</summary>
         public const int ChecksumIntervalTicks = 60;
 
@@ -48,6 +53,10 @@ namespace Degunatsu.Net
 
         // ホスト: プレイヤーの番号 → 接続の番号（-1 ならいない）。
         private readonly int[] _playerPeer = new int[MaxPlayers];
+
+        // ホスト: プレイヤーの番号 → ロビーで届いたプレイヤーネーム（空ならまだない）。
+        private readonly string[] _lobbyNames = new string[MaxPlayers];
+        private string _localName = string.Empty;
 
         // ホスト: ティック → プレイヤーごとのチェックサム（全員の分を比べたら消す）。
         private readonly Dictionary<int, ChecksumRow> _checksums = new Dictionary<int, ChecksumRow>();
@@ -79,6 +88,54 @@ namespace Degunatsu.Net
 
         /// <summary>試合の人数（始まるまで 0）。</summary>
         public int PlayerCount { get; private set; }
+
+        /// <summary>試合のプレイヤーネーム（番号の順。入力がなかった人は空。始まるまで空の配列）。</summary>
+        public IReadOnlyList<string> PlayerNames { get; private set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// 自分のプレイヤーネーム（SanitizeName で整える）。クライアントは、ロビーにいればすぐにホストへ送る。試合中に変えたら、
+        /// 次の試合（再戦）から使われる。
+        /// </summary>
+        public string LocalName
+        {
+            get => _localName;
+            set
+            {
+                string name = SanitizeName(value);
+                if (name == _localName)
+                {
+                    return;
+                }
+                _localName = name;
+                if (IsHost)
+                {
+                    _lobbyNames[0] = name;
+                }
+                else if (LocalPlayer >= 0)
+                {
+                    _link.Send(0, NetMessages.Hello(name), reliable: true);
+                }
+            }
+        }
+
+        /// <summary>名前を整える: 制御文字を除き、前後の空白を取り、MaxNameLength 文字までにする（null は空）。</summary>
+        public static string SanitizeName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return string.Empty;
+            }
+            var builder = new System.Text.StringBuilder(name.Length);
+            foreach (char c in name)
+            {
+                if (!char.IsControl(c))
+                {
+                    builder.Append(c);
+                }
+            }
+            string trimmed = builder.ToString().Trim();
+            return trimmed.Length > MaxNameLength ? trimmed.Substring(0, MaxNameLength).TrimEnd() : trimmed;
+        }
 
         /// <summary>今の試合の番号（始まるたびに 1 増える。0〜255 を繰り返す。始まるまで 0）。</summary>
         public int MatchNumber { get; private set; }
@@ -228,7 +285,12 @@ namespace Degunatsu.Net
             rules.Validate().ThrowIfInvalid();
             int match = (MatchNumber + 1) & 0xFF;
             // ホストも送ったものと同じ JSON から作った値を使う（全員が同じ値になり、試合中にアセットを編集しても影響しない）。
-            string json = JsonUtility.ToJson(new StartSettings { Character = _hostConfig, Match = rules });
+            var names = new string[count];
+            for (int p = 0; p < count; p++)
+            {
+                names[p] = SanitizeName(p == 0 ? _localName : _lobbyNames[p]);
+            }
+            string json = JsonUtility.ToJson(new StartSettings { Character = _hostConfig, Match = rules, Names = names });
             byte[] start = NetMessages.Start(count, match, json);
             for (int p = 1; p < MaxPlayers; p++)
             {
@@ -413,6 +475,12 @@ namespace Degunatsu.Net
         private void Begin(int playerCount, int match, StartSettings settings)
         {
             PlayerCount = playerCount;
+            var names = new string[playerCount];
+            for (int p = 0; p < playerCount; p++)
+            {
+                names[p] = settings.Names != null && p < settings.Names.Length ? SanitizeName(settings.Names[p]) : string.Empty;
+            }
+            PlayerNames = names;
             MatchNumber = match;
             // 前の試合（再戦の前）の進み具合を残さない。
             _accumulator = 0f;
@@ -480,6 +548,7 @@ namespace Degunatsu.Net
                         return;
                     }
                     _playerPeer[player] = e.Peer;
+                    _lobbyNames[player] = string.Empty;
                     _link.Send(e.Peer, NetMessages.Welcome(player), reliable: true);
                     Status = $"Hosting on port {Port}: {LobbyPlayerCount} player(s)";
                     break;
@@ -490,6 +559,7 @@ namespace Degunatsu.Net
                         if (_playerPeer[p] == e.Peer)
                         {
                             _playerPeer[p] = -1;
+                            _lobbyNames[p] = string.Empty;
                             if (State == SessionState.Running)
                             {
                                 // 試合中に抜けた人がいたら、試合を終える（残りの人も止まったままにしないよう、接続を切る）。
@@ -528,6 +598,14 @@ namespace Degunatsu.Net
                     }
                     break;
 
+                case NetKind.Hello:
+                    int sender = PlayerOfPeer(e.Peer);
+                    if (sender > 0)
+                    {
+                        _lobbyNames[sender] = SanitizeName(NetMessages.ReadHello(e.Data));
+                    }
+                    break;
+
                 case NetKind.Checksum:
                     NetMessages.ReadChecksum(e.Data, out int checksumMatch, out int player, out int tick, out ulong checksum);
                     if (State == SessionState.Running && checksumMatch == MatchNumber && player > 0 && player < PlayerCount)
@@ -557,6 +635,10 @@ namespace Degunatsu.Net
                         case NetKind.Welcome:
                             LocalPlayer = NetMessages.ReadWelcome(e.Data);
                             State = SessionState.Lobby;
+                            if (_localName.Length > 0)
+                            {
+                                _link.Send(0, NetMessages.Hello(_localName), reliable: true);
+                            }
                             Status = $"Joined as player {LocalPlayer + 1}. Waiting for the host to start";
                             break;
                         case NetKind.Refused:
@@ -600,12 +682,26 @@ namespace Degunatsu.Net
             return settings;
         }
 
-        /// <summary>試合の開始のときに、ホストが全員へ送る値（調整値と試合のルール）。</summary>
+        /// <summary>試合の開始のときに、ホストが全員へ送る値（調整値、試合のルール、プレイヤーネーム）。</summary>
         [Serializable]
         private sealed class StartSettings
         {
             public CharacterConfig Character;
             public MatchRules Match;
+            public string[] Names;
+        }
+
+        // 接続の番号 → プレイヤーの番号（いなければ -1）。
+        private int PlayerOfPeer(int peer)
+        {
+            for (int p = 1; p < MaxPlayers; p++)
+            {
+                if (_playerPeer[p] == peer)
+                {
+                    return p;
+                }
+            }
+            return -1;
         }
 
         private int FreePlayer()

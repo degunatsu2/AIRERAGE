@@ -47,8 +47,9 @@ namespace Degunatsu.Runtime.Presentation
         private float _introProgress = -1f;
         private GUIStyle _center;
         private GUIStyle _timer;
-        private GUIStyle _row;
         private GUIStyle _plate;
+        private PlayerStatusPlate _resultPlate;
+        private GUIStyle _rank;
 
         /// <summary>画面の中央に出している文字（なければ空。テスト用）。</summary>
         public string CenterText { get; private set; } = string.Empty;
@@ -70,6 +71,11 @@ namespace Degunatsu.Runtime.Presentation
 
         /// <summary>結果の順位（キャラクターの番号。出していなければ空）。</summary>
         public IReadOnlyList<int> Ranking { get; private set; } = new int[0];
+
+        private void OnDestroy()
+        {
+            _resultPlate?.Dispose();
+        }
 
         private void Awake()
         {
@@ -201,7 +207,6 @@ namespace Degunatsu.Runtime.Presentation
             {
                 _center = new GUIStyle(GUI.skin.label) { fontSize = 96, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _timer = new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                _row = new GUIStyle(GUI.skin.label) { fontSize = 28, fontStyle = FontStyle.Bold };
                 _plate = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
             }
             Color previous = GUI.color;
@@ -304,27 +309,40 @@ namespace Degunatsu.Runtime.Presentation
             GUI.matrix = baseMatrix;
         }
 
+        // 結果: 右上の表と同じ札（PlayerStatusPlate）を、大きくして順位の順に並べる。左に順位、首位に王冠。
         private void DrawResults()
         {
+            const int plateWidth = 440;
+            const int plateHeight = 64;
+            const float rowGap = 10f;
+            if (_resultPlate == null)
+            {
+                _resultPlate = new PlayerStatusPlate(plateWidth, plateHeight, 1.3f);
+                _rank = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
+            }
             float width = 640f;
             bool buttons = _matchControls != null;
-            float height = 110f + Ranking.Count * 44f + (buttons ? 64f : 0f);
+            float height = 110f + Ranking.Count * (plateHeight + rowGap) + (buttons ? 64f : 0f);
             var area = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
-            GUI.color = new Color(1f, 1f, 1f, 0.9f);
-            GUI.Box(area, GUIContent.none);
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(area, Texture2D.whiteTexture);
+            GUI.color = Color.white;
             Shadowed(new Rect(area.x, area.y + 8f, width, 44f), "RESULT", _timer, new Color(1f, 0.85f, 0.3f));
-            int local = _feed.LocalCharacter;
+            float plateX = area.x + (width - plateWidth) * 0.5f + 30f;
             for (int i = 0; i < Ranking.Count; i++)
             {
                 int index = Ranking[i];
-                CharacterState state = _feed.GetState(index);
-                string mark = index == local ? ">" : " ";
-                string text = $"{mark}{i + 1}.  {_feed.LabelOf(index),-8}  {state.Coins.Banked,4} COIN   KO {state.Combat.Knockouts,2}  Fall {state.Combat.Falls,2}";
-                Shadowed(new Rect(area.x + 40f, area.y + 60f + i * 44f, width - 60f, 40f), text, _row, i == 0 ? new Color(1f, 0.9f, 0.4f) : Color.white);
+                float y = area.y + 60f + i * (plateHeight + rowGap);
+                Color rankColor = i == 0 ? new Color(1f, 0.85f, 0.3f) : Color.white;
+                bool crown = ScoreboardHud.IsLeader(_feed, index);
+                float rankRight = plateX - (crown ? _resultPlate.CrownWidth : 0f) - 8f;
+                Shadowed(new Rect(rankRight - 60f, y, 60f, plateHeight), (i + 1).ToString(), _rank, rankColor);
+                _resultPlate.Draw(new Rect(plateX, y, plateWidth, plateHeight), index + 1, _feed.LabelOf(index), _feed.ColorOf(index),
+                    _feed.GetState(index), crown, default, new Color(1f, 0.85f, 0.2f));
             }
             // 順位は確定コインの数（D-25）。同じなら仮に撃破の数（同点のアディショナルタイムは T4-8。D-45）。
             GUI.color = new Color(0.8f, 0.8f, 0.85f);
-            float noteY = area.y + 64f + Ranking.Count * 44f;
+            float noteY = area.y + 62f + Ranking.Count * (plateHeight + rowGap);
             GUI.Label(new Rect(area.x + 20f, noteY, width - 40f, 28f), "Ranked by banked coins (ties: KO, then fewer falls)");
             if (!buttons)
             {

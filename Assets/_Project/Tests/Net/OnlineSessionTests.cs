@@ -183,6 +183,27 @@ namespace Degunatsu.Net.Tests
         }
 
         [Test]
+        public void PlayerNames_AreSharedWithEveryone_AndCanChangeInTheLobby()
+        {
+            OnlineSession host = Host();
+            host.LocalName = "  Bob\n ";
+            OnlineSession first = Join(host);
+            first.LocalName = "Alice";
+            OnlineSession second = Join(host);
+            PumpUntil(() => first.LocalPlayer >= 0 && second.LocalPlayer >= 0);
+            first.LocalName = "Alice the very long name";
+            PumpFrames(5);
+
+            host.StartMatch();
+            PumpUntil(() => first.State == OnlineSession.SessionState.Running && second.State == OnlineSession.SessionState.Running);
+            var expected = new[] { "Bob", "Alice the ve", string.Empty };
+            Assert.That(host.PlayerNames, Is.EqualTo(expected), "ホストの名前の表");
+            Assert.That(first.PlayerNames, Is.EqualTo(expected), "クライアントに届いた名前");
+            Assert.That(second.PlayerNames, Is.EqualTo(expected), "名前のない人は空");
+            Assert.That(OnlineSession.SanitizeName(null), Is.EqualTo(string.Empty));
+        }
+
+        [Test]
         public void ClientsReceiveTheMatchRules()
         {
             OnlineSession host = Host();

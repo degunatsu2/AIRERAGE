@@ -91,11 +91,15 @@ namespace Degunatsu.Core.Tests.Economy
             List<FieldCoin> drops = Drops(world);
             Assert.That(Total(drops), Is.EqualTo(5));
             Assert.That(drops.ConvertAll(c => c.Value), Is.EqualTo(new[] { 3, 1, 1 }), "20・3・1 枚に分けていない");
+            Vector3 victim = world.GetState(1).Position;
             foreach (FieldCoin coin in drops)
             {
-                Assert.That(coin.PickableFromTick, Is.EqualTo(hitTick + 30), "拾えるまでの時間");
+                Assert.That(coin.PickableFromTick, Is.EqualTo(hitTick + 60), "拾えるまでの時間");
                 Assert.That(coin.ExpireTick, Is.EqualTo(hitTick + 600), "寿命");
+                Assert.That(coin.Origin, Is.EqualTo(CoinEventKind.HitDrop));
                 Assert.That(coin.Position.Y, Is.GreaterThan(GroundY), "当たった人の上に並んでいない");
+                // 戦っている2人がすぐに拾わないように、少し遠くに置く（2.8m 以上。当たった人は吹き飛び始めているので少し余裕を見る）。
+                Assert.That(Vector2.Distance(coin.Position, new Vector2(victim.X, victim.Y)), Is.GreaterThan(2f), "当たった人に近すぎる");
             }
             AssertConserved(world);
         }
@@ -106,13 +110,15 @@ namespace Degunatsu.Core.Tests.Economy
             SimWorld world = AttackWorld(50);
             StepUntilHit(world);
             int hits = 0;
-            for (int i = 0; i < 60; i++)
+            // 地上技の二段目まで、と、その後しばらく（拾えない時間が過ぎても、戦っていた2人の近くに落ちていない）。
+            for (int i = 0; i < 100; i++)
             {
                 world.Step(new PlayerInput[2]);
                 hits += world.LastHits.Count;
             }
             Assert.That(hits, Is.GreaterThan(0), "前提: 地上技の二段目が当たった");
-            Assert.That(world.GetState(1).Coins.Held, Is.EqualTo(45), "同じコンボで、もう一度落とした");
+            Assert.That(world.GetState(1).Coins.Held, Is.EqualTo(45), "同じコンボで、もう一度落とした（か、戦っていた人が拾った）");
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(0), "攻撃した人が、すぐ近くに落ちたコインを拾った");
         }
 
         [Test]
@@ -155,7 +161,7 @@ namespace Degunatsu.Core.Tests.Economy
         }
 
         [Test]
-        public void BeingKnockedOut_DropsHalf_InsideTheStage()
+        public void BeingKnockedOut_DropsHalf_InAClusterAtACoinSpawnPoint()
         {
             // 幅 8m の浮いた足場から右へ歩いて落ちる（自滅。D-44 で撃破と同じドロップ）。
             var coin = new CoinSpawnPoint(new Vector2(0f, 1f), 9);
@@ -175,13 +181,43 @@ namespace Degunatsu.Core.Tests.Economy
             Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(4), "所持の半分（切り上げ）を落とさない");
             List<FieldCoin> drops = Drops(world);
             Assert.That(Total(drops), Is.EqualTo(5));
-            Vector2 origin = CoinDropRules.Inside(world.LastKnockouts[0].Position, Bounds, world.Rules.KoDropInset);
-            Assert.That(origin.Y, Is.EqualTo(Bounds.MinY + world.Rules.KoDropInset), "下から出たのに、範囲の内側に入れていない");
+            // 出現地点は1つなので、そこに固めて置く。
+            Vector2 origin = CoinDropRules.KoDropOrigin(world.LastKnockouts[0], Bounds, world.CoinSpawns, world.Rules, world.Tick);
+            Assert.That(origin, Is.EqualTo(coin.Position), "コインの出現地点に置いていない");
             foreach (FieldCoin dropped in drops)
             {
+                Assert.That(dropped.Origin, Is.EqualTo(CoinEventKind.KoDrop));
+                Assert.That(Vector2.Distance(dropped.Position, origin), Is.LessThanOrEqualTo(1.7f), "固まっていない");
                 Assert.That(Bounds.Contains(new Vector3(dropped.Position.X, dropped.Position.Y, 0f)), Is.True, "ステージの外に落とした");
             }
             AssertConserved(world);
+        }
+
+        [Test]
+        public void TheKnockoutDropSpot_IsPickedFromTheCoinSpawnPoints_ByTheSeed()
+        {
+            var spots = new[]
+            {
+                new CoinSpawnPoint(new Vector2(-10f, 5f), 1),
+                new CoinSpawnPoint(new Vector2(0f, 12f), 3),
+                new CoinSpawnPoint(new Vector2(10f, 5f), 20),
+                new CoinSpawnPoint(new Vector2(0f, 25f), 100, CoinSpawnKind.Jackpot),
+            };
+            var ko = new KnockoutRecord(1, -1, new Vector2(0f, -30f));
+            var chosen = new HashSet<Vector2>();
+            for (int seed = 0; seed < 40; seed++)
+            {
+                var rules = new MatchRules { Seed = seed };
+                Vector2 a = CoinDropRules.KoDropOrigin(ko, Bounds, spots, rules, 500);
+                Assert.That(CoinDropRules.KoDropOrigin(ko, Bounds, spots, rules, 500), Is.EqualTo(a), "同じ種で場所が違う");
+                Assert.That(System.Array.Exists(spots, s => s.Position == a), Is.True, "出現地点のどれでもない");
+                chosen.Add(a);
+            }
+            Assert.That(chosen.Count, Is.GreaterThanOrEqualTo(3), "種を変えても場所が変わらない");
+
+            // 出現地点がなければ、ステージの外に出た位置を範囲の内側に入れる。
+            Vector2 fallback = CoinDropRules.KoDropOrigin(ko, Bounds, new CoinSpawnPoint[0], new MatchRules(), 500);
+            Assert.That(fallback.Y, Is.EqualTo(Bounds.MinY + new MatchRules().KoDropInset));
         }
 
         [Test]
@@ -198,6 +234,7 @@ namespace Degunatsu.Core.Tests.Economy
             Assert.That(CoinDropRules.KoDropAmount(rules, 3), Is.EqualTo(2));
             Assert.That(CoinDropRules.KoDropAmount(rules, 50), Is.EqualTo(25));
         }
+
 
         [Test]
         public void DropsAreSplitIntoTwentyThreeAndOne_UpToTheMaximum()

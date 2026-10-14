@@ -356,7 +356,7 @@ namespace Degunatsu.Editor
         /// コインの出現地点（docs/12 T4-4）と、コインの表示（回る金色のコイン）、所持コインと「+n」の表示を作る。
         /// source は ISimulationFeed。
         /// </summary>
-        internal static void CreateCoins((Vector2 Position, int Value)[] spawns, Vector2[] jackpotSpots, MonoBehaviour source)
+        internal static void CreateCoins((Vector2 Position, int Value)[] spawns, Vector2[] jackpotSpots, MonoBehaviour source, EdgeGuideLayer guides)
         {
             var root = new GameObject("CoinSpawns").transform;
             for (int i = 0; i < spawns.Length; i++)
@@ -399,13 +399,30 @@ namespace Degunatsu.Editor
             var hud = new GameObject("CoinHud").AddComponent<CoinHud>();
             SetReference(hud, "_source", source);
             SetReference(hud, "_camera", Object.FindFirstObjectByType<Camera>());
+            SetReference(hud, "_guides", guides);
+        }
+
+        /// <summary>画面の外の物の誘導表示（矢印と札）をまとめて描く層（EdgeGuideLayer）。</summary>
+        internal static EdgeGuideLayer CreateEdgeGuides()
+        {
+            var layer = new GameObject("EdgeGuides").AddComponent<EdgeGuideLayer>();
+            SetReference(layer, "_camera", Object.FindFirstObjectByType<Camera>());
+            return layer;
+        }
+
+        /// <summary>ほかのプレイヤーが画面の外にいるときの誘導表示（PlayerGuides）。</summary>
+        internal static void CreatePlayerGuides(MonoBehaviour source, EdgeGuideLayer guides)
+        {
+            var view = new GameObject("PlayerGuides").AddComponent<PlayerGuides>();
+            SetReference(view, "_source", source);
+            SetReference(view, "_guides", guides);
         }
 
         /// <summary>
         /// 拠点の候補の地点（BankSpotAuthoring。spots[0] が試合の始まりの拠点）と、拠点の表示（BankView。輪、回る弧、光の柱、
         /// 次の地点の輪）を作る（docs/12 T4-7）。
         /// </summary>
-        internal static void CreateBank(Vector2[] spots, MonoBehaviour source, GameAudio audio)
+        internal static void CreateBank(Vector2[] spots, MonoBehaviour source, GameAudio audio, EdgeGuideLayer guides)
         {
             var root = new GameObject("BankSpots").transform;
             for (int i = 0; i < spots.Length; i++)
@@ -425,6 +442,7 @@ namespace Degunatsu.Editor
             SetReference(view, "_beam", CreateIndicatorLine(view.transform, "Beam", material, 1.6f));
             SetReference(view, "_next", CreateIndicatorLine(view.transform, "Next", material, 0.14f));
             SetReference(view, "_audio", audio);
+            SetReference(view, "_guides", guides);
         }
 
         /// <summary>右上の全員の情報（ScoreboardHud。順位の順に並ぶ札）。</summary>

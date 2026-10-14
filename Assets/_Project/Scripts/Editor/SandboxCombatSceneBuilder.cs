@@ -166,8 +166,10 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.CreateDebugTools(runner, inputActions, audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
-            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner);
-            SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio);
+            EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
+            SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner, guides);
+            SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio, guides);
+            SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
             SandboxWireSceneBuilder.CreateScoreboard(runner);
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
 

@@ -138,7 +138,7 @@ namespace Degunatsu.PlayMode.Tests
             Assert.That(hud.JackpotBannerShowing, Is.True, "「JACKPOT」が出ない");
 
             bool onScreen = !ScreenEdgeMarker.Locate(Object.FindFirstObjectByType<Camera>(),
-                new Vector3(jackpot.Position.X, jackpot.Position.Y, 0f), 48f, out _, out _);
+                new Vector3(jackpot.Position.X, jackpot.Position.Y, 0f), 56f, out _, out _);
             Assert.That(hud.JackpotOffscreen, Is.EqualTo(!onScreen), "画面の外かどうかの判定が合わない");
 
             // 再戦すると、ふつうの BGM に戻る。

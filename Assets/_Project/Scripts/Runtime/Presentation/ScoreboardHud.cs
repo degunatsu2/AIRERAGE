@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Degunatsu.Core.Common;
 using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Runtime.Simulation;
@@ -7,35 +8,40 @@ using UnityEngine;
 namespace Degunatsu.Runtime.Presentation
 {
     /// <summary>
-    /// 右上の全員の情報（ユーザーの要望、2026-10-14）。1 人 1 枚の札（GuidePlate）で、縁と斜めの線はプレイヤーの色。
-    /// 左にキャラクターの絵（今はプレイヤーの色の四角と番号）、右を 4 つに分けて BANK（確定コイン）/ COIN（所持コイン）/
-    /// K（撃破した数）/ F（撃破された数）。BANK の文字と数だけ黄色。
+    /// 右上の全員の情報（ユーザーの要望、2026-10-14）。1 人 1 枚の札（PlayerStatusPlate）で、縁と斜めの線はプレイヤーの色。
+    /// 左にキャラクターの絵（今はプレイヤーの色の四角と番号）とプレイヤーネーム、右を 4 つに分けて BANK（確定コイン）/
+    /// COIN（所持コイン）/ K（撃破した数）/ F（撃破された数）。BANK の文字と数だけ黄色。
     /// いつも今の順位（MatchResults.Rank。確定コインの順）に並べ、順位が変わると札が滑って入れ替わる。確定コインが最も多い人
-    /// （1 枚以上）には、札の左に王冠をつける（同じ数なら全員）。状態を読むだけで、書き換えない。
+    /// （1 枚以上）には、札の左に王冠をつける（同じ数なら全員）。
+    /// 撃破されたら（復帰を待っている間）: 札がひび割れて揺れ、灰色に暗くなり、「RESPAWN n」（復帰までの秒）を出す。復帰したら、
+    /// 白く光ってからふつうの見た目に戻る。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class ScoreboardHud : MonoBehaviour
     {
-        private static readonly string[] Labels = { "BANK", "COIN", "K", "F" };
-
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
         [SerializeField] private int _width = 300;
-        [SerializeField] private int _rowHeight = 44;
+        [SerializeField] private int _rowHeight = 52;
         [SerializeField] private float _rowGap = 6f;
         [Tooltip("画面の右上からの余白（ピクセル）")]
         [SerializeField] private Vector2 _margin = new Vector2(12f, 10f);
         [Tooltip("順位が変わったときに、札が新しい位置へ滑る速さ（1 秒あたりの割合）")]
         [SerializeField] private float _slideSpeed = 10f;
         [SerializeField] private Color _bankColor = new Color(1f, 0.85f, 0.2f);
+        [Tooltip("撃破されたときに、ひび割れてから灰色になるまでの秒数")]
+        [SerializeField] private float _crackSeconds = 0.35f;
+        [Tooltip("灰色になりきるまでの秒数")]
+        [SerializeField] private float _graySeconds = 0.3f;
+        [Tooltip("復帰したときに白く光る秒数")]
+        [SerializeField] private float _flashSeconds = 0.45f;
 
         private readonly List<float> _rowY = new List<float>();
         private ISimulationFeed _feed;
-        private GuidePlate _plate;
-        private Texture2D _crown;
-        private GUIStyle _label;
-        private GUIStyle _number;
-        private GUIStyle _iconText;
+        private PlayerStatusPlate _plate;
         private int[] _order = new int[0];
+        private bool[] _waiting = new bool[0];
+        private float[] _fellAt = new float[0];
+        private float[] _backAt = new float[0];
 
         /// <summary>今の並び（上から、キャラクターの番号）と、王冠をつけている人の数（テスト用）。</summary>
         public IReadOnlyList<int> Order => _order;
@@ -44,7 +50,25 @@ namespace Degunatsu.Runtime.Presentation
         /// <summary>キャラクター index に王冠をつけているか（テスト用）。</summary>
         public bool HasCrown(int index)
         {
-            return IsLeader(index, out _);
+            return IsLeader(_feed, index);
+        }
+
+        /// <summary>キャラクター index の札の今の見た目（テスト用）。</summary>
+        public PlayerStatusPlate.Look LookOf(int index)
+        {
+            return index < _waiting.Length ? CurrentLook(index) : default;
+        }
+
+        /// <summary>確定コインが最も多い人（1 枚以上。同じ数なら全員）か。結果の画面でも使う。</summary>
+        public static bool IsLeader(ISimulationFeed feed, int index)
+        {
+            int best = 0;
+            int count = feed.CharacterCount;
+            for (int i = 0; i < count; i++)
+            {
+                best = Mathf.Max(best, feed.GetState(i).Coins.Banked);
+            }
+            return best > 0 && index < count && feed.GetState(index).Coins.Banked == best;
         }
 
         private void Awake()
@@ -60,10 +84,6 @@ namespace Degunatsu.Runtime.Presentation
         private void OnDestroy()
         {
             _plate?.Dispose();
-            if (_crown != null)
-            {
-                Destroy(_crown);
-            }
         }
 
         private void Update()
@@ -75,6 +95,7 @@ namespace Degunatsu.Runtime.Presentation
                 states[i] = _feed.GetState(i);
             }
             _order = MatchResults.Rank(states);
+            TrackFalls(states);
 
             while (_rowY.Count < count)
             {
@@ -87,84 +108,83 @@ namespace Degunatsu.Runtime.Presentation
                 int index = _order[rank];
                 float target = _margin.y + rank * (_rowHeight + _rowGap);
                 _rowY[index] = _rowY[index] < 0f ? target : Mathf.Lerp(_rowY[index], target, blend);
-                crowns += IsLeader(index, out _) ? 1 : 0;
+                crowns += IsLeader(_feed, index) ? 1 : 0;
             }
             CrownCount = crowns;
         }
 
-        // 確定コインが最も多い人（1 枚以上）か。
-        private bool IsLeader(int index, out int best)
+        // 撃破された瞬間（復帰を待ち始めた）と、復帰した瞬間を覚える（人数が変わったら、今の様子から数え直す）。
+        private void TrackFalls(CharacterState[] states)
         {
-            best = 0;
-            int count = _feed.CharacterCount;
-            for (int i = 0; i < count; i++)
+            if (_waiting.Length != states.Length)
             {
-                best = Mathf.Max(best, _feed.GetState(i).Coins.Banked);
+                _waiting = new bool[states.Length];
+                _fellAt = new float[states.Length];
+                _backAt = new float[states.Length];
+                for (int i = 0; i < states.Length; i++)
+                {
+                    _waiting[i] = states[i].Combat.IsWaitingToRespawn;
+                    _fellAt[i] = float.NegativeInfinity;
+                    _backAt[i] = float.NegativeInfinity;
+                }
+                return;
             }
-            return best > 0 && index < count && _feed.GetState(index).Coins.Banked == best;
+            for (int i = 0; i < states.Length; i++)
+            {
+                bool waiting = states[i].Combat.IsWaitingToRespawn;
+                if (waiting && !_waiting[i])
+                {
+                    _fellAt[i] = Time.time;
+                }
+                else if (!waiting && _waiting[i])
+                {
+                    _backAt[i] = Time.time;
+                }
+                _waiting[i] = waiting;
+            }
+        }
+
+        private PlayerStatusPlate.Look CurrentLook(int index)
+        {
+            var look = new PlayerStatusPlate.Look();
+            if (_waiting[index])
+            {
+                float t = Time.time - _fellAt[index];
+                if (float.IsInfinity(t))
+                {
+                    t = _crackSeconds + _graySeconds;
+                }
+                look.Crack = Mathf.Clamp01(t / (_crackSeconds * 0.4f));
+                float shake = Mathf.Clamp01(1f - t / _crackSeconds) * 4f;
+                look.Shake = new Vector2(Mathf.Sin(Time.time * 90f) * shake, Mathf.Cos(Time.time * 70f) * shake * 0.5f);
+                look.Gray = Mathf.Clamp01((t - _crackSeconds) / _graySeconds);
+                float seconds = _feed.GetState(index).Combat.RespawnTicksLeft / (float)SimTime.TicksPerSecond;
+                look.Overlay = $"RESPAWN {seconds:0.0}";
+            }
+            else
+            {
+                look.Flash = Mathf.Clamp01(1f - (Time.time - _backAt[index]) / _flashSeconds);
+            }
+            return look;
         }
 
         private void OnGUI()
         {
             int count = _feed.CharacterCount;
-            if (count == 0 || _order.Length != count)
+            if (count == 0 || _order.Length != count || _waiting.Length != count)
             {
                 return;
             }
             if (_plate == null)
             {
-                _plate = new GuidePlate(_width, _rowHeight);
-                _crown = GuideIcons.Crown(64);
-                _label = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperCenter };
-                _number = new GUIStyle(GUI.skin.label) { fontSize = 19, fontStyle = FontStyle.Bold, alignment = TextAnchor.LowerCenter };
-                _iconText = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+                _plate = new PlayerStatusPlate(_width, _rowHeight);
             }
             float x = Screen.width - _margin.x - _width;
             foreach (int index in _order)
             {
-                DrawRow(new Rect(x, _rowY[index], _width, _rowHeight), index);
-            }
-        }
-
-        private void DrawRow(Rect rect, int index)
-        {
-            CharacterState state = _feed.GetState(index);
-            Color color = _feed.ColorOf(index);
-            _plate.DrawBackground(rect);
-            _plate.DrawFrame(rect, color);
-
-            // 左: キャラクターの絵（今はプレイヤーの色の四角と番号）。
-            Rect icon = _plate.IconRect(rect);
-            Color previous = GUI.color;
-            GUI.color = Color.Lerp(color, Color.black, 0.45f);
-            GUI.DrawTexture(icon, Texture2D.whiteTexture);
-            GUI.color = color;
-            GUI.DrawTexture(new Rect(icon.x + 2f, icon.y + 2f, icon.width - 4f, icon.height - 4f), Texture2D.whiteTexture);
-            GUI.color = previous;
-            GuidePlate.DrawText(icon, (index + 1).ToString(), _iconText, Color.white);
-
-            if (IsLeader(index, out _))
-            {
-                float size = rect.height * 0.8f;
-                GUI.DrawTexture(new Rect(rect.x - size - 4f, rect.y + (rect.height - size) * 0.5f, size, size), _crown, ScaleMode.ScaleToFit);
-            }
-
-            // 右: 4 つに分けて BANK / COIN / K / F。
-            Rect right = _plate.RightRect(rect);
-            int[] values = { state.Coins.Banked, state.Coins.Held, state.Combat.Knockouts, state.Combat.Falls };
-            float cell = right.width / Labels.Length;
-            for (int c = 0; c < Labels.Length; c++)
-            {
-                var cellRect = new Rect(right.x + c * cell, right.y + 3f, cell, right.height - 6f);
-                Color textColor = c == 0 ? _bankColor : Color.white;
-                GuidePlate.DrawText(cellRect, Labels[c], _label, new Color(textColor.r, textColor.g, textColor.b, 0.85f));
-                GuidePlate.DrawText(cellRect, values[c].ToString(), _number, textColor);
-                if (c > 0)
-                {
-                    GUI.color = new Color(1f, 1f, 1f, 0.18f);
-                    GUI.DrawTexture(new Rect(cellRect.x, cellRect.y + 4f, 1f, cellRect.height - 8f), Texture2D.whiteTexture);
-                    GUI.color = previous;
-                }
+                var rect = new Rect(x, _rowY[index], _width, _rowHeight);
+                _plate.Draw(rect, index + 1, _feed.LabelOf(index), _feed.ColorOf(index), _feed.GetState(index),
+                    IsLeader(_feed, index), CurrentLook(index), _bankColor);
             }
         }
     }

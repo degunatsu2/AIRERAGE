@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Degunatsu.Core.Combat;
+using Degunatsu.Core.Common;
 using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
 
@@ -13,9 +14,11 @@ namespace Degunatsu.Core.Economy
     ///   （少なくとも 1 枚、上限 HitDropMax）を、当たった人の位置に落とす。同じコンボの間は落とさない。ガードされたら落とさない。
     ///   同じティックに同じ人が何回当たっても、落とすのは1回。
     /// - 撃破ドロップ: 撃破されたら（自滅も。D-44）、所持コインの KoDropPercent（端数は切り上げ）を落とす。落とす場所は、
-    ///   ステージの外に出た位置を、ステージの範囲の KoDropInset だけ内側に入れた位置【仮】。
+    ///   ステージのどこか（コインの出現地点のどれか1つを、試合の種・ティック・撃破された人で選ぶ）に固めて置く（D-49。
+    ///   ユーザーの決定、2026-10-14）。出現地点がなければ、ステージの外に出た位置を範囲の KoDropInset だけ内側に入れた位置。
     /// - 落とすコインは、20・3・1 枚のコインに分ける（大きい順。見た目で価値が分かるように。docs/12 3.5）。最大 MaxPieces 個で、
-    ///   最後の1つに残りをまとめる。落とした位置の上の扇形に、決まった間隔で並べる（三角関数を使わず、決まった値の表で。PC 間で同じにする）。
+    ///   最後の1つに残りをまとめる。被弾は当たった人の上の扇形に少し遠くまで、撃破は選んだ地点の周りに固めて並べる
+    ///   （三角関数を使わず、決まった値の表で。PC 間で同じにする）。
     /// - 落としたコインは DropPickableDelayTicks の間だれも拾えず、DropLifetimeTicks で消える。
     /// 当たった順、撃破の順（番号の順）に落とす（結果が順番で変わらない）。
     /// </summary>
@@ -24,26 +27,67 @@ namespace Degunatsu.Core.Economy
         /// <summary>1回のドロップで出すコインの数の上限。</summary>
         public const int MaxPieces = 16;
 
-        // 落とした位置からの、コインの並べ方（上の扇形。半径 1.4m、2.3m、3.2m）。
-        private static readonly Vector2[] Offsets =
+        // 被弾ドロップの並べ方: 当たった人の上の扇形（半径 2.8m、4.0m、5.2m）。戦っている2人がすぐに拾わないように、
+        // 少し遠くに置く（ユーザーの要望、2026-10-14）。
+        private static readonly Vector2[] HitOffsets =
         {
-            new Vector2(0f, 1.4f),
-            new Vector2(0.7f, 1.212f),
-            new Vector2(-0.7f, 1.212f),
-            new Vector2(1.212f, 0.7f),
-            new Vector2(-1.212f, 0.7f),
-            new Vector2(0.595f, 2.222f),
-            new Vector2(-0.595f, 2.222f),
-            new Vector2(1.626f, 1.626f),
-            new Vector2(-1.626f, 1.626f),
-            new Vector2(2.222f, 0.595f),
-            new Vector2(-2.222f, 0.595f),
-            new Vector2(0f, 3.2f),
-            new Vector2(1.6f, 2.771f),
-            new Vector2(-1.6f, 2.771f),
-            new Vector2(2.771f, 1.6f),
-            new Vector2(-2.771f, 1.6f),
+            new Vector2(0f, 2.8f),
+            new Vector2(1.4f, 2.425f),
+            new Vector2(-1.4f, 2.425f),
+            new Vector2(2.425f, 1.4f),
+            new Vector2(-2.425f, 1.4f),
+            new Vector2(1.035f, 3.864f),
+            new Vector2(-1.035f, 3.864f),
+            new Vector2(2.828f, 2.828f),
+            new Vector2(-2.828f, 2.828f),
+            new Vector2(3.864f, 1.035f),
+            new Vector2(-3.864f, 1.035f),
+            new Vector2(0f, 5.2f),
+            new Vector2(2.6f, 4.503f),
+            new Vector2(-2.6f, 4.503f),
+            new Vector2(4.503f, 2.6f),
+            new Vector2(-4.503f, 2.6f),
         };
+
+        // 撃破ドロップの並べ方: 選んだ地点の周りに固める（半径 0.8m に 6 個、1.6m に 10 個。中心はあける。そこにある
+        // 出現地点のコインと重ならないように）。
+        private static readonly Vector2[] KoOffsets =
+        {
+            new Vector2(0f, 0.8f),
+            new Vector2(-0.693f, 0.4f),
+            new Vector2(-0.693f, -0.4f),
+            new Vector2(0f, -0.8f),
+            new Vector2(0.693f, -0.4f),
+            new Vector2(0.693f, 0.4f),
+            new Vector2(0.494f, 1.522f),
+            new Vector2(-0.494f, 1.522f),
+            new Vector2(-1.294f, 0.94f),
+            new Vector2(-1.6f, 0f),
+            new Vector2(-1.294f, -0.94f),
+            new Vector2(-0.494f, -1.522f),
+            new Vector2(0.494f, -1.522f),
+            new Vector2(1.294f, -0.94f),
+            new Vector2(1.6f, 0f),
+            new Vector2(1.294f, 0.94f),
+        };
+
+        // 撃破ドロップの場所を選ぶ乱数の、ほかの選択と分けるための数。
+        private const int KoDropSalt = 300;
+
+        /// <summary>
+        /// 被弾ドロップを pieces 個に分けたときの、落とした位置からの平均のずれ（表示が、コインの真ん中から落とした位置を求めて、
+        /// そこから飛んでいくように見せるのに使う）。
+        /// </summary>
+        public static Vector2 MeanHitOffset(int pieces)
+        {
+            int count = Math.Max(1, Math.Min(pieces, HitOffsets.Length));
+            Vector2 sum = Vector2.Zero;
+            for (int i = 0; i < count; i++)
+            {
+                sum += HitOffsets[i];
+            }
+            return sum / count;
+        }
 
         /// <summary>被弾ドロップで落とす枚数（所持 held 枚のとき）。</summary>
         public static int HitDropAmount(MatchRules rules, int held)
@@ -89,19 +133,33 @@ namespace Degunatsu.Core.Economy
                 }
                 CharacterState victim = states[hit.Victim];
                 int amount = HitDropAmount(rules, victim.Coins.Held);
-                Drop(ledger, states, hit.Victim, CoinEventKind.HitDrop, amount, new Vector2(victim.Position.X, victim.Position.Y), rules, tick);
+                Drop(ledger, states, hit.Victim, CoinEventKind.HitDrop, amount, new Vector2(victim.Position.X, victim.Position.Y), HitOffsets, rules, tick);
             }
         }
 
-        /// <summary>撃破ドロップ。KnockoutResolver の後に呼ぶ（撃破された人は出現位置にいるが、所持コインはまだ持っている）。</summary>
+        /// <summary>
+        /// 撃破ドロップ。KnockoutResolver の後に呼ぶ（撃破された人は出現位置にいるが、所持コインはまだ持っている）。
+        /// spots はコインの出現地点（落とす場所の候補）。
+        /// </summary>
         public static void DropOnKnockouts(CoinLedger ledger, List<CharacterState> states, IReadOnlyList<KnockoutRecord> knockouts,
-            StageBounds bounds, MatchRules rules, int tick)
+            StageBounds bounds, IReadOnlyList<CoinSpawnPoint> spots, MatchRules rules, int tick)
         {
             foreach (KnockoutRecord ko in knockouts)
             {
                 int amount = KoDropAmount(rules, states[ko.Victim].Coins.Held);
-                Drop(ledger, states, ko.Victim, CoinEventKind.KoDrop, amount, Inside(ko.Position, bounds, rules.KoDropInset), rules, tick);
+                Vector2 origin = KoDropOrigin(ko, bounds, spots, rules, tick);
+                Drop(ledger, states, ko.Victim, CoinEventKind.KoDrop, amount, origin, KoOffsets, rules, tick);
             }
+        }
+
+        /// <summary>撃破ドロップを固めて置く中心（出現地点のどれか。なければ、ステージの外に出た位置を範囲の内側に入れた位置）。</summary>
+        public static Vector2 KoDropOrigin(KnockoutRecord ko, StageBounds bounds, IReadOnlyList<CoinSpawnPoint> spots, MatchRules rules, int tick)
+        {
+            if (spots == null || spots.Count == 0)
+            {
+                return Inside(ko.Position, bounds, rules.KoDropInset);
+            }
+            return spots[StableHash.Range(rules.Seed, KoDropSalt + ko.Victim, tick, spots.Count)].Position;
         }
 
         /// <summary>ステージの外に出た位置を、範囲の inset だけ内側に入れた位置（範囲が狭ければ中心）。</summary>
@@ -135,13 +193,13 @@ namespace Degunatsu.Core.Economy
         }
 
         private static void Drop(CoinLedger ledger, List<CharacterState> states, int character, CoinEventKind kind, int amount,
-            Vector2 origin, MatchRules rules, int tick)
+            Vector2 origin, Vector2[] offsets, MatchRules rules, int tick)
         {
             int remaining = amount;
             for (int piece = 0; remaining > 0 && piece < MaxPieces; piece++)
             {
                 int value = PieceValue(remaining, piece);
-                int coinId = ledger.Drop(new CoinEventId(tick, kind, character, piece), states, character, value, origin + Offsets[piece],
+                int coinId = ledger.Drop(new CoinEventId(tick, kind, character, piece), states, character, value, origin + offsets[piece],
                     tick + rules.DropPickableDelayTicks, tick + rules.DropLifetimeTicks);
                 if (coinId < 0)
                 {

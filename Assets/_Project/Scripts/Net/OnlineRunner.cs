@@ -53,6 +53,8 @@ namespace Degunatsu.Net
         [SerializeField] private WireView[] _wireViews = new WireView[0];
         [SerializeField] private AimIndicatorView _aimIndicator;
         [SerializeField] private string _address = "127.0.0.1";
+        [Tooltip("プレイヤーネーム（空なら P1〜P4）。前に入れた名前を PlayerPrefs から読む")]
+        [SerializeField] private string _playerName = string.Empty;
         [SerializeField] private ushort _port = 7777;
         [Tooltip("ロールバックの設定（すべて【仮】。T2-9 で決める）")]
         [SerializeField] private RollbackSettings _rollback = new RollbackSettings();
@@ -104,7 +106,7 @@ namespace Degunatsu.Net
         int ISimulationFeed.LocalCharacter => Running ? _session.LocalPlayer : -1;
         CharacterState ISimulationFeed.GetState(int index) => _session.World.GetState(index);
         CharacterConfig ISimulationFeed.GetConfig(int index) => _session.World.GetConfig(index);
-        string ISimulationFeed.LabelOf(int index) => $"P{index + 1}";
+        string ISimulationFeed.LabelOf(int index) => LabelOf(index);
         int ISimulationFeed.CurrentTick => Running ? _session.World.Tick : 0;
         MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
         CoinField ISimulationFeed.Coins => Running ? _session.World.Coins.Field : null;
@@ -198,6 +200,10 @@ namespace Degunatsu.Net
                 Debug.LogError($"{name}: CharacterConfigAsset、InputActionAsset、出現位置、Camera のどれかが設定されていません", this);
                 enabled = false;
                 return;
+            }
+            if (string.IsNullOrEmpty(_playerName))
+            {
+                _playerName = OnlineSession.SanitizeName(PlayerPrefs.GetString(PlayerNameKey, string.Empty));
             }
             if (_characterViews.Length < OnlineSession.MaxPlayers || _wireViews.Length < OnlineSession.MaxPlayers)
             {
@@ -327,6 +333,7 @@ namespace Degunatsu.Net
             try
             {
                 _session = open();
+                _session.LocalName = _playerName;
                 _message = string.Empty;
                 return true;
             }
@@ -422,9 +429,49 @@ namespace Degunatsu.Net
             GUILayout.EndArea();
         }
 
+        private const string PlayerNameKey = "Degunatsu.PlayerName";
+
+        /// <summary>表示用の名前（入力したプレイヤーネーム。なければ P1〜P4）。</summary>
+        public string LabelOf(int index)
+        {
+            IReadOnlyList<string> names = _session != null ? _session.PlayerNames : null;
+            string name = names != null && index >= 0 && index < names.Count ? names[index] : string.Empty;
+            return string.IsNullOrEmpty(name) ? $"P{index + 1}" : name;
+        }
+
+        /// <summary>自分のプレイヤーネーム（テスト用にも公開。セッションにも渡す）。</summary>
+        public string PlayerName
+        {
+            get => _playerName;
+            set
+            {
+                _playerName = OnlineSession.SanitizeName(value);
+                if (_session != null)
+                {
+                    _session.LocalName = _playerName;
+                }
+            }
+        }
+
+        // プレイヤーネームの入力欄（ロビーの前とロビーで）。変えたら覚えておき、セッションにも渡す。
+        private void DrawNameField()
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Name", _style, GUILayout.Width(70f));
+            string edited = GUILayout.TextField(_playerName, OnlineSession.MaxNameLength, GUILayout.Width(160f));
+            GUILayout.Label("(empty = P1-P4)", _style);
+            GUILayout.EndHorizontal();
+            if (edited != _playerName)
+            {
+                PlayerName = edited;
+                PlayerPrefs.SetString(PlayerNameKey, _playerName);
+            }
+        }
+
         private void DrawConnectPanel()
         {
             GUILayout.Label("Online (T2-7)", _style);
+            DrawNameField();
             GUILayout.BeginHorizontal();
             GUILayout.Label("Address", _style, GUILayout.Width(70f));
             _address = GUILayout.TextField(_address, GUILayout.Width(160f));
@@ -487,6 +534,10 @@ namespace Degunatsu.Net
                     }
                     return;
                 }
+            }
+            if (_session.State == OnlineSession.SessionState.Lobby)
+            {
+                DrawNameField();
             }
             if (_session.IsHost && _session.State == OnlineSession.SessionState.Lobby)
             {

@@ -108,7 +108,7 @@ namespace Degunatsu.Core.Economy
             state.Coins.Held -= amount;
             states[character] = state;
             int coinId = Field.NextCoinId++;
-            Field.Add(new FieldCoin(coinId, position, amount, pickableFromTick, expireTick));
+            Field.Add(new FieldCoin(coinId, position, amount, pickableFromTick, expireTick, -1, id.Kind));
             Record(id, character, coinId, amount, position);
             return coinId;
         }

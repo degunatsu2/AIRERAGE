@@ -35,6 +35,8 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private LineRenderer _next;
         [Tooltip("予告の音（なくてもよい）")]
         [SerializeField] private GameAudio _audio;
+        [Tooltip("画面の外のときの誘導表示（矢印と札）を描く層")]
+        [SerializeField] private EdgeGuideLayer _guides;
         [Tooltip("拠点の色（輪、誘導表示の札の縁と斜めの線。水色）")]
         [SerializeField] private Color _color = new Color(0.35f, 0.85f, 1f);
         [Tooltip("予告が始まったときの「BANK MOVES IN n」の秒数")]
@@ -43,20 +45,15 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private int _noticeSoundWindowTicks = 30;
         [Tooltip("光の柱の高さ（m）")]
         [SerializeField] private float _beamHeight = 9f;
-        [Tooltip("画面の端の矢印を置く、端からの距離（ピクセル）")]
-        [SerializeField] private float _edgeMargin = 56f;
         [SerializeField] private float _popupSeconds = 1.3f;
         [SerializeField] private float _flashSeconds = 0.5f;
 
         private readonly List<Popup> _popups = new List<Popup>();
         private int[] _shownBanked = new int[0];
         private ISimulationFeed _feed;
-        private Texture2D _arrow;
         private Texture2D _bankIcon;
-        private GuidePlate _plate;
         private GUIStyle _label;
         private GUIStyle _popup;
-        private GUIStyle _plateText;
         private GUIStyle _banner;
         private float _noticeStartedAt = float.NegativeInfinity;
         private float _flashStartedAt = float.NegativeInfinity;
@@ -65,10 +62,7 @@ namespace Degunatsu.Runtime.Presentation
         private Vector3 _nextCenter;
         private float _radius;
         private int _secondsUntilMove;
-        private Vector2 _bankEdge;
-        private float _bankAngle;
-        private Vector2 _nextEdge;
-        private float _nextAngle;
+        private bool _nextOffscreen;
 
         /// <summary>今の拠点の地点の番号（なければ -1）と、予告している次の地点の番号（予告していなければ -1）。テスト用。</summary>
         public int CurrentSpot { get; private set; } = -1;
@@ -110,19 +104,19 @@ namespace Degunatsu.Runtime.Presentation
             _next.loop = true;
             _sweep.positionCount = SweepSegments;
             _beam.positionCount = 2;
+            _bankIcon = GuideIcons.Bank(64, _color);
+            if (_guides == null)
+            {
+                Debug.LogError($"{name}: 誘導表示の層（EdgeGuideLayer）が設定されていません。画面の外の拠点を示せません", this);
+            }
         }
 
         private void OnDestroy()
         {
-            if (_arrow != null)
-            {
-                Destroy(_arrow);
-            }
             if (_bankIcon != null)
             {
                 Destroy(_bankIcon);
             }
-            _plate?.Dispose();
         }
 
         private void Update()
@@ -187,11 +181,9 @@ namespace Degunatsu.Runtime.Presentation
                 DrawRing(_next, _nextCenter, _radius, _color, blink);
             }
 
-            BankOffscreen = ScreenEdgeMarker.Locate(_camera, _bankCenter, _edgeMargin, out _bankEdge, out _bankAngle);
-            if (NextSpot >= 0)
-            {
-                ScreenEdgeMarker.Locate(_camera, _nextCenter, _edgeMargin, out _nextEdge, out _nextAngle);
-            }
+            // 画面の外なら、誘導表示の札（左に拠点の絵、右に「BANK」。予告中は次の地点も「NEXT」で）。
+            BankOffscreen = _guides != null && _guides.Add(_bankCenter, _color, _bankIcon, "BANK");
+            _nextOffscreen = NextSpot >= 0 && _guides != null && _guides.Add(_nextCenter, _color, _bankIcon, "NEXT", 0.7f);
         }
 
         // 確定した数が増えた人を探し、「+n BANKED」を出して輪を光らせる（巻き戻しで減ったときは何も出さない）。
@@ -238,11 +230,7 @@ namespace Degunatsu.Runtime.Presentation
             {
                 _label = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _popup = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                _plateText = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _banner = new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                _arrow = ScreenEdgeMarker.CreateArrowTexture(64);
-                _bankIcon = GuideIcons.Bank(64, _color);
-                _plate = new GuidePlate(180, 48);
             }
             if (NoticeBannerShowing && CurrentSpot >= 0)
             {
@@ -255,11 +243,10 @@ namespace Degunatsu.Runtime.Presentation
             if (CurrentSpot >= 0)
             {
                 string move = NextSpot >= 0 ? $"MOVE {_secondsUntilMove}" : null;
-                DrawMarker(_bankCenter, BankOffscreen, _bankEdge, _bankAngle, "BANK", "BANK", move, 1f);
+                DrawMarker(_bankCenter, BankOffscreen, "BANK", move, 1f);
                 if (NextSpot >= 0)
                 {
-                    bool nextOffscreen = ScreenEdgeMarker.Locate(_camera, _nextCenter, _edgeMargin, out _, out _);
-                    DrawMarker(_nextCenter, nextOffscreen, _nextEdge, _nextAngle, $"NEXT {_secondsUntilMove}", "NEXT", null, 0.7f);
+                    DrawMarker(_nextCenter, _nextOffscreen, $"NEXT {_secondsUntilMove}", null, 0.7f);
                 }
             }
             foreach (Popup popup in _popups)
@@ -276,17 +263,13 @@ namespace Degunatsu.Runtime.Presentation
             GUI.color = previous;
         }
 
-        // 画面の中なら輪の上に文字、外なら画面の端に矢印と誘導表示の札（左に拠点の絵、右に plateText）。
-        private void DrawMarker(Vector3 center, bool offscreen, Vector2 edge, float angle, string title, string plateText, string sub, float alpha)
+        // 画面の中なら輪の上に文字（外のときは EdgeGuideLayer が札を描く）。
+        private void DrawMarker(Vector3 center, bool offscreen, string title, string sub, float alpha)
         {
             Color color = _color;
             color.a = alpha;
             if (offscreen)
             {
-                float pulse = 1f + 0.1f * Mathf.Sin(Time.time * 6f);
-                ScreenEdgeMarker.DrawArrow(_arrow, edge, angle, 40f * pulse, color);
-                Rect plate = _plate.PlaceAtEdge(edge, angle, 40f, 8f);
-                _plate.Draw(plate, _color, _bankIcon, plateText, _plateText, alpha);
                 return;
             }
             if (!ToScreen(center + new Vector3(0f, _radius + 0.7f, 0f), out Vector2 screen))

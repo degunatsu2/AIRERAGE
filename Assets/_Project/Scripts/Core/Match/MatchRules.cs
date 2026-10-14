@@ -63,8 +63,8 @@ namespace Degunatsu.Core.Match
         /// <summary>撃破ドロップを落とす位置: ステージの外に出た位置を、ステージの範囲のこれだけ内側（m）に入れる【仮】。</summary>
         public float KoDropInset = 4f;
 
-        /// <summary>ドロップしたコインを、だれも拾えない時間（ティック。0.5 秒）【仮】。</summary>
-        public int DropPickableDelayTicks = 30;
+        /// <summary>ドロップしたコインを、だれも拾えない時間（ティック。1 秒。戦っている2人が攻撃の途中に拾わないように 0.5 秒から延ばした）【仮】。</summary>
+        public int DropPickableDelayTicks = 60;
 
         /// <summary>ドロップしたコインの寿命（ティック。10 秒）【仮】。過ぎると消える。</summary>
         public int DropLifetimeTicks = 600;

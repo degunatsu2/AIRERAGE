@@ -44,6 +44,8 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private RingGaugeView _respawnGauge;
         [Tooltip("ドロップしたコインが消える前に点滅する時間（ティック）")]
         [SerializeField] private int _dropBlinkTicks = 120;
+        [Tooltip("被弾ドロップのコインが、落とした所から飛んでいく時間（秒。拾えない時間より短く）")]
+        [SerializeField] private float _flySeconds = 0.35f;
 
         private static readonly int LookCount = System.Enum.GetValues(typeof(CoinLook)).Length;
 
@@ -65,6 +67,8 @@ namespace Degunatsu.Runtime.Presentation
             public Transform[] Faces;
             public Renderer[] Renderers;
             public float BornAt;
+            public bool Flies;
+            public Vector3 FlyFrom;
         }
 
         /// <summary>次に出るまでのゲージを出している出現地点の数（テスト用）。</summary>
@@ -158,12 +162,21 @@ namespace Degunatsu.Runtime.Presentation
                 {
                     shown = Take(LookOf(coin.Value));
                     shown.BornAt = time;
+                    // 被弾ドロップは、落とした位置（当たった人の位置）から、それぞれの場所へ飛んでいくように見せる。
+                    shown.Flies = coin.Origin == CoinEventKind.HitDrop;
+                    shown.FlyFrom = shown.Flies ? BatchCenter(field, coin) : Vector3.zero;
                     _shown.Add(coin.Id, shown);
                 }
                 float pop = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((time - shown.BornAt) / _popSeconds));
                 float bob = Mathf.Sin(time * 2.5f + coin.Id) * _bobHeight;
                 Transform t = shown.Visual.transform;
-                t.position = new Vector3(coin.Position.X, coin.Position.Y + bob, 0f);
+                var target = new Vector3(coin.Position.X, coin.Position.Y + bob, 0f);
+                if (shown.Flies)
+                {
+                    float fly = Mathf.Clamp01((time - shown.BornAt) / Mathf.Max(0.01f, _flySeconds));
+                    target = Vector3.Lerp(shown.FlyFrom, target, 1f - (1f - fly) * (1f - fly));
+                }
+                t.position = target;
                 t.localScale = Vector3.one * pop;
                 // 面をカメラに向けたまま、縦の軸で回す（ピラミッドの 3 枚はそろえて回す）。
                 Quaternion spin = Quaternion.Euler(0f, time * _spinDegreesPerSecond + coin.Id * 37f, 0f) * Quaternion.Euler(90f, 0f, 0f);
@@ -182,6 +195,24 @@ namespace Degunatsu.Runtime.Presentation
             BlinkHiddenCount = hidden;
             UpdatePreview(time);
             UpdateGauges(field, tick);
+        }
+
+        // 被弾ドロップを落とした位置: 同じときに落ちたコイン（同じ拾えるティック）の真ん中から、並べ方の平均のずれを引く。
+        private static Vector3 BatchCenter(CoinField field, FieldCoin coin)
+        {
+            Vector2 sum = Vector2.zero;
+            int count = 0;
+            foreach (FieldCoin other in field.Coins)
+            {
+                if (other.Origin == coin.Origin && other.PickableFromTick == coin.PickableFromTick)
+                {
+                    sum += new Vector2(other.Position.X, other.Position.Y);
+                    count++;
+                }
+            }
+            sum /= Mathf.Max(1, count);
+            System.Numerics.Vector2 offset = CoinDropRules.MeanHitOffset(count);
+            return new Vector3(sum.x - offset.X, sum.y - offset.Y, 0f);
         }
 
         // 100 枚のコインの予告の間、出る地点に小さな虹色のコインを脈打たせる。
