@@ -349,6 +349,14 @@ namespace Airerage.Editor
             }
         }
 
+        /// <summary>試合中のお知らせ（タイマーの下の札と、画面を横切る帯。ユーザーの選択、2026-10-14）。source は ISimulationFeed。</summary>
+        internal static void CreateNoticeHud(MonoBehaviour source, GameAudio audio)
+        {
+            var hud = new GameObject("NoticeHud").AddComponent<NoticeHud>();
+            SetReference(hud, "_source", source);
+            SetReference(hud, "_audio", audio);
+        }
+
         // 100 枚のコインの枚数（ユーザーの要望、2026-10-13）。
         internal const int JackpotValue = 100;
 

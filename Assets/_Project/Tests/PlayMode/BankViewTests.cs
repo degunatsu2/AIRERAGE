@@ -68,11 +68,15 @@ namespace Airerage.PlayMode.Tests
             Assert.That(runner.Session.World.BankSpots.Count, Is.EqualTo(runner.Stage.BankSpots.Count), "試合のワールドに拠点が渡っていない");
             Assert.That(view.CurrentSpot, Is.EqualTo(0), "始まりの拠点が最初の地点ではない");
 
+            var notices = Object.FindFirstObjectByType<NoticeHud>();
+            Assert.That(notices, Is.Not.Null, "お知らせの表示（NoticeHud）がない");
+            bool chip = false;
             bool announced = false;
             int announcedSpot = -1;
             float start = Time.time;
             while (Time.time - start < 3f && view.CurrentSpot == 0)
             {
+                chip |= notices.ChipTitles.Contains("BANK MOVES");
                 if (view.NextSpot >= 0)
                 {
                     announced = true;
@@ -84,6 +88,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(view.CurrentSpot, Is.Not.EqualTo(0), "拠点が移らない");
             Assert.That(view.CurrentSpot, Is.EqualTo(announcedSpot), "予告と違う地点に移った");
             Assert.That(view.NoticeCount, Is.GreaterThanOrEqualTo(1), "予告の表示を出していない");
+            Assert.That(chip, Is.True, "タイマーの下に「BANK MOVES」の札が出ない");
             Assert.That(Object.FindFirstObjectByType<GameAudio>().History.Contains(SoundId.BankNotice), Is.True, "予告の呼び鈴が鳴らない");
             runner.Leave();
         }

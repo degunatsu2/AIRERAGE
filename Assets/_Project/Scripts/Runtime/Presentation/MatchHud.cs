@@ -13,6 +13,8 @@ namespace Airerage.Runtime.Presentation
     /// 結果には「Restart」と「Quit」（IMatchControls があれば）。復帰までの残りは、出現位置の周りのゲージで示す（CharacterView）。
     /// 始まる前の演出は「シネマスコープ」（D-46 の C 案。ユーザーの選択、2026-10-13）: 画面の上下に黒い帯が入り、全員の名前が色つきで
     /// 左右から滑り込む。始まると、帯が斜めに切り裂かれるように開く。
+    /// 残り時間は、上の辺に付いた台形の札と、その下の試合の流れのバー（TimerPlate。ユーザーの選択、2026-10-14）。残り 10 秒は
+    /// 赤く脈打ち、1 秒ごとに短い音。アディショナルタイムは橙色。お知らせ（拠点の移動、100 枚のコイン、COIN RUSH）は NoticeHud。
     /// 試合の段階と残りは、ティック数と MatchRules から求める（ISimulationFeed）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class MatchHud : MonoBehaviour
@@ -36,7 +38,7 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _finishSeconds = 1.5f;
         [Tooltip("残り時間を目立たせる秒数")]
         [SerializeField] private int _warningSeconds = 10;
-        [Tooltip("「OVERTIME」「COIN RUSH」を大きく出す秒数")]
+        [Tooltip("「OVERTIME」を大きく出す秒数")]
         [SerializeField] private float _bannerSeconds = 2f;
 
         private ISimulationFeed _feed;
@@ -48,8 +50,9 @@ namespace Airerage.Runtime.Presentation
         private float _finishAt = -1f;
         private float _introProgress = -1f;
         private float _overtimeAt = -1f;
-        private float _rushAt = -1f;
-        private bool _wasLateGame;
+        private int _lastWarningSecond = -1;
+        private readonly List<float> _bankMoves = new List<float>();
+        private TimerPlate _timerPlate;
         private GUIStyle _center;
         private GUIStyle _timer;
         private GUIStyle _plate;
@@ -62,6 +65,13 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>上の中央の残り時間（時間の制限がなければ空）。</summary>
         public string TimerText { get; private set; } = string.Empty;
+
+        /// <summary>タイマーの札の見出し（TIME / OVERTIME）と数字（テスト用）。</summary>
+        public string TimerLabel { get; private set; } = string.Empty;
+        public string TimerDigits { get; private set; } = string.Empty;
+
+        /// <summary>残り 10 秒の、1 秒ごとの音を鳴らした数（テスト用）。</summary>
+        public int CountdownTicksPlayed { get; private set; }
 
         /// <summary>始まる前の演出（黒い帯と名前）を出しているか。</summary>
         public bool ShowingIntro => _introProgress >= 0f;
@@ -81,12 +91,10 @@ namespace Airerage.Runtime.Presentation
         /// <summary>アディショナルタイムに、拠点に着けば勝てる人の名前（「BANK = WIN」の行。テスト用）。</summary>
         public string ChallengersText { get; private set; } = string.Empty;
 
-        /// <summary>終盤（COIN RUSH）の表示を出しているか（テスト用）。</summary>
-        public bool ShowingRush => _rushAt >= 0f && Time.time - _rushAt < _bannerSeconds;
-
         private void OnDestroy()
         {
             _resultPlate?.Dispose();
+            _timerPlate?.Dispose();
         }
 
         private void Awake()
@@ -116,11 +124,12 @@ namespace Airerage.Runtime.Presentation
                 _openAt = -1f;
                 _finishAt = -1f;
                 _overtimeAt = -1f;
-                _rushAt = -1f;
-                _wasLateGame = false;
+                _lastWarningSecond = -1;
             }
             CenterText = string.Empty;
             TimerText = string.Empty;
+            TimerLabel = string.Empty;
+            TimerDigits = string.Empty;
             ShowingResults = false;
             Ranking = new int[0];
             ChallengersText = string.Empty;
@@ -134,13 +143,6 @@ namespace Airerage.Runtime.Presentation
             MatchState match = _feed.Match;
             MatchPhase phase = MatchFlow.PhaseAt(rules, match, tick);
             int left = MatchFlow.TicksLeftAt(rules, match, tick);
-            bool late = phase == MatchPhase.Playing && MatchFlow.IsLateGame(rules, tick);
-            if (late && !_wasLateGame)
-            {
-                // 残り 30 秒: コインの出現が増える（COIN RUSH）。
-                _rushAt = Time.time;
-            }
-            _wasLateGame = late;
             switch (phase)
             {
                 case MatchPhase.Countdown:
@@ -162,6 +164,15 @@ namespace Airerage.Runtime.Presentation
                     {
                         int seconds = Seconds(left);
                         TimerText = $"{seconds / 60}:{seconds % 60:00}";
+                        TimerLabel = "TIME";
+                        TimerDigits = TimerText;
+                        // 残り 10 秒は、1 秒ごとに短い音。
+                        if (seconds <= _warningSeconds && seconds > 0 && seconds != _lastWarningSecond)
+                        {
+                            _lastWarningSecond = seconds;
+                            CountdownTicksPlayed++;
+                            Play(SoundId.CountdownTick);
+                        }
                     }
                     break;
                 case MatchPhase.Overtime:
@@ -171,6 +182,8 @@ namespace Airerage.Runtime.Presentation
                         Play(SoundId.Overtime);
                     }
                     TimerText = $"OVERTIME {Seconds(left)}";
+                    TimerLabel = "OVERTIME";
+                    TimerDigits = Seconds(left).ToString();
                     if (Time.time - _overtimeAt < _bannerSeconds)
                     {
                         CenterText = "OVERTIME";
@@ -184,6 +197,8 @@ namespace Airerage.Runtime.Presentation
                         Play(SoundId.Finish);
                     }
                     TimerText = "0:00";
+                    TimerLabel = "TIME";
+                    TimerDigits = TimerText;
                     if (Time.time - _finishAt < _finishSeconds)
                     {
                         CenterText = match.Winner >= 0 ? $"{_feed.LabelOf(match.Winner)} WINS!" : "FINISH!";
@@ -275,20 +290,7 @@ namespace Airerage.Runtime.Presentation
             GUI.matrix = matrix;
             if (TimerText.Length > 0)
             {
-                MatchPhase phase = _rules != null ? MatchFlow.PhaseAt(_rules, _feed.Match, _feed.CurrentTick) : MatchPhase.Playing;
-                bool warning = phase == MatchPhase.Playing
-                    && MatchFlow.TicksLeftAt(_rules, _feed.Match, _feed.CurrentTick) <= _warningSeconds * SimTime.TicksPerSecond;
-                Color timerColor = phase == MatchPhase.Overtime ? new Color(1f, 0.6f, 0.15f) : warning ? new Color(1f, 0.35f, 0.3f) : Color.white;
-                Shadowed(new Rect(Screen.width * 0.5f - 200f, 8f, 400f, 56f), TimerText, _timer, timerColor);
-                if (ChallengersText.Length > 0)
-                {
-                    Shadowed(new Rect(Screen.width * 0.5f - 300f, 62f, 600f, 34f), $"BANK = WIN:  {ChallengersText}", _small, new Color(1f, 0.85f, 0.4f));
-                }
-                if (ShowingRush)
-                {
-                    float pulse = 0.6f + 0.4f * Mathf.Sin(Time.time * 12f);
-                    Shadowed(new Rect(Screen.width * 0.5f - 300f, 62f, 600f, 40f), "LAST 30 SECONDS!  COIN RUSH", _small, new Color(1f, 0.85f, 0.25f, pulse));
-                }
+                DrawTimer();
             }
             if (CenterText.Length > 0)
             {
@@ -299,6 +301,29 @@ namespace Airerage.Runtime.Presentation
                 DrawResults();
             }
             GUI.color = previous;
+        }
+
+        // 上の中央の台形の札と、試合の流れのバー（TimerPlate）。その下に、アディショナルタイムに拠点に着けば勝てる人。
+        private void DrawTimer()
+        {
+            if (_timerPlate == null)
+            {
+                _timerPlate = new TimerPlate();
+            }
+            MatchState match = _feed.Match;
+            int tick = _feed.CurrentTick;
+            MatchPhase phase = MatchFlow.PhaseAt(_rules, match, tick);
+            int left = MatchFlow.TicksLeftAt(_rules, match, tick);
+            bool warning = phase == MatchPhase.Playing && left <= _warningSeconds * SimTime.TicksPerSecond;
+            Color color = phase == MatchPhase.Overtime ? new Color(1f, 0.6f, 0.15f) : warning ? new Color(1f, 0.35f, 0.3f) : Color.white;
+            float scale = warning ? 1f + 0.08f * Mathf.Abs(Mathf.Sin(Time.time * Mathf.PI)) : 1f;
+            float remaining = phase == MatchPhase.Playing && _rules.DurationTicks > 0 ? (float)left / _rules.DurationTicks : phase == MatchPhase.Overtime ? 0f : -1f;
+            TimerPlate.Timeline timeline = TimerPlate.TimelineOf(_rules, tick, _bankMoves);
+            float bottom = _timerPlate.Draw(Screen.width * 0.5f, TimerLabel, TimerDigits, color, remaining, scale, timeline);
+            if (ChallengersText.Length > 0)
+            {
+                Shadowed(new Rect(Screen.width * 0.5f - 300f, bottom + 4f, 600f, 30f), $"BANK = WIN:  {ChallengersText}", _small, new Color(1f, 0.85f, 0.4f));
+            }
         }
 
         // シネマスコープの演出。progress はカウントダウンの進み（0〜1）、open は始まった後に帯が開く進み（0〜1）。

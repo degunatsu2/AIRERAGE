@@ -277,6 +277,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(runner, "_audio", audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
+            SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner, guides);
             SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio, guides);

@@ -92,6 +92,8 @@ namespace Airerage.PlayMode.Tests
             var hud = Object.FindFirstObjectByType<CoinHud>();
             var view = Object.FindFirstObjectByType<CoinView>();
             var atmosphere = Object.FindFirstObjectByType<MatchAtmosphere>();
+            var notices = Object.FindFirstObjectByType<NoticeHud>();
+            Assert.That(notices, Is.Not.Null, "お知らせの表示（NoticeHud）がない");
             var audio = Object.FindFirstObjectByType<GameAudio>();
             Assert.That(atmosphere, Is.Not.Null, "終盤の雰囲気の切り替えがない");
             runner.HostRules.CountdownTicks = 0;
@@ -114,6 +116,8 @@ namespace Airerage.PlayMode.Tests
             Assert.That(audio.BgmTense, Is.True, "緊張感のある BGM にならない");
             Assert.That(audio.History.Contains(SoundId.JackpotAlarm), Is.True, "警報が鳴らない");
             Assert.That(atmosphere.SkyBlend, Is.GreaterThan(0f), "空が赤くならない");
+            Assert.That(notices.ChipTitles, Does.Contain("JACKPOT"), "タイマーの下に予告の札が出ない");
+            Assert.That(notices.BandsShown, Is.EqualTo(1), "JACKPOT INCOMING の帯が出ない");
 
             yield return WaitSeconds(0.6f);
             Assert.That(view.PreviewShowing, Is.False, "出た後も予告の印が残っている");
@@ -135,7 +139,7 @@ namespace Airerage.PlayMode.Tests
             yield return WaitSeconds(0.3f);
             Assert.That(glow.CurrentColor, Is.Not.EqualTo(before), "色が移り変わらない");
             Assert.That(hud.JackpotPresent, Is.True, "100 枚のコインを見つけていない");
-            Assert.That(hud.JackpotBannerShowing, Is.True, "「JACKPOT」が出ない");
+            Assert.That(notices.ChipTitles, Does.Contain($"JACKPOT {CoinView.RainbowValue}"), "出た後の「JACKPOT 100」の札が出ない");
 
             bool onScreen = !ScreenEdgeMarker.Locate(Object.FindFirstObjectByType<Camera>(),
                 new Vector3(jackpot.Position.X, jackpot.Position.Y, 0f), 56f, out _, out _);

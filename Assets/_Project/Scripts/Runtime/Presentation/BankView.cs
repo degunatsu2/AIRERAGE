@@ -13,8 +13,8 @@ namespace Airerage.Runtime.Presentation
     /// 拠点（バンク。docs/12_match_plan.md T4-7）の表示。状態を読むだけで、書き換えない。場所はティック数とルールから求める
     /// （BankRules.SpotAt）。
     /// - 今の拠点: 脈打つ輪（確定に使う円と同じ半径）、回る弧、上へ伸びる光の柱、「BANK」の文字。
-    /// - 予告（移る 10 秒前から）: 次の地点に点滅する輪と「NEXT n」、今の拠点に「MOVE n」。予告が始まった瞬間に、画面の上に
-    ///   「BANK MOVES IN n」を出し、呼び鈴の音を鳴らす（ユーザーの要望、2026-10-14）。
+    /// - 予告（移る 10 秒前から）: 次の地点に点滅する輪と「NEXT n」、今の拠点に「MOVE n」。予告が始まった瞬間に、呼び鈴の音を
+    ///   鳴らす（ユーザーの要望、2026-10-14）。画面のお知らせ（タイマーの下の「BANK MOVES」の札）は NoticeHud。
     /// - 画面の外にあるときは、画面の端の矢印と誘導表示の札（GuidePlate。左に拠点の絵、右に「BANK」。縁は水色）で場所を示す
     ///   （予告中は次の地点も「NEXT」の札で）。
     /// - だれかが確定したら、その人の位置から「+n BANKED」が浮かび、輪がその人の色で光る（確定した数を前のフレームと比べる）。
@@ -39,8 +39,6 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private EdgeGuideLayer _guides;
         [Tooltip("拠点の色（輪、誘導表示の札の縁と斜めの線。水色）")]
         [SerializeField] private Color _color = new Color(0.35f, 0.85f, 1f);
-        [Tooltip("予告が始まったときの「BANK MOVES IN n」の秒数")]
-        [SerializeField] private float _noticeBannerSeconds = 2.5f;
         [Tooltip("予告が始まってから、これだけ遅れて表示を始めたときは音を鳴らさない（ティック。途中から見始めたとき）")]
         [SerializeField] private int _noticeSoundWindowTicks = 30;
         [Tooltip("光の柱の高さ（m）")]
@@ -54,8 +52,6 @@ namespace Airerage.Runtime.Presentation
         private Texture2D _bankIcon;
         private GUIStyle _label;
         private GUIStyle _popup;
-        private GUIStyle _banner;
-        private float _noticeStartedAt = float.NegativeInfinity;
         private float _flashStartedAt = float.NegativeInfinity;
         private Color _flashColor = Color.white;
         private Vector3 _bankCenter;
@@ -71,8 +67,6 @@ namespace Airerage.Runtime.Presentation
         /// <summary>今の拠点が画面の外か（端に矢印を出しているか）。テスト用。</summary>
         public bool BankOffscreen { get; private set; }
 
-        /// <summary>予告の「BANK MOVES IN n」を出しているか（テスト用）。</summary>
-        public bool NoticeBannerShowing => Time.time - _noticeStartedAt < _noticeBannerSeconds;
 
         /// <summary>予告が始まった回数（テスト用）。</summary>
         public int NoticeCount { get; private set; }
@@ -143,7 +137,6 @@ namespace Airerage.Runtime.Presentation
             {
                 // 予告が始まった（巻き戻しではティックは戻らないので、1 回の予告で 1 回だけ）。
                 NoticeCount++;
-                _noticeStartedAt = Time.time;
                 if (_audio != null && rules.BankNoticeTicks - ticksUntilMove <= _noticeSoundWindowTicks)
                 {
                     _audio.Play(SoundId.BankNotice);
@@ -230,14 +223,6 @@ namespace Airerage.Runtime.Presentation
             {
                 _label = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _popup = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                _banner = new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            }
-            if (NoticeBannerShowing && CurrentSpot >= 0)
-            {
-                float t = (Time.time - _noticeStartedAt) / _noticeBannerSeconds;
-                Color color = Color.Lerp(Color.white, _color, 0.5f + 0.5f * Mathf.Sin(Time.time * 10f));
-                color.a = Mathf.Clamp01((1f - t) * 4f);
-                Shadowed(new Rect(0f, Screen.height * 0.3f - 30f, Screen.width, 60f), $"BANK MOVES IN {_secondsUntilMove}", _banner, color);
             }
             Color previous = GUI.color;
             if (CurrentSpot >= 0)
