@@ -256,6 +256,47 @@ namespace Degunatsu.Net.Tests
         }
 
         [Test]
+        public void Restart_ResendsTheStart_UntilTheClientHasStarted_AndDuplicatesAreIgnored()
+        {
+            // 配布したビルドの再戦で、クライアントが始まらずに止まった（2026-10-14）。開始のメッセージが届いたと分かるまで送り直す。
+            OnlineSession host = Host();
+            OnlineSession client = Join(host);
+            PumpUntil(() => client.LocalPlayer >= 0);
+            var rules = new MatchRules { CountdownTicks = 10, DurationTicks = 60, OvertimeTicks = 0 };
+            host.StartMatch(rules);
+            PumpUntil(() => _sessions.TrueForAll(s => s.World != null && s.World.Phase == MatchPhase.Finished));
+
+            // クライアントからホストへの送信を全部落とす（ホストは、クライアントが新しい試合を始めたことを知れない）。
+            client.Link.SetSimulatedConditions(0, 0, 100);
+            host.RestartMatch(rules);
+            int match = host.MatchNumber;
+            var watch = Stopwatch.StartNew();
+            while (watch.ElapsedMilliseconds < 1500)
+            {
+                PumpFrames(1);
+                Thread.Sleep(1);
+            }
+            Assert.That(client.MatchNumber, Is.EqualTo(match), "クライアントに開始のメッセージが届かない");
+            Assert.That(host.StartResends, Is.GreaterThan(0), "始めたと分からないのに、送り直さない");
+            int startedTick = client.Session.CurrentTick;
+            Assert.That(startedTick, Is.GreaterThan(0), "前提: クライアントが新しい試合を進めている");
+
+            // 送信を戻すと、そろって進み、送り直しも止まる。送り直された開始のメッセージで、クライアントが始め直さない。
+            client.Link.SetSimulatedConditions(0, 0, 0);
+            foreach (OnlineSession session in _sessions)
+            {
+                session.TickLimit = 150;
+            }
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == 150 && s.Session.ConfirmedTick >= 149));
+            int resends = host.StartResends;
+            PumpFrames(60);
+            Assert.That(host.StartResends, Is.EqualTo(resends), "クライアントが始めた後も送り直している");
+            Assert.That(client.MatchNumber, Is.EqualTo(match));
+            Assert.That(client.World.Checksum(), Is.EqualTo(host.World.Checksum()), "送り直しのあとに状態が違う");
+            Assert.That(host.Desyncs, Is.Empty);
+        }
+
+        [Test]
         public void RestartMatch_OnlyForTheHostDuringAMatch()
         {
             OnlineSession host = Host();

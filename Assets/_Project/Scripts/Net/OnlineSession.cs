@@ -21,6 +21,9 @@ namespace Degunatsu.Net
     /// - ステージ（OnlineStage）: 地形、出現位置、ステージの範囲（撃破）、ギミック。全員が自分のシーンから作る。
     /// - プレイヤーネーム: 各自が LocalName を決める（ロビーで）。クライアントは変えるたびにホストへ送り（Hello）、ホストが試合の
     ///   開始のときに全員の名前を開始のメッセージに入れて送る（PlayerNames）。名前はシミュレーションに関係しない（表示だけ）。
+    /// - 開始のメッセージは、クライアントが新しい試合の入力を送ってくる（その試合を始めた）まで、ホストが StartResendSeconds ごとに
+    ///   送り直す（送れなかった、届かなかったときに、ホストだけが始まって止まったままにならないように。配布したビルドでの再戦で
+    ///   起きた）。クライアントは、今の試合と同じ番号の開始のメッセージは無視する。
     /// - 再戦: ホストが RestartMatch を呼ぶと、同じ人で、新しい試合の番号で始め直す。入力とチェックサムのメッセージには
     ///   試合の番号をつけ、今の試合のものだけを使う（前の試合のメッセージが遅れて届いても混ざらない）。
     /// </summary>
@@ -45,6 +48,9 @@ namespace Degunatsu.Net
         // 1フレームで進める最大のティック数（処理落ちのときに追いつこうとして、さらに遅れるのを防ぐ）。
         private const int MaxTicksPerFrame = 5;
 
+        /// <summary>まだ新しい試合を始めていないクライアントへ、開始のメッセージを送り直す間隔（秒）。</summary>
+        public const float StartResendSeconds = 0.5f;
+
         private readonly TransportLink _link;
         private readonly OnlineStage _stage;
         private readonly RollbackSettings _settings;
@@ -56,6 +62,13 @@ namespace Degunatsu.Net
 
         // ホスト: プレイヤーの番号 → ロビーで届いたプレイヤーネーム（空ならまだない）。
         private readonly string[] _lobbyNames = new string[MaxPlayers];
+
+        // ホスト: プレイヤーの番号 → そのクライアントから最後に届いた入力の試合の番号（まだなら -1）。
+        private readonly int[] _peerMatch = new int[MaxPlayers];
+
+        // ホスト: 送り直すかもしれない開始のメッセージ（全員が始めたら null）と、次に送り直すまでの秒数。
+        private byte[] _startMessage;
+        private float _startResendTimer;
         private string _localName = string.Empty;
 
         // ホスト: ティック → プレイヤーごとのチェックサム（全員の分を比べたら消す）。
@@ -170,6 +183,9 @@ namespace Degunatsu.Net
 
         public int StalledFrames { get; private set; }
         public int TimeSyncWaitFrames { get; private set; }
+
+        /// <summary>開始のメッセージを送り直した回数（ホストのみ。調査とテスト用）。</summary>
+        public int StartResends { get; private set; }
 
         /// <summary>巻き戻しで、表示中のキャラクターの位置が変わった回数（キャラクターごとに数える）。</summary>
         public int CorrectionCount { get; private set; }
@@ -294,11 +310,14 @@ namespace Degunatsu.Net
             byte[] start = NetMessages.Start(count, match, json);
             for (int p = 1; p < MaxPlayers; p++)
             {
-                if (_playerPeer[p] >= 0)
+                _peerMatch[p] = -1;
+                if (_playerPeer[p] >= 0 && !_link.Send(_playerPeer[p], start, reliable: true))
                 {
-                    _link.Send(_playerPeer[p], start, reliable: true);
+                    Debug.LogError($"OnlineSession: 試合の開始のメッセージをプレイヤー {p + 1} に送れませんでした（{start.Length} バイト）。送り直します");
                 }
             }
+            _startMessage = start;
+            _startResendTimer = StartResendSeconds;
             Begin(count, match, SettingsFromJson(json));
         }
 
@@ -314,6 +333,7 @@ namespace Degunatsu.Net
                 Advance(deltaTime, localInput);
                 SendInputs();
                 ReportChecksum();
+                ResendStartIfNeeded(deltaTime);
             }
             _link.Update(_events);
             HandleEvents();
@@ -409,6 +429,39 @@ namespace Degunatsu.Net
                 else
                 {
                     _link.Send(0, data, reliable: false);
+                }
+            }
+        }
+
+        // ホスト: 新しい試合の入力をまだ送ってこない（始めていない）クライアントへ、開始のメッセージを送り直す。
+        private void ResendStartIfNeeded(float deltaTime)
+        {
+            if (!IsHost || _startMessage == null)
+            {
+                return;
+            }
+            bool waiting = false;
+            for (int p = 1; p < PlayerCount; p++)
+            {
+                waiting |= _playerPeer[p] >= 0 && _peerMatch[p] != MatchNumber;
+            }
+            if (!waiting)
+            {
+                _startMessage = null;
+                return;
+            }
+            _startResendTimer -= deltaTime;
+            if (_startResendTimer > 0f)
+            {
+                return;
+            }
+            _startResendTimer = StartResendSeconds;
+            for (int p = 1; p < PlayerCount; p++)
+            {
+                if (_playerPeer[p] >= 0 && _peerMatch[p] != MatchNumber)
+                {
+                    _link.Send(_playerPeer[p], _startMessage, reliable: true);
+                    StartResends++;
                 }
             }
         }
@@ -531,6 +584,11 @@ namespace Degunatsu.Net
                     // 壊れたメッセージは捨てる（原因を追えるようにログを残す）。
                     Debug.LogWarning($"OnlineSession: 読めないメッセージを捨てました（相手 {e.Peer}）: {ex.Message}");
                 }
+                catch (InvalidTuningException ex)
+                {
+                    // 調整値やルールが不正な開始のメッセージ（違うビルドどうしなど）。捨てて、同じメッセージで毎フレーム止まらないようにする。
+                    Debug.LogError($"OnlineSession: 試合の開始のメッセージの値が不正なので捨てました（相手 {e.Peer}）: {ex.Message}");
+                }
             }
             _events.Clear();
         }
@@ -582,6 +640,12 @@ namespace Degunatsu.Net
             switch (NetMessages.KindOf(e.Data))
             {
                 case NetKind.Input:
+                    int inputSender = PlayerOfPeer(e.Peer);
+                    if (inputSender > 0)
+                    {
+                        // そのクライアントが今どの試合にいるか（開始のメッセージを送り直すかどうかに使う）。
+                        _peerMatch[inputSender] = NetMessages.InputMatch(e.Data);
+                    }
                     if (State != SessionState.Running || NetMessages.InputMatch(e.Data) != MatchNumber)
                     {
                         // 試合の前か、前の試合のメッセージ（再戦の前に送られて遅れて届いた）。
@@ -647,6 +711,11 @@ namespace Degunatsu.Net
                             break;
                         case NetKind.Start:
                             NetMessages.ReadStart(e.Data, out int count, out int match, out string json);
+                            if (State == SessionState.Running && match == MatchNumber)
+                            {
+                                // 送り直された、今の試合の開始のメッセージ（もう始めている）。
+                                break;
+                            }
                             Begin(count, match, SettingsFromJson(json));
                             break;
                         case NetKind.Input:

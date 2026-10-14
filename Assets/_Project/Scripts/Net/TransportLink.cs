@@ -40,6 +40,10 @@ namespace Degunatsu.Net
         // 遅延の模擬で、送るのを遅らせて覚えておけるパケットの数（入力は相手1人につき毎秒60個）。
         private const int SimulatorMaxPackets = 512;
 
+        // 信頼性ありの経路で、分けて送れるメッセージの大きさの上限（バイト）。既定の 4096 では、試合の開始のメッセージ
+        // （調整値とルールの JSON。約 4KB）に名前が加わると足りなくなるので、余裕を持たせる。両方の側で同じ値にする。
+        private const int ReliablePayloadCapacity = 16 * 1024;
+
         private NetworkDriver _driver;
         private readonly NetworkPipeline _unreliable;
         private readonly NetworkPipeline _reliable;
@@ -53,6 +57,7 @@ namespace Degunatsu.Net
             var settings = new NetworkSettings(Allocator.Temp);
             settings.WithSimulatorStageParameters(
                 maxPacketCount: SimulatorMaxPackets, mode: ApplyMode.Off, randomSeed: (uint)Stopwatch.GetTimestamp());
+            settings.WithFragmentationStageParameters(payloadCapacity: ReliablePayloadCapacity);
             _driver = NetworkDriver.Create(settings);
             _unreliable = _driver.CreatePipeline(typeof(SimulatorPipelineStage));
             _reliable = _driver.CreatePipeline(
