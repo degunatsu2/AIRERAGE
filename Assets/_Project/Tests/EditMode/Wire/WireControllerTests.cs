@@ -109,13 +109,30 @@ namespace Airerage.Core.Tests.Wire
         [Test]
         public void AimAssist_IgnoresAnchorOutsideAngle()
         {
-            float assist = new CharacterConfig().Wire.AimAssistAngleDeg;
+            var config = new CharacterConfig();
+            config.Wire.AimAssistRadius = 0f;
+            float assist = config.Wire.AimAssistAngleDeg;
             var world = TestArenas.Ground().AddAnchor(TanDeg(assist * 1.3f) * 5f, StandingY + 5f);
-            var harness = new SimHarness(world);
+            var harness = new SimHarness(world, config);
 
             harness.Step(Inputs.Wire(0f, 1f));
 
             Assert.That(harness.State.Wire.HasTargetPoint, Is.False);
+        }
+
+        [TestCase(0.8f, true)]
+        [TestCase(0f, false)]
+        public void AimAssist_PicksAnAnchorNearTheAimLine_WithinTheRadius(float radius, bool expected)
+        {
+            // 真上を狙い、2m 先のアンカーが横に 0.7m ずれている（約 19°。角度では外れる）。判定の半径の内なら対象にする。
+            var config = new CharacterConfig();
+            config.Wire.AimAssistRadius = radius;
+            var world = TestArenas.Ground().AddAnchor(0.7f, StandingY + 2f);
+            var harness = new SimHarness(world, config);
+
+            harness.Step(Inputs.Wire(0f, 1f));
+
+            Assert.That(harness.State.Wire.HasTargetPoint, Is.EqualTo(expected));
         }
 
         [Test]

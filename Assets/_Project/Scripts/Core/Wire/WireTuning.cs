@@ -80,6 +80,12 @@ namespace Airerage.Core.Wire
         /// <summary>エイムアシストの角度（度、照準方向から左右それぞれ）。</summary>
         public float AimAssistAngleDeg = 6f;
 
+        /// <summary>
+        /// アンカーポイントの判定の半径（m）【仮】。照準の線がアンカーからこの距離以内を通れば、角度が AimAssistAngleDeg より
+        /// 外れていても対象にする（近くのアンカーを狙いやすく。ユーザーの要望、2026-10-14）。0 なら角度だけ。
+        /// </summary>
+        public float AimAssistRadius = 0.8f;
+
         /// <summary>スティックの入力がないときの照準角（度、向いている方向から上向きに）。</summary>
         public float NeutralAimAngleDeg = 45f;
 
@@ -136,6 +142,7 @@ namespace Airerage.Core.Wire
             v.NonNegative(nameof(CooldownTicks), CooldownTicks);
             v.NonNegative(nameof(ReleaseCooldownTicks), ReleaseCooldownTicks);
             v.InRange(nameof(AimAssistAngleDeg), AimAssistAngleDeg, 0f, 90f);
+            v.NonNegative(nameof(AimAssistRadius), AimAssistRadius);
             v.InRange(nameof(NeutralAimAngleDeg), NeutralAimAngleDeg, -90f, 90f);
             v.InRange(nameof(AimDeadzone), AimDeadzone, 0f, 0.95f);
             v.Positive(nameof(MinRopeLength), MinRopeLength);

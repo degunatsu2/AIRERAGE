@@ -71,7 +71,8 @@ namespace Airerage.Core.Wire
         }
 
         /// <summary>
-        /// エイムアシストの対象を探す。照準方向から AimAssistAngleDeg 以内・射程内・遮るものがないアンカーポイントのうち、
+        /// エイムアシストの対象を探す。照準方向から AimAssistAngleDeg 以内か、照準の線がアンカーから AimAssistRadius 以内を通る、
+        /// 射程内・遮るものがないアンカーポイントのうち、
         /// 照準方向との角度が最も小さいもの（同じなら近いもの）を選ぶ。
         /// </summary>
         public static bool TryFindAssistTarget(
@@ -94,7 +95,9 @@ namespace Airerage.Core.Wire
                 }
 
                 float angle = SimMath.AngleBetweenDeg(aimDirection, toAnchor / distance);
-                if (angle > tuning.AimAssistAngleDeg)
+                float along = Vector3.Dot(toAnchor, aimDirection);
+                bool nearTheLine = along > 0f && (toAnchor - aimDirection * along).Length() <= tuning.AimAssistRadius;
+                if (angle > tuning.AimAssistAngleDeg && !nearTheLine)
                 {
                     continue;
                 }

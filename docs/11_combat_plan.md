@@ -272,6 +272,8 @@
 - 割り当ては調整値: `InertialWireTuning` の `NeutralMode` / `UpMode` / `DownMode`（`WireLengthMode`: Reel / Hold / ReelOut）、`ReelSpeed`、`ReelOutSpeed`、`UpInputThreshold`、`DownInputThreshold`、`HoldSwingAcceleration`。どれも【仮】。D-41 の `FastReelSpeed`（上で素早く縮む）はなくした（上はふつうの巻き取りになったため）。
 - 確認の手順は 5.14。
 
+- **アンカーポイントを狙いやすく（2026-10-14、ユーザーの要望）**: 見た目の球を直径 0.5 → 0.8m に。判定は、照準の角度（±6°）に加えて、照準の線がアンカーから 0.8m 以内を通れば対象にする（`WireTuning.AimAssistRadius`【仮】。近くのアンカーほど、角度だけでは外れやすかった）。
+
 ---
 
 ## 4. 初期パラメータ（すべて【仮】）

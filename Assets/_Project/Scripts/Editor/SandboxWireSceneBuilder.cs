@@ -257,7 +257,8 @@ namespace Airerage.Editor
             var anchorRoot = new GameObject("AnchorPoints").transform;
             foreach (Vector2 point in anchorPoints)
             {
-                GameObject go = CreateVisual(PrimitiveType.Sphere, "AnchorPoint", anchorMaterial, Vector3.one * 0.5f);
+                // 見た目の大きさ（直径 0.8m。0.5m から少し大きくした。ユーザーの要望、2026-10-14）。判定は WireTuning.AimAssistRadius。
+                GameObject go = CreateVisual(PrimitiveType.Sphere, "AnchorPoint", anchorMaterial, Vector3.one * 0.8f);
                 go.transform.SetParent(anchorRoot, false);
                 go.transform.localPosition = new Vector3(point.x, point.y, 0f);
                 go.AddComponent<WireAnchorPoint>();
