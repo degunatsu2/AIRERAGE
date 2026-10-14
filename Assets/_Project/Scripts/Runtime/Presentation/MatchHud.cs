@@ -36,6 +36,8 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private float _finishSeconds = 1.5f;
         [Tooltip("残り時間を目立たせる秒数")]
         [SerializeField] private int _warningSeconds = 10;
+        [Tooltip("「OVERTIME」「COIN RUSH」を大きく出す秒数")]
+        [SerializeField] private float _bannerSeconds = 2f;
 
         private ISimulationFeed _feed;
         private IMatchControls _matchControls;
@@ -45,9 +47,13 @@ namespace Degunatsu.Runtime.Presentation
         private float _openAt = -1f;
         private float _finishAt = -1f;
         private float _introProgress = -1f;
+        private float _overtimeAt = -1f;
+        private float _rushAt = -1f;
+        private bool _wasLateGame;
         private GUIStyle _center;
         private GUIStyle _timer;
         private GUIStyle _plate;
+        private GUIStyle _small;
         private PlayerStatusPlate _resultPlate;
         private GUIStyle _rank;
 
@@ -71,6 +77,12 @@ namespace Degunatsu.Runtime.Presentation
 
         /// <summary>結果の順位（キャラクターの番号。出していなければ空）。</summary>
         public IReadOnlyList<int> Ranking { get; private set; } = new int[0];
+
+        /// <summary>アディショナルタイムに、拠点に着けば勝てる人の名前（「BANK = WIN」の行。テスト用）。</summary>
+        public string ChallengersText { get; private set; } = string.Empty;
+
+        /// <summary>終盤（COIN RUSH）の表示を出しているか（テスト用）。</summary>
+        public bool ShowingRush => _rushAt >= 0f && Time.time - _rushAt < _bannerSeconds;
 
         private void OnDestroy()
         {
@@ -103,11 +115,15 @@ namespace Degunatsu.Runtime.Presentation
                 _platesStarted = 0;
                 _openAt = -1f;
                 _finishAt = -1f;
+                _overtimeAt = -1f;
+                _rushAt = -1f;
+                _wasLateGame = false;
             }
             CenterText = string.Empty;
             TimerText = string.Empty;
             ShowingResults = false;
             Ranking = new int[0];
+            ChallengersText = string.Empty;
             _introProgress = -1f;
             if (rules == null)
             {
@@ -115,8 +131,16 @@ namespace Degunatsu.Runtime.Presentation
             }
 
             int tick = _feed.CurrentTick;
-            MatchPhase phase = rules.PhaseAt(tick);
-            int left = rules.TicksLeftAt(tick);
+            MatchState match = _feed.Match;
+            MatchPhase phase = MatchFlow.PhaseAt(rules, match, tick);
+            int left = MatchFlow.TicksLeftAt(rules, match, tick);
+            bool late = phase == MatchPhase.Playing && MatchFlow.IsLateGame(rules, tick);
+            if (late && !_wasLateGame)
+            {
+                // 残り 30 秒: コインの出現が増える（COIN RUSH）。
+                _rushAt = Time.time;
+            }
+            _wasLateGame = late;
             switch (phase)
             {
                 case MatchPhase.Countdown:
@@ -140,6 +164,19 @@ namespace Degunatsu.Runtime.Presentation
                         TimerText = $"{seconds / 60}:{seconds % 60:00}";
                     }
                     break;
+                case MatchPhase.Overtime:
+                    if (_lastPhase != MatchPhase.Overtime)
+                    {
+                        _overtimeAt = Time.time;
+                        Play(SoundId.Overtime);
+                    }
+                    TimerText = $"OVERTIME {Seconds(left)}";
+                    if (Time.time - _overtimeAt < _bannerSeconds)
+                    {
+                        CenterText = "OVERTIME";
+                    }
+                    ChallengersText = Challengers();
+                    break;
                 case MatchPhase.Finished:
                     if (_lastPhase != MatchPhase.Finished)
                     {
@@ -149,16 +186,31 @@ namespace Degunatsu.Runtime.Presentation
                     TimerText = "0:00";
                     if (Time.time - _finishAt < _finishSeconds)
                     {
-                        CenterText = "FINISH!";
+                        CenterText = match.Winner >= 0 ? $"{_feed.LabelOf(match.Winner)} WINS!" : "FINISH!";
                     }
                     else
                     {
                         ShowingResults = true;
-                        Ranking = MatchResults.Rank(States());
+                        Ranking = MatchResults.Rank(States(), match.Winner);
                     }
                     break;
             }
             _lastPhase = phase;
+        }
+
+        // アディショナルタイムに、拠点に着けば勝てる人（確定＋所持が、ほかの人の確定の最大以上）の名前。
+        private string Challengers()
+        {
+            CharacterState[] states = States();
+            var names = new List<string>();
+            for (int i = 0; i < states.Length; i++)
+            {
+                if (MatchFlow.CanWinAtTheBank(states, i))
+                {
+                    names.Add(_feed.LabelOf(i));
+                }
+            }
+            return string.Join("  ", names);
         }
 
         // 演出の進み progress までに、滑り込み始めた名前の数。
@@ -208,6 +260,7 @@ namespace Degunatsu.Runtime.Presentation
                 _center = new GUIStyle(GUI.skin.label) { fontSize = 96, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _timer = new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _plate = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+                _small = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             }
             Color previous = GUI.color;
             Matrix4x4 matrix = GUI.matrix;
@@ -222,9 +275,20 @@ namespace Degunatsu.Runtime.Presentation
             GUI.matrix = matrix;
             if (TimerText.Length > 0)
             {
-                bool warning = _rules != null && _rules.PhaseAt(_feed.CurrentTick) == MatchPhase.Playing
-                    && _rules.TicksLeftAt(_feed.CurrentTick) <= _warningSeconds * SimTime.TicksPerSecond;
-                Shadowed(new Rect(Screen.width * 0.5f - 120f, 8f, 240f, 56f), TimerText, _timer, warning ? new Color(1f, 0.35f, 0.3f) : Color.white);
+                MatchPhase phase = _rules != null ? MatchFlow.PhaseAt(_rules, _feed.Match, _feed.CurrentTick) : MatchPhase.Playing;
+                bool warning = phase == MatchPhase.Playing
+                    && MatchFlow.TicksLeftAt(_rules, _feed.Match, _feed.CurrentTick) <= _warningSeconds * SimTime.TicksPerSecond;
+                Color timerColor = phase == MatchPhase.Overtime ? new Color(1f, 0.6f, 0.15f) : warning ? new Color(1f, 0.35f, 0.3f) : Color.white;
+                Shadowed(new Rect(Screen.width * 0.5f - 200f, 8f, 400f, 56f), TimerText, _timer, timerColor);
+                if (ChallengersText.Length > 0)
+                {
+                    Shadowed(new Rect(Screen.width * 0.5f - 300f, 62f, 600f, 34f), $"BANK = WIN:  {ChallengersText}", _small, new Color(1f, 0.85f, 0.4f));
+                }
+                if (ShowingRush)
+                {
+                    float pulse = 0.6f + 0.4f * Mathf.Sin(Time.time * 12f);
+                    Shadowed(new Rect(Screen.width * 0.5f - 300f, 62f, 600f, 40f), "LAST 30 SECONDS!  COIN RUSH", _small, new Color(1f, 0.85f, 0.25f, pulse));
+                }
             }
             if (CenterText.Length > 0)
             {
@@ -340,10 +404,10 @@ namespace Degunatsu.Runtime.Presentation
                 _resultPlate.Draw(new Rect(plateX, y, plateWidth, plateHeight), index + 1, _feed.LabelOf(index), _feed.ColorOf(index),
                     _feed.GetState(index), crown, default, new Color(1f, 0.85f, 0.2f));
             }
-            // 順位は確定コインの数（D-25）。同じなら仮に撃破の数（同点のアディショナルタイムは T4-8。D-45）。
+            // 順位は確定コインの数（D-25）。アディショナルタイムで勝った人はいちばん上。同じなら仮に撃破の数。
             GUI.color = new Color(0.8f, 0.8f, 0.85f);
             float noteY = area.y + 62f + Ranking.Count * (plateHeight + rowGap);
-            GUI.Label(new Rect(area.x + 20f, noteY, width - 40f, 28f), "Ranked by banked coins (ties: KO, then fewer falls)");
+            GUI.Label(new Rect(area.x + 20f, noteY, width - 40f, 28f), "Ranked by banked coins (overtime winner first; ties: KO, then fewer falls)");
             if (!buttons)
             {
                 return;

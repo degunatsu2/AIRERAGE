@@ -65,15 +65,18 @@ namespace Degunatsu.Core.Simulation
             return hash;
         }
 
-        /// <summary>ワールドの全状態（ティック数、全キャラクターの状態、ワールド全体のコイン）のチェックサム。</summary>
-        public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states, CoinField coins)
+        /// <summary>ワールドの全状態（ティック数、全キャラクターの状態、ワールド全体のコイン、試合の進み具合）のチェックサム。</summary>
+        public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states, CoinField coins, Match.MatchState match)
         {
             ulong hash = Mix(FnvOffsetBasis, tick);
             for (int i = 0; i < states.Count; i++)
             {
                 hash = Mix(hash, Checksum(states[i]));
             }
-            return Mix(hash, Checksum(coins));
+            hash = Mix(hash, Checksum(coins));
+            hash = Mix(hash, match.OvertimeStartTick);
+            hash = Mix(hash, match.EndTick);
+            return Mix(hash, match.Winner);
         }
 
         /// <summary>ワールド全体のコイン（フィールドのコイン、次の番号、生成・破棄の枚数）のチェックサム。</summary>

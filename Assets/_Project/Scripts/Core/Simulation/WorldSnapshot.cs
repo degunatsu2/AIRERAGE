@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Degunatsu.Core.Economy;
+using Degunatsu.Core.Match;
 
 namespace Degunatsu.Core.Simulation
 {
     /// <summary>
-    /// SimWorld の全状態（ティック数、全キャラクターの状態、ワールド全体のコイン）の写し（docs/10_online_plan.md T2-1）。
+    /// SimWorld の全状態（ティック数、全キャラクターの状態、ワールド全体のコイン、試合の進み具合）の写し（docs/10_online_plan.md T2-1）。
     /// ロールバックで巻き戻すために保存する。毎ティック作り直さずに済むよう、同じインスタンスに上書きして使い回せる。
     /// 調整値は試合中に変わらない前提なので含めない。
     /// </summary>
@@ -21,6 +22,9 @@ namespace Degunatsu.Core.Simulation
         /// <summary>ワールド全体のコイン（フィールドのコインなど）の写し。</summary>
         public CoinField Coins { get; } = new CoinField();
 
+        /// <summary>アディショナルタイムと勝者の写し。</summary>
+        public MatchState Match { get; private set; } = MatchState.None;
+
         public CharacterState GetState(int index)
         {
             if (index < 0 || index >= CharacterCount)
@@ -33,12 +37,13 @@ namespace Degunatsu.Core.Simulation
         /// <summary>全状態のチェックサム（ティック数と全キャラクターの状態。PC が違っても同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, Coins);
+            return StateCodec.WorldChecksum(Tick, _states, Coins, Match);
         }
 
-        internal void Capture(int tick, IReadOnlyList<CharacterState> states, CoinField coins)
+        internal void Capture(int tick, IReadOnlyList<CharacterState> states, CoinField coins, MatchState match)
         {
             Coins.CopyFrom(coins);
+            Match = match;
             if (_states.Length != states.Count)
             {
                 _states = new CharacterState[states.Count];

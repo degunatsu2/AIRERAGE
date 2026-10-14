@@ -234,7 +234,8 @@ namespace Degunatsu.Net.Tests
             PumpUntil(() => client.LocalPlayer >= 0);
             host.Link.SetSimulatedConditions(40, 5, 5);
             client.Link.SetSimulatedConditions(40, 5, 5);
-            var rules = new MatchRules { CountdownTicks = 20, DurationTicks = 100 };
+            // 2 人とも確定 0 で同点なので、時間切れでアディショナルタイム（30 ティック）に入ってから終わる（T4-8）。
+            var rules = new MatchRules { CountdownTicks = 20, DurationTicks = 100, OvertimeTicks = 30 };
             host.StartMatch(rules);
             PumpUntil(() => _sessions.TrueForAll(s => s.World != null && s.World.Phase == MatchPhase.Finished));
             int firstMatch = host.MatchNumber;

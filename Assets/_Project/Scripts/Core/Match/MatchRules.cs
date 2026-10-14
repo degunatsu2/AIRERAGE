@@ -14,6 +14,9 @@ namespace Degunatsu.Core.Match
 
         /// <summary>時間切れで終わった。全員が止まる。</summary>
         Finished = 2,
+
+        /// <summary>アディショナルタイム（時間切れのとき、逆転できる人がいれば。docs/12 4.2、T4-8）。試合中と同じく動ける。</summary>
+        Overtime = 3,
     }
 
     /// <summary>
@@ -29,6 +32,15 @@ namespace Degunatsu.Core.Match
 
         /// <summary>試合の長さ（ティック。カウントダウンの後から数える）。0 なら時間の制限はない。</summary>
         public int DurationTicks = 10800;
+
+        /// <summary>アディショナルタイムの長さ（ティック。5 秒。20 秒から短くした。ユーザーの決定、2026-10-14）。</summary>
+        public int OvertimeTicks = 300;
+
+        /// <summary>コインの出現が増える終盤（試合の残り。ティック。30 秒）【仮】。アディショナルタイムも含む。</summary>
+        public int LateGameTicks = 1800;
+
+        /// <summary>終盤に、コインが拾われてから同じ地点にまた出るまで（ティック。5 秒。ふだんの半分）【仮】。</summary>
+        public int LateGameSpawnIntervalTicks = 300;
 
         /// <summary>撃破されてから復帰するまで（ティック）。この間は出現位置で待ち、動かず、攻撃も受けない。</summary>
         public int RespawnDelayTicks = 180;
@@ -99,7 +111,10 @@ namespace Degunatsu.Core.Match
         /// <summary>時間の制限があるか。</summary>
         public bool HasTimeLimit => DurationTicks > 0;
 
-        /// <summary>ティック tick（それまでに進めたティック数）からの1ティックが、試合のどの段階か。</summary>
+        /// <summary>
+        /// ティック tick（それまでに進めたティック数）からの1ティックが、試合のどの段階か（アディショナルタイムを考えない、時間だけの
+        /// 段階。アディショナルタイムを含めた段階は MatchFlow.PhaseAt）。
+        /// </summary>
         public MatchPhase PhaseAt(int tick)
         {
             if (tick < CountdownTicks)
@@ -145,6 +160,9 @@ namespace Degunatsu.Core.Match
             v.InRange(nameof(KoDropPercent), KoDropPercent, 0f, 100f);
             v.NonNegative(nameof(DropPickableDelayTicks), DropPickableDelayTicks);
             v.Positive(nameof(DropLifetimeTicks), DropLifetimeTicks);
+            v.NonNegative(nameof(OvertimeTicks), OvertimeTicks);
+            v.NonNegative(nameof(LateGameTicks), LateGameTicks);
+            v.Positive(nameof(LateGameSpawnIntervalTicks), LateGameSpawnIntervalTicks);
             v.NonNegative(nameof(KoDropInset), KoDropInset);
             v.Positive(nameof(BankMoveIntervalTicks), BankMoveIntervalTicks);
             v.NonNegative(nameof(BankNoticeTicks), BankNoticeTicks);

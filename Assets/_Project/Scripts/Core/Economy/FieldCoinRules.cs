@@ -12,6 +12,7 @@ namespace Degunatsu.Core.Economy
     /// 増減はすべて CoinLedger を通す。
     /// - 出現: 試合が始まったとき、ふつうの出現地点の全部に出す。その後は、コインが拾われてから
     ///   MatchRules.CoinSpawnIntervalTicks たつと、同じ地点にまた出す（拾われてから数える。ユーザーの要望、2026-10-13）。
+    ///   終盤（残り 30 秒とアディショナルタイム）は間隔が短くなる（EffectiveReadyTick。T4-8）。
     ///   同じ地点のコインは1つまで。出現地点のコインは消えない。
     /// - 100 枚のコイン: 時間の制限があるとき、残り MatchRules.JackpotTicksBeforeEnd（1 分）で予告し（表示と音だけ）、
     ///   その MatchRules.JackpotNoticeTicks（10 秒）後に出す。場所は候補の地点（CoinSpawnKind.Jackpot）から1つを、試合の種
@@ -49,7 +50,7 @@ namespace Degunatsu.Core.Economy
             }
             for (int i = 0; i < spawns.Count; i++)
             {
-                if (spawns[i].Kind != CoinSpawnKind.Regular || tick < ledger.Field.SpawnReadyTick(i) || HasCoinFrom(ledger.Field, i))
+                if (spawns[i].Kind != CoinSpawnKind.Regular || tick < EffectiveReadyTick(ledger.Field, i, rules, tick) || HasCoinFrom(ledger.Field, i))
                 {
                     continue;
                 }
@@ -57,6 +58,21 @@ namespace Degunatsu.Core.Economy
                 ledger.Spawn(new CoinEventId(tick, CoinEventKind.Spawn, i), point.Position, point.Value, tick, Never, i);
             }
             SpawnJackpot(ledger, spawns, rules, tick);
+        }
+
+        /// <summary>
+        /// 出現地点 point に次のコインを出せるティック。終盤（MatchFlow.IsLateGame。残り 30 秒とアディショナルタイム）は、拾われてから
+        /// MatchRules.LateGameSpawnIntervalTicks で出す（ふだんの間隔との差だけ早める。終盤の前に拾われた地点も早まる）。
+        /// 表示（次に出るまでのゲージ）もこれを使う。
+        /// </summary>
+        public static int EffectiveReadyTick(CoinField field, int point, MatchRules rules, int tick)
+        {
+            int ready = field.SpawnReadyTick(point);
+            if (ready > 0 && MatchFlow.IsLateGame(rules, tick - 1))
+            {
+                ready -= Math.Max(0, rules.CoinSpawnIntervalTicks - rules.LateGameSpawnIntervalTicks);
+            }
+            return ready;
         }
 
         /// <summary>

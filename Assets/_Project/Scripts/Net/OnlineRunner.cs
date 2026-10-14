@@ -109,6 +109,7 @@ namespace Degunatsu.Net
         string ISimulationFeed.LabelOf(int index) => LabelOf(index);
         int ISimulationFeed.CurrentTick => Running ? _session.World.Tick : 0;
         MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
+        MatchState ISimulationFeed.Match => Running ? _session.World.Match : MatchState.None;
         CoinField ISimulationFeed.Coins => Running ? _session.World.Coins.Field : null;
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => Running ? _session.World.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => Running ? _session.World.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();

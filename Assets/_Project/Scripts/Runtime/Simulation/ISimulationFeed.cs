@@ -36,6 +36,9 @@ namespace Degunatsu.Runtime.Simulation
         /// <summary>試合のルール（始まっていなければ null）。</summary>
         MatchRules Rules { get; }
 
+        /// <summary>アディショナルタイムと勝者（docs/12 T4-8。始まっていなければ MatchState.None）。段階は MatchFlow.PhaseAt で求める。</summary>
+        MatchState Match { get; }
+
         /// <summary>フィールドのコイン（始まっていなければ null）。</summary>
         CoinField Coins { get; }
 

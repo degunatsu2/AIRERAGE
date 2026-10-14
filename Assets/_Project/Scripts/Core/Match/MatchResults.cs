@@ -10,8 +10,8 @@ namespace Degunatsu.Core.Match
     /// </summary>
     public static class MatchResults
     {
-        /// <summary>順位の順に並べた、キャラクターの番号。</summary>
-        public static int[] Rank(IReadOnlyList<CharacterState> states)
+        /// <summary>順位の順に並べた、キャラクターの番号。winner（アディショナルタイムで勝った人。なければ -1）がいれば、いちばん上。</summary>
+        public static int[] Rank(IReadOnlyList<CharacterState> states, int winner = -1)
         {
             var order = new int[states.Count];
             for (int i = 0; i < order.Length; i++)
@@ -23,7 +23,7 @@ namespace Degunatsu.Core.Match
             {
                 int current = order[i];
                 int j = i - 1;
-                while (j >= 0 && Before(states[current], current, states[order[j]], order[j]))
+                while (j >= 0 && (current == winner || (order[j] != winner && Before(states[current], current, states[order[j]], order[j]))))
                 {
                     order[j + 1] = order[j];
                     j--;

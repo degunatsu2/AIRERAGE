@@ -94,7 +94,7 @@ namespace Degunatsu.Runtime.Presentation
             {
                 states[i] = _feed.GetState(i);
             }
-            _order = MatchResults.Rank(states);
+            _order = MatchResults.Rank(states, _feed.Match.Winner);
             TrackFalls(states);
 
             while (_rowY.Count < count)

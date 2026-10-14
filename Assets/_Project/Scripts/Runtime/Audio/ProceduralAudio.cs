@@ -69,6 +69,9 @@ namespace Degunatsu.Runtime.Audio
 
         /// <summary>100 枚のコインの予告（警報。ユーザーの要望、2026-10-14）。</summary>
         JackpotAlarm,
+
+        /// <summary>アディショナルタイムに入った（短く2回鳴る笛）。</summary>
+        Overtime,
     }
 
     /// <summary>
@@ -286,6 +289,17 @@ namespace Degunatsu.Runtime.Audio
                         AddTone(b, r, i * 0.2f, 0.2f, f * 0.5f, f * 0.5f, Wave.Saw, 0.14f, 0.004f, 0.2f);
                     }
                     AddTone(b, r, 0f, 1.7f, 110f, 330f, Wave.Saw, 0.2f, 0.05f, 1.2f);
+                    break;
+                case SoundId.Overtime:
+                    // 笛（高い正弦波を少し揺らす）を短く2回、最後に下の和音。
+                    b = new float[Samples(1f, r)];
+                    for (int i = 0; i < 2; i++)
+                    {
+                        AddTone(b, r, i * 0.22f, 0.18f, 2350f, 2250f, Wave.Sine, 0.4f, 0.005f, 0.12f);
+                        AddNoise(b, r, rng, i * 0.22f, 0.18f, 0.12f, 0.005f, 0.1f, 6000f, 6000f, 2000f);
+                    }
+                    AddTone(b, r, 0.44f, 0.5f, NoteFrequency(62), NoteFrequency(62), Wave.Saw, 0.25f, 0.005f, 0.3f);
+                    AddTone(b, r, 0.44f, 0.5f, NoteFrequency(69), NoteFrequency(69), Wave.Saw, 0.2f, 0.005f, 0.3f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

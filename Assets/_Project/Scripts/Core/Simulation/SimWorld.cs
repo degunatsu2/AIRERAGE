@@ -22,6 +22,7 @@ namespace Degunatsu.Core.Simulation
         private readonly List<CharacterState> _spawns = new List<CharacterState>();
         private readonly CoinField _coins = new CoinField();
         private readonly List<KnockoutRecord> _knockouts = new List<KnockoutRecord>();
+        private MatchState _match = MatchState.None;
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
         /// <param name="zones">ステージのギミック（ジャンプ台など）。渡した順によらず、決まった順（StageZone.CompareTo）に並べて効かせる。</param>
@@ -77,8 +78,11 @@ namespace Degunatsu.Core.Simulation
         /// <summary>拠点の候補の地点（番号の順。先頭が試合の始まりの拠点）。今の拠点は BankRules.SpotAt(Rules, BankSpots.Count, Tick)。</summary>
         public IReadOnlyList<BankSpot> BankSpots { get; }
 
-        /// <summary>次に進めるティックの、試合の段階（ティック数だけから決まる）。</summary>
-        public MatchPhase Phase => Rules.PhaseAt(Tick);
+        /// <summary>次に進めるティックの、試合の段階（ティック数、ルール、MatchState から決まる。MatchFlow.PhaseAt）。</summary>
+        public MatchPhase Phase => MatchFlow.PhaseAt(Rules, _match, Tick);
+
+        /// <summary>アディショナルタイムと勝者（docs/12 T4-8）。状態の一部（巻き戻しとチェックサムに乗る）。</summary>
+        public MatchState Match => _match;
 
         /// <summary>直前の Step で当たった命中（表示とデバッグ用。状態ではないので、巻き戻しでは戻らない）。</summary>
         public IReadOnlyList<HitRecord> LastHits => _hits.LastHits;
@@ -120,7 +124,7 @@ namespace Degunatsu.Core.Simulation
             {
                 throw new ArgumentNullException(nameof(snapshot));
             }
-            snapshot.Capture(Tick, _states, _coins);
+            snapshot.Capture(Tick, _states, _coins, _match);
         }
 
         /// <summary>snapshot の全状態に戻す（ロールバックの巻き戻し）。キャラクターの数が違えば ArgumentException。</summary>
@@ -140,13 +144,14 @@ namespace Degunatsu.Core.Simulation
                 _states[i] = snapshot.GetState(i);
             }
             _coins.CopyFrom(snapshot.Coins);
+            _match = snapshot.Match;
             Tick = snapshot.Tick;
         }
 
         /// <summary>今の全状態のチェックサム（WorldSnapshot.Checksum と同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, _coins);
+            return StateCodec.WorldChecksum(Tick, _states, _coins, _match);
         }
 
         public CharacterConfig GetConfig(int index)
@@ -167,6 +172,7 @@ namespace Degunatsu.Core.Simulation
         /// 最後に、フィールドのコインの出現・拾得・消滅を決め（FieldCoinRules。docs/12 T4-4）、拠点に触れている人の所持コインを
         /// 確定する（BankRules。T4-7）。
         /// 試合の段階（Phase）がカウントダウンの間は入力を無視し、終わった後は全員を止める（ティック数だけ進める）。
+        /// 時間切れの瞬間に、アディショナルタイムに入るか終わるかを決め、アディショナルタイム中は勝者と終わりを決める（MatchFlow。T4-8）。
         /// </summary>
         public void Step(IReadOnlyList<PlayerInput> inputs)
         {
@@ -203,8 +209,17 @@ namespace Degunatsu.Core.Simulation
                 KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts);
                 CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, CoinSpawns, Rules, Tick);
             }
-            FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, phase == MatchPhase.Playing);
-            BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, phase == MatchPhase.Playing);
+            bool active = phase == MatchPhase.Playing || phase == MatchPhase.Overtime;
+            FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, active);
+            if (phase == MatchPhase.Overtime)
+            {
+                MatchFlow.StepOvertime(ref _match, _states, _configs, BankSpots, Rules, Tick);
+            }
+            BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, active);
+            if (phase == MatchPhase.Playing && Rules.HasTimeLimit && Tick == Rules.CountdownTicks + Rules.DurationTicks)
+            {
+                MatchFlow.DecideAtTimeUp(ref _match, _states, Tick);
+            }
         }
 
         private static void ValidateConfig(CharacterConfig config)

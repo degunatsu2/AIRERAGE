@@ -261,7 +261,7 @@ namespace Degunatsu.Runtime.Presentation
             {
                 CoinSpawnPoint point = spawns[i];
                 bool red = point.Kind == CoinSpawnKind.Regular && LookOf(point.Value) == CoinLook.Red;
-                int ready = field.SpawnReadyTick(i);
+                int ready = FieldCoinRules.EffectiveReadyTick(field, i, rules, tick + 1);
                 bool waiting = red && !_occupied.Contains(i) && tick < ready;
                 if (!waiting)
                 {
@@ -278,7 +278,8 @@ namespace Degunatsu.Runtime.Presentation
                     gauge.gameObject.SetActive(true);
                     _gauges.Add(i, gauge);
                 }
-                float fraction = (ready - tick) / (float)Mathf.Max(1, rules.CoinSpawnIntervalTicks);
+                int interval = MatchFlow.IsLateGame(rules, tick) ? rules.LateGameSpawnIntervalTicks : rules.CoinSpawnIntervalTicks;
+                float fraction = Mathf.Min(1f, (ready - tick) / (float)Mathf.Max(1, interval));
                 gauge.Show(new Vector3(point.Position.X, point.Position.Y, 0f), fraction);
                 shown++;
             }
