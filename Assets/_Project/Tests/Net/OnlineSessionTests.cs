@@ -164,6 +164,114 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
+        public void FourPlayers_PlayAWholeMatch_WithCoinsBanksAndTheJackpot_AndRestart()
+        {
+            // T4-9: 4 人の本当の通信（遅延と欠落あり）で、短い試合を最後まで（カウントダウン → コイン・拠点の移動・100 枚のコイン・
+            // 攻撃と撃破 → 終盤 → 時間切れ（アディショナルタイムを含む）→ 終わり）進め、全員が同じ状態で終わる。その後に再戦する。
+            BoxTerrain floor = new BoxTerrain().AddBox(-16f, -1f, 16f, 0f, true).AddBox(-16f, 9f, 16f, 10f, true);
+            StageZone[] zones =
+            {
+                new StageZone(StageZoneKind.JumpPad, -2f, 0f, 2f, 0.4f, System.Numerics.Vector2.UnitY, 22f),
+                new StageZone(StageZoneKind.Updraft, 9f, 0f, 12f, 6f, System.Numerics.Vector2.Zero, 60f, 13f),
+            };
+            CoinSpawnPoint[] coins =
+            {
+                new CoinSpawnPoint(new System.Numerics.Vector2(-9f, 1f), 1),
+                new CoinSpawnPoint(new System.Numerics.Vector2(-3f, 1f), 3),
+                new CoinSpawnPoint(new System.Numerics.Vector2(3f, 1f), 1),
+                new CoinSpawnPoint(new System.Numerics.Vector2(9f, 1f), 20),
+                new CoinSpawnPoint(new System.Numerics.Vector2(0f, 4f), 100, CoinSpawnKind.Jackpot),
+                new CoinSpawnPoint(new System.Numerics.Vector2(-6f, 4f), 100, CoinSpawnKind.Jackpot),
+            };
+            BankSpot[] banks =
+            {
+                new BankSpot(new System.Numerics.Vector2(0f, 1.5f), true),
+                new BankSpot(new System.Numerics.Vector2(-8f, 1.5f), false),
+                new BankSpot(new System.Numerics.Vector2(8f, 1.5f), false),
+            };
+            Vector3[] spawns = { new Vector3(-6f, 1f, 0f), new Vector3(6f, 1f, 0f), new Vector3(-2f, 1f, 0f), new Vector3(2f, 1f, 0f) };
+            _stage = new OnlineStage(floor, spawns, new StageBounds(-20f, -10f, 20f, 14f), zones, coins, banks);
+            _input = (player, tick) =>
+            {
+                PlayerInput input = Scripted(player, tick);
+                return (tick + player * 11) % 40 < 2 ? PlayerInput.FromAxes(input.Move.X, 0f, input.Buttons | InputButtons.Attack) : input;
+            };
+            var rules = new MatchRules
+            {
+                CountdownTicks = 30,
+                DurationTicks = 900,
+                OvertimeTicks = 60,
+                CoinSpawnIntervalTicks = 120,
+                LateGameTicks = 300,
+                LateGameSpawnIntervalTicks = 60,
+                JackpotTicksBeforeEnd = 600,
+                JackpotNoticeTicks = 120,
+                BankMoveIntervalTicks = 240,
+                BankNoticeTicks = 60,
+                Seed = 7,
+            };
+            int end = rules.CountdownTicks + rules.DurationTicks + rules.OvertimeTicks + 30;
+
+            OnlineSession host = Host();
+            var clients = new List<OnlineSession> { Join(host), Join(host), Join(host) };
+            PumpUntil(() => clients.TrueForAll(c => c.LocalPlayer >= 0));
+            foreach (OnlineSession session in _sessions)
+            {
+                session.Link.SetSimulatedConditions(25, 3, 2);
+            }
+            host.StartMatch(rules);
+            PumpUntil(() => clients.TrueForAll(c => c.State == OnlineSession.SessionState.Running));
+            foreach (OnlineSession session in _sessions)
+            {
+                session.TickLimit = end;
+            }
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == end && s.Session.ConfirmedTick >= end - 1));
+            PumpFrames(2);
+
+            ulong expected = host.World.Checksum();
+            foreach (OnlineSession session in _sessions)
+            {
+                Assert.That(session.PlayerCount, Is.EqualTo(4));
+                Assert.That(session.World.Phase, Is.EqualTo(MatchPhase.Finished), $"プレイヤー {session.LocalPlayer}: 試合が終わっていない");
+                Assert.That(session.World.Checksum(), Is.EqualTo(expected), $"プレイヤー {session.LocalPlayer} の状態が違う");
+            }
+            Assert.That(host.Desyncs, Is.Empty);
+            Assert.That(host.ComparedChecksums, Is.GreaterThan(0));
+
+            var states = new List<CharacterState>();
+            int picked = 0;
+            int falls = 0;
+            for (int p = 0; p < 4; p++)
+            {
+                CharacterState state = host.World.GetState(p);
+                states.Add(state);
+                picked += state.Coins.Held + state.Coins.Banked;
+                falls += state.Combat.Falls;
+            }
+            CoinTotals totals = host.World.Coins.Totals(states);
+            Assert.That(totals.IsConserved, Is.True, totals.ToString());
+            Assert.That(totals.Generated, Is.GreaterThanOrEqualTo(100), "前提: 100 枚のコインが出た");
+            Assert.That(picked, Is.GreaterThan(0), "前提: だれかがコインを拾った");
+            Assert.That(BankRules.MovesAt(rules, end), Is.GreaterThanOrEqualTo(3), "前提: 拠点が移った");
+            Assert.That(MatchResults.Rank(states, host.World.Match.Winner), Has.Length.EqualTo(4));
+
+            // 再戦: 同じ 4 人で、新しい試合を同じ状態で進める。
+            host.RestartMatch(rules);
+            PumpUntil(() => clients.TrueForAll(c => c.MatchNumber == host.MatchNumber));
+            foreach (OnlineSession session in _sessions)
+            {
+                session.TickLimit = 180;
+            }
+            PumpUntil(() => _sessions.TrueForAll(s => s.MatchNumber == host.MatchNumber && s.Session.CurrentTick == 180 && s.Session.ConfirmedTick >= 179));
+            PumpFrames(2);
+            foreach (OnlineSession session in _sessions)
+            {
+                Assert.That(session.World.Checksum(), Is.EqualTo(host.World.Checksum()), $"再戦の後に、プレイヤー {session.LocalPlayer} の状態が違う");
+            }
+            Assert.That(host.Desyncs, Is.Empty, "再戦の後に不一致");
+        }
+
+        [Test]
         public void ClientsReceiveHostConfig()
         {
             var config = new CharacterConfig();
