@@ -1,16 +1,14 @@
 {
-    "name": "Degunatsu.Net.Tests",
-    "rootNamespace": "Degunatsu.Net.Tests",
+    "name": "Airerage.PlayMode.Tests",
+    "rootNamespace": "Airerage.PlayMode.Tests",
     "references": [
-        "Degunatsu.Core",
-        "Degunatsu.Core.Tests",
-        "Degunatsu.Net",
-        "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "Airerage.Core",
+        "Airerage.Runtime",
+        "Airerage.Net",
+        "Unity.Cinemachine",
+        "UnityEngine.TestRunner"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

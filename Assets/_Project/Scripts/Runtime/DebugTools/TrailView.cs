@@ -1,8 +1,8 @@
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.DebugTools
+namespace Airerage.Runtime.DebugTools
 {
     /// <summary>
     /// キャラクターの軌跡（直近の数秒）を線で表示する（docs/06_prototype_plan.md T1-9）。ティックごとの位置を使う。

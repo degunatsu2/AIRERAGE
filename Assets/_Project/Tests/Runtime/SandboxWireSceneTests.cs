@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Physics;
-using Degunatsu.Runtime.DebugTools;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Physics;
+using Airerage.Runtime.DebugTools;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -9,7 +9,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using NVector3 = System.Numerics.Vector3;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     /// <summary>
     /// 生成した検証用シーン（Sandbox_Wire）の配置を検査する。地形の配置を変えたときに、置き方の誤りを見つけるため。

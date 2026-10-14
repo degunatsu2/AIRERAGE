@@ -1,10 +1,10 @@
 using System;
 using System.Linq;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Rollback;
+using Airerage.Core.Input;
+using Airerage.Core.Rollback;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Rollback
+namespace Airerage.Core.Tests.Rollback
 {
     /// <summary>入力のメッセージのバイト列（docs/10_online_plan.md T2-4）。</summary>
     public class InputMessageTests

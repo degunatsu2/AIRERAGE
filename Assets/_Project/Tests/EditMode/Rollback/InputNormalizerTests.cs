@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Rollback;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Rollback
+namespace Airerage.Core.Tests.Rollback
 {
     /// <summary>送る前の入力の正規化（docs/10_online_plan.md T2-5）。</summary>
     public class InputNormalizerTests

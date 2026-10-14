@@ -1,11 +1,11 @@
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Wire
+namespace Airerage.Core.Tests.Wire
 {
     /// <summary>
     /// 照準の方向（マウスでの照準を含む）と、射出結果の予測（照準のインジケーター用）。

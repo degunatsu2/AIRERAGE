@@ -1,16 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using Degunatsu.Core.Input;
-using Degunatsu.Runtime.DebugTools;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Input;
+using Airerage.Runtime.DebugTools;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// 入力の記録と再生（docs/06_prototype_plan.md T1-9b）を Sandbox_Wire で動かして確かめる（キーの代わりにメソッドを呼ぶ）。
@@ -52,7 +52,7 @@ namespace Degunatsu.PlayMode.Tests
 
             // 記録を始めてから、決まった入力で動かす（走る、ジャンプ、右上へワイヤー、解除、左へ走る）。
             replay.StartRecording();
-            Degunatsu.Core.Simulation.CharacterState start = runner.PlayerState;
+            Airerage.Core.Simulation.CharacterState start = runner.PlayerState;
             var script = new ScriptedInput();
             script.Add(SimInput.FromAxes(1f, 0f, InputButtons.None), 20);
             script.Add(SimInput.FromAxes(1f, 0f, InputButtons.Jump), 3);

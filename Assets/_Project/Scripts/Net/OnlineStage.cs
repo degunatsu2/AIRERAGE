@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Economy;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
 using NVector3 = System.Numerics.Vector3;
 
-namespace Degunatsu.Net
+namespace Airerage.Net
 {
     /// <summary>
     /// オンラインの試合のステージ（docs/11_combat_plan.md T3-8）: 地形、出現位置、ステージの範囲（外に出ると撃破）、ギミック、

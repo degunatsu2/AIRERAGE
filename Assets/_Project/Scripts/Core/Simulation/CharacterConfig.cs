@@ -1,10 +1,10 @@
 using System;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Movement;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Combat;
+using Airerage.Core.Common;
+using Airerage.Core.Movement;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Simulation
+namespace Airerage.Core.Simulation
 {
     /// <summary>
     /// キャラクター1人分の調整値の組み合わせ。参照で共有するので、プレイ中の調整が次のティックから反映される。

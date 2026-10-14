@@ -1,10 +1,10 @@
 using System;
 using System.IO;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Net;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Simulation;
+using Airerage.Net;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -12,9 +12,9 @@ using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
-using TerrainBox = Degunatsu.Editor.SandboxWireSceneBuilder.TerrainBox;
+using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
-namespace Degunatsu.Editor
+namespace Airerage.Editor
 {
     /// <summary>
     /// オンライン対戦のシーン（Sandbox_Online）を作る（docs/10_online_plan.md T2-7、docs/11_combat_plan.md T3-8）。
@@ -25,7 +25,7 @@ namespace Degunatsu.Editor
     /// 地形とギミックの配置と値はこのコードで決め、シーンは生成物として扱う【仮】。
     ///
     /// バッチモードでの実行:
-    ///   Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxOnlineSceneBuilder.Build
+    ///   Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxOnlineSceneBuilder.Build
     /// </summary>
     public static class SandboxOnlineSceneBuilder
     {
@@ -192,7 +192,7 @@ namespace Degunatsu.Editor
             new Vector3(24f, 3.5f, 0f),
         };
 
-        [MenuItem("Degunatsu/Sandbox_Online シーンを作り直す")]
+        [MenuItem("Airerage/Sandbox_Online シーンを作り直す")]
         private static void BuildFromMenu()
         {
             if (File.Exists(ScenePath)

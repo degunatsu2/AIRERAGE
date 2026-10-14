@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Economy
+namespace Airerage.Core.Economy
 {
     /// <summary>
     /// コイン台帳（docs/01_game_design.md 3.2、docs/12_match_plan.md T4-3）。コインの増減は、すべてここを通す。

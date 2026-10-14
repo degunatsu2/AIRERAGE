@@ -1,9 +1,9 @@
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// キャラクターの状態を箱で表示する（プロトタイプ用）。直前と現在のティックの状態を補間する。

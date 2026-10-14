@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 17401b775c1c455396f260bce2a3c785, type: 3}
   m_Name: DefaultCharacter
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Data.CharacterConfigAsset
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Data.CharacterConfigAsset
   _config:
     Movement:
       RunSpeed: 8

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// ワイヤーのエイムアシストの対象になるアンカーポイント（この GameObject の位置）。

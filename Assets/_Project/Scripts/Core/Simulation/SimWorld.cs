@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
+using Airerage.Core.Economy;
+using Airerage.Core.Combat;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
 
-namespace Degunatsu.Core.Simulation
+namespace Airerage.Core.Simulation
 {
     /// <summary>
     /// シミュレーション全体。固定ティックで全キャラクターを進める。

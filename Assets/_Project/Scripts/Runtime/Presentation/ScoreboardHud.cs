@@ -1,11 +1,11 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Common;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 右上の全員の情報（ユーザーの要望、2026-10-14）。1 人 1 枚の札（PlayerStatusPlate）で、縁と斜めの線はプレイヤーの色。

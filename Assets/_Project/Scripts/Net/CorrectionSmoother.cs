@@ -1,8 +1,8 @@
 using System;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 using UnityEngine;
 
-namespace Degunatsu.Net
+namespace Airerage.Net
 {
     /// <summary>表示の補正の調整値（docs/10_online_plan.md T2-8）。初期値はすべて【仮】。</summary>
     [Serializable]

@@ -1,11 +1,11 @@
 using System.Numerics;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Wire
+namespace Airerage.Core.Tests.Wire
 {
     /// <summary>ロープの巻き付き（D-33）。</summary>
     public class RopeWrappingTests

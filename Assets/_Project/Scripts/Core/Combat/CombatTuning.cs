@@ -1,7 +1,7 @@
 using System;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 
-namespace Degunatsu.Core.Combat
+namespace Airerage.Core.Combat
 {
     /// <summary>
     /// 攻撃の判定1つ（docs/01_game_design.md 6.4）。攻撃を始めてから StartTick ティック目から ActiveTicks ティックの間だけ出る、

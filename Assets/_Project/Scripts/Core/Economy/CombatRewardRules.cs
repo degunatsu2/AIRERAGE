@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Economy
+namespace Airerage.Core.Economy
 {
     /// <summary>
     /// 戦闘の報酬（docs/12_match_plan.md T4-5、docs/01_game_design.md 3.3。ユーザーの決定、2026-10-14）。増減はすべて

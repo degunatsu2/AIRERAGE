@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 誘導表示の札（ユーザーの要望、2026-10-14）: 横長の長方形を、斜めの線で左 1 : 右 2 に分ける。左に絵、右に半透明の黒の背景と

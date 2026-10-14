@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Audio
+namespace Airerage.Runtime.Audio
 {
     /// <summary>効果音の種類。</summary>
     public enum SoundId

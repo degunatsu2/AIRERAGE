@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace Degunatsu.Net
+namespace Airerage.Net
 {
     /// <summary>セッションのメッセージの種類（先頭の1バイト）。</summary>
     public enum NetKind : byte

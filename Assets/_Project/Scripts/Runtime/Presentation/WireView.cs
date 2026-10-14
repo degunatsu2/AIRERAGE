@@ -1,9 +1,9 @@
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// ワイヤーを線で表示する（プロトタイプ用）。フックが飛んでいる間はフックまで、接続中は接続点まで線を引き、接続点に印を置く。

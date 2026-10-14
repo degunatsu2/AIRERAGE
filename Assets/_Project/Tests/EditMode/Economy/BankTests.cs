@@ -1,14 +1,14 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Common;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Economy
+namespace Airerage.Core.Tests.Economy
 {
     /// <summary>拠点（バンク。docs/12_match_plan.md T4-7）: 場所と移動、予告、所持コインの確定。</summary>
     public class BankTests

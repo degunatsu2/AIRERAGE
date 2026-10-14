@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Economy;
+using Airerage.Core.Combat;
+using Airerage.Core.Input;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Simulation
+namespace Airerage.Core.Simulation
 {
     /// <summary>
     /// CharacterState をバイト列にする（入力の記録の保存、PC 間の比較に使う）。

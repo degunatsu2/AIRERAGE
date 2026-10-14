@@ -1,7 +1,7 @@
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 1 人分の情報の札（右上の表 ScoreboardHud と、結果の画面 MatchHud で同じ見た目にする。ユーザーの要望、2026-10-14）。

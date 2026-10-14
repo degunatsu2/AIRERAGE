@@ -1,12 +1,12 @@
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Wire
+namespace Airerage.Core.Tests.Wire
 {
     /// <summary>
     /// すべてのタイプが守るべき共通の規則（docs/06_prototype_plan.md T1-6）。

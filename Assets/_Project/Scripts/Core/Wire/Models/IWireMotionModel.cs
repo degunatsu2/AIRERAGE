@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace Degunatsu.Core.Wire.Models
+namespace Airerage.Core.Wire.Models
 {
     /// <summary>
     /// 接続中の1ティック分の入力。

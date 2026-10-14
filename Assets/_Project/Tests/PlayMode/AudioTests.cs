@@ -1,16 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Degunatsu.Core.Input;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Input;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// 仮の BGM と効果音（ユーザーの要望、2026-10-13）。BGM が繰り返し鳴る設定になっていて、攻撃を出して当てると効果音を鳴らす。

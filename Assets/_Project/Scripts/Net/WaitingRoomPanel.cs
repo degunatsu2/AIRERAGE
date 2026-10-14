@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Runtime.Presentation;
+using Airerage.Runtime.Presentation;
 using UnityEngine;
 
-namespace Degunatsu.Net
+namespace Airerage.Net
 {
     /// <summary>
     /// 待機所（ロビー）の表示（ユーザーの要望、2026-10-14）。ホストもクライアントも、画面の中央に同じ顔ぶれを出す

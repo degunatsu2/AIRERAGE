@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Replay
+namespace Airerage.Core.Replay
 {
     /// <summary>
     /// 入力の記録（docs/06_prototype_plan.md T1-9b）。開始時の状態と、ティックごとの入力と、
@@ -21,7 +21,10 @@ namespace Degunatsu.Core.Replay
         /// <summary>テキストの形式の版。</summary>
         public const int FormatVersion = 1;
 
-        private const string Magic = "degunatsu-input-recording";
+        private const string Magic = "airerage-input-recording";
+
+        // ゲームの名前を変える前（2026-10-14 まで）の記録の先頭。読むときだけ受け付ける。
+        private const string LegacyMagic = "degunatsu-input-recording";
 
         private readonly List<PlayerInput> _inputs;
 
@@ -130,7 +133,7 @@ namespace Degunatsu.Core.Replay
             var reader = new LineReader(text);
 
             string[] header = reader.Next().Split(' ');
-            if (header.Length != 2 || header[0] != Magic)
+            if (header.Length != 2 || (header[0] != Magic && header[0] != LegacyMagic))
             {
                 throw reader.Error($"入力の記録ではありません（1行目は「{Magic} 版」）");
             }

@@ -77,7 +77,7 @@ lfs.github.com
 
 ```bash
 #!/bin/bash
-# degunatsu: Unity 6.3 LTS（Linux 版）を /opt/unity に入れる（docs/08_cloud_unity_setup.md 3.3）。
+# AIRERAGE: Unity 6.3 LTS（Linux 版）を /opt/unity に入れる（docs/08_cloud_unity_setup.md 3.3）。
 # 失敗してもセッションは起動させる（Unity を使わない作業はできるため。セッションの中で tools/unity/install_editor.sh を実行し直せる）
 set -o pipefail
 V=6000.3.26f1
@@ -114,8 +114,8 @@ exit 0
   - 6000.3 に合う最新版は **17.1.0**（`unity: 6000.3`。URP 17.0.4、Input System 1.14.2、Test Framework 1.6.0 に依存。2026-10-12 に packages.unity.com で確認）。17.2 以降は 6000.6 以降向け。
   - エディタに同梱されている版（17.0.14）は古いので使わない。
 - 手順: レジストリから 17.1.0 の `.tgz` を取得してチェックサムを確かめ、リポジトリの外に `-createProject <フォルダ> -cloneFromTemplate <.tgz>` で作成する。そこから `Assets/` の中身（`Assets/_Project/` は上書きしない）、`Packages/`、`ProjectSettings/` をリポジトリへコピーする（[09](09_unity_project_setup.md) の 3〜4 と同じ考え方）。
-- 作成後に確認すること: コンパイルエラーがない、EditMode テスト（`Degunatsu.Core.Tests`）が通る、Active Input Handling が Input System を含む、`Library/` などがコミットされていない。
-- **実施結果（2026-10-12）**: 上の手順で作成し、すべて確認した（6章）。テンプレートの内容（サンプルシーン、URP の設定、Input System のアクション）を取り込み、`productName` だけ `degunatsu` に変えた。チュートリアル用の `TutorialInfo/` と `Readme.asset` は取り込まなかった（ゲームに不要で、ほかから参照されていない。アイコン画像が Git LFS の対象で、クラウドからは LFS にアップロードできないため（6章）。ユーザーの承認）。
+- 作成後に確認すること: コンパイルエラーがない、EditMode テスト（`Airerage.Core.Tests`）が通る、Active Input Handling が Input System を含む、`Library/` などがコミットされていない。
+- **実施結果（2026-10-12）**: 上の手順で作成し、すべて確認した（6章）。テンプレートの内容（サンプルシーン、URP の設定、Input System のアクション）を取り込み、`productName` だけ `degunatsu` に変えた（2026-10-14 に `AIRERAGE` へ変更）。チュートリアル用の `TutorialInfo/` と `Readme.asset` は取り込まなかった（ゲームに不要で、ほかから参照されていない。アイコン画像が Git LFS の対象で、クラウドからは LFS にアップロードできないため（6章）。ユーザーの承認）。
   - 依存パッケージは、エディタが 6000.3 に合う版に解決した（URP 17.3.0、Input System 1.20.0、Test Framework 1.6.0 など。`Packages/manifest.json`）。テンプレートには Visual Scripting、Unity Version Control（collab-proxy）、Multiplayer Center なども含まれる。不要なものを外すかは別途相談する（パッケージの変更は承認が必要）。
   - URP の設定アセットは、2回目に開いたときに URP 17.3 の形式（`k_AssetVersion: 13`）へ自動で更新された。
 
@@ -128,10 +128,10 @@ exit 0
 | EditMode テスト | `bash tools/unity/run_unity_tests.sh` | コンパイルとテストを行い、結果を要約する。ログと結果は `Logs/`（コミットしない）。2回目以降は約30秒、初回（`Library/` がない）は約2分 |
 | PlayMode テスト | `bash tools/unity/run_unity_tests.sh PlayMode` | シーンを再生する通しの確認。約40秒 |
 | テストを絞り込む | `bash tools/unity/run_unity_tests.sh EditMode <テストの名前>` | Unity の `-testFilter` に渡す。`[Explicit]` のテストは名前で指定したときだけ実行される |
-| 入力の記録の照合 | `bash tools/unity/run_unity_tests.sh EditMode Degunatsu.Runtime.Tests.RecordedReplayTests` | `InputRecordings/` の記録を再生し、最後の状態が記録と一致するかを確かめる（別の PC で記録したファイルでの決定性の確認。docs/04 3.5） |
-| 検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxWireSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Wire.unity` を作り直す（地形の配置はビルダーのコード）。エディタではメニューの「Degunatsu」から |
-| オンライン用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxOnlineSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Online.unity` を作り直す（オンライン対戦用のアスレチックステージ。docs/10 T2-7、docs/11 T3-8） |
-| 空中戦の検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxCombatSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Combat.unity` を作り直す（足場が少なく、外に出ると撃破。docs/11 T3-3） |
+| 入力の記録の照合 | `bash tools/unity/run_unity_tests.sh EditMode Airerage.Runtime.Tests.RecordedReplayTests` | `InputRecordings/` の記録を再生し、最後の状態が記録と一致するかを確かめる（別の PC で記録したファイルでの決定性の確認。docs/04 3.5） |
+| 検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxWireSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Wire.unity` を作り直す（地形の配置はビルダーのコード）。エディタではメニューの「Airerage」から |
+| オンライン用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxOnlineSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Online.unity` を作り直す（オンライン対戦用のアスレチックステージ。docs/10 T2-7、docs/11 T3-8） |
+| 空中戦の検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxCombatSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Combat.unity` を作り直す（足場が少なく、外に出ると撃破。docs/11 T3-3） |
 
 ## 5. うまくいかない場合の代案
 
@@ -153,4 +153,4 @@ exit 0
 | テンプレート | `com.unity.template.urp-blank` 17.1.0 をレジストリから取得し、SHA1 一致（約30MB。ダウンロード URL は別のホストへのリダイレクトなので `curl -L` が必要） |
 | プロジェクトの作成（`-createProject -cloneFromTemplate`） | 成功（約310秒）。コンパイルエラー 0。音声デバイスがないため ALSA / FMOD のエラーが出るが、動作には影響しない |
 | Git LFS へのアップロード（`git lfs push`） | 初めは `lfs.github.com` が環境のネットワークポリシーで遮断された（403）。ユーザーが Allowed domains に `lfs.github.com` を追加した後は、アップロードできた（24KB の画像で確認）。リポジトリには `git lfs install --local --skip-smudge` で pre-push フックを入れてある（クラウドのセッションごとに必要） |
-| リポジトリのプロジェクトを開いて EditMode テスト（`-runTests -testPlatform EditMode`） | **49件すべて成功**（`Degunatsu.Core.Tests`、8つのテストクラス）。コンパイルエラー 0、警告 0。初回は約125秒（インポートを含む）、2回目は約26秒。既存の `.meta` は書き換えられなかった |
+| リポジトリのプロジェクトを開いて EditMode テスト（`-runTests -testPlatform EditMode`） | **49件すべて成功**（`Airerage.Core.Tests`、8つのテストクラス）。コンパイルエラー 0、警告 0。初回は約125秒（インポートを含む）、2回目は約26秒。既存の `.meta` は書き換えられなかった |

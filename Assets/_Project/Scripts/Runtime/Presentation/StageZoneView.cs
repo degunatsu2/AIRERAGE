@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// ギミック（StageZoneAuthoring）の動く見た目（表示だけ。シミュレーションには関係しない）。

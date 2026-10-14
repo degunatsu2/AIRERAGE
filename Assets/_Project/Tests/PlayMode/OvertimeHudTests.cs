@@ -2,19 +2,19 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>アディショナルタイムの表示（docs/12 T4-8）: OVERTIME と残り、拠点に着けば勝てる人、勝った人、結果の順位。</summary>
     public sealed class OvertimeHudTests

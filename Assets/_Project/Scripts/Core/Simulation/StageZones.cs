@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 
-namespace Degunatsu.Core.Simulation
+namespace Airerage.Core.Simulation
 {
     /// <summary>
     /// ステージのギミック（StageZone）をキャラクターに効かせる。CharacterSimulator が移動と接地の後に呼ぶ

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Runtime.DebugTools
+namespace Airerage.Runtime.DebugTools
 {
     /// <summary>
     /// デバッグ機能でのワイヤーのタイプの名前と、切り替えの順番。

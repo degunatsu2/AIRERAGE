@@ -1,12 +1,12 @@
 using System.Text;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.Runtime.DebugTools
+namespace Airerage.Runtime.DebugTools
 {
     /// <summary>
     /// デバッグ表示（docs/06_prototype_plan.md T1-9）。画面の右上に IMGUI で、キャラクターとワイヤーの状態、

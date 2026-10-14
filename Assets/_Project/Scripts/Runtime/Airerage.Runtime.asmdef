@@ -1,13 +1,10 @@
 {
-    "name": "Degunatsu.Net",
-    "rootNamespace": "Degunatsu.Net",
+    "name": "Airerage.Runtime",
+    "rootNamespace": "Airerage.Runtime",
     "references": [
-        "Degunatsu.Core",
-        "Degunatsu.Runtime",
-        "Unity.Networking.Transport",
-        "Unity.Collections",
-        "Unity.InputSystem",
-        "Unity.Cinemachine"
+        "Airerage.Core",
+        "Unity.Cinemachine",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

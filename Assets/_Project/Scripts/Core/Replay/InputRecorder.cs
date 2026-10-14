@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Replay
+namespace Airerage.Core.Replay
 {
     /// <summary>
     /// 直近の入力を記録し続ける（docs/06_prototype_plan.md T1-9b）。容量を超えたら古い入力から捨てる。

@@ -1,14 +1,14 @@
 using System.Numerics;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Combat;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Match
+namespace Airerage.Core.Tests.Match
 {
     /// <summary>撃破された後の復帰待ちと、復帰した後の無敵（docs/12_match_plan.md T4-2）。</summary>
     public class RespawnTests

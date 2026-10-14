@@ -1,4 +1,4 @@
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// 結果の画面のボタン（docs/12_match_plan.md T4-9 の先取り。ユーザーの要望、2026-10-13）。試合を進める側（OnlineRunner）が持つ。

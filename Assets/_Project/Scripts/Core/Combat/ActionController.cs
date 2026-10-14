@@ -1,11 +1,11 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Movement;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Movement;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Combat
+namespace Airerage.Core.Combat
 {
     /// <summary>
     /// アクション状態の遷移とキャンセルの可否を1か所で決める（docs/01_game_design.md 6.2、6.3。docs/11_combat_plan.md T3-4）。

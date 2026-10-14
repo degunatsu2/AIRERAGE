@@ -1,15 +1,15 @@
 using System.Collections;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Input;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Input;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// ガードとジャストガード（docs/11_combat_plan.md T3-5）。ガード中は「GUARD!」の表示、終わるとクールタイムのゲージ。

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace Degunatsu.Core.Physics
+namespace Airerage.Core.Physics
 {
     /// <summary>
     /// 地形への衝突クエリの結果。

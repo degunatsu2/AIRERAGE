@@ -1,15 +1,15 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Combat;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Economy
+namespace Airerage.Core.Tests.Economy
 {
     /// <summary>
     /// 戦闘の報酬（docs/12_match_plan.md T4-5。ユーザーの決定、2026-10-14）: コンボが終わったらダメージの 30%（少なくとも 1 枚）、
@@ -257,9 +257,9 @@ namespace Degunatsu.Core.Tests.Economy
         [Test]
         public void InvalidRewardRules_AreRejected()
         {
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { DamageRewardPercent = -1 }));
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { KoRewardBase = -1 }));
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { KoRewardMaxBonus = -5 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { DamageRewardPercent = -1 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { KoRewardBase = -1 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { KoRewardMaxBonus = -5 }));
         }
     }
 }

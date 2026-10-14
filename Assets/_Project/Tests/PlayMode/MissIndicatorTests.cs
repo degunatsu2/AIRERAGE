@@ -1,14 +1,14 @@
 using System.Collections;
-using Degunatsu.Core.Input;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Input;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>ワイヤーが外れたときの表示（プレイテスト 2026-10-13 の #7）。</summary>
     public sealed class MissIndicatorTests

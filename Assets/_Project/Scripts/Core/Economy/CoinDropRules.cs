@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Common;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Economy
+namespace Airerage.Core.Economy
 {
     /// <summary>
     /// コインのドロップ（docs/12_match_plan.md T4-6、docs/01_game_design.md 3.3）。増減はすべて CoinLedger.Drop を通す。

@@ -1,7 +1,7 @@
 using System;
-using Degunatsu.Core.Input;
+using Airerage.Core.Input;
 
-namespace Degunatsu.Core.Rollback
+namespace Airerage.Core.Rollback
 {
     /// <summary>
     /// 送る前の入力の正規化（docs/10_online_plan.md T2-5、docs/04_network.md 3.3）。

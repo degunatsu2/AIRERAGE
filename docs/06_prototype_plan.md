@@ -25,7 +25,7 @@
 
 Phase 1 はローカルのみですが、次の点を最初から守ります。
 
-1. シミュレーションは固定ティック（60Hz）の純C#（`Degunatsu.Core`）で、UnityEngine に依存しない。
+1. シミュレーションは固定ティック（60Hz）の純C#（`Airerage.Core`）で、UnityEngine に依存しない。
 2. キャラクターの動きは入力コマンド（`PlayerInput`）だけで決まる。Input System を直接読むのは Runtime のアダプターだけ。
 3. キャラクターとワイヤーの状態は、すべて構造体（`CharacterState` / `WireState`）にあり、コピーと比較ができる。
 4. Rigidbody を使わず、衝突は `ICollisionQuery` を通して調べる。

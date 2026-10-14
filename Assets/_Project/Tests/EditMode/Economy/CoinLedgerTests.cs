@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Economy;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Economy
+namespace Airerage.Core.Tests.Economy
 {
     /// <summary>コイン台帳（docs/12_match_plan.md T4-3）: 取引、二重の加算の拒否、不正な取引の拒否、総量の保存、巻き戻し。</summary>
     public class CoinLedgerTests

@@ -1,8 +1,10 @@
 {
-    "name": "Degunatsu.Core.Tests",
-    "rootNamespace": "Degunatsu.Core.Tests",
+    "name": "Airerage.Runtime.Tests",
+    "rootNamespace": "Airerage.Runtime.Tests",
     "references": [
-        "Degunatsu.Core",
+        "Airerage.Core",
+        "Airerage.Core.Tests",
+        "Airerage.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

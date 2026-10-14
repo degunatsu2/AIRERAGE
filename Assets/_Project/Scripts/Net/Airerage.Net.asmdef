@@ -1,16 +1,15 @@
 {
-    "name": "Degunatsu.Editor",
-    "rootNamespace": "Degunatsu.Editor",
+    "name": "Airerage.Net",
+    "rootNamespace": "Airerage.Net",
     "references": [
-        "Degunatsu.Core",
-        "Degunatsu.Runtime",
-        "Degunatsu.Net",
-        "Unity.Cinemachine",
-        "Unity.InputSystem"
+        "Airerage.Core",
+        "Airerage.Runtime",
+        "Unity.Networking.Transport",
+        "Unity.Collections",
+        "Unity.InputSystem",
+        "Unity.Cinemachine"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

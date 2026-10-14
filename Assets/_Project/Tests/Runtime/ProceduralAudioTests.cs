@@ -1,8 +1,8 @@
 using System;
-using Degunatsu.Runtime.Audio;
+using Airerage.Runtime.Audio;
 using NUnit.Framework;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     /// <summary>仮の効果音と BGM の合成（ユーザーの要望、2026-10-13）。音の良し悪しは耳で確かめる。ここでは壊れていないことだけを見る。</summary>
     public class ProceduralAudioTests

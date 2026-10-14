@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace Degunatsu.Core.Wire
+namespace Airerage.Core.Wire
 {
     /// <summary>
     /// ワイヤーのフェーズ（docs/01_game_design.md 5.2）。両タイプ共通。

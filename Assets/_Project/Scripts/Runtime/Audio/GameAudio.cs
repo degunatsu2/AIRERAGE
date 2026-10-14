@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Audio
+namespace Airerage.Runtime.Audio
 {
     /// <summary>
     /// BGM と効果音を鳴らす（仮の音。ユーザーの要望、2026-10-13）。音は ProceduralAudio がその場で合成する。

@@ -1,6 +1,6 @@
 using System;
 
-namespace Degunatsu.Core.Combat
+namespace Airerage.Core.Combat
 {
     /// <summary>
     /// アクション状態の種類（docs/01_game_design.md 6.2。排他的でどれか1つ）。

@@ -1,12 +1,12 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Common;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 試合の表示（docs/12_match_plan.md T4-1）: 始まる前の演出、上の中央の残り時間、終わったときの「FINISH!」と結果（順位）。

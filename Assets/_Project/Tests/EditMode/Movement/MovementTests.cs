@@ -1,11 +1,11 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Common;
+using Airerage.Core.Physics;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Movement
+namespace Airerage.Core.Tests.Movement
 {
     public class MovementTests
     {
@@ -140,7 +140,7 @@ namespace Degunatsu.Core.Tests.Movement
         [Test]
         public void JumpBuffer_PressedJustBeforeLanding_JumpsOnLanding()
         {
-            var config = new Degunatsu.Core.Simulation.CharacterConfig();
+            var config = new Airerage.Core.Simulation.CharacterConfig();
             config.Movement.AirJumps = 0;
             var harness = new SimHarness(TestArenas.Ground(), config, new Vector3(0f, 1.2f, 0f));
             var state = harness.State;

@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Economy
+namespace Airerage.Core.Tests.Economy
 {
     /// <summary>フィールドのコイン（docs/12_match_plan.md T4-4）: 出現、拾得、消滅。すべて台帳を通る。</summary>
     public class FieldCoinTests

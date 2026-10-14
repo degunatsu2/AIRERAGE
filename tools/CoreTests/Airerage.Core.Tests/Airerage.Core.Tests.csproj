@@ -18,7 +18,7 @@
     <Compile Include="../../../Assets/_Project/Tests/EditMode/**/*.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../Degunatsu.Core/Degunatsu.Core.csproj" />
+    <ProjectReference Include="../Airerage.Core/Airerage.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />

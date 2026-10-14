@@ -1,18 +1,18 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Input;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// 命中の表示（docs/11_combat_plan.md T3-7）: 火花、COMBO の表示、FATAL の虹色の光と「FATAL!」と重い音（ユーザーの要望）、

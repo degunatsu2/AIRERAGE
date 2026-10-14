@@ -1,16 +1,16 @@
 using System.Collections;
 using System.Linq;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Net;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Economy;
+using Airerage.Core.Simulation;
+using Airerage.Net;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// 誘導表示（EdgeGuideLayer、PlayerGuides、撃破ドロップのかたまり）、撃破されたときの右上の札、プレイヤーネーム

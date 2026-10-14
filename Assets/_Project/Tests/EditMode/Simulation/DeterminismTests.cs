@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Simulation
+namespace Airerage.Core.Tests.Simulation
 {
     /// <summary>
     /// 同じ入力列からは同じ状態が得られること（ネットワークの予測・入力の記録と再生の前提）。

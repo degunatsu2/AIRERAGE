@@ -1,7 +1,7 @@
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Runtime.DebugTools
+namespace Airerage.Runtime.DebugTools
 {
     /// <summary>
     /// 調整のための計測（docs/06_prototype_plan.md T1-9）。ティックごとの状態から、今の速さ、最高速、

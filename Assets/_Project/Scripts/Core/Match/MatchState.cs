@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Economy;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Match
+namespace Airerage.Core.Match
 {
     /// <summary>
     /// 試合の進み具合のうち、ティック数とルールだけでは決まらないもの（アディショナルタイムと勝者。docs/12_match_plan.md T4-8）。

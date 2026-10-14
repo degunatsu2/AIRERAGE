@@ -1,8 +1,8 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 
-namespace Degunatsu.Core.Wire.Models
+namespace Airerage.Core.Wire.Models
 {
     /// <summary>
     /// タイプA: 物理・慣性重視。ロープ長の拘束と重力による振り子運動。

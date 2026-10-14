@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Degunatsu.Core.Input;
+using Airerage.Core.Input;
 
-namespace Degunatsu.Core.Rollback
+namespace Airerage.Core.Rollback
 {
     /// <summary>
     /// プレイヤーが相手1人に送るメッセージ（docs/10_online_plan.md T2-4、docs/04_network.md 3.4）。

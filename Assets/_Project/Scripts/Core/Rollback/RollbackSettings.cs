@@ -1,7 +1,7 @@
 using System;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 
-namespace Degunatsu.Core.Rollback
+namespace Airerage.Core.Rollback
 {
     /// <summary>ロールバックの設定。初期値はすべて【仮】（docs/10_online_plan.md 4章）。</summary>
     [Serializable]

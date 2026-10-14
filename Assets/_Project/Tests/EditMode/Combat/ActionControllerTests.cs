@@ -1,14 +1,14 @@
 using System.Numerics;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Combat;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Rollback;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Combat
+namespace Airerage.Core.Tests.Combat
 {
     /// <summary>攻撃の状態とフレームデータ、地上技の動き（docs/11_combat_plan.md T3-1）。</summary>
     public class ActionControllerTests

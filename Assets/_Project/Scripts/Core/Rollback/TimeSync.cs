@@ -1,6 +1,6 @@
 using System;
 
-namespace Degunatsu.Core.Rollback
+namespace Airerage.Core.Rollback
 {
     /// <summary>
     /// 相手とのティックの進み具合の差を推定し、自分が進みすぎていれば待つフレーム数を勧める

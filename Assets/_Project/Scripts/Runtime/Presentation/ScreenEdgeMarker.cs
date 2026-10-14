@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 画面の外にある物の方向を、画面の端の矢印で示すための計算と描画（100 枚のコイン、拠点。docs/12_match_plan.md）。

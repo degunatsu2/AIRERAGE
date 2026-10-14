@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Degunatsu.Core.Economy
+namespace Airerage.Core.Economy
 {
     /// <summary>
     /// ワールド全体のコインの状態（docs/12_match_plan.md T4-3）: フィールドのコイン（番号の順）、次のコインの番号、

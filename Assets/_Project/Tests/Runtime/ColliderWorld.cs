@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Physics;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Physics;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     /// <summary>
     /// テスト用に、シーンへ地形のコライダーやアンカーポイントを置く。テストの終わりに Dispose で消す。

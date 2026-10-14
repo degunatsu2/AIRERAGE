@@ -1,13 +1,13 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Simulation
+namespace Airerage.Core.Tests.Simulation
 {
     public class SimWorldTests
     {

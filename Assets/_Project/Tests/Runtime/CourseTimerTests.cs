@@ -1,9 +1,9 @@
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.DebugTools;
+using Airerage.Core.Wire;
+using Airerage.Runtime.DebugTools;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     public sealed class CourseTimerTests
     {

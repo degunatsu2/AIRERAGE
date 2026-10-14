@@ -1,21 +1,21 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Data;
-using Degunatsu.Runtime.Input;
-using Degunatsu.Runtime.Presentation;
+using Airerage.Core.Combat;
+using Airerage.Core.Common;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Data;
+using Airerage.Runtime.Input;
+using Airerage.Runtime.Presentation;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// シミュレーションを固定ティック（60Hz）で進め、表示を更新する（docs/03_architecture.md 4.1）。

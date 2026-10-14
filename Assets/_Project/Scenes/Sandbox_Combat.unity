@@ -414,7 +414,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 76496046}
   _innerRing: {fileID: 1972025169}
   _rays: {fileID: 1533357504}
@@ -476,7 +476,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 1278354789}
   _fuse: {fileID: 2049595739}
   _spark: {fileID: 734740422}
@@ -1049,7 +1049,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 1211036220}
   _fuse: {fileID: 2023718234}
   _spark: {fileID: 1447172088}
@@ -1248,7 +1248,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 261053557}
   _innerRing: {fileID: 425543623}
   _rays: {fileID: 211339082}
@@ -1452,7 +1452,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 135ace7c2926436b800c69b6e07a8823, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.EdgeGuideLayer
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.EdgeGuideLayer
   _camera: {fileID: 7160995}
   _edgeMargin: 56
   _plateWidth: 180
@@ -1786,7 +1786,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0f3dbf8ecbe84a5eb15e9341e7c5c71b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.ChargeEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.ChargeEffectView
   _ring: {fileID: 1549890273}
   _pulse: {fileID: 969137726}
   _rays: {fileID: 1210333028}
@@ -1842,7 +1842,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 723551218}
   _innerRing: {fileID: 1247643947}
   _rays: {fileID: 319865072}
@@ -2647,7 +2647,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 653df7cfde214300bfe7d833e0ecb6c7, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.GuardEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.GuardEffectView
   _glow: {fileID: 354587672}
   _burst: {fileID: 108462489}
   _rays: {fileID: 2063338731}
@@ -3459,7 +3459,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 496625830}
   _fuse: {fileID: 729063810}
   _spark: {fileID: 30878415}
@@ -3800,7 +3800,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 1649052799}
   _innerRing: {fileID: 37267974}
   _rays: {fileID: 1030702336}
@@ -4254,7 +4254,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1d65c05386134795b782c3776b803ab5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAttachable
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAttachable
 --- !u!23 &394250260
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -4361,7 +4361,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 1217841277}
   _innerRing: {fileID: 623732021}
   _rays: {fileID: 953160324}
@@ -4423,7 +4423,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 1099700991}
   _innerRing: {fileID: 1732170740}
   _rays: {fileID: 1916560099}
@@ -4502,7 +4502,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0461ad397c6d4580b5c8b06c99844f5f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAnchorPoint
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAnchorPoint
 --- !u!23 &405123843
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -4747,7 +4747,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0461ad397c6d4580b5c8b06c99844f5f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAnchorPoint
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAnchorPoint
 --- !u!23 &414411310
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -4882,7 +4882,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 1
   _kind: 0
 --- !u!1 &424980561
@@ -5197,7 +5197,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 805876311}
   _innerRing: {fileID: 540096892}
   _rays: {fileID: 1782086516}
@@ -5416,7 +5416,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9791e810749e4e7b8efe67aaa5afd17a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.BankSpotAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.BankSpotAuthoring
   _isFirst: 0
 --- !u!1 &440339803
 GameObject:
@@ -5554,7 +5554,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1d65c05386134795b782c3776b803ab5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAttachable
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAttachable
 --- !u!23 &445181479
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -6052,7 +6052,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0461ad397c6d4580b5c8b06c99844f5f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAnchorPoint
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAnchorPoint
 --- !u!23 &457470068
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -7417,7 +7417,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 100
   _kind: 1
 --- !u!1 &574611649
@@ -7448,7 +7448,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 850226433}
   _innerRing: {fileID: 774266402}
   _rays: {fileID: 938693644}
@@ -7512,7 +7512,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dec2c9db7ee9429c888536f6a1dd8379, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.CharacterView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.CharacterView
   _startupColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   _chargeColor: {r: 1, g: 0.72, b: 0, a: 1}
   _activeColor: {r: 0.95, g: 0.15, b: 0.15, a: 1}
@@ -7648,7 +7648,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1d65c05386134795b782c3776b803ab5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAttachable
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAttachable
 --- !u!23 &586666751
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -7755,7 +7755,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cc0c840c38334482b983efb7498ab90b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.CoinView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.CoinView
   _source: {fileID: 1634050611}
   _templates:
   - {fileID: 1313069784}
@@ -8242,7 +8242,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 496948003}
   _fuse: {fileID: 1053589768}
   _spark: {fileID: 545302539}
@@ -8458,7 +8458,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0461ad397c6d4580b5c8b06c99844f5f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAnchorPoint
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAnchorPoint
 --- !u!23 &672214276
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -8830,7 +8830,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0fdbc5d914f340d4893f74dc1b6f8303, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.CameraZoom
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.CameraZoom
   _composer: {fileID: 698001408}
   _inputActions: {fileID: -944628639613478452, guid: 6c3f7d13dd5d09fd187efbc56ee36988, type: 3}
   _minDistance: 12
@@ -8955,7 +8955,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b4ee0b1fd3e9477fa41994ff56b8fc07, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.ScoreboardHud
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.ScoreboardHud
   _source: {fileID: 1634050611}
   _width: 300
   _rowHeight: 52
@@ -9293,7 +9293,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0f3dbf8ecbe84a5eb15e9341e7c5c71b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.ChargeEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.ChargeEffectView
   _ring: {fileID: 428423881}
   _pulse: {fileID: 1133987588}
   _rays: {fileID: 1718776639}
@@ -9351,7 +9351,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dec2c9db7ee9429c888536f6a1dd8379, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.CharacterView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.CharacterView
   _startupColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   _chargeColor: {r: 1, g: 0.72, b: 0, a: 1}
   _activeColor: {r: 0.95, g: 0.15, b: 0.15, a: 1}
@@ -9469,7 +9469,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 653df7cfde214300bfe7d833e0ecb6c7, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.GuardEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.GuardEffectView
   _glow: {fileID: 1681126554}
   _burst: {fileID: 1020519500}
   _rays: {fileID: 1911416804}
@@ -10094,7 +10094,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 78f3448478cd482cbae4ef197b6dd10b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RainbowCoinGlow
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RainbowCoinGlow
   _faces:
   - {fileID: 68099142}
   _halo: {fileID: 2105990602}
@@ -10149,7 +10149,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 653df7cfde214300bfe7d833e0ecb6c7, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.GuardEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.GuardEffectView
   _glow: {fileID: 204994073}
   _burst: {fileID: 1074659826}
   _rays: {fileID: 1332491253}
@@ -10206,7 +10206,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 560932608}
   _innerRing: {fileID: 1694648066}
   _rays: {fileID: 704954086}
@@ -10268,7 +10268,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 468385885}
   _fuse: {fileID: 903747947}
   _spark: {fileID: 1364955968}
@@ -10467,7 +10467,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 653df7cfde214300bfe7d833e0ecb6c7, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.GuardEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.GuardEffectView
   _glow: {fileID: 1042910946}
   _burst: {fileID: 205999396}
   _rays: {fileID: 447308599}
@@ -10681,7 +10681,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9791e810749e4e7b8efe67aaa5afd17a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.BankSpotAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.BankSpotAuthoring
   _isFirst: 1
 --- !u!1 &805876309
 GameObject:
@@ -11137,7 +11137,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 1378534728}
   _fuse: {fileID: 1967110455}
   _spark: {fileID: 1687461266}
@@ -11620,7 +11620,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 1847184958}
   _innerRing: {fileID: 424980563}
   _rays: {fileID: 371771368}
@@ -11697,7 +11697,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 3
   _kind: 0
 --- !u!1 &881170965
@@ -11728,7 +11728,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 136066043}
   _innerRing: {fileID: 6472915}
   _rays: {fileID: 1079685471}
@@ -11790,7 +11790,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 1277927990}
   _fuse: {fileID: 244290871}
   _spark: {fileID: 453458658}
@@ -12715,7 +12715,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: db9985bd25c348c88aebae6f6672a666, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.MissIndicatorView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.MissIndicatorView
   _runner: {fileID: 1634050611}
   _camera: {fileID: 7160995}
   _missColor: {r: 1, g: 0.25, b: 0.25, a: 0.95}
@@ -13003,7 +13003,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a5ea068c94b444de84b6375c97c8fdce, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.KnockoutBounds
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.KnockoutBounds
   _min: {x: -34, y: -16}
   _max: {x: 34, y: 36}
 --- !u!4 &941688428
@@ -13846,7 +13846,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 100
   _kind: 1
 --- !u!1 &993855300
@@ -13892,7 +13892,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9791e810749e4e7b8efe67aaa5afd17a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.BankSpotAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.BankSpotAuthoring
   _isFirst: 0
 --- !u!1 &1005815095
 GameObject:
@@ -13922,7 +13922,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ad5d521ecfb44a9ea7b822c62a7eac7b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.ComboHud
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.ComboHud
   _source: {fileID: 1634050611}
   _lingerSeconds: 1.2
   _countColor: {r: 1, g: 0.85, b: 0.25, a: 1}
@@ -13986,7 +13986,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 3
   _kind: 0
 --- !u!1 &1020030893
@@ -14017,7 +14017,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 679635307}
   _innerRing: {fileID: 653567128}
   _rays: {fileID: 508390604}
@@ -15246,7 +15246,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 34784b10d631482687aad3feee7049e3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.PlayerGuides
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.PlayerGuides
   _source: {fileID: 1634050611}
   _guides: {fileID: 113249821}
 --- !u!4 &1074174070
@@ -15914,7 +15914,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1d65c05386134795b782c3776b803ab5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAttachable
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAttachable
 --- !u!23 &1102391861
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -16053,7 +16053,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 890122021}
   _fuse: {fileID: 1082333033}
   _spark: {fileID: 1275084411}
@@ -16267,7 +16267,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9791e810749e4e7b8efe67aaa5afd17a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.BankSpotAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.BankSpotAuthoring
   _isFirst: 0
 --- !u!1 &1183248097
 GameObject:
@@ -16299,7 +16299,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dec2c9db7ee9429c888536f6a1dd8379, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.CharacterView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.CharacterView
   _startupColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   _chargeColor: {r: 1, g: 0.72, b: 0, a: 1}
   _activeColor: {r: 0.95, g: 0.15, b: 0.15, a: 1}
@@ -16559,7 +16559,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 621779289}
   _innerRing: {fileID: 1654683535}
   _rays: {fileID: 623875948}
@@ -16920,7 +16920,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 20
   _kind: 0
 --- !u!1 &1217841275
@@ -17849,7 +17849,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 1
   _kind: 0
 --- !u!1 &1289341322
@@ -18022,7 +18022,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 209825237}
   _innerRing: {fileID: 257063101}
   _rays: {fileID: 2056022038}
@@ -18916,7 +18916,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 345222284}
   _innerRing: {fileID: 1515806225}
   _rays: {fileID: 1654983891}
@@ -18978,7 +18978,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 1846974267}
   _fuse: {fileID: 2141616766}
   _spark: {fileID: 1855729216}
@@ -19224,7 +19224,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 1
   _kind: 0
 --- !u!1 &1509598813
@@ -19255,7 +19255,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0f3dbf8ecbe84a5eb15e9341e7c5c71b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.ChargeEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.ChargeEffectView
   _ring: {fileID: 1678877147}
   _pulse: {fileID: 1289341324}
   _rays: {fileID: 1050606732}
@@ -20021,7 +20021,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0f3dbf8ecbe84a5eb15e9341e7c5c71b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.ChargeEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.ChargeEffectView
   _ring: {fileID: 1054322702}
   _pulse: {fileID: 1025601359}
   _rays: {fileID: 2073698919}
@@ -20234,7 +20234,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 1
   _kind: 0
 --- !u!1 &1606793730
@@ -20265,7 +20265,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 49705868}
   _innerRing: {fileID: 507377973}
   _rays: {fileID: 868462669}
@@ -20329,7 +20329,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a518e5063454695b291a4f0becc5392, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.DebugTools.ReplayControls
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.DebugTools.ReplayControls
   _runner: {fileID: 1634050611}
   _inputActions: {fileID: -944628639613478452, guid: 6c3f7d13dd5d09fd187efbc56ee36988, type: 3}
   _maxRecordSeconds: 300
@@ -20344,7 +20344,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1a434422215540bb95e60937d3d88918, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.DebugTools.DebugHud
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.DebugTools.DebugHud
   _runner: {fileID: 1634050611}
 --- !u!114 &1614828465
 MonoBehaviour:
@@ -20357,7 +20357,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9f25592d0cea4d288a2e663e5dcaa6eb, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.DebugTools.DebugControls
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.DebugTools.DebugControls
   _runner: {fileID: 1634050611}
   _inputActions: {fileID: -944628639613478452, guid: 6c3f7d13dd5d09fd187efbc56ee36988, type: 3}
   _audio: {fileID: 1921905735}
@@ -20405,7 +20405,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e8988a9dad43bc8222b064321b23a8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.MatchAtmosphere
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.MatchAtmosphere
   _source: {fileID: 1634050611}
   _audio: {fileID: 1921905735}
   _tenseSkyTint: {r: 0.85, g: 0.3, b: 0.25, a: 1}
@@ -20455,7 +20455,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 36fd60508ded487eb91a4f8bc6d609ec, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.SimulationRunner
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.SimulationRunner
   _character: {fileID: 11400000, guid: e6e9c5b391fca3317bb8d5481ea17116, type: 2}
   _inputActions: {fileID: -944628639613478452, guid: 6c3f7d13dd5d09fd187efbc56ee36988, type: 3}
   _spawnPoint: {fileID: 191526137}
@@ -20518,7 +20518,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2cffbb7c4fa1430d97f64e2abab46985, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.WireView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.WireView
   _anchorMarker: {fileID: 373326930}
   _attachGauge: {fileID: 884105237}
 --- !u!4 &1641332204
@@ -21685,7 +21685,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 20
   _kind: 0
 --- !u!1 &1708684912
@@ -22106,7 +22106,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 873fceca9f164457bad9cea632427de5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.DebugTools.TrailView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.DebugTools.TrailView
   _runner: {fileID: 1634050611}
   _maxPoints: 180
   _color: {r: 0, g: 0.75, b: 0.75, a: 0.7}
@@ -22532,7 +22532,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8381ba3c0dce4598b8a2aba506556bd2, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BankView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BankView
   _source: {fileID: 1634050611}
   _camera: {fileID: 7160995}
   _ring: {fileID: 389665117}
@@ -22841,7 +22841,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 1
   _kind: 0
 --- !u!1 &1782086515
@@ -23031,7 +23031,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0461ad397c6d4580b5c8b06c99844f5f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.WireAnchorPoint
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.WireAnchorPoint
 --- !u!23 &1799951355
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -23117,7 +23117,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 2079997057}
   _innerRing: {fileID: 1042972548}
   _rays: {fileID: 862306491}
@@ -23889,7 +23889,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 2116909897}
   _fuse: {fileID: 125539327}
   _spark: {fileID: 1919284493}
@@ -24103,7 +24103,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 100
   _kind: 1
 --- !u!1 &1909386302
@@ -24845,7 +24845,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 21bb95569b1248ee99318ffb03c90aff, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Audio.GameAudio
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Audio.GameAudio
   _bgmOverride: {fileID: 0}
   _tenseBgmOverride: {fileID: 0}
   _overrides: []
@@ -24863,7 +24863,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d14788dfae394329b09cca74e071056f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Audio.CombatSoundEvents
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Audio.CombatSoundEvents
   _source: {fileID: 1634050611}
   _audio: {fileID: 1921905735}
 --- !u!4 &1921905737
@@ -25051,7 +25051,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 1740527923}
   _fuse: {fileID: 1194245718}
   _spark: {fileID: 894727573}
@@ -25108,7 +25108,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e55ae44a5e5b458292c0e83af827ed57, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.CoinHud
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.CoinHud
   _source: {fileID: 1634050611}
   _camera: {fileID: 7160995}
   _popupSeconds: 1
@@ -25587,7 +25587,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 709034372}
   _fuse: {fileID: 1372996708}
   _spark: {fileID: 923563707}
@@ -25786,7 +25786,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 1513378240}
   _fuse: {fileID: 1717482270}
   _spark: {fileID: 916016600}
@@ -25843,7 +25843,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 12a69580e9254cbc9695227c9eba0277, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.RingGaugeView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.RingGaugeView
   _track: {fileID: 1227327607}
   _fuse: {fileID: 2011317417}
   _spark: {fileID: 1843633838}
@@ -26326,7 +26326,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 963623194}
   _innerRing: {fileID: 272414862}
   _rays: {fileID: 972468003}
@@ -26390,7 +26390,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dec2c9db7ee9429c888536f6a1dd8379, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.CharacterView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.CharacterView
   _startupColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   _chargeColor: {r: 1, g: 0.72, b: 0, a: 1}
   _activeColor: {r: 0.95, g: 0.15, b: 0.15, a: 1}
@@ -26665,7 +26665,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 3
   _kind: 0
 --- !u!1 &2079997055
@@ -26853,7 +26853,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0d03cce3d804219b5fdd3f9e2193e26, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.CoinSpawnAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.CoinSpawnAuthoring
   _value: 1
   _kind: 0
 --- !u!1 &2094486940
@@ -26884,7 +26884,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 034c2b70fea84860b7011280210c6fef, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.AimIndicatorView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.AimIndicatorView
   _aimLine: {fileID: 1920025121}
   _targetMarker: {fileID: 1894137874}
   _rangeRing: {fileID: 970299654}
@@ -26941,7 +26941,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 680388076}
   _innerRing: {fileID: 1932682252}
   _rays: {fileID: 782379336}
@@ -27160,7 +27160,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9791e810749e4e7b8efe67aaa5afd17a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Simulation.BankSpotAuthoring
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Simulation.BankSpotAuthoring
   _isFirst: 0
 --- !u!1 &2116909895
 GameObject:
@@ -27332,7 +27332,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 018b80a6c78943a0a696eb68265ee21c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.MatchHud
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.MatchHud
   _source: {fileID: 1634050611}
   _controls: {fileID: 0}
   _audio: {fileID: 1921905735}
@@ -27383,7 +27383,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4a4bb6078801422d836597e8b587811f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Degunatsu.Runtime::Degunatsu.Runtime.Presentation.BurstEffectView
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Presentation.BurstEffectView
   _ring: {fileID: 1595739571}
   _innerRing: {fileID: 739054748}
   _rays: {fileID: 1726293377}

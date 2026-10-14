@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Text;
-using Degunatsu.Core.Physics;
+using Airerage.Core.Physics;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// シーンの地形から Core の BoxTerrain を作る（docs/03_architecture.md 4.2）。

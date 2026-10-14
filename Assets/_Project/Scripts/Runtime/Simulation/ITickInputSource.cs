@@ -1,6 +1,6 @@
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>プレイヤーの入力の代わりに、ティックごとに入力を渡すもの（入力の再生など、デバッグ用）。</summary>
     public interface ITickInputSource

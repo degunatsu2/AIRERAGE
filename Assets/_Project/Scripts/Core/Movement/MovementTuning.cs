@@ -1,8 +1,8 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 
-namespace Degunatsu.Core.Movement
+namespace Airerage.Core.Movement
 {
     /// <summary>
     /// 基本移動の調整値。初期値はすべて【仮】（docs/06_prototype_plan.md 4.1）。

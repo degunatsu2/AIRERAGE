@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Economy;
+using Airerage.Core.Economy;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// シーンに置くコインの出現地点（Core の CoinSpawnPoint。docs/12_match_plan.md T4-4）。位置はこの物体の位置（Z = 0 の面）。

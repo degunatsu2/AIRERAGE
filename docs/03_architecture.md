@@ -23,15 +23,15 @@
 ## 2. 全体構成
 
 ```
-┌────────────────────────── Unity 側（Degunatsu.Runtime）──────────────────────────┐
+┌────────────────────────── Unity 側（Airerage.Runtime）──────────────────────────┐
 │ Unity Input System → InputAdapter ──┐                                            │
 │                                      ▼                                            │
 │                              PlayerInput（ティックごと）                            │
-│                                      │        ┌── Degunatsu.Net（Phase 2〜）────┐ │
+│                                      │        ┌── Airerage.Net（Phase 2〜）────┐ │
 │                                      │◀──────▶│ 入力の送受信（全員の入力）        │ │
 │                                      ▼        │ 予測・巻き戻し（ロールバック）    │ │
 │  SimulationRunner（ティックを回す） ──▶ ┌──────────────────────────────────┐       │ │
-│                                        │ Degunatsu.Core（純C#・固定ティック） │       │ │
+│                                        │ Airerage.Core（純C#・固定ティック） │       │ │
 │                                        │  Physics ：BoxTerrain（地形）        │       │ │
 │  SceneTerrainBuilder ────────────────▶ │  Movement：KinematicMotor            │       │ │
 │  （シーンの BoxCollider を読む）       │  Wire    ：WireController            │       │ │
@@ -49,16 +49,16 @@
 ### 2.1 アセンブリ（asmdef）と依存方向
 
 ```
-Degunatsu.Core        （noEngineReferences: true。UnityEngine を参照しない）
+Airerage.Core        （noEngineReferences: true。UnityEngine を参照しない）
    ▲
-Degunatsu.Runtime     （Core を参照。MonoBehaviour、ScriptableObject、アダプター）
+Airerage.Runtime     （Core を参照。MonoBehaviour、ScriptableObject、アダプター）
    ▲
-Degunatsu.Net         （Core と Runtime を参照。ネットワークのライブラリを参照するのはここだけ。Phase 2〜）
+Airerage.Net         （Core と Runtime を参照。ネットワークのライブラリを参照するのはここだけ。Phase 2〜）
 
-Degunatsu.Editor      （Runtime を参照。エディタ拡張のみ）
-Degunatsu.Core.Tests  （Core を参照。EditMode テスト。dotnet test でも実行する）
-Degunatsu.Runtime.Tests（Runtime と Core.Tests を参照。EditMode テスト。シーンの読み込みなど）
-Degunatsu.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを再生する通しの確認。最小限）
+Airerage.Editor      （Runtime を参照。エディタ拡張のみ）
+Airerage.Core.Tests  （Core を参照。EditMode テスト。dotnet test でも実行する）
+Airerage.Runtime.Tests（Runtime と Core.Tests を参照。EditMode テスト。シーンの読み込みなど）
+Airerage.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを再生する通しの確認。最小限）
 ```
 
 - Core は Runtime・Net・UnityEngine を**絶対に参照しない**。asmdef の設定で強制する。
@@ -183,7 +183,7 @@ public interface IWireMotionModel
 Unity プロジェクトをリポジトリ直下に置く前提です（D-04）。
 
 ```
-degunatsu/
+AIRERAGE/
 ├─ CLAUDE.md                     # Claude Code 向けのプロジェクト規約
 ├─ README.md
 ├─ docs/                         # 設計書（本書を含む）
@@ -192,7 +192,7 @@ degunatsu/
 ├─ Assets/
 │  └─ _Project/                  # 自作アセットはすべてここ（サードパーティと分ける）
 │     ├─ Scripts/
-│     │  ├─ Core/                # Degunatsu.Core.asmdef（UnityEngine 非依存）
+│     │  ├─ Core/                # Airerage.Core.asmdef（UnityEngine 非依存）
 │     │  │  ├─ Common/
 │     │  │  ├─ Input/
 │     │  │  ├─ Physics/
@@ -205,7 +205,7 @@ degunatsu/
 │     │  │  ├─ Combat/           # Phase 3
 │     │  │  ├─ Economy/          # Phase 4
 │     │  │  └─ Match/            # Phase 4
-│     │  ├─ Runtime/             # Degunatsu.Runtime.asmdef
+│     │  ├─ Runtime/             # Airerage.Runtime.asmdef
 │     │  │  ├─ Bootstrap/
 │     │  │  ├─ Simulation/
 │     │  │  ├─ Input/
@@ -213,12 +213,12 @@ degunatsu/
 │     │  │  ├─ Presentation/
 │     │  │  ├─ Camera/
 │     │  │  └─ DebugTools/
-│     │  ├─ Net/                 # Degunatsu.Net.asmdef（Phase 2）
-│     │  └─ Editor/              # Degunatsu.Editor.asmdef
+│     │  ├─ Net/                 # Airerage.Net.asmdef（Phase 2）
+│     │  └─ Editor/              # Airerage.Editor.asmdef
 │     ├─ Tests/
-│     │  ├─ EditMode/            # Degunatsu.Core.Tests.asmdef（純C#）
-│     │  ├─ Runtime/             # Degunatsu.Runtime.Tests.asmdef（EditMode）
-│     │  └─ PlayMode/            # Degunatsu.PlayMode.Tests.asmdef
+│     │  ├─ EditMode/            # Airerage.Core.Tests.asmdef（純C#）
+│     │  ├─ Runtime/             # Airerage.Runtime.Tests.asmdef（EditMode）
+│     │  └─ PlayMode/            # Airerage.PlayMode.Tests.asmdef
 │     ├─ Data/                   # ScriptableObject アセット
 │     │  ├─ Characters/
 │     │  ├─ Movement/
@@ -250,7 +250,7 @@ degunatsu/
 
 | 対象 | 規則 | 例 |
 |---|---|---|
-| 名前空間 | `Degunatsu.<アセンブリ>.<機能>` | `Degunatsu.Core.Wire` |
+| 名前空間 | `Airerage.<アセンブリ>.<機能>` | `Airerage.Core.Wire` |
 | 型・メソッド・プロパティ | PascalCase | `WireController`, `TryFire()` |
 | private フィールド | `_camelCase`（インスペクターでは先頭の `_` が除かれて表示される） | `[SerializeField] private float _maxSpeed;` |
 | Core の設定クラスのフィールド | PascalCase の public フィールド（Core は UnityEngine の `SerializeField` を使えないため。Unity は public フィールドをシリアライズする） | `public float RunSpeed = 8f;` |

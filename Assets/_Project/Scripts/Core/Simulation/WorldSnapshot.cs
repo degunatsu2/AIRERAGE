@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Match;
+using Airerage.Core.Economy;
+using Airerage.Core.Match;
 
-namespace Degunatsu.Core.Simulation
+namespace Airerage.Core.Simulation
 {
     /// <summary>
     /// SimWorld の全状態（ティック数、全キャラクターの状態、ワールド全体のコイン、試合の進み具合）の写し（docs/10_online_plan.md T2-1）。

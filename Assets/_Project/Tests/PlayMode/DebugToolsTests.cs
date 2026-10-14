@@ -1,15 +1,15 @@
 using System.Collections;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.DebugTools;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.DebugTools;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// デバッグ機能（docs/06_prototype_plan.md T1-9）とカメラのズームを Sandbox_Wire で動かして確かめる

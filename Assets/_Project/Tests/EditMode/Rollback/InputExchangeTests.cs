@@ -1,10 +1,10 @@
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Input;
+using Airerage.Core.Rollback;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Rollback
+namespace Airerage.Core.Tests.Rollback
 {
     /// <summary>入力の送受信の規則（冗長送信と確認応答。docs/10_online_plan.md T2-4）。</summary>
     public class InputExchangeTests

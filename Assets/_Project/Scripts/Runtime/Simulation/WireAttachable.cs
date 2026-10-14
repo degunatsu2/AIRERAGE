@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// この地形（同じ GameObject のコライダー）にワイヤーを接続できることを示す。

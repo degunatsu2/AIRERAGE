@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Economy;
+using Airerage.Core.Economy;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// シーンに置く拠点（バンク）の候補の地点（Core の BankSpot。docs/12_match_plan.md T4-7）。位置はこの物体の位置（Z = 0 の面）。

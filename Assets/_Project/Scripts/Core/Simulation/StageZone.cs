@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace Degunatsu.Core.Simulation
+namespace Airerage.Core.Simulation
 {
     /// <summary>ステージのギミックの種類（StageZone。ユーザーの要望、2026-10-13）。</summary>
     public enum StageZoneKind : byte

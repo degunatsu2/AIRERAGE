@@ -1,12 +1,12 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Wire
+namespace Airerage.Core.Tests.Wire
 {
     /// <summary>
     /// タイプA（物理・慣性重視）のモデル（docs/06_prototype_plan.md T1-4）。

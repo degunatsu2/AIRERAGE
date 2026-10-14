@@ -1,17 +1,17 @@
 using System;
 using System.IO;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
-using TerrainBox = Degunatsu.Editor.SandboxWireSceneBuilder.TerrainBox;
+using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
-namespace Degunatsu.Editor
+namespace Airerage.Editor
 {
     /// <summary>
     /// 空中戦の検証用シーン（Sandbox_Combat、docs/11_combat_plan.md T3-3）を作る。足場が少なく、下と左右が外
@@ -19,7 +19,7 @@ namespace Degunatsu.Editor
     /// 地形の配置はこのコードで決め、シーンは生成物として扱う。
     ///
     /// バッチモードでの実行:
-    ///   Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxCombatSceneBuilder.Build
+    ///   Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxCombatSceneBuilder.Build
     /// </summary>
     public static class SandboxCombatSceneBuilder
     {
@@ -92,7 +92,7 @@ namespace Degunatsu.Editor
             new Vector3(13.5f, 5.5f, 0f),
         };
 
-        [MenuItem("Degunatsu/Sandbox_Combat シーンを作り直す")]
+        [MenuItem("Airerage/Sandbox_Combat シーンを作り直す")]
         private static void BuildFromMenu()
         {
             if (File.Exists(ScenePath)

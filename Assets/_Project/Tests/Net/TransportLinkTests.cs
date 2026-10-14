@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using NUnit.Framework;
 
-namespace Degunatsu.Net.Tests
+namespace Airerage.Net.Tests
 {
     /// <summary>
     /// TransportLink を同じ PC の中（127.0.0.1）で実際に通信させて確かめる。ポートは 0（空いているポート）を使う。

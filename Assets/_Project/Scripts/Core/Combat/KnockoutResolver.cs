@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Combat
+namespace Airerage.Core.Combat
 {
     /// <summary>
     /// ステージの外に出たキャラクターを撃破にする（docs/11_combat_plan.md T3-3、docs/12_match_plan.md T4-2）。

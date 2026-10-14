@@ -1,12 +1,12 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 using NVector3 = System.Numerics.Vector3;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     /// <summary>
     /// シーンのコライダーから作った地形で、Core のテストと同じ動きになることを確かめる（シーン → BoxTerrain → SimWorld の通し）。

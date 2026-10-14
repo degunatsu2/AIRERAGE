@@ -1,17 +1,17 @@
 using System.Collections;
 using System.Linq;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Net;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Presentation;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
+using Airerage.Net;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Presentation;
 using NUnit.Framework;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// Sandbox_Online シーンを再生して、ホストが1人で試合を始められ、シミュレーションと表示がつながっていることを確かめる

@@ -1,7 +1,7 @@
 using System;
-using Degunatsu.Core.Input;
+using Airerage.Core.Input;
 
-namespace Degunatsu.Core.Combat
+namespace Airerage.Core.Combat
 {
     /// <summary>
     /// 戦闘のための、アクション状態とは別に続く値（docs/11_combat_plan.md T3-2、T3-3）。値だけで完結させる。

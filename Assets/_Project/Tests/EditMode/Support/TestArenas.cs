@@ -1,6 +1,6 @@
-using Degunatsu.Core.Physics;
+using Airerage.Core.Physics;
 
-namespace Degunatsu.Core.Tests.Support
+namespace Airerage.Core.Tests.Support
 {
     /// <summary>
     /// 複数のテストで使う地形。

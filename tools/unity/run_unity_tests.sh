@@ -5,7 +5,7 @@
 #   bash tools/unity/run_unity_tests.sh [EditMode|PlayMode] [テストの絞り込み]   （既定は EditMode、絞り込みなし）
 #
 # テストの絞り込みは Unity の -testFilter に渡す（テストの完全な名前か正規表現）。
-# [Explicit] のテスト（例: Degunatsu.Runtime.Tests.RecordedReplayTests）は、名前で絞り込んだときだけ実行される。
+# [Explicit] のテスト（例: Airerage.Runtime.Tests.RecordedReplayTests）は、名前で絞り込んだときだけ実行される。
 #
 # エディタのバージョンは ProjectSettings/ProjectVersion.txt に合わせる（導入は tools/unity/install_editor.sh、
 # ライセンスは tools/unity/activate_license.sh）。ログと結果の XML は Logs/（.gitignore の対象）に出力する。

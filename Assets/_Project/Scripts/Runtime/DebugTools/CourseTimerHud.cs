@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.Text;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Common;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.DebugTools
+namespace Airerage.Runtime.DebugTools
 {
     /// <summary>
     /// タイム計測コースの計測と表示（デバッグ用。画面の左上に IMGUI で出す）。

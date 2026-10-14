@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Movement;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Combat;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Movement;
+using Airerage.Core.Physics;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Simulation
+namespace Airerage.Core.Simulation
 {
     /// <summary>
     /// キャラクター1人分の1ティックの処理の順序を決める。

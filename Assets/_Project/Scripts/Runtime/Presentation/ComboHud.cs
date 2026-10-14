@@ -1,11 +1,11 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Economy;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 操作するキャラクターのコンボの表示（ユーザーの指示、2026-10-13。docs/11_combat_plan.md T3-7）。

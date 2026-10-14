@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Physics;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     /// <summary>
     /// シーンのコライダーから BoxTerrain を正しく作れることを確かめる。

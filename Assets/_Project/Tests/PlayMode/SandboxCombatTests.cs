@@ -1,16 +1,16 @@
 using System;
 using System.Collections;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Input;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// 空中戦の検証用シーン（Sandbox_Combat、docs/11_combat_plan.md T3-3）。足場から落ちると撃破されて出現位置に戻り、

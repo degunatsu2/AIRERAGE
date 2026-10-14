@@ -2,15 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Replay;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Replay;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Replay
+namespace Airerage.Core.Tests.Replay
 {
     /// <summary>
     /// 入力の記録と再生（docs/06_prototype_plan.md T1-9b）。
@@ -144,10 +144,22 @@ namespace Degunatsu.Core.Tests.Replay
             Assert.That(loaded.ConfigText, Is.Empty);
         }
 
+        [Test]
+        public void Parse_ARecordingFromBeforeTheRename_IsStillRead()
+        {
+            // ゲームの名前を AIRERAGE に変える前の記録（先頭が degunatsu-input-recording）も読める。
+            var recording = new InputRecording(default(CharacterState), WireModelType.Inertial, new[] { Inputs.Jump }, 42UL, string.Empty);
+            string text = recording.ToText();
+            Assert.That(text, Does.StartWith("airerage-input-recording "), "前提: 新しい名前で書く");
+
+            InputRecording loaded = InputRecording.Parse(text.Replace("airerage-input-recording", "degunatsu-input-recording"));
+            Assert.That(loaded.Inputs, Is.EqualTo(new[] { Inputs.Jump }));
+        }
+
         [TestCase("ticks 2", "ticks 3", "一致しません")]
         [TestCase("final-checksum 000000000000002a", "final-checksum xyz", "16進数")]
         [TestCase("wire-model Inertial", "wire-model Orbit", "不明なワイヤーのタイプ")]
-        [TestCase("degunatsu-input-recording 1", "degunatsu-input-recording 99", "版")]
+        [TestCase("airerage-input-recording 1", "airerage-input-recording 99", "版")]
         public void Parse_Malformed_ThrowsWithLineNumber(string original, string broken, string expectedMessage)
         {
             var recording = new InputRecording(default(CharacterState), WireModelType.Inertial, new[] { Inputs.Jump, Inputs.Jump }, 42UL, string.Empty);

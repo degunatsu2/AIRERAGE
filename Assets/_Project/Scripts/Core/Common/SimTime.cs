@@ -1,6 +1,6 @@
 using System;
 
-namespace Degunatsu.Core.Common
+namespace Airerage.Core.Common
 {
     /// <summary>
     /// シミュレーションの時間の基準。固定ティック（D-31: 60Hz）で進める。

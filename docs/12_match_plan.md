@@ -21,7 +21,7 @@
 
 ## 2. 構成の方針
 
-- 試合のルールは Core の `MatchRules`（`Degunatsu.Core.Match`。`[Serializable]`、値は初期値の1か所）。`SimWorld` に渡す。
+- 試合のルールは Core の `MatchRules`（`Airerage.Core.Match`。`[Serializable]`、値は初期値の1か所）。`SimWorld` に渡す。
 - **試合の段階（カウントダウン・試合中・終了）は、ティック数とルールだけから決まる**（`MatchRules.PhaseAt`）。段階を状態に持たないので、巻き戻しても全員で同じになり、状態の形式も増えない。
 - 試合のルールはホストのものを全員が使う。試合の開始のメッセージ（`NetMessages.Start`）に、調整値といっしょに入れて送る（`OnlineSession.StartMatch(MatchRules)`）。
 - 表示（`MatchHud`）は、ティック数とルールから段階と残り時間を求めて出す（`ISimulationFeed.CurrentTick` / `Rules`）。状態は書き換えない。

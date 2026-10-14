@@ -1,7 +1,7 @@
 using System;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 
-namespace Degunatsu.Core.Wire
+namespace Airerage.Core.Wire
 {
     /// <summary>接続中の運動モデル（docs/01_game_design.md 5.3）。</summary>
     public enum WireModelType : byte

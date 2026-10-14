@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Rollback;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Tests.Support
+namespace Airerage.Core.Tests.Support
 {
     /// <summary>
     /// ロールバックのセッションを、遅延・揺らぎ・欠落のある疑似ネットワークでつなぐテスト補助（docs/10_online_plan.md T2-3、T2-4）。

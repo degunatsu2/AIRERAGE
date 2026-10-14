@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 虹色に光るコイン（100 枚。docs/12_match_plan.md 3.5）の光（表示だけ）: コインの色が虹色に移り変わり、周りに虹色の輪が

@@ -1,13 +1,13 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Match
+namespace Airerage.Core.Tests.Match
 {
     /// <summary>試合の進行（カウントダウン、制限時間、終了）と順位（docs/12_match_plan.md T4-1）。</summary>
     public class MatchTests

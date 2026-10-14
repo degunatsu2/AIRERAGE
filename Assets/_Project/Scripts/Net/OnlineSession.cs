@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
+using Airerage.Core.Rollback;
+using Airerage.Core.Simulation;
 using UnityEngine;
 using NVector3 = System.Numerics.Vector3;
 
-namespace Degunatsu.Net
+namespace Airerage.Net
 {
     /// <summary>
     /// オンラインの試合の1人分（docs/10_online_plan.md T2-7）。通信（TransportLink）と、Core のロールバック
@@ -735,7 +735,7 @@ namespace Degunatsu.Net
                     int target = NetMessages.InputTarget(e.Data);
                     if (target == LocalPlayer)
                     {
-                        Exchange.Receive(Degunatsu.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data)));
+                        Exchange.Receive(Airerage.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data)));
                     }
                     else if (target > 0 && target < PlayerCount && _playerPeer[target] >= 0)
                     {
@@ -812,7 +812,7 @@ namespace Degunatsu.Net
                             if (State == SessionState.Running && NetMessages.InputMatch(e.Data) == MatchNumber
                                 && NetMessages.InputTarget(e.Data) == LocalPlayer)
                             {
-                                Exchange.Receive(Degunatsu.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data)));
+                                Exchange.Receive(Airerage.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data)));
                             }
                             break;
                     }

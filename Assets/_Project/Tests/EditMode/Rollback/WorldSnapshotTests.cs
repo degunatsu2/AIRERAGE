@@ -1,9 +1,9 @@
 using System;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Rollback
+namespace Airerage.Core.Tests.Rollback
 {
     /// <summary>ワールドの全状態の保存と復元（docs/10_online_plan.md T2-1）。</summary>
     public class WorldSnapshotTests

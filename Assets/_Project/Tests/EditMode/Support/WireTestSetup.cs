@@ -1,9 +1,9 @@
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Input;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Tests.Support
+namespace Airerage.Core.Tests.Support
 {
     /// <summary>
     /// 接続済みの状態から始めるテストの補助。

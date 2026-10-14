@@ -1,23 +1,23 @@
 using System.Collections.Generic;
 using System.IO;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Replay;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.DebugTools;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Physics;
+using Airerage.Core.Replay;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.DebugTools;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     /// <summary>
     /// InputRecordings フォルダの入力の記録（Sandbox_Wire で記録したもの）を、記録したときの調整値と Sandbox_Wire の地形で
     /// 再生し、最後の状態が記録と一致するかを確かめる。別の PC で記録したファイルで、PC 間の決定性
     /// （docs/04_network.md 3.5、R-11）を確かめるのに使う。
     /// シミュレーションのコードを変えると古い記録は一致しなくなるので、通常のテストでは実行しない
-    /// （Test Runner で選んで実行するか、bash tools/unity/run_unity_tests.sh EditMode Degunatsu.Runtime.Tests.RecordedReplayTests）。
+    /// （Test Runner で選んで実行するか、bash tools/unity/run_unity_tests.sh EditMode Airerage.Runtime.Tests.RecordedReplayTests）。
     /// </summary>
     [Explicit("入力の記録ファイルを確かめるときだけ実行する")]
     public sealed class RecordedReplayTests
@@ -54,7 +54,7 @@ namespace Degunatsu.Runtime.Tests
                 bool wasAttached = false;
                 CharacterState final = recording.Simulate(terrain, config, state =>
                 {
-                    bool attached = state.Wire.Phase == Degunatsu.Core.Wire.WirePhase.Attached;
+                    bool attached = state.Wire.Phase == Airerage.Core.Wire.WirePhase.Attached;
                     attaches += attached && !wasAttached ? 1 : 0;
                     wasAttached = attached;
                     maxPivots = Mathf.Max(maxPivots, state.Wire.Pivots.Count);

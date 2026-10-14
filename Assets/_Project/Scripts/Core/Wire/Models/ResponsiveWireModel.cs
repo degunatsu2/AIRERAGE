@@ -1,7 +1,7 @@
 using System.Numerics;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 
-namespace Degunatsu.Core.Wire.Models
+namespace Airerage.Core.Wire.Models
 {
     /// <summary>
     /// タイプB: 操作追従重視。接続点へ向かう目標速度に素早く収束する。スティックで進路を横にずらせる。

@@ -1,7 +1,7 @@
 using System;
 using NUnit.Framework;
 
-namespace Degunatsu.Net.Tests
+namespace Airerage.Net.Tests
 {
     public sealed class NetMessagesTests
     {

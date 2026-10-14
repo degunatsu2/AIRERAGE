@@ -1,10 +1,10 @@
 using System;
 using System.IO;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Data;
-using Degunatsu.Runtime.DebugTools;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Data;
+using Airerage.Runtime.DebugTools;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -14,20 +14,20 @@ using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
-namespace Degunatsu.Editor
+namespace Airerage.Editor
 {
     /// <summary>
     /// ワイヤー移動の検証用シーン（Sandbox_Wire）を作る。地形の配置はこのコードで決め、シーンは生成物として扱う。
     /// 調整値のアセットとマテリアルは、すでにあれば作り直さない（調整した値を消さないため）。
     ///
     /// バッチモードでの実行:
-    ///   Unity -batchmode -nographics -quit -projectPath . -executeMethod Degunatsu.Editor.SandboxWireSceneBuilder.Build
+    ///   Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxWireSceneBuilder.Build
     /// </summary>
     public static class SandboxWireSceneBuilder
     {
         public const string ScenePath = "Assets/_Project/Scenes/Sandbox_Wire.unity";
         public const string CharacterConfigPath = "Assets/_Project/Data/Characters/DefaultCharacter.asset";
-        public const string InputActionsPath = "Assets/_Project/Input/DegunatsuControls.inputactions";
+        public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
         // 地形の奥行き（見た目のため）。キャラクターの奥行きより大きければよい。
@@ -136,7 +136,7 @@ namespace Degunatsu.Editor
         private const float CameraDistance = 22f;
         private const float CameraDamping = 0.3f;    // 秒
 
-        [MenuItem("Degunatsu/Sandbox_Wire シーンを作り直す")]
+        [MenuItem("Airerage/Sandbox_Wire シーンを作り直す")]
         private static void BuildFromMenu()
         {
             if (File.Exists(ScenePath)
@@ -372,7 +372,7 @@ namespace Degunatsu.Editor
                 var point = new GameObject($"JackpotSpot{i + 1}");
                 point.transform.SetParent(root, false);
                 point.transform.position = new Vector3(jackpotSpots[i].x, jackpotSpots[i].y, 0f);
-                point.AddComponent<CoinSpawnAuthoring>().Configure(JackpotValue, Degunatsu.Core.Economy.CoinSpawnKind.Jackpot);
+                point.AddComponent<CoinSpawnAuthoring>().Configure(JackpotValue, Airerage.Core.Economy.CoinSpawnKind.Jackpot);
             }
 
             // 見た目の見本（CoinLook の順: 1 枚は金色、3 枚は金色のピラミッド、5 枚は赤、100 枚は虹色に光る）。

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 残り時間を、円の周りの導火線のように短くなっていくゲージで示す（ユーザーの要望、2026-10-13）。

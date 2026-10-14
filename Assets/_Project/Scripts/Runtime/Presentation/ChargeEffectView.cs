@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 撃破技のチャージ（発生の間）を派手に示す（D-38、ユーザーの要望 2026-10-13）。キャラクターの周りに金色の輪が集まり、

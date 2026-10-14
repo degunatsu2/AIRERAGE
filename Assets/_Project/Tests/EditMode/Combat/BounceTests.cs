@@ -1,11 +1,11 @@
 using System.Numerics;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Combat
+namespace Airerage.Core.Tests.Combat
 {
     /// <summary>のけぞり中に床・壁・天井へ勢いよくぶつかったら跳ね返る（ユーザーの要望、2026-10-13）。</summary>
     public class BounceTests

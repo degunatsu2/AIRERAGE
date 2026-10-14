@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 画面の外にある物の誘導表示（画面の端の矢印と札。GuidePlate）を、まとめて描く（ユーザーの要望、2026-10-14）。

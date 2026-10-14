@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Movement;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Input;
+using Airerage.Core.Movement;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Simulation
+namespace Airerage.Core.Tests.Simulation
 {
     /// <summary>ステージのギミック（ジャンプ台、上昇気流、加速リング。StageZone / StageZones。ユーザーの要望、2026-10-13）。</summary>
     public class StageZoneTests

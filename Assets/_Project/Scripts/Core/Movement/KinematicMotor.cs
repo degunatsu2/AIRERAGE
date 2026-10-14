@@ -1,8 +1,8 @@
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Physics;
+using Airerage.Core.Common;
+using Airerage.Core.Physics;
 
-namespace Degunatsu.Core.Movement
+namespace Airerage.Core.Movement
 {
     /// <summary>
     /// Rigidbody を使わない移動と衝突解決。箱を移動方向にスイープし、当たった面に沿って滑らせる。

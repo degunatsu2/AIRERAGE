@@ -1,17 +1,17 @@
 using System.Collections;
 using System.Collections.Generic;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Input;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// Sandbox_Wire で攻撃ボタンを押すと、キャラクターの色が攻撃の段階（発生 → 持続 → 硬直）で変わり、終わると戻る

@@ -1,13 +1,13 @@
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace Degunatsu.Runtime.DebugTools
+namespace Airerage.Runtime.DebugTools
 {
     /// <summary>
-    /// デバッグ用の操作（docs/06_prototype_plan.md 3章）。DegunatsuControls.inputactions の "Debug" マップを読む。
+    /// デバッグ用の操作（docs/06_prototype_plan.md 3章）。AirerageControls.inputactions の "Debug" マップを読む。
     /// - ToggleWireType（Tab / Select）: ワイヤーのタイプ A / B を切り替える（調整値のアセットの値を変える）
     /// - CycleSpeed（F1 / 十字キー下）: シミュレーションの速さを 1 → 1/2 → 1/4 → 一時停止 → 1 の順に変える
     /// - StepTick（F2 / 十字キー右）: 一時停止中に1ティックだけ進める

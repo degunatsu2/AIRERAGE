@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Unity 外で Degunatsu.Core をビルドするためのプロジェクト。
+    Unity 外で Airerage.Core をビルドするためのプロジェクト。
     ソースは Assets/_Project/Scripts/Core をそのまま取り込む。
     Unity 6 の API 互換レベル（.NET Standard 2.1）と C# 9 に合わせ、Unity でコンパイルできないコードを検出する。
   -->
@@ -11,8 +11,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <AssemblyName>Degunatsu.Core</AssemblyName>
-    <RootNamespace>Degunatsu.Core</RootNamespace>
+    <AssemblyName>Airerage.Core</AssemblyName>
+    <RootNamespace>Airerage.Core</RootNamespace>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>

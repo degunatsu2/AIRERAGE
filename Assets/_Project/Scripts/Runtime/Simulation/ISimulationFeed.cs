@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Economy;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// 表示と効果音のための、シミュレーションの状態の読み取り口。オフライン（SimulationRunner）とオンライン（OnlineRunner）の

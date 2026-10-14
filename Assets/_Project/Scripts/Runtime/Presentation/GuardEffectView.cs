@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// ガードとジャストガードの表示（D-21、ユーザーの指示 2026-10-13。docs/11_combat_plan.md T3-5）。

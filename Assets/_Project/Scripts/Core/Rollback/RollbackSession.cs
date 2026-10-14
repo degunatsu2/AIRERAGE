@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Input;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Rollback
+namespace Airerage.Core.Rollback
 {
     /// <summary>
     /// 決定論的ロールバックの1人分のセッション（docs/10_online_plan.md T2-2、docs/04_network.md 3.1）。

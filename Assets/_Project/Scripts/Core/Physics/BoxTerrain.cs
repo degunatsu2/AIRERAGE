@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace Degunatsu.Core.Physics
+namespace Airerage.Core.Physics
 {
     /// <summary>
     /// 軸平行な矩形（XY 平面上。Z 方向には無限に続く）とアンカーポイントの集まりでできた地形。
     /// スイープは Minkowski 和を使った厳密な計算で、結果が決定的になる。
-    /// Unity のシーンでは、軸平行な BoxCollider から作る（Degunatsu.Runtime の SceneTerrainBuilder）。
+    /// Unity のシーンでは、軸平行な BoxCollider から作る（Airerage.Runtime の SceneTerrainBuilder）。
     /// Unity の物理エンジン（PhysX）のクエリは、形状を約2mm膨らませて扱うため使わない（docs/03_architecture.md 4.2）。
     /// </summary>
     public sealed class BoxTerrain : ICollisionQuery

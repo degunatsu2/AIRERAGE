@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.DebugTools
+namespace Airerage.Runtime.DebugTools
 {
     /// <summary>
     /// タイム計測コースのスタートかゴールの範囲。範囲は同じ GameObject の BoxCollider（トリガー。地形としては読み込まれない）。

@@ -1,9 +1,9 @@
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// ワイヤーが外れたことを分かりやすく示す（プレイテスト 2026-10-13 の #7）。外れた位置に×印と「MISS」を出し、

@@ -1,15 +1,15 @@
 using System;
-using Degunatsu.Core.Input;
+using Airerage.Core.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.Runtime.Input
+namespace Airerage.Runtime.Input
 {
     /// <summary>
     /// Input System を読み、ティックごとの PlayerInput を作る（docs/03_architecture.md 4.5）。
     /// Input System を直接読むのはここだけで、シミュレーションは PlayerInput だけを見る。
-    /// アクションは DegunatsuControls.inputactions の "Player" マップ（Move / Jump / Wire / Attack / Guard / Reset / Point / Aim）。
+    /// アクションは AirerageControls.inputactions の "Player" マップ（Move / Jump / Wire / Attack / Guard / Reset / Point / Aim）。
     ///
     /// 照準（D-08）: 最後に使った機器がキーボードかマウスなら、マウスポインターの方向に照準する（PlayerInput の照準の方向）。
     /// ゲームパッドなら、右スティックを倒しているときはその方向に照準する。倒していなければ照準の方向を指定せず、

@@ -1,7 +1,7 @@
 using System;
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 
-namespace Degunatsu.Core.Match
+namespace Airerage.Core.Match
 {
     /// <summary>試合の段階（MatchRules.PhaseAt）。</summary>
     public enum MatchPhase : byte

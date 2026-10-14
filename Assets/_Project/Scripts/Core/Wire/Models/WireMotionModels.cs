@@ -1,6 +1,6 @@
 using System;
 
-namespace Degunatsu.Core.Wire.Models
+namespace Airerage.Core.Wire.Models
 {
     /// <summary>
     /// WireModelType から運動モデルを取り出す。モデルは状態を持たないので、インスタンスを共有する。

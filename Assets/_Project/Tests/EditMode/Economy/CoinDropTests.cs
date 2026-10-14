@@ -1,15 +1,15 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Combat;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Economy
+namespace Airerage.Core.Tests.Economy
 {
     /// <summary>コインのドロップ（docs/12_match_plan.md T4-6）: 被弾ドロップ、撃破ドロップ、分け方、拾える時刻と寿命。</summary>
     public class CoinDropTests
@@ -290,8 +290,8 @@ namespace Degunatsu.Core.Tests.Economy
         [Test]
         public void InvalidDropRules_AreRejected()
         {
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { HitDropPercent = 150 }));
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { DropLifetimeTicks = 0 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { HitDropPercent = 150 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => new SimWorld(TestArenas.Ground(), null, null, new MatchRules { DropLifetimeTicks = 0 }));
         }
     }
 }

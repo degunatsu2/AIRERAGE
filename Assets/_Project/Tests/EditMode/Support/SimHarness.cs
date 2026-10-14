@@ -1,11 +1,11 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Input;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Support
+namespace Airerage.Core.Tests.Support
 {
     /// <summary>
     /// キャラクター1人のシミュレーションを動かすテスト補助。

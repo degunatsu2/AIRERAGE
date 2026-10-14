@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Match;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Economy;
+using Airerage.Core.Match;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>コインの見た目の種類（枚数で決める。docs/12_match_plan.md 3.5）。</summary>
     public enum CoinLook

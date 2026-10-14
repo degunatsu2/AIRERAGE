@@ -1,8 +1,8 @@
-using Degunatsu.Core.Common;
+using Airerage.Core.Common;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Degunatsu.Net.Tests
+namespace Airerage.Net.Tests
 {
     public sealed class CorrectionSmootherTests
     {

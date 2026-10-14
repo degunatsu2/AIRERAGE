@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 誘導表示の札（GuidePlate）と右上の表に使う絵を、コードで描いて作る（仮の絵。本番の絵ができたら差し替える）。

@@ -1,12 +1,12 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Wire
+namespace Airerage.Core.Tests.Wire
 {
     /// <summary>
     /// ワイヤーの共通制御（docs/06_prototype_plan.md T1-3）。
@@ -319,7 +319,7 @@ namespace Degunatsu.Core.Tests.Wire
             var harness = new SimHarness(world, config, spawn: new Vector3(5f, 3f, 0f));
             var state = harness.State;
             state.Wire = new WireState { Phase = WirePhase.Attached, Anchor = new Vector3(0f, 8f, 0f), RopeLength = 7.1f };
-            state.PreviousButtons = Degunatsu.Core.Input.InputButtons.Wire;
+            state.PreviousButtons = Airerage.Core.Input.InputButtons.Wire;
             harness.State = state;
 
             harness.Step(Inputs.Wire());
@@ -355,7 +355,7 @@ namespace Degunatsu.Core.Tests.Wire
             var harness = new SimHarness(TestArenas.Playground(), spawn: new Vector3(-29.55f, 5f, 0f), facing: -1);
             var state = harness.State;
             state.Wire = new WireState { Phase = WirePhase.Attached, Anchor = new Vector3(-30f, 10f, 0f), RopeLength = 5f };
-            state.PreviousButtons = Degunatsu.Core.Input.InputButtons.Wire;
+            state.PreviousButtons = Airerage.Core.Input.InputButtons.Wire;
             harness.State = state;
 
             for (int tick = 0; tick < 60; tick++)

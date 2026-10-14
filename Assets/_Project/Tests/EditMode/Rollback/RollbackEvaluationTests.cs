@@ -3,18 +3,18 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Input;
+using Airerage.Core.Rollback;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Rollback
+namespace Airerage.Core.Tests.Rollback
 {
     /// <summary>
     /// 入力遅延と予測の上限を決めるための評価（docs/10_online_plan.md T2-9）。人の入力（ユーザーが Windows で記録した 3600 ティック）で
     /// 4人の疑似ネットワークを動かし、通信の条件と設定ごとに、巻き戻し・ワープ（巻き戻しで相手の位置が飛ぶ）・止まり（自分が進めない）を測って表にする。
     /// 時間がかかるので明示的に選んだときだけ実行する:
-    ///   dotnet test tools/CoreTests/Degunatsu.Core.Tests --filter "FullyQualifiedName~RollbackEvaluationTests" --logger "console;verbosity=detailed"
+    ///   dotnet test tools/CoreTests/Airerage.Core.Tests --filter "FullyQualifiedName~RollbackEvaluationTests" --logger "console;verbosity=detailed"
     /// </summary>
     [Explicit("評価用。時間がかかるので、名前で選んだときだけ実行する")]
     public class RollbackEvaluationTests

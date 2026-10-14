@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// ほかのプレイヤーが画面の外にいるときの誘導表示（ユーザーの要望、2026-10-14）: 縁と斜めの線はプレイヤーの色、左にキャラクターの

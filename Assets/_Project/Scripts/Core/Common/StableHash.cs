@@ -1,4 +1,4 @@
-namespace Degunatsu.Core.Common
+namespace Airerage.Core.Common
 {
     /// <summary>
     /// 決定的な乱数の代わり（docs/12 T4-4・T4-7）。種と数から、PC が違っても同じ値を返す（整数の演算だけ。状態を持たない）。

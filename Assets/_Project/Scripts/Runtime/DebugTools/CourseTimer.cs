@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Wire;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.DebugTools
+namespace Airerage.Runtime.DebugTools
 {
     /// <summary>
     /// タイム計測コースの計測（docs/06_prototype_plan.md T1-8）。ティックごとにキャラクターの位置を受け取る。

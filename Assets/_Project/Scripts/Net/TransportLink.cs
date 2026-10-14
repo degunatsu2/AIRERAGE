@@ -6,7 +6,7 @@ using Unity.Networking.Transport;
 using Unity.Networking.Transport.Utilities;
 using Debug = UnityEngine.Debug;
 
-namespace Degunatsu.Net
+namespace Airerage.Net
 {
     /// <summary>
     /// Unity Transport の薄い包み（docs/10_online_plan.md T2-7）。通信のライブラリへの依存はここに閉じ込める。

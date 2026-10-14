@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace Degunatsu.Core.Common
+namespace Airerage.Core.Common
 {
     /// <summary>
     /// シミュレーションで使う数学の補助関数。ゲームプレイは XY 平面（Z = 0）で行う。

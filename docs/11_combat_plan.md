@@ -22,7 +22,7 @@
 
 ## 2. 構成の方針
 
-- 戦闘のロジックは Core の `Degunatsu.Core.Combat`（純C#、決定的）。状態は `CharacterState.Action`（`ActionState`）などに値で持つので、巻き戻しと PC 間のチェックサムにそのまま乗る。
+- 戦闘のロジックは Core の `Airerage.Core.Combat`（純C#、決定的）。状態は `CharacterState.Action`（`ActionState`）などに値で持つので、巻き戻しと PC 間のチェックサムにそのまま乗る。
 - 状態の遷移は `ActionController` の1か所で決める（[01](01_game_design.md) 6.3 の実装原則）。アニメーションや表示から状態を変えない。
 - 攻撃のデータは Core の `[Serializable]` な設定クラス（`CombatTuning` / `AttackData`）に置き、`CharacterConfig.Combat` として ScriptableObject（`DefaultCharacter.asset`）で調整する。仮値は初期値の1か所にだけ書く。
 - 命中の判定はキャラクターどうしの関係なので、`SimWorld` が全員のティックを進めた後に解決する。同じティックの相打ちが順番で変わらないよう、先に全員分の命中を集めてから、プレイヤーの番号の順に当てる（T3-2）。

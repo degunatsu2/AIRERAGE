@@ -1,4 +1,4 @@
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// Core（System.Numerics）と Unity のベクトルの変換。変換はこの境界でだけ行う。

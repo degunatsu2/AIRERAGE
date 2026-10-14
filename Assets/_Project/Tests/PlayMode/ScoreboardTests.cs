@@ -1,13 +1,13 @@
 using System.Collections;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>右上の全員の情報（ScoreboardHud。ユーザーの要望、2026-10-14）: 順位の順に並び、確定コインの首位に王冠。</summary>
     public sealed class ScoreboardTests

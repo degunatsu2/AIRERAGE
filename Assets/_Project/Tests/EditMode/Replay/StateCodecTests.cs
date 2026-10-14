@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Simulation;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Replay
+namespace Airerage.Core.Tests.Replay
 {
     /// <summary>
     /// 状態のバイト列とチェックサム（入力の記録と、PC 間の比較に使う）。

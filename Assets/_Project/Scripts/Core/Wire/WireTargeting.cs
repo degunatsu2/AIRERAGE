@@ -1,8 +1,8 @@
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Physics;
+using Airerage.Core.Common;
+using Airerage.Core.Physics;
 
-namespace Degunatsu.Core.Wire
+namespace Airerage.Core.Wire
 {
     /// <summary>射出の方向と、エイムアシストの対象。</summary>
     public readonly struct WireAim

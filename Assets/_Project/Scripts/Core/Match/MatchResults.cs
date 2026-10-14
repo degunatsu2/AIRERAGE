@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Match
+namespace Airerage.Core.Match
 {
     /// <summary>
     /// 試合の順位（docs/12_match_plan.md T4-1、T4-7）: スコア（確定コイン。D-25）が多い順。同じなら仮に【仮】、撃破した数が

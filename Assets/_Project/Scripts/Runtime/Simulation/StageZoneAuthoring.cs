@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// シーンに置くギミック（ジャンプ台、上昇気流、加速リング。Core の StageZone）。範囲は、この物体の位置を中心に、

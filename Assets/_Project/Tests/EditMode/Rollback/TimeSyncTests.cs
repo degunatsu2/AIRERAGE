@@ -1,8 +1,8 @@
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Rollback;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Rollback
+namespace Airerage.Core.Tests.Rollback
 {
     /// <summary>時刻の同期（docs/10_online_plan.md T2-6）。</summary>
     public class TimeSyncTests
@@ -55,7 +55,7 @@ namespace Degunatsu.Core.Tests.Rollback
             };
             network.RunUntil(1200, maxFrames: 6000);
             ulong expected = network.Reference(1200).Checksum();
-            foreach (Degunatsu.Core.Simulation.SimWorld world in network.Worlds)
+            foreach (Airerage.Core.Simulation.SimWorld world in network.Worlds)
             {
                 Assert.That(world.Checksum(), Is.EqualTo(expected), "全員が同じ状態にならない");
             }

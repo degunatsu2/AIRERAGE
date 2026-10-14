@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace Degunatsu.Core.Wire
+namespace Airerage.Core.Wire
 {
     /// <summary>
     /// ロープが地形の角に巻き付いてできた支点（D-33）。接続点に近い方から順に並ぶ。

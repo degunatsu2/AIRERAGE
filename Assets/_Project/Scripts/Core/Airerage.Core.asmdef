@@ -1,6 +1,6 @@
 {
-    "name": "Degunatsu.Core",
-    "rootNamespace": "Degunatsu.Core",
+    "name": "Airerage.Core",
+    "rootNamespace": "Airerage.Core",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

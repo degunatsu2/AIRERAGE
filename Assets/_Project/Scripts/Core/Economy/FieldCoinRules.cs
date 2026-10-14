@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Common;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Economy
+namespace Airerage.Core.Economy
 {
     /// <summary>
     /// フィールドのコインの決まり（docs/12_match_plan.md T4-4）。SimWorld が、全員を進めて命中と撃破を決めた後に呼ぶ。

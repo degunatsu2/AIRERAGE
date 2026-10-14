@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Input;
+using Airerage.Core.Input;
 
-namespace Degunatsu.Core.Rollback
+namespace Airerage.Core.Rollback
 {
     /// <summary>
     /// 入力の送受信の規則（docs/10_online_plan.md T2-4）。RollbackSession を包み、

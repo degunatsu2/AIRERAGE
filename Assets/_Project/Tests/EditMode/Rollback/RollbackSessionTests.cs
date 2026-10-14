@@ -1,11 +1,11 @@
 using System;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Input;
+using Airerage.Core.Rollback;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Rollback
+namespace Airerage.Core.Tests.Rollback
 {
     /// <summary>
     /// ロールバックのセッション（docs/10_online_plan.md T2-2、T2-3）。4人のセッションを疑似ネットワークでつなぎ、
@@ -100,7 +100,7 @@ namespace Degunatsu.Core.Tests.Rollback
         {
             var settings = new RollbackSettings { InputDelayTicks = 0, MaxPredictionTicks = 0 };
 
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => new RollbackSession(TwoPlayerWorld(), 0, settings));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => new RollbackSession(TwoPlayerWorld(), 0, settings));
         }
 
         [Test]

@@ -1,8 +1,8 @@
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// ワイヤーの照準のインジケーター。半透明の線で射出の方向を示し、終点の印と色で結果の予測を示す

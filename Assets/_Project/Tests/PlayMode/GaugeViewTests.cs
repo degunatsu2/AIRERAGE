@@ -1,16 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Input;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.PlayMode.Tests
+namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// 円形のゲージ（ユーザーの要望、2026-10-13）: ワイヤーキャンセルのクールタイム（キャラクターの周り、「WIRE CANCEL」）と、

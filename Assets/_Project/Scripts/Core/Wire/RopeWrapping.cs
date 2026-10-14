@@ -1,9 +1,9 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Physics;
+using Airerage.Core.Common;
+using Airerage.Core.Physics;
 
-namespace Degunatsu.Core.Wire
+namespace Airerage.Core.Wire
 {
     /// <summary>
     /// ロープの巻き付き（D-33）。接続中に、今の支点からキャラクターまでのロープが地形の角に掛かったら、その角を新しい支点にする。

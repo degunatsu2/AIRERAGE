@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Common;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Economy
+namespace Airerage.Core.Economy
 {
     /// <summary>拠点（バンク）の候補の地点（docs/12_match_plan.md T4-7）。シーンに置く。</summary>
     public readonly struct BankSpot : IEquatable<BankSpot>, IComparable<BankSpot>

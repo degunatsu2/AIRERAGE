@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace Degunatsu.Core.Economy
+namespace Airerage.Core.Economy
 {
     /// <summary>
     /// キャラクター1人のコイン（docs/01_game_design.md 3.1）。増減は CoinLedger だけが行う。

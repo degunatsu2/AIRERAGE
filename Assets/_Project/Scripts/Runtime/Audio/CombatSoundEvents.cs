@@ -1,10 +1,10 @@
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Audio
+namespace Airerage.Runtime.Audio
 {
     /// <summary>
     /// シミュレーションの状態の変化から効果音を鳴らす（仮の音。ユーザーの要望、2026-10-13）。SimulationRunner の

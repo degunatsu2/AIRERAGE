@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 一瞬の光（広がる輪 2 つと光の筋。文字と画面の閃光は任意）。docs/11_combat_plan.md T3-7。

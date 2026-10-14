@@ -1,12 +1,12 @@
 using System.Numerics;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Movement;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire.Models;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Movement;
+using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire.Models;
 
-namespace Degunatsu.Core.Wire
+namespace Airerage.Core.Wire
 {
     /// <summary>
     /// ワイヤーの共通制御（両タイプ共通）。フェーズ遷移、照準とエイムアシスト、フックの飛翔と接続判定、

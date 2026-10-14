@@ -2,12 +2,12 @@ using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// カメラのズーム（ユーザーの要望。2026-10-12）。マウスホイールとゲームパッドの LB / RB で、追従カメラの距離を変える。
     /// 距離は下限と上限の間に制限し、なめらかに近づける。表示だけの機能で、シミュレーションには影響しない。
-    /// アクションは DegunatsuControls.inputactions の "Camera" マップ（ScrollZoom / HoldZoom）。
+    /// アクションは AirerageControls.inputactions の "Camera" マップ（ScrollZoom / HoldZoom）。
     /// </summary>
     public sealed class CameraZoom : MonoBehaviour
     {

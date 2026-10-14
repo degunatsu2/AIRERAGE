@@ -1,13 +1,13 @@
 using System.Collections.Generic;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Common;
+using Airerage.Core.Economy;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 拠点（バンク。docs/12_match_plan.md T4-7）の表示。状態を読むだけで、書き換えない。場所はティック数とルールから求める

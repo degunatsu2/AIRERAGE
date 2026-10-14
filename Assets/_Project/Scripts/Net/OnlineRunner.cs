@@ -1,24 +1,24 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Data;
-using Degunatsu.Runtime.Input;
-using Degunatsu.Runtime.Presentation;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Common;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
+using Airerage.Core.Rollback;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Data;
+using Airerage.Runtime.Input;
+using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using SimInput = Degunatsu.Core.Input.PlayerInput;
+using SimInput = Airerage.Core.Input.PlayerInput;
 
-namespace Degunatsu.Net
+namespace Airerage.Net
 {
     /// <summary>
     /// オンライン接続の検証用シーン（Sandbox_Online）の進行と表示（docs/10_online_plan.md T2-7）。
@@ -483,7 +483,7 @@ namespace Degunatsu.Net
             }
         }
 
-        private const string PlayerNameKey = "Degunatsu.PlayerName";
+        private const string PlayerNameKey = "Airerage.PlayerName";
 
         /// <summary>表示用の名前（入力したプレイヤーネーム。なければ P1〜P4）。</summary>
         public string LabelOf(int index)

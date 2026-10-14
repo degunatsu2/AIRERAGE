@@ -26,7 +26,7 @@ fi
 
 echo "[session-start] NuGet パッケージを復元します" >&2
 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 \
-  dotnet restore "$PROJECT_DIR/tools/CoreTests/Degunatsu.Core.Tests" --verbosity quiet >&2
+  dotnet restore "$PROJECT_DIR/tools/CoreTests/Airerage.Core.Tests" --verbosity quiet >&2
 
 # Unity のライセンス（docs/08_cloud_unity_setup.md）: エディタが導入済みで認証情報があれば有効化する。
 # エディタの導入は環境のセットアップスクリプトか tools/unity/install_editor.sh で行う。失敗してもセッションは続ける

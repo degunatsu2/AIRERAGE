@@ -3,16 +3,16 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Physics;
-using Degunatsu.Core.Rollback;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Physics;
+using Airerage.Core.Rollback;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Net.Tests
+namespace Airerage.Net.Tests
 {
     /// <summary>
     /// OnlineSession を、同じプロセスの中で、本当の通信（127.0.0.1）を通して複数動かす（docs/10_online_plan.md T2-7）。
@@ -314,7 +314,7 @@ namespace Degunatsu.Net.Tests
             OnlineSession host = Host();
             host.StartMatch();
             Assert.That(host.World.Rules.HasTimeLimit, Is.False);
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => Host().StartMatch(new MatchRules { CountdownTicks = -1 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => Host().StartMatch(new MatchRules { CountdownTicks = -1 }));
         }
 
         [Test]

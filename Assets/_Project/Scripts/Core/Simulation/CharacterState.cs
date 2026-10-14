@@ -1,11 +1,11 @@
 using System;
 using System.Numerics;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Wire;
+using Airerage.Core.Economy;
+using Airerage.Core.Combat;
+using Airerage.Core.Input;
+using Airerage.Core.Wire;
 
-namespace Degunatsu.Core.Simulation
+namespace Airerage.Core.Simulation
 {
     /// <summary>
     /// キャラクター1人分のシミュレーション状態。値だけで完結させ、コピー・比較・巻き戻しができるようにする。

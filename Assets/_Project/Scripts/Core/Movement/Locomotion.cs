@@ -1,10 +1,10 @@
 using System;
-using Degunatsu.Core.Combat;
-using Degunatsu.Core.Common;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Combat;
+using Airerage.Core.Common;
+using Airerage.Core.Input;
+using Airerage.Core.Simulation;
 
-namespace Degunatsu.Core.Movement
+namespace Airerage.Core.Movement
 {
     /// <summary>
     /// ワイヤーに接続していないときの速度の計算（走行、空中制御、重力、ジャンプ）。

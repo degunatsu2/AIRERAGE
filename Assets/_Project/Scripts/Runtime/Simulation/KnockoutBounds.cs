@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Degunatsu.Core.Simulation;
+using Airerage.Core.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Simulation
+namespace Airerage.Runtime.Simulation
 {
     /// <summary>
     /// シーンのステージの範囲（docs/11_combat_plan.md T3-3）。キャラクターの中心がこの長方形（Z = 0 の面、ワールド座標）の

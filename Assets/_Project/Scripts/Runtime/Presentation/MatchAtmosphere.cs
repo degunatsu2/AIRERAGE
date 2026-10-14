@@ -1,10 +1,10 @@
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Match;
-using Degunatsu.Runtime.Audio;
-using Degunatsu.Runtime.Simulation;
+using Airerage.Core.Economy;
+using Airerage.Core.Match;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Presentation
+namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 試合の終盤の雰囲気（ユーザーの要望、2026-10-14）: 100 枚のコインの予告（残り 1 分）から試合の終わりまで、BGM を緊張感の

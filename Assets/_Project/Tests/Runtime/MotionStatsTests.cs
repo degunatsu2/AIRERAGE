@@ -1,10 +1,10 @@
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Wire;
-using Degunatsu.Runtime.DebugTools;
+using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
+using Airerage.Runtime.DebugTools;
 using NUnit.Framework;
 using NVector3 = System.Numerics.Vector3;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     public sealed class MotionStatsTests
     {

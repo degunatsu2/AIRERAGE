@@ -1,8 +1,8 @@
-using Degunatsu.Runtime.Input;
+using Airerage.Runtime.Input;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Degunatsu.Runtime.Tests
+namespace Airerage.Runtime.Tests
 {
     /// <summary>
     /// マウスポインターの位置を、ゲームプレイ平面（Z = 0）上の点に写す計算（マウスでの照準に使う）。

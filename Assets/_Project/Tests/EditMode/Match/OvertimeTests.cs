@@ -1,12 +1,12 @@
 using System.Numerics;
-using Degunatsu.Core.Economy;
-using Degunatsu.Core.Input;
-using Degunatsu.Core.Match;
-using Degunatsu.Core.Simulation;
-using Degunatsu.Core.Tests.Support;
+using Airerage.Core.Economy;
+using Airerage.Core.Input;
+using Airerage.Core.Match;
+using Airerage.Core.Simulation;
+using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
-namespace Degunatsu.Core.Tests.Match
+namespace Airerage.Core.Tests.Match
 {
     /// <summary>
     /// アディショナルタイム（docs/12_match_plan.md 4.2、T4-8。D-25、D-45 とその細部の決定）と、終盤のコインの出現の増加。
@@ -248,8 +248,8 @@ namespace Degunatsu.Core.Tests.Match
         [Test]
         public void InvalidOvertimeRules_AreRejected()
         {
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => World(new MatchRules { OvertimeTicks = -1 }));
-            Assert.Throws<Degunatsu.Core.Common.InvalidTuningException>(() => World(new MatchRules { LateGameSpawnIntervalTicks = 0 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => World(new MatchRules { OvertimeTicks = -1 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => World(new MatchRules { LateGameSpawnIntervalTicks = 0 }));
         }
     }
 }

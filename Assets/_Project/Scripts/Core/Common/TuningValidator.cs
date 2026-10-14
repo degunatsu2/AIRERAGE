@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Degunatsu.Core.Common
+namespace Airerage.Core.Common
 {
     /// <summary>
     /// 調整値の検査結果をまとめ、不正な値があればまとめて例外にする。

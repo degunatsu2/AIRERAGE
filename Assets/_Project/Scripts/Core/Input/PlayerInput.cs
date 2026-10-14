@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace Degunatsu.Core.Input
+namespace Airerage.Core.Input
 {
     [Flags]
     public enum InputButtons : ushort
