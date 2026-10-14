@@ -111,11 +111,13 @@ namespace Degunatsu.Core.Wire
         public float ExitSpeedCap = 18f;
 
         /// <summary>
-        /// 接続した瞬間に接続点から遠ざかる向きに動いていたとき、その向きの速さを接続点へ向かう向きに反転させる割合（0〜1）
-        /// （ユーザーの要望、2026-10-14。D-50）。1 なら速さを保ったまま反転する（慣性が乗っている方向と逆にフックを刺すと、
-        /// 同じ速さで逆へ向かう）。0 なら以前のとおり、ロープが遠ざかる向きの速さを止める。両タイプ共通【仮】。
+        /// 接続した瞬間に接続点から遠ざかる向きに動いていたとき、ロープに止められて失われる速さのうち、振りの向き（ロープに垂直な向き。
+        /// 今の動きに近い方）に曲げて残す割合（0〜1）【試行】。1 なら速さを保ったまま向きだけが振りの向きに変わる
+        /// （SpeedRunners のように、勢いを落とさずに方向転換する。ユーザーの要望、2026-10-14）。0 なら以前のとおり、遠ざかる向きの
+        /// 速さはロープが止める。真後ろへ遠ざかっているとき（振りの向きが決まらない）は曲げない。両タイプ共通。
+        /// 以前の「遠ざかる向きの速さを接続点へ向かう向きに反転させる」（AttachReverseOutward）は、挙動がおかしくなることがあり廃止した。
         /// </summary>
-        public float AttachReverseOutward = 1f;
+        public float AttachRedirect = 0f;
 
         public InertialWireTuning Inertial = new InertialWireTuning();
         public ResponsiveWireTuning Responsive = new ResponsiveWireTuning();
@@ -137,7 +139,7 @@ namespace Degunatsu.Core.Wire
             v.Positive(nameof(MaxAttachedSpeed), MaxAttachedSpeed);
             v.Positive(nameof(ExitSpeedCap), ExitSpeedCap);
             v.InRange(nameof(AttachedInputInfluence), AttachedInputInfluence, 0f, 1f);
-            v.InRange(nameof(AttachReverseOutward), AttachReverseOutward, 0f, 1f);
+            v.InRange(nameof(AttachRedirect), AttachRedirect, 0f, 1f);
             v.NotNull(nameof(Inertial), Inertial);
             v.NotNull(nameof(Responsive), Responsive);
             if (Inertial != null)

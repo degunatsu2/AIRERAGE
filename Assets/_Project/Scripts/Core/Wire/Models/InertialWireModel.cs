@@ -9,7 +9,8 @@ namespace Degunatsu.Core.Wire.Models
     /// 巻き取るとロープが縮み、角運動量の保存で振りが速くなる（上限は共通の MaxAttachedSpeed）。
     /// 遅い状態で接続した直後は、速さが下限（StartPullSpeed）に届くように接続点の方向へ強く引く。
     /// 上下の入力でロープの長さの扱いを変える（WireLengthMode。D-41、D-50。どの入力にどれを割り当てるかは調整値）:
-    /// - 標準（縦の入力なし）: 長さを保ち（張力を保ったまま）、左右の入力だけで振る（HoldSwingAcceleration）。
+    /// - 標準（縦の入力なし）: 長さを保ち（張力を保ったまま）、左右の入力だけで振る（HoldSwingAcceleration）。接続点へ近づいたら、
+    ///   その分だけロープを巻き取ってたるませない（たるんだロープが急に張って跳ねないように）。伸ばすときも同じ。
     /// - 上（真上に近い入力）: 巻き取る（ReelSpeed。以前の標準の動き）。
     /// - 下（斜め下を含む）: 伸ばしながら、左右の入力で振る（ReelOutSpeed。最大長まで）。
     /// 長さを保つ・伸ばすときは、接続直後に遅ければ、接続点の方向へ引く代わりに、振りの方向の速さを下限まで上げる。
@@ -68,7 +69,10 @@ namespace Degunatsu.Core.Wire.Models
             {
                 // ロープの長さを保つ（伸ばすときは負の巻き取り）。接続直後に遅ければ、振りの方向の速さを下限まで上げる。
                 reelSpeed = mode == WireLengthMode.ReelOut ? -tuning.ReelOutSpeed : 0f;
-                tangential = RaiseToFloor(tangential, tangent, context.Stick.X, floor);
+                // 接続点へ近づいている速さも数える（振りの速さだけを下限まで上げると、合わせた速さが下限を超えて跳ねる）。
+                float inward = MathF.Min(radialSpeed, 0f);
+                float tangentialFloor = floor * floor > inward * inward ? MathF.Sqrt(floor * floor - inward * inward) : 0f;
+                tangential = RaiseToFloor(tangential, tangent, context.Stick.X, tangentialFloor);
                 velocity = tangential + radial * radialSpeed;
             }
             else
@@ -84,30 +88,35 @@ namespace Degunatsu.Core.Wire.Models
             }
 
             float lengthBefore = context.RopeLength;
+            // 長さを保つ・伸ばすときは張力を保つ: 接続点へ近づいた分だけロープを巻き取り、たるませない（たるんだロープが急に張ると、
+            // 遠ざかる向きの速さが1ティックで消えて、跳ねたように向きが変わる。D-50 の後のプレイテストの指摘、2026-10-14）。
+            float ropeBase = holdLength && distance < lengthBefore - TautTolerance
+                ? MathF.Min(lengthBefore, MathMax(context.Tuning.MinRopeLength, distance))
+                : lengthBefore;
             float lengthAfter;
             if (reelSpeed >= 0f)
             {
-                lengthAfter = MathMax(context.Tuning.MinRopeLength, lengthBefore - reelSpeed * dt);
-                if (lengthAfter > lengthBefore)
+                lengthAfter = MathMax(context.Tuning.MinRopeLength, ropeBase - reelSpeed * dt);
+                if (lengthAfter > ropeBase)
                 {
                     // 最小長より短い状態で接続した場合は、ロープを伸ばさない。
-                    lengthAfter = lengthBefore;
+                    lengthAfter = ropeBase;
                 }
             }
             else
             {
                 // 伸ばす（最大長まで。最大長より長い状態では伸ばさない）。
-                lengthAfter = MathF.Max(lengthBefore, MathF.Min(context.Tuning.MaxLength, lengthBefore - reelSpeed * dt));
+                lengthAfter = MathF.Max(ropeBase, MathF.Min(context.Tuning.MaxLength, ropeBase - reelSpeed * dt));
             }
 
-            bool taut = distance >= lengthBefore - TautTolerance;
+            bool taut = distance >= ropeBase - TautTolerance;
             if (taut)
             {
                 // ロープは伸びないので外向きの速度は消え、巻き取りの速さで内側へ引かれる（伸ばしているときは、伸ばす速さまで外へ動ける）。
                 // ロープの力は接続点に向かう（中心力）ので角運動量は変わらず、半径が縮むと振りが自然に速くなる。
                 // 接続直後の強い引きの間は、接続点の方向の速さをロープが決める
                 // （引きが弱まるときに、勢いでロープがたるまないように）。最小長に達したら通常に戻す。
-                float reelInSpeed = (lengthBefore - lengthAfter) / dt;
+                float reelInSpeed = (ropeBase - lengthAfter) / dt;
                 bool ropeControlsRadial = pullingAtStart && lengthAfter > context.Tuning.MinRopeLength;
                 bool keepFasterInward = !ropeControlsRadial && radialSpeed < -reelInSpeed;
                 float newRadialSpeed = keepFasterInward ? radialSpeed : -reelInSpeed;

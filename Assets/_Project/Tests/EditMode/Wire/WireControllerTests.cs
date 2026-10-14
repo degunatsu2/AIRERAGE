@@ -267,19 +267,21 @@ namespace Degunatsu.Core.Tests.Wire
             Assert.That(state.Wire.Phase, Is.EqualTo(WirePhase.Ready));
         }
 
-        [TestCase(1f)]
         [TestCase(0f)]
-        public void Attach_BehindTheMotion_ReversesTheMomentum_KeepingTheSpeed(float reverse)
+        [TestCase(1f)]
+        public void Attach_MovingAway_KeepsOnlyTheRedirectedShare_OfTheSpeed(float redirect)
         {
-            // 右へ速く飛んでいる間に、左の壁へフックを刺す。接続点から遠ざかる向きの速さは、接続点へ向かう向きに反転する（D-50）。
+            // 右へ速く飛んでいる間に、左上の壁へフックを刺す（接続点から遠ざかる向きに動いている）。
+            // 標準（AttachRedirect 0）は、遠ざかる向きの速さをロープが止める。1 なら速さを保ったまま、振りの向きに曲がる。
+            // どちらも、接続点の方へ跳ね返らない（以前の「反転」は廃止した）。
             var world = new BoxTerrain().AddBox(-7f, -20f, -6f, 30f, attachable: true);
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
-            config.Wire.AttachReverseOutward = reverse;
+            config.Wire.AttachRedirect = redirect;
             config.Wire.Inertial.StartPullSpeed = 0f;
             var harness = new SimHarness(world, config, new Vector3(0f, 5f, 0f));
             var state = harness.State;
             state.Grounded = false;
-            state.Velocity = new Vector3(12f, 0f, 0f);
+            state.Velocity = new Vector3(12f, 4f, 0f);
             harness.State = state;
 
             Vector3 before = harness.State.Velocity;
@@ -291,19 +293,19 @@ namespace Degunatsu.Core.Tests.Wire
                     return false;
                 }
                 return true;
-            }, Inputs.Wire(-1f, 0f), 30);
+            }, Inputs.Wire(-1f, 0.6f), 30);
 
             Vector3 after = harness.State.Velocity;
-            if (reverse > 0f)
+            Vector3 radial = Vector3.Normalize(harness.State.Position - harness.State.Wire.Anchor);
+            Assert.That(Vector3.Dot(after, radial), Is.GreaterThan(-1f), $"接続点の方へ跳ね返った: 前 {before}、後 {after}");
+            if (redirect > 0f)
             {
-                Assert.That(after.X, Is.LessThan(-before.X + 1f), $"反転しない: 前 {before}、後 {after}");
-                Assert.That(after.X, Is.LessThan(0f), "接続点の方へ向かわない");
-                Assert.That(after.Length(), Is.EqualTo(before.Length()).Within(0.6f), $"速さが変わる: 前 {before}、後 {after}");
+                Assert.That(after.Length(), Is.EqualTo(before.Length()).Within(1f), $"速さが保たれない: 前 {before}、後 {after}");
+                Assert.That(MathF.Abs(Vector3.Dot(after, radial)), Is.LessThan(1f), "振りの向き（ロープに垂直）になっていない");
             }
             else
             {
-                // 反転を切ると（以前の挙動）、遠ざかる向きの速さはロープに止められて失われる。
-                Assert.That(after.Length(), Is.LessThan(before.Length() * 0.5f), $"反転を切っても速さが残る: 前 {before}、後 {after}");
+                Assert.That(after.Length(), Is.LessThan(before.Length() * 0.6f), $"遠ざかる向きの速さが残る: 前 {before}、後 {after}");
             }
         }
 

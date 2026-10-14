@@ -264,14 +264,18 @@ namespace Degunatsu.Core.Wire
             state.Wire.RopeLength = ropeLength > tuning.MaxLength ? tuning.MaxLength : ropeLength;
             state.Wire.AttachSpeed = state.Velocity.Length();
 
-            // 接続点から遠ざかる向きに動いていたら、その向きの速さを接続点へ向かう向きに反転させる（速さを保つ。D-50）。
-            if (tuning.AttachReverseOutward > 0f && distance > SimMath.Epsilon)
+            // 接続点から遠ざかる向きに動いていたら、ロープに止められる速さの AttachRedirect の割合を、振りの向きに曲げて残す。
+            if (tuning.AttachRedirect > 0f && distance > SimMath.Epsilon)
             {
                 Vector3 outward = -toAnchor / distance;
                 float away = Vector3.Dot(state.Velocity, outward);
-                if (away > 0f)
+                Vector3 along = state.Velocity - outward * away;
+                float alongSpeed = along.Length();
+                if (away > 0f && alongSpeed > SimMath.Epsilon)
                 {
-                    state.Velocity -= outward * (away * (1f + tuning.AttachReverseOutward));
+                    float speed = state.Velocity.Length();
+                    float kept = alongSpeed + (speed - alongSpeed) * tuning.AttachRedirect;
+                    state.Velocity = along * (kept / alongSpeed);
                 }
             }
         }

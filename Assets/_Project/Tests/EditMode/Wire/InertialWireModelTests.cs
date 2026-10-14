@@ -175,6 +175,7 @@ namespace Degunatsu.Core.Tests.Wire
         public void Neutral_KeepsTheRopeLength_WhileSwinging()
         {
             // 縦の入力がなければ（標準）巻き取らない。左右で振ることはできる（D-50。以前は下を押したときの動き）。
+            // 振りの高いところで接続点の方へ落ちたときは、その分だけたるみを取る（ロープは少しだけ縮むことがある）。
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
             var harness = new SimHarness(new BoxTerrain(), config);
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(6f, -8f, 0f), Anchor);
@@ -184,11 +185,43 @@ namespace Degunatsu.Core.Tests.Wire
             for (int i = 0; i < 300; i++)
             {
                 harness.Step(Inputs.Wire(i % 120 < 60 ? -1f : 1f, 0f));
-                Assert.That(harness.State.Wire.RopeLength, Is.EqualTo(rope), $"ティック {i}: ロープが縮んだ");
+                Assert.That(harness.State.Wire.RopeLength, Is.LessThanOrEqualTo(rope), $"ティック {i}: ロープが伸びた");
+                Assert.That(harness.State.Wire.RopeLength, Is.GreaterThan(rope - 0.5f), $"ティック {i}: 巻き取っている");
                 Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.LessThanOrEqualTo(rope + 1e-3f), $"ティック {i}");
                 minX = MathF.Min(minX, harness.State.Position.X);
             }
             Assert.That(minX, Is.LessThan(0f), "振れていない（接続点の左側まで行かない）");
+        }
+
+        [Test]
+        public void Neutral_MovingTowardTheAnchor_TakesUpTheSlack_WithoutASnap()
+        {
+            // 接続点の横から、接続点の方へ（斜め上へ）動いている状態で接続する。以前は、ロープがたるんでから急に張り、
+            // 遠ざかる向きの速さが1ティックで消えて跳ねたように向きが変わった（プレイテストの指摘、2026-10-14）。
+            // 今は、近づいた分だけロープを巻き取って張ったままにするので、向きはなめらかに変わる。
+            var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
+            config.Wire.Inertial.StartPullSpeed = 0f;
+            var harness = new SimHarness(new BoxTerrain(), config);
+            WireTestSetup.AttachAt(harness, Anchor + new Vector3(6f, -2f, 0f), Anchor, new Vector3(-6f, 9f, 0f));
+            float rope = harness.State.Wire.RopeLength;
+
+            Vector3 previous = harness.State.Velocity;
+            float worstTurn = 0f;
+            for (int i = 0; i < 90; i++)
+            {
+                harness.Step(Inputs.Wire());
+                Vector3 v = harness.State.Velocity;
+                if (v.Length() > 2f && previous.Length() > 2f)
+                {
+                    float cos = Math.Clamp(Vector3.Dot(v, previous) / (v.Length() * previous.Length()), -1f, 1f);
+                    worstTurn = MathF.Max(worstTurn, MathF.Acos(cos) * 180f / MathF.PI);
+                }
+                Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.GreaterThan(harness.State.Wire.RopeLength - 0.3f),
+                    $"ティック {i}: ロープがたるんでいる");
+                previous = v;
+            }
+            Assert.That(harness.State.Wire.RopeLength, Is.LessThan(rope - 1f), "前提: 近づいた分だけ巻き取った");
+            Assert.That(worstTurn, Is.LessThan(15f), "1ティックで向きが大きく変わった（跳ねた）");
         }
 
         [Test]
@@ -259,8 +292,11 @@ namespace Degunatsu.Core.Tests.Wire
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(3f, -4f, 0f), Anchor);
             float rope = harness.State.Wire.RopeLength;
 
+            // 張ったまま伸ばす: キャラクターが遠ざかる分だけ、1 ティックに ReelOutSpeed までロープを送る（たるませない）。
             harness.Step(Inputs.Wire(1f, -1f), 10);
-            Assert.That(harness.State.Wire.RopeLength, Is.EqualTo(rope + 10 * config.Wire.Inertial.ReelOutSpeed / 60f).Within(1e-3f), "伸びない");
+            Assert.That(harness.State.Wire.RopeLength, Is.GreaterThan(rope + 0.2f), "伸びない");
+            Assert.That(harness.State.Wire.RopeLength, Is.LessThanOrEqualTo(rope + 10 * config.Wire.Inertial.ReelOutSpeed / 60f + 1e-3f), "速く伸びすぎる");
+            Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.GreaterThan(harness.State.Wire.RopeLength - 0.15f), "たるんでいる");
             Assert.That(WireTestSetup.DistanceToAnchor(harness.State), Is.LessThanOrEqualTo(harness.State.Wire.RopeLength + 1e-3f));
 
             harness.Step(Inputs.Wire(0f, -1f), 200);
