@@ -13,8 +13,9 @@ namespace Degunatsu.Core.Economy
     /// - 出現: 試合が始まったとき、ふつうの出現地点の全部に出す。その後は、コインが拾われてから
     ///   MatchRules.CoinSpawnIntervalTicks たつと、同じ地点にまた出す（拾われてから数える。ユーザーの要望、2026-10-13）。
     ///   同じ地点のコインは1つまで。出現地点のコインは消えない。
-    /// - 100 枚のコイン: 時間の制限があるとき、残り MatchRules.JackpotTicksBeforeEnd（1 分）になったティックに、候補の地点
-    ///   （CoinSpawnKind.Jackpot）から1つを試合の種（MatchRules.Seed）で選んで出す。1 試合に1回。
+    /// - 100 枚のコイン: 時間の制限があるとき、残り MatchRules.JackpotTicksBeforeEnd（1 分）で予告し（表示と音だけ）、
+    ///   その MatchRules.JackpotNoticeTicks（10 秒）後に出す。場所は候補の地点（CoinSpawnKind.Jackpot）から1つを、試合の種
+    ///   （MatchRules.Seed）で選ぶ。1 試合に1回。予告の時刻と場所は、ティック数とルールだけから決まる（JackpotAnnounceTick など）。
     /// - 拾得: キャラクターの箱を MatchRules.CoinPickupRadius だけ広げた中にコインの中心が入ったら拾う。何人も触れていたら、
     ///   いちばん近い人（同じなら番号の小さい人）が拾う。復帰を待っている人は拾わない。拾えるティックより前は拾えない。
     /// - 消滅: 寿命（ExpireTick）のティックで消える（ドロップのコイン。T4-6）。
@@ -58,14 +59,32 @@ namespace Degunatsu.Core.Economy
             SpawnJackpot(ledger, spawns, rules, tick);
         }
 
-        private static void SpawnJackpot(CoinLedger ledger, IReadOnlyList<CoinSpawnPoint> spawns, MatchRules rules, int tick)
+        /// <summary>
+        /// 100 枚のコインを予告するティック（それまでに進めたティック数。MatchRules.PhaseAt と同じ数え方）。
+        /// 出ない試合（時間の制限がない、試合が短すぎる）なら -1。
+        /// </summary>
+        public static int JackpotAnnounceTick(MatchRules rules)
         {
-            // 試合が始まってから何ティック目のステップか（始まった最初のステップが 0）。
-            int elapsed = tick - 1 - rules.CountdownTicks;
-            if (!rules.HasTimeLimit || rules.DurationTicks <= rules.JackpotTicksBeforeEnd
-                || elapsed != rules.DurationTicks - rules.JackpotTicksBeforeEnd)
+            if (!rules.HasTimeLimit || rules.DurationTicks <= rules.JackpotTicksBeforeEnd)
             {
-                return;
+                return -1;
+            }
+            return rules.CountdownTicks + rules.DurationTicks - rules.JackpotTicksBeforeEnd;
+        }
+
+        /// <summary>100 枚のコインが出るティック（このティックからのステップで出る）。出ない試合なら -1。</summary>
+        public static int JackpotSpawnTick(MatchRules rules)
+        {
+            int announce = JackpotAnnounceTick(rules);
+            return announce < 0 ? -1 : announce + rules.JackpotNoticeTicks;
+        }
+
+        /// <summary>100 枚のコインが出る地点の番号（spawns の中の番号。候補がない・出ない試合なら -1）。</summary>
+        public static int JackpotSpot(MatchRules rules, IReadOnlyList<CoinSpawnPoint> spawns)
+        {
+            if (spawns == null || JackpotAnnounceTick(rules) < 0)
+            {
+                return -1;
             }
             int candidates = 0;
             for (int i = 0; i < spawns.Count; i++)
@@ -74,20 +93,30 @@ namespace Degunatsu.Core.Economy
             }
             if (candidates == 0)
             {
-                return;
+                return -1;
             }
             int chosen = StableHash.Range(rules.Seed, JackpotSalt, 0, candidates);
             for (int i = 0; i < spawns.Count; i++)
             {
-                if (spawns[i].Kind != CoinSpawnKind.Jackpot)
+                if (spawns[i].Kind == CoinSpawnKind.Jackpot && chosen-- == 0)
                 {
-                    continue;
+                    return i;
                 }
-                if (chosen-- == 0)
-                {
-                    ledger.Spawn(new CoinEventId(tick, CoinEventKind.Spawn, i), spawns[i].Position, spawns[i].Value, tick, Never, i);
-                    return;
-                }
+            }
+            return -1;
+        }
+
+        private static void SpawnJackpot(CoinLedger ledger, IReadOnlyList<CoinSpawnPoint> spawns, MatchRules rules, int tick)
+        {
+            // tick は進めた後のティックなので、このステップは tick - 1 から。
+            if (tick - 1 != JackpotSpawnTick(rules))
+            {
+                return;
+            }
+            int spot = JackpotSpot(rules, spawns);
+            if (spot >= 0)
+            {
+                ledger.Spawn(new CoinEventId(tick, CoinEventKind.Spawn, spot), spawns[spot].Position, spawns[spot].Value, tick, Never, spot);
             }
         }
 

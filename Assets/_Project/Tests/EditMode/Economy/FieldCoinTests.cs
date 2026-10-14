@@ -131,17 +131,22 @@ namespace Degunatsu.Core.Tests.Economy
         }
 
         [Test]
-        public void TheJackpot_Appears_WhenOneMinuteIsLeft_Once()
+        public void TheJackpot_IsAnnouncedWithOneMinuteLeft_AndAppearsAfterTheNotice_Once()
         {
-            var rules = new MatchRules { CountdownTicks = 0, DurationTicks = 600, JackpotTicksBeforeEnd = 120 };
+            var rules = new MatchRules { CountdownTicks = 0, DurationTicks = 600, JackpotTicksBeforeEnd = 120, JackpotNoticeTicks = 30 };
             var points = new List<CoinSpawnPoint>(JackpotSpots) { Far };
             SimWorld world = World(rules, points.ToArray());
             world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
+            Assert.That(FieldCoinRules.JackpotAnnounceTick(rules), Is.EqualTo(480), "予告は残り 120 ティック");
+            Assert.That(FieldCoinRules.JackpotSpawnTick(rules), Is.EqualTo(510), "出るのは予告の 30 ティック後");
+            int spot = FieldCoinRules.JackpotSpot(rules, world.CoinSpawns);
+            Assert.That(spot, Is.GreaterThanOrEqualTo(0));
+            Assert.That(world.CoinSpawns[spot].Kind, Is.EqualTo(CoinSpawnKind.Jackpot));
 
-            Step(world, 480);
-            Assert.That(CountJackpots(world), Is.EqualTo(0), "残り 1 分の前に出た（候補の地点がふつうに出た）");
+            Step(world, 510);
+            Assert.That(CountJackpots(world), Is.EqualTo(0), "予告の間に出た（候補の地点がふつうに出た）");
             Step(world, 1);
-            Assert.That(CountJackpots(world), Is.EqualTo(1), "残り 1 分で出ない");
+            Assert.That(CountJackpots(world), Is.EqualTo(1), "予告の後に出ない");
             FieldCoin jackpot = default;
             foreach (FieldCoin coin in world.Coins.Field.Coins)
             {
@@ -150,6 +155,7 @@ namespace Degunatsu.Core.Tests.Economy
                     jackpot = coin;
                 }
             }
+            Assert.That(jackpot.Position, Is.EqualTo(world.CoinSpawns[spot].Position), "予告した地点と違う");
 
             // 拾っても、もう出ない。
             CharacterState state = world.GetState(0);
@@ -157,7 +163,7 @@ namespace Degunatsu.Core.Tests.Economy
             world.SetState(0, state);
             Step(world, 1);
             Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(100));
-            Step(world, 110);
+            Step(world, 80);
             Assert.That(CountJackpots(world), Is.EqualTo(0), "100 枚のコインが2回出た");
         }
 
@@ -167,7 +173,7 @@ namespace Degunatsu.Core.Tests.Economy
             var spots = new HashSet<Vector2>();
             for (int seed = 0; seed < 30; seed++)
             {
-                var rules = new MatchRules { CountdownTicks = 0, DurationTicks = 20, JackpotTicksBeforeEnd = 10, Seed = seed };
+                var rules = new MatchRules { CountdownTicks = 0, DurationTicks = 20, JackpotTicksBeforeEnd = 10, JackpotNoticeTicks = 0, Seed = seed };
                 SimWorld world = World(rules, JackpotSpots);
                 world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
                 Step(world, 11);
@@ -190,6 +196,8 @@ namespace Degunatsu.Core.Tests.Economy
             Step(world, 1000);
 
             Assert.That(world.Coins.Field.Coins, Is.Empty);
+            Assert.That(FieldCoinRules.JackpotAnnounceTick(world.Rules), Is.EqualTo(-1));
+            Assert.That(FieldCoinRules.JackpotSpot(world.Rules, world.CoinSpawns), Is.EqualTo(-1));
         }
 
         [Test]

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using Degunatsu.Core.Common;
 using Degunatsu.Core.Economy;
+using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Runtime.Simulation;
 using UnityEngine;
@@ -10,7 +12,9 @@ namespace Degunatsu.Runtime.Presentation
     /// コインの数の表示（docs/12_match_plan.md T4-4）: 全員の頭の上に所持コインの数（金色の丸と数字）。所持コインが増えた瞬間に、
     /// その人の位置から「+n」が浮かび上がって消える。状態を読むだけで、書き換えない。
     /// 増えたかどうかは、前のフレームの数と比べる（巻き戻しで減ったときは何も出さない）。
-    /// 100 枚のコイン（虹色。docs/12 3.5）が出たら、画面の上に「JACKPOT」を出し、画面の外にある間は画面の端の矢印で場所を示す。
+    /// 100 枚のコイン（虹色。docs/12 3.5）: 予告（残り 1 分。ユーザーの要望、2026-10-14）の間は、画面の上に「JACKPOT INCOMING」と
+    /// 出るまでの秒、出る地点の上に「100 IN n」。出たら「JACKPOT 100」。予告の間も出た後も、場所が画面の外なら、画面の端の矢印と
+    /// 誘導表示の札（左に虹色のコイン、右に「JACKPOT」。縁と斜めの線は虹色）で示す。予告の時刻と場所はティック数とルールから決まる。
     /// </summary>
     public sealed class CoinHud : MonoBehaviour
     {
@@ -25,19 +29,27 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private float _jackpotBannerSeconds = 2.5f;
         [Tooltip("画面の端の矢印を置く、端からの距離（ピクセル）")]
         [SerializeField] private float _edgeMargin = 48f;
+        [Tooltip("予告の「JACKPOT INCOMING」を大きく出す時間（ティック）。その後は出るまでの秒だけ")]
+        [SerializeField] private int _incomingBannerTicks = 180;
 
         private readonly List<Popup> _popups = new List<Popup>();
         private int[] _shownHeld = new int[0];
         private ISimulationFeed _feed;
         private Texture2D _dot;
         private Texture2D _arrow;
+        private Texture2D _jackpotIcon;
+        private GuidePlate _plate;
         private GUIStyle _count;
         private GUIStyle _popup;
         private GUIStyle _banner;
+        private GUIStyle _plateText;
         private int _jackpotId = -1;
         private float _jackpotSince = float.NegativeInfinity;
         private Vector2 _jackpotEdge;
         private float _jackpotAngle;
+        private Vector3 _jackpotPosition;
+        private int _secondsUntilJackpot;
+        private int _noticeElapsedTicks;
 
         /// <summary>今浮かんでいる「+n」の数と、最後に出した枚数（テスト用）。</summary>
         public int PopupCount => _popups.Count;
@@ -47,6 +59,9 @@ namespace Degunatsu.Runtime.Presentation
         public bool JackpotPresent { get; private set; }
         public bool JackpotOffscreen { get; private set; }
         public bool JackpotBannerShowing => Time.time - _jackpotSince < _jackpotBannerSeconds;
+
+        /// <summary>100 枚のコインを予告している間か（出る前。テスト用）。</summary>
+        public bool JackpotIncoming { get; private set; }
 
         private struct Popup
         {
@@ -75,6 +90,11 @@ namespace Degunatsu.Runtime.Presentation
             {
                 Destroy(_arrow);
             }
+            if (_jackpotIcon != null)
+            {
+                Destroy(_jackpotIcon);
+            }
+            _plate?.Dispose();
         }
 
         private void Update()
@@ -108,34 +128,55 @@ namespace Degunatsu.Runtime.Presentation
             UpdateJackpot();
         }
 
-        // 100 枚のコインを探し、新しく出たら「JACKPOT」を出す。画面の外なら矢印の位置を決める。
+        // 100 枚のコインを探し、新しく出たら「JACKPOT」を出す。出る前の予告の間は、出る地点を示す。画面の外なら矢印の位置を決める。
         private void UpdateJackpot()
         {
             JackpotPresent = false;
+            JackpotIncoming = false;
             JackpotOffscreen = false;
             CoinField field = _feed.Coins;
-            if (field == null)
+            MatchRules rules = _feed.Rules;
+            if (field == null || rules == null)
             {
                 _jackpotId = -1;
                 return;
             }
+            bool found = false;
             foreach (FieldCoin coin in field.Coins)
             {
                 if (CoinView.LookOf(coin.Value) != CoinLook.Rainbow)
                 {
                     continue;
                 }
+                found = true;
                 JackpotPresent = true;
                 if (coin.Id != _jackpotId)
                 {
                     _jackpotId = coin.Id;
                     _jackpotSince = Time.time;
                 }
-                JackpotOffscreen = ScreenEdgeMarker.Locate(_camera, new Vector3(coin.Position.X, coin.Position.Y, 0f), _edgeMargin, out _jackpotEdge, out _jackpotAngle);
-                return;
+                _jackpotPosition = new Vector3(coin.Position.X, coin.Position.Y, 0f);
+                break;
             }
-            // 出ていなければ忘れる（再戦の試合でコインの番号が同じになっても、また「JACKPOT」を出す）。
-            _jackpotId = -1;
+            if (!found)
+            {
+                // 出ていなければ忘れる（再戦の試合でコインの番号が同じになっても、また「JACKPOT」を出す）。
+                _jackpotId = -1;
+                int tick = _feed.CurrentTick;
+                int announce = FieldCoinRules.JackpotAnnounceTick(rules);
+                int spawn = FieldCoinRules.JackpotSpawnTick(rules);
+                int spot = FieldCoinRules.JackpotSpot(rules, _feed.CoinSpawns);
+                if (announce < 0 || spot < 0 || tick < announce || tick > spawn)
+                {
+                    return;
+                }
+                JackpotIncoming = true;
+                _noticeElapsedTicks = tick - announce;
+                _secondsUntilJackpot = Mathf.CeilToInt((spawn + 1 - tick) / (float)SimTime.TicksPerSecond);
+                System.Numerics.Vector2 position = _feed.CoinSpawns[spot].Position;
+                _jackpotPosition = new Vector3(position.X, position.Y, 0f);
+            }
+            JackpotOffscreen = ScreenEdgeMarker.Locate(_camera, _jackpotPosition, _edgeMargin, out _jackpotEdge, out _jackpotAngle);
         }
 
         private void OnGUI()
@@ -145,8 +186,11 @@ namespace Degunatsu.Runtime.Presentation
                 _count = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
                 _popup = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _banner = new GUIStyle(GUI.skin.label) { fontSize = 46, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+                _plateText = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _dot = CreateDot(32);
                 _arrow = ScreenEdgeMarker.CreateArrowTexture(64);
+                _jackpotIcon = GuideIcons.RainbowCoin(64);
+                _plate = new GuidePlate(180, 48);
             }
             Color previous = GUI.color;
             int count = _feed.CharacterCount;
@@ -180,15 +224,31 @@ namespace Degunatsu.Runtime.Presentation
             GUI.color = previous;
         }
 
-        // 「JACKPOT」の表示と、画面の端の矢印（虹色に移り変わる）。
+        // 予告の「JACKPOT INCOMING」と「100 IN n」、出たときの「JACKPOT 100」、画面の外なら端の矢印と札（虹色に移り変わる）。
         private void DrawJackpot()
         {
-            if (!JackpotPresent)
+            if (!JackpotPresent && !JackpotIncoming)
             {
                 return;
             }
             Color rainbow = Color.HSVToRGB(Mathf.Repeat(Time.time / 1.6f, 1f), 0.65f, 1f);
-            if (JackpotBannerShowing)
+            if (JackpotIncoming)
+            {
+                // 警報のように点滅させる。
+                float blink = 0.55f + 0.45f * Mathf.Sign(Mathf.Sin(Time.time * Mathf.PI * 4f));
+                Color warning = Color.Lerp(new Color(1f, 0.3f, 0.25f), rainbow, 0.35f);
+                warning.a = blink;
+                if (_noticeElapsedTicks < _incomingBannerTicks)
+                {
+                    Shadowed(new Rect(0f, Screen.height * 0.2f - 40f, Screen.width, 80f), "JACKPOT INCOMING", _banner, warning);
+                }
+                Shadowed(new Rect(0f, Screen.height * 0.2f + 30f, Screen.width, 40f), $"{CoinView.RainbowValue} COINS IN {_secondsUntilJackpot}", _popup, rainbow);
+                if (!JackpotOffscreen && ToScreen(_jackpotPosition + new Vector3(0f, 1.6f, 0f), out Vector2 above))
+                {
+                    Shadowed(new Rect(above.x - 100f, above.y - 18f, 200f, 36f), $"{CoinView.RainbowValue} IN {_secondsUntilJackpot}", _popup, rainbow);
+                }
+            }
+            else if (JackpotBannerShowing)
             {
                 float t = (Time.time - _jackpotSince) / _jackpotBannerSeconds;
                 Color color = rainbow;
@@ -200,9 +260,10 @@ namespace Degunatsu.Runtime.Presentation
             if (JackpotOffscreen)
             {
                 float pulse = 1f + 0.12f * Mathf.Sin(Time.time * 8f);
-                ScreenEdgeMarker.DrawArrow(_arrow, _jackpotEdge, _jackpotAngle, 46f * pulse, rainbow);
-                Vector2 label = ScreenEdgeMarker.Inward(_jackpotEdge, _jackpotAngle, 44f);
-                Shadowed(new Rect(label.x - 50f, label.y - 16f, 100f, 32f), CoinView.RainbowValue.ToString(), _count, rainbow);
+                ScreenEdgeMarker.DrawArrow(_arrow, _jackpotEdge, _jackpotAngle, 40f * pulse, rainbow);
+                Rect plate = _plate.PlaceAtEdge(_jackpotEdge, _jackpotAngle, 40f, 8f);
+                string text = JackpotIncoming ? $"JACKPOT {_secondsUntilJackpot}" : "JACKPOT";
+                _plate.DrawRainbow(plate, Time.time, _jackpotIcon, text, _plateText, JackpotIncoming ? 0.85f : 1f);
             }
         }
 

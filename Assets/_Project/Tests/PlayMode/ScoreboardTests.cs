@@ -1,0 +1,55 @@
+using System.Collections;
+using Degunatsu.Core.Simulation;
+using Degunatsu.Runtime.Presentation;
+using Degunatsu.Runtime.Simulation;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
+
+namespace Degunatsu.PlayMode.Tests
+{
+    /// <summary>右上の全員の情報（ScoreboardHud。ユーザーの要望、2026-10-14）: 順位の順に並び、確定コインの首位に王冠。</summary>
+    public sealed class ScoreboardTests
+    {
+        [UnityTest]
+        public IEnumerator Rows_FollowTheRanking_AndTheLeaderGetsACrown()
+        {
+            SceneManager.LoadScene("Sandbox_Combat");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            var board = Object.FindFirstObjectByType<ScoreboardHud>();
+            Assert.That(board, Is.Not.Null, "右上の表がない");
+            yield return WaitSeconds(0.2f);
+
+            ISimulationFeed feed = runner;
+            Assert.That(board.Order.Count, Is.EqualTo(feed.CharacterCount), "全員の札がない");
+            Assert.That(board.CrownCount, Is.EqualTo(0), "だれも確定していないのに王冠がある");
+
+            // 操作するキャラクター（番号 0）が撃破されたことにすると、同じ確定コインの中で最後に並ぶ。
+            CharacterState state = runner.PlayerState;
+            state.Combat.Falls = 3;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.1f);
+            Assert.That(board.Order[board.Order.Count - 1], Is.EqualTo(0), "撃破された数で並びが変わらない");
+
+            // 確定コインを持つと、いちばん上に来て王冠がつく。
+            state = runner.PlayerState;
+            state.Coins.Banked = 25;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.1f);
+            Assert.That(board.Order[0], Is.EqualTo(0), "確定コインの首位が上に来ない");
+            Assert.That(board.HasCrown(0), Is.True, "首位に王冠がない");
+            Assert.That(board.CrownCount, Is.EqualTo(1));
+        }
+
+        private static IEnumerator WaitSeconds(float seconds)
+        {
+            float start = Time.time;
+            while (Time.time - start < seconds)
+            {
+                yield return null;
+            }
+        }
+    }
+}

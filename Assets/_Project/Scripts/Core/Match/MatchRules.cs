@@ -17,7 +17,7 @@ namespace Degunatsu.Core.Match
     }
 
     /// <summary>
-    /// 試合のルール（docs/12_match_plan.md T4-1、T4-2、T4-4、T4-7）。値はすべて【仮】（docs/01_game_design.md 1章、2章、6.8）。
+    /// 試合のルール（docs/12_match_plan.md T4-1、T4-2、T4-4、T4-6、T4-7）。値はすべて【仮】（docs/01_game_design.md 1章、2章、6.8）。
     /// 試合の段階はティック数だけから決まる（状態を持たないので、巻き戻しても全員で同じになる）。
     /// オンラインでは、ホストが試合の開始のときに全員へ送る。
     /// </summary>
@@ -42,8 +42,32 @@ namespace Degunatsu.Core.Match
         /// </summary>
         public int CoinSpawnIntervalTicks = 600;
 
-        /// <summary>100 枚のコイン（候補の地点の1つ）が出る、試合の残り（ティック。残り 1 分。ユーザーの要望）。時間の制限がなければ出ない。</summary>
+        /// <summary>
+        /// 100 枚のコイン（候補の地点の1つ）を予告する、試合の残り（ティック。残り 1 分。ユーザーの要望）。時間の制限がなければ出ない。
+        /// 予告してから JackpotNoticeTicks の後に出る。
+        /// </summary>
         public int JackpotTicksBeforeEnd = 3600;
+
+        /// <summary>100 枚のコインを予告してから、出るまで（ティック。10 秒。ユーザーの要望、2026-10-14）。</summary>
+        public int JackpotNoticeTicks = 600;
+
+        /// <summary>被弾ドロップ（docs/12 T4-6）: コンボの最初の被弾で落とす、所持コインの割合（%）【仮】。少なくとも 1 枚。</summary>
+        public int HitDropPercent = 10;
+
+        /// <summary>被弾ドロップの上限（枚）【仮】。</summary>
+        public int HitDropMax = 10;
+
+        /// <summary>撃破ドロップ: 撃破されたときに落とす、所持コインの割合（%。端数は切り上げ）【仮】。自滅も同じ（D-44）。</summary>
+        public int KoDropPercent = 50;
+
+        /// <summary>撃破ドロップを落とす位置: ステージの外に出た位置を、ステージの範囲のこれだけ内側（m）に入れる【仮】。</summary>
+        public float KoDropInset = 4f;
+
+        /// <summary>ドロップしたコインを、だれも拾えない時間（ティック。0.5 秒）【仮】。</summary>
+        public int DropPickableDelayTicks = 30;
+
+        /// <summary>ドロップしたコインの寿命（ティック。10 秒）【仮】。過ぎると消える。</summary>
+        public int DropLifetimeTicks = 600;
 
         /// <summary>拠点（バンク。docs/12 T4-7）が次の地点へ移る間隔（ティック。40 秒）【仮】。試合が始まってから数える。</summary>
         public int BankMoveIntervalTicks = 2400;
@@ -51,8 +75,8 @@ namespace Degunatsu.Core.Match
         /// <summary>拠点が移る何ティック前から、次の地点を予告するか（10 秒）【仮】。表示だけに使う。</summary>
         public int BankNoticeTicks = 600;
 
-        /// <summary>拠点の円の半径（m）【仮】。キャラクターの箱が触れていれば、所持コインを確定する。</summary>
-        public float BankRadius = 2f;
+        /// <summary>拠点の円の半径（m）【仮】。キャラクターの箱が触れていれば、所持コインを確定する（2m から少し小さくした。ユーザーの要望、2026-10-14）。</summary>
+        public float BankRadius = 1.7f;
 
         /// <summary>試合ごとの乱数の種（100 枚のコインの場所、拠点の移動先を選ぶ。ホストが試合を始めるたびに決めて全員へ送る）。</summary>
         public int Seed;
@@ -115,6 +139,13 @@ namespace Degunatsu.Core.Match
             v.Positive(nameof(CoinSpawnIntervalTicks), CoinSpawnIntervalTicks);
             v.Positive(nameof(CoinPickupRadius), CoinPickupRadius);
             v.NonNegative(nameof(JackpotTicksBeforeEnd), JackpotTicksBeforeEnd);
+            v.NonNegative(nameof(JackpotNoticeTicks), JackpotNoticeTicks);
+            v.InRange(nameof(HitDropPercent), HitDropPercent, 0f, 100f);
+            v.NonNegative(nameof(HitDropMax), HitDropMax);
+            v.InRange(nameof(KoDropPercent), KoDropPercent, 0f, 100f);
+            v.NonNegative(nameof(DropPickableDelayTicks), DropPickableDelayTicks);
+            v.Positive(nameof(DropLifetimeTicks), DropLifetimeTicks);
+            v.NonNegative(nameof(KoDropInset), KoDropInset);
             v.Positive(nameof(BankMoveIntervalTicks), BankMoveIntervalTicks);
             v.NonNegative(nameof(BankNoticeTicks), BankNoticeTicks);
             v.Positive(nameof(BankRadius), BankRadius);

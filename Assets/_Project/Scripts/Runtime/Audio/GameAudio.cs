@@ -22,6 +22,8 @@ namespace Degunatsu.Runtime.Audio
 
         [Tooltip("BGM（空なら合成した仮の BGM）")]
         [SerializeField] private AudioClip _bgmOverride;
+        [Tooltip("緊張感のある BGM（100 枚のコインの予告から。なければ合成する）")]
+        [SerializeField] private AudioClip _tenseBgmOverride;
         [Tooltip("効果音の差し替え（設定がない効果音は合成する）")]
         [SerializeField] private ClipOverride[] _overrides = new ClipOverride[0];
         [Range(0f, 1f)] [SerializeField] private float _bgmVolume = 0.3f;
@@ -31,6 +33,8 @@ namespace Degunatsu.Runtime.Audio
         private readonly Dictionary<SoundId, AudioClip> _clips = new Dictionary<SoundId, AudioClip>();
         private readonly List<SoundId> _history = new List<SoundId>();
         private AudioSource _bgm;
+        private AudioClip _normalClip;
+        private AudioClip _tenseClip;
         private AudioSource[] _se;
         private int _nextSe;
         private System.Random _pitchRandom = new System.Random(1);
@@ -66,6 +70,24 @@ namespace Degunatsu.Runtime.Audio
         /// <summary>BGM を鳴らす設定か（音の出る機器がない環境では isPlaying が false のままのことがあるので、設定を別に持つ）。</summary>
         public bool BgmEnabled { get; private set; }
 
+        /// <summary>緊張感のある BGM にしているか（MatchAtmosphere が切り替える）。</summary>
+        public bool BgmTense { get; private set; }
+
+        /// <summary>BGM を、ふつうのものと緊張感のあるものとで切り替える（鳴らす設定なら、頭から鳴らし直す）。</summary>
+        public void SetBgmTense(bool tense)
+        {
+            if (_bgm == null || tense == BgmTense)
+            {
+                return;
+            }
+            BgmTense = tense;
+            _bgm.clip = tense ? _tenseClip : _normalClip;
+            if (BgmEnabled)
+            {
+                _bgm.Play();
+            }
+        }
+
         private void Awake()
         {
             foreach (ClipOverride entry in _overrides)
@@ -84,7 +106,9 @@ namespace Degunatsu.Runtime.Audio
             }
 
             _bgm = gameObject.AddComponent<AudioSource>();
-            _bgm.clip = _bgmOverride != null ? _bgmOverride : ProceduralAudio.CreateBgm();
+            _normalClip = _bgmOverride != null ? _bgmOverride : ProceduralAudio.CreateBgm();
+            _tenseClip = _tenseBgmOverride != null ? _tenseBgmOverride : ProceduralAudio.CreateTenseBgm();
+            _bgm.clip = _normalClip;
             _bgm.loop = true;
             _bgm.playOnAwake = false;
             _bgm.volume = _bgmVolume;

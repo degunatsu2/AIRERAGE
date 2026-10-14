@@ -244,9 +244,9 @@ namespace Degunatsu.Core.Tests.Economy
         }
 
         [Test]
-        public void KnockedOut_KeepsTheCoins()
+        public void KnockedOut_KeepsTheBankedCoins_AndDropsHalfOfTheHeld()
         {
-            // 撃破されても、コインは消えない（撃破のドロップは T4-6 で、台帳を通して落とす）。
+            // 撃破されても、確定コインは減らない。所持コインの半分は台帳を通してフィールドに落ちる（消えない。T4-6）。
             var world = new SimWorld(TestArenas.Ground(), new StageBounds(-10f, -10f, 10f, 30f));
             world.AddCharacter(new CharacterConfig(), new Vector3(0f, 0.91f, 0f));
             CharacterState state = world.GetState(0);
@@ -256,7 +256,8 @@ namespace Degunatsu.Core.Tests.Economy
             world.Step(new Input.PlayerInput[1]);
 
             Assert.That(world.GetState(0).Combat.Falls, Is.EqualTo(1), "前提: 撃破された");
-            Assert.That(world.GetState(0).Coins, Is.EqualTo(new CoinPurse { Held = 12, Banked = 30 }));
+            Assert.That(world.GetState(0).Coins, Is.EqualTo(new CoinPurse { Held = 6, Banked = 30 }));
+            Assert.That(world.Coins.Field.FieldTotal, Is.EqualTo(6), "落とした分がフィールドにない");
         }
 
         [Test]

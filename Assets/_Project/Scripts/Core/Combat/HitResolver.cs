@@ -150,6 +150,7 @@ namespace Degunatsu.Core.Combat
             {
                 victim.Combat.FatalHitCount++;
             }
+            bool startsCombo = false;
             switch (result)
             {
                 case HitResult.JustGuarded:
@@ -159,11 +160,11 @@ namespace Degunatsu.Core.Combat
                     Guard(configs[hit.Victim].Combat, ref victim, hit, tick);
                     break;
                 default:
-                    Hit(configs[hit.Victim].Wire, ref victim, hit, tick);
+                    startsCombo = Hit(configs[hit.Victim].Wire, ref victim, hit, tick);
                     break;
             }
             states[hit.Victim] = victim;
-            return hit.WithResult(result);
+            return hit.WithResult(result, startsCombo);
         }
 
         private static void AddGauge(ref CombatState combat, CombatTuning tuning, int amount)
@@ -171,7 +172,8 @@ namespace Degunatsu.Core.Combat
             combat.Gauge = Math.Min(tuning.MaxGauge, combat.Gauge + amount);
         }
 
-        private static void Hit(WireTuning wire, ref CharacterState victim, HitRecord hit, int tick)
+        // 当てる。新しいコンボの最初の命中なら true（被弾ドロップに使う。docs/12 T4-6）。
+        private static bool Hit(WireTuning wire, ref CharacterState victim, HitRecord hit, int tick)
         {
             AttackHit data = hit.Data;
             WireController.Interrupt(ref victim, wire);
@@ -191,6 +193,7 @@ namespace Degunatsu.Core.Combat
             victim.Combat.LastDamagedTick = tick;
             victim.Combat.ComboCount = comboContinues ? victim.Combat.ComboCount + 1 : 1;
             victim.Combat.ComboDamage = (comboContinues ? victim.Combat.ComboDamage : 0) + hit.Damage;
+            return !comboContinues;
         }
 
         // ふつうのガード: ガードのまま（ガード硬直の分だけ延ばす）、弱く吹き飛ぶ。削りとして最後にダメージを与えた人を記録する【仮】。
@@ -263,8 +266,11 @@ namespace Degunatsu.Core.Combat
         /// <summary>結果（命中、ガード、ジャストガード）。</summary>
         public readonly HitResult Result;
 
+        /// <summary>当たって、当たった側の新しいコンボの最初の命中になったか（被弾ドロップ。docs/12 T4-6）。</summary>
+        public readonly bool StartsCombo;
+
         public HitRecord(int attacker, int victim, AttackSlot attack, int hitIndex, AttackHit data, int facing, float knockbackScale,
-            bool fatal = false, HitResult result = HitResult.Hit)
+            bool fatal = false, HitResult result = HitResult.Hit, bool startsCombo = false)
         {
             Attacker = attacker;
             Victim = victim;
@@ -275,11 +281,12 @@ namespace Degunatsu.Core.Combat
             KnockbackScale = knockbackScale;
             Fatal = fatal;
             Result = result;
+            StartsCombo = startsCombo;
         }
 
-        public HitRecord WithResult(HitResult result)
+        public HitRecord WithResult(HitResult result, bool startsCombo = false)
         {
-            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, Fatal, result);
+            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, Fatal, result, startsCombo);
         }
 
         /// <summary>当たった側の吹き飛びの速度（m/s、X は右が正）。</summary>

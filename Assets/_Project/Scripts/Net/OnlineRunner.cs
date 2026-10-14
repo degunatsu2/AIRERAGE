@@ -28,7 +28,7 @@ namespace Degunatsu.Net
     /// 巻き戻しでキャラクターの位置が飛んだときは、表示だけを少しずつ寄せる（CorrectionSmoother。T2-8）。
     /// 検証のため、自分が送るパケットに遅延と欠落を加えられる（往復の遅延を模擬するには全員で同じ値を選ぶ）。
     /// ステージ（T3-8）: シーンのステージの範囲（KnockoutBounds）、ギミック（StageZoneAuthoring）、出現位置（_spawnPoints）を使う。
-    /// 試合中は、右上に全員の撃破の数（KO）と撃破された数（Fall）を出す。コンボの表示と効果音は ISimulationFeed で読ませる。
+    /// 右上の全員の情報（ScoreboardHud）、コンボの表示、効果音などは ISimulationFeed で読ませる。
     /// </summary>
     public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls
     {
@@ -79,7 +79,6 @@ namespace Degunatsu.Net
         private int _notifiedTick = -1;
         private bool _showDetails;
         private bool _timedMatch = true;
-        private GUIStyle _scoreStyle;
         private InputSystemAdapter _input;
         private OnlineSession _session;
         private string _portText;
@@ -109,6 +108,7 @@ namespace Degunatsu.Net
         int ISimulationFeed.CurrentTick => Running ? _session.World.Tick : 0;
         MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
         CoinField ISimulationFeed.Coins => Running ? _session.World.Coins.Field : null;
+        IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => Running ? _session.World.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => Running ? _session.World.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
         Color ISimulationFeed.ColorOf(int index) => index < _playerColors.Length ? _playerColors[index] : Color.white;
 
@@ -420,36 +420,6 @@ namespace Degunatsu.Net
                 DrawSessionPanel(compact);
             }
             GUILayout.EndArea();
-            DrawScoreboard();
-        }
-
-        // 右上に全員のスコア（確定コイン。Bank）、所持コイン（Coin）、撃破の数（KO）、撃破された数（Fall）。自分の行には印をつける。
-        private void DrawScoreboard()
-        {
-            if (!Running)
-            {
-                return;
-            }
-            if (_scoreStyle == null)
-            {
-                _scoreStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold };
-            }
-            int count = _session.PlayerCount;
-            var area = new Rect(Screen.width - 370f, 10f, 360f, 34f + count * 28f);
-            GUI.Box(area, GUIContent.none);
-            Color previous = GUI.color;
-            GUI.color = Color.white;
-            GUI.Label(new Rect(area.x + 10f, area.y + 4f, 350f, 26f), "     Bank  Coin  KO Fall", _scoreStyle);
-            for (int p = 0; p < count; p++)
-            {
-                Degunatsu.Core.Combat.CombatState combat = _session.World.GetState(p).Combat;
-                GUI.color = p < _playerColors.Length ? Color.Lerp(_playerColors[p], Color.white, 0.25f) : Color.white;
-                string mark = p == _session.LocalPlayer ? ">" : " ";
-                Degunatsu.Core.Economy.CoinPurse coins = _session.World.GetState(p).Coins;
-                GUI.Label(new Rect(area.x + 10f, area.y + 30f + p * 28f, 350f, 26f),
-                    $"{mark}P{p + 1} {coins.Banked,5} {coins.Held,5} {combat.Knockouts,3} {combat.Falls,4}", _scoreStyle);
-            }
-            GUI.color = previous;
         }
 
         private void DrawConnectPanel()

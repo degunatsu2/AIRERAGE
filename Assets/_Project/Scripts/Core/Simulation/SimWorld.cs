@@ -21,6 +21,7 @@ namespace Degunatsu.Core.Simulation
         private readonly List<CharacterConfig> _configs = new List<CharacterConfig>();
         private readonly List<CharacterState> _spawns = new List<CharacterState>();
         private readonly CoinField _coins = new CoinField();
+        private readonly List<KnockoutRecord> _knockouts = new List<KnockoutRecord>();
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
         /// <param name="zones">ステージのギミック（ジャンプ台など）。渡した順によらず、決まった順（StageZone.CompareTo）に並べて効かせる。</param>
@@ -81,6 +82,9 @@ namespace Degunatsu.Core.Simulation
 
         /// <summary>直前の Step で当たった命中（表示とデバッグ用。状態ではないので、巻き戻しでは戻らない）。</summary>
         public IReadOnlyList<HitRecord> LastHits => _hits.LastHits;
+
+        /// <summary>直前の Step の撃破（表示とデバッグ用。状態ではない）。</summary>
+        public IReadOnlyList<KnockoutRecord> LastKnockouts => _knockouts;
 
         /// <summary>これまでに進めたティック数。</summary>
         public int Tick { get; private set; }
@@ -159,6 +163,7 @@ namespace Degunatsu.Core.Simulation
         /// <summary>
         /// 1ティック進める。inputs はキャラクターの番号順で、数が一致しなければ ArgumentException。
         /// 全員を進めた後に、攻撃の命中を決めて当て（HitResolver）、ステージの外に出たキャラクターを撃破にする（KnockoutResolver）。
+        /// 被弾と撃破でコインを落とす（CoinDropRules。docs/12 T4-6）。
         /// 最後に、フィールドのコインの出現・拾得・消滅を決め（FieldCoinRules。docs/12 T4-4）、拠点に触れている人の所持コインを
         /// 確定する（BankRules。T4-7）。
         /// 試合の段階（Phase）がカウントダウンの間は入力を無視し、終わった後は全員を止める（ティック数だけ進める）。
@@ -177,6 +182,7 @@ namespace Degunatsu.Core.Simulation
 
             MatchPhase phase = Phase;
             Coins.BeginTick(Tick + 1);
+            _knockouts.Clear();
             if (phase == MatchPhase.Finished)
             {
                 _hits.Clear();
@@ -191,9 +197,11 @@ namespace Degunatsu.Core.Simulation
             }
             Tick++;
             _hits.Resolve(_states, _configs, Tick);
+            CoinDropRules.DropOnHits(Coins, _states, _hits.LastHits, Rules, Tick);
             if (Bounds.HasValue)
             {
-                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules);
+                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts);
+                CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, Rules, Tick);
             }
             FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, phase == MatchPhase.Playing);
             BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, phase == MatchPhase.Playing);

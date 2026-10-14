@@ -56,8 +56,8 @@ namespace Degunatsu.Editor
             (new Vector2(-7f, 7f), 3),
             (new Vector2(7f, 7f), 3),
             (new Vector2(0f, 15f), 3),
-            (new Vector2(-21f, 12f), 5),
-            (new Vector2(21f, 12f), 5),
+            (new Vector2(-21f, 12f), 20),
+            (new Vector2(21f, 12f), 20),
         };
 
         // 100 枚のコインの候補の地点（残り 1 分に出る。ここは時間の制限がないので出ない）【仮】。
@@ -167,7 +167,9 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
             SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner);
-            SandboxWireSceneBuilder.CreateBank(BankSpots, runner);
+            SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio);
+            SandboxWireSceneBuilder.CreateScoreboard(runner);
+            SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

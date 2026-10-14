@@ -39,6 +39,9 @@ namespace Degunatsu.Runtime.Simulation
         /// <summary>フィールドのコイン（始まっていなければ null）。</summary>
         CoinField Coins { get; }
 
+        /// <summary>コインの出現地点（番号の順。CoinField.SpawnReadyTick と FieldCoin.Source の番号。始まっていなければ空）。</summary>
+        IReadOnlyList<CoinSpawnPoint> CoinSpawns { get; }
+
         /// <summary>拠点の候補の地点（番号の順。始まっていなければ空）。今の拠点は BankRules.SpotAt(Rules, BankSpots.Count, CurrentTick)。</summary>
         IReadOnlyList<BankSpot> BankSpots { get; }
 

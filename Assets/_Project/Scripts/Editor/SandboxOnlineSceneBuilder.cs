@@ -100,7 +100,7 @@ namespace Degunatsu.Editor
             ("UpdraftRight", StageZoneKind.Updraft, new Vector2(13.5f, -8f), new Vector2(7f, 20f), Vector2.up, 45f, 10f),
         };
 
-        // コインの出現地点（基本は空中。1 枚はよく通る道に多く、3 枚・5 枚は取りにくい・危ない場所）【仮】。
+        // コインの出現地点（基本は空中。1 枚はよく通る道に多く、3 枚・20 枚（赤）は取りにくい・危ない場所）【仮】。
         // 拾われてから CoinSpawnIntervalTicks 後に、同じ地点に出直す（docs/12 3.5）。
         internal static readonly (Vector2 Position, int Value)[] CoinSpawns =
         {
@@ -142,14 +142,14 @@ namespace Degunatsu.Editor
             (new Vector2(13.5f, 3f), 3),
             (new Vector2(-27f, 5f), 3),
             (new Vector2(27f, 5f), 3),
-            // 5 枚: ステージのいちばん上、上昇気流の下（落ちると危ない）、ステージの外の近く、上の端。
-            (new Vector2(0f, 27f), 5),
-            (new Vector2(-13.5f, -8f), 5),
-            (new Vector2(13.5f, -8f), 5),
-            (new Vector2(-38f, 14f), 5),
-            (new Vector2(38f, 14f), 5),
-            (new Vector2(-14f, 28f), 5),
-            (new Vector2(14f, 28f), 5),
+            // 20 枚（赤。地点の攻防を激しくする。ユーザーの要望）: ステージのいちばん上、上昇気流の下（落ちると危ない）、ステージの外の近く、上の端。
+            (new Vector2(0f, 27f), 20),
+            (new Vector2(-13.5f, -8f), 20),
+            (new Vector2(13.5f, -8f), 20),
+            (new Vector2(-38f, 14f), 20),
+            (new Vector2(38f, 14f), 20),
+            (new Vector2(-14f, 28f), 20),
+            (new Vector2(14f, 28f), 20),
         };
 
         // 100 枚のコインの候補の地点（残り 1 分に、試合ごとの種で選んだ1つに出る。どこも遠いか危ない）【仮】。
@@ -278,7 +278,9 @@ namespace Degunatsu.Editor
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
             SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner);
-            SandboxWireSceneBuilder.CreateBank(BankSpots, runner);
+            SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio);
+            SandboxWireSceneBuilder.CreateScoreboard(runner);
+            SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

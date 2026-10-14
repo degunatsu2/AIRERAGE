@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Numerics;
 using Degunatsu.Core.Match;
 using Degunatsu.Core.Simulation;
 
@@ -17,8 +18,12 @@ namespace Degunatsu.Core.Combat
     /// </summary>
     public static class KnockoutResolver
     {
-        /// <summary>spawns はキャラクターごとの出現したときの状態（同じ番号・同じ数）。</summary>
-        public static void Resolve(List<CharacterState> states, IReadOnlyList<CharacterState> spawns, StageBounds bounds, MatchRules rules)
+        /// <summary>
+        /// spawns はキャラクターごとの出現したときの状態（同じ番号・同じ数）。knockouts を渡すと、このティックの撃破を番号の順に加える
+        /// （撃破ドロップに使う。docs/12 T4-6）。
+        /// </summary>
+        public static void Resolve(List<CharacterState> states, IReadOnlyList<CharacterState> spawns, StageBounds bounds, MatchRules rules,
+            List<KnockoutRecord> knockouts = null)
         {
             for (int i = 0; i < states.Count; i++)
             {
@@ -33,6 +38,8 @@ namespace Degunatsu.Core.Combat
                     attacker.Combat.Knockouts++;
                     states[state.Combat.LastAttacker] = attacker;
                 }
+                knockouts?.Add(new KnockoutRecord(i, state.Combat.HasLastAttacker ? state.Combat.LastAttacker : -1,
+                    new Vector2(state.Position.X, state.Position.Y)));
                 states[i] = Respawn(states[i], spawns[i], rules);
             }
         }
@@ -54,9 +61,28 @@ namespace Degunatsu.Core.Combat
             respawned.PreviousButtons = state.PreviousButtons;
             respawned.JumpPadCount = state.JumpPadCount;
             respawned.BoostRingCount = state.BoostRingCount;
-            // コインはなくさない（撃破のドロップは T4-6 で、台帳を通して落とす）。
+            // コインはここではなくさない（撃破ドロップは CoinDropRules が、台帳を通して落とす。T4-6）。
             respawned.Coins = state.Coins;
             return respawned;
+        }
+    }
+
+    /// <summary>撃破1つ（KnockoutResolver.Resolve）。</summary>
+    public readonly struct KnockoutRecord
+    {
+        public readonly int Victim;
+
+        /// <summary>手柄のキャラクター（だれにも攻撃されていなければ -1。自滅）。</summary>
+        public readonly int Attacker;
+
+        /// <summary>ステージの外に出た位置。</summary>
+        public readonly Vector2 Position;
+
+        public KnockoutRecord(int victim, int attacker, Vector2 position)
+        {
+            Victim = victim;
+            Attacker = attacker;
+            Position = position;
         }
     }
 }

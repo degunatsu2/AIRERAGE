@@ -63,6 +63,12 @@ namespace Degunatsu.Runtime.Audio
 
         /// <summary>拠点で所持コインを確定した（上がっていく明るい和音と、コインの音）。</summary>
         Bank,
+
+        /// <summary>拠点が 10 秒後に移る（呼び鈴の「ピンポーン」。ユーザーの要望、2026-10-14）。</summary>
+        BankNotice,
+
+        /// <summary>100 枚のコインの予告（警報。ユーザーの要望、2026-10-14）。</summary>
+        JackpotAlarm,
     }
 
     /// <summary>
@@ -97,6 +103,15 @@ namespace Degunatsu.Runtime.Audio
         {
             return ToClip("BGM_Temporary", SynthesizeBgm(), BgmSampleRate);
         }
+
+        /// <summary>緊張感のある BGM（100 枚のコインの予告から試合の終わりまで。ユーザーの要望、2026-10-14）。</summary>
+        public static AudioClip CreateTenseBgm()
+        {
+            return ToClip("BGM_Tense_Temporary", SynthesizeTenseBgm(), BgmSampleRate);
+        }
+
+        /// <summary>緊張感のある BGM のテンポ（拍/分）。</summary>
+        public const float TenseBgmTempo = 168f;
 
         /// <summary>効果音の波形（SeSampleRate、モノラル、-1〜1）。</summary>
         public static float[] Synthesize(SoundId id)
@@ -248,6 +263,30 @@ namespace Degunatsu.Runtime.Audio
                     AddTone(b, r, 0.24f, 0.4f, NoteFrequency(96), NoteFrequency(96), Wave.Sine, 0.3f, 0.001f, 0.14f);
                     AddTone(b, r, 0.24f, 0.3f, NoteFrequency(103), NoteFrequency(103), Wave.Sine, 0.12f, 0.001f, 0.08f);
                     break;
+                case SoundId.BankNotice:
+                    // 「ピン」（E5）、「ポーン」（C5）。鐘のように、少しずれた倍音を重ねて長く残す。
+                    b = new float[Samples(1.6f, r)];
+                    int[] bell = { 76, 72 };
+                    for (int i = 0; i < bell.Length; i++)
+                    {
+                        float f = NoteFrequency(bell[i]);
+                        float start = i * 0.42f;
+                        AddTone(b, r, start, 1.1f, f, f, Wave.Sine, 0.6f, 0.003f, 0.45f);
+                        AddTone(b, r, start, 0.8f, f * 2f, f * 2f, Wave.Sine, 0.18f, 0.003f, 0.25f);
+                        AddTone(b, r, start, 0.4f, f * 2.76f, f * 2.76f, Wave.Sine, 0.08f, 0.002f, 0.1f);
+                    }
+                    break;
+                case SoundId.JackpotAlarm:
+                    // 高い音と低い音を交互に速く鳴らす警報（4 往復）と、下から上がるうなり。
+                    b = new float[Samples(1.8f, r)];
+                    for (int i = 0; i < 8; i++)
+                    {
+                        float f = i % 2 == 0 ? 988f : 740f;
+                        AddTone(b, r, i * 0.2f, 0.2f, f, f, Wave.Square, 0.22f, 0.004f, 0.2f);
+                        AddTone(b, r, i * 0.2f, 0.2f, f * 0.5f, f * 0.5f, Wave.Saw, 0.14f, 0.004f, 0.2f);
+                    }
+                    AddTone(b, r, 0f, 1.7f, 110f, 330f, Wave.Saw, 0.2f, 0.05f, 1.2f);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");
             }
@@ -325,6 +364,70 @@ namespace Degunatsu.Runtime.Audio
                 {
                     float open = inBar == 14 ? 0.05f : 0.012f;
                     AddNoise(b, r, rng, t, 0.08f, 0.09f, 0.001f, open, 11000f, 11000f, 7000f);
+                }
+            }
+            Finish(b, 0.8f);
+            return b;
+        }
+
+        /// <summary>
+        /// 緊張感のある BGM の波形（BgmSampleRate、モノラル、繰り返して鳴らす）。168 拍/分、8 小節。短調（Dm B♭ Gm A）で、
+        /// 16 分音符で刻むベース（のこぎり波）、裏拍の和音、上がっていくアルペジオ、4 つ打ちのキック、16 分のハイハット、
+        /// 4 小節ごとのうなり（警報の名残）。
+        /// </summary>
+        public static float[] SynthesizeTenseBgm()
+        {
+            const int r = BgmSampleRate;
+            float step = 60f / TenseBgmTempo / 4f; // 16 分音符
+            int steps = BgmBars * 16;
+            var b = new float[Samples(step * steps, r)];
+            var rng = new System.Random(11);
+
+            int[] roots = { 50, 46, 43, 45, 50, 46, 43, 45 }; // D B♭ G A（2 回）
+            bool[] minor = { true, false, true, false, true, false, true, false };
+
+            for (int s = 0; s < steps; s++)
+            {
+                int bar = s / 16;
+                int inBar = s % 16;
+                float t = s * step;
+                int root = roots[bar];
+                int third = root + (minor[bar] ? 3 : 4);
+                int fifth = root + 7;
+
+                // ベース: 16 分音符で刻む（拍の頭はオクターブ下を強く）。
+                int bassNote = root - 12 - (inBar % 4 == 0 ? 12 : 0);
+                AddTone(b, r, t, step, NoteFrequency(bassNote), NoteFrequency(bassNote), Wave.Saw, inBar % 4 == 0 ? 0.26f : 0.16f, 0.002f, 0.06f);
+
+                // 裏拍の和音（短く切る）。
+                if (inBar % 4 == 2)
+                {
+                    foreach (int note in new[] { root + 12, third + 12, fifth + 12 })
+                    {
+                        AddTone(b, r, t, step * 1.5f, NoteFrequency(note), NoteFrequency(note), Wave.Pulse25, 0.06f, 0.002f, 0.05f);
+                    }
+                }
+
+                // 上がっていくアルペジオ（後半 4 小節は 1 オクターブ上）。
+                int[] arp = { root + 24, third + 24, fifth + 24, root + 36 };
+                int arpNote = arp[inBar % 4] + (bar >= 4 ? 12 : 0);
+                AddTone(b, r, t, step * 0.8f, NoteFrequency(arpNote), NoteFrequency(arpNote), Wave.Square, 0.045f, 0.002f, 0.04f);
+
+                // ドラム: 4 つ打ちのキック、2・4 拍のスネア、16 分のハイハット（裏を強く）。
+                if (inBar % 4 == 0)
+                {
+                    AddTone(b, r, t, 0.14f, 160f, 45f, Wave.Sine, 0.75f, 0.001f, 0.05f);
+                }
+                if (inBar == 4 || inBar == 12)
+                {
+                    AddNoise(b, r, rng, t, 0.12f, 0.32f, 0.001f, 0.035f, 7000f, 7000f, 1200f);
+                }
+                AddNoise(b, r, rng, t, 0.05f, inBar % 2 == 1 ? 0.1f : 0.05f, 0.001f, 0.01f, 11000f, 11000f, 7500f);
+
+                // 4 小節ごとに、下から上がるうなり。
+                if (inBar == 0 && bar % 4 == 0)
+                {
+                    AddTone(b, r, t, step * 16f, NoteFrequency(root), NoteFrequency(root + 12), Wave.Saw, 0.06f, 0.2f, 1.5f);
                 }
             }
             Finish(b, 0.8f);

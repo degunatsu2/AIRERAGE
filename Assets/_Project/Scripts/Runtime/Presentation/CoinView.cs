@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Degunatsu.Core.Economy;
+using Degunatsu.Core.Match;
 using Degunatsu.Runtime.Simulation;
 using UnityEngine;
 
@@ -12,7 +13,7 @@ namespace Degunatsu.Runtime.Presentation
         Single,
         /// <summary>3 枚: 金色のコインがピラミッド型に 3 枚。</summary>
         Triple,
-        /// <summary>5 枚: 赤いコイン。</summary>
+        /// <summary>20 枚: 赤いコイン（5 枚から 20 枚にした。ユーザーの要望、2026-10-14）。</summary>
         Red,
         /// <summary>100 枚: 虹色に光るコイン。</summary>
         Rainbow,
@@ -20,7 +21,10 @@ namespace Degunatsu.Runtime.Presentation
 
     /// <summary>
     /// フィールドのコインの表示（docs/12_match_plan.md T4-4）。枚数ごとに見た目を変える（CoinLook）: 1 枚は金色、3 枚は金色が
-    /// ピラミッド型に 3 枚、5 枚は赤、100 枚は虹色に光る。コインは回りながら、少し上下に揺れる。出たときは小さくから大きくなる。
+    /// ピラミッド型に 3 枚、20 枚は赤、100 枚は虹色に光る。コインは回りながら、少し上下に揺れる。出たときは小さくから大きくなる。
+    /// ドロップしたコイン（寿命がある。T4-6）は、消える前の DropBlinkTicks の間点滅する。
+    /// 赤いコインの出現地点は、拾われてから次に出るまでを円形のゲージで示す（ユーザーの要望、2026-10-14）。
+    /// 100 枚のコインの予告の間は、出る地点に小さな虹色のコインを脈打たせる。
     /// 状態（CoinField）を読むだけで、書き換えない。見た目は種類ごとの見本を複製して作る。見本の子のうちメッシュを持つもの
     /// （コインの面）を、それぞれの縦の軸で回す。
     /// </summary>
@@ -36,13 +40,20 @@ namespace Degunatsu.Runtime.Presentation
         [SerializeField] private float _spinDegreesPerSecond = 160f;
         [SerializeField] private float _bobHeight = 0.12f;
         [SerializeField] private float _popSeconds = 0.25f;
+        [Tooltip("赤いコインの出現地点の、次に出るまでのゲージの見本（シーンでは隠しておく。なくてもよい）")]
+        [SerializeField] private RingGaugeView _respawnGauge;
+        [Tooltip("ドロップしたコインが消える前に点滅する時間（ティック）")]
+        [SerializeField] private int _dropBlinkTicks = 120;
 
         private static readonly int LookCount = System.Enum.GetValues(typeof(CoinLook)).Length;
 
         private readonly Dictionary<int, Shown> _shown = new Dictionary<int, Shown>();
         private readonly List<int> _gone = new List<int>();
+        private readonly Dictionary<int, RingGaugeView> _gauges = new Dictionary<int, RingGaugeView>();
+        private readonly HashSet<int> _occupied = new HashSet<int>();
         private Stack<Shown>[] _pools;
         private ISimulationFeed _feed;
+        private Shown _preview;
 
         /// <summary>表示しているコインの数（テスト用）。</summary>
         public int ShownCount => _shown.Count;
@@ -52,17 +63,30 @@ namespace Degunatsu.Runtime.Presentation
             public GameObject Visual;
             public CoinLook Look;
             public Transform[] Faces;
+            public Renderer[] Renderers;
             public float BornAt;
         }
 
-        /// <summary>枚数に合う見た目（100 枚以上は虹色、5 枚以上は赤、3 枚以上はピラミッド、それより少なければ金色）。</summary>
+        /// <summary>次に出るまでのゲージを出している出現地点の数（テスト用）。</summary>
+        public int RespawnGaugeCount { get; private set; }
+
+        /// <summary>100 枚のコインの予告の、小さな虹色のコインを出しているか（テスト用）。</summary>
+        public bool PreviewShowing => _preview != null && _preview.Visual.activeSelf;
+
+        /// <summary>点滅して隠れているコインの数（テスト用）。</summary>
+        public int BlinkHiddenCount { get; private set; }
+
+        /// <summary>赤いコインにする枚数。</summary>
+        public const int RedValue = 20;
+
+        /// <summary>枚数に合う見た目（100 枚以上は虹色、20 枚以上は赤、3 枚以上はピラミッド、それより少なければ金色）。</summary>
         public static CoinLook LookOf(int value)
         {
             if (value >= RainbowValue)
             {
                 return CoinLook.Rainbow;
             }
-            if (value >= 5)
+            if (value >= RedValue)
             {
                 return CoinLook.Red;
             }
@@ -92,6 +116,10 @@ namespace Degunatsu.Runtime.Presentation
                 _pools[i] = new Stack<Shown>();
                 _templates[i].SetActive(false);
             }
+            if (_respawnGauge != null)
+            {
+                _respawnGauge.gameObject.SetActive(false);
+            }
         }
 
         private void Update()
@@ -114,12 +142,18 @@ namespace Degunatsu.Runtime.Presentation
             }
             if (field == null)
             {
+                HidePreview();
+                HideGauges();
                 return;
             }
 
             float time = Time.time;
+            int tick = _feed.CurrentTick;
+            int hidden = 0;
+            _occupied.Clear();
             foreach (FieldCoin coin in field.Coins)
             {
+                _occupied.Add(coin.Source);
                 if (!_shown.TryGetValue(coin.Id, out Shown shown))
                 {
                     shown = Take(LookOf(coin.Value));
@@ -137,7 +171,96 @@ namespace Degunatsu.Runtime.Presentation
                 {
                     face.localRotation = spin;
                 }
+                // 寿命のあるコイン（ドロップ）は、消える前に点滅する。
+                bool visible = coin.ExpireTick - tick > _dropBlinkTicks || Mathf.Repeat(time * 8f, 1f) < 0.6f;
+                hidden += visible ? 0 : 1;
+                foreach (Renderer face in shown.Renderers)
+                {
+                    face.enabled = visible;
+                }
             }
+            BlinkHiddenCount = hidden;
+            UpdatePreview(time);
+            UpdateGauges(field, tick);
+        }
+
+        // 100 枚のコインの予告の間、出る地点に小さな虹色のコインを脈打たせる。
+        private void UpdatePreview(float time)
+        {
+            MatchRules rules = _feed.Rules;
+            int tick = _feed.CurrentTick;
+            int announce = rules != null ? FieldCoinRules.JackpotAnnounceTick(rules) : -1;
+            int spot = rules != null ? FieldCoinRules.JackpotSpot(rules, _feed.CoinSpawns) : -1;
+            if (announce < 0 || spot < 0 || tick < announce || tick > FieldCoinRules.JackpotSpawnTick(rules))
+            {
+                HidePreview();
+                return;
+            }
+            if (_preview == null)
+            {
+                _preview = Take(CoinLook.Rainbow);
+            }
+            _preview.Visual.SetActive(true);
+            System.Numerics.Vector2 position = _feed.CoinSpawns[spot].Position;
+            Transform t = _preview.Visual.transform;
+            t.position = new Vector3(position.X, position.Y, 0f);
+            t.localScale = Vector3.one * (0.4f + 0.1f * Mathf.Sin(time * 6f));
+            Quaternion spin = Quaternion.Euler(0f, time * _spinDegreesPerSecond * 2f, 0f) * Quaternion.Euler(90f, 0f, 0f);
+            foreach (Transform face in _preview.Faces)
+            {
+                face.localRotation = spin;
+            }
+        }
+
+        private void HidePreview()
+        {
+            if (_preview != null)
+            {
+                _preview.Visual.SetActive(false);
+            }
+        }
+
+        // 赤いコインの出現地点: コインがなく、まだ次に出せないなら、次に出るまでの残りをゲージで示す。
+        private void UpdateGauges(CoinField field, int tick)
+        {
+            IReadOnlyList<CoinSpawnPoint> spawns = _feed.CoinSpawns;
+            MatchRules rules = _feed.Rules;
+            int shown = 0;
+            for (int i = 0; spawns != null && rules != null && _respawnGauge != null && i < spawns.Count; i++)
+            {
+                CoinSpawnPoint point = spawns[i];
+                bool red = point.Kind == CoinSpawnKind.Regular && LookOf(point.Value) == CoinLook.Red;
+                int ready = field.SpawnReadyTick(i);
+                bool waiting = red && !_occupied.Contains(i) && tick < ready;
+                if (!waiting)
+                {
+                    if (_gauges.TryGetValue(i, out RingGaugeView idle))
+                    {
+                        idle.Hide();
+                    }
+                    continue;
+                }
+                if (!_gauges.TryGetValue(i, out RingGaugeView gauge))
+                {
+                    gauge = Instantiate(_respawnGauge, transform);
+                    gauge.name = $"RespawnGauge{i}";
+                    gauge.gameObject.SetActive(true);
+                    _gauges.Add(i, gauge);
+                }
+                float fraction = (ready - tick) / (float)Mathf.Max(1, rules.CoinSpawnIntervalTicks);
+                gauge.Show(new Vector3(point.Position.X, point.Position.Y, 0f), fraction);
+                shown++;
+            }
+            RespawnGaugeCount = shown;
+        }
+
+        private void HideGauges()
+        {
+            foreach (RingGaugeView gauge in _gauges.Values)
+            {
+                gauge.Hide();
+            }
+            RespawnGaugeCount = 0;
         }
 
         private Shown Take(CoinLook look)
@@ -151,7 +274,13 @@ namespace Degunatsu.Runtime.Presentation
             else
             {
                 GameObject visual = Instantiate(_templates[(int)look], transform);
-                shown = new Shown { Visual = visual, Look = look, Faces = FacesOf(visual.transform) };
+                Transform[] faces = FacesOf(visual.transform);
+                var renderers = new Renderer[faces.Length];
+                for (int i = 0; i < faces.Length; i++)
+                {
+                    renderers[i] = faces[i].GetComponent<Renderer>();
+                }
+                shown = new Shown { Visual = visual, Look = look, Faces = faces, Renderers = renderers };
             }
             shown.Visual.SetActive(true);
             return shown;

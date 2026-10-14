@@ -100,6 +100,7 @@ namespace Degunatsu.Runtime.Simulation
         string ISimulationFeed.LabelOf(int index) => index == _player ? "PLAYER" : $"DUMMY {index - _player}";
         MatchRules ISimulationFeed.Rules => _world?.Rules;
         CoinField ISimulationFeed.Coins => _world?.Coins.Field;
+        IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => _world != null ? _world.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => _world != null ? _world.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
         Color ISimulationFeed.ColorOf(int index) => index == _player ? new Color(0.95f, 0.55f, 0.2f) : new Color(0.7f, 0.7f, 0.75f);
 

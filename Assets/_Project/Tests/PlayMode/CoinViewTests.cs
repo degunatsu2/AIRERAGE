@@ -78,28 +78,45 @@ namespace Degunatsu.PlayMode.Tests
             Assert.That(looks, Is.EquivalentTo(new[] { CoinLook.Single, CoinLook.Triple, CoinLook.Red }), "1・3・5 枚の見た目がそろっていない");
             Assert.That(CoinView.LookOf(1), Is.EqualTo(CoinLook.Single));
             Assert.That(CoinView.LookOf(3), Is.EqualTo(CoinLook.Triple));
-            Assert.That(CoinView.LookOf(5), Is.EqualTo(CoinLook.Red));
+            Assert.That(CoinView.LookOf(5), Is.EqualTo(CoinLook.Triple));
+            Assert.That(CoinView.LookOf(20), Is.EqualTo(CoinLook.Red));
             Assert.That(CoinView.LookOf(100), Is.EqualTo(CoinLook.Rainbow));
         }
 
         [UnityTest]
-        public IEnumerator Jackpot_AppearsWithOneMinuteLeft_AndIsMarked()
+        public IEnumerator Jackpot_IsAnnouncedWithOneMinuteLeft_ThenAppears_AndIsMarked()
         {
             SceneManager.LoadScene("Sandbox_Online");
             yield return null;
             var runner = Object.FindFirstObjectByType<OnlineRunner>();
             var hud = Object.FindFirstObjectByType<CoinHud>();
             var view = Object.FindFirstObjectByType<CoinView>();
+            var atmosphere = Object.FindFirstObjectByType<MatchAtmosphere>();
+            var audio = Object.FindFirstObjectByType<GameAudio>();
+            Assert.That(atmosphere, Is.Not.Null, "終盤の雰囲気の切り替えがない");
             runner.HostRules.CountdownTicks = 0;
-            // 始まって 0.5 秒で残り 1 分になる長さ。
+            // 始まって 0.5 秒で残り 1 分（予告）になり、その 0.5 秒後に出る。
             runner.HostRules.DurationTicks = runner.HostRules.JackpotTicksBeforeEnd + 30;
+            runner.HostRules.JackpotNoticeTicks = 30;
             runner.TimedMatch = true;
             runner.StartHost(0);
             runner.StartMatch();
             yield return WaitSeconds(0.2f);
-            Assert.That(hud.JackpotPresent, Is.False, "残り 1 分より前に出た");
+            Assert.That(hud.JackpotPresent || hud.JackpotIncoming, Is.False, "残り 1 分より前に予告した");
+            Assert.That(atmosphere.Tense, Is.False);
+            Assert.That(audio.BgmTense, Is.False);
+
+            yield return WaitSeconds(0.45f);
+            Assert.That(hud.JackpotIncoming, Is.True, "残り 1 分で予告しない");
+            Assert.That(hud.JackpotPresent, Is.False, "予告の間に出た");
+            Assert.That(view.PreviewShowing, Is.True, "出る地点を示していない");
+            Assert.That(atmosphere.Tense, Is.True, "終盤の雰囲気にならない");
+            Assert.That(audio.BgmTense, Is.True, "緊張感のある BGM にならない");
+            Assert.That(audio.History.Contains(SoundId.JackpotAlarm), Is.True, "警報が鳴らない");
+            Assert.That(atmosphere.SkyBlend, Is.GreaterThan(0f), "空が赤くならない");
 
             yield return WaitSeconds(0.6f);
+            Assert.That(view.PreviewShowing, Is.False, "出た後も予告の印が残っている");
             FieldCoin jackpot = default;
             int found = 0;
             foreach (FieldCoin coin in runner.Session.World.Coins.Field.Coins)
@@ -123,7 +140,47 @@ namespace Degunatsu.PlayMode.Tests
             bool onScreen = !ScreenEdgeMarker.Locate(Object.FindFirstObjectByType<Camera>(),
                 new Vector3(jackpot.Position.X, jackpot.Position.Y, 0f), 48f, out _, out _);
             Assert.That(hud.JackpotOffscreen, Is.EqualTo(!onScreen), "画面の外かどうかの判定が合わない");
+
+            // 再戦すると、ふつうの BGM に戻る。
+            runner.HostRules.DurationTicks = 0;
+            runner.Restart();
+            yield return WaitSeconds(0.3f);
+            Assert.That(atmosphere.Tense, Is.False, "再戦しても終盤の雰囲気のまま");
+            Assert.That(audio.BgmTense, Is.False);
             runner.Leave();
+        }
+
+        [UnityTest]
+        public IEnumerator PickingUpARedCoin_ShowsItsRespawnGauge()
+        {
+            SceneManager.LoadScene("Sandbox_Combat");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            var view = Object.FindFirstObjectByType<CoinView>();
+            yield return WaitSeconds(0.2f);
+            Assert.That(view.RespawnGaugeCount, Is.EqualTo(0), "赤いコインがあるのにゲージが出ている");
+
+            ISimulationFeed feed = runner;
+            FieldCoin red = default;
+            bool found = false;
+            foreach (FieldCoin coin in feed.Coins.Coins)
+            {
+                if (CoinView.LookOf(coin.Value) == CoinLook.Red)
+                {
+                    red = coin;
+                    found = true;
+                }
+            }
+            Assert.That(found, Is.True, "前提: 赤いコインがある");
+            Assert.That(red.Value, Is.EqualTo(CoinView.RedValue));
+            CharacterState state = runner.PlayerState;
+            state.Position = new System.Numerics.Vector3(red.Position.X, red.Position.Y, 0f);
+            state.Velocity = System.Numerics.Vector3.Zero;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.2f);
+
+            Assert.That(runner.PlayerState.Coins.Held, Is.EqualTo(CoinView.RedValue), "前提: 拾った");
+            Assert.That(view.RespawnGaugeCount, Is.EqualTo(1), "次に出るまでのゲージが出ない");
         }
 
         [UnityTest]

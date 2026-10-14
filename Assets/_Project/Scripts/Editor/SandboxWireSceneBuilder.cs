@@ -392,6 +392,9 @@ namespace Degunatsu.Editor
                 CreateIndicatorLine(jackpot.transform, "Wave", lineMaterial, 0.08f));
             SetReference(view, "_source", source);
             SetReferenceArray(view, "_templates", new Object[] { single, triple, redCoin, jackpot });
+            // 赤いコインの出現地点の、次に出るまでのゲージの見本（文字なし。CoinView が地点ごとに複製する）。
+            RingGaugeView gauge = CreateRingGauge("RespawnGaugeTemplate", view.transform, string.Empty, 0.75f, new Color(1f, 0.3f, 0.25f, 0.8f));
+            SetReference(view, "_respawnGauge", gauge);
 
             var hud = new GameObject("CoinHud").AddComponent<CoinHud>();
             SetReference(hud, "_source", source);
@@ -402,7 +405,7 @@ namespace Degunatsu.Editor
         /// 拠点の候補の地点（BankSpotAuthoring。spots[0] が試合の始まりの拠点）と、拠点の表示（BankView。輪、回る弧、光の柱、
         /// 次の地点の輪）を作る（docs/12 T4-7）。
         /// </summary>
-        internal static void CreateBank(Vector2[] spots, MonoBehaviour source)
+        internal static void CreateBank(Vector2[] spots, MonoBehaviour source, GameAudio audio)
         {
             var root = new GameObject("BankSpots").transform;
             for (int i = 0; i < spots.Length; i++)
@@ -421,6 +424,22 @@ namespace Degunatsu.Editor
             SetReference(view, "_sweep", CreateIndicatorLine(view.transform, "Sweep", material, 0.14f));
             SetReference(view, "_beam", CreateIndicatorLine(view.transform, "Beam", material, 1.6f));
             SetReference(view, "_next", CreateIndicatorLine(view.transform, "Next", material, 0.14f));
+            SetReference(view, "_audio", audio);
+        }
+
+        /// <summary>右上の全員の情報（ScoreboardHud。順位の順に並ぶ札）。</summary>
+        internal static void CreateScoreboard(MonoBehaviour source)
+        {
+            var hud = new GameObject("Scoreboard").AddComponent<ScoreboardHud>();
+            SetReference(hud, "_source", source);
+        }
+
+        /// <summary>試合の終盤の雰囲気（MatchAtmosphere。100 枚のコインの予告から、緊張感のある BGM と赤い空）。</summary>
+        internal static void CreateAtmosphere(MonoBehaviour source, GameAudio audio)
+        {
+            var atmosphere = new GameObject("Atmosphere").AddComponent<MatchAtmosphere>();
+            SetReference(atmosphere, "_source", source);
+            SetReference(atmosphere, "_audio", audio);
         }
 
         // コインの見た目の見本: 空の親の下に、面をカメラに向けたコイン（円柱）を faces の位置に置く。
