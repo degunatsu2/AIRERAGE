@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -24,6 +25,44 @@ namespace Degunatsu.Net
 
         /// <summary>クライアント → ホスト: 自分のプレイヤーネーム（ロビーで。変えるたびに送る）。</summary>
         Hello = 6,
+
+        /// <summary>ホスト → クライアント: ロビーの顔ぶれ（番号ごとに、つながっているかとプレイヤーネーム）。変わるたびに送る。</summary>
+        Lobby = 7,
+    }
+
+    /// <summary>ロビーの1つの番号（待機所の表示に使う）。</summary>
+    public readonly struct LobbySlot : IEquatable<LobbySlot>
+    {
+        public readonly bool Connected;
+
+        /// <summary>プレイヤーネーム（入力がなければ空）。</summary>
+        public readonly string Name;
+
+        public LobbySlot(bool connected, string name)
+        {
+            Connected = connected;
+            Name = name ?? string.Empty;
+        }
+
+        public bool Equals(LobbySlot other)
+        {
+            return Connected == other.Connected && Name == other.Name;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is LobbySlot other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Connected, Name);
+        }
+
+        public override string ToString()
+        {
+            return Connected ? $"[{Name}]" : "[-]";
+        }
     }
 
     /// <summary>
@@ -71,6 +110,46 @@ namespace Degunatsu.Net
         {
             Expect(data, NetKind.Hello, 1);
             return Encoding.UTF8.GetString(data, 1, data.Length - 1);
+        }
+
+        /// <summary>ロビーの顔ぶれ（番号の順。つながっているかと、プレイヤーネームの UTF-8）。</summary>
+        public static byte[] Lobby(IReadOnlyList<LobbySlot> slots)
+        {
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write((byte)NetKind.Lobby);
+                writer.Write((byte)slots.Count);
+                foreach (LobbySlot slot in slots)
+                {
+                    byte[] name = Encoding.UTF8.GetBytes(slot.Name);
+                    writer.Write(slot.Connected);
+                    writer.Write((byte)Math.Min(name.Length, byte.MaxValue));
+                    writer.Write(name, 0, Math.Min(name.Length, byte.MaxValue));
+                }
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        public static LobbySlot[] ReadLobby(byte[] data)
+        {
+            Expect(data, NetKind.Lobby, 2);
+            int count = data[1];
+            var slots = new LobbySlot[count];
+            int offset = 2;
+            for (int i = 0; i < count; i++)
+            {
+                if (offset + 2 > data.Length || offset + 2 + data[offset + 1] > data.Length)
+                {
+                    throw new FormatException($"ロビーのメッセージが途中で切れています（{data.Length} バイト）");
+                }
+                bool connected = data[offset] != 0;
+                int length = data[offset + 1];
+                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + 2, length));
+                offset += 2 + length;
+            }
+            return slots;
         }
 
         /// <summary>試合の開始（人数、試合の番号、調整値とルールの JSON）。同じ人で再戦するときも送る（番号が変わる）。</summary>

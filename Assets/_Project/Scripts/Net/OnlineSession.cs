@@ -24,6 +24,9 @@ namespace Degunatsu.Net
     /// - 開始のメッセージは、クライアントが新しい試合の入力を送ってくる（その試合を始めた）まで、ホストが StartResendSeconds ごとに
     ///   送り直す（送れなかった、届かなかったときに、ホストだけが始まって止まったままにならないように。配布したビルドでの再戦で
     ///   起きた）。クライアントは、今の試合と同じ番号の開始のメッセージは無視する。
+    /// - 待機所（ロビー）: ホストは、番号ごとにつながっているかとプレイヤーネーム（Roster）を、変わるたびに全員へ送る（Lobby）。
+    ///   クライアントも同じ顔ぶれを表示できる。ロビーで抜けた人の番号は空き、試合を始めるときに詰める（番号が変わる人には
+    ///   Welcome を送り直してから Start を送る。確実に届ける経路は順番どおりに届く）。
     /// - 再戦: ホストが RestartMatch を呼ぶと、同じ人で、新しい試合の番号で始め直す。入力とチェックサムのメッセージには
     ///   試合の番号をつけ、今の試合のものだけを使う（前の試合のメッセージが遅れて届いても混ざらない）。
     /// </summary>
@@ -70,6 +73,9 @@ namespace Degunatsu.Net
         private byte[] _startMessage;
         private float _startResendTimer;
         private string _localName = string.Empty;
+
+        // クライアント: ホストから届いたロビーの顔ぶれ（まだ届いていなければ、全員いない）。
+        private LobbySlot[] _clientRoster = EmptyRoster();
 
         // ホスト: ティック → プレイヤーごとのチェックサム（全員の分を比べたら消す）。
         private readonly Dictionary<int, ChecksumRow> _checksums = new Dictionary<int, ChecksumRow>();
@@ -123,6 +129,7 @@ namespace Degunatsu.Net
                 if (IsHost)
                 {
                     _lobbyNames[0] = name;
+                    BroadcastLobby();
                 }
                 else if (LocalPlayer >= 0)
                 {
@@ -164,6 +171,28 @@ namespace Degunatsu.Net
                     count += peer >= 0 ? 1 : 0;
                 }
                 return IsHost ? count + 1 : count;
+            }
+        }
+
+        /// <summary>
+        /// ロビーの顔ぶれ（番号の順に MaxPlayers 個。つながっているかとプレイヤーネーム）。ホストは今の値、クライアントはホストから
+        /// 最後に届いた値（待機所の表示に使う）。
+        /// </summary>
+        public IReadOnlyList<LobbySlot> Roster
+        {
+            get
+            {
+                if (!IsHost)
+                {
+                    return _clientRoster;
+                }
+                var slots = new LobbySlot[MaxPlayers];
+                slots[0] = new LobbySlot(true, _localName);
+                for (int p = 1; p < MaxPlayers; p++)
+                {
+                    slots[p] = new LobbySlot(_playerPeer[p] >= 0, _playerPeer[p] >= 0 ? _lobbyNames[p] : string.Empty);
+                }
+                return slots;
             }
         }
 
@@ -279,7 +308,57 @@ namespace Degunatsu.Net
             {
                 throw new InvalidOperationException("試合を始められるのは、ロビーにいるホストだけです");
             }
+            CloseUpPlayers();
             SendStartAndBegin(LobbyPlayerCount, rules);
+        }
+
+        // ロビーで抜けた人の空いた番号を詰める（番号が 0 から人数 - 1 までになるように）。番号が変わる人には Welcome を送り直す。
+        private void CloseUpPlayers()
+        {
+            int next = 1;
+            for (int p = 1; p < MaxPlayers; p++)
+            {
+                if (_playerPeer[p] < 0)
+                {
+                    continue;
+                }
+                if (p != next)
+                {
+                    _playerPeer[next] = _playerPeer[p];
+                    _lobbyNames[next] = _lobbyNames[p];
+                    _playerPeer[p] = -1;
+                    _lobbyNames[p] = string.Empty;
+                    _link.Send(_playerPeer[next], NetMessages.Welcome(next), reliable: true);
+                }
+                next++;
+            }
+        }
+
+        // ホスト: ロビーの顔ぶれを全員へ送る（ロビーにいる間だけ）。
+        private void BroadcastLobby()
+        {
+            if (!IsHost || State != SessionState.Lobby)
+            {
+                return;
+            }
+            byte[] message = NetMessages.Lobby(Roster);
+            for (int p = 1; p < MaxPlayers; p++)
+            {
+                if (_playerPeer[p] >= 0)
+                {
+                    _link.Send(_playerPeer[p], message, reliable: true);
+                }
+            }
+        }
+
+        private static LobbySlot[] EmptyRoster()
+        {
+            var slots = new LobbySlot[MaxPlayers];
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                slots[p] = new LobbySlot(false, string.Empty);
+            }
+            return slots;
         }
 
         /// <summary>
@@ -609,6 +688,7 @@ namespace Degunatsu.Net
                     _lobbyNames[player] = string.Empty;
                     _link.Send(e.Peer, NetMessages.Welcome(player), reliable: true);
                     Status = $"Hosting on port {Port}: {LobbyPlayerCount} player(s)";
+                    BroadcastLobby();
                     break;
 
                 case TransportLink.EventKind.Disconnected:
@@ -618,6 +698,7 @@ namespace Degunatsu.Net
                         {
                             _playerPeer[p] = -1;
                             _lobbyNames[p] = string.Empty;
+                            BroadcastLobby();
                             if (State == SessionState.Running)
                             {
                                 // 試合中に抜けた人がいたら、試合を終える（残りの人も止まったままにしないよう、接続を切る）。
@@ -667,6 +748,7 @@ namespace Degunatsu.Net
                     if (sender > 0)
                     {
                         _lobbyNames[sender] = SanitizeName(NetMessages.ReadHello(e.Data));
+                        BroadcastLobby();
                     }
                     break;
 
@@ -704,6 +786,14 @@ namespace Degunatsu.Net
                                 _link.Send(0, NetMessages.Hello(_localName), reliable: true);
                             }
                             Status = $"Joined as player {LocalPlayer + 1}. Waiting for the host to start";
+                            break;
+                        case NetKind.Lobby:
+                            LobbySlot[] roster = NetMessages.ReadLobby(e.Data);
+                            _clientRoster = EmptyRoster();
+                            for (int p = 0; p < MaxPlayers && p < roster.Length; p++)
+                            {
+                                _clientRoster[p] = new LobbySlot(roster[p].Connected, SanitizeName(roster[p].Name));
+                            }
                             break;
                         case NetKind.Refused:
                             State = SessionState.Ended;

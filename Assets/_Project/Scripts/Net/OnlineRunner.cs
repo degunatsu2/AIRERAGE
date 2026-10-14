@@ -29,6 +29,8 @@ namespace Degunatsu.Net
     /// 検証のため、自分が送るパケットに遅延と欠落を加えられる（往復の遅延を模擬するには全員で同じ値を選ぶ）。
     /// ステージ（T3-8）: シーンのステージの範囲（KnockoutBounds）、ギミック（StageZoneAuthoring）、出現位置（_spawnPoints）を使う。
     /// 右上の全員の情報（ScoreboardHud）、コンボの表示、効果音などは ISimulationFeed で読ませる。
+    /// ロビーでは、画面の中央に待機所（WaitingRoomPanel。だれがつながっていて、どの番号がまだ空いているか）を、ホストにも
+    /// クライアントにも出す。ホストはその下の「START」で始める。
     /// </summary>
     public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls
     {
@@ -89,6 +91,8 @@ namespace Degunatsu.Net
         private GUIStyle _style;
         private int _delayPreset;
         private int _dropPreset;
+        private WaitingRoomPanel _waitingRoom;
+        private GUIStyle _footer;
 
         /// <summary>今のセッション（始めていなければ null）。</summary>
         public OnlineSession Session => _session;
@@ -249,6 +253,7 @@ namespace Degunatsu.Net
             _session?.Dispose();
             _session = null;
             _input?.Dispose();
+            _waitingRoom?.Dispose();
         }
 
         private void Update()
@@ -428,6 +433,54 @@ namespace Degunatsu.Net
                 DrawSessionPanel(compact);
             }
             GUILayout.EndArea();
+
+            if (_session != null && _session.State == OnlineSession.SessionState.Lobby)
+            {
+                DrawWaitingRoom();
+            }
+        }
+
+        // 待機所: 画面の中央に、番号ごとの札。ホストは下に時間の制限の切り替えと「START」、クライアントは待っている案内。
+        private void DrawWaitingRoom()
+        {
+            if (_waitingRoom == null)
+            {
+                _waitingRoom = new WaitingRoomPanel();
+                _footer = new GUIStyle(GUI.skin.label) { fontSize = 16, alignment = TextAnchor.MiddleCenter };
+                _footer.normal.textColor = Color.white;
+            }
+            const float padding = 18f;
+            float width = WaitingRoomPanel.PlateWidth + padding * 2f;
+            float height = WaitingRoomPanel.Height + 70f + padding * 2f;
+            var box = new Rect((Screen.width - width) * 0.5f, Mathf.Max(10f, (Screen.height - height) * 0.5f), width, height);
+            Color previous = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(box, Texture2D.whiteTexture);
+            GUI.color = previous;
+
+            string subtitle = _session.IsHost
+                ? $"Hosting on port {_session.Port}. Friends join with your address."
+                : "Connected. The host starts the match.";
+            float y = _waitingRoom.Draw(new Vector2(box.x + padding, box.y + padding), _session.Roster, _session.LocalPlayer,
+                index => index < _playerColors.Length ? _playerColors[index] : Color.white, subtitle);
+
+            var footer = new Rect(box.x + padding, y + 4f, WaitingRoomPanel.PlateWidth, 56f);
+            if (_session.IsHost)
+            {
+                int seconds = _match.DurationTicks / SimTime.TicksPerSecond;
+                _timedMatch = GUI.Toggle(new Rect(footer.x, footer.y, footer.width, 20f), _timedMatch,
+                    $" Timed match ({seconds / 60}:{seconds % 60:00}). Off = free play");
+                if (GUI.Button(new Rect(footer.x, footer.y + 24f, footer.width, 32f), "START"))
+                {
+                    StartMatch();
+                    ExitGui();
+                }
+            }
+            else
+            {
+                int dots = 1 + (int)(Time.unscaledTime * 2f) % 3;
+                GuidePlate.DrawText(footer, "Waiting for the host to start" + new string('.', dots), _footer, new Color(1f, 1f, 1f, 0.8f));
+            }
         }
 
         private const string PlayerNameKey = "Degunatsu.PlayerName";
@@ -539,17 +592,6 @@ namespace Degunatsu.Net
             if (_session.State == OnlineSession.SessionState.Lobby)
             {
                 DrawNameField();
-            }
-            if (_session.IsHost && _session.State == OnlineSession.SessionState.Lobby)
-            {
-                GUILayout.Label($"Players: {_session.LobbyPlayerCount} / {OnlineSession.MaxPlayers}", _style);
-                int seconds = _match.DurationTicks / SimTime.TicksPerSecond;
-                _timedMatch = GUILayout.Toggle(_timedMatch, $"Timed match ({seconds / 60}:{seconds % 60:00}). Off = free play");
-                if (GUILayout.Button("Start"))
-                {
-                    StartMatch();
-                    ExitGui();
-                }
             }
 
             RollbackSession rollback = _session.Session;

@@ -349,6 +349,81 @@ namespace Degunatsu.Net.Tests
         }
 
         [Test]
+        public void Lobby_ShowsWhoIsConnected_OnTheHostAndEveryClient()
+        {
+            OnlineSession host = Host();
+            host.LocalName = "Bob";
+            OnlineSession first = Join(host);
+            first.LocalName = "Alice";
+            OnlineSession second = Join(host);
+            PumpUntil(() => first.LocalPlayer >= 0 && second.LocalPlayer >= 0);
+            PumpUntil(() => second.Roster[1].Name == "Alice");
+
+            var expected = new[]
+            {
+                new LobbySlot(true, "Bob"), new LobbySlot(true, "Alice"), new LobbySlot(true, string.Empty), new LobbySlot(false, string.Empty),
+            };
+            Assert.That(host.Roster, Is.EqualTo(expected), "ホストの待機所");
+            Assert.That(first.Roster, Is.EqualTo(expected), "クライアントの待機所");
+            Assert.That(second.Roster, Is.EqualTo(expected), "あとから来たクライアントの待機所");
+
+            // 名前を変えると、全員の待機所に届く。
+            second.LocalName = "Carol";
+            host.LocalName = "Bobby";
+            PumpUntil(() => first.Roster[2].Name == "Carol" && first.Roster[0].Name == "Bobby");
+            Assert.That(second.Roster[0].Name, Is.EqualTo("Bobby"));
+        }
+
+        [Test]
+        public void Lobby_ALeavingPlayer_IsShownAsWaiting_AndTheNumbersCloseUpAtTheStart()
+        {
+            OnlineSession host = Host();
+            OnlineSession leaves = Join(host);
+            PumpUntil(() => leaves.LocalPlayer == 1);
+            OnlineSession first = Join(host);
+            PumpUntil(() => first.LocalPlayer == 2);
+            first.LocalName = "Alice";
+            OnlineSession second = Join(host);
+            PumpUntil(() => second.LocalPlayer == 3);
+            second.LocalName = "Carol";
+            PumpFrames(5);
+
+            leaves.Dispose();
+            _sessions.Remove(leaves);
+            PumpUntil(() => !host.Roster[1].Connected && !first.Roster[1].Connected && !second.Roster[1].Connected);
+            Assert.That(first.Roster[2], Is.EqualTo(new LobbySlot(true, "Alice")), "残った人の表示が変わった");
+            Assert.That(host.LobbyPlayerCount, Is.EqualTo(3));
+
+            // 空いた番号を詰めて始める（3 人で、番号は 0〜2）。
+            host.StartMatch();
+            PumpUntil(() => first.State == OnlineSession.SessionState.Running && second.State == OnlineSession.SessionState.Running);
+            Assert.That(host.PlayerCount, Is.EqualTo(3));
+            Assert.That(first.LocalPlayer, Is.EqualTo(1), "番号が詰まらない");
+            Assert.That(second.LocalPlayer, Is.EqualTo(2));
+            Assert.That(first.PlayerNames, Is.EqualTo(new[] { string.Empty, "Alice", "Carol" }));
+
+            const int ticks = 120;
+            foreach (OnlineSession session in _sessions)
+            {
+                session.TickLimit = ticks;
+            }
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == ticks && s.Session.ConfirmedTick >= ticks - 1));
+            PumpFrames(2);
+            Assert.That(first.World.Checksum(), Is.EqualTo(host.World.Checksum()));
+            Assert.That(second.World.Checksum(), Is.EqualTo(host.World.Checksum()));
+            Assert.That(host.Desyncs, Is.Empty);
+        }
+
+        [Test]
+        public void LobbyMessage_RoundTrips_AndRejectsBrokenData()
+        {
+            var slots = new[] { new LobbySlot(true, "ボブ"), new LobbySlot(false, string.Empty) };
+            byte[] data = NetMessages.Lobby(slots);
+            Assert.That(NetMessages.ReadLobby(data), Is.EqualTo(slots));
+            Assert.Throws<FormatException>(() => NetMessages.ReadLobby(new[] { (byte)NetKind.Lobby, (byte)2, (byte)1, (byte)9 }));
+        }
+
+        [Test]
         public void StartMatch_OnClient_Throws()
         {
             OnlineSession host = Host();
