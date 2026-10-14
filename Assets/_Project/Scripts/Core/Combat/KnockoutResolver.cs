@@ -46,7 +46,7 @@ namespace Degunatsu.Core.Combat
 
         /// <summary>
         /// 出現したときの状態に戻し、復帰を待たせる。撃破の数（撃破された数は +1）、ゲージ、前のティックのボタン、ギミックの数、
-        /// コインを引き継ぐ。
+        /// コイン、まだ払っていないダメージ報酬の元を引き継ぐ。
         /// 無敵は、待つ間と復帰した後の両方の長さにする。
         /// </summary>
         private static CharacterState Respawn(in CharacterState state, in CharacterState spawn, MatchRules rules)
@@ -63,6 +63,9 @@ namespace Degunatsu.Core.Combat
             respawned.BoostRingCount = state.BoostRingCount;
             // コインはここではなくさない（撃破ドロップは CoinDropRules が、台帳を通して落とす。T4-6）。
             respawned.Coins = state.Coins;
+            // 撃破で終わったコンボのダメージ報酬は、このティックの後で CombatRewardRules が払う（T4-5）。
+            respawned.Combat.RewardDamage = state.Combat.RewardDamage;
+            respawned.Combat.RewardAttacker = state.Combat.RewardAttacker;
             return respawned;
         }
     }

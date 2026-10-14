@@ -16,6 +16,8 @@ namespace Degunatsu.Core.Combat
     ///   FatalHitstopMultiplier 倍になり、当たった側の FatalHitCount が増える（表示と効果音。ガードされたら FATAL にならない）。
     ///   最後にダメージを与えた人と時刻、コンボの数とダメージを記録する。HP はない（D-23）。
     ///   コンボは当てた人ごとで、のけぞりが終わるまで続く（別の人が当てると、その人の新しいコンボになる）。
+    ///   コンボのダメージは、ダメージ報酬の元として CombatState.RewardDamage にも積む（docs/12 T4-5）。別の人の新しいコンボに
+    ///   なったら、前のコンボの分を LastEndedCombos に出す（払うのは CombatRewardRules）。
     /// - 当たった側がガード中なら（T3-5。D-21）:
     ///   - ガードを始めてから JustGuardTicks 以内ならジャストガード: 当たった側は吹き飛ばず、すぐに動ける（Free）。ガードの
     ///     クールタイムが戻る（D-39）。攻撃した側は ParriedStunTicks の間のけぞり（隙）、少しだけ斜め上に弾かれる。
@@ -33,6 +35,7 @@ namespace Degunatsu.Core.Combat
         public const int MaxCharacters = 8;
 
         private readonly List<HitRecord> _hits = new List<HitRecord>();
+        private readonly List<ComboEnd> _endedCombos = new List<ComboEnd>();
 
         /// <summary>
         /// 直前の Resolve で当たった命中（当てた順）。表示とデバッグ用で、シミュレーションの状態ではない
@@ -40,10 +43,17 @@ namespace Degunatsu.Core.Combat
         /// </summary>
         public IReadOnlyList<HitRecord> LastHits => _hits;
 
-        /// <summary>LastHits を空にする（命中を決めないティック。試合が終わった後など）。</summary>
+        /// <summary>
+        /// 直前の Resolve で、別の人の新しいコンボに置き換わって終わったコンボ（終わった順。ダメージ報酬に使う。docs/12 T4-5）。
+        /// のけぞりが終わって終わったコンボは、ここには出ない（CombatState.RewardDamage に残る）。
+        /// </summary>
+        public IReadOnlyList<ComboEnd> LastEndedCombos => _endedCombos;
+
+        /// <summary>LastHits と LastEndedCombos を空にする（命中を決めないティック。試合が終わった後など）。</summary>
         public void Clear()
         {
             _hits.Clear();
+            _endedCombos.Clear();
         }
 
         /// <summary>このティックの命中を決めて当てる。tick は進めた後のティック（記録に使う）。</summary>
@@ -54,6 +64,7 @@ namespace Degunatsu.Core.Combat
                 throw new InvalidOperationException($"命中を決められるのは {MaxCharacters} 人まで（{states.Count} 人）");
             }
             _hits.Clear();
+            _endedCombos.Clear();
             for (int a = 0; a < states.Count; a++)
             {
                 CharacterState attacker = states[a];
@@ -94,7 +105,7 @@ namespace Degunatsu.Core.Combat
 
             for (int i = 0; i < _hits.Count; i++)
             {
-                _hits[i] = Apply(states, configs, _hits[i], tick);
+                _hits[i] = Apply(states, configs, _hits[i], tick, _endedCombos);
             }
         }
 
@@ -115,7 +126,8 @@ namespace Degunatsu.Core.Combat
 
         // 判定のデータ、向き、倍率は、集めたときのものを使う（相打ちで、先に当てた命中が攻撃した側をのけぞらせていることがある）。
         // 結果（命中、ガード、ジャストガード）は当てるときに決める（同じティックの先の命中で、当たった側の状態が変わることがある）。
-        private static HitRecord Apply(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, HitRecord hit, int tick)
+        private static HitRecord Apply(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, HitRecord hit, int tick,
+            List<ComboEnd> endedCombos)
         {
             AttackHit data = hit.Data;
             CharacterState victim = states[hit.Victim];
@@ -160,7 +172,7 @@ namespace Degunatsu.Core.Combat
                     Guard(configs[hit.Victim].Combat, ref victim, hit, tick);
                     break;
                 default:
-                    startsCombo = Hit(configs[hit.Victim].Wire, ref victim, hit, tick);
+                    startsCombo = Hit(configs[hit.Victim].Wire, ref victim, hit, tick, endedCombos);
                     break;
             }
             states[hit.Victim] = victim;
@@ -172,8 +184,9 @@ namespace Degunatsu.Core.Combat
             combat.Gauge = Math.Min(tuning.MaxGauge, combat.Gauge + amount);
         }
 
-        // 当てる。新しいコンボの最初の命中なら true（被弾ドロップに使う。docs/12 T4-6）。
-        private static bool Hit(WireTuning wire, ref CharacterState victim, HitRecord hit, int tick)
+        // 当てる。新しいコンボの最初の命中なら true（被弾ドロップに使う。docs/12 T4-6）。前のコンボの払っていないダメージ報酬の元が
+        // 残っていれば、endedCombos に出す（T4-5）。
+        private static bool Hit(WireTuning wire, ref CharacterState victim, HitRecord hit, int tick, List<ComboEnd> endedCombos)
         {
             AttackHit data = hit.Data;
             WireController.Interrupt(ref victim, wire);
@@ -193,6 +206,13 @@ namespace Degunatsu.Core.Combat
             victim.Combat.LastDamagedTick = tick;
             victim.Combat.ComboCount = comboContinues ? victim.Combat.ComboCount + 1 : 1;
             victim.Combat.ComboDamage = (comboContinues ? victim.Combat.ComboDamage : 0) + hit.Damage;
+            bool rewardContinues = comboContinues && victim.Combat.RewardAttacker == hit.Attacker;
+            if (!rewardContinues && victim.Combat.RewardDamage > 0)
+            {
+                endedCombos.Add(new ComboEnd(victim.Combat.RewardAttacker, hit.Victim, victim.Combat.RewardDamage));
+            }
+            victim.Combat.RewardDamage = (rewardContinues ? victim.Combat.RewardDamage : 0) + hit.Damage;
+            victim.Combat.RewardAttacker = (byte)hit.Attacker;
             return !comboContinues;
         }
 
@@ -228,6 +248,29 @@ namespace Degunatsu.Core.Combat
             attacker.Velocity = new Vector3(away * combat.ParriedPushbackX, combat.ParriedPushbackY, 0f);
             attacker.JumpBufferTicksLeft = 0;
             states[hit.Attacker] = attacker;
+        }
+    }
+
+    /// <summary>終わったコンボ1つ（HitResolver.LastEndedCombos。ダメージ報酬の元。docs/12 T4-5）。</summary>
+    public readonly struct ComboEnd
+    {
+        /// <summary>コンボを当てていた人（ダメージ報酬を受け取る）。</summary>
+        public readonly int Attacker;
+        public readonly int Victim;
+
+        /// <summary>コンボのダメージの合計。</summary>
+        public readonly int Damage;
+
+        public ComboEnd(int attacker, int victim, int damage)
+        {
+            Attacker = attacker;
+            Victim = victim;
+            Damage = damage;
+        }
+
+        public override string ToString()
+        {
+            return $"P{Attacker}->P{Victim} {Damage}";
         }
     }
 
@@ -292,7 +335,7 @@ namespace Degunatsu.Core.Combat
         /// <summary>当たった側の吹き飛びの速度（m/s、X は右が正）。</summary>
         public Vector2 Knockback => new Vector2(Data.KnockbackX * Facing, Data.KnockbackY) * KnockbackScale;
 
-        /// <summary>威力（ダメージ。撃破技は倍率をかけて四捨五入）。コインへの変換は Phase 4。</summary>
+        /// <summary>威力（ダメージ。撃破技は倍率をかけて四捨五入）。コンボが終わったときに、ダメージ報酬になる（docs/12 T4-5）。</summary>
         public int Damage => (int)MathF.Round(Data.Damage * KnockbackScale);
 
         /// <summary>FATAL として当たったか。</summary>

@@ -118,7 +118,9 @@ namespace Degunatsu.Core.Tests.Economy
             }
             Assert.That(hits, Is.GreaterThan(0), "前提: 地上技の二段目が当たった");
             Assert.That(world.GetState(1).Coins.Held, Is.EqualTo(45), "同じコンボで、もう一度落とした（か、戦っていた人が拾った）");
-            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(0), "攻撃した人が、すぐ近くに落ちたコインを拾った");
+            // 攻撃した人の所持は、コンボが終わったときのダメージ報酬（T4-5）だけ。
+            int reward = CombatRewardRules.DamageRewardAmount(world.Rules, world.GetState(1).Combat.ComboDamage);
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(reward), "攻撃した人が、すぐ近くに落ちたコインを拾った");
         }
 
         [Test]

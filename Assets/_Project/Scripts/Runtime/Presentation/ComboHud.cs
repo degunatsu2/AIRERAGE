@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Degunatsu.Core.Combat;
+using Degunatsu.Core.Economy;
 using Degunatsu.Core.Simulation;
 using Degunatsu.Runtime.Simulation;
 using UnityEngine;
@@ -9,7 +10,7 @@ namespace Degunatsu.Runtime.Presentation
     /// <summary>
     /// 操作するキャラクターのコンボの表示（ユーザーの指示、2026-10-13。docs/11_combat_plan.md T3-7）。
     /// - 相手ごとに 1 つ。同時に最大 3 つ（画面の左に縦に並べる）。2 ヒット以上つながったら出す。
-    /// - 大きな数字でコンボの数と、コンボ中に攻撃で得たコイン（今は威力の合計【仮】。コインは Phase 4）を出し、
+    /// - 大きな数字でコンボの数と、コンボが終わったときにもらえるダメージ報酬（docs/12 T4-5。コンボのダメージの 30%）を出し、
     ///   その下に、相手ののけぞりが終わるまでの残りをゲージで示す（格闘ゲームでよくある表示）。
     /// - コンボが切れたら（相手ののけぞりが終わったら）、最後の数を少しの間残して消す。
     /// オフライン（SimulationRunner。相手はダミー）とオンライン（OnlineRunner。相手はほかのプレイヤー）のどちらでも使う
@@ -83,7 +84,7 @@ namespace Degunatsu.Runtime.Presentation
                         _entries.Insert(0, entry);
                     }
                     entry.Count = c.ComboCount;
-                    entry.Coins = c.ComboDamage;
+                    entry.Coins = CombatRewardRules.DamageRewardAmount(_feed.Rules, c.ComboDamage);
                     entry.HitstunLeft = target.Action.Duration > 0
                         ? Mathf.Clamp01((float)(target.Action.Duration - target.Action.Ticks) / target.Action.Duration)
                         : 0f;

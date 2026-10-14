@@ -81,6 +81,21 @@ namespace Degunatsu.Core.Match
         /// <summary>ドロップしたコインの寿命（ティック。10 秒）【仮】。過ぎると消える。</summary>
         public int DropLifetimeTicks = 600;
 
+        /// <summary>
+        /// ダメージ報酬（docs/12 T4-5。ユーザーの決定、2026-10-14）: コンボが終わったときに、そのコンボのダメージのこの割合（%。端数は
+        /// 切り捨て、少なくとも 1 枚）を、当てた人の所持コインに加える【仮】。0 なら払わない。同じ相手からの上限と減衰はない。
+        /// </summary>
+        public int DamageRewardPercent = 30;
+
+        /// <summary>撃破報酬（T4-5）: 撃破した人の所持コインに加える、基本の枚数【仮】。自滅（手柄なし）では払わない。</summary>
+        public int KoRewardBase = 20;
+
+        /// <summary>撃破報酬の上乗せ: 撃破した相手が、撃破した人より 1 つ上の順位（確定コイン）にいるごとに加える枚数【仮】。</summary>
+        public int KoRewardPerRank = 10;
+
+        /// <summary>撃破報酬の上乗せの上限（枚）【仮】。4 人なら、最下位が首位を撃破すると 20 + 30 = 50 枚。同じ相手への減りはない。</summary>
+        public int KoRewardMaxBonus = 30;
+
         /// <summary>拠点（バンク。docs/12 T4-7）が次の地点へ移る間隔（ティック。40 秒）【仮】。試合が始まってから数える。</summary>
         public int BankMoveIntervalTicks = 2400;
 
@@ -164,6 +179,10 @@ namespace Degunatsu.Core.Match
             v.NonNegative(nameof(LateGameTicks), LateGameTicks);
             v.Positive(nameof(LateGameSpawnIntervalTicks), LateGameSpawnIntervalTicks);
             v.NonNegative(nameof(KoDropInset), KoDropInset);
+            v.InRange(nameof(DamageRewardPercent), DamageRewardPercent, 0f, 1000f);
+            v.NonNegative(nameof(KoRewardBase), KoRewardBase);
+            v.NonNegative(nameof(KoRewardPerRank), KoRewardPerRank);
+            v.NonNegative(nameof(KoRewardMaxBonus), KoRewardMaxBonus);
             v.Positive(nameof(BankMoveIntervalTicks), BankMoveIntervalTicks);
             v.NonNegative(nameof(BankNoticeTicks), BankNoticeTicks);
             v.Positive(nameof(BankRadius), BankRadius);

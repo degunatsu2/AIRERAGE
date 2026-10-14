@@ -168,7 +168,7 @@ namespace Degunatsu.Core.Simulation
         /// <summary>
         /// 1ティック進める。inputs はキャラクターの番号順で、数が一致しなければ ArgumentException。
         /// 全員を進めた後に、攻撃の命中を決めて当て（HitResolver）、ステージの外に出たキャラクターを撃破にする（KnockoutResolver）。
-        /// 被弾と撃破でコインを落とす（CoinDropRules。docs/12 T4-6）。
+        /// 被弾と撃破でコインを落とし（CoinDropRules。docs/12 T4-6）、終わったコンボと撃破の報酬を払う（CombatRewardRules。T4-5）。
         /// 最後に、フィールドのコインの出現・拾得・消滅を決め（FieldCoinRules。docs/12 T4-4）、拠点に触れている人の所持コインを
         /// 確定する（BankRules。T4-7）。
         /// 試合の段階（Phase）がカウントダウンの間は入力を無視し、終わった後は全員を止める（ティック数だけ進める）。
@@ -209,6 +209,7 @@ namespace Degunatsu.Core.Simulation
                 KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts);
                 CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, CoinSpawns, Rules, Tick);
             }
+            CombatRewardRules.Step(Coins, _states, _hits.LastEndedCombos, _knockouts, Rules, Tick);
             bool active = phase == MatchPhase.Playing || phase == MatchPhase.Overtime;
             FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, active);
             if (phase == MatchPhase.Overtime)
