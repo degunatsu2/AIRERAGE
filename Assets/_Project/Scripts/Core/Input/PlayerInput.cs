@@ -13,6 +13,15 @@ namespace Airerage.Core.Input
 
         /// <summary>ガード（Shift ／ ゲームパッドの B。D-35）。</summary>
         Guard = 1 << 3,
+
+        /// <summary>特殊攻撃 1（Q ／ ゲームパッドの Y【仮】。D-53、D-56）。</summary>
+        Special1 = 1 << 4,
+
+        /// <summary>特殊攻撃 2（E ／ ゲームパッドの LT【仮】）。</summary>
+        Special2 = 1 << 5,
+
+        /// <summary>必殺技（R ／ ゲームパッドの右スティックの押し込み【仮】）。</summary>
+        Super = 1 << 6,
     }
 
     /// <summary>

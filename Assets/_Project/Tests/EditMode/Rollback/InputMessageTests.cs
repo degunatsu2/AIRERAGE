@@ -32,6 +32,17 @@ namespace Airerage.Core.Tests.Rollback
         }
 
         [Test]
+        public void Bytes_KeepTheSpecialAndSuperButtons()
+        {
+            // 特殊攻撃 2 つと必殺技のボタン（D-53。T5-1）も、送ったとおりに届く。
+            InputButtons buttons = InputButtons.Special1 | InputButtons.Special2 | InputButtons.Super | InputButtons.Jump;
+            var inputs = new[] { PlayerInput.FromAxes(-1f, 0.5f, buttons) };
+            InputMessage read = InputMessage.FromBytes(new InputMessage(0, 10, 0, 9, 8, inputs).ToBytes());
+
+            Assert.That(read.Inputs[0].Buttons, Is.EqualTo(buttons));
+        }
+
+        [Test]
         public void Bytes_WithoutInputs_RoundTrip()
         {
             InputMessage read = InputMessage.FromBytes(new InputMessage(0, 0, 0, -1, 2, new PlayerInput[0]).ToBytes());
