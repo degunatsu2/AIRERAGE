@@ -78,6 +78,9 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>残り 10 秒の、1 秒ごとの短い音（ユーザーの選択、2026-10-14）。</summary>
         CountdownTick,
+
+        /// <summary>100 枚のコインを取った（派手な獲得音。ユーザーの要望、2026-10-15）。</summary>
+        JackpotGet,
     }
 
     /// <summary>
@@ -329,6 +332,29 @@ namespace Airerage.Runtime.Audio
                     b = new float[Samples(0.15f, r)];
                     AddTone(b, r, 0f, 0.1f, 1760f, 1760f, Wave.Square, 0.25f, 0.002f, 0.05f);
                     AddTone(b, r, 0f, 0.1f, 880f, 880f, Wave.Sine, 0.2f, 0.002f, 0.06f);
+                    break;
+                case SoundId.JackpotGet:
+                    // 2 オクターブを駆け上がるアルペジオ、明るい和音の伸ばし、たくさんのコインのきらめき。
+                    b = new float[Samples(2f, r)];
+                    int[] climb = { 72, 76, 79, 84, 88, 91, 96, 100 };
+                    for (int i = 0; i < climb.Length; i++)
+                    {
+                        float f = NoteFrequency(climb[i]);
+                        AddTone(b, r, i * 0.05f, 0.18f, f, f, Wave.Pulse25, 0.2f, 0.002f, 0.08f);
+                        AddTone(b, r, i * 0.05f, 0.18f, f * 0.5f, f * 0.5f, Wave.Triangle, 0.2f, 0.002f, 0.08f);
+                    }
+                    int[] shine = { 84, 88, 91, 96 };
+                    foreach (int note in shine)
+                    {
+                        float f = NoteFrequency(note);
+                        AddTone(b, r, 0.42f, 1.4f, f, f, Wave.Square, 0.12f, 0.01f, 0.9f);
+                        AddTone(b, r, 0.42f, 1.4f, f * 1.003f, f * 1.003f, Wave.Triangle, 0.18f, 0.01f, 0.9f);
+                    }
+                    for (int i = 0; i < 10; i++)
+                    {
+                        float f = NoteFrequency(98 + (i * 5) % 12);
+                        AddTone(b, r, 0.45f + i * 0.09f, 0.25f, f, f, Wave.Sine, 0.14f, 0.001f, 0.1f);
+                    }
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

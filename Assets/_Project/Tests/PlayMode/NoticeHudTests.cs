@@ -137,5 +137,57 @@ namespace Airerage.PlayMode.Tests
                 Object.Destroy(root);
             }
         }
+
+        [UnityTest]
+        public IEnumerator TakingTheJackpot_MakesTheTakersPlateGlowRainbow_ThenReturnsToNormal()
+        {
+            // 100 枚のコインが、立っているキャラクター 0 の上に出て、そのまま拾われる（予告 1 秒、出るまで 0.5 秒）。
+            var rules = new MatchRules
+            {
+                CountdownTicks = 0,
+                DurationTicks = 900,
+                JackpotTicksBeforeEnd = 840,
+                JackpotNoticeTicks = 30,
+                BankMoveIntervalTicks = 100000,
+            };
+            var terrain = new BoxTerrain().AddBox(-30f, -1f, 30f, 0f);
+            var spawns = new[] { new CoinSpawnPoint(new System.Numerics.Vector2(0f, 1f), 100, CoinSpawnKind.Jackpot) };
+            var world = new SimWorld(terrain, null, null, rules, spawns);
+            world.AddCharacter(new CharacterConfig(), new System.Numerics.Vector3(0f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new System.Numerics.Vector3(-8f, GroundY, 0f));
+
+            var root = new GameObject("JackpotCelebrationTest");
+            root.SetActive(false);
+            var feed = root.AddComponent<TestFeed>();
+            feed.World = world;
+            var board = root.AddComponent<ScoreboardHud>();
+            typeof(ScoreboardHud).GetField("_source", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(board, feed);
+            root.SetActive(true);
+            try
+            {
+                while (world.Tick < 120)
+                {
+                    yield return null;
+                }
+                yield return null;
+                Assert.That(world.GetState(0).Coins.Held, Is.GreaterThanOrEqualTo(100), "前提: キャラクター 0 が 100 枚のコインを拾った");
+                Assert.That(board.JackpotCelebrations, Is.EqualTo(1), "取ったことを見つけない");
+                Assert.That(board.IsCelebrating(0), Is.True, "取った人の札が光らない");
+                Assert.That(board.IsCelebrating(1), Is.False, "取っていない人の札が光った");
+                Assert.That(board.LookOf(0).Jackpot, Is.GreaterThan(0f));
+
+                float start = Time.time;
+                while (Time.time - start < 3.2f)
+                {
+                    yield return null;
+                }
+                Assert.That(board.IsCelebrating(0), Is.False, "演出の後に、ふつうの札に戻らない");
+                Assert.That(board.LookOf(0).Jackpot, Is.EqualTo(0f));
+            }
+            finally
+            {
+                Object.Destroy(root);
+            }
+        }
     }
 }

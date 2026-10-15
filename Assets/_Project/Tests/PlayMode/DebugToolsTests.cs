@@ -81,6 +81,12 @@ namespace Airerage.PlayMode.Tests
             Assert.That(zoom.TargetDistance, Is.EqualTo(zoom.MaxDistance));
             yield return WaitSeconds(1f);
             Assert.That(composer.CameraDistance, Is.EqualTo(zoom.MaxDistance).Within(0.1f), "カメラが離れない");
+
+            // ホイールの押し込み・LB と RB の同時押しで、初期の距離に戻る。
+            Assert.That(zoom.DefaultDistance, Is.EqualTo(30f).Within(0.01f), "初期の距離が違う");
+            zoom.ResetZoom();
+            yield return WaitSeconds(1f);
+            Assert.That(composer.CameraDistance, Is.EqualTo(zoom.DefaultDistance).Within(0.1f), "初期の距離に戻らない");
         }
 
         private static IEnumerator WaitSeconds(float seconds)

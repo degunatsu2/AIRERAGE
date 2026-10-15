@@ -100,6 +100,8 @@ namespace Airerage.PlayMode.Tests
             // 始まって 0.5 秒で残り 1 分（予告）になり、その 0.5 秒後に出る。
             runner.HostRules.DurationTicks = runner.HostRules.JackpotTicksBeforeEnd + 30;
             runner.HostRules.JackpotNoticeTicks = 30;
+            // 試合のはじめから COIN RUSH（終盤）にして、コインが光るのを確かめる。
+            runner.HostRules.LateGameTicks = runner.HostRules.DurationTicks;
             runner.TimedMatch = true;
             runner.StartHost(0);
             runner.StartMatch();
@@ -110,6 +112,7 @@ namespace Airerage.PlayMode.Tests
 
             yield return WaitSeconds(0.45f);
             Assert.That(hud.JackpotIncoming, Is.True, "残り 1 分で予告しない");
+            Assert.That(view.RushGlowing, Is.True, "COIN RUSH なのにコインが光らない");
             Assert.That(hud.JackpotPresent, Is.False, "予告の間に出た");
             Assert.That(view.PreviewShowing, Is.True, "出る地点を示していない");
             Assert.That(atmosphere.Tense, Is.True, "終盤の雰囲気にならない");

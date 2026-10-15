@@ -64,6 +64,15 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
+        /// <summary>虹色の縁と斜めの線だけを描く（色は time で移り変わる）。</summary>
+        public void DrawRainbowFrame(Rect rect, float time, float alpha = 1f)
+        {
+            Color previous = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.DrawTexture(rect, RainbowFrame(time));
+            GUI.color = previous;
+        }
+
         /// <summary>背景（左は少し薄い黒、右は半透明の黒）。</summary>
         public void DrawBackground(Rect rect, float alpha = 1f)
         {

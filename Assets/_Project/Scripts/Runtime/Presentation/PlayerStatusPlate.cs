@@ -42,6 +42,9 @@ namespace Airerage.Runtime.Presentation
 
             /// <summary>暗くしたときに右の部分に重ねる文字（なければ null）。</summary>
             public string Overlay;
+
+            /// <summary>100 枚のコインを取ったときの虹色の光の強さ（0〜1）。縁が虹色になり、右に「JACKPOT!」。</summary>
+            public float Jackpot;
         }
 
         public PlayerStatusPlate(int width, int height, float fontScale = 1f, int crackSeed = 7)
@@ -129,6 +132,21 @@ namespace Airerage.Runtime.Presentation
             if (look.Flash > 0f)
             {
                 _plate.DrawFill(rect, new Color(1f, 1f, 1f, 0.85f * look.Flash));
+            }
+            if (look.Jackpot > 0f)
+            {
+                // 虹色に光る（中が虹色に脈打ち、縁が虹色になり、右の部分に「JACKPOT!」。ユーザーの要望、2026-10-15）。
+                float time = Time.time;
+                Color hue = Color.HSVToRGB(Mathf.Repeat(time / 0.9f, 1f), 0.7f, 1f);
+                _plate.DrawFill(rect, new Color(hue.r, hue.g, hue.b, (0.25f + 0.2f * Mathf.Sin(time * 14f)) * look.Jackpot));
+                _plate.DrawRainbowFrame(rect, time, look.Jackpot);
+                Rect jackpotArea = _plate.RightRect(rect);
+                GUI.color = new Color(0f, 0f, 0f, 0.6f * look.Jackpot);
+                GUI.DrawTexture(new Rect(jackpotArea.x, jackpotArea.y + jackpotArea.height * 0.15f, jackpotArea.width, jackpotArea.height * 0.7f), Texture2D.whiteTexture);
+                GUI.color = previous;
+                Color text = Color.HSVToRGB(Mathf.Repeat(time / 0.9f + 0.5f, 1f), 0.45f, 1f);
+                text.a = look.Jackpot;
+                GuidePlate.DrawText(jackpotArea, "JACKPOT!", _overlay, text);
             }
             GUI.color = previous;
         }

@@ -34,6 +34,9 @@ namespace Airerage.Runtime.Presentation
         public const int RainbowValue = 100;
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
+        private const int HaloSegments = 24;
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+
         [SerializeField] private MonoBehaviour _source;
         [Tooltip("見た目の見本（CoinLook の順: 1 枚、3 枚、5 枚、100 枚）。シーンでは隠しておく")]
         [SerializeField] private GameObject[] _templates = new GameObject[0];
@@ -49,6 +52,7 @@ namespace Airerage.Runtime.Presentation
 
         private static readonly int LookCount = System.Enum.GetValues(typeof(CoinLook)).Length;
 
+        private MaterialPropertyBlock _block;
         private readonly Dictionary<int, Shown> _shown = new Dictionary<int, Shown>();
         private readonly List<int> _gone = new List<int>();
         private readonly Dictionary<int, RingGaugeView> _gauges = new Dictionary<int, RingGaugeView>();
@@ -66,10 +70,16 @@ namespace Airerage.Runtime.Presentation
             public CoinLook Look;
             public Transform[] Faces;
             public Renderer[] Renderers;
+            public Color[] BaseColors;
+            public LineRenderer RushHalo;
+            public bool Glowing;
             public float BornAt;
             public bool Flies;
             public Vector3 FlyFrom;
         }
+
+        /// <summary>COIN RUSH（終盤）で、コインを光らせているか（テスト用）。</summary>
+        public bool RushGlowing { get; private set; }
 
         /// <summary>次に出るまでのゲージを出している出現地点の数（テスト用）。</summary>
         public int RespawnGaugeCount { get; private set; }
@@ -154,6 +164,10 @@ namespace Airerage.Runtime.Presentation
             float time = Time.time;
             int tick = _feed.CurrentTick;
             int hidden = 0;
+            // COIN RUSH（残り 30 秒から試合の終わりまで）は、コインが脈打って光り、周りに金色の輪が出る（ユーザーの要望、2026-10-15）。
+            MatchRules rules = _feed.Rules;
+            MatchPhase phase = rules != null ? MatchFlow.PhaseAt(rules, _feed.Match, tick) : MatchPhase.Countdown;
+            RushGlowing = rules != null && (phase == MatchPhase.Overtime || (phase == MatchPhase.Playing && MatchFlow.IsLateGame(rules, tick)));
             _occupied.Clear();
             foreach (FieldCoin coin in field.Coins)
             {
@@ -191,10 +205,58 @@ namespace Airerage.Runtime.Presentation
                 {
                     face.enabled = visible;
                 }
+                Glow(shown, coin, RushGlowing && visible && shown.Look != CoinLook.Rainbow, time, pop);
             }
             BlinkHiddenCount = hidden;
             UpdatePreview(time);
             UpdateGauges(field, tick);
+        }
+
+        // COIN RUSH の光: 面の色を白へ寄せて脈打たせ、少し大きくし、周りに金色の輪を出す。光らないときは元に戻す。
+        private void Glow(Shown shown, FieldCoin coin, bool glow, float time, float pop)
+        {
+            if (!glow)
+            {
+                if (shown.Glowing)
+                {
+                    shown.Glowing = false;
+                    foreach (Renderer face in shown.Renderers)
+                    {
+                        face.SetPropertyBlock(null);
+                    }
+                    if (shown.RushHalo != null)
+                    {
+                        shown.RushHalo.enabled = false;
+                    }
+                }
+                return;
+            }
+            shown.Glowing = true;
+            float pulse = 0.5f + 0.5f * Mathf.Sin(time * 7f + coin.Id);
+            Transform t = shown.Visual.transform;
+            t.localScale = Vector3.one * pop * (1f + 0.15f * pulse);
+            _block ??= new MaterialPropertyBlock();
+            for (int i = 0; i < shown.Renderers.Length; i++)
+            {
+                _block.SetColor(BaseColorId, Color.Lerp(shown.BaseColors[i], Color.white, 0.25f + 0.45f * pulse));
+                shown.Renderers[i].SetPropertyBlock(_block);
+            }
+            if (shown.RushHalo != null)
+            {
+                LineRenderer halo = shown.RushHalo;
+                halo.enabled = true;
+                halo.loop = true;
+                halo.positionCount = HaloSegments;
+                float radius = (0.55f + 0.2f * pulse) * pop;
+                for (int i = 0; i < HaloSegments; i++)
+                {
+                    float angle = i * Mathf.PI * 2f / HaloSegments;
+                    halo.SetPosition(i, t.position + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, 0f));
+                }
+                Color color = new Color(1f, 0.9f, 0.4f, 0.35f + 0.5f * pulse);
+                halo.startColor = color;
+                halo.endColor = color;
+            }
         }
 
         // 被弾ドロップを落とした位置: 同じときに落ちたコイン（同じ拾えるティック）の真ん中から、並べ方の平均のずれを引く。
@@ -312,7 +374,26 @@ namespace Airerage.Runtime.Presentation
                 {
                     renderers[i] = faces[i].GetComponent<Renderer>();
                 }
-                shown = new Shown { Visual = visual, Look = look, Faces = faces, Renderers = renderers };
+                var baseColors = new Color[faces.Length];
+                for (int i = 0; i < faces.Length; i++)
+                {
+                    Material material = renderers[i].sharedMaterial;
+                    baseColors[i] = material != null && material.HasProperty(BaseColorId) ? material.GetColor(BaseColorId) : Color.white;
+                }
+                Transform halo = visual.transform.Find("RushHalo");
+                shown = new Shown
+                {
+                    Visual = visual,
+                    Look = look,
+                    Faces = faces,
+                    Renderers = renderers,
+                    BaseColors = baseColors,
+                    RushHalo = halo != null ? halo.GetComponent<LineRenderer>() : null,
+                };
+                if (shown.RushHalo != null)
+                {
+                    shown.RushHalo.enabled = false;
+                }
             }
             shown.Visual.SetActive(true);
             return shown;

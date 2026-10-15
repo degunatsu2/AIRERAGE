@@ -169,6 +169,15 @@
 | 置き換えたもの | 画面中央の「BANK MOVES IN n」（`BankView`）、「JACKPOT INCOMING」「100 COINS IN n」「JACKPOT 100」（`CoinHud`）、タイマーの下の「LAST 30 SECONDS! COIN RUSH」（`MatchHud`）。ステージの中の表示（拠点の「MOVE n」「NEXT n」、出る地点の「100 IN n」）と音（呼び鈴、警報）は今までどおり |
 | 決まり方 | 出来事の時刻はティック数とルールだけから決まる（`BankRules`、`FieldCoinRules`、`MatchRules`）。巻き戻しでもずれない。動き（出る、消える、帯）は表示の時間（Time.time） |
 
+### 3.12 4 回目の要望（2026-10-15）
+
+| 項目 | 内容 |
+|---|---|
+| 100 枚のコインを取ったとき | 派手な獲得音（`SoundId.JackpotGet`。2 オクターブ駆け上がって和音ときらめき）。右上の表の、取った人の札が虹色に光り（中が虹色に脈打ち、縁と斜めの線が虹色）、右に「JACKPOT!」。3 秒でふつうの札に戻る（`ScoreboardHud`、`PlayerStatusPlate.Look.Jackpot`）。取った人は、100 枚のコインがあった（またはその間に出た）のに消え、確定＋所持が 100 枚以上増えた人 |
+| COIN RUSH の間のコイン | 残り 30 秒から試合の終わり（アディショナルタイムを含む）まで、コインが脈打って白く光り、少し大きくなり、周りに金色の輪が出る（`CoinView.RushGlowing`。100 枚のコインは今までどおり虹色） |
+| カメラ | 初期の距離を 22 → 30m に（`SandboxWireSceneBuilder.CameraDistance`）。マウスのホイールの押し込み、ゲームパッドの LB と RB の同時押しで初期の距離に戻る（入力の「Camera」マップの `ResetZoom`、`CameraZoom.ResetZoom`） |
+| アンカーポイント | 丸だとコインと見分けにくいので、菱形（立方体を 45° 回したもの。対角線 約 0.85m）に |
+
 ## 4. 決まったことと、確認したいこと
 
 ユーザーの決定（2026-10-13）:

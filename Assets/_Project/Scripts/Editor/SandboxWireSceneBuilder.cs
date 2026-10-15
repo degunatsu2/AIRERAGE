@@ -133,7 +133,8 @@ namespace Airerage.Editor
         // 視野角 40°・距離 22m で、縦 約16m × 横 約28m（16:9）が映る（ワイヤーの最大長 12m が収まる）。
         // デッドゾーンは使わない（止まったときのキャラクターの画面上の位置が、毎回同じ中央になるように）。
         private const float CameraFieldOfView = 40f;
-        private const float CameraDistance = 22f;
+        // 初期のカメラの距離（m）。近すぎて毎回ズームアウトしていたので 22 から遠くした（ユーザーの要望、2026-10-15）。
+        private const float CameraDistance = 30f;
         private const float CameraDamping = 0.3f;    // 秒
 
         [MenuItem("Airerage/Sandbox_Wire シーンを作り直す")]
@@ -257,10 +258,12 @@ namespace Airerage.Editor
             var anchorRoot = new GameObject("AnchorPoints").transform;
             foreach (Vector2 point in anchorPoints)
             {
-                // 見た目の大きさ（直径 0.8m。0.5m から少し大きくした。ユーザーの要望、2026-10-14）。判定は WireTuning.AimAssistRadius。
-                GameObject go = CreateVisual(PrimitiveType.Sphere, "AnchorPoint", anchorMaterial, Vector3.one * 0.8f);
+                // 菱形（立方体を 45° 回す。丸だとコインと見分けにくかった。ユーザーの要望、2026-10-15）。対角線は約 0.85m。
+                // 判定は WireTuning.AimAssistRadius。
+                GameObject go = CreateVisual(PrimitiveType.Cube, "AnchorPoint", anchorMaterial, new Vector3(0.6f, 0.6f, 0.3f));
                 go.transform.SetParent(anchorRoot, false);
                 go.transform.localPosition = new Vector3(point.x, point.y, 0f);
+                go.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
                 go.AddComponent<WireAnchorPoint>();
             }
         }
@@ -395,6 +398,11 @@ namespace Airerage.Editor
             GameObject redCoin = CreateCoinTemplate("CoinRed", view.transform, red, 0.75f, new[] { Vector2.zero });
             GameObject jackpot = CreateCoinTemplate("CoinRainbow", view.transform, rainbow, 1.1f, new[] { Vector2.zero });
             var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            // COIN RUSH のときにコインの周りに出す金色の輪（CoinView が名前で探して使う。ふだんは出さない）。
+            foreach (GameObject template in new[] { single, triple, redCoin })
+            {
+                CreateIndicatorLine(template.transform, "RushHalo", lineMaterial, 0.07f).enabled = false;
+            }
             jackpot.AddComponent<RainbowCoinGlow>().Configure(
                 jackpot.GetComponentsInChildren<MeshRenderer>(),
                 CreateIndicatorLine(jackpot.transform, "Halo", lineMaterial, 0.14f),
@@ -455,10 +463,11 @@ namespace Airerage.Editor
         }
 
         /// <summary>右上の全員の情報（ScoreboardHud。順位の順に並ぶ札）。</summary>
-        internal static void CreateScoreboard(MonoBehaviour source)
+        internal static void CreateScoreboard(MonoBehaviour source, GameAudio audio)
         {
             var hud = new GameObject("Scoreboard").AddComponent<ScoreboardHud>();
             SetReference(hud, "_source", source);
+            SetReference(hud, "_audio", audio);
         }
 
         /// <summary>試合の終盤の雰囲気（MatchAtmosphere。100 枚のコインの予告から、緊張感のある BGM と赤い空）。</summary>

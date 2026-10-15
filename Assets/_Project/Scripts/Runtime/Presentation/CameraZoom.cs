@@ -7,7 +7,9 @@ namespace Airerage.Runtime.Presentation
     /// <summary>
     /// カメラのズーム（ユーザーの要望。2026-10-12）。マウスホイールとゲームパッドの LB / RB で、追従カメラの距離を変える。
     /// 距離は下限と上限の間に制限し、なめらかに近づける。表示だけの機能で、シミュレーションには影響しない。
-    /// アクションは AirerageControls.inputactions の "Camera" マップ（ScrollZoom / HoldZoom）。
+    /// 初期の距離（シーンで置いた距離）へは、マウスのホイールの押し込みか、ゲームパッドの LB と RB の同時押しで戻る（ResetZoom。
+    /// ユーザーの要望、2026-10-15）。
+    /// アクションは AirerageControls.inputactions の "Camera" マップ（ScrollZoom / HoldZoom / ResetZoom）。
     /// </summary>
     public sealed class CameraZoom : MonoBehaviour
     {
@@ -30,9 +32,13 @@ namespace Airerage.Runtime.Presentation
         private InputActionMap _map;
         private InputAction _scroll;
         private InputAction _hold;
+        private InputAction _reset;
 
         /// <summary>目標の距離（m）。実際の距離はこれになめらかに近づく。</summary>
         public float TargetDistance { get; private set; }
+
+        /// <summary>初期の距離（m。ResetZoom で戻る）。</summary>
+        public float DefaultDistance { get; private set; }
 
         public float MinDistance => _minDistance;
         public float MaxDistance => _maxDistance;
@@ -54,7 +60,9 @@ namespace Airerage.Runtime.Presentation
             _map = _inputActions.FindActionMap(MapName, throwIfNotFound: true);
             _scroll = _map.FindAction("ScrollZoom", throwIfNotFound: true);
             _hold = _map.FindAction("HoldZoom", throwIfNotFound: true);
-            TargetDistance = Mathf.Clamp(_composer.CameraDistance, _minDistance, _maxDistance);
+            _reset = _map.FindAction("ResetZoom", throwIfNotFound: true);
+            DefaultDistance = Mathf.Clamp(_composer.CameraDistance, _minDistance, _maxDistance);
+            TargetDistance = DefaultDistance;
         }
 
         private void OnEnable()
@@ -74,9 +82,19 @@ namespace Airerage.Runtime.Presentation
             // LB で離れ、RB で近づく。
             float hold = _hold.ReadValue<float>();
             ZoomIn(scroll * _scrollStep + hold * _holdSpeed * Time.unscaledDeltaTime);
+            if (_reset.WasPressedThisFrame())
+            {
+                ResetZoom();
+            }
 
             float t = 1f - Mathf.Exp(-_sharpness * Time.unscaledDeltaTime);
             _composer.CameraDistance = Mathf.Lerp(_composer.CameraDistance, TargetDistance, t);
+        }
+
+        /// <summary>目標の距離を初期の距離に戻す。</summary>
+        public void ResetZoom()
+        {
+            TargetDistance = DefaultDistance;
         }
 
         /// <summary>目標の距離を amount（m）だけ近づける（負なら離す）。下限と上限で止まる。</summary>

@@ -171,7 +171,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner, guides);
             SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio, guides);
             SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
-            SandboxWireSceneBuilder.CreateScoreboard(runner);
+            SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));
