@@ -29,7 +29,8 @@ namespace Airerage.Core.Combat
     ///   ガード硬直の間はできない（CancelFromTick）。キャンセルしてもガードは終わったことになり、クールタイムが始まる。
     /// - 攻撃中・のけぞり中・ガード中の移動・ジャンプ・ワイヤーの入力は無視する（ControlInput）。攻撃のデータが決める動きは ApplyMotion。
     /// - 特殊攻撃と必殺技（docs/13 T5-2、T5-3。D-53、D-55）: 出し方とキャンセルは通常攻撃と同じ（先行入力、ワイヤー→技、
-    ///   ガード→技、当たったときの攻撃→技・技→攻撃。攻撃→攻撃の 1 回に数える。地上技→空中の攻撃のように数えない例外はない）。
+    ///   ガード→技、当たったときの攻撃→技・技→攻撃）。ただし、攻撃（技を含む）→特殊攻撃・必殺技のキャンセルは、攻撃→攻撃の
+    ///   1 回とは別枠で、数えず、1 回を使った後でもできる（当たったときだけ。ユーザーの要望、2026-10-15）。技→通常攻撃は 1 回に数える。
     ///   地上でも空中でも同じ技。違うのは使う条件だけ: 特殊攻撃はそれぞれのクールタイム（使い始めたときから数える）が 0 のとき、
     ///   必殺技はゲージが SuperGaugeCost 以上のとき（出したときに減る）。条件を満たさない間は出ず、先行入力の間に満たせば出る。
     ///   同じティックに複数を押したら、必殺技 → 特殊攻撃 2 → 特殊攻撃 1 → 通常攻撃 の順に優先する【仮】。
@@ -348,7 +349,10 @@ namespace Airerage.Core.Combat
             {
                 return;
             }
-            if (state.Action.Attack == AttackSlot.Ground && !state.Grounded && !CombatTuning.IsSpecial(next))
+            // 特殊攻撃と必殺技へのキャンセルは、攻撃→攻撃の 1 回とは別枠（数えず、使った後でもできる。ユーザーの要望、2026-10-15）。
+            // 回数はそれぞれのクールタイムとゲージで限られる。地上技→空中の攻撃も数えない（D-42）。
+            bool groundToAir = state.Action.Attack == AttackSlot.Ground && !state.Grounded;
+            if (CombatTuning.IsSpecial(next) || groundToAir)
             {
                 StartAttack(ref state, next, combat);
                 return;

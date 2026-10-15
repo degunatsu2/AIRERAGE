@@ -342,6 +342,7 @@ namespace Airerage.Core.Combat
 
         /// <summary>
         /// 必殺技（デフォルトのキャラクター。docs/13 T5-3 の仮の技）: その場で止まってためた後、体の周りを大きく吹き飛ばす。
+        /// ダメージは 60（ユーザーの要望、2026-10-15。15 では低かった）。
         /// </summary>
         public AttackData Super = new AttackData
         {
@@ -353,7 +354,7 @@ namespace Airerage.Core.Combat
                 new AttackHit
                 {
                     StartTick = 18, ActiveTicks = 8, OffsetX = 0f, HalfWidth = 4.5f, HalfHeight = 4.5f,
-                    Damage = 15, HitstopTicks = 24, HitstunTicks = 40, KnockbackX = 16f, KnockbackY = 12f,
+                    Damage = 60, HitstopTicks = 24, HitstunTicks = 40, KnockbackX = 16f, KnockbackY = 12f,
                 },
             },
             Motions = new[]
@@ -362,8 +363,11 @@ namespace Airerage.Core.Combat
             },
         };
 
-        /// <summary>必殺技に使うゲージ（D-55: 100）。出したときに減る。</summary>
-        public int SuperGaugeCost = 100;
+        /// <summary>
+        /// 必殺技に使うゲージ（0.1% 単位。D-55: 100%）。出したときに減る。キャラクターごとに変える（ユーザーの要望、2026-10-15。
+        /// 最大の 100% 以下）。
+        /// </summary>
+        public int SuperGaugeCost = 1000;
 
         /// <summary>撃破技にする攻撃（キャラクターごとに1つ。D-38）。</summary>
         public AttackSlot KoAttack = AttackSlot.AirDown;
@@ -427,23 +431,35 @@ namespace Airerage.Core.Combat
         public float ParriedPushbackX = 4f;
         public float ParriedPushbackY = 6f;
 
-        /// <summary>ゲージの最大（docs/01_game_design.md 6.7）。使い道は必殺技だけ（D-55、D-57）。</summary>
-        public int MaxGauge = 100;
+        /// <summary>ゲージ 1% あたりの値（ゲージは 0.1% 単位の整数。％で小数第 1 位まで表示する。ユーザーの要望、2026-10-15）。</summary>
+        public const int GaugePerPercent = 10;
 
-        /// <summary>攻撃が当たったときに、当てた側が得るゲージ（大）。必殺技が当たったときは得ない【仮】。【仮】</summary>
-        public int GaugeOnHit = 8;
+        /// <summary>
+        /// ゲージの最大（0.1% 単位で 100%。docs/01_game_design.md 6.7）。どのキャラクターも同じ（ユーザーの指示、2026-10-15）。
+        /// 使い道は必殺技だけ（D-55、D-57）。
+        /// </summary>
+        public const int MaxGauge = 100 * GaugePerPercent;
 
-        /// <summary>攻撃がふつうのガードをされたときに、攻撃した側が得るゲージ。【仮】</summary>
-        public int GaugeOnGuarded = 3;
+        /// <summary>攻撃が当たったときに、当てた側が得るゲージ（大。8%）。必殺技が当たったときは得ない【仮】。【仮】</summary>
+        public int GaugeOnHit = 80;
 
-        /// <summary>攻撃を受けた（のけぞった）ときに得るゲージ（小）。【仮】</summary>
-        public int GaugeOnDamaged = 4;
+        /// <summary>攻撃がふつうのガードをされたときに、攻撃した側が得るゲージ（3%）。【仮】</summary>
+        public int GaugeOnGuarded = 30;
 
-        /// <summary>攻撃をふつうのガードで受けたときに得るゲージ。【仮】</summary>
-        public int GaugeOnGuard = 2;
+        /// <summary>攻撃を受けた（のけぞった）ときに得るゲージ（小。4%）。【仮】</summary>
+        public int GaugeOnDamaged = 40;
 
-        /// <summary>ジャストガードに成功したときに得るゲージ（大。D-21）。【仮】</summary>
-        public int GaugeOnJustGuard = 20;
+        /// <summary>攻撃をふつうのガードで受けたときに得るゲージ（2%）。【仮】</summary>
+        public int GaugeOnGuard = 20;
+
+        /// <summary>ジャストガードに成功したときに得るゲージ（大。20%。D-21）。【仮】</summary>
+        public int GaugeOnJustGuard = 200;
+
+        /// <summary>
+        /// コインを拾ったときに、コインの価値 1 枚あたり得るゲージ（0.2%。価値の高いコインはその枚数分。ユーザーの要望、2026-10-15）。
+        /// 拾ったとき（フィールドのコインとドロップ）だけで、戦闘の報酬や拠点での確定では得ない。
+        /// </summary>
+        public int GaugePerCoin = 2;
 
         public AttackData Get(AttackSlot slot)
         {
@@ -476,6 +492,12 @@ namespace Airerage.Core.Combat
                 case AttackSlot.Special2: return Special2CooldownTicks;
                 default: return 0;
             }
+        }
+
+        /// <summary>ゲージを amount だけ増やす（最大 MaxGauge）。</summary>
+        public static void AddGauge(ref CombatState combat, int amount)
+        {
+            combat.Gauge = Math.Min(MaxGauge, combat.Gauge + amount);
         }
 
         /// <summary>撃破技の倍率（吹き飛びと威力。打つ直前の速さ speed から）。</summary>
@@ -520,12 +542,12 @@ namespace Airerage.Core.Combat
             v.InRange(nameof(GuardKnockbackScale), GuardKnockbackScale, 0f, 1f);
             v.NonNegative(nameof(ParriedStunTicks), ParriedStunTicks);
             v.NonNegative(nameof(ParriedPushbackX), ParriedPushbackX);
-            v.Positive(nameof(MaxGauge), MaxGauge);
             v.NonNegative(nameof(GaugeOnHit), GaugeOnHit);
             v.NonNegative(nameof(GaugeOnGuarded), GaugeOnGuarded);
             v.NonNegative(nameof(GaugeOnDamaged), GaugeOnDamaged);
             v.NonNegative(nameof(GaugeOnGuard), GaugeOnGuard);
             v.NonNegative(nameof(GaugeOnJustGuard), GaugeOnJustGuard);
+            v.NonNegative(nameof(GaugePerCoin), GaugePerCoin);
             return v;
         }
     }

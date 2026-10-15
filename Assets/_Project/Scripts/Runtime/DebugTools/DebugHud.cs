@@ -2,6 +2,7 @@ using System.Text;
 using Airerage.Core.Combat;
 using Airerage.Core.Simulation;
 using Airerage.Core.Wire;
+using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
 using SimInput = Airerage.Core.Input.PlayerInput;
@@ -79,7 +80,7 @@ namespace Airerage.Runtime.DebugTools
             WireState w = s.Wire;
 
             _text.Clear();
-            _text.Append("Debug  Tab: type  F1: speed  F2: step  F7: walk ").Append(_runner.DummiesWalk ? "on" : "off")
+            _text.Append("Debug  Tab: type  F1: speed  F2: step  F3: ").Append(_runner.PlayerCharacter.DisplayName).Append("  F7: walk ").Append(_runner.DummiesWalk ? "on" : "off")
                 .Append("  F8: attack ").Append(_runner.DummiesAttack ? "on" : "off").Append("  F9: BGM").Append('\n');
             _text.Append("Type ").Append(WireTypeLabels.Long(tuning.ModelType))
                 .Append("   Speed ").Append(_runner.SpeedScale > 0f ? "x" + _runner.SpeedScale.ToString("0.##") : "PAUSED")
@@ -148,7 +149,7 @@ namespace Airerage.Runtime.DebugTools
             CombatState c = s.Combat;
             _text.Append("Guard ").Append(c.GuardCooldownTicksLeft > 0 ? "cooldown " + c.GuardCooldownTicksLeft + "t" : "ready")
                 .Append("  Parry ").Append(c.JustGuardCount).Append("  Guarded ").Append(c.GuardedCount)
-                .Append("  Gauge ").Append(c.Gauge).Append('/').Append(_runner.PlayerConfig.Combat.MaxGauge);
+                .Append("  Gauge ").Append(SkillHud.PercentText(c.Gauge));
         }
 
         // 最後に当てた攻撃の吹き飛び（倍率をかけた後の速度）と威力（今はダメージの値。コインへの変換は Phase 4）。

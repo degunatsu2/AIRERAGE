@@ -581,6 +581,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "CycleCharacter",
+                    "type": "Button",
+                    "id": "4c51a7fa-dad7-4d18-acb3-513075aae6ce",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -680,6 +689,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "ToggleBgm",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5a82ec52-4443-42b0-9cf5-6c84ca560fae",
+                    "path": "<Keyboard>/f3",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "CycleCharacter",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

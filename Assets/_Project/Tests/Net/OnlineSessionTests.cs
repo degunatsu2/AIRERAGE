@@ -312,6 +312,49 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
+        public void EachPlayer_UsesTheCharacterTheyPicked_AndStaysInSync()
+        {
+            // キャラクターの選択（docs/13 T5-5）: ロビーで選んだ番号をホストへ送り、ホストが開始のメッセージで各自の調整値を全員へ送る。
+            const int ticks = 240;
+            var standard = new CharacterConfig();
+            var fast = new CharacterConfig();
+            fast.Movement.RunSpeed = 11f;
+            fast.Combat.SuperGaugeCost = 500;
+            OnlineSession host = OnlineSession.Host(0, new OnlineStage(_terrain, new[] { SpawnBase }), new[] { standard, fast },
+                new RollbackSettings());
+            _sessions.Add(host);
+            host.LocalCharacter = 1;
+            OnlineSession first = Join(host);
+            first.LocalCharacter = 1;
+            OnlineSession second = Join(host);
+            second.LocalCharacter = 5;
+            PumpUntil(() => first.LocalPlayer >= 0 && second.LocalPlayer >= 0);
+            PumpUntil(() => first.Roster[1].Character == 1 && first.Roster[0].Character == 1);
+            Assert.That(host.Roster[2].Character, Is.Zero, "選べない番号は 0 になる");
+
+            host.StartMatch();
+            PumpUntil(() => _sessions.TrueForAll(s => s.State == OnlineSession.SessionState.Running));
+            foreach (OnlineSession session in _sessions)
+            {
+                Assert.That(session.PlayerCharacters, Is.EqualTo(new[] { 1, 1, 0 }), $"プレイヤー {session.LocalPlayer} のキャラクターの表");
+                Assert.That(session.World.GetConfig(0).Movement.RunSpeed, Is.EqualTo(11f));
+                Assert.That(session.World.GetConfig(1).Movement.RunSpeed, Is.EqualTo(11f));
+                Assert.That(session.World.GetConfig(2).Movement.RunSpeed, Is.EqualTo(8f));
+                Assert.That(session.World.GetConfig(1).Combat.SuperGaugeCost, Is.EqualTo(500));
+                session.TickLimit = ticks;
+            }
+
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == ticks && s.Session.ConfirmedTick >= ticks - 1));
+            PumpFrames(2);
+            ulong expected = host.World.Checksum();
+            foreach (OnlineSession session in _sessions)
+            {
+                Assert.That(session.World.Checksum(), Is.EqualTo(expected), $"プレイヤー {session.LocalPlayer} の状態が違う");
+            }
+            Assert.That(host.Desyncs, Is.Empty);
+        }
+
+        [Test]
         public void ClientsReceiveTheMatchRules()
         {
             OnlineSession host = Host();

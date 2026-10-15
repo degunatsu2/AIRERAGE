@@ -27,6 +27,7 @@ namespace Airerage.Editor
     {
         public const string ScenePath = "Assets/_Project/Scenes/Sandbox_Wire.unity";
         public const string CharacterConfigPath = "Assets/_Project/Data/Characters/DefaultCharacter.asset";
+        public const string CharacterRosterPath = "Assets/_Project/Data/Characters/CharacterRoster.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
@@ -200,6 +201,7 @@ namespace Airerage.Editor
 
             var runner = new GameObject("Simulation").AddComponent<SimulationRunner>();
             SetReference(runner, "_character", character);
+            SetReference(runner, "_roster", LoadOrCreateCharacterRoster(character));
             SetReference(runner, "_inputActions", inputActions);
             SetReference(runner, "_spawnPoint", spawn);
             SetReference(runner, "_characterView", characterView);
@@ -359,6 +361,7 @@ namespace Airerage.Editor
             var hud = root.AddComponent<SkillHud>();
             SetReference(hud, "_source", source);
             SetReference(hud, "_audio", audio);
+            SetReference(hud, "_camera", Object.FindFirstObjectByType<Camera>());
             var flash = root.AddComponent<SuperFlashHud>();
             SetReference(flash, "_source", source);
             SetReference(flash, "_camera", Object.FindFirstObjectByType<Camera>());
@@ -768,6 +771,25 @@ namespace Airerage.Editor
             asset = ScriptableObject.CreateInstance<CharacterConfigAsset>();
             AssetDatabase.CreateAsset(asset, CharacterConfigPath);
             return asset;
+        }
+
+        /// <summary>
+        /// 選べるキャラクターの一覧（docs/13 T5-5）。なければ、character だけの一覧を作る。あれば、そのまま使う（キャラクターを足したら、
+        /// このアセットに加える）。
+        /// </summary>
+        internal static CharacterRoster LoadOrCreateCharacterRoster(CharacterConfigAsset character)
+        {
+            var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
+            if (roster != null)
+            {
+                return roster;
+            }
+            EnsureFolder(Path.GetDirectoryName(CharacterRosterPath));
+            roster = ScriptableObject.CreateInstance<CharacterRoster>();
+            roster.Configure(new[] { character });
+            AssetDatabase.CreateAsset(roster, CharacterRosterPath);
+            AssetDatabase.SaveAssets();
+            return roster;
         }
 
         internal static Material LoadOrCreateMaterial(string name, Color color, bool unlit = false)

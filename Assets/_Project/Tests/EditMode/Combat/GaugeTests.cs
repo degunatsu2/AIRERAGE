@@ -78,7 +78,7 @@ namespace Airerage.Core.Tests.Combat
             world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f), 1);
             world.AddCharacter(new CharacterConfig(), new Vector3(1.6f, GroundY, 0f), -1);
             CharacterState attacker = world.GetState(0);
-            attacker.Combat.Gauge = Combat.MaxGauge - 1;
+            attacker.Combat.Gauge = CombatTuning.MaxGauge - 1;
             world.SetState(0, attacker);
             world.Step(new PlayerInput[2]);
             world.Step(new[] { Attack, default });
@@ -87,7 +87,7 @@ namespace Airerage.Core.Tests.Combat
                 world.Step(new PlayerInput[2]);
             }
 
-            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(Combat.MaxGauge));
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(CombatTuning.MaxGauge));
         }
 
         [Test]

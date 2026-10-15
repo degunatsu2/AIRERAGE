@@ -5,6 +5,7 @@ using Airerage.Core.Combat;
 using Airerage.Core.Input;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
 using NUnit.Framework;
@@ -65,6 +66,11 @@ namespace Airerage.PlayMode.Tests
             yield return WaitSeconds(0.2f);
             Assert.That(slot.Ready, Is.True);
             Assert.That(slot.ReadyCount, Is.EqualTo(1), "使えるようになったことを示さない");
+            Assert.That(hud.HeadNoticeCount, Is.EqualTo(1), "頭上の通知が出ない");
+            Assert.That(hud.HeadNotices.Count, Is.EqualTo(1));
+            Assert.That(hud.HeadNotices[0].Text, Is.EqualTo(runner.PlayerConfig.Combat.Special1.Name), "頭上の通知が技の名前でない");
+            yield return WaitSeconds(SkillHud.HeadNoticeSeconds + 0.1f);
+            Assert.That(hud.HeadNotices, Is.Empty, "頭上の通知が消えない");
             Assert.That(audio.History.Contains(SoundId.SkillReady), Is.True, "使えるようになった音が鳴らない");
         }
 
@@ -82,16 +88,41 @@ namespace Airerage.PlayMode.Tests
 
             SkillHud.Slot slot = hud.SlotOf(2);
             Assert.That(slot.Ready, Is.False, "ゲージ 0 で使える");
-            Assert.That(slot.Text, Is.EqualTo("0"));
+            Assert.That(slot.Text, Is.EqualTo("0.0%"), "ゲージは％で小数第 1 位まで");
+            Assert.That(slot.Line, Is.EqualTo(runner.PlayerConfig.Combat.SuperGaugeCost / (float)CombatTuning.MaxGauge),
+                "必殺技を出せる量の位置に線がない");
+
+            // 必殺技に必要な量はキャラクターごと。半分（50%）なら、半分たまったところで使える。
+            int cost = runner.PlayerConfig.Combat.SuperGaugeCost;
+            runner.PlayerConfig.Combat.SuperGaugeCost = CombatTuning.MaxGauge / 2;
+            try
+            {
+                CharacterState half = runner.PlayerState;
+                half.Combat.Gauge = CombatTuning.MaxGauge / 2 + 3;
+                runner.SetPlayerState(half);
+                yield return WaitSeconds(0.1f);
+                Assert.That(slot.Line, Is.EqualTo(0.5f));
+                Assert.That(slot.Ready, Is.True, "必要な量があるのに使えない");
+                Assert.That(slot.Text, Is.EqualTo("50.3%"));
+                half.Combat.Gauge = 0;
+                runner.SetPlayerState(half);
+                yield return WaitSeconds(0.1f);
+            }
+            finally
+            {
+                runner.PlayerConfig.Combat.SuperGaugeCost = cost;
+            }
+            int readyBefore = slot.ReadyCount;
 
             CharacterState state = runner.PlayerState;
-            state.Combat.Gauge = runner.PlayerConfig.Combat.MaxGauge;
+            state.Combat.Gauge = CombatTuning.MaxGauge;
             runner.SetPlayerState(state);
             yield return WaitSeconds(0.1f);
             Assert.That(slot.Ready, Is.True);
-            Assert.That(slot.Text, Is.EqualTo("READY!"));
+            Assert.That(slot.Text, Is.EqualTo("100.0%"));
+            Assert.That(slot.Label, Is.EqualTo("READY!"));
             Assert.That(slot.Fill, Is.EqualTo(1f));
-            Assert.That(slot.ReadyCount, Is.EqualTo(1));
+            Assert.That(slot.ReadyCount, Is.EqualTo(readyBefore + 1));
 
             var inputs = new List<SimInput> { new SimInput(0, 0, InputButtons.Super) };
             for (int i = 0; i < 10; i++)
@@ -118,6 +149,31 @@ namespace Airerage.PlayMode.Tests
 
             yield return WaitSeconds(1f);
             Assert.That(flash.IsFlashing, Is.False, "暗転が終わらない");
+        }
+
+        [Test]
+        public void PercentText_ShowsOneDecimalPlace()
+        {
+            Assert.That(SkillHud.PercentText(0), Is.EqualTo("0.0%"));
+            Assert.That(SkillHud.PercentText(643), Is.EqualTo("64.3%"));
+            Assert.That(SkillHud.PercentText(CombatTuning.MaxGauge), Is.EqualTo("100.0%"));
+            Assert.That(SkillHud.PercentText(2), Is.EqualTo("0.2%"), "コイン 1 枚の分");
+        }
+
+        [UnityTest]
+        public IEnumerator Feed_KnowsTheCharacter_AndF3CyclesThroughTheRoster()
+        {
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            ISimulationFeed feed = runner;
+            Assert.That(feed.CharacterOf(0), Is.SameAs(runner.PlayerCharacter));
+            Assert.That(runner.PlayerCharacter.DisplayName, Is.Not.Empty);
+            // 一覧にキャラクターが 1 体しかない間は、切り替えても同じキャラクター（出現位置に戻る）。
+            CharacterConfigAsset next = runner.CycleCharacter();
+            Assert.That(next, Is.Not.Null);
+            Assert.That(runner.PlayerConfig, Is.SameAs(next.Config));
+            Assert.That(((ISimulationFeed)runner).GetConfig(0), Is.SameAs(next.Config), "シミュレーションの調整値が切り替わらない");
         }
 
         private static IEnumerator WaitSeconds(float seconds)

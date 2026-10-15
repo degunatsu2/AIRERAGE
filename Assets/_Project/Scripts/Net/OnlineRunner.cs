@@ -34,7 +34,10 @@ namespace Airerage.Net
     /// </summary>
     public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls
     {
+        [Tooltip("一覧がないときのキャラクター")]
         [SerializeField] private CharacterConfigAsset _character;
+        [Tooltip("ロビーで選べるキャラクターの一覧（番号の順。全員が同じビルドのこと。なければ _character だけ。docs/13 T5-5）")]
+        [SerializeField] private CharacterRoster _roster;
         [SerializeField] private InputActionAsset _inputActions;
         [Tooltip("試合の前にカメラを向ける位置。_spawnPoints がなければ、ここを中心に横に並べて出す")]
         [SerializeField] private Transform _spawnPoint;
@@ -110,6 +113,8 @@ namespace Airerage.Net
         int ISimulationFeed.LocalCharacter => Running ? _session.LocalPlayer : -1;
         CharacterState ISimulationFeed.GetState(int index) => _session.World.GetState(index);
         CharacterConfig ISimulationFeed.GetConfig(int index) => _session.World.GetConfig(index);
+        CharacterConfigAsset ISimulationFeed.CharacterOf(int index) => CharacterAsset(
+            Running && index >= 0 && index < _session.PlayerCharacters.Count ? _session.PlayerCharacters[index] : 0);
         string ISimulationFeed.LabelOf(int index) => LabelOf(index);
         int ISimulationFeed.CurrentTick => Running ? _session.World.Tick : 0;
         MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
@@ -122,7 +127,12 @@ namespace Airerage.Net
         /// <summary>ホストとして待ち受ける（port が 0 なら空いているポート）。失敗したら false で、理由を画面に出す。</summary>
         public bool StartHost(ushort port)
         {
-            return Open(() => OnlineSession.Host(port, _stage, _character.Config, _rollback));
+            var configs = new List<CharacterConfig>();
+            for (int i = 0; i < CharacterCount; i++)
+            {
+                configs.Add(CharacterAsset(i).Config);
+            }
+            return Open(() => OnlineSession.Host(port, _stage, configs, _rollback));
         }
 
         /// <summary>address:port のホストに参加する。失敗したら false で、理由を画面に出す。</summary>
@@ -210,6 +220,7 @@ namespace Airerage.Net
             {
                 _playerName = OnlineSession.SanitizeName(PlayerPrefs.GetString(PlayerNameKey, string.Empty));
             }
+            _localCharacter = Mathf.Clamp(PlayerPrefs.GetInt(CharacterKey, 0), 0, CharacterCount - 1);
             if (_characterViews.Length < OnlineSession.MaxPlayers || _wireViews.Length < OnlineSession.MaxPlayers)
             {
                 Debug.LogError($"{name}: キャラクターとワイヤーの表示が {OnlineSession.MaxPlayers} 人分ありません", this);
@@ -265,7 +276,7 @@ namespace Airerage.Net
             if (_session.State == OnlineSession.SessionState.Running)
             {
                 // 試合の前に押したボタンを、最初のティックに持ち込まない。
-                _input.Poll(_camera, _character.Config.Wire.AimDeadzone);
+                _input.Poll(_camera, _session.World.GetConfig(_session.LocalPlayer).Wire.AimDeadzone);
             }
             _session.Update(Time.deltaTime, ConsumeLocalInput);
             UpdateSmoothing(Time.deltaTime);
@@ -340,6 +351,7 @@ namespace Airerage.Net
             {
                 _session = open();
                 _session.LocalName = _playerName;
+                _session.LocalCharacter = _localCharacter;
                 _message = string.Empty;
                 return true;
             }
@@ -451,7 +463,7 @@ namespace Airerage.Net
             }
             const float padding = 18f;
             float width = WaitingRoomPanel.PlateWidth + padding * 2f;
-            float height = WaitingRoomPanel.Height + 70f + padding * 2f;
+            float height = WaitingRoomPanel.Height + 70f + CharacterRowHeight + padding * 2f;
             var box = new Rect((Screen.width - width) * 0.5f, Mathf.Max(10f, (Screen.height - height) * 0.5f), width, height);
             Color previous = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, 0.55f);
@@ -462,7 +474,22 @@ namespace Airerage.Net
                 ? $"Hosting on port {_session.Port}. Friends join with your address."
                 : "Connected. The host starts the match.";
             float y = _waitingRoom.Draw(new Vector2(box.x + padding, box.y + padding), _session.Roster, _session.LocalPlayer,
-                index => index < _playerColors.Length ? _playerColors[index] : Color.white, subtitle);
+                index => index < _playerColors.Length ? _playerColors[index] : Color.white, subtitle,
+                character => CharacterAsset(character).DisplayName);
+
+            // 自分のキャラクターの選択（◀ ▶ で一覧を回る。docs/13 T5-5）。
+            var row = new Rect(box.x + padding, y + 2f, WaitingRoomPanel.PlateWidth, CharacterRowHeight - 6f);
+            if (GUI.Button(new Rect(row.x, row.y, 40f, row.height), "<"))
+            {
+                LocalCharacter = (_localCharacter + CharacterCount - 1) % CharacterCount;
+            }
+            if (GUI.Button(new Rect(row.xMax - 40f, row.y, 40f, row.height), ">"))
+            {
+                LocalCharacter = (_localCharacter + 1) % CharacterCount;
+            }
+            GuidePlate.DrawText(new Rect(row.x + 44f, row.y, row.width - 88f, row.height),
+                $"CHARACTER: {CharacterAsset(_localCharacter).DisplayName}", _footer, Color.white);
+            y += CharacterRowHeight;
 
             var footer = new Rect(box.x + padding, y + 4f, WaitingRoomPanel.PlateWidth, 56f);
             if (_session.IsHost)
@@ -484,6 +511,34 @@ namespace Airerage.Net
         }
 
         private const string PlayerNameKey = "Airerage.PlayerName";
+        private const string CharacterKey = "Airerage.Character";
+        private const float CharacterRowHeight = 38f;
+
+        private int _localCharacter;
+
+        /// <summary>選べるキャラクターの数（一覧がなければ 1）。</summary>
+        public int CharacterCount => _roster != null && _roster.Count > 0 ? _roster.Count : 1;
+
+        /// <summary>番号のキャラクターのアセット（一覧がなければ _character）。</summary>
+        public CharacterConfigAsset CharacterAsset(int index)
+        {
+            return _roster != null && _roster.Count > 0 ? _roster.Get(index) : _character;
+        }
+
+        /// <summary>自分が選んだキャラクターの番号（ロビーで ◀ ▶。覚えておき、セッションにも渡す。テスト用にも公開）。</summary>
+        public int LocalCharacter
+        {
+            get => _localCharacter;
+            set
+            {
+                _localCharacter = Mathf.Clamp(value, 0, CharacterCount - 1);
+                PlayerPrefs.SetInt(CharacterKey, _localCharacter);
+                if (_session != null)
+                {
+                    _session.LocalCharacter = _localCharacter;
+                }
+            }
+        }
 
         /// <summary>表示用の名前（入力したプレイヤーネーム。なければ P1〜P4）。</summary>
         public string LabelOf(int index)

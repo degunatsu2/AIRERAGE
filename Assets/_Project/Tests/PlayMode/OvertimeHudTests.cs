@@ -7,6 +7,7 @@ using Airerage.Core.Input;
 using Airerage.Core.Match;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
 using NUnit.Framework;
@@ -30,6 +31,7 @@ namespace Airerage.PlayMode.Tests
             public int LocalCharacter => 0;
             public CharacterState GetState(int index) => World.GetState(index);
             public CharacterConfig GetConfig(int index) => World.GetConfig(index);
+            public CharacterConfigAsset CharacterOf(int index) => null;
             public string LabelOf(int index) => $"P{index + 1}";
             public Color ColorOf(int index) => Color.white;
             public int CurrentTick => World.Tick;

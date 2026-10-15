@@ -151,14 +151,14 @@ namespace Airerage.Core.Combat
             attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, hitstop);
             if (hit.Attack != AttackSlot.Super)
             {
-                AddGauge(ref attacker.Combat, attackerCombat,
+                CombatTuning.AddGauge(ref attacker.Combat,
                     result == HitResult.Hit ? attackerCombat.GaugeOnHit : result == HitResult.Guarded ? attackerCombat.GaugeOnGuarded : 0);
             }
             states[hit.Attacker] = attacker;
 
             victim = states[hit.Victim];
             CombatTuning victimCombat = configs[hit.Victim].Combat;
-            AddGauge(ref victim.Combat, victimCombat,
+            CombatTuning.AddGauge(ref victim.Combat,
                 result == HitResult.Hit ? victimCombat.GaugeOnDamaged
                 : result == HitResult.Guarded ? victimCombat.GaugeOnGuard : victimCombat.GaugeOnJustGuard);
             victim.Combat.HitstopTicksLeft = Math.Max(victim.Combat.HitstopTicksLeft, hitstop);
@@ -181,11 +181,6 @@ namespace Airerage.Core.Combat
             }
             states[hit.Victim] = victim;
             return hit.WithResult(result, startsCombo);
-        }
-
-        private static void AddGauge(ref CombatState combat, CombatTuning tuning, int amount)
-        {
-            combat.Gauge = Math.Min(tuning.MaxGauge, combat.Gauge + amount);
         }
 
         // 当てる。新しいコンボの最初の命中なら true（被弾ドロップに使う。docs/12 T4-6）。前のコンボの払っていないダメージ報酬の元が

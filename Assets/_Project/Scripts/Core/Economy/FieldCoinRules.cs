@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Airerage.Core.Combat;
 using Airerage.Core.Common;
 using Airerage.Core.Match;
 using Airerage.Core.Simulation;
@@ -19,6 +20,7 @@ namespace Airerage.Core.Economy
     ///   （MatchRules.Seed）で選ぶ。1 試合に1回。予告の時刻と場所は、ティック数とルールだけから決まる（JackpotAnnounceTick など）。
     /// - 拾得: キャラクターの箱を MatchRules.CoinPickupRadius だけ広げた中にコインの中心が入ったら拾う。何人も触れていたら、
     ///   いちばん近い人（同じなら番号の小さい人）が拾う。復帰を待っている人は拾わない。拾えるティックより前は拾えない。
+    ///   拾った人は、コインの価値 × CombatTuning.GaugePerCoin のゲージも得る（ユーザーの要望、2026-10-15）。
     /// - 消滅: 寿命（ExpireTick）のティックで消える（ドロップのコイン。T4-6）。
     /// コインは番号の順、キャラクターは番号の順に調べる（結果が順番で変わらない）。
     /// </summary>
@@ -161,6 +163,10 @@ namespace Airerage.Core.Economy
                 int picker = ClosestToucher(coin.Position, states, configs, rules.CoinPickupRadius);
                 if (picker >= 0 && ledger.Pickup(new CoinEventId(tick, CoinEventKind.Pickup, coin.Id), coin.Id, states, picker))
                 {
+                    // 拾ったコインの価値の分だけ、ゲージも増える（ユーザーの要望、2026-10-15）。
+                    CharacterState state = states[picker];
+                    CombatTuning.AddGauge(ref state.Combat, coin.Value * configs[picker].Combat.GaugePerCoin);
+                    states[picker] = state;
                     if (coin.Source >= 0)
                     {
                         // 拾われたときから、次に出るまでを数える。

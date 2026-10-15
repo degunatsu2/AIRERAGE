@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using Airerage.Core.Combat;
 using Airerage.Core.Economy;
 using Airerage.Core.Input;
 using Airerage.Core.Match;
@@ -89,6 +90,29 @@ namespace Airerage.Core.Tests.Economy
             Step(world, 1);
             Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(10), "次の間隔でまた出て、拾う");
             AssertConserved(world);
+        }
+
+        [Test]
+        public void PickingUpACoin_GivesGauge_ForEachCoinOfItsValue()
+        {
+            // 1 枚につき 0.2%、価値の高いコインはその枚数分（ユーザーの要望、2026-10-15）。5 枚のコインで 1.0%。
+            SimWorld world = World(Rules(interval: 60), Near);
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
+
+            Step(world, 1);
+            var combat = new CombatTuning();
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(5), "前提: 拾った");
+            Assert.That(combat.GaugePerCoin, Is.EqualTo(CombatTuning.GaugePerPercent / 5), "1 枚 0.2%");
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(5 * combat.GaugePerCoin));
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(CombatTuning.GaugePerPercent), "5 枚で 1.0%");
+
+            // 最大を超えない。
+            CharacterState state = world.GetState(0);
+            state.Combat.Gauge = CombatTuning.MaxGauge - 1;
+            world.SetState(0, state);
+            Step(world, 60);
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(10), "前提: また拾った");
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(CombatTuning.MaxGauge));
         }
 
         [Test]

@@ -264,6 +264,7 @@ namespace Airerage.Editor
 
             var runner = new GameObject("Online").AddComponent<OnlineRunner>();
             SandboxWireSceneBuilder.SetReference(runner, "_character", character);
+            SandboxWireSceneBuilder.SetReference(runner, "_roster", SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(character));
             SandboxWireSceneBuilder.SetReference(runner, "_inputActions", inputActions);
             SandboxWireSceneBuilder.SetReference(runner, "_spawnPoint", spawn);
             SandboxWireSceneBuilder.SetReferenceArray(runner, "_spawnPoints", spawnPoints);

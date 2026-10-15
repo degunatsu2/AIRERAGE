@@ -11,6 +11,7 @@ namespace Airerage.Runtime.DebugTools
     /// - ToggleWireType（Tab / Select）: ワイヤーのタイプ A / B を切り替える（調整値のアセットの値を変える）
     /// - CycleSpeed（F1）: シミュレーションの速さを 1 → 1/2 → 1/4 → 一時停止 → 1 の順に変える
     /// - StepTick（F2）: 一時停止中に1ティックだけ進める
+    /// - CycleCharacter（F3）: 操作するキャラクターを一覧の次のキャラクターに切り替えて、出現位置に戻す（docs/13 T5-5）
     /// - ToggleDummyWalk（F7）: ダミーを向いている方向へ歩かせる／止める（足場から落として撃破の手柄を確かめる）
     /// - ToggleDummyAttack（F8）: ダミーに一定の間隔で攻撃させる／止める（ガードとジャストガードを試す）
     /// - ToggleBgm（F9）: 仮の BGM を止める／鳴らす（_audio があれば）
@@ -35,6 +36,7 @@ namespace Airerage.Runtime.DebugTools
         private InputAction _toggleDummyWalk;
         private InputAction _toggleDummyAttack;
         private InputAction _toggleBgm;
+        private InputAction _cycleCharacter;
         private int _speedIndex;
 
         private void Awake()
@@ -52,6 +54,7 @@ namespace Airerage.Runtime.DebugTools
             _toggleDummyWalk = _map.FindAction("ToggleDummyWalk", throwIfNotFound: true);
             _toggleDummyAttack = _map.FindAction("ToggleDummyAttack", throwIfNotFound: true);
             _toggleBgm = _map.FindAction("ToggleBgm", throwIfNotFound: true);
+            _cycleCharacter = _map.FindAction("CycleCharacter", throwIfNotFound: true);
         }
 
         private void OnEnable()
@@ -85,6 +88,10 @@ namespace Airerage.Runtime.DebugTools
             if (_toggleDummyAttack.WasPressedThisFrame())
             {
                 _runner.DummiesAttack = !_runner.DummiesAttack;
+            }
+            if (_cycleCharacter.WasPressedThisFrame())
+            {
+                _runner.CycleCharacter();
             }
             if (_toggleBgm.WasPressedThisFrame() && _audio != null)
             {

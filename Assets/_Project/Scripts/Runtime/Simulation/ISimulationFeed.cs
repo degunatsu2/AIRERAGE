@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Airerage.Core.Economy;
 using Airerage.Core.Match;
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Data;
 using UnityEngine;
 
 namespace Airerage.Runtime.Simulation
@@ -23,6 +24,9 @@ namespace Airerage.Runtime.Simulation
         CharacterState GetState(int index);
 
         CharacterConfig GetConfig(int index);
+
+        /// <summary>キャラクターのアセット（表示用の名前と技の絵。分からなければ null。docs/13 T5-5）。</summary>
+        CharacterConfigAsset CharacterOf(int index);
 
         /// <summary>表示用の名前（"DUMMY 1"、"P2" など）。</summary>
         string LabelOf(int index);

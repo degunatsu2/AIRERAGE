@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using Airerage.Core.Combat;
 using Airerage.Core.Common;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
 
@@ -9,10 +11,14 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 自分の特殊攻撃 2 つと必殺技の表示（docs/13_character_plan.md T5-4）。画面の下の中央に、斜めの札を 3 枚並べる
-    /// （左から 特殊攻撃 1・特殊攻撃 2・必殺技。キー、技の名前）。
+    /// （左から 特殊攻撃 1・特殊攻撃 2・必殺技。キー、技の名前か絵）。
     /// - 特殊攻撃: クールタイムの間は、たまった分だけ左から色がつき、残りの秒数を出す。使えるときは縁が明るい。
-    /// - 必殺技: ゲージのたまった分だけ金色がつき、ゲージの数を出す。たまったら縁が虹色に光って「READY!」。
+    /// - 必殺技: ゲージ（0〜100%）のたまった分だけ金色がつき、％を小数第 1 位まで出す。必殺技を出せる量（キャラクターごと）の位置に
+    ///   虹色の線を引く。出せるようになったら縁が虹色に光って「READY!」（ユーザーの要望、2026-10-15）。
     /// - 使えるようになった瞬間は札が白く光り、小さな音を鳴らす（_audio があれば）。技を出している間は縁が白い。
+    /// - 使えるようになった瞬間は、自分のキャラクターの頭上にも小さな通知（技の名前。絵があれば絵）を出す（札を見なくても分かるように。
+    ///   ユーザーの要望、2026-10-15）。この PC で操作しているキャラクターのものだけなので、ほかのプレイヤーには見えない。
+    /// 技の絵は、キャラクターのアセット（CharacterConfigAsset）にあれば使う（まだない）。
     /// オフライン（SimulationRunner）とオンライン（OnlineRunner）のどちらでも使う（ISimulationFeed）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class SkillHud : MonoBehaviour
@@ -22,8 +28,12 @@ namespace Airerage.Runtime.Presentation
         private const int SlotHeight = 60;
         private const float SlotGap = 10f;
         private const float BottomMargin = 16f;
-        private const float Slant = 14f;
+        private const int Slant = 14;
+        private const int LineWidth = Slant + 6;
         private const float ReadyFlashSeconds = 0.35f;
+
+        /// <summary>頭上の通知を出している長さ（秒）。</summary>
+        public const float HeadNoticeSeconds = 1.4f;
 
         private static readonly AttackSlot[] Slots = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
         private static readonly string[] Keys = { "Q / LB", "E / RB", "R / R3" };
@@ -36,14 +46,22 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private MonoBehaviour _source;
         [Tooltip("使えるようになったときの音（なくてもよい）")]
         [SerializeField] private GameAudio _audio;
+        [Tooltip("頭上の通知の位置を画面に写すカメラ（なければ頭上の通知を出さない）")]
+        [SerializeField] private Camera _camera;
 
         private readonly Slot[] _slots = { new Slot(), new Slot(), new Slot() };
+        private readonly List<HeadNotice> _notices = new List<HeadNotice>();
+        private readonly Texture2D[] _partial = new Texture2D[SlotCount];
+        private readonly int[] _partialWidth = { -1, -1, -1 };
+        private Color32[] _pixels;
         private ISimulationFeed _feed;
         private Texture2D _fill;
         private Texture2D _frame;
+        private Texture2D _line;
         private GUIStyle _key;
         private GUIStyle _name;
         private GUIStyle _number;
+        private GUIStyle _notice;
 
         /// <summary>札 1 枚の今の表示（テスト用）。</summary>
         public sealed class Slot
@@ -57,21 +75,53 @@ namespace Airerage.Runtime.Presentation
             /// <summary>技を出している間か。</summary>
             public bool InUse;
 
-            /// <summary>色のついた割合（0〜1。特殊攻撃はクールタイムのたまった分、必殺技はゲージ）。</summary>
+            /// <summary>色のついた割合（0〜1。特殊攻撃はクールタイムのたまった分、必殺技はゲージの 0〜100%）。</summary>
             public float Fill;
 
-            /// <summary>中央の文字（技の名前、残りの秒数、ゲージの数、「READY!」）。</summary>
+            /// <summary>虹色の線の位置（0〜1。必殺技を出せるゲージの量。線がなければ負）。</summary>
+            public float Line = -1f;
+
+            /// <summary>中央の文字（技の名前、残りの秒数、ゲージの％）。</summary>
             public string Text = string.Empty;
+
+            /// <summary>下の小さな文字（技の名前、「READY!」。なければ空）。</summary>
+            public string Label = string.Empty;
 
             /// <summary>使えるようになった回数（光った回数。最初から使えるときは数えない）。</summary>
             public int ReadyCount;
 
             public float ReadyAt = -10f;
             public string Name = string.Empty;
+
+            /// <summary>技の絵（なければ null。文字で出す）。</summary>
+            public Texture2D Icon;
+        }
+
+        /// <summary>頭上の通知 1 つ。</summary>
+        public sealed class HeadNotice
+        {
+            public string Text;
+            public Texture2D Icon;
+            public Color Color;
+            public float At;
         }
 
         /// <summary>左から 特殊攻撃 1・特殊攻撃 2・必殺技 の札の表示（テスト用）。</summary>
         public Slot SlotOf(int index) => _slots[index];
+
+        /// <summary>今出している頭上の通知（古い順。テスト用）。</summary>
+        public IReadOnlyList<HeadNotice> HeadNotices => _notices;
+
+        /// <summary>これまでに出した頭上の通知の数（テスト用）。</summary>
+        public int HeadNoticeCount { get; private set; }
+
+        /// <summary>ゲージ（0.1% 単位）を「64.3%」の形にする（小数第 1 位まで。ユーザーの要望、2026-10-15）。</summary>
+        public static string PercentText(int gauge)
+        {
+            int value = Mathf.Max(0, gauge);
+            int per = CombatTuning.GaugePerPercent;
+            return $"{value / per}.{value % per * 10 / per}%";
+        }
 
         private void Awake()
         {
@@ -85,10 +135,12 @@ namespace Airerage.Runtime.Presentation
 
         private void OnDestroy()
         {
-            if (_fill != null)
+            foreach (Texture2D texture in new[] { _fill, _frame, _line, _partial[0], _partial[1], _partial[2] })
             {
-                Destroy(_fill);
-                Destroy(_frame);
+                if (texture != null)
+                {
+                    Destroy(texture);
+                }
             }
         }
 
@@ -106,8 +158,12 @@ namespace Airerage.Runtime.Presentation
                 }
                 CharacterState state = _feed.GetState(local);
                 CombatTuning combat = _feed.GetConfig(local).Combat;
+                CharacterConfigAsset character = _feed.CharacterOf(local);
                 AttackSlot move = Slots[i];
                 bool ready = ActionController.CanUse(state, move, combat);
+                string moveName = combat.Get(move).Name;
+                slot.Name = string.IsNullOrEmpty(moveName) ? (move == AttackSlot.Super ? "SUPER" : $"SPECIAL {i + 1}") : moveName;
+                slot.Icon = character != null ? character.IconOf(move) : null;
                 if (slot.Shown && ready && !slot.Ready)
                 {
                     slot.ReadyCount++;
@@ -116,25 +172,35 @@ namespace Airerage.Runtime.Presentation
                     {
                         _audio.Play(SoundId.SkillReady, 0.6f);
                     }
+                    AddHeadNotice(slot, move == AttackSlot.Super ? SuperColor : SpecialColor);
                 }
                 slot.Shown = true;
                 slot.Ready = ready;
                 slot.InUse = state.Action.Kind == ActionKind.Attack && state.Action.Attack == move;
-                string moveName = combat.Get(move).Name;
-                slot.Name = string.IsNullOrEmpty(moveName) ? (move == AttackSlot.Super ? "SUPER" : $"SPECIAL {i + 1}") : moveName;
                 if (move == AttackSlot.Super)
                 {
-                    slot.Fill = Mathf.Clamp01(state.Combat.Gauge / (float)combat.SuperGaugeCost);
-                    slot.Text = ready ? "READY!" : state.Combat.Gauge.ToString();
+                    slot.Fill = Mathf.Clamp01(state.Combat.Gauge / (float)CombatTuning.MaxGauge);
+                    slot.Line = Mathf.Clamp01(combat.SuperGaugeCost / (float)CombatTuning.MaxGauge);
+                    slot.Text = PercentText(state.Combat.Gauge);
+                    slot.Label = ready ? "READY!" : slot.Name;
                 }
                 else
                 {
                     int total = combat.CooldownTicksOf(move);
                     int left = move == AttackSlot.Special1 ? state.Combat.Special1CooldownTicksLeft : state.Combat.Special2CooldownTicksLeft;
                     slot.Fill = total <= 0 ? 1f : 1f - Mathf.Clamp01(left / (float)total);
+                    slot.Line = -1f;
                     slot.Text = ready ? slot.Name : (left * SimTime.DeltaTime).ToString("0.0");
+                    slot.Label = ready ? string.Empty : slot.Name;
                 }
             }
+            _notices.RemoveAll(n => Time.time - n.At >= HeadNoticeSeconds);
+        }
+
+        private void AddHeadNotice(Slot slot, Color color)
+        {
+            _notices.Add(new HeadNotice { Text = slot.Name, Icon = slot.Icon, Color = color, At = Time.time });
+            HeadNoticeCount++;
         }
 
         private void OnGUI()
@@ -151,6 +217,7 @@ namespace Airerage.Runtime.Presentation
             {
                 DrawSlot(_slots[i], i, new Rect(x + i * (SlotWidth + SlotGap), y, SlotWidth, SlotHeight));
             }
+            DrawHeadNotices();
         }
 
         private void DrawSlot(Slot slot, int index, Rect rect)
@@ -161,13 +228,11 @@ namespace Airerage.Runtime.Presentation
             GUI.color = Fill;
             GUI.DrawTexture(rect, _fill);
 
-            // たまった分（左から）。使えるときは薄く、たまっている途中は少し濃く。
+            // たまった分（左から。縁と同じ傾きで切る）。使えるときは薄く、たまっている途中は少し濃く。
             if (slot.Fill > 0f)
             {
-                GUI.BeginGroup(new Rect(rect.x, rect.y, rect.width * slot.Fill, rect.height));
                 GUI.color = new Color(accent.r, accent.g, accent.b, slot.Ready ? 0.28f : 0.45f);
-                GUI.DrawTexture(new Rect(0f, 0f, rect.width, rect.height), _fill);
-                GUI.EndGroup();
+                GUI.DrawTexture(rect, PartialFill(index, slot.Fill));
             }
 
             float flash = 1f - (Time.time - slot.ReadyAt) / ReadyFlashSeconds;
@@ -175,6 +240,14 @@ namespace Airerage.Runtime.Presentation
             {
                 GUI.color = new Color(1f, 1f, 1f, 0.7f * flash);
                 GUI.DrawTexture(rect, _fill);
+            }
+
+            // 必殺技を出せるゲージの量の位置に、縁と同じ傾きの虹色の線。
+            if (slot.Line >= 0f)
+            {
+                float lineX = rect.x + slot.Line * (SlotWidth - Slant) - (LineWidth - Slant) * 0.5f;
+                GUI.color = Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f, 1f), 0.7f, 1f);
+                GUI.DrawTexture(new Rect(lineX, rect.y, LineWidth, rect.height), _line);
             }
 
             if (slot.InUse)
@@ -194,13 +267,96 @@ namespace Airerage.Runtime.Presentation
 
             GuidePlate.DrawText(new Rect(rect.x + Slant + 6f, rect.y + 3f, rect.width - Slant - 10f, 16f), Keys[index], _key,
                 new Color(1f, 1f, 1f, 0.75f));
-            GuidePlate.DrawText(new Rect(rect.x + 4f, rect.y + 18f, rect.width - 8f, 28f), slot.Text, slot.Ready ? _name : _number,
-                slot.Ready ? Color.white : new Color(1f, 1f, 1f, 0.85f));
-            if (!slot.Ready || super)
+            var center = new Rect(rect.x + 4f, rect.y + 18f, rect.width - 8f, 28f);
+            bool iconShown = slot.Icon != null && slot.Ready && !super;
+            if (iconShown)
             {
-                GuidePlate.DrawText(new Rect(rect.x + 2f, rect.y + rect.height - 17f, rect.width - Slant - 8f, 14f),
-                    super && slot.Ready ? slot.Name : (super ? "GAUGE" : slot.Name), _key, new Color(1f, 1f, 1f, 0.55f));
+                GUI.DrawTexture(new Rect(center.center.x - 14f, center.center.y - 14f, 28f, 28f), slot.Icon, ScaleMode.ScaleToFit);
             }
+            else
+            {
+                bool bold = slot.Ready && !super;
+                GuidePlate.DrawText(center, slot.Text, bold ? _name : _number, slot.Ready ? Color.white : new Color(1f, 1f, 1f, 0.85f));
+            }
+            if (!string.IsNullOrEmpty(slot.Label))
+            {
+                Color labelColor = super && slot.Ready
+                    ? Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f + 0.3f, 1f), 0.45f, 1f)
+                    : new Color(1f, 1f, 1f, 0.55f);
+                GuidePlate.DrawText(new Rect(rect.x + 2f, rect.y + rect.height - 17f, rect.width - Slant - 8f, 14f), slot.Label, _key, labelColor);
+            }
+        }
+
+        // 頭上の通知: 自分のキャラクターの頭の上に、小さな札（技の名前か絵）が浮かび上がって消える。重なったら上へ積む。
+        private void DrawHeadNotices()
+        {
+            int local = _feed.LocalCharacter;
+            if (_notices.Count == 0 || _camera == null || local < 0 || local >= _feed.CharacterCount)
+            {
+                return;
+            }
+            CharacterState state = _feed.GetState(local);
+            float top = state.Position.Y + _feed.GetConfig(local).Movement.HalfHeight + 0.5f;
+            Vector3 p = _camera.WorldToScreenPoint(new Vector3(state.Position.X, top, 0f));
+            if (p.z <= 0f)
+            {
+                return;
+            }
+            Color previous = GUI.color;
+            for (int i = 0; i < _notices.Count; i++)
+            {
+                HeadNotice notice = _notices[i];
+                float t = (Time.time - notice.At) / HeadNoticeSeconds;
+                float alpha = t < 0.12f ? t / 0.12f : t > 0.7f ? 1f - (t - 0.7f) / 0.3f : 1f;
+                float rise = Mathf.Min(t / 0.25f, 1f) * 14f;
+                float width = notice.Icon != null ? 30f : 16f + notice.Text.Length * 9f;
+                const float height = 24f;
+                float y = Screen.height - p.y - height - rise - (_notices.Count - 1 - i) * (height + 4f);
+                var rect = new Rect(p.x - width * 0.5f, y, width, height);
+                GUI.color = new Color(0.03f, 0.05f, 0.09f, 0.8f * alpha);
+                GUI.DrawTexture(rect, Texture2D.whiteTexture);
+                GUI.color = new Color(notice.Color.r, notice.Color.g, notice.Color.b, alpha);
+                GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2f, rect.width, 2f), Texture2D.whiteTexture);
+                if (notice.Icon != null)
+                {
+                    GUI.color = new Color(1f, 1f, 1f, alpha);
+                    GUI.DrawTexture(new Rect(rect.x + 3f, rect.y + 1f, 24f, 20f), notice.Icon, ScaleMode.ScaleToFit);
+                }
+                else
+                {
+                    GuidePlate.DrawText(rect, notice.Text, _notice, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+            GUI.color = previous;
+        }
+
+        // たまった分の形（札の形のうち、左から fraction の割合まで。縁と同じ傾きで切る）。幅が変わったときだけ作り直す。
+        private Texture2D PartialFill(int index, float fraction)
+        {
+            int width = Mathf.RoundToInt(fraction * (SlotWidth - Slant));
+            if (_partial[index] != null && _partialWidth[index] == width)
+            {
+                return _partial[index];
+            }
+            if (_partial[index] == null)
+            {
+                _partial[index] = TimerPlate.Create($"SkillSlotPartial{index}", SlotWidth, SlotHeight, (x, y) => 0f);
+            }
+            _pixels = _pixels ?? new Color32[SlotWidth * SlotHeight];
+            for (int yFromTop = 0; yFromTop < SlotHeight; yFromTop++)
+            {
+                int row = (SlotHeight - 1 - yFromTop) * SlotWidth;
+                float left = Slant * (1f - (yFromTop + 0.5f) / SlotHeight);
+                for (int x = 0; x < SlotWidth; x++)
+                {
+                    bool inside = InsideSlot(x, yFromTop, 0f) && x + 0.5f <= left + width;
+                    _pixels[row + x] = new Color32(255, 255, 255, inside ? (byte)255 : (byte)0);
+                }
+            }
+            _partial[index].SetPixels32(_pixels);
+            _partial[index].Apply();
+            _partialWidth[index] = width;
+            return _partial[index];
         }
 
         // 札の形（右へ傾いた平行四辺形。上の辺が Slant だけ右）の中か。inset は内側へ縮める量（ピクセル）。
@@ -225,12 +381,20 @@ namespace Airerage.Runtime.Presentation
             _fill = TimerPlate.Create("SkillSlotFill", SlotWidth, SlotHeight, (x, y) => InsideSlot(x, y, 0f) ? 1f : 0f);
             _frame = TimerPlate.Create("SkillSlotFrame", SlotWidth, SlotHeight,
                 (x, y) => InsideSlot(x, y, 0f) && !InsideSlot(x, y, 2.5f) ? 1f : 0f);
+            // 縁と同じ傾きの細い線（幅 LineWidth の中で、上が右、下が左）。
+            _line = TimerPlate.Create("SkillSlotLine", LineWidth, SlotHeight, (x, y) =>
+            {
+                float center = (LineWidth - Slant) * 0.5f + Slant * (1f - (y + 0.5f) / SlotHeight);
+                return Mathf.Abs(x + 0.5f - center) <= 1.6f ? 1f : 0f;
+            });
             _key = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false };
             _name = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false };
             _number = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            _key.normal.textColor = Color.white;
-            _name.normal.textColor = Color.white;
-            _number.normal.textColor = Color.white;
+            _notice = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            foreach (GUIStyle style in new[] { _key, _name, _number, _notice })
+            {
+                style.normal.textColor = Color.white;
+            }
         }
     }
 }

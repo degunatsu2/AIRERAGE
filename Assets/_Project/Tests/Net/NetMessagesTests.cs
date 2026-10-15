@@ -1,5 +1,7 @@
 using System;
+using Airerage.Core.Simulation;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace Airerage.Net.Tests
 {
@@ -21,6 +23,29 @@ namespace Airerage.Net.Tests
             Assert.That(count, Is.EqualTo(4));
             Assert.That(match, Is.EqualTo(7));
             Assert.That(json, Is.EqualTo("{\"a\":\"ワイヤー\"}"));
+        }
+
+        [Test]
+        public void Start_CompressesTheConfigs_SoFourCharactersFitInOneMessage()
+        {
+            // キャラクターが 4 体違っても、通信路の 1 つのメッセージの上限（16 KB）に収まる（docs/13 T5-5）。
+            string one = JsonUtility.ToJson(new CharacterConfig());
+            string json = "[" + one + "," + one.Replace("8", "9") + "," + one.Replace("1", "2") + "," + one.Replace("0", "3") + "]";
+            byte[] data = NetMessages.Start(4, 1, json);
+            NetMessages.ReadStart(data, out _, out _, out string back);
+            Assert.That(back, Is.EqualTo(json));
+            Assert.That(data.Length, Is.LessThan(16 * 1024), $"縮めても大きすぎる（JSON {json.Length} 文字）");
+            Assert.That(data.Length, Is.LessThan(json.Length / 2), "縮めていない");
+            Assert.Throws<FormatException>(() => NetMessages.ReadStart(new byte[] { (byte)NetKind.Start, 1, 1, 9, 9, 9 }, out _, out _, out _));
+        }
+
+        [Test]
+        public void Pick_RoundTrips()
+        {
+            byte[] data = NetMessages.Pick(2);
+            Assert.That(NetMessages.KindOf(data), Is.EqualTo(NetKind.Pick));
+            Assert.That(NetMessages.ReadPick(data), Is.EqualTo(2));
+            Assert.That(NetMessages.ReadPick(NetMessages.Pick(-3)), Is.Zero);
         }
 
         [Test]

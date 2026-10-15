@@ -9,7 +9,7 @@ namespace Airerage.Net
     /// 待機所（ロビー）の表示（ユーザーの要望、2026-10-14）。ホストもクライアントも、画面の中央に同じ顔ぶれを出す
     /// （OnlineSession.Roster）。番号ごとに 1 枚の札（GuidePlate。右上の表と同じ形）:
     /// - つながっている人: 縁と斜めの線はプレイヤーの色、左にプレイヤーの色の四角と番号、右にプレイヤーネーム（なければ P1〜P4）と
-    ///   「HOST」「YOU」の印。
+    ///   「HOST」「YOU」の印。名前の下に、選んだキャラクターの名前（docs/13 T5-5）。
     /// - まだいない番号: 灰色の縁で、「WAITING...」がゆっくり明滅する。
     /// 札が埋まった・空いた瞬間は、札が白く光る。座標は OnGUI の座標。使い終わったら Dispose でテクスチャを消す。
     /// </summary>
@@ -32,6 +32,7 @@ namespace Airerage.Net
         private GUIStyle _tag;
         private GUIStyle _number;
         private GUIStyle _waiting;
+        private GUIStyle _character;
 
         public WaitingRoomPanel()
         {
@@ -48,7 +49,8 @@ namespace Airerage.Net
         /// 題と札を描く（左上が origin）。colorOf はプレイヤーの色、subtitle は題の下の小さな説明。
         /// 返り値は、札の下の y（OnGUI の座標）。
         /// </summary>
-        public float Draw(Vector2 origin, IReadOnlyList<LobbySlot> roster, int localPlayer, Func<int, Color> colorOf, string subtitle)
+        public float Draw(Vector2 origin, IReadOnlyList<LobbySlot> roster, int localPlayer, Func<int, Color> colorOf, string subtitle,
+            Func<int, string> characterName = null)
         {
             EnsureStyles();
             int connected = 0;
@@ -69,7 +71,8 @@ namespace Airerage.Net
             for (int p = 0; p < roster.Count && p < OnlineSession.MaxPlayers; p++)
             {
                 TrackChange(p, roster[p].Connected);
-                DrawSlot(new Rect(origin.x, y, PlateWidth, PlateHeight), p, roster[p], p == localPlayer, colorOf(p));
+                DrawSlot(new Rect(origin.x, y, PlateWidth, PlateHeight), p, roster[p], p == localPlayer, colorOf(p),
+                    characterName != null ? characterName(roster[p].Character) : string.Empty);
                 y += PlateHeight + PlateGap;
             }
             return y;
@@ -89,7 +92,7 @@ namespace Airerage.Net
             }
         }
 
-        private void DrawSlot(Rect rect, int slot, LobbySlot entry, bool isLocal, Color color)
+        private void DrawSlot(Rect rect, int slot, LobbySlot entry, bool isLocal, Color color, string character)
         {
             Color previous = GUI.color;
             _plate.DrawBackground(rect);
@@ -106,8 +109,14 @@ namespace Airerage.Net
                 GuidePlate.DrawText(icon, (slot + 1).ToString(), _number, Color.white);
 
                 string name = string.IsNullOrEmpty(entry.Name) ? $"P{slot + 1}" : entry.Name;
-                var nameRect = new Rect(right.x + 10f, right.y, right.width - 120f, right.height);
+                bool hasCharacter = !string.IsNullOrEmpty(character);
+                var nameRect = new Rect(right.x + 10f, right.y - (hasCharacter ? 7f : 0f), right.width - 120f, right.height);
                 GuidePlate.DrawText(nameRect, name, _name, Color.white);
+                if (hasCharacter)
+                {
+                    GuidePlate.DrawText(new Rect(right.x + 11f, right.yMax - 19f, right.width - 120f, 16f), character, _character,
+                        new Color(1f, 1f, 1f, 0.7f));
+                }
                 float tagX = right.xMax - 10f;
                 if (isLocal)
                 {
@@ -166,7 +175,8 @@ namespace Airerage.Net
             _tag = new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _number = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _waiting = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            foreach (GUIStyle style in new[] { _title, _count, _subtitle, _name, _tag, _number, _waiting })
+            _character = new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip };
+            foreach (GUIStyle style in new[] { _title, _count, _subtitle, _name, _tag, _number, _waiting, _character })
             {
                 style.normal.textColor = Color.white;
             }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 
 namespace Airerage.Net
@@ -26,8 +27,11 @@ namespace Airerage.Net
         /// <summary>クライアント → ホスト: 自分のプレイヤーネーム（ロビーで。変えるたびに送る）。</summary>
         Hello = 6,
 
-        /// <summary>ホスト → クライアント: ロビーの顔ぶれ（番号ごとに、つながっているかとプレイヤーネーム）。変わるたびに送る。</summary>
+        /// <summary>ホスト → クライアント: ロビーの顔ぶれ（番号ごとに、つながっているか、プレイヤーネーム、キャラクター）。変わるたびに送る。</summary>
         Lobby = 7,
+
+        /// <summary>クライアント → ホスト: 自分が選んだキャラクターの番号（ロビーで。変えるたびに送る。docs/13 T5-5）。</summary>
+        Pick = 8,
     }
 
     /// <summary>ロビーの1つの番号（待機所の表示に使う）。</summary>
@@ -38,15 +42,19 @@ namespace Airerage.Net
         /// <summary>プレイヤーネーム（入力がなければ空）。</summary>
         public readonly string Name;
 
-        public LobbySlot(bool connected, string name)
+        /// <summary>選んだキャラクターの番号（CharacterRoster の番号）。</summary>
+        public readonly int Character;
+
+        public LobbySlot(bool connected, string name, int character = 0)
         {
             Connected = connected;
             Name = name ?? string.Empty;
+            Character = character;
         }
 
         public bool Equals(LobbySlot other)
         {
-            return Connected == other.Connected && Name == other.Name;
+            return Connected == other.Connected && Name == other.Name && Character == other.Character;
         }
 
         public override bool Equals(object obj)
@@ -56,12 +64,12 @@ namespace Airerage.Net
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Connected, Name);
+            return HashCode.Combine(Connected, Name, Character);
         }
 
         public override string ToString()
         {
-            return Connected ? $"[{Name}]" : "[-]";
+            return Connected ? $"[{Name} #{Character}]" : "[-]";
         }
     }
 
@@ -112,7 +120,19 @@ namespace Airerage.Net
             return Encoding.UTF8.GetString(data, 1, data.Length - 1);
         }
 
-        /// <summary>ロビーの顔ぶれ（番号の順。つながっているかと、プレイヤーネームの UTF-8）。</summary>
+        /// <summary>選んだキャラクターの番号（0〜255）。</summary>
+        public static byte[] Pick(int character)
+        {
+            return new[] { (byte)NetKind.Pick, (byte)Math.Max(0, Math.Min(byte.MaxValue, character)) };
+        }
+
+        public static int ReadPick(byte[] data)
+        {
+            Expect(data, NetKind.Pick, 2);
+            return data[1];
+        }
+
+        /// <summary>ロビーの顔ぶれ（番号の順。つながっているか、キャラクターの番号、プレイヤーネームの UTF-8）。</summary>
         public static byte[] Lobby(IReadOnlyList<LobbySlot> slots)
         {
             using (var stream = new MemoryStream())
@@ -124,6 +144,7 @@ namespace Airerage.Net
                 {
                     byte[] name = Encoding.UTF8.GetBytes(slot.Name);
                     writer.Write(slot.Connected);
+                    writer.Write((byte)Math.Max(0, Math.Min(byte.MaxValue, slot.Character)));
                     writer.Write((byte)Math.Min(name.Length, byte.MaxValue));
                     writer.Write(name, 0, Math.Min(name.Length, byte.MaxValue));
                 }
@@ -140,28 +161,37 @@ namespace Airerage.Net
             int offset = 2;
             for (int i = 0; i < count; i++)
             {
-                if (offset + 2 > data.Length || offset + 2 + data[offset + 1] > data.Length)
+                if (offset + 3 > data.Length || offset + 3 + data[offset + 2] > data.Length)
                 {
                     throw new FormatException($"ロビーのメッセージが途中で切れています（{data.Length} バイト）");
                 }
                 bool connected = data[offset] != 0;
-                int length = data[offset + 1];
-                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + 2, length));
-                offset += 2 + length;
+                int character = data[offset + 1];
+                int length = data[offset + 2];
+                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + 3, length), character);
+                offset += 3 + length;
             }
             return slots;
         }
 
-        /// <summary>試合の開始（人数、試合の番号、調整値とルールの JSON）。同じ人で再戦するときも送る（番号が変わる）。</summary>
+        /// <summary>
+        /// 試合の開始（人数、試合の番号、調整値とルールの JSON を GZip で縮めたもの）。同じ人で再戦するときも送る（番号が変わる）。
+        /// キャラクターが増えると調整値の JSON が大きくなるので縮める（docs/13 T5-5）。
+        /// </summary>
         public static byte[] Start(int playerCount, int match, string configJson)
         {
-            byte[] config = Encoding.UTF8.GetBytes(configJson ?? string.Empty);
-            var data = new byte[3 + config.Length];
-            data[0] = (byte)NetKind.Start;
-            data[1] = (byte)playerCount;
-            data[2] = (byte)match;
-            Array.Copy(config, 0, data, 3, config.Length);
-            return data;
+            byte[] json = Encoding.UTF8.GetBytes(configJson ?? string.Empty);
+            using (var stream = new MemoryStream())
+            {
+                stream.WriteByte((byte)NetKind.Start);
+                stream.WriteByte((byte)playerCount);
+                stream.WriteByte((byte)match);
+                using (var gzip = new GZipStream(stream, CompressionLevel.Optimal, leaveOpen: true))
+                {
+                    gzip.Write(json, 0, json.Length);
+                }
+                return stream.ToArray();
+            }
         }
 
         public static void ReadStart(byte[] data, out int playerCount, out int match, out string configJson)
@@ -169,7 +199,21 @@ namespace Airerage.Net
             Expect(data, NetKind.Start, 3);
             playerCount = data[1];
             match = data[2];
-            configJson = Encoding.UTF8.GetString(data, 3, data.Length - 3);
+            try
+            {
+                using (var input = new MemoryStream(data, 3, data.Length - 3))
+                using (var gzip = new GZipStream(input, CompressionMode.Decompress))
+                using (var output = new MemoryStream())
+                {
+                    gzip.CopyTo(output);
+                    configJson = Encoding.UTF8.GetString(output.ToArray());
+                }
+            }
+            catch (IOException e)
+            {
+                // 壊れたデータ（.NET では InvalidDataException、Unity の Mono では IOException。前者は後者の派生）。
+                throw new FormatException($"開始のメッセージの調整値を展開できません: {e.Message}", e);
+            }
         }
 
         /// <summary>

@@ -152,6 +152,7 @@ namespace Airerage.Editor
 
             var runner = new GameObject("Simulation").AddComponent<SimulationRunner>();
             SandboxWireSceneBuilder.SetReference(runner, "_character", character);
+            SandboxWireSceneBuilder.SetReference(runner, "_roster", SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(character));
             SandboxWireSceneBuilder.SetReference(runner, "_inputActions", inputActions);
             SandboxWireSceneBuilder.SetReference(runner, "_spawnPoint", spawn);
             SandboxWireSceneBuilder.SetReference(runner, "_characterView", characterView);

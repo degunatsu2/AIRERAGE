@@ -33,7 +33,10 @@ namespace Airerage.Runtime.Simulation
         // ダミーに攻撃させるときの間隔（ティック。デバッグ用。ガードを試すため）。
         public const int DummyAttackIntervalTicks = 90;
 
+        [Tooltip("操作するキャラクターの初めのキャラクター。ダミーもこのキャラクター")]
         [SerializeField] private CharacterConfigAsset _character;
+        [Tooltip("操作するキャラクターを切り替えられる一覧（デバッグ。F3。なくてもよい。docs/13 T5-5）")]
+        [SerializeField] private CharacterRoster _roster;
         [SerializeField] private InputActionAsset _inputActions;
         [SerializeField] private Transform _spawnPoint;
         [Tooltip("地形として読み込むコライダーの層")]
@@ -55,6 +58,8 @@ namespace Airerage.Runtime.Simulation
         private InputSystemAdapter _input;
         private int _player;
         private CharacterState _previous;
+        private CharacterConfigAsset _playerCharacter;
+        private int _rosterIndex;
         private float _accumulator;
         private bool _dummiesAttack;
         private int _dummyAttackTicks;
@@ -69,7 +74,10 @@ namespace Airerage.Runtime.Simulation
         public event Action Ticked;
 
         /// <summary>操作するキャラクターの調整値（値はシミュレーションと共有している）。</summary>
-        public CharacterConfig PlayerConfig => _character.Config;
+        public CharacterConfig PlayerConfig => _playerCharacter.Config;
+
+        /// <summary>操作するキャラクターのアセット（F3 で切り替える）。</summary>
+        public CharacterConfigAsset PlayerCharacter => _playerCharacter;
 
         /// <summary>操作するキャラクターの今の状態。</summary>
         public CharacterState PlayerState => _world.GetState(_player);
@@ -97,6 +105,7 @@ namespace Airerage.Runtime.Simulation
         int ISimulationFeed.LocalCharacter => _world == null ? -1 : _player;
         CharacterState ISimulationFeed.GetState(int index) => _world.GetState(index);
         CharacterConfig ISimulationFeed.GetConfig(int index) => _world.GetConfig(index);
+        CharacterConfigAsset ISimulationFeed.CharacterOf(int index) => index == _player ? _playerCharacter : _character;
         string ISimulationFeed.LabelOf(int index) => index == _player ? "PLAYER" : $"DUMMY {index - _player}";
         MatchRules ISimulationFeed.Rules => _world?.Rules;
         MatchState ISimulationFeed.Match => _world != null ? _world.Match : MatchState.None;
@@ -176,6 +185,7 @@ namespace Airerage.Runtime.Simulation
 
             _terrain = terrain;
             _world = new SimWorld(terrain, bounds, zones, null, coinSpawns, bankSpots);
+            _playerCharacter = _character;
             _player = _world.AddCharacter(_character.Config, _spawnPoint.position.ToNumerics());
             _previous = _world.GetState(_player);
             if (_dummyViews.Length != _dummySpawns.Length)
@@ -210,7 +220,7 @@ namespace Airerage.Runtime.Simulation
 
         private void Update()
         {
-            _input.Poll(_camera, _character.Config.Wire.AimDeadzone);
+            _input.Poll(_camera, PlayerConfig.Wire.AimDeadzone);
             if (_input.ResetRequested)
             {
                 ResetPlayer();
@@ -277,8 +287,8 @@ namespace Airerage.Runtime.Simulation
             CharacterState current = _world.GetState(_player);
             if (_characterView != null)
             {
-                _characterView.Render(_previous, current, alpha, _character.Config.Movement.HalfExtents.ToUnity());
-                _characterView.RenderAction(current, _character.Config.Combat, _world.Rules.RespawnDelayTicks);
+                _characterView.Render(_previous, current, alpha, PlayerConfig.Movement.HalfExtents.ToUnity());
+                _characterView.RenderAction(current, PlayerConfig.Combat, _world.Rules.RespawnDelayTicks);
             }
             for (int i = 0; i < _previousDummies.Length; i++)
             {
@@ -288,7 +298,7 @@ namespace Airerage.Runtime.Simulation
             }
             if (_wireView != null)
             {
-                _wireView.Render(_previous, current, alpha, _character.Config.Wire);
+                _wireView.Render(_previous, current, alpha, PlayerConfig.Wire);
             }
             if (_aimIndicator != null)
             {
@@ -298,7 +308,7 @@ namespace Airerage.Runtime.Simulation
                 System.Numerics.Vector3 simOrigin = origin.ToNumerics();
                 SimInput shown = InputOverride != null ? LastInput : _input.Peek(simOrigin);
                 var frame = new InputFrame(shown, current.PreviousButtons);
-                WireTuning wire = _character.Config.Wire;
+                WireTuning wire = PlayerConfig.Wire;
                 WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _terrain);
                 _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength);
             }
@@ -339,6 +349,23 @@ namespace Airerage.Runtime.Simulation
                 _world.SetState(_player + 1 + i, CharacterState.Spawn(_dummySpawns[i].position.ToNumerics(), -1));
                 _previousDummies[i] = GetDummyState(i);
             }
+        }
+
+        /// <summary>
+        /// 操作するキャラクターを、一覧（_roster）の次のキャラクターに切り替えて、出現位置に戻す（デバッグ。F3。docs/13 T5-5）。
+        /// 一覧がなければ何もしない。切り替えたキャラクターを返す。
+        /// </summary>
+        public CharacterConfigAsset CycleCharacter()
+        {
+            if (_roster == null || _roster.Count == 0)
+            {
+                return _playerCharacter;
+            }
+            _rosterIndex = (_rosterIndex + 1) % _roster.Count;
+            _playerCharacter = _roster.Get(_rosterIndex);
+            _world.SetConfig(_player, _playerCharacter.Config);
+            ResetPlayer();
+            return _playerCharacter;
         }
 
         private void ResetPlayer()

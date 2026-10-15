@@ -65,7 +65,7 @@ namespace Airerage.Core.Tests.Combat
             Assert.That(Combat.Get(AttackSlot.Special1), Is.SameAs(Combat.Special1));
             Assert.That(Combat.Get(AttackSlot.Special2), Is.SameAs(Combat.Special2));
             Assert.That(Combat.Get(AttackSlot.Super), Is.SameAs(Combat.Super));
-            Assert.That(Combat.SuperGaugeCost, Is.EqualTo(100), "D-55: 必殺技はゲージ 100");
+            Assert.That(Combat.SuperGaugeCost, Is.EqualTo(100 * CombatTuning.GaugePerPercent), "D-55: 必殺技はゲージ 100%");
             Assert.That(CombatTuning.IsSpecial(AttackSlot.AirDown), Is.False);
             Assert.That(CombatTuning.IsSpecial(AttackSlot.Super), Is.True);
         }
@@ -74,7 +74,7 @@ namespace Airerage.Core.Tests.Combat
         public void SuperGaugeCost_AboveTheMaximum_IsInvalid()
         {
             var config = new CharacterConfig();
-            config.Combat.SuperGaugeCost = config.Combat.MaxGauge + 1;
+            config.Combat.SuperGaugeCost = CombatTuning.MaxGauge + 1;
 
             Assert.Throws<InvalidTuningException>(() => config.Validate());
         }
@@ -134,17 +134,17 @@ namespace Airerage.Core.Tests.Combat
             Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(Combat.SuperGaugeCost - 1), "出ないのにゲージが減った");
 
             Step(world, Combat.AttackBufferTicks + 1);
-            SetGauge(world, Combat.MaxGauge);
+            SetGauge(world, CombatTuning.MaxGauge);
             world.Step(new[] { Press(InputButtons.Super) });
             Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Super));
-            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(Combat.MaxGauge - Combat.SuperGaugeCost));
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(CombatTuning.MaxGauge - Combat.SuperGaugeCost));
         }
 
         [Test]
         public void PressingSeveralAtOnce_PrefersTheSuper_ThenTheSpecials_ThenTheAttack()
         {
             SimWorld world = AirWorld();
-            SetGauge(world, Combat.MaxGauge);
+            SetGauge(world, CombatTuning.MaxGauge);
             world.Step(new[] { Press(InputButtons.Attack | InputButtons.Special1 | InputButtons.Special2 | InputButtons.Super) });
             Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Super));
 
@@ -179,29 +179,46 @@ namespace Airerage.Core.Tests.Combat
         }
 
         [Test]
-        public void AttackToSpecial_OnHit_UsesTheAttackCancel()
+        public void CancelIntoASpecial_OnHit_IsSeparateFromTheAttackCancel()
         {
+            // 攻撃→特殊攻撃・必殺技のキャンセルは、攻撃→攻撃の 1 回とは別枠（ユーザーの要望、2026-10-15）。
             SimWorld world = AirWorld();
             world.Step(new[] { Press(InputButtons.Attack) });
             Step(world, 6);
             world.Step(new[] { Press(InputButtons.Special1) });
             Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirNeutral), "空振りなのに特殊攻撃でキャンセルした");
 
+            // 攻撃→攻撃の 1 回を先に使う。
+            MarkHit(world);
+            world.Step(new[] { Press(InputButtons.Attack, 1f) });
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirSide));
+            Assert.That(world.GetState(0).Combat.AttackCancelUsed, Is.True, "前提: 攻撃→攻撃を使った");
+
+            // 使った後でも、当たれば特殊攻撃へキャンセルできる（数えない）。
+            Step(world, 8);
             MarkHit(world);
             world.Step(new[] { Press(InputButtons.Special1) });
-            CharacterState state = world.GetState(0);
-            Assert.That(state.Action.Attack, Is.EqualTo(AttackSlot.Special1), "当たったのに特殊攻撃でキャンセルできない");
-            Assert.That(state.Combat.AttackCancelUsed, Is.True, "攻撃→技を 1 回に数えない");
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Special1), "攻撃→攻撃を使った後に特殊攻撃でキャンセルできない");
+            Assert.That(world.GetState(0).Action.Ticks, Is.Zero);
 
-            // 特殊攻撃が当たっても、もう攻撃→攻撃を使っているので次へはつながらない。
+            // 技→通常攻撃は、攻撃→攻撃の 1 回に数える（もう使っているのでできない）。
             Step(world, 8);
             MarkHit(world);
             world.Step(new[] { Press(InputButtons.Attack, 0f, 1f) });
-            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Special1), "連携の 2 回目のキャンセルができた");
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Special1), "連携の 2 回目の攻撃→攻撃ができた");
+
+            // 技→もう一方の技・必殺技は、別枠なのでできる。
+            world.Step(new[] { Press(InputButtons.Special2) });
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Special2), "技→技でキャンセルできない");
+            Step(world, 6);
+            MarkHit(world);
+            SetGauge(world, CombatTuning.MaxGauge);
+            world.Step(new[] { Press(InputButtons.Super) });
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Super), "技→必殺技でキャンセルできない");
         }
 
         [Test]
-        public void GroundAttackToSpecial_IsCounted_UnlikeGroundToAirAttack()
+        public void GroundAttackToSpecial_DoesNotUseTheAttackCancel()
         {
             var world = new SimWorld(TestArenas.Ground());
             world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f), 1);
@@ -213,7 +230,7 @@ namespace Airerage.Core.Tests.Combat
             world.Step(new[] { Press(InputButtons.Special2) });
             CharacterState state = world.GetState(0);
             Assert.That(state.Action.Attack, Is.EqualTo(AttackSlot.Special2));
-            Assert.That(state.Combat.AttackCancelUsed, Is.True);
+            Assert.That(state.Combat.AttackCancelUsed, Is.False);
         }
 
         [Test]
@@ -267,7 +284,7 @@ namespace Airerage.Core.Tests.Combat
             var world = new SimWorld(TestArenas.Ground());
             world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY + 2f, 0f), 1);
             world.AddCharacter(new CharacterConfig(), new Vector3(-3f, GroundY, 0f), 1);
-            SetGauge(world, Combat.MaxGauge);
+            SetGauge(world, CombatTuning.MaxGauge);
             world.Step(new[] { Press(InputButtons.Super), default });
 
             HitRecord? hit = null;
@@ -313,7 +330,7 @@ namespace Airerage.Core.Tests.Combat
                 for (int i = 0; i < world.CharacterCount; i++)
                 {
                     CharacterState state = world.GetState(i);
-                    state.Combat.Gauge = Combat.MaxGauge;
+                    state.Combat.Gauge = CombatTuning.MaxGauge;
                     world.SetState(i, state);
                 }
             }

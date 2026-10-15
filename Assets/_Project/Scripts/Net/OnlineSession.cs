@@ -57,7 +57,8 @@ namespace Airerage.Net
         private readonly TransportLink _link;
         private readonly OnlineStage _stage;
         private readonly RollbackSettings _settings;
-        private readonly CharacterConfig _hostConfig;
+        // ホスト: 選べるキャラクターの調整値（番号の順。CharacterRoster と同じ順）。
+        private readonly IReadOnlyList<CharacterConfig> _characters;
         private readonly List<TransportLink.Event> _events = new List<TransportLink.Event>();
 
         // ホスト: プレイヤーの番号 → 接続の番号（-1 ならいない）。
@@ -66,6 +67,9 @@ namespace Airerage.Net
         // ホスト: プレイヤーの番号 → ロビーで届いたプレイヤーネーム（空ならまだない）。
         private readonly string[] _lobbyNames = new string[MaxPlayers];
 
+        // ホスト: プレイヤーの番号 → ロビーで選んだキャラクターの番号（docs/13 T5-5）。
+        private readonly int[] _lobbyCharacters = new int[MaxPlayers];
+
         // ホスト: プレイヤーの番号 → そのクライアントから最後に届いた入力の試合の番号（まだなら -1）。
         private readonly int[] _peerMatch = new int[MaxPlayers];
 
@@ -73,6 +77,7 @@ namespace Airerage.Net
         private byte[] _startMessage;
         private float _startResendTimer;
         private string _localName = string.Empty;
+        private int _localCharacter;
 
         // クライアント: ホストから届いたロビーの顔ぶれ（まだ届いていなければ、全員いない）。
         private LobbySlot[] _clientRoster = EmptyRoster();
@@ -87,12 +92,12 @@ namespace Airerage.Net
         private int _waitFrames;
         private int _nextChecksumTick = ChecksumIntervalTicks;
 
-        private OnlineSession(TransportLink link, OnlineStage stage, RollbackSettings settings, CharacterConfig hostConfig)
+        private OnlineSession(TransportLink link, OnlineStage stage, RollbackSettings settings, IReadOnlyList<CharacterConfig> characters)
         {
             _link = link;
             _stage = stage;
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            _hostConfig = hostConfig;
+            _characters = characters;
             for (int p = 0; p < MaxPlayers; p++)
             {
                 _playerPeer[p] = -1;
@@ -111,6 +116,41 @@ namespace Airerage.Net
         /// <summary>試合のプレイヤーネーム（番号の順。入力がなかった人は空。始まるまで空の配列）。</summary>
         public IReadOnlyList<string> PlayerNames { get; private set; } = Array.Empty<string>();
 
+        /// <summary>試合で各プレイヤーが使うキャラクターの番号（番号の順。CharacterRoster の番号。始まるまで空の配列。表示に使う）。</summary>
+        public IReadOnlyList<int> PlayerCharacters { get; private set; } = Array.Empty<int>();
+
+        /// <summary>
+        /// 自分が選んだキャラクターの番号（CharacterRoster の番号。docs/13 T5-5）。クライアントは、ロビーにいればすぐにホストへ送る。
+        /// 試合中に変えたら、次の試合（再戦）から使われる。ホストは、選べる数を超えた番号を 0 にする。
+        /// </summary>
+        public int LocalCharacter
+        {
+            get => _localCharacter;
+            set
+            {
+                int character = Math.Max(0, value);
+                if (character == _localCharacter)
+                {
+                    return;
+                }
+                _localCharacter = character;
+                if (IsHost)
+                {
+                    _lobbyCharacters[0] = ClampCharacter(character);
+                    BroadcastLobby();
+                }
+                else if (LocalPlayer >= 0)
+                {
+                    _link.Send(0, NetMessages.Pick(character), reliable: true);
+                }
+            }
+        }
+
+        // ホスト: 選べるキャラクターの番号に収める（範囲の外なら 0）。
+        private int ClampCharacter(int character)
+        {
+            return _characters != null && character >= 0 && character < _characters.Count ? character : 0;
+        }
         /// <summary>
         /// 自分のプレイヤーネーム（SanitizeName で整える）。クライアントは、ロビーにいればすぐにホストへ送る。試合中に変えたら、
         /// 次の試合（再戦）から使われる。
@@ -187,10 +227,11 @@ namespace Airerage.Net
                     return _clientRoster;
                 }
                 var slots = new LobbySlot[MaxPlayers];
-                slots[0] = new LobbySlot(true, _localName);
+                slots[0] = new LobbySlot(true, _localName, _lobbyCharacters[0]);
                 for (int p = 1; p < MaxPlayers; p++)
                 {
-                    slots[p] = new LobbySlot(_playerPeer[p] >= 0, _playerPeer[p] >= 0 ? _lobbyNames[p] : string.Empty);
+                    bool connected = _playerPeer[p] >= 0;
+                    slots[p] = new LobbySlot(connected, connected ? _lobbyNames[p] : string.Empty, connected ? _lobbyCharacters[p] : 0);
                 }
                 return slots;
             }
@@ -238,19 +279,39 @@ namespace Airerage.Net
             return Host(port, new OnlineStage(terrain, new[] { spawnBase }), config, settings);
         }
 
-        /// <summary>ホストとして port で待ち受ける（0 なら空いているポート）。config は全員が使う調整値。</summary>
+        /// <summary>ホストとして port で待ち受ける（0 なら空いているポート）。config は全員が使う調整値（キャラクターは 1 体だけ）。</summary>
         public static OnlineSession Host(ushort port, OnlineStage stage, CharacterConfig config, RollbackSettings settings)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+            return Host(port, stage, new[] { config }, settings);
+        }
+
+        /// <summary>
+        /// ホストとして port で待ち受ける（0 なら空いているポート）。characters は選べるキャラクターの調整値（番号の順。CharacterRoster と
+        /// 同じ順。1 体以上）。開始のときに、各プレイヤーが選んだキャラクターの調整値を全員へ送る（docs/13 T5-5）。
+        /// </summary>
+        public static OnlineSession Host(ushort port, OnlineStage stage, IReadOnlyList<CharacterConfig> characters, RollbackSettings settings)
         {
             if (stage == null)
             {
                 throw new ArgumentNullException(nameof(stage));
             }
-            if (config == null)
+            if (characters == null || characters.Count == 0)
             {
-                throw new ArgumentNullException(nameof(config));
+                throw new ArgumentException("選べるキャラクターが 1 体もありません", nameof(characters));
             }
-            config.Validate();
-            var session = new OnlineSession(TransportLink.Host(port), stage, settings, config)
+            foreach (CharacterConfig config in characters)
+            {
+                if (config == null)
+                {
+                    throw new ArgumentNullException(nameof(characters), "キャラクターの調整値が null です");
+                }
+                config.Validate();
+            }
+            var session = new OnlineSession(TransportLink.Host(port), stage, settings, characters)
             {
                 LocalPlayer = 0,
                 State = SessionState.Lobby,
@@ -326,8 +387,10 @@ namespace Airerage.Net
                 {
                     _playerPeer[next] = _playerPeer[p];
                     _lobbyNames[next] = _lobbyNames[p];
+                    _lobbyCharacters[next] = _lobbyCharacters[p];
                     _playerPeer[p] = -1;
                     _lobbyNames[p] = string.Empty;
+                    _lobbyCharacters[p] = 0;
                     _link.Send(_playerPeer[next], NetMessages.Welcome(next), reliable: true);
                 }
                 next++;
@@ -356,7 +419,7 @@ namespace Airerage.Net
             var slots = new LobbySlot[MaxPlayers];
             for (int p = 0; p < MaxPlayers; p++)
             {
-                slots[p] = new LobbySlot(false, string.Empty);
+                slots[p] = new LobbySlot(false, string.Empty, 0);
             }
             return slots;
         }
@@ -385,7 +448,30 @@ namespace Airerage.Net
             {
                 names[p] = SanitizeName(p == 0 ? _localName : _lobbyNames[p]);
             }
-            string json = JsonUtility.ToJson(new StartSettings { Character = _hostConfig, Match = rules, Names = names });
+            // 使うキャラクターの調整値だけを、重ねずに送る（同じキャラクターを選んだ人は同じ調整値を指す）。
+            var picks = new int[count];
+            var ids = new int[count];
+            var used = new List<int>();
+            for (int p = 0; p < count; p++)
+            {
+                ids[p] = ClampCharacter(_lobbyCharacters[p]);
+                int index = used.IndexOf(ids[p]);
+                if (index < 0)
+                {
+                    index = used.Count;
+                    used.Add(ids[p]);
+                }
+                picks[p] = index;
+            }
+            var configs = new CharacterConfig[used.Count];
+            for (int i = 0; i < used.Count; i++)
+            {
+                configs[i] = _characters[used[i]];
+            }
+            string json = JsonUtility.ToJson(new StartSettings
+            {
+                Characters = configs, Picks = picks, CharacterIds = ids, Match = rules, Names = names,
+            });
             byte[] start = NetMessages.Start(count, match, json);
             for (int p = 1; p < MaxPlayers; p++)
             {
@@ -397,7 +483,7 @@ namespace Airerage.Net
             }
             _startMessage = start;
             _startResendTimer = StartResendSeconds;
-            Begin(count, match, SettingsFromJson(json));
+            Begin(count, match, SettingsFromJson(json, count));
         }
 
         /// <summary>
@@ -613,6 +699,7 @@ namespace Airerage.Net
                 names[p] = settings.Names != null && p < settings.Names.Length ? SanitizeName(settings.Names[p]) : string.Empty;
             }
             PlayerNames = names;
+            PlayerCharacters = (int[])settings.CharacterIds.Clone();
             MatchNumber = match;
             // 前の試合（再戦の前）の進み具合を残さない。
             _accumulator = 0f;
@@ -622,7 +709,7 @@ namespace Airerage.Net
             World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match, _stage.CoinSpawns, _stage.BankSpots);
             for (int p = 0; p < playerCount; p++)
             {
-                World.AddCharacter(settings.Character, _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));
+                World.AddCharacter(settings.Characters[settings.Picks[p]], _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));
             }
             Session = new RollbackSession(World, LocalPlayer, _settings);
             Exchange = new InputExchange(Session, _settings);
@@ -686,6 +773,7 @@ namespace Airerage.Net
                     }
                     _playerPeer[player] = e.Peer;
                     _lobbyNames[player] = string.Empty;
+                    _lobbyCharacters[player] = 0;
                     _link.Send(e.Peer, NetMessages.Welcome(player), reliable: true);
                     Status = $"Hosting on port {Port}: {LobbyPlayerCount} player(s)";
                     BroadcastLobby();
@@ -698,6 +786,7 @@ namespace Airerage.Net
                         {
                             _playerPeer[p] = -1;
                             _lobbyNames[p] = string.Empty;
+                            _lobbyCharacters[p] = 0;
                             BroadcastLobby();
                             if (State == SessionState.Running)
                             {
@@ -752,6 +841,15 @@ namespace Airerage.Net
                     }
                     break;
 
+                case NetKind.Pick:
+                    int picker = PlayerOfPeer(e.Peer);
+                    if (picker > 0)
+                    {
+                        _lobbyCharacters[picker] = ClampCharacter(NetMessages.ReadPick(e.Data));
+                        BroadcastLobby();
+                    }
+                    break;
+
                 case NetKind.Checksum:
                     NetMessages.ReadChecksum(e.Data, out int checksumMatch, out int player, out int tick, out ulong checksum);
                     if (State == SessionState.Running && checksumMatch == MatchNumber && player > 0 && player < PlayerCount)
@@ -785,6 +883,10 @@ namespace Airerage.Net
                             {
                                 _link.Send(0, NetMessages.Hello(_localName), reliable: true);
                             }
+                            if (_localCharacter != 0)
+                            {
+                                _link.Send(0, NetMessages.Pick(_localCharacter), reliable: true);
+                            }
                             Status = $"Joined as player {LocalPlayer + 1}. Waiting for the host to start";
                             break;
                         case NetKind.Lobby:
@@ -792,7 +894,7 @@ namespace Airerage.Net
                             _clientRoster = EmptyRoster();
                             for (int p = 0; p < MaxPlayers && p < roster.Length; p++)
                             {
-                                _clientRoster[p] = new LobbySlot(roster[p].Connected, SanitizeName(roster[p].Name));
+                                _clientRoster[p] = new LobbySlot(roster[p].Connected, SanitizeName(roster[p].Name), roster[p].Character);
                             }
                             break;
                         case NetKind.Refused:
@@ -806,7 +908,7 @@ namespace Airerage.Net
                                 // 送り直された、今の試合の開始のメッセージ（もう始めている）。
                                 break;
                             }
-                            Begin(count, match, SettingsFromJson(json));
+                            Begin(count, match, SettingsFromJson(json, count));
                             break;
                         case NetKind.Input:
                             if (State == SessionState.Running && NetMessages.InputMatch(e.Data) == MatchNumber
@@ -832,20 +934,52 @@ namespace Airerage.Net
             }
         }
 
-        private static StartSettings SettingsFromJson(string json)
+        private static StartSettings SettingsFromJson(string json, int playerCount)
         {
-            var settings = new StartSettings { Character = new CharacterConfig(), Match = new MatchRules() };
+            var settings = new StartSettings { Match = new MatchRules() };
             JsonUtility.FromJsonOverwrite(json, settings);
-            settings.Character.Validate();
+            if (settings.Characters == null || settings.Characters.Length == 0)
+            {
+                throw new FormatException("開始のメッセージにキャラクターの調整値がありません");
+            }
+            foreach (CharacterConfig config in settings.Characters)
+            {
+                if (config == null)
+                {
+                    throw new FormatException("開始のメッセージのキャラクターの調整値が空です");
+                }
+                config.Validate();
+            }
+            if (settings.Picks == null || settings.Picks.Length < playerCount || settings.CharacterIds == null || settings.CharacterIds.Length < playerCount)
+            {
+                throw new FormatException($"開始のメッセージのキャラクターの選択が人数（{playerCount}）より少ない");
+            }
+            for (int p = 0; p < playerCount; p++)
+            {
+                if (settings.Picks[p] < 0 || settings.Picks[p] >= settings.Characters.Length)
+                {
+                    throw new FormatException($"開始のメッセージのプレイヤー {p + 1} のキャラクターが範囲の外（{settings.Picks[p]}）");
+                }
+            }
             settings.Match.Validate().ThrowIfInvalid();
             return settings;
         }
 
-        /// <summary>試合の開始のときに、ホストが全員へ送る値（調整値、試合のルール、プレイヤーネーム）。</summary>
+        /// <summary>
+        /// 試合の開始のときに、ホストが全員へ送る値（使うキャラクターの調整値、各プレイヤーのキャラクター、試合のルール、プレイヤーネーム）。
+        /// </summary>
         [Serializable]
         private sealed class StartSettings
         {
-            public CharacterConfig Character;
+            /// <summary>使うキャラクターの調整値（重ねない）。</summary>
+            public CharacterConfig[] Characters;
+
+            /// <summary>プレイヤーごとの、Characters の番号。</summary>
+            public int[] Picks;
+
+            /// <summary>プレイヤーごとの、キャラクターの番号（CharacterRoster の番号。表示に使う）。</summary>
+            public int[] CharacterIds;
+
             public MatchRules Match;
             public string[] Names;
         }
