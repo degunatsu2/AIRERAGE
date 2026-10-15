@@ -1,4 +1,7 @@
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Airerage.Core.Wire;
 using Airerage.Runtime.DebugTools;
 using Airerage.Runtime.Presentation;
@@ -6,6 +9,7 @@ using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using Unity.Cinemachine;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
@@ -82,11 +86,48 @@ namespace Airerage.PlayMode.Tests
             yield return WaitSeconds(1f);
             Assert.That(composer.CameraDistance, Is.EqualTo(zoom.MaxDistance).Within(0.1f), "カメラが離れない");
 
-            // ホイールの押し込み・LB と RB の同時押しで、初期の距離に戻る。
+            // ホイールの押し込み・十字キーの左右で、初期の距離に戻る。
             Assert.That(zoom.DefaultDistance, Is.EqualTo(30f).Within(0.01f), "初期の距離が違う");
             zoom.ResetZoom();
             yield return WaitSeconds(1f);
             Assert.That(composer.CameraDistance, Is.EqualTo(zoom.DefaultDistance).Within(0.1f), "初期の距離に戻らない");
+        }
+
+        [UnityTest]
+        public IEnumerator Gamepad_SpecialsOnTheShoulders_ZoomAndResetOnTheDpad()
+        {
+            // D-56（2026-10-15、ユーザー）: LB / RB を特殊攻撃に、ズームを十字キーの上下に、ズームのリセットを十字キーの左右に。
+            // 十字キーの検証用の操作はキーボードだけにする。
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+
+            var zoom = Object.FindFirstObjectByType<CameraZoom>();
+            var asset = (InputActionAsset)typeof(CameraZoom)
+                .GetField("_inputActions", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(zoom);
+            Assert.That(asset, Is.Not.Null, "前提: 入力のアセットがある");
+
+            Assert.That(Paths(asset, "Player", "Special1"), Does.Contain("<Gamepad>/leftShoulder").And.Contain("<Keyboard>/q"));
+            Assert.That(Paths(asset, "Player", "Special2"), Does.Contain("<Gamepad>/rightShoulder").And.Contain("<Keyboard>/e"));
+            Assert.That(Paths(asset, "Player", "Super"), Does.Contain("<Keyboard>/r"));
+            Assert.That(Paths(asset, "Camera", "HoldZoom"), Does.Contain("<Gamepad>/dpad/up").And.Contain("<Gamepad>/dpad/down"));
+            Assert.That(Paths(asset, "Camera", "ResetZoom"),
+                Does.Contain("<Gamepad>/dpad/left").And.Contain("<Gamepad>/dpad/right").And.Contain("<Mouse>/middleButton"));
+
+            foreach (InputBinding binding in asset.FindActionMap("Camera", true).bindings)
+            {
+                Assert.That(binding.path, Does.Not.Contain("Shoulder"), $"カメラが肩のボタンをまだ使っている: {binding.action}");
+            }
+            foreach (InputBinding binding in asset.FindActionMap("Debug", true).bindings)
+            {
+                Assert.That(binding.path, Does.Not.StartWith("<Gamepad>/dpad"), $"検証用の操作が十字キーをまだ使っている: {binding.action}");
+            }
+        }
+
+        // アクションの割り当て（合成の部分を含む）のパス。
+        private static List<string> Paths(InputActionAsset asset, string map, string action)
+        {
+            return asset.FindActionMap(map, true).FindAction(action, true).bindings
+                .Where(b => !b.isComposite).Select(b => b.path).ToList();
         }
 
         private static IEnumerator WaitSeconds(float seconds)

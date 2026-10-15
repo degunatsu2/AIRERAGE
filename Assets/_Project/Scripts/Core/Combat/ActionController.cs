@@ -28,6 +28,11 @@ namespace Airerage.Core.Combat
     ///   ガードの途中でも、攻撃・ワイヤーでキャンセルして動ける（ユーザーの要望、2026-10-13）。ただし攻撃をガードした後の
     ///   ガード硬直の間はできない（CancelFromTick）。キャンセルしてもガードは終わったことになり、クールタイムが始まる。
     /// - 攻撃中・のけぞり中・ガード中の移動・ジャンプ・ワイヤーの入力は無視する（ControlInput）。攻撃のデータが決める動きは ApplyMotion。
+    /// - 特殊攻撃と必殺技（docs/13 T5-2、T5-3。D-53、D-55）: 出し方とキャンセルは通常攻撃と同じ（先行入力、ワイヤー→技、
+    ///   ガード→技、当たったときの攻撃→技・技→攻撃。攻撃→攻撃の 1 回に数える。地上技→空中の攻撃のように数えない例外はない）。
+    ///   地上でも空中でも同じ技。違うのは使う条件だけ: 特殊攻撃はそれぞれのクールタイム（使い始めたときから数える）が 0 のとき、
+    ///   必殺技はゲージが SuperGaugeCost 以上のとき（出したときに減る）。条件を満たさない間は出ず、先行入力の間に満たせば出る。
+    ///   同じティックに複数を押したら、必殺技 → 特殊攻撃 2 → 特殊攻撃 1 → 通常攻撃 の順に優先する【仮】。
     /// </summary>
     public static class ActionController
     {
@@ -92,7 +97,12 @@ namespace Airerage.Core.Combat
                 StartGuard(ref state, config);
                 return;
             }
-            if (state.Combat.AttackBufferTicksLeft == 0)
+            if (state.Combat.AttackBufferTicksLeft == 0 || state.Wire.Phase == WirePhase.Firing)
+            {
+                return;
+            }
+            AttackSlot slot = BufferedSlot(state);
+            if (!CanUse(state, slot, combat))
             {
                 return;
             }
@@ -100,9 +110,21 @@ namespace Airerage.Core.Combat
             {
                 WireController.Release(ref state, WireReleaseReason.Attack, config.Wire);
             }
-            if (state.Wire.Phase != WirePhase.Firing)
+            StartAttack(ref state, slot, combat);
+        }
+
+        /// <summary>
+        /// 技を使う条件を満たしているか（特殊攻撃はクールタイムが 0、必殺技はゲージが足りる。通常攻撃はいつでも true）。
+        /// 表示（使えるかどうか）にも使う。
+        /// </summary>
+        public static bool CanUse(in CharacterState state, AttackSlot slot, CombatTuning combat)
+        {
+            switch (slot)
             {
-                StartAttack(ref state, state.Grounded ? AttackSlot.Ground : state.Combat.BufferedAirAttack);
+                case AttackSlot.Special1: return state.Combat.Special1CooldownTicksLeft == 0;
+                case AttackSlot.Special2: return state.Combat.Special2CooldownTicksLeft == 0;
+                case AttackSlot.Super: return state.Combat.Gauge >= combat.SuperGaugeCost;
+                default: return true;
             }
         }
 
@@ -126,10 +148,7 @@ namespace Airerage.Core.Combat
         public static void RecordHitstopPresses(ref CharacterState state, PlayerInput input, CharacterConfig config)
         {
             var frame = new InputFrame(input, state.PreviousButtons);
-            if (frame.WasPressed(InputButtons.Attack))
-            {
-                BufferAttack(ref state, frame, config.Combat, config.Movement.MoveDeadzone);
-            }
+            BufferPresses(ref state, frame, config.Combat, config.Movement.MoveDeadzone);
             state.Combat.HitstopPresses |= frame.Pressed & InputButtons.Jump;
         }
 
@@ -200,24 +219,24 @@ namespace Airerage.Core.Combat
             return x >= deadzone ? AttackSlot.AirSide : AttackSlot.AirNeutral;
         }
 
-        // 攻撃ボタンの先行入力（押したときのスティックの向きも覚える）と、ワイヤーキャンセル・ガードのクールタイムを進める。
+        // 攻撃・技のボタンの先行入力（押したときのスティックの向きも覚える）と、ワイヤーキャンセル・ガード・特殊攻撃のクールタイムを進める。
         private static void UpdateTimers(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone)
         {
-            if (input.WasPressed(InputButtons.Attack))
-            {
-                BufferAttack(ref state, input, combat, deadzone);
-            }
-            else if (state.Combat.AttackBufferTicksLeft > 0)
+            if (!BufferPresses(ref state, input, combat, deadzone) && state.Combat.AttackBufferTicksLeft > 0)
             {
                 state.Combat.AttackBufferTicksLeft--;
             }
-            if (state.Combat.WireCancelCooldownTicksLeft > 0)
+            CountDown(ref state.Combat.WireCancelCooldownTicksLeft);
+            CountDown(ref state.Combat.GuardCooldownTicksLeft);
+            CountDown(ref state.Combat.Special1CooldownTicksLeft);
+            CountDown(ref state.Combat.Special2CooldownTicksLeft);
+        }
+
+        private static void CountDown(ref int ticksLeft)
+        {
+            if (ticksLeft > 0)
             {
-                state.Combat.WireCancelCooldownTicksLeft--;
-            }
-            if (state.Combat.GuardCooldownTicksLeft > 0)
-            {
-                state.Combat.GuardCooldownTicksLeft--;
+                ticksLeft--;
             }
         }
 
@@ -229,10 +248,10 @@ namespace Airerage.Core.Combat
                 EndGuard(ref state, config.Combat);
                 return;
             }
-            if (state.Combat.AttackBufferTicksLeft > 0)
+            if (state.Combat.AttackBufferTicksLeft > 0 && CanUse(state, BufferedSlot(state), config.Combat))
             {
                 EndGuard(ref state, config.Combat);
-                StartAttack(ref state, state.Grounded ? AttackSlot.Ground : state.Combat.BufferedAirAttack);
+                StartAttack(ref state, BufferedSlot(state), config.Combat);
             }
         }
 
@@ -258,11 +277,44 @@ namespace Airerage.Core.Combat
             state.Combat.AttackBufferTicksLeft = 0;
         }
 
-        private static void BufferAttack(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone)
+        // このティックに押した攻撃・技のボタンを先行入力にする（優先: 必殺技 → 特殊攻撃 2 → 特殊攻撃 1 → 通常攻撃）。押していれば true。
+        private static bool BufferPresses(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone)
+        {
+            if (input.WasPressed(InputButtons.Super))
+            {
+                BufferAttack(ref state, input, combat, deadzone, AttackSlot.Super);
+            }
+            else if (input.WasPressed(InputButtons.Special2))
+            {
+                BufferAttack(ref state, input, combat, deadzone, AttackSlot.Special2);
+            }
+            else if (input.WasPressed(InputButtons.Special1))
+            {
+                BufferAttack(ref state, input, combat, deadzone, AttackSlot.Special1);
+            }
+            else if (input.WasPressed(InputButtons.Attack))
+            {
+                BufferAttack(ref state, input, combat, deadzone, SelectAttack(false, input.Move, deadzone));
+            }
+            else
+            {
+                return false;
+            }
+            return true;
+        }
+
+        private static void BufferAttack(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone, AttackSlot slot)
         {
             state.Combat.AttackBufferTicksLeft = Math.Max(1, combat.AttackBufferTicks);
-            state.Combat.BufferedAirAttack = SelectAttack(false, input.Move, deadzone);
+            state.Combat.BufferedAttack = slot;
             state.Combat.BufferedFacing = (sbyte)(input.Move.X >= deadzone ? 1 : input.Move.X <= -deadzone ? -1 : 0);
+        }
+
+        // 先行入力から出す技（通常攻撃は地上なら地上技、空中なら押したときの向きの技。特殊攻撃と必殺技はそのまま）。
+        private static AttackSlot BufferedSlot(in CharacterState state)
+        {
+            AttackSlot buffered = state.Combat.BufferedAttack;
+            return state.Grounded && !CombatTuning.IsSpecial(buffered) ? AttackSlot.Ground : buffered;
         }
 
         // 攻撃中のキャンセル。キャンセルしたら、Free にする（ジャンプ・ワイヤーは、このティックの移動とワイヤーの処理で行う）か、
@@ -291,22 +343,27 @@ namespace Airerage.Core.Combat
             {
                 return;
             }
-            if (state.Action.Attack == AttackSlot.Ground && !state.Grounded)
+            AttackSlot next = BufferedSlot(state);
+            if (!CanUse(state, next, combat))
             {
-                StartAttack(ref state, state.Combat.BufferedAirAttack);
                 return;
             }
-            AttackSlot next = state.Grounded ? AttackSlot.Ground : state.Combat.BufferedAirAttack;
+            if (state.Action.Attack == AttackSlot.Ground && !state.Grounded && !CombatTuning.IsSpecial(next))
+            {
+                StartAttack(ref state, next, combat);
+                return;
+            }
             if (state.Combat.AttackCancelUsed || (state.Action.Attack == AttackSlot.Ground && next == AttackSlot.Ground))
             {
                 return;
             }
-            StartAttack(ref state, next);
+            StartAttack(ref state, next, combat);
             state.Combat.AttackCancelUsed = true;
         }
 
         // 攻撃を始める（先行入力を使い切る）。押したときに横を入れていれば、その向きを向く。
-        private static void StartAttack(ref CharacterState state, AttackSlot slot)
+        // 特殊攻撃ならクールタイムを始め、必殺技ならゲージを使う。
+        private static void StartAttack(ref CharacterState state, AttackSlot slot, CombatTuning combat)
         {
             if (state.Combat.BufferedFacing != 0)
             {
@@ -319,6 +376,18 @@ namespace Airerage.Core.Combat
                 Ticks = 0,
             };
             state.Combat.AttackBufferTicksLeft = 0;
+            switch (slot)
+            {
+                case AttackSlot.Special1:
+                    state.Combat.Special1CooldownTicksLeft = combat.Special1CooldownTicks;
+                    break;
+                case AttackSlot.Special2:
+                    state.Combat.Special2CooldownTicksLeft = combat.Special2CooldownTicks;
+                    break;
+                case AttackSlot.Super:
+                    state.Combat.Gauge -= combat.SuperGaugeCost;
+                    break;
+            }
         }
 
         // Locomotion と同じ条件で、このティックにジャンプできるか（地上・コヨーテタイム・空中ジャンプの残り）。

@@ -46,17 +46,26 @@ namespace Airerage.Core.Combat
         /// <summary>攻撃ボタンの先行入力の残り（ティック）。0 でなければ、攻撃を始められるようになったときに出る。</summary>
         public int AttackBufferTicksLeft;
 
-        /// <summary>先行入力した攻撃の、空中での種類（押したときのスティックの向きで決める。地上なら地上技になる）。</summary>
-        public AttackSlot BufferedAirAttack;
+        /// <summary>
+        /// 先行入力した攻撃の種類。通常攻撃なら空中での種類（押したときのスティックの向きで決める。地上なら地上技になる）、
+        /// 特殊攻撃と必殺技ならその技（地上でも空中でも同じ）。
+        /// </summary>
+        public AttackSlot BufferedAttack;
 
         /// <summary>先行入力したときの横の向き（-1、0、1。0 なら向きを変えない）。</summary>
         public sbyte BufferedFacing;
 
         /// <summary>
         /// ゲージ（0〜CombatTuning.MaxGauge。docs/01_game_design.md 6.7、docs/11_combat_plan.md T3-6）。攻撃の命中・被弾・ガード・
-        /// ジャストガードで増える。撃破されて戻っても引き継ぐ【仮】。消費は Phase 5。
+        /// ジャストガードで増える。撃破されて戻っても引き継ぐ【仮】。必殺技を出すと CombatTuning.SuperGaugeCost だけ減る（D-55）。
         /// </summary>
         public int Gauge;
+
+        /// <summary>特殊攻撃 1 をもう一度使えるまでの残り（ティック。使い始めたときから数える。D-55）。撃破されると 0 に戻る【仮】。</summary>
+        public int Special1CooldownTicksLeft;
+
+        /// <summary>特殊攻撃 2 をもう一度使えるまでの残り（ティック）。</summary>
+        public int Special2CooldownTicksLeft;
 
         /// <summary>次のガードができるまでの残り（ティック。ガードが終わってから数える。D-21）。</summary>
         public int GuardCooldownTicksLeft;
@@ -107,9 +116,11 @@ namespace Airerage.Core.Combat
                 && AttackCancelUsed == other.AttackCancelUsed
                 && WireCancelCooldownTicksLeft == other.WireCancelCooldownTicksLeft
                 && AttackBufferTicksLeft == other.AttackBufferTicksLeft
-                && BufferedAirAttack == other.BufferedAirAttack
+                && BufferedAttack == other.BufferedAttack
                 && BufferedFacing == other.BufferedFacing
                 && Gauge == other.Gauge
+                && Special1CooldownTicksLeft == other.Special1CooldownTicksLeft
+                && Special2CooldownTicksLeft == other.Special2CooldownTicksLeft
                 && GuardCooldownTicksLeft == other.GuardCooldownTicksLeft
                 && BounceCount == other.BounceCount
                 && FatalHitCount == other.FatalHitCount
@@ -131,7 +142,8 @@ namespace Airerage.Core.Combat
         {
             return HashCode.Combine(
                 HashCode.Combine(HitstopTicksLeft, HasLastAttacker, LastAttacker, LastDamagedTick, ComboCount, ComboDamage, Knockouts, Falls),
-                HashCode.Combine(AttackCancelUsed, WireCancelCooldownTicksLeft, AttackBufferTicksLeft, BufferedAirAttack, BufferedFacing),
+                HashCode.Combine(AttackCancelUsed, WireCancelCooldownTicksLeft, AttackBufferTicksLeft, BufferedAttack, BufferedFacing,
+                    Special1CooldownTicksLeft, Special2CooldownTicksLeft),
                 HashCode.Combine(Gauge, GuardCooldownTicksLeft, BounceCount, FatalHitCount, JustGuardCount, GuardedCount, HitstopPresses),
                 HashCode.Combine(RespawnTicksLeft, InvincibleTicksLeft, RewardDamage, RewardAttacker));
         }
@@ -140,7 +152,7 @@ namespace Airerage.Core.Combat
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAirAttack},{BufferedFacing}) gauge={Gauge} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker}";
         }
     }
 }

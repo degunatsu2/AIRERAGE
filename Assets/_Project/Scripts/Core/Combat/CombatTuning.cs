@@ -101,6 +101,9 @@ namespace Airerage.Core.Combat
         /// <summary>1つの攻撃が持てる判定の数の上限（当てた相手の記録のビット数による）。</summary>
         public const int MaxHits = 4;
 
+        /// <summary>技の名前（表示用。特殊攻撃と必殺技の表示に使う。空なら表示しない）。</summary>
+        public string Name = string.Empty;
+
         /// <summary>攻撃の全体の長さ（ティック）。終わったティックから次の行動ができる。</summary>
         public int TotalTicks = 18;
 
@@ -180,6 +183,7 @@ namespace Airerage.Core.Combat
     /// <summary>
     /// 戦闘の調整値（攻撃のセット）。初期値はすべて【仮】（docs/11_combat_plan.md）。
     /// 地上技1つと、空中のニュートラル／横／上／下の4つ（D-35）。そのうち1つが撃破技（D-38）。
+    /// ほかに特殊攻撃 2 つ（それぞれのクールタイム）と必殺技（ゲージを消費）を持つ（D-53、D-55。docs/13 T5-2、T5-3）。
     /// 友達との対戦の結果（ワイヤーで動きながらだと当てにくい。ユーザーの要望、2026-10-13）で、判定の箱を縦横とも約 2.5 倍に
     /// （体の近くも含むように、キャラクターの側の端はおおむね残して前へ広げた）、ヒットストップを 2 倍にした（最初の攻撃から
     /// コンボへ行きやすいように）。
@@ -283,6 +287,84 @@ namespace Airerage.Core.Combat
             },
         };
 
+        /// <summary>
+        /// 特殊攻撃 1（デフォルトのキャラクター。docs/13 T5-2 の仮の技）: 少しためてから、向いている方向へまっすぐ突進して当てる
+        /// （突進の間は高さを保つ。横への移動技にもなる）。
+        /// </summary>
+        public AttackData Special1 = new AttackData
+        {
+            Name = "DASH",
+            TotalTicks = 30,
+            WireCancelFromTick = 6,
+            Hits = new[]
+            {
+                new AttackHit
+                {
+                    StartTick = 6, ActiveTicks = 12, OffsetX = 1f, HalfWidth = 1.5f, HalfHeight = 1.5f,
+                    Damage = 6, HitstopTicks = 12, HitstunTicks = 24, KnockbackX = 12f, KnockbackY = 8f,
+                },
+            },
+            Motions = new[]
+            {
+                new AttackMotion { StartTick = 0, Ticks = 6, VelocityX = 0f, VelocityY = 0f },
+                new AttackMotion { StartTick = 6, Ticks = 12, VelocityX = 22f, VelocityY = 0f },
+            },
+        };
+
+        /// <summary>特殊攻撃 1 をもう一度使えるまで（ティック。使い始めたときから数える。D-55）。【仮】4 秒。</summary>
+        public int Special1CooldownTicks = 240;
+
+        /// <summary>
+        /// 特殊攻撃 2（デフォルトのキャラクター。docs/13 T5-2 の仮の技）: すぐに斜め上へ飛び上がりながら、頭上を打ち上げる
+        /// （上への移動技にもなる。ステージの外から戻るのにも使える）。
+        /// </summary>
+        public AttackData Special2 = new AttackData
+        {
+            Name = "RISE",
+            TotalTicks = 30,
+            WireCancelFromTick = 4,
+            Hits = new[]
+            {
+                new AttackHit
+                {
+                    StartTick = 4, ActiveTicks = 8, OffsetX = 0.4f, OffsetY = 1.2f, HalfWidth = 1.5f, HalfHeight = 2f,
+                    Damage = 5, HitstopTicks = 12, HitstunTicks = 26, KnockbackX = 3f, KnockbackY = 15f,
+                },
+            },
+            Motions = new[]
+            {
+                new AttackMotion { StartTick = 4, Ticks = 8, VelocityX = 3f, VelocityY = 14f },
+            },
+        };
+
+        /// <summary>特殊攻撃 2 をもう一度使えるまで（ティック）。【仮】6 秒。</summary>
+        public int Special2CooldownTicks = 360;
+
+        /// <summary>
+        /// 必殺技（デフォルトのキャラクター。docs/13 T5-3 の仮の技）: その場で止まってためた後、体の周りを大きく吹き飛ばす。
+        /// </summary>
+        public AttackData Super = new AttackData
+        {
+            Name = "BURST",
+            TotalTicks = 54,
+            WireCancelFromTick = 18,
+            Hits = new[]
+            {
+                new AttackHit
+                {
+                    StartTick = 18, ActiveTicks = 8, OffsetX = 0f, HalfWidth = 4.5f, HalfHeight = 4.5f,
+                    Damage = 15, HitstopTicks = 24, HitstunTicks = 40, KnockbackX = 16f, KnockbackY = 12f,
+                },
+            },
+            Motions = new[]
+            {
+                new AttackMotion { StartTick = 0, Ticks = 26, VelocityX = 0f, VelocityY = 0f },
+            },
+        };
+
+        /// <summary>必殺技に使うゲージ（D-55: 100）。出したときに減る。</summary>
+        public int SuperGaugeCost = 100;
+
         /// <summary>撃破技にする攻撃（キャラクターごとに1つ。D-38）。</summary>
         public AttackSlot KoAttack = AttackSlot.AirDown;
 
@@ -345,10 +427,10 @@ namespace Airerage.Core.Combat
         public float ParriedPushbackX = 4f;
         public float ParriedPushbackY = 6f;
 
-        /// <summary>ゲージの最大（docs/01_game_design.md 6.7）。消費（方向転換、必殺技）は Phase 5。</summary>
+        /// <summary>ゲージの最大（docs/01_game_design.md 6.7）。使い道は必殺技だけ（D-55、D-57）。</summary>
         public int MaxGauge = 100;
 
-        /// <summary>攻撃が当たったときに、当てた側が得るゲージ（大）。【仮】</summary>
+        /// <summary>攻撃が当たったときに、当てた側が得るゲージ（大）。必殺技が当たったときは得ない【仮】。【仮】</summary>
         public int GaugeOnHit = 8;
 
         /// <summary>攻撃がふつうのガードをされたときに、攻撃した側が得るゲージ。【仮】</summary>
@@ -372,7 +454,27 @@ namespace Airerage.Core.Combat
                 case AttackSlot.AirSide: return AirSide;
                 case AttackSlot.AirUp: return AirUp;
                 case AttackSlot.AirDown: return AirDown;
+                case AttackSlot.Special1: return Special1;
+                case AttackSlot.Special2: return Special2;
+                case AttackSlot.Super: return Super;
                 default: throw new ArgumentOutOfRangeException(nameof(slot), slot, "不明な攻撃の種類");
+            }
+        }
+
+        /// <summary>特殊攻撃か必殺技か（地上でも空中でも同じ技で、使う条件がある）。</summary>
+        public static bool IsSpecial(AttackSlot slot)
+        {
+            return slot == AttackSlot.Special1 || slot == AttackSlot.Special2 || slot == AttackSlot.Super;
+        }
+
+        /// <summary>特殊攻撃のクールタイム（ティック。それ以外は 0）。</summary>
+        public int CooldownTicksOf(AttackSlot slot)
+        {
+            switch (slot)
+            {
+                case AttackSlot.Special1: return Special1CooldownTicks;
+                case AttackSlot.Special2: return Special2CooldownTicks;
+                default: return 0;
             }
         }
 
@@ -398,6 +500,10 @@ namespace Airerage.Core.Combat
             {
                 v.Fail($"{nameof(KoAttack)} が攻撃の種類ではありません（{KoAttack}）");
             }
+            v.NonNegative(nameof(Special1CooldownTicks), Special1CooldownTicks);
+            v.NonNegative(nameof(Special2CooldownTicks), Special2CooldownTicks);
+            v.Positive(nameof(SuperGaugeCost), SuperGaugeCost);
+            v.AtMost(nameof(SuperGaugeCost), SuperGaugeCost, nameof(MaxGauge), MaxGauge);
             v.NonNegative(nameof(KoKnockbackBase), KoKnockbackBase);
             v.NonNegative(nameof(KoKnockbackPerSpeed), KoKnockbackPerSpeed);
             v.NonNegative(nameof(FatalStrikeSpeed), FatalStrikeSpeed);

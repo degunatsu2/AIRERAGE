@@ -340,7 +340,7 @@
                 {
                     "name": "",
                     "id": "5e856bf2-742e-4e92-aa12-71723513a1a8",
-                    "path": "<Gamepad>/buttonNorth",
+                    "path": "<Gamepad>/leftShoulder",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -362,7 +362,7 @@
                 {
                     "name": "",
                     "id": "2932c72d-df06-42e6-8405-7bd5ee26c5c2",
-                    "path": "<Gamepad>/leftTrigger",
+                    "path": "<Gamepad>/rightShoulder",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -439,7 +439,7 @@
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "Shoulders",
+                    "name": "DpadUpDown",
                     "id": "bf3e7e28-471b-4761-956d-24d6b5a50206",
                     "path": "1DAxis",
                     "interactions": "",
@@ -452,7 +452,7 @@
                 {
                     "name": "negative",
                     "id": "ac5730b3-60b9-450a-91ca-54e6b5d07f2d",
-                    "path": "<Gamepad>/leftShoulder",
+                    "path": "<Gamepad>/dpad/down",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -463,7 +463,7 @@
                 {
                     "name": "positive",
                     "id": "102320d8-28d7-4a66-a26b-21f1f1a0ddc6",
-                    "path": "<Gamepad>/rightShoulder",
+                    "path": "<Gamepad>/dpad/up",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -483,37 +483,26 @@
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "BothShoulders",
-                    "id": "501df65d-13ee-49bd-8093-441c81e5adf5",
-                    "path": "OneModifier(overrideModifiersNeedToBePressedFirst=true)",
+                    "name": "",
+                    "id": "1d3b12aa-8956-450a-b045-6d68cd587054",
+                    "path": "<Gamepad>/dpad/left",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "ResetZoom",
-                    "isComposite": true,
+                    "isComposite": false,
                     "isPartOfComposite": false
                 },
                 {
-                    "name": "modifier",
-                    "id": "fa2bfd10-9495-453a-b6ef-5e24eb62cd92",
-                    "path": "<Gamepad>/leftShoulder",
+                    "name": "",
+                    "id": "fd5bb50f-be01-40c6-afad-dce85b3cbb27",
+                    "path": "<Gamepad>/dpad/right",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "ResetZoom",
                     "isComposite": false,
-                    "isPartOfComposite": true
-                },
-                {
-                    "name": "binding",
-                    "id": "5e8f394b-1a62-4e29-8b8a-920f2511cfb9",
-                    "path": "<Gamepad>/rightShoulder",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "ResetZoom",
-                    "isComposite": false,
-                    "isPartOfComposite": true
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -630,30 +619,8 @@
                 },
                 {
                     "name": "",
-                    "id": "78fed367-0f9d-404d-b52f-7b51e8179971",
-                    "path": "<Gamepad>/dpad/down",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "CycleSpeed",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "ab8e32f5-b325-40dd-82e0-ae94a04a9e15",
                     "path": "<Keyboard>/f2",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "StepTick",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "b454ad3e-2926-4ad5-a35d-6eab432c39c1",
-                    "path": "<Gamepad>/dpad/right",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -674,30 +641,8 @@
                 },
                 {
                     "name": "",
-                    "id": "0e9d7edb-4ef7-4db3-b4f3-473531f5b46c",
-                    "path": "<Gamepad>/dpad/up",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "SaveRecording",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "0f081484-0975-479b-a82a-7a2b26d7e216",
                     "path": "<Keyboard>/f6",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "PlayRecording",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "e69e59a7-2595-4c07-925c-85ff7f47aba1",
-                    "path": "<Gamepad>/dpad/left",
                     "interactions": "",
                     "processors": "",
                     "groups": "",

@@ -19,6 +19,7 @@ namespace Airerage.Core.Combat
 
     /// <summary>
     /// 攻撃の種類（docs/01_game_design.md 6.1）。地上は方向に関係なく「地上技」1つ、空中はニュートラル／横／上／下（D-35）。
+    /// 特殊攻撃 2 つ（それぞれのクールタイム）と必殺技（ゲージを消費）は、地上でも空中でも同じ技（D-53、D-55。docs/13 T5-2、T5-3）。
     /// </summary>
     public enum AttackSlot : byte
     {
@@ -27,6 +28,15 @@ namespace Airerage.Core.Combat
         AirSide,
         AirUp,
         AirDown,
+
+        /// <summary>特殊攻撃 1（キーボードの Q、ゲームパッドの LB）。</summary>
+        Special1,
+
+        /// <summary>特殊攻撃 2（キーボードの E、ゲームパッドの RB）。</summary>
+        Special2,
+
+        /// <summary>必殺技（キーボードの R、ゲームパッドの右スティックの押し込み【仮】）。</summary>
+        Super,
     }
 
     /// <summary>攻撃の段階（フレームデータ）。</summary>

@@ -28,6 +28,7 @@ namespace Airerage.Core.Combat
     /// - 両者にヒットストップを与える。
     /// - ゲージ（T3-6）: 当たれば当てた側が GaugeOnHit・受けた側が GaugeOnDamaged、ふつうのガードなら攻撃した側が GaugeOnGuarded・
     ///   守った側が GaugeOnGuard、ジャストガードなら守った側が GaugeOnJustGuard を得る（それぞれ自分の調整値。上限 MaxGauge）。
+    ///   必殺技では、攻撃した側はゲージを得ない（続けて必殺技を出せないように。docs/13 T5-3）【仮】。受けた側・守った側は得る。
     /// </summary>
     public sealed class HitResolver
     {
@@ -148,8 +149,11 @@ namespace Airerage.Core.Combat
                 attacker.Action.Connected |= result == HitResult.Hit;
             }
             attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, hitstop);
-            AddGauge(ref attacker.Combat, attackerCombat,
-                result == HitResult.Hit ? attackerCombat.GaugeOnHit : result == HitResult.Guarded ? attackerCombat.GaugeOnGuarded : 0);
+            if (hit.Attack != AttackSlot.Super)
+            {
+                AddGauge(ref attacker.Combat, attackerCombat,
+                    result == HitResult.Hit ? attackerCombat.GaugeOnHit : result == HitResult.Guarded ? attackerCombat.GaugeOnGuarded : 0);
+            }
             states[hit.Attacker] = attacker;
 
             victim = states[hit.Victim];

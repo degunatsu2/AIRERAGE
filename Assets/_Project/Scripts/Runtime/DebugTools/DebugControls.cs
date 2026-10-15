@@ -9,8 +9,8 @@ namespace Airerage.Runtime.DebugTools
     /// <summary>
     /// デバッグ用の操作（docs/06_prototype_plan.md 3章）。AirerageControls.inputactions の "Debug" マップを読む。
     /// - ToggleWireType（Tab / Select）: ワイヤーのタイプ A / B を切り替える（調整値のアセットの値を変える）
-    /// - CycleSpeed（F1 / 十字キー下）: シミュレーションの速さを 1 → 1/2 → 1/4 → 一時停止 → 1 の順に変える
-    /// - StepTick（F2 / 十字キー右）: 一時停止中に1ティックだけ進める
+    /// - CycleSpeed（F1）: シミュレーションの速さを 1 → 1/2 → 1/4 → 一時停止 → 1 の順に変える
+    /// - StepTick（F2）: 一時停止中に1ティックだけ進める
     /// - ToggleDummyWalk（F7）: ダミーを向いている方向へ歩かせる／止める（足場から落として撃破の手柄を確かめる）
     /// - ToggleDummyAttack（F8）: ダミーに一定の間隔で攻撃させる／止める（ガードとジャストガードを試す）
     /// - ToggleBgm（F9）: 仮の BGM を止める／鳴らす（_audio があれば）

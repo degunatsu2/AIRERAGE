@@ -81,6 +81,15 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>100 枚のコインを取った（派手な獲得音。ユーザーの要望、2026-10-15）。</summary>
         JackpotGet,
+
+        /// <summary>特殊攻撃を出した（鋭く上がる風の音。docs/13 T5-4）。</summary>
+        SpecialMove,
+
+        /// <summary>必殺技を出した（暗転に合わせた、低い唸りと上がっていく光の音）。</summary>
+        SuperStart,
+
+        /// <summary>自分の特殊攻撃のクールタイムが終わった・必殺技のゲージがたまった（小さく明るい音）。</summary>
+        SkillReady,
     }
 
     /// <summary>
@@ -355,6 +364,34 @@ namespace Airerage.Runtime.Audio
                         float f = NoteFrequency(98 + (i * 5) % 12);
                         AddTone(b, r, 0.45f + i * 0.09f, 0.25f, f, f, Wave.Sine, 0.14f, 0.001f, 0.1f);
                     }
+                    break;
+                case SoundId.SpecialMove:
+                    // 風を切る音（通常攻撃より強く、高く上がる）に、短い電子音の上昇を重ねる。
+                    b = new float[Samples(0.32f, r)];
+                    AddNoise(b, r, rng, 0f, 0.28f, 0.7f, 0.01f, 0.09f, 1200f, 7000f, 500f);
+                    AddTone(b, r, 0f, 0.22f, 330f, 1320f, Wave.Saw, 0.22f, 0.003f, 0.08f);
+                    AddTone(b, r, 0.04f, 0.2f, 660f, 1980f, Wave.Pulse25, 0.12f, 0.003f, 0.07f);
+                    break;
+                case SoundId.SuperStart:
+                    // 暗転の間（約 0.3 秒）に低い唸りが上がり、最後に明るい和音で光る。
+                    b = new float[Samples(1.1f, r)];
+                    AddTone(b, r, 0f, 0.45f, 55f, 220f, Wave.Saw, 0.45f, 0.01f, 0.3f);
+                    AddTone(b, r, 0f, 0.45f, 110f, 440f, Wave.Square, 0.18f, 0.01f, 0.3f);
+                    AddNoise(b, r, rng, 0f, 0.4f, 0.4f, 0.05f, 0.2f, 400f, 6000f, 200f);
+                    ApplyTremolo(b, r, 18f, 0.35f);
+                    int[] flash = { 79, 83, 86, 91 };
+                    foreach (int note in flash)
+                    {
+                        float f = NoteFrequency(note);
+                        AddTone(b, r, 0.3f, 0.8f, f, f, Wave.Triangle, 0.2f, 0.004f, 0.4f);
+                        AddTone(b, r, 0.3f, 0.6f, f * 2f, f * 2f, Wave.Sine, 0.08f, 0.004f, 0.25f);
+                    }
+                    AddNoise(b, r, rng, 0.3f, 0.12f, 0.6f, 0.001f, 0.05f, 9000f, 9000f, 2000f);
+                    break;
+                case SoundId.SkillReady:
+                    b = new float[Samples(0.25f, r)];
+                    AddTone(b, r, 0f, 0.12f, NoteFrequency(88), NoteFrequency(88), Wave.Sine, 0.35f, 0.002f, 0.05f);
+                    AddTone(b, r, 0.06f, 0.18f, NoteFrequency(95), NoteFrequency(95), Wave.Sine, 0.35f, 0.002f, 0.07f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

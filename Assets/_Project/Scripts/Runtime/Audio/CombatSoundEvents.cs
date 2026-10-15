@@ -116,7 +116,19 @@ namespace Airerage.Runtime.Audio
                 && (before.Action.Kind != ActionKind.Attack || now.Action.Attack != before.Action.Attack || now.Action.Ticks < before.Action.Ticks);
             if (attackStarted)
             {
-                _audio.Play(now.Action.Attack == koAttack ? SoundId.Charge : SoundId.Swing, 0.8f, 0.08f);
+                switch (now.Action.Attack)
+                {
+                    case AttackSlot.Super:
+                        _audio.Play(SoundId.SuperStart);
+                        break;
+                    case AttackSlot.Special1:
+                    case AttackSlot.Special2:
+                        _audio.Play(SoundId.SpecialMove, 0.85f, 0.05f);
+                        break;
+                    default:
+                        _audio.Play(now.Action.Attack == koAttack ? SoundId.Charge : SoundId.Swing, 0.8f, 0.08f);
+                        break;
+                }
             }
             if (now.Action.Kind == ActionKind.Guard && before.Action.Kind != ActionKind.Guard)
             {

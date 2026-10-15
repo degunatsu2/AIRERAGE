@@ -23,6 +23,7 @@ namespace Airerage.Core.Tests.Support
         };
 
         private readonly Random _random;
+        private readonly Action<SimWorld> _setup;
         private readonly int _latency;
         private readonly int _jitter;
         private readonly double _loss;
@@ -40,9 +41,12 @@ namespace Airerage.Core.Tests.Support
         }
 
         /// <param name="scripts">プレイヤーごとの入力列（目標のティック＋入力遅延より長いこと）。</param>
-        public PseudoNetwork(PlayerInput[][] scripts, RollbackSettings settings, int latencyFrames, int jitterFrames, double lossRate, int seed)
+        /// <param name="setup">作ったワールドの最初の状態を変える（全員のワールドと Reference のワールドに同じように。なくてもよい）。</param>
+        public PseudoNetwork(PlayerInput[][] scripts, RollbackSettings settings, int latencyFrames, int jitterFrames, double lossRate, int seed,
+            Action<SimWorld> setup = null)
         {
             int players = scripts.Length;
+            _setup = setup;
             _random = new Random(seed);
             _latency = latencyFrames;
             _jitter = jitterFrames;
@@ -357,7 +361,7 @@ namespace Airerage.Core.Tests.Support
             return true;
         }
 
-        private static SimWorld MakeWorld(int players)
+        private SimWorld MakeWorld(int players)
         {
             var world = new SimWorld(TestArenas.Playground());
             for (int p = 0; p < players; p++)
@@ -366,6 +370,7 @@ namespace Airerage.Core.Tests.Support
                 config.Wire.ModelType = p % 2 == 0 ? WireModelType.Inertial : WireModelType.Responsive;
                 world.AddCharacter(config, Spawns[p], p % 2 == 0 ? 1 : -1);
             }
+            _setup?.Invoke(world);
             return world;
         }
 

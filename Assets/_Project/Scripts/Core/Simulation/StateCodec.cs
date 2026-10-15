@@ -18,7 +18,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 16;
+        public const int FormatVersion = 17;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -200,9 +200,11 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.AttackCancelUsed);
             writer.Write(combat.WireCancelCooldownTicksLeft);
             writer.Write(combat.AttackBufferTicksLeft);
-            writer.Write((byte)combat.BufferedAirAttack);
+            writer.Write((byte)combat.BufferedAttack);
             writer.Write(combat.BufferedFacing);
             writer.Write(combat.Gauge);
+            writer.Write(combat.Special1CooldownTicksLeft);
+            writer.Write(combat.Special2CooldownTicksLeft);
             writer.Write(combat.GuardCooldownTicksLeft);
             writer.Write(combat.BounceCount);
             writer.Write(combat.FatalHitCount);
@@ -282,9 +284,11 @@ namespace Airerage.Core.Simulation
                 AttackCancelUsed = reader.ReadBoolean(),
                 WireCancelCooldownTicksLeft = reader.ReadInt32(),
                 AttackBufferTicksLeft = reader.ReadInt32(),
-                BufferedAirAttack = (AttackSlot)reader.ReadByte(),
+                BufferedAttack = (AttackSlot)reader.ReadByte(),
                 BufferedFacing = reader.ReadSByte(),
                 Gauge = reader.ReadInt32(),
+                Special1CooldownTicksLeft = reader.ReadInt32(),
+                Special2CooldownTicksLeft = reader.ReadInt32(),
                 GuardCooldownTicksLeft = reader.ReadInt32(),
                 BounceCount = reader.ReadInt32(),
                 FatalHitCount = reader.ReadInt32(),

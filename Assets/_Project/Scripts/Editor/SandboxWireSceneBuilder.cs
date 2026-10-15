@@ -217,6 +217,7 @@ namespace Airerage.Editor
             GameAudio audio = CreateAudio(runner);
             CreateDebugTools(runner, inputActions, audio);
             CreateComboHud(runner);
+            CreateSkillHud(runner, audio);
             CreateMatchHud(runner, audio);
 
             EnsureFolder(Path.GetDirectoryName(ScenePath));
@@ -313,6 +314,14 @@ namespace Airerage.Editor
             BurstEffectView gimmick = CreateBurst(name + "GimmickBurst", parent);
             gimmick.Configure(new Color(0.55f, 1f, 0.6f, 1f), false, 0.3f, 0.4f, 1.6f, 8, 0.7f, 0.1f, string.Empty, 0, 0f);
             SetReference(view, "_gimmickBurst", gimmick);
+            // 特殊攻撃を出した（プレイヤーの色の、鋭い光。docs/13 T5-4）。
+            BurstEffectView special = CreateBurst(name + "SpecialBurst", parent);
+            special.Configure(Color.Lerp(playerColor, Color.white, 0.35f), false, 0.3f, 0.3f, 2.2f, 12, 1.4f, 0.13f, string.Empty, 0, 0f);
+            SetReference(view, "_specialBurst", special);
+            // 必殺技を出した（虹色の大きな光と「SUPER!」。画面の暗転は SuperFlashHud）。
+            BurstEffectView super = CreateBurst(name + "SuperBurst", parent);
+            super.Configure(Color.white, true, 0.8f, 0.5f, 4.5f, 16, 2.6f, 0.22f, "SUPER!", 56, 0f);
+            SetReference(view, "_superBurst", super);
             // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。
             RingGaugeView respawn = CreateRingGauge(name + "RespawnGauge", parent, "RESPAWN", 2.6f,
                 new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f));
@@ -339,6 +348,20 @@ namespace Airerage.Editor
         {
             var hud = new GameObject("ComboHud").AddComponent<ComboHud>();
             SetReference(hud, "_source", source);
+        }
+
+        /// <summary>
+        /// 自分の特殊攻撃と必殺技の表示（画面の下の中央）と、必殺技の暗転（docs/13 T5-4）。source は ISimulationFeed。
+        /// </summary>
+        internal static void CreateSkillHud(MonoBehaviour source, GameAudio audio)
+        {
+            var root = new GameObject("SkillHud");
+            var hud = root.AddComponent<SkillHud>();
+            SetReference(hud, "_source", source);
+            SetReference(hud, "_audio", audio);
+            var flash = root.AddComponent<SuperFlashHud>();
+            SetReference(flash, "_source", source);
+            SetReference(flash, "_camera", Object.FindFirstObjectByType<Camera>());
         }
 
         /// <summary>試合の表示（始まる前の演出、残り時間、結果。docs/12）。source は ISimulationFeed、controls は結果のボタン（IMatchControls）。</summary>
@@ -708,7 +731,7 @@ namespace Airerage.Editor
 
         /// <summary>
         /// キャラクターを横から追従するカメラ（Cinemachine 3）。回転はせず、位置だけを合わせる。
-        /// マウスホイールと LB / RB で距離を変えられる（CameraZoom）。
+        /// マウスホイールと十字キーの上下で距離を変えられる（CameraZoom）。
         /// </summary>
         internal static CinemachineCamera CreateFollowCamera(Transform target, InputActionAsset inputActions)
         {

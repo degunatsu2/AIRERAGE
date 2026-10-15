@@ -5,10 +5,11 @@ using UnityEngine.InputSystem;
 namespace Airerage.Runtime.Presentation
 {
     /// <summary>
-    /// カメラのズーム（ユーザーの要望。2026-10-12）。マウスホイールとゲームパッドの LB / RB で、追従カメラの距離を変える。
+    /// カメラのズーム（ユーザーの要望。2026-10-12）。マウスホイールとゲームパッドの十字キーの上下で、追従カメラの距離を変える
+    /// （LB / RB は特殊攻撃に使うため十字キーへ移した。D-56、2026-10-15）。
     /// 距離は下限と上限の間に制限し、なめらかに近づける。表示だけの機能で、シミュレーションには影響しない。
-    /// 初期の距離（シーンで置いた距離）へは、マウスのホイールの押し込みか、ゲームパッドの LB と RB の同時押しで戻る（ResetZoom。
-    /// ユーザーの要望、2026-10-15）。
+    /// 初期の距離（シーンで置いた距離）へは、マウスのホイールの押し込みか、ゲームパッドの十字キーの左か右で戻る（ResetZoom。
+    /// ユーザーの要望、2026-10-15。十字キーの左右は【仮】）。
     /// アクションは AirerageControls.inputactions の "Camera" マップ（ScrollZoom / HoldZoom / ResetZoom）。
     /// </summary>
     public sealed class CameraZoom : MonoBehaviour
@@ -24,7 +25,7 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _maxDistance = 40f;
         [Tooltip("ホイール1目盛りで変える距離（m）【仮】")]
         [SerializeField] private float _scrollStep = 2f;
-        [Tooltip("LB / RB を押している間に変える速さ（m/s）【仮】")]
+        [Tooltip("十字キーの上下を押している間に変える速さ（m/s）【仮】")]
         [SerializeField] private float _holdSpeed = 15f;
         [Tooltip("目標の距離に近づく速さ（1/s、大きいほど速い）")]
         [SerializeField] private float _sharpness = 12f;
@@ -79,7 +80,7 @@ namespace Airerage.Runtime.Presentation
         {
             // ホイールの値は1目盛りで ±1（Input System の既定の scrollDeltaBehavior）。上に回すと近づく。
             float scroll = _scroll.ReadValue<float>();
-            // LB で離れ、RB で近づく。
+            // 十字キーの下で離れ、上で近づく。
             float hold = _hold.ReadValue<float>();
             ZoomIn(scroll * _scrollStep + hold * _holdSpeed * Time.unscaledDeltaTime);
             if (_reset.WasPressedThisFrame())

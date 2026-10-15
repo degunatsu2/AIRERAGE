@@ -14,6 +14,7 @@ namespace Airerage.Runtime.Presentation
     /// ガード中・ジャストガードの成功は _guardEffect、ガードのクールタイムは _guardGauge で示す（T3-5。あれば）。
     /// 攻撃を受けた瞬間は火花（_hitSpark）、FATAL を受けた瞬間は虹色の光と「FATAL!」（_fatalBurst）、攻撃をワイヤーで
     /// キャンセルした瞬間は紫の光（_wireCancelBurst）を出す（T3-7。あれば）。ジャンプ台・加速リングが効いた瞬間は _gimmickBurst。
+    /// 特殊攻撃を出した瞬間は _specialBurst、必殺技を出した瞬間は虹色の光と「SUPER!」（_superBurst）を出す（docs/13 T5-4。あれば）。
     /// 撃破されて復帰を待っている間は見えなくし、復帰した後の無敵の間は点滅させる（docs/12 T4-2）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
@@ -67,6 +68,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private BurstEffectView _bounceBurst;
         [Tooltip("ジャンプ台・加速リングが効いた瞬間の光（なくてもよい）")]
         [SerializeField] private BurstEffectView _gimmickBurst;
+        [Tooltip("特殊攻撃を出した瞬間の光（なくてもよい）")]
+        [SerializeField] private BurstEffectView _specialBurst;
+        [Tooltip("必殺技を出した瞬間の虹色の光と「SUPER!」（なくてもよい）")]
+        [SerializeField] private BurstEffectView _superBurst;
         [Tooltip("撃破されて復帰を待つ間の、出現位置の周りの大きなゲージ（なくてもよい）")]
         [SerializeField] private RingGaugeView _respawnGauge;
 
@@ -80,6 +85,9 @@ namespace Airerage.Runtime.Presentation
         private int _shownWireCancelCooldown;
         private int _shownBounces;
         private int _shownGimmicks;
+        private int _shownSpecial1Cooldown;
+        private int _shownSpecial2Cooldown;
+        private int _shownGauge;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
         public AttackPhase? ShownPhase
@@ -121,6 +129,8 @@ namespace Airerage.Runtime.Presentation
         public BurstEffectView WireCancelBurst => _wireCancelBurst;
         public BurstEffectView BounceBurst => _bounceBurst;
         public BurstEffectView GimmickBurst => _gimmickBurst;
+        public BurstEffectView SpecialBurst => _specialBurst;
+        public BurstEffectView SuperBurst => _superBurst;
 
         /// <summary>復帰までの残りのゲージ（なければ null）。</summary>
         public RingGaugeView RespawnGauge => _respawnGauge;
@@ -229,6 +239,20 @@ namespace Airerage.Runtime.Presentation
             {
                 _gimmickBurst.Play(center);
             }
+            // 特殊攻撃はクールタイムが始まった（増えた）とき、必殺技はゲージが減って必殺技を出しているとき。
+            bool special = c.Special1CooldownTicksLeft > _shownSpecial1Cooldown || c.Special2CooldownTicksLeft > _shownSpecial2Cooldown;
+            if (special && _specialBurst != null)
+            {
+                _specialBurst.Play(center);
+            }
+            bool super = c.Gauge < _shownGauge && state.Action.Kind == ActionKind.Attack && state.Action.Attack == AttackSlot.Super;
+            if (super && _superBurst != null)
+            {
+                _superBurst.Play(center);
+            }
+            _shownSpecial1Cooldown = c.Special1CooldownTicksLeft;
+            _shownSpecial2Cooldown = c.Special2CooldownTicksLeft;
+            _shownGauge = c.Gauge;
             _shownGimmicks = gimmicks;
             _shownBounces = c.BounceCount;
             _shownFatalHits = c.FatalHitCount;
