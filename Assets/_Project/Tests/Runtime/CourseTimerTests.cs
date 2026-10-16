@@ -127,15 +127,39 @@ namespace Airerage.Runtime.Tests
         }
 
         /// <summary>スタートから出て、ticks ティック目にゴールに入る。</summary>
-        private static void Run(CourseTimer timer, WireModelType type, int ticks)
+        [Test]
+        public void Best_IsKeptPerCharacter_AndSwitchingCharacterDuringRun_AbortsRun()
         {
-            timer.Step(InStart, Half, type);
-            timer.Step(Outside, Half, type);
+            // キャラクターの比較（docs/13 T5-7）: 同じコース・同じタイプでも、キャラクターごとにベストを持つ。
+            CourseTimer timer = CreateTimer();
+            Run(timer, WireModelType.Inertial, 20, "STANDARD");
+            Run(timer, WireModelType.Inertial, 14, "STORM RUNNER");
+            Run(timer, WireModelType.Inertial, 18, "STANDARD");
+
+            Assert.That(timer.TryGetBest("Right", WireModelType.Inertial, "STANDARD", out int standard), Is.True);
+            Assert.That(standard, Is.EqualTo(18));
+            Assert.That(timer.TryGetBest("Right", WireModelType.Inertial, "STORM RUNNER", out int storm), Is.True);
+            Assert.That(storm, Is.EqualTo(14));
+            Assert.That(timer.TryGetBest("Right", WireModelType.Inertial, "SPACE TRAVELER", out _), Is.False);
+            Assert.That(timer.LastRecord.Value.Character, Is.EqualTo("STANDARD"));
+
+            // 走っている途中でキャラクターを変えたら、その走りは無効。
+            timer.Step(InStart, Half, WireModelType.Inertial, "STANDARD");
+            timer.Step(Outside, Half, WireModelType.Inertial, "STANDARD");
+            timer.Step(Outside, Half, WireModelType.Inertial, "RISK TAKER");
+            timer.Step(InGoal, Half, WireModelType.Inertial, "RISK TAKER");
+            Assert.That(timer.TryGetBest("Right", WireModelType.Inertial, "RISK TAKER", out _), Is.False, "途中で変えた走りを記録した");
+        }
+
+        private static void Run(CourseTimer timer, WireModelType type, int ticks, string character = "")
+        {
+            timer.Step(InStart, Half, type, character);
+            timer.Step(Outside, Half, type, character);
             for (int i = 0; i < ticks - 1; i++)
             {
-                timer.Step(Outside, Half, type);
+                timer.Step(Outside, Half, type, character);
             }
-            timer.Step(InGoal, Half, type);
+            timer.Step(InGoal, Half, type, character);
         }
     }
 }

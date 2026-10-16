@@ -8,7 +8,8 @@ namespace Airerage.Runtime.DebugTools
     /// <summary>
     /// タイム計測コースの計測（docs/06_prototype_plan.md T1-8）。ティックごとにキャラクターの位置を受け取る。
     /// スタートの範囲を出たティックから、どれかのゴールの範囲に入ったティックまでのティック数を記録する。
-    /// ベストタイムはコースとワイヤーのタイプごとに持つ。計測中にタイプを変えたら、その走りは無効にする。
+    /// ベストタイムはコースとワイヤーのタイプとキャラクターごとに持つ（キャラクターは docs/13 T5-7 の比較のため）。計測中にタイプか
+    /// キャラクターを変えたら、その走りは無効にする。
     /// </summary>
     public sealed class CourseTimer
     {
@@ -42,18 +43,23 @@ namespace Airerage.Runtime.DebugTools
             public readonly WireModelType WireType;
             public readonly int Ticks;
 
-            public Record(string course, WireModelType wireType, int ticks)
+            /// <summary>走ったキャラクターの名前（分けなければ空）。</summary>
+            public readonly string Character;
+
+            public Record(string course, WireModelType wireType, int ticks, string character = "")
             {
                 Course = course;
                 WireType = wireType;
                 Ticks = ticks;
+                Character = character ?? string.Empty;
             }
         }
 
         private readonly Rect _start;
         private readonly List<Goal> _goals;
-        private readonly Dictionary<(string, WireModelType), int> _best = new Dictionary<(string, WireModelType), int>();
+        private readonly Dictionary<(string, WireModelType, string), int> _best = new Dictionary<(string, WireModelType, string), int>();
         private WireModelType _runWireType;
+        private string _runCharacter = string.Empty;
 
         public CourseTimer(Rect start, IEnumerable<Goal> goals)
         {
@@ -76,12 +82,19 @@ namespace Airerage.Runtime.DebugTools
 
         public bool TryGetBest(string course, WireModelType wireType, out int ticks)
         {
-            return _best.TryGetValue((course, wireType), out ticks);
+            return TryGetBest(course, wireType, string.Empty, out ticks);
         }
 
-        /// <summary>1ティック分進める。center と halfExtents はキャラクターの箱（XY 平面）。</summary>
-        public void Step(Vector2 center, Vector2 halfExtents, WireModelType wireType)
+        /// <summary>キャラクター character のベストタイム。</summary>
+        public bool TryGetBest(string course, WireModelType wireType, string character, out int ticks)
         {
+            return _best.TryGetValue((course, wireType, character ?? string.Empty), out ticks);
+        }
+
+        /// <summary>1ティック分進める。center と halfExtents はキャラクターの箱（XY 平面）。character はキャラクターの名前（分けなければ空）。</summary>
+        public void Step(Vector2 center, Vector2 halfExtents, WireModelType wireType, string character = "")
+        {
+            character = character ?? string.Empty;
             bool inStart = Overlaps(_start, center, halfExtents);
             switch (Phase)
             {
@@ -99,6 +112,7 @@ namespace Airerage.Runtime.DebugTools
                         Phase = TimerPhase.Running;
                         RunningTicks = 0;
                         _runWireType = wireType;
+                        _runCharacter = character;
                     }
                     break;
 
@@ -110,7 +124,7 @@ namespace Airerage.Runtime.DebugTools
                         RunningTicks = 0;
                         break;
                     }
-                    if (wireType != _runWireType)
+                    if (wireType != _runWireType || character != _runCharacter)
                     {
                         Abort();
                         break;
@@ -137,9 +151,9 @@ namespace Airerage.Runtime.DebugTools
 
         private void Finish(string course)
         {
-            var record = new Record(course, _runWireType, RunningTicks);
+            var record = new Record(course, _runWireType, RunningTicks, _runCharacter);
             LastRecord = record;
-            var key = (course, _runWireType);
+            var key = (course, _runWireType, _runCharacter);
             if (!_best.TryGetValue(key, out int best) || record.Ticks < best)
             {
                 _best[key] = record.Ticks;

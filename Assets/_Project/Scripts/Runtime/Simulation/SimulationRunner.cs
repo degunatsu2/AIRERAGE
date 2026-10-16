@@ -80,6 +80,9 @@ namespace Airerage.Runtime.Simulation
         /// <summary>操作するキャラクターのアセット（F3 で切り替える）。</summary>
         public CharacterConfigAsset PlayerCharacter => _playerCharacter;
 
+        /// <summary>F3 で切り替えるキャラクターの一覧（なければ null）。</summary>
+        public CharacterRoster Roster => _roster;
+
         /// <summary>操作するキャラクターの今の状態。</summary>
         public CharacterState PlayerState => _world.GetState(_player);
 

@@ -3,6 +3,7 @@ using System.Text;
 using Airerage.Core.Common;
 using Airerage.Core.Simulation;
 using Airerage.Core.Wire;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
 
@@ -89,7 +90,7 @@ namespace Airerage.Runtime.DebugTools
             CharacterConfig config = _runner.PlayerConfig;
             var center = new Vector2(state.Position.X, state.Position.Y);
             var half = new Vector2(config.Movement.HalfWidth, config.Movement.HalfHeight);
-            _timer.Step(center, half, config.Wire.ModelType);
+            _timer.Step(center, half, config.Wire.ModelType, _runner.PlayerCharacter.DisplayName);
         }
 
         private void OnPlayerReset()
@@ -125,30 +126,66 @@ namespace Airerage.Runtime.DebugTools
             if (_timer.LastRecord is CourseTimer.Record last)
             {
                 _text.Append("Last: ").Append(last.Course).Append(' ').Append(Seconds(last.Ticks))
-                    .Append(" (").Append(WireTypeLabels.Short(last.WireType)).Append(")\n");
+                    .Append(" (").Append(ShortName(last.Character)).Append(", ").Append(WireTypeLabels.Short(last.WireType)).Append(")\n");
             }
+            // ベストは、今のワイヤーのタイプで、キャラクターごと（docs/13 T5-7 の比較）。
+            WireModelType wireType = _runner.PlayerConfig.Wire.ModelType;
+            IReadOnlyList<string> characters = Characters();
             _text.Append("Best      ");
-            foreach (WireModelType type in WireTypeLabels.Order)
+            foreach (string character in characters)
             {
-                _text.Append(WireTypeLabels.Short(type).PadLeft(ColumnWidth));
+                _text.Append(ShortName(character).PadLeft(ColumnWidth));
             }
             _text.Append('\n');
             foreach (CourseTimer.Goal goal in _timer.Goals)
             {
                 _text.Append(goal.Course.PadRight(10));
-                foreach (WireModelType type in WireTypeLabels.Order)
+                foreach (string character in characters)
                 {
-                    _text.Append(Best(goal.Course, type).PadLeft(ColumnWidth));
+                    _text.Append(Best(goal.Course, wireType, character).PadLeft(ColumnWidth));
                 }
                 _text.Append('\n');
             }
             // 行数: 見出し、状態、前回、ベストの見出し、コースごとの行
-            GUI.Box(new Rect(10f, 10f, 320f, 12f + 22f * (_timer.Goals.Count + 4)), _text.ToString(), _style);
+            float width = 140f + 95f * characters.Count;
+            GUI.Box(new Rect(10f, 10f, width, 12f + 22f * (_timer.Goals.Count + 4)), _text.ToString(), _style);
         }
 
-        private string Best(string course, WireModelType type)
+        // 列に並べるキャラクター（F3 の一覧の順。一覧がなければ今のキャラクターだけ）。
+        private IReadOnlyList<string> Characters()
         {
-            return _timer.TryGetBest(course, type, out int ticks) ? Seconds(ticks) : "--";
+            var names = new List<string>();
+            if (_runner.Roster != null)
+            {
+                foreach (CharacterConfigAsset character in _runner.Roster.Characters)
+                {
+                    if (character != null)
+                    {
+                        names.Add(character.DisplayName);
+                    }
+                }
+            }
+            if (names.Count == 0)
+            {
+                names.Add(_runner.PlayerCharacter.DisplayName);
+            }
+            return names;
+        }
+
+        // 列の見出し（名前の最初の語）。
+        private static string ShortName(string character)
+        {
+            if (string.IsNullOrEmpty(character))
+            {
+                return "-";
+            }
+            int space = character.IndexOf(' ');
+            return space > 0 ? character.Substring(0, space) : character;
+        }
+
+        private string Best(string course, WireModelType type, string character)
+        {
+            return _timer.TryGetBest(course, type, character, out int ticks) ? Seconds(ticks) : "--";
         }
 
         private static string Seconds(int ticks)
