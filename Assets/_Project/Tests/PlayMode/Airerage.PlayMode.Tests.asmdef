@@ -7,6 +7,7 @@
         "Airerage.Net",
         "Unity.Cinemachine",
         "Unity.InputSystem",
+        "UnityEngine.UI",
         "UnityEngine.TestRunner"
     ],
     "includePlatforms": [],

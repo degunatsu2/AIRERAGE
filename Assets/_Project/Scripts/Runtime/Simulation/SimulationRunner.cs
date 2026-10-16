@@ -38,7 +38,10 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private CharacterConfigAsset _character;
         [Tooltip("操作するキャラクターを切り替えられる一覧（デバッグ。F3。なくてもよい。docs/13 T5-5）")]
         [SerializeField] private CharacterRoster _roster;
+        [Tooltip("前に選んだキャラクター（PlayerPrefs。オンラインの待機所と同じ）で始め、F3 で変えたら覚える（トレーニング。docs/15 T6-6）")]
+        [SerializeField] private bool _rememberCharacter;
         [SerializeField] private InputActionAsset _inputActions;
+        [Tooltip("出現位置（なければ、読み込んだステージのシーンの SpawnPointAuthoring の 1 番目。docs/15 T6-2）")]
         [SerializeField] private Transform _spawnPoint;
         [Tooltip("地形として読み込むコライダーの層")]
         [SerializeField] private LayerMask _terrainMask = 1;
@@ -47,13 +50,15 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private CharacterView _characterView;
         [SerializeField] private WireView _wireView;
         [SerializeField] private AimIndicatorView _aimIndicator;
-        [Tooltip("ダミーの出現位置（攻撃を当てて試す相手。入力なし）")]
+        [Tooltip("ダミーの出現位置（攻撃を当てて試す相手。入力なし。なければ、ステージの SpawnPointAuthoring の 2 番目から）")]
         [SerializeField] private Transform[] _dummySpawns = new Transform[0];
         [Tooltip("ダミーの表示（出現位置と同じ数・順番）")]
         [SerializeField] private CharacterView[] _dummyViews = new CharacterView[0];
 
         private SimInput[] _inputs = new SimInput[1];
         private CharacterState[] _previousDummies = new CharacterState[0];
+        private Vector3 _playerSpawn;
+        private Vector3[] _dummySpawnPositions = new Vector3[0];
         private SimWorld _world;
         private BoxTerrain _terrain;
         private InputSystemAdapter _input;
@@ -170,11 +175,28 @@ namespace Airerage.Runtime.Simulation
 
         private void Awake()
         {
-            if (_character == null || _inputActions == null || _spawnPoint == null)
+            if (_character == null || _inputActions == null)
             {
-                Debug.LogError($"{name}: CharacterConfigAsset、InputActionAsset、出現位置のどれかが設定されていません", this);
+                Debug.LogError($"{name}: CharacterConfigAsset か InputActionAsset が設定されていません", this);
                 enabled = false;
                 return;
+            }
+            // 出現位置: 設定したもの、なければ読み込んだステージのシーンのもの（試合の仕組みとステージが別のシーン。D-66）。
+            List<Vector3> stageSpawns = SpawnPointAuthoring.Collect();
+            if (_spawnPoint == null && stageSpawns.Count == 0)
+            {
+                Debug.LogError($"{name}: 出現位置がありません（_spawnPoint も、ステージの SpawnPointAuthoring もない）", this);
+                enabled = false;
+                return;
+            }
+            _playerSpawn = _spawnPoint != null ? _spawnPoint.position : stageSpawns[0];
+            if (_dummySpawns.Length > 0)
+            {
+                _dummySpawnPositions = System.Array.ConvertAll(_dummySpawns, t => t.position);
+            }
+            else
+            {
+                _dummySpawnPositions = stageSpawns.GetRange(Mathf.Min(1, stageSpawns.Count), Mathf.Max(0, stageSpawns.Count - 1)).ToArray();
             }
 
             var errors = new List<string>();
@@ -191,17 +213,22 @@ namespace Airerage.Runtime.Simulation
             _terrain = terrain;
             _world = new SimWorld(terrain, bounds, zones, null, coinSpawns, bankSpots);
             _playerCharacter = _character;
-            _player = _world.AddCharacter(_character.Config, _spawnPoint.position.ToNumerics());
-            _previous = _world.GetState(_player);
-            if (_dummyViews.Length != _dummySpawns.Length)
+            if (_rememberCharacter && _roster != null && _roster.Count > 0)
             {
-                Debug.LogError($"{name}: ダミーの出現位置（{_dummySpawns.Length}）と表示（{_dummyViews.Length}）の数が違います", this);
+                _rosterIndex = _roster.Clamp(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0));
+                _playerCharacter = _roster.Get(_rosterIndex);
             }
-            int dummies = Mathf.Min(_dummySpawns.Length, _dummyViews.Length);
+            _player = _world.AddCharacter(_playerCharacter.Config, _playerSpawn.ToNumerics());
+            _previous = _world.GetState(_player);
+            if (_dummyViews.Length != _dummySpawnPositions.Length)
+            {
+                Debug.LogError($"{name}: ダミーの出現位置（{_dummySpawnPositions.Length}）と表示（{_dummyViews.Length}）の数が違います", this);
+            }
+            int dummies = Mathf.Min(_dummySpawnPositions.Length, _dummyViews.Length);
             _previousDummies = new CharacterState[dummies];
             for (int i = 0; i < dummies; i++)
             {
-                _world.AddCharacter(_character.Config, _dummySpawns[i].position.ToNumerics(), -1);
+                _world.AddCharacter(_character.Config, _dummySpawnPositions[i].ToNumerics(), -1);
                 _previousDummies[i] = GetDummyState(i);
             }
             _inputs = new SimInput[1 + dummies];
@@ -353,7 +380,7 @@ namespace Airerage.Runtime.Simulation
             DummiesAttack = false;
             for (int i = 0; i < _previousDummies.Length; i++)
             {
-                _world.SetState(_player + 1 + i, CharacterState.Spawn(_dummySpawns[i].position.ToNumerics(), -1));
+                _world.SetState(_player + 1 + i, CharacterState.Spawn(_dummySpawnPositions[i].ToNumerics(), -1));
                 _previousDummies[i] = GetDummyState(i);
             }
         }
@@ -371,14 +398,19 @@ namespace Airerage.Runtime.Simulation
             _rosterIndex = (_rosterIndex + 1) % _roster.Count;
             _playerCharacter = _roster.Get(_rosterIndex);
             _world.SetConfig(_player, _playerCharacter.Config);
+            if (_rememberCharacter)
+            {
+                PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, _rosterIndex);
+            }
             ResetPlayer();
             return _playerCharacter;
         }
 
-        private void ResetPlayer()
+        /// <summary>操作するキャラクターとダミーを出現位置に戻す（Backspace と同じ。一時停止のメニューからも使う）。</summary>
+        public void ResetPlayer()
         {
             ResetDummies();
-            SetPlayerState(CharacterState.Spawn(_spawnPoint.position.ToNumerics(), 1));
+            SetPlayerState(CharacterState.Spawn(_playerSpawn.ToNumerics(), 1));
         }
     }
 }

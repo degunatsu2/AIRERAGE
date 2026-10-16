@@ -300,7 +300,7 @@ namespace Airerage.Editor
         }
 
         /// <summary>ギミック（StageZoneAuthoring と、その見た目）を作る。</summary>
-        private static void CreateZones()
+        internal static void CreateZones()
         {
             var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             Material padMaterial = SandboxWireSceneBuilder.LoadOrCreateMaterial("JumpPad", new Color(0.3f, 0.95f, 0.4f));

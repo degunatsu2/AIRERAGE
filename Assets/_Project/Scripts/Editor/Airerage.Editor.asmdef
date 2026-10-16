@@ -6,7 +6,8 @@
         "Airerage.Runtime",
         "Airerage.Net",
         "Unity.Cinemachine",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"

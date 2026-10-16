@@ -10,6 +10,9 @@ namespace Airerage.Runtime.Data
     [CreateAssetMenu(menuName = "Airerage/Character Roster", fileName = "CharacterRoster")]
     public sealed class CharacterRoster : ScriptableObject
     {
+        /// <summary>前に選んだキャラクターの番号を覚えておく PlayerPrefs の名前（オンラインの待機所とトレーニングで同じ）。</summary>
+        public const string SelectedPreferenceKey = "Airerage.Character";
+
         [SerializeField] private CharacterConfigAsset[] _characters = new CharacterConfigAsset[0];
 
         public int Count => _characters.Length;

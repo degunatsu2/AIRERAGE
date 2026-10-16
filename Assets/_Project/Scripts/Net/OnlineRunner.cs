@@ -11,6 +11,7 @@ using Airerage.Core.Simulation;
 using Airerage.Core.Wire;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
+using Airerage.Runtime.Flow;
 using Airerage.Runtime.Input;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
@@ -96,6 +97,7 @@ namespace Airerage.Net
         private int _delayPreset;
         private int _dropPreset;
         private WaitingRoomPanel _waitingRoom;
+        private GameFlow _flow;
         private GUIStyle _footer;
 
         /// <summary>今のセッション（始めていなければ null）。</summary>
@@ -164,10 +166,15 @@ namespace Airerage.Net
             _notifiedTick = -1;
         }
 
-        /// <summary>ゲームを終える（エディタでは再生を止める）。</summary>
+        /// <summary>ゲームを終える（エディタでは再生を止める）。App のシーンから始めたときは、メニューへ戻る（docs/15 T6-1）。</summary>
         public void Quit()
         {
             Leave();
+            if (_flow != null)
+            {
+                _flow.ShowMenu();
+                return;
+            }
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #else
@@ -232,6 +239,9 @@ namespace Airerage.Net
             _rollback.Validate();
             _smoothing.Validate();
             _match.Validate().ThrowIfInvalid();
+
+            // App のシーンから始めたときの、ゲームの流れ（なければ null。Quit でメニューへ戻る）。
+            _flow = FindFirstObjectByType<GameFlow>();
 
             // 複数のプレイヤーを同じ PC で動かすとき（Multiplayer Play Mode）、操作していないウィンドウも止めない。
             Application.runInBackground = true;
@@ -525,7 +535,7 @@ namespace Airerage.Net
         }
 
         private const string PlayerNameKey = "Airerage.PlayerName";
-        private const string CharacterKey = "Airerage.Character";
+        private const string CharacterKey = CharacterRoster.SelectedPreferenceKey;
         private const float CharacterRowHeight = 38f;
 
         private int _localCharacter;
@@ -625,6 +635,12 @@ namespace Airerage.Net
             if (_message.Length > 0)
             {
                 GUILayout.Label(_message, _style);
+            }
+            // App のシーンから始めたときは、メニューへ戻れる（docs/15 T6-1）。
+            if (_flow != null && GUILayout.Button("Back to menu"))
+            {
+                _flow.ShowMenu();
+                ExitGui();
             }
         }
 

@@ -222,6 +222,7 @@ namespace Airerage.Editor
 
             GameAudio audio = CreateAudio(runner);
             CreateDebugTools(runner, inputActions, audio);
+            MenuUiBuilder.CreatePauseMenu(runner, inputActions);
             CreateComboHud(runner);
             CreateSkillHud(runner, audio);
             CreateMatchHud(runner, audio);
@@ -551,6 +552,13 @@ namespace Airerage.Editor
         /// </summary>
         internal static void CreateCoins((Vector2 Position, int Value)[] spawns, Vector2[] jackpotSpots, MonoBehaviour source, EdgeGuideLayer guides)
         {
+            CreateCoinSpawns(spawns, jackpotSpots);
+            CreateCoinViews(source, guides);
+        }
+
+        /// <summary>コインの出現地点と 100 枚のコインの候補の地点（CoinSpawnAuthoring。ステージのシーンに置く。docs/15 T6-2）。</summary>
+        internal static void CreateCoinSpawns((Vector2 Position, int Value)[] spawns, Vector2[] jackpotSpots)
+        {
             var root = new GameObject("CoinSpawns").transform;
             for (int i = 0; i < spawns.Length; i++)
             {
@@ -567,7 +575,11 @@ namespace Airerage.Editor
                 point.transform.position = new Vector3(jackpotSpots[i].x, jackpotSpots[i].y, 0f);
                 point.AddComponent<CoinSpawnAuthoring>().Configure(JackpotValue, Airerage.Core.Economy.CoinSpawnKind.Jackpot);
             }
+        }
 
+        /// <summary>コインの表示（CoinView、CoinHud。試合の仕組みのシーンに置く。出現地点は実行が読み込んだシーンから集める）。</summary>
+        internal static void CreateCoinViews(MonoBehaviour source, EdgeGuideLayer guides)
+        {
             // 見た目の見本（CoinLook の順: 1 枚は金色、3 枚は金色のピラミッド、5 枚は赤、100 枚は虹色に光る）。
             Material gold = LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f));
             Material red = LoadOrCreateMaterial("CoinRed", new Color(0.9f, 0.12f, 0.1f));
@@ -622,6 +634,13 @@ namespace Airerage.Editor
         /// </summary>
         internal static void CreateBank(Vector2[] spots, MonoBehaviour source, GameAudio audio, EdgeGuideLayer guides)
         {
+            CreateBankSpots(spots);
+            CreateBankView(source, audio, guides);
+        }
+
+        /// <summary>拠点の候補の地点（BankSpotAuthoring。ステージのシーンに置く。docs/15 T6-2）。</summary>
+        internal static void CreateBankSpots(Vector2[] spots)
+        {
             var root = new GameObject("BankSpots").transform;
             for (int i = 0; i < spots.Length; i++)
             {
@@ -630,7 +649,11 @@ namespace Airerage.Editor
                 point.transform.position = new Vector3(spots[i].x, spots[i].y, 0f);
                 point.AddComponent<BankSpotAuthoring>().Configure(i == 0);
             }
+        }
 
+        /// <summary>拠点の表示（BankView。試合の仕組みのシーンに置く）。</summary>
+        internal static void CreateBankView(MonoBehaviour source, GameAudio audio, EdgeGuideLayer guides)
+        {
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             var view = new GameObject("Bank").AddComponent<BankView>();
             SetReference(view, "_source", source);
