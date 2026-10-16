@@ -1,4 +1,6 @@
 using System;
+using Airerage.Runtime.Audio;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -13,7 +15,9 @@ namespace Airerage.Runtime.UI
     /// - タイトル: 「AIRERAGE」と「PRESS ANY BUTTON」（どれかのキー・ボタンでメインメニューへ。最初の 1 回だけ）。
     /// - メインメニュー: SINGLE（Phase 7 の CPU まで選べない）、LOCAL VS（T6-5 まで選べない）、NETWORK VS、TRAINING、OPTIONS（T6-9 まで
     ///   選べない）、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
-    /// 画面の移り変わりは App のシーンの GameFlow に頼む（App のシーンから始めないと、項目を選んでも何もしない）。
+    /// - TRAINING → キャラクター選択（T6-3）→ ステージ選択（T6-4）→ トレーニング。戻る操作で 1 つ前の画面へ。選んだキャラクターは
+    ///   覚えておき（PlayerPrefs。オンラインの待機所と同じ）、トレーニングの試合の仕組みがそのキャラクターで始める。
+    /// 画面の移り変わりは App のシーンの GameFlow に頼む（App のシーンから始めないと、試合へは移らない）。
     /// </summary>
     public sealed class MenuScreens : MonoBehaviour
     {
@@ -26,17 +30,27 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption _training;
         [SerializeField] private MenuOption _options;
         [SerializeField] private MenuOption _quit;
+        [SerializeField] private CharacterSelectScreen _characterSelect;
+        [SerializeField] private StageSelectScreen _stageSelect;
 
         private GameFlow _flow;
         private IDisposable _anyButton;
         private float _shownAt;
         private int _selectAtFrame = -1;
+        private MenuOption _focus;
 
         /// <summary>タイトルを出しているか（テスト用）。</summary>
         public bool ShowingTitle => _title != null && _title.activeSelf;
 
         /// <summary>メインメニューを出しているか（テスト用）。</summary>
         public bool ShowingMain => _main != null && _main.activeSelf;
+
+        /// <summary>キャラクター選択・ステージ選択を出しているか（テスト用）。</summary>
+        public bool ShowingCharacterSelect => _characterSelect != null && _characterSelect.gameObject.activeSelf;
+        public bool ShowingStageSelect => _stageSelect != null && _stageSelect.gameObject.activeSelf;
+
+        public CharacterSelectScreen CharacterSelect => _characterSelect;
+        public StageSelectScreen StageSelect => _stageSelect;
 
         public MenuOption Single => _single;
         public MenuOption Local => _local;
@@ -48,7 +62,7 @@ namespace Airerage.Runtime.UI
         private void Awake()
         {
             if (_title == null || _main == null || _single == null || _local == null || _network == null || _training == null
-                || _options == null || _quit == null)
+                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null)
             {
                 Debug.LogError($"{name}: 画面か項目が設定されていません", this);
                 enabled = false;
@@ -58,7 +72,15 @@ namespace Airerage.Runtime.UI
             _local.SetAvailable(false, "COMING SOON");
             _options.SetAvailable(false, "COMING SOON");
             _network.Clicked.AddListener(() => Run(flow => flow.StartOnline()));
-            _training.Clicked.AddListener(() => Run(flow => flow.StartTraining(flow.Stages.Get(0))));
+            _training.Clicked.AddListener(ShowCharacterSelect);
+            _characterSelect.Confirmed += index =>
+            {
+                PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, index);
+                ShowStageSelect();
+            };
+            _characterSelect.Cancelled += () => ShowMain(_training);
+            _stageSelect.Confirmed += stage => Run(flow => flow.StartTraining(stage));
+            _stageSelect.Cancelled += ShowCharacterSelect;
             _quit.Clicked.AddListener(() => Run(flow => flow.QuitGame()));
             foreach (MenuOption item in new[] { _single, _local, _network, _training, _options, _quit })
             {
@@ -106,7 +128,7 @@ namespace Airerage.Runtime.UI
         /// <summary>タイトルを出す（どれかのキー・ボタンでメインメニューへ）。</summary>
         public void ShowTitle()
         {
-            _main.SetActive(false);
+            HideAll();
             _title.SetActive(true);
             _shownAt = Time.unscaledTime;
             if (EventSystem.current != null)
@@ -122,24 +144,51 @@ namespace Airerage.Runtime.UI
         {
             _anyButton?.Dispose();
             _anyButton = null;
+            UiSounds.Find().Play(SoundId.UiConfirm);
             ShowMain();
         }
 
-        private void ShowMain()
+        // メインメニューを出す（focus の項目、なければ使える最初の項目を選ぶ）。
+        private void ShowMain(MenuOption focus = null)
         {
-            _title.SetActive(false);
+            HideAll();
             _main.SetActive(true);
             _flow?.MarkTitlePassed();
+            _focus = focus;
             // タイトルを抜けたボタン（Enter や A）で、そのまま最初の項目まで決まらないよう、項目を選ぶのは次のフレーム。
             _selectAtFrame = Time.frameCount + 1;
         }
 
+        private void ShowCharacterSelect()
+        {
+            HideAll();
+            _characterSelect.Show(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0));
+        }
+
+        private void ShowStageSelect()
+        {
+            HideAll();
+            _stageSelect.Show();
+        }
+
+        private void HideAll()
+        {
+            _title.SetActive(false);
+            _main.SetActive(false);
+            _characterSelect.Hide();
+            _stageSelect.Hide();
+            _selectAtFrame = -1;
+        }
+
         private void SelectFirst()
         {
-            MenuOption first = Array.Find(new[] { _single, _local, _network, _training, _options, _quit }, item => item.Button.interactable);
-            if (EventSystem.current != null && first != null)
+            MenuOption first = _focus != null && _focus.Button.interactable
+                ? _focus
+                : Array.Find(new[] { _single, _local, _network, _training, _options, _quit }, item => item.Button.interactable);
+            _focus = null;
+            if (first != null)
             {
-                EventSystem.current.SetSelectedGameObject(first.gameObject);
+                first.SelectQuietly();
             }
         }
 

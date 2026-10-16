@@ -121,6 +121,46 @@ namespace Airerage.Editor
         }
 
         /// <summary>
+        /// キャラクター選択の札（縦長の斜めの札に、ロゴと名前。選んでいるときは上へ出る）。anchor を基準に、札の左上を position に置く。
+        /// </summary>
+        public static MenuOption CreateCharacterCard(Transform parent, string name, Texture2D logo, string displayName, Vector2 anchor,
+            Vector2 position, Vector2 size)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+            var plate = go.AddComponent<SlantedPlate>();
+            plate.Configure(0.12f, 3f, PlateFill, PlateBorder);
+            var button = go.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = plate;
+            button.navigation = new Navigation { mode = Navigation.Mode.Horizontal };
+
+            var logoGo = new GameObject("Logo", typeof(RectTransform));
+            logoGo.transform.SetParent(go.transform, false);
+            var logoRect = (RectTransform)logoGo.transform;
+            logoRect.anchorMin = logoRect.anchorMax = logoRect.pivot = new Vector2(0.5f, 1f);
+            float logoSize = size.x * 0.62f;
+            logoRect.anchoredPosition = new Vector2(size.y * 0.12f * 0.5f, -26f);
+            logoRect.sizeDelta = new Vector2(logoSize, logoSize);
+            var image = logoGo.AddComponent<RawImage>();
+            image.texture = logo;
+            image.raycastTarget = false;
+
+            Text text = CreateText(go.transform, "Name", displayName, 26, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0f), new Vector2(0f, 34f), new Vector2(size.x - 20f, 40f), Color.white);
+            var option = go.AddComponent<MenuOption>();
+            option.Configure(plate, text, null, Accent);
+            option.SetSelectedShift(new Vector2(0f, 16f));
+            return option;
+        }
+
+        /// <summary>
         /// 一時停止のメニュー（Esc かゲームパッドの Start。RESUME、RESET POSITION、BACK TO MENU）。オフラインの試合と検証用のシーンに置く。
         /// </summary>
         public static PauseMenu CreatePauseMenu(SimulationRunner runner, InputActionAsset inputActions)

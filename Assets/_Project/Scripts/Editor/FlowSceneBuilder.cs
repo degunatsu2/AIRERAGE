@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Airerage.Runtime.Audio;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
@@ -19,8 +20,8 @@ namespace Airerage.Editor
 {
     /// <summary>
     /// ゲームの流れのシーン（docs/15 T6-1、T6-2、T6-6。D-66）を作る:
-    /// - App: いつも読み込んでおくシーン（GameFlow、EventSystem）。ビルドの最初のシーン。
-    /// - Menu: タイトルとメインメニュー（uGUI）。背景にステージを映すカメラ。
+    /// - App: いつも読み込んでおくシーン（GameFlow、EventSystem、メニューの効果音 UiSounds）。ビルドの最初のシーン。
+    /// - Menu: タイトル、メインメニュー、キャラクター選択、ステージ選択（uGUI）。背景にステージを映すカメラ。
     /// - Stage_Athletic: アスレチックステージ（地形、ギミック、撃破の範囲、コインの出現地点、拠点の候補、出現位置、光）。
     ///   Sandbox_Online と同じ配置（値は SandboxOnlineSceneBuilder の 1 か所）。
     /// - Match_Training: トレーニングの試合の仕組み（自分＋ダミー 3 体、表示、HUD、カメラ、一時停止）。ステージのシーンに重ねる。
@@ -189,7 +190,12 @@ namespace Airerage.Editor
                 TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
             main.gameObject.SetActive(false);
 
+            CharacterSelectScreen characterSelect = CreateCharacterSelect(canvas.transform);
+            StageSelectScreen stageSelect = CreateStageSelect(canvas.transform);
+
             var screens = canvas.gameObject.AddComponent<MenuScreens>();
+            SandboxWireSceneBuilder.SetReference(screens, "_characterSelect", characterSelect);
+            SandboxWireSceneBuilder.SetReference(screens, "_stageSelect", stageSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_title", title.gameObject);
             SandboxWireSceneBuilder.SetReference(screens, "_pressAnyButton", press);
             SandboxWireSceneBuilder.SetReference(screens, "_main", main.gameObject);
@@ -202,6 +208,88 @@ namespace Airerage.Editor
             Save(scene, MenuScenePath);
         }
 
+        // キャラクター選択（docs/15 T6-3）: 上に題、真ん中にキャラクターの札を横に並べ、下にカーソルのあるキャラクターの名前・ロゴ・技。
+        private static CharacterSelectScreen CreateCharacterSelect(Transform canvas)
+        {
+            CharacterRoster roster = SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(SandboxWireSceneBuilder.LoadOrCreateCharacterConfig());
+            RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CharacterSelect");
+            MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.45f), Vector2.zero, Vector2.one);
+            MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
+            var size = new Vector2(300f, 360f);
+            const float gap = 40f;
+            float total = roster.Count * size.x + (roster.Count - 1) * gap;
+            var cards = new Object[roster.Count];
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var character = roster.Get(i);
+                cards[i] = MenuUiBuilder.CreateCharacterCard(panel, $"Card{i + 1}", character.Logo, character.DisplayName,
+                    new Vector2(0.5f, 0.5f), new Vector2(-total * 0.5f + i * (size.x + gap), 300f), size);
+            }
+            // 下の説明: ロゴ、名前、技。
+            RectTransform info = MenuUiBuilder.CreateFull(panel, "Info");
+            MenuUiBuilder.CreateFill(info, "Band", new Color(0f, 0f, 0f, 0.5f), new Vector2(0f, 0.05f), new Vector2(1f, 0.36f));
+            var logoGo = new GameObject("Logo", typeof(RectTransform));
+            logoGo.transform.SetParent(info, false);
+            var logoRect = (RectTransform)logoGo.transform;
+            logoRect.anchorMin = logoRect.anchorMax = logoRect.pivot = new Vector2(0.5f, 0.2f);
+            logoRect.anchoredPosition = new Vector2(-520f, 0f);
+            logoRect.sizeDelta = new Vector2(220f, 220f);
+            var logo = logoGo.AddComponent<UnityEngine.UI.RawImage>();
+            logo.raycastTarget = false;
+            UnityEngine.UI.Text name = MenuUiBuilder.CreateText(info, "Name", string.Empty, 56, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+                new Vector2(0.5f, 0.3f), new Vector2(-370f, 0f), new Vector2(900f, 80f), Color.white);
+            UnityEngine.UI.Text moves = MenuUiBuilder.CreateText(info, "Moves", string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft,
+                new Vector2(0.5f, 0.26f), new Vector2(-370f, -20f), new Vector2(900f, 200f), new Color(1f, 1f, 1f, 0.85f));
+            MenuUiBuilder.CreateText(panel, "Hint", "Left / Right: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 20f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
+
+            var screen = panel.gameObject.AddComponent<CharacterSelectScreen>();
+            SandboxWireSceneBuilder.SetReference(screen, "_roster", roster);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_cards", cards);
+            SandboxWireSceneBuilder.SetReference(screen, "_logo", logo);
+            SandboxWireSceneBuilder.SetReference(screen, "_name", name);
+            SandboxWireSceneBuilder.SetReference(screen, "_moves", moves);
+            panel.gameObject.SetActive(false);
+            return screen;
+        }
+
+        // ステージ選択（docs/15 T6-4）: 左にステージの札を縦に並べ、右にカーソルのあるステージの名前と説明（ステージの色の帯）。
+        private static StageSelectScreen CreateStageSelect(Transform canvas)
+        {
+            StageCatalog catalog = LoadOrCreateStages();
+            RectTransform panel = MenuUiBuilder.CreateFull(canvas, "StageSelect");
+            MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.42f, 1f));
+            MenuUiBuilder.CreateText(panel, "Title", "STAGE SELECT", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
+            var options = new Object[catalog.Count];
+            var stages = new Object[catalog.Count];
+            for (int i = 0; i < catalog.Count; i++)
+            {
+                StageDefinition stage = catalog.Get(i);
+                stages[i] = stage;
+                options[i] = MenuUiBuilder.CreateMenuItem(panel, $"Stage{i + 1}", stage.DisplayName, new Vector2(0f, 1f),
+                    new Vector2(110f, -230f - i * 88f), new Vector2(560f, 72f));
+            }
+            UnityEngine.UI.Image band = MenuUiBuilder.CreateFill(panel, "Band", new Color(0.35f, 0.85f, 1f, 0.35f),
+                new Vector2(0.45f, 0.55f), new Vector2(1f, 0.75f));
+            UnityEngine.UI.Text name = MenuUiBuilder.CreateText(panel, "Name", string.Empty, 72, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+                new Vector2(0.5f, 0.65f), new Vector2(0f, 0f), new Vector2(900f, 100f), Color.white);
+            UnityEngine.UI.Text description = MenuUiBuilder.CreateText(panel, "Description", string.Empty, 28, FontStyle.Bold, TextAnchor.UpperLeft,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), new Vector2(900f, 200f), new Color(1f, 1f, 1f, 0.85f));
+            MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
+
+            var screen = panel.gameObject.AddComponent<StageSelectScreen>();
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_stages", stages);
+            SandboxWireSceneBuilder.SetReference(screen, "_name", name);
+            SandboxWireSceneBuilder.SetReference(screen, "_description", description);
+            SandboxWireSceneBuilder.SetReference(screen, "_band", band);
+            panel.gameObject.SetActive(false);
+            return screen;
+        }
+
         private static void BuildApp()
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -211,6 +299,8 @@ namespace Airerage.Editor
             var events = new GameObject("EventSystem");
             events.AddComponent<EventSystem>();
             events.AddComponent<InputSystemUIInputModule>().AssignDefaultActions();
+            // メニューの効果音（決定した直後に画面のシーンを外しても途切れないよう、いつも読み込むシーンに置く）。
+            new GameObject("UiSounds").AddComponent<UiSounds>();
             Save(scene, AppScenePath);
         }
 

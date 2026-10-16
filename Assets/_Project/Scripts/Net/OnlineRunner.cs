@@ -495,10 +495,12 @@ namespace Airerage.Net
             var row = new Rect(box.x + padding, y + 2f, WaitingRoomPanel.PlateWidth, CharacterRowHeight - 6f);
             if (GUI.Button(new Rect(row.x, row.y, 40f, row.height), "<"))
             {
+                UiSounds.Find().Play(SoundId.UiMove);
                 LocalCharacter = (_localCharacter + CharacterCount - 1) % CharacterCount;
             }
             if (GUI.Button(new Rect(row.xMax - 40f, row.y, 40f, row.height), ">"))
             {
+                UiSounds.Find().Play(SoundId.UiMove);
                 LocalCharacter = (_localCharacter + 1) % CharacterCount;
             }
             // 選んでいるキャラクターのロゴ（docs/13 T5-8）と名前を、並べて中央に。
@@ -523,6 +525,7 @@ namespace Airerage.Net
                     $" Timed match ({seconds / 60}:{seconds % 60:00}). Off = free play");
                 if (GUI.Button(new Rect(footer.x, footer.y + 24f, footer.width, 32f), "START"))
                 {
+                    UiSounds.Find().Play(SoundId.UiConfirm);
                     StartMatch();
                     ExitGui();
                 }
@@ -617,11 +620,13 @@ namespace Airerage.Net
             GUI.enabled = validPort;
             if (GUILayout.Button("Host"))
             {
+                UiSounds.Find().Play(SoundId.UiConfirm);
                 StartHost(port);
                 ExitGui();
             }
             if (GUILayout.Button("Join"))
             {
+                UiSounds.Find().Play(SoundId.UiConfirm);
                 StartJoin(_address, port);
                 ExitGui();
             }
@@ -639,6 +644,7 @@ namespace Airerage.Net
             // App のシーンから始めたときは、メニューへ戻れる（docs/15 T6-1）。
             if (_flow != null && GUILayout.Button("Back to menu"))
             {
+                UiSounds.Find().Play(SoundId.UiConfirm);
                 _flow.ShowMenu();
                 ExitGui();
             }

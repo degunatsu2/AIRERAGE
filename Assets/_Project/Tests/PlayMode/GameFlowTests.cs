@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Airerage.Core.Simulation;
 using Airerage.Net;
+using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Simulation;
@@ -27,8 +28,8 @@ namespace Airerage.PlayMode.Tests
             int savedCharacter = PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0);
             try
             {
-                // 前に選んだキャラクター（オンラインの待機所と同じ）で、トレーニングが始まる。
-                PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, 3);
+                // キャラクター選択のカーソルは、前に選んだキャラクター（オンラインの待機所と同じ）から始まる。
+                PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, 1);
                 SceneManager.LoadScene("App");
                 yield return null;
                 var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
@@ -38,19 +39,71 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("Stage_Athletic"), "光と空がステージのものでない");
 
                 var menu = UnityEngine.Object.FindFirstObjectByType<MenuScreens>();
+                var sounds = UnityEngine.Object.FindFirstObjectByType<UiSounds>();
+                Assert.That(sounds, Is.Not.Null, "App のシーンにメニューの効果音がない");
                 Assert.That(menu.ShowingTitle, Is.True, "最初にタイトルを出さない");
                 menu.ContinueFromTitle();
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingMain, Is.True, "タイトルの後にメインメニューを出さない");
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Network.gameObject), "使える最初の項目を選んでいない");
+                Assert.That(sounds.History, Is.EqualTo(new[] { SoundId.UiConfirm }), "タイトルを抜けたときに決定の音だけを鳴らさない（最初の項目は音なしで選ぶ）");
+
+                // カーソルを動かすと移動の音、決定すると決定の音（ユーザーの要望、2026-10-16）。
+                EventSystem.current.SetSelectedGameObject(menu.Training.gameObject);
+                Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiMove), "カーソルを動かしても音が鳴らない");
                 Assert.That(menu.Single.Button.interactable, Is.False, "SINGLE は Phase 7 まで選べない");
                 Assert.That(menu.Local.Button.interactable, Is.False, "LOCAL VS は T6-5 まで選べない");
                 Assert.That(menu.Options.Button.interactable, Is.False, "OPTIONS は T6-9 まで選べない");
                 Assert.That(menu.Training.Button.interactable && menu.Quit.Button.interactable, Is.True);
 
+                // TRAINING → キャラクター選択（T6-3）。
                 menu.Training.Button.onClick.Invoke();
+                Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiConfirm), "決定しても音が鳴らない");
+                yield return null;
+                yield return null;
+                Assert.That(menu.ShowingCharacterSelect, Is.True, "TRAINING でキャラクター選択を出さない");
+                Assert.That(menu.ShowingMain, Is.False);
+                CharacterSelectScreen characters = menu.CharacterSelect;
+                Assert.That(characters.Count, Is.EqualTo(4), "4 体の札がない");
+                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(characters.Card(1).gameObject), "前に選んだキャラクターから始まらない");
+                EventSystem.current.SetSelectedGameObject(characters.Card(3).gameObject);
+                Assert.That(characters.ShownName, Is.EqualTo(CharacterPresets.SpaceTravelerName), "カーソルのキャラクターの名前を出さない");
+                Assert.That(characters.ShownMoves, Does.Contain("PORTAL").And.Contain("MISSILE").And.Contain("COSMIC RAY").And.Contain("MOON HOP"),
+                    "技の名前を出さない");
+
+                // 戻る操作で 1 つ前の画面へ（キャラクター選択 → メインメニューの TRAINING）。
+                characters.Card(3).OnCancel(null);
+                yield return null;
+                yield return null;
+                Assert.That(menu.ShowingMain, Is.True, "キャラクター選択から戻れない");
+                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Training.gameObject), "戻ったときに TRAINING を選んでいない");
+                menu.Training.Button.onClick.Invoke();
+                yield return null;
+                yield return null;
+                EventSystem.current.SetSelectedGameObject(characters.Card(3).gameObject);
+                characters.Card(3).Button.onClick.Invoke();
+                Assert.That(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0), Is.EqualTo(3), "選んだキャラクターを覚えない");
+                yield return null;
+                yield return null;
+
+                // ステージ選択（T6-4）: 戻るとキャラクター選択、決定でトレーニング。
+                Assert.That(menu.ShowingStageSelect, Is.True, "キャラクターを決めてもステージ選択を出さない");
+                StageSelectScreen stages = menu.StageSelect;
+                Assert.That(stages.Count, Is.EqualTo(flow.Stages.Count));
+                Assert.That(stages.ShownName, Is.EqualTo(flow.Stages.Get(0).DisplayName));
+                stages.Option(0).OnCancel(null);
+                yield return null;
+                yield return null;
+                Assert.That(menu.ShowingCharacterSelect, Is.True, "ステージ選択から戻れない");
+                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(characters.Card(3).gameObject), "戻ったときに選んだキャラクターにいない");
+                characters.Card(3).Button.onClick.Invoke();
+                yield return null;
+                yield return null;
+                stages.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+                Assert.That(flow.CurrentStage, Is.SameAs(flow.Stages.Get(0)), "選んだステージでない");
+                Assert.That(sounds != null, Is.True, "画面を移ると効果音が消える（決定の音が途切れる）");
                 Assert.That(flow.LoadedScenes, Is.EqualTo(new[] { "Stage_Athletic", "Match_Training" }), "ステージを先に、試合の仕組みを後に読み込んでいない");
                 Assert.That(UnityEngine.Object.FindFirstObjectByType<MenuScreens>(), Is.Null, "メニューが残っている");
                 var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
@@ -58,7 +111,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(runner.enabled, Is.True, "試合の仕組みが動いていない（ステージの物が見つからない）");
                 ISimulationFeed feed = runner;
                 Assert.That(feed.CharacterCount, Is.EqualTo(4), "自分とダミー 3 体でない");
-                Assert.That(runner.PlayerCharacter.DisplayName, Is.EqualTo(CharacterPresets.SpaceTravelerName), "前に選んだキャラクターで始まらない");
+                Assert.That(runner.PlayerCharacter.DisplayName, Is.EqualTo(CharacterPresets.SpaceTravelerName), "選んだキャラクターで始まらない");
                 Vector3 spawn = SpawnPointAuthoring.Collect()[0];
                 Assert.That(Mathf.Abs(runner.PlayerState.Position.X - spawn.x), Is.LessThan(0.5f), "ステージの 1 番目の出現位置に出ない");
                 yield return WaitFor(() => runner.PlayerState.Grounded, 3f, "ステージの地面に立たない");
@@ -70,6 +123,8 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 Assert.That(pause.IsOpen, Is.True);
                 Assert.That(runner.SpeedScale, Is.Zero, "止まらない");
+                Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiPause), "一時停止を開いても音が鳴らない");
+                Assert.That(UnityEngine.Object.FindObjectsByType<UiSounds>(FindObjectsSortMode.None).Length, Is.EqualTo(1), "効果音が 2 つ以上ある");
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(pause.Resume.gameObject), "RESUME を選んでいない");
                 Assert.That(pause.BackToMenu.gameObject.activeSelf, Is.True, "App から始めたのに BACK TO MENU がない");
                 int tick = feed.CurrentTick;
@@ -129,6 +184,9 @@ namespace Airerage.PlayMode.Tests
             yield return null;
             yield return null;
             Assert.That(EventSystem.current, Is.Not.Null, "EventSystem を用意しない");
+            var sandboxSounds = UnityEngine.Object.FindFirstObjectByType<UiSounds>();
+            Assert.That(sandboxSounds, Is.Not.Null, "App から始めていないときに、効果音を用意しない");
+            Assert.That(sandboxSounds.History, Does.Contain(SoundId.UiPause), "一時停止を開いても音が鳴らない");
             Assert.That(pause.BackToMenu.gameObject.activeSelf, Is.False, "App から始めていないのに BACK TO MENU がある");
             pause.ResetPosition.Button.onClick.Invoke();
             yield return null;

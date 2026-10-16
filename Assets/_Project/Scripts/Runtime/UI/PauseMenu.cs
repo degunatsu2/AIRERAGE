@@ -1,3 +1,4 @@
+using Airerage.Runtime.Audio;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
@@ -85,7 +86,7 @@ namespace Airerage.Runtime.UI
             if (_selectAtFrame >= 0 && Time.frameCount >= _selectAtFrame && IsOpen)
             {
                 _selectAtFrame = -1;
-                EventSystem.current.SetSelectedGameObject(_resume.gameObject);
+                _resume.SelectQuietly();
             }
             if (_pause.WasPressedThisFrame())
             {
@@ -110,6 +111,7 @@ namespace Airerage.Runtime.UI
             EnsureEventSystem();
             _speedBefore = _runner.SpeedScale;
             _runner.SpeedScale = 0f;
+            UiSounds.Find().Play(SoundId.UiPause);
             _panel.SetActive(true);
             // 開いたボタン（Esc は戻る操作でもある）で、そのまま閉じないよう、項目を選ぶのは次のフレーム。
             EventSystem.current.SetSelectedGameObject(null);

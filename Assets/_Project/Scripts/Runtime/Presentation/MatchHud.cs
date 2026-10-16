@@ -454,11 +454,13 @@ namespace Airerage.Runtime.Presentation
             GUI.enabled = _matchControls.CanRestart;
             if (GUI.Button(restart, _matchControls.CanRestart ? "Restart" : "Waiting for the host"))
             {
+                UiSounds.Find().Play(SoundId.UiConfirm);
                 _matchControls.Restart();
             }
             GUI.enabled = true;
             if (GUI.Button(quit, "Quit"))
             {
+                UiSounds.Find().Play(SoundId.UiConfirm);
                 _matchControls.Quit();
             }
         }
