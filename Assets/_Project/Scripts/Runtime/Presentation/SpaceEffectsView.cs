@@ -9,7 +9,7 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// SPACE TRAVELER のキャラクターまわりの表示（docs/14 1.1）。
-    /// - スペースミサイルを長押しで狙っている間（CombatState.HoldAim）: 照準の方向へ伸びる狙いの線と、先の照準（C-8。撃つ先を示す表示）。
+    /// - スペースミサイルを長押しで狙っている間（CombatState.SkillAim）: 照準の方向へ伸びる狙いの線と、先の照準（C-8。撃つ先を示す表示）。
     /// - ゆっくり落ちている間（CombatState.SlowFallSerial）: 足もとに散る星の光。
     /// - ワープポータルで移った瞬間（CombatState.WarpCount が増えた）: 入った所と出た所に紫の光。
     /// 見た目の動きは表示の時間で決める。状態を読むだけで、書き換えない。
@@ -91,7 +91,7 @@ namespace Airerage.Runtime.Presentation
                 SetAim(effects, aiming);
                 if (aiming)
                 {
-                    System.Numerics.Vector2 aim = SkillRules.AimDirection(state.Combat.HoldAim, state.Facing, config.Wire.AimDeadzone);
+                    System.Numerics.Vector2 aim = SkillRules.AimDirection(state.Combat.SkillAim, state.Facing, config.Wire.AimDeadzone);
                     DrawAim(effects, center + new Vector3(0f, config.Skills.Missile.OffsetY, 0f), new Vector3(aim.X, aim.Y, 0f));
                 }
 

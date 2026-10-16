@@ -59,6 +59,7 @@ namespace Airerage.Core.Combat
         public static void Update(ref CharacterState state, in InputFrame input, CharacterConfig config)
         {
             CombatTuning combat = config.Combat;
+            RememberSkillAim(ref state, input);
             UpdateTimers(ref state, input, combat, config.Movement.MoveDeadzone);
             if (state.Wire.Phase == WirePhase.Attached)
             {
@@ -167,7 +168,6 @@ namespace Airerage.Core.Combat
             state.Combat.Holding = true;
             state.Combat.HoldSlot = slot;
             state.Combat.HoldTicks = 0;
-            state.Combat.HoldAim = input.Aim;
             state.Combat.AttackBufferTicksLeft = 0;
             // 押したときに横を入れていれば、その向きを向く。ためている間は向きを変えられ、離したときの向きで出す。
             if (state.Combat.BufferedFacing != 0)
@@ -201,8 +201,6 @@ namespace Airerage.Core.Combat
                 {
                     state.Combat.HoldTicks++;
                 }
-                // ためている間の照準（ミサイルの狙いの表示）。
-                state.Combat.HoldAim = input.Aim;
                 return false;
             }
             int charge = state.Combat.HoldTicks;
@@ -287,6 +285,7 @@ namespace Airerage.Core.Combat
         public static void RecordHitstopPresses(ref CharacterState state, PlayerInput input, CharacterConfig config)
         {
             var frame = new InputFrame(input, state.PreviousButtons);
+            RememberSkillAim(ref state, frame);
             BufferPresses(ref state, frame, config.Combat, config.Movement.MoveDeadzone);
             state.Combat.HitstopPresses |= frame.Pressed & InputButtons.Jump;
         }
@@ -606,6 +605,20 @@ namespace Airerage.Core.Combat
             return true;
         }
 
+        /// <summary>技のボタン（Q・E・R）。押している間の照準を、技の照準として覚える。</summary>
+        public const InputButtons SkillButtons = InputButtons.Special1 | InputButtons.Special2 | InputButtons.Super;
+
+        // 技の照準（CombatState.SkillAim）: 技のボタンを押している間の、毎ティックの照準を覚える。技はこの照準で出す（押している間に
+        // 出る技は今の照準、離してから出る技（ため技、先行入力）は最後に押していたティックの照準）。オンラインでは照準をこの間だけ送る
+        // （InputNormalizer）。今のティックのボタンだけで決めるので、正規化の前と後で結果が変わらない。
+        private static void RememberSkillAim(ref CharacterState state, in InputFrame input)
+        {
+            if ((input.Held & SkillButtons) != 0)
+            {
+                state.Combat.SkillAim = input.Aim;
+            }
+        }
+
         private static void BufferAttack(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone, AttackSlot slot)
         {
             state.Combat.AttackBufferTicksLeft = Math.Max(1, combat.AttackBufferTicks);
@@ -678,7 +691,8 @@ namespace Airerage.Core.Combat
             state.Combat.AttackCancelUsed = true;
         }
 
-        // 攻撃を始める（先行入力を使い切る）。押したときに横を入れていれば、その向きを向く。照準の方向を覚える（照準の向きに置く技）。
+        // 攻撃を始める（先行入力を使い切る）。押したときに横を入れていれば、その向きを向く。技なら技の照準（SkillAim）を覚える
+        // （照準の向きに出す技）。
         // 特殊攻撃ならクールタイムを始め、必殺技ならゲージを使う。
         private static void StartAttack(ref CharacterState state, AttackSlot slot, CombatTuning combat, in InputFrame input)
         {
@@ -693,7 +707,7 @@ namespace Airerage.Core.Combat
                 Attack = slot,
                 Ticks = 0,
                 Advance = 1,
-                Aim = input.Aim,
+                Aim = CombatTuning.IsSpecial(slot) ? state.Combat.SkillAim : System.Numerics.Vector2.Zero,
                 Recast = recast,
             };
             state.Combat.AttackBufferTicksLeft = 0;

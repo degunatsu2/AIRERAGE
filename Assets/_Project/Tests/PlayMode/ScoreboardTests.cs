@@ -63,6 +63,29 @@ namespace Airerage.PlayMode.Tests
             Assert.That(next, Is.Not.SameAs(standard), "キャラクターを変えても、ロゴが変わらない");
         }
 
+        [UnityTest]
+        public IEnumerator OfflineSwitch_ShowsTheLogoAndName_InTheMiddle()
+        {
+            // オフラインのキャラクターの選択（F3）: 切り替えると、中央にロゴと名前（Sandbox_Wire には右上の札がないため）。
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            var banner = Object.FindFirstObjectByType<Airerage.Runtime.DebugTools.CharacterSwitchBanner>();
+            Assert.That(banner, Is.Not.Null, "キャラクターの切り替えの表示がない");
+            yield return null;
+            Assert.That(banner.Showing, Is.Null, "切り替えていないのに出した");
+            Airerage.Runtime.Data.CharacterConfigAsset next = runner.CycleCharacter();
+            yield return null;
+            Assert.That(banner.Showing, Is.SameAs(next), "切り替えたキャラクターを出さない");
+            Assert.That(next.Logo, Is.Not.Null, "切り替えたキャラクターにロゴがない");
+            float start = Time.time;
+            while (Time.time - start < 2f)
+            {
+                yield return null;
+            }
+            Assert.That(banner.Showing, Is.Null, "しばらくしても消えない");
+        }
+
         private static IEnumerator WaitSeconds(float seconds)
         {
             float start = Time.time;

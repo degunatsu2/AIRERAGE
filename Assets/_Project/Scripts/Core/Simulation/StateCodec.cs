@@ -292,8 +292,8 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.SkyBoostTicksLeft);
             writer.Write(combat.Special1Spent);
             writer.Write(combat.Special2Spent);
-            writer.Write(combat.HoldAim.X);
-            writer.Write(combat.HoldAim.Y);
+            writer.Write(combat.SkillAim.X);
+            writer.Write(combat.SkillAim.Y);
             writer.Write(combat.SlowFallSerial);
             writer.Write(combat.PortalCount);
             writer.Write(combat.InPortalId);
@@ -404,7 +404,7 @@ namespace Airerage.Core.Simulation
                 SkyBoostTicksLeft = reader.ReadInt32(),
                 Special1Spent = reader.ReadInt32(),
                 Special2Spent = reader.ReadInt32(),
-                HoldAim = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                SkillAim = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
                 SlowFallSerial = reader.ReadInt32(),
                 PortalCount = reader.ReadInt32(),
                 InPortalId = reader.ReadInt32(),

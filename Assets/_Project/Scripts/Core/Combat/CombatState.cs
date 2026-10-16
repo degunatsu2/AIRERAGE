@@ -135,8 +135,11 @@ namespace Airerage.Core.Combat
         public int Special1Spent;
         public int Special2Spent;
 
-        /// <summary>長押しでためている間の照準の方向（毎ティック入力から。ミサイルの狙いの表示に使う）。</summary>
-        public System.Numerics.Vector2 HoldAim;
+        /// <summary>
+        /// 技の照準（技のボタン Q・E・R を押している間の、最後のティックの照準。ActionController）。技はこの照準で出す（ためている間の
+        /// ミサイルの狙いの表示にも使う）。オンラインでは、照準を送るのは技のボタンを押している間とワイヤーを押したティックだけ。
+        /// </summary>
+        public System.Numerics.Vector2 SkillAim;
 
         /// <summary>ゆっくり落ちている間は、それを始めた攻撃の番号 + 1（0 なら落ちていない。SPACE TRAVELER の地上技の後）。</summary>
         public int SlowFallSerial;
@@ -194,7 +197,7 @@ namespace Airerage.Core.Combat
                 && JackpotHitCount == other.JackpotHitCount
                 && GaugeBonusRemainder == other.GaugeBonusRemainder
                 && SpeedBoostTicksLeft == other.SpeedBoostTicksLeft && SkyBoostTicksLeft == other.SkyBoostTicksLeft
-                && Special1Spent == other.Special1Spent && Special2Spent == other.Special2Spent && HoldAim.Equals(other.HoldAim)
+                && Special1Spent == other.Special1Spent && Special2Spent == other.Special2Spent && SkillAim.Equals(other.SkillAim)
                 && SlowFallSerial == other.SlowFallSerial && PortalCount == other.PortalCount && InPortalId == other.InPortalId
                 && WarpCooldownTicks == other.WarpCooldownTicks && WarpCount == other.WarpCount;
         }
@@ -214,7 +217,7 @@ namespace Airerage.Core.Combat
                 HashCode.Combine(RespawnTicksLeft, InvincibleTicksLeft, RewardDamage, RewardAttacker),
                 HashCode.Combine(Holding, HoldSlot, HoldTicks, AttackSerial, CoinBoostTicksLeft, CoinBonusMilli, JackpotHitCount,
                     GaugeBonusRemainder),
-                HashCode.Combine(SpeedBoostTicksLeft, SkyBoostTicksLeft, Special1Spent, Special2Spent, HoldAim, SlowFallSerial, PortalCount,
+                HashCode.Combine(SpeedBoostTicksLeft, SkyBoostTicksLeft, Special1Spent, Special2Spent, SkillAim, SlowFallSerial, PortalCount,
                     HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount)));
         }
 

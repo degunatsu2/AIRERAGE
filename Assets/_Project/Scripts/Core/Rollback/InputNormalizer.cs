@@ -1,4 +1,5 @@
 using System;
+using Airerage.Core.Combat;
 using Airerage.Core.Input;
 
 namespace Airerage.Core.Rollback
@@ -13,7 +14,8 @@ namespace Airerage.Core.Rollback
     {
         /// <summary>
         /// input を正規化する。previous は同じプレイヤーの1つ前のティックの、正規化した後の入力。
-        /// - 照準の方向は、ワイヤーのボタンを押したティックにしか使わない（WireController の射出）ので、それ以外では消す。
+        /// - 照準の方向は、ワイヤーのボタンを押したティック（WireController の射出）と、技のボタン（Q・E・R）を押している間
+        ///   （ActionController が技の照準 CombatState.SkillAim を覚える）にしか使わないので、それ以外では消す。
         ///   シミュレーションの結果は変わらない。マウスの照準は毎ティック変わるため、特に効く。
         /// - 移動のスティックは、前のティックからの変化が moveHysteresis 以下なら前の値のままにする（スティックの揺れを無視する）。
         ///   ただし 0（離した）と端（いっぱいに倒した）にはすぐ合わせる。
@@ -21,8 +23,9 @@ namespace Airerage.Core.Rollback
         public static PlayerInput Normalize(PlayerInput input, PlayerInput previous, int moveHysteresis)
         {
             bool wirePressed = input.IsHeld(InputButtons.Wire) && !previous.IsHeld(InputButtons.Wire);
-            sbyte aimX = wirePressed ? input.AimX : (sbyte)0;
-            sbyte aimY = wirePressed ? input.AimY : (sbyte)0;
+            bool keepAim = wirePressed || (input.Buttons & ActionController.SkillButtons) != 0;
+            sbyte aimX = keepAim ? input.AimX : (sbyte)0;
+            sbyte aimY = keepAim ? input.AimY : (sbyte)0;
             sbyte moveX = Settle(input.MoveX, previous.MoveX, moveHysteresis);
             sbyte moveY = Settle(input.MoveY, previous.MoveY, moveHysteresis);
             return new PlayerInput(moveX, moveY, input.Buttons, aimX, aimY);

@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Linq;
+using Airerage.Core.Combat;
 using Airerage.Core.Match;
 using Airerage.Core.Simulation;
 using Airerage.Net;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -66,6 +68,64 @@ namespace Airerage.PlayMode.Tests
             runner.Leave();
             Assert.That(runner.Session, Is.Null);
             Assert.That(shown.gameObject.activeSelf, Is.False, "抜けた後もキャラクターが表示されている");
+        }
+
+        [UnityTest]
+        public IEnumerator Host_AsSpaceTraveler_ShowsFacing_Logo_StackGauge_AndTheNewMoonHop()
+        {
+            // オンラインでも、4 回目の要望とロゴ（docs/13 3.11、3.12）が届いている: 向きの印、右上の札のロゴ、スタックのゲージ、MOON HOP の値。
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            var runner = Object.FindFirstObjectByType<OnlineRunner>();
+            int space = -1;
+            for (int i = 0; i < runner.CharacterCount; i++)
+            {
+                space = runner.CharacterAsset(i).DisplayName == CharacterPresets.SpaceTravelerName ? i : space;
+            }
+            Assert.That(space, Is.GreaterThanOrEqualTo(0), "一覧に SPACE TRAVELER がない");
+            int chosen = runner.LocalCharacter;
+            runner.LocalCharacter = space;
+            try
+            {
+                Assert.That(runner.StartHost(0), Is.True, "待ち受けを始められない");
+                runner.StartMatch();
+                float start = Time.time;
+                while (Time.time - start < 1f)
+                {
+                    yield return null;
+                }
+                ISimulationFeed feed = runner;
+                Assert.That(feed.CharacterCount, Is.EqualTo(1));
+
+                AttackData hop = feed.GetConfig(0).Combat.Ground;
+                Assert.That(hop.Name, Is.EqualTo("MOON HOP"));
+                Assert.That(hop.Hits.Length, Is.EqualTo(1), "MOON HOP の攻撃の判定が届いていない");
+                Assert.That(hop.Hits[0].KnockbackY, Is.GreaterThan(hop.Hits[0].KnockbackX * 4f), "吹き飛びが強い上向きでない");
+                Assert.That(hop.Motions[hop.Motions.Length - 1].VelocityY, Is.GreaterThan(15f), "飛び上がる速さが前のまま");
+
+                Texture2D logo = ScoreboardHud.LogoOf(feed, 0);
+                Assert.That(logo, Is.Not.Null, "右上の札にロゴがない");
+                Assert.That(logo, Is.SameAs(runner.CharacterAsset(space).Logo));
+
+                var hud = Object.FindFirstObjectByType<SkillHud>();
+                Assert.That(hud.SlotOf(0).MaxCharges, Is.EqualTo(2), "ワープポータルの札にスタックのゲージがない");
+                Assert.That(hud.SlotOf(0).StackFill, Is.EqualTo(1f).Within(1e-4f));
+
+                CharacterView shown = System.Array.Find(
+                    Object.FindObjectsByType<CharacterView>(FindObjectsInactive.Include, FindObjectsSortMode.None), v => v.gameObject.activeSelf);
+                Assert.That(shown.transform.Find("Facing/Visor"), Is.Not.Null, "向きの印がない");
+                Assert.That(shown.ShowsFacingMarker, Is.True, "向きの印を見せていない");
+                Assert.That(shown.ShownFacing, Is.EqualTo(feed.GetState(0).Facing < 0 ? -1 : 1), "印の向きがキャラクターの向きと違う");
+
+                var version = Object.FindFirstObjectByType<Airerage.Runtime.DebugTools.VersionLabel>();
+                Assert.That(version, Is.Not.Null, "版の表示がない");
+                Assert.That(version.Text, Does.Contain("@"), "版（ブランチとコミット）を読めない");
+            }
+            finally
+            {
+                runner.Leave();
+                runner.LocalCharacter = chosen;
+            }
         }
 
         [UnityTest]

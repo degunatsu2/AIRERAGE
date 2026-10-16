@@ -247,7 +247,7 @@ namespace Airerage.Core.Tests.Skills
             // E を押したまま照準を上へ（狙い）、離して撃つ。
             Step(world, 20, new PlayerInput(0, 0, InputButtons.Special2, 0, 127));
             Assert.That(world.GetState(0).Combat.Holding, Is.True, "長押しで狙えない");
-            Assert.That(world.GetState(0).Combat.HoldAim.Y, Is.GreaterThan(0.9f), "狙いの向きを覚えない");
+            Assert.That(world.GetState(0).Combat.SkillAim.Y, Is.GreaterThan(0.9f), "狙いの向きを覚えない");
             Step(world, 1, new PlayerInput(0, 0, InputButtons.None, 0, 127));
             Step(world, 4);
             WorldObject missile = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Missile);
