@@ -410,6 +410,7 @@ MonoBehaviour:
       SlowFall:
         MaxFallSpeed: 3
   _displayName: RISK TAKER
+  _logo: {fileID: 2800000, guid: 1a21ce27e35e469a0a863c15f13e2e64, type: 2}
   _special1Icon: {fileID: 0}
   _special2Icon: {fileID: 0}
   _superIcon: {fileID: 0}

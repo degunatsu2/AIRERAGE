@@ -59,9 +59,14 @@ namespace Airerage.PlayMode.Tests
             runner.SetPlayerState(state);
             yield return null;
             Assert.That(hud.SlotOf(2).Label, Is.EqualTo("PORTAL x2"), "ポータルがないときに、必殺技の札で知らせない");
+            Assert.That(hud.SlotOf(0).MaxCharges, Is.EqualTo(2), "札にスタックのゲージを出さない");
+            Assert.That(hud.SlotOf(0).StackFill, Is.EqualTo(1f).Within(1e-4f), "2 スタックたまっているのに、ゲージが満タンでない");
+            Assert.That(hud.SlotOf(1).MaxCharges, Is.EqualTo(1), "1 回だけの技にスタックのゲージを出した");
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special1), default });
             yield return WaitSeconds(0.3f);
             Assert.That(hud.SlotOf(0).Label, Does.StartWith("x1"), "札に残りの回数を出さない");
+            // 1 つ使うと半分（次の 1 つがたまっている途中の分だけ、少し上）。
+            Assert.That(hud.SlotOf(0).StackFill, Is.InRange(0.5f, 0.55f), "1 スタックのときに、ゲージが半分でない");
             state = runner.PlayerState;
             state.Position = new System.Numerics.Vector3(state.Position.X + 6f, state.Position.Y + 3f, 0f);
             state.Velocity = System.Numerics.Vector3.Zero;

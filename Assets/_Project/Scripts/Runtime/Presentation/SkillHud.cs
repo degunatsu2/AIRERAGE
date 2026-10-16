@@ -32,6 +32,10 @@ namespace Airerage.Runtime.Presentation
         private const int Slant = 14;
         private const int LineWidth = Slant + 6;
         private const float ReadyFlashSeconds = 0.35f;
+        // スタックのゲージ（札の左の縁に沿った細い帯。ユーザーの要望、2026-10-16）。
+        private const int StackWidth = 5;
+        private const int StackSpacing = 4;
+        private const int StackGap = 2;
 
         /// <summary>頭上の通知を出している長さ（秒）。</summary>
         public const float HeadNoticeSeconds = 1.4f;
@@ -54,6 +58,8 @@ namespace Airerage.Runtime.Presentation
         private readonly List<HeadNotice> _notices = new List<HeadNotice>();
         private readonly Texture2D[] _partial = new Texture2D[SlotCount];
         private readonly int[] _partialWidth = { -1, -1, -1 };
+        private readonly Texture2D[] _stack = new Texture2D[SlotCount];
+        private readonly int[] _stackKey = { -1, -1, -1 };
         private Color32[] _pixels;
         private ISimulationFeed _feed;
         private Texture2D _fill;
@@ -96,6 +102,15 @@ namespace Airerage.Runtime.Presentation
 
             /// <summary>技の絵（なければ null。文字で出す）。</summary>
             public Texture2D Icon;
+
+            /// <summary>続けて使える回数（スタック）。2 以上なら札の左にスタックのゲージを出す（1 なら出さない）。</summary>
+            public int MaxCharges = 1;
+
+            /// <summary>たまっているスタック（使える回数 ＋ 次の 1 つのたまった割合。0〜MaxCharges）。</summary>
+            public float Stacks;
+
+            /// <summary>スタックのゲージのたまった割合（0〜1。2 スタックで 1 つたまっていれば 0.5）。</summary>
+            public float StackFill => MaxCharges > 1 ? Mathf.Clamp01(Stacks / MaxCharges) : 0f;
         }
 
         /// <summary>頭上の通知 1 つ。</summary>
@@ -136,7 +151,7 @@ namespace Airerage.Runtime.Presentation
 
         private void OnDestroy()
         {
-            foreach (Texture2D texture in new[] { _fill, _frame, _line, _partial[0], _partial[1], _partial[2] })
+            foreach (Texture2D texture in new[] { _fill, _frame, _line, _partial[0], _partial[1], _partial[2], _stack[0], _stack[1], _stack[2] })
             {
                 if (texture != null)
                 {
@@ -180,6 +195,8 @@ namespace Airerage.Runtime.Presentation
                 slot.Shown = true;
                 slot.Ready = ready;
                 slot.InUse = state.Action.Kind == ActionKind.Attack && state.Action.Attack == move;
+                slot.MaxCharges = move == AttackSlot.Super ? 1 : combat.MaxChargesOf(move);
+                slot.Stacks = 0f;
                 if (move == AttackSlot.Super)
                 {
                     slot.Fill = Mathf.Clamp01(state.Combat.Gauge / (float)CombatTuning.MaxGauge);
@@ -217,11 +234,16 @@ namespace Airerage.Runtime.Presentation
                         slot.Fill = total <= 0 ? 1f : 1f - Mathf.Clamp01(left / (float)total);
                         slot.Text = ready ? slot.Name : (left * SimTime.DeltaTime).ToString("0.0");
                         slot.Label = ready ? string.Empty : slot.Name;
-                        int charges = combat.MaxChargesOf(move);
-                        if (charges > 1)
+                    }
+                    int charges = slot.MaxCharges;
+                    if (charges > 1)
+                    {
+                        // 続けて使える技（ワープポータル）: 残りの回数と、次が戻るまで。ゲージは 使える回数 ＋ 次の 1 つのたまった割合。
+                        int spent = move == AttackSlot.Special1 ? state.Combat.Special1Spent : state.Combat.Special2Spent;
+                        float next = spent > 0 && total > 0 && left > 0 ? 1f - Mathf.Clamp01(left / (float)total) : 0f;
+                        slot.Stacks = Mathf.Clamp(charges - spent + next, 0f, charges);
+                        if (left != CombatState.CooldownWhileActive && !(state.Combat.Holding && state.Combat.HoldSlot == move))
                         {
-                            // 続けて使える技（ワープポータル）: 残りの回数と、次が戻るまで。
-                            int spent = move == AttackSlot.Special1 ? state.Combat.Special1Spent : state.Combat.Special2Spent;
                             slot.Label = left > 0 && ready ? $"x{charges - spent}  {left * SimTime.DeltaTime:0.0}" : $"x{charges - spent}";
                         }
                     }
@@ -296,6 +318,13 @@ namespace Airerage.Runtime.Presentation
                 GUI.color = slot.Ready ? accent : Idle;
             }
             GUI.DrawTexture(rect, _frame);
+            if (slot.MaxCharges > 1)
+            {
+                // 札の左の縁に沿った、スタックの数だけ縦に分けたゲージ（下からたまる）。
+                GUI.color = Color.white;
+                GUI.DrawTexture(new Rect(rect.x - StackSpacing - StackWidth, rect.y, StackWidth + Slant + 1, SlotHeight),
+                    StackGauge(index, slot.MaxCharges, slot.Stacks, accent));
+            }
             GUI.color = previous;
 
             GuidePlate.DrawText(new Rect(rect.x + Slant + 6f, rect.y + 3f, rect.width - Slant - 10f, 16f), Keys[index], _key,
@@ -390,6 +419,49 @@ namespace Airerage.Runtime.Presentation
             _partial[index].Apply();
             _partialWidth[index] = width;
             return _partial[index];
+        }
+
+        // スタックのゲージの形（札の左の縁と同じ傾きの細い帯を、スタックの数だけ縦に分ける）。たまった区切りは明るく、たまっている途中の
+        // 区切りは途中まで薄く、空の区切りは暗く。見た目が変わったときだけ作り直す。
+        private Texture2D StackGauge(int index, int maxCharges, float stacks, Color accent)
+        {
+            int full = Mathf.FloorToInt(stacks + 1e-4f);
+            float segment = (SlotHeight - StackGap * (maxCharges - 1)) / (float)maxCharges;
+            int partialRows = full < maxCharges ? Mathf.RoundToInt((stacks - full) * segment) : 0;
+            int key = (maxCharges * 16 + full) * 256 + partialRows;
+            if (_stack[index] != null && _stackKey[index] == key)
+            {
+                return _stack[index];
+            }
+            int width = StackWidth + Slant + 1;
+            if (_stack[index] == null)
+            {
+                _stack[index] = TimerPlate.Create($"SkillSlotStack{index}", width, SlotHeight, (x, y) => 0f);
+            }
+            var lit = (Color32)new Color(accent.r, accent.g, accent.b, 1f);
+            var charging = (Color32)new Color(accent.r, accent.g, accent.b, 0.5f);
+            var empty = (Color32)new Color(Fill.r, Fill.g, Fill.b, 0.85f);
+            var none = new Color32(0, 0, 0, 0);
+            var pixels = new Color32[width * SlotHeight];
+            for (int yFromTop = 0; yFromTop < SlotHeight; yFromTop++)
+            {
+                int row = (SlotHeight - 1 - yFromTop) * width;
+                float fromBottom = SlotHeight - (yFromTop + 0.5f);
+                int k = Mathf.FloorToInt(fromBottom / (segment + StackGap));
+                float inSegment = fromBottom - k * (segment + StackGap);
+                bool gap = inSegment > segment || k >= maxCharges;
+                Color32 color = gap ? none : k < full ? lit : k == full && inSegment <= partialRows ? charging : empty;
+                float left = Slant * (1f - (yFromTop + 0.5f) / SlotHeight);
+                for (int x = 0; x < width; x++)
+                {
+                    float px = x + 0.5f;
+                    pixels[row + x] = px >= left && px <= left + StackWidth ? color : none;
+                }
+            }
+            _stack[index].SetPixels32(pixels);
+            _stack[index].Apply();
+            _stackKey[index] = key;
+            return _stack[index];
         }
 
         // 札の形（右へ傾いた平行四辺形。上の辺が Slant だけ右）の中か。inset は内側へ縮める量（ピクセル）。

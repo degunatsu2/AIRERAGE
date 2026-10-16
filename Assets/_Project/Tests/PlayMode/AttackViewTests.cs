@@ -56,6 +56,38 @@ namespace Airerage.PlayMode.Tests
         }
 
         [UnityTest]
+        public IEnumerator FacingMarker_ShowsWhichWayTheCharacterFaces()
+        {
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            CharacterView view = runner.PlayerView;
+            Transform visor = view.transform.Find("Facing/Visor");
+            Assert.That(visor, Is.Not.Null, "向きの印（目の帯）がない");
+            Assert.That(view.transform.Find("Facing/Nose"), Is.Not.Null, "向きの印（突き出た印）がない");
+            yield return WaitSeconds(0.5f);
+            Assert.That(view.ShowsFacingMarker, Is.True, "向きの印を見せていない");
+
+            // 左へ歩くと、印が左に寄る。右へ歩くと右に寄る。
+            foreach (sbyte x in new sbyte[] { -SimInput.AxisMax, SimInput.AxisMax })
+            {
+                var walk = new List<SimInput>();
+                for (int t = 0; t < 10; t++)
+                {
+                    walk.Add(new SimInput(x, 0, InputButtons.None));
+                }
+                runner.InputOverride = new Script(walk);
+                yield return WaitSeconds(0.3f);
+                int facing = x < 0 ? -1 : 1;
+                Assert.That(runner.PlayerState.Facing, Is.EqualTo(facing), "前提: 歩いた方を向いている");
+                Assert.That(view.ShownFacing, Is.EqualTo(facing), "印の向きがキャラクターの向きと違う");
+                Assert.That(Mathf.Sign(visor.position.x - view.transform.position.x), Is.EqualTo((float)facing), "目の帯が向いている側にない");
+                Assert.That(visor.position.z, Is.LessThan(view.transform.position.z), "目の帯がカメラの側の面にない");
+            }
+        }
+
+        [UnityTest]
         public IEnumerator GroundAttack_HitsTheDummy()
         {
             SceneManager.LoadScene("Sandbox_Wire");

@@ -438,7 +438,7 @@ namespace Airerage.Runtime.Presentation
                 float rankRight = plateX - (crown ? _resultPlate.CrownWidth : 0f) - 8f;
                 Shadowed(new Rect(rankRight - 60f, y, 60f, plateHeight), (i + 1).ToString(), _rank, rankColor);
                 _resultPlate.Draw(new Rect(plateX, y, plateWidth, plateHeight), index + 1, _feed.LabelOf(index), _feed.ColorOf(index),
-                    _feed.GetState(index), crown, default, new Color(1f, 0.85f, 0.2f));
+                    _feed.GetState(index), crown, default, new Color(1f, 0.85f, 0.2f), ScoreboardHud.LogoOf(_feed, index));
             }
             // 順位は確定コインの数（D-25）。アディショナルタイムで勝った人はいちばん上。同じなら仮に撃破の数。
             GUI.color = new Color(0.8f, 0.8f, 0.85f);

@@ -9,7 +9,7 @@ namespace Airerage.Net
     /// 待機所（ロビー）の表示（ユーザーの要望、2026-10-14）。ホストもクライアントも、画面の中央に同じ顔ぶれを出す
     /// （OnlineSession.Roster）。番号ごとに 1 枚の札（GuidePlate。右上の表と同じ形）:
     /// - つながっている人: 縁と斜めの線はプレイヤーの色、左にプレイヤーの色の四角と番号、右にプレイヤーネーム（なければ P1〜P4）と
-    ///   「HOST」「YOU」の印。名前の下に、選んだキャラクターの名前（docs/13 T5-5）。
+    ///   「HOST」「YOU」の印。名前の下に、選んだキャラクターのロゴと名前（docs/13 T5-5、T5-8）。
     /// - まだいない番号: 灰色の縁で、「WAITING...」がゆっくり明滅する。
     /// 札が埋まった・空いた瞬間は、札が白く光る。座標は OnGUI の座標。使い終わったら Dispose でテクスチャを消す。
     /// </summary>
@@ -46,11 +46,11 @@ namespace Airerage.Net
         public static float Height => 70f + OnlineSession.MaxPlayers * (PlateHeight + PlateGap);
 
         /// <summary>
-        /// 題と札を描く（左上が origin）。colorOf はプレイヤーの色、subtitle は題の下の小さな説明。
-        /// 返り値は、札の下の y（OnGUI の座標）。
+        /// 題と札を描く（左上が origin）。colorOf はプレイヤーの色、subtitle は題の下の小さな説明。characterName と characterLogo は
+        /// キャラクターの番号から名前とロゴ（なければ null）。返り値は、札の下の y（OnGUI の座標）。
         /// </summary>
         public float Draw(Vector2 origin, IReadOnlyList<LobbySlot> roster, int localPlayer, Func<int, Color> colorOf, string subtitle,
-            Func<int, string> characterName = null)
+            Func<int, string> characterName = null, Func<int, Texture2D> characterLogo = null)
         {
             EnsureStyles();
             int connected = 0;
@@ -72,7 +72,8 @@ namespace Airerage.Net
             {
                 TrackChange(p, roster[p].Connected);
                 DrawSlot(new Rect(origin.x, y, PlateWidth, PlateHeight), p, roster[p], p == localPlayer, colorOf(p),
-                    characterName != null ? characterName(roster[p].Character) : string.Empty);
+                    characterName != null ? characterName(roster[p].Character) : string.Empty,
+                    characterLogo != null ? characterLogo(roster[p].Character) : null);
                 y += PlateHeight + PlateGap;
             }
             return y;
@@ -92,7 +93,7 @@ namespace Airerage.Net
             }
         }
 
-        private void DrawSlot(Rect rect, int slot, LobbySlot entry, bool isLocal, Color color, string character)
+        private void DrawSlot(Rect rect, int slot, LobbySlot entry, bool isLocal, Color color, string character, Texture2D logo)
         {
             Color previous = GUI.color;
             _plate.DrawBackground(rect);
@@ -114,7 +115,13 @@ namespace Airerage.Net
                 GuidePlate.DrawText(nameRect, name, _name, Color.white);
                 if (hasCharacter)
                 {
-                    GuidePlate.DrawText(new Rect(right.x + 11f, right.yMax - 19f, right.width - 120f, 16f), character, _character,
+                    float textX = right.x + 11f;
+                    if (logo != null)
+                    {
+                        GUI.DrawTexture(new Rect(textX, right.yMax - 20f, 18f, 18f), logo, ScaleMode.ScaleToFit);
+                        textX += 21f;
+                    }
+                    GuidePlate.DrawText(new Rect(textX, right.yMax - 19f, right.width - 120f, 16f), character, _character,
                         new Color(1f, 1f, 1f, 0.7f));
                 }
                 float tagX = right.xMax - 10f;

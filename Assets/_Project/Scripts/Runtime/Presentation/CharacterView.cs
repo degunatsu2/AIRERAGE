@@ -19,6 +19,7 @@ namespace Airerage.Runtime.Presentation
     /// （_feverGauge）を出す（RISK TAKER。docs/14。あれば）。
     /// 撃破されて復帰を待っている間は見えなくし、復帰した後の無敵の間は点滅させる（docs/12 T4-2）。
     /// 回る技（AttackData.SpinPerHit）の間は、判定 1 つにつき 1 回転させる。
+    /// 向いている方向は、箱の前の面の目の帯と、横へ突き出た印（_facingMarker。あれば）で示す（向きで左右を反転する。ユーザーの要望、2026-10-16）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
@@ -81,6 +82,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private RingGaugeView _feverGauge;
         [Tooltip("撃破されて復帰を待つ間の、出現位置の周りの大きなゲージ（なくてもよい）")]
         [SerializeField] private RingGaugeView _respawnGauge;
+        [Tooltip("向きの印（目の帯と突き出た印をまとめた子。右向きで作り、左を向いたら左右を反転する。なければ出さない）")]
+        [SerializeField] private Transform _facingMarker;
 
         private MeshRenderer _renderer;
         private MaterialPropertyBlock _block;
@@ -97,6 +100,7 @@ namespace Airerage.Runtime.Presentation
         private int _shownGauge;
         private int _shownJackpots;
         private int _feverTicks;
+        private Renderer[] _facingRenderers;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
         public AttackPhase? ShownPhase
@@ -152,6 +156,12 @@ namespace Airerage.Runtime.Presentation
         /// <summary>無敵なので点滅させているか。</summary>
         public bool Blinking { get; private set; }
 
+        /// <summary>向きの印が示している向き（1 = 右、-1 = 左。印がなければ 0）。</summary>
+        public int ShownFacing => _facingMarker == null ? 0 : _facingMarker.localScale.x < 0f ? -1 : 1;
+
+        /// <summary>向きの印を見せているか。</summary>
+        public bool ShowsFacingMarker => _facingRenderers != null && _facingRenderers.Length > 0 && _facingRenderers[0].enabled;
+
         public void Render(in CharacterState previous, in CharacterState current, float alpha, Vector3 halfExtents)
         {
             transform.position = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
@@ -166,6 +176,7 @@ namespace Airerage.Runtime.Presentation
         {
             RenderHitbox(current, combat);
             RenderSpin(current, combat);
+            RenderFacing(current);
             Tint tint = TintOf(current, combat);
             RenderCharge(current, combat, tint == Tint.Charge);
             RenderCooldownGauges(current, combat);
@@ -217,6 +228,21 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
+        // 向きの印: 右向きで作ってあり、左を向いたら左右を反転する（回る技の間は、体と一緒に回る）。
+        private void RenderFacing(in CharacterState state)
+        {
+            if (_facingMarker == null)
+            {
+                return;
+            }
+            float sign = state.Facing < 0 ? -1f : 1f;
+            Vector3 scale = _facingMarker.localScale;
+            if (!Mathf.Approximately(Mathf.Sign(scale.x), sign))
+            {
+                _facingMarker.localScale = new Vector3(Mathf.Abs(scale.x) * sign, scale.y, scale.z);
+            }
+        }
+
         // 復帰を待つ間、出現位置の周りに大きなゲージ（残りの割合）を出す（数字ではなくゲージで。ユーザーの要望、2026-10-13）。
         private void RenderRespawn(in CharacterState state, int respawnDelayTicks)
         {
@@ -245,6 +271,14 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             _renderer.enabled = !HiddenForRespawn && !(Blinking && Mathf.Repeat(Time.time * BlinkPerSecond, 1f) >= 0.5f);
+            if (_facingMarker != null)
+            {
+                _facingRenderers = _facingRenderers ?? _facingMarker.GetComponentsInChildren<Renderer>(true);
+                foreach (Renderer marker in _facingRenderers)
+                {
+                    marker.enabled = _renderer.enabled;
+                }
+            }
         }
 
         // 状態の変化（受けた時刻、FATAL を受けた数、ワイヤーキャンセルのクールタイムの始まり）から、一瞬の光を出す。

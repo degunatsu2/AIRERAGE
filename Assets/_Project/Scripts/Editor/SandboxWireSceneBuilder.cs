@@ -281,10 +281,30 @@ namespace Airerage.Editor
             GameObject go = CreateVisual(PrimitiveType.Cube, name, material, Vector3.one);
             go.transform.position = position;
             var view = go.AddComponent<CharacterView>();
+            AddFacingMarker(view);
             SetReference(view, "_hitboxLine", CreateHitboxLine(name + "Hitbox"));
             SetReference(view, "_chargeEffect", CreateChargeEffect(name + "Charge"));
             AddCombatIndicators(view, name, null, material.GetColor("_BaseColor"));
             return view;
+        }
+
+        /// <summary>
+        /// キャラクターの箱に、向いている方向の印を付ける（ユーザーの要望、2026-10-16）: 前の面の上のほうの、向いている側に寄せた白い目の帯と、
+        /// 向いている側の横へ突き出た印。箱（大きさ 1 の立方体を体の大きさに伸ばしたもの）の子なので、大きさは箱に対する割合で書く。
+        /// 右向きで作る（左を向いたら CharacterView が左右を反転する）。オンライン用のシーンでも使う。
+        /// </summary>
+        internal static void AddFacingMarker(CharacterView view)
+        {
+            Material material = LoadOrCreateMaterial("FacingMarker", Color.white, unlit: true);
+            var root = new GameObject("Facing").transform;
+            root.SetParent(view.transform, false);
+            GameObject visor = CreateVisual(PrimitiveType.Cube, "Visor", material, new Vector3(0.62f, 0.09f, 0.04f));
+            visor.transform.SetParent(root, false);
+            visor.transform.localPosition = new Vector3(0.19f, 0.28f, -0.52f);
+            GameObject nose = CreateVisual(PrimitiveType.Cube, "Nose", material, new Vector3(0.28f, 0.1f, 0.5f));
+            nose.transform.SetParent(root, false);
+            nose.transform.localPosition = new Vector3(0.64f, 0.28f, 0f);
+            SetReference(view, "_facingMarker", root);
         }
 
         // ガードのクールタイムのゲージの色（ワイヤーキャンセルの紫と区別する）。
@@ -895,28 +915,30 @@ namespace Airerage.Editor
             return virtualCamera;
         }
 
+        /// <summary>
+        /// 基準のキャラクター（STANDARD）のアセット。ほかのキャラクターと同じく、ビルドのたびに CharacterPresets の値で作り直す
+        /// （値はコードの 1 か所で決める。ロゴを設定するとアセットの全部の項目が書き出され、コードの初期値を変えても反映されなく
+        /// なるため。docs/13 T5-8）。
+        /// </summary>
         internal static CharacterConfigAsset LoadOrCreateCharacterConfig()
         {
-            var asset = AssetDatabase.LoadAssetAtPath<CharacterConfigAsset>(CharacterConfigPath);
-            if (asset != null)
-            {
-                return asset;
-            }
-            EnsureFolder(Path.GetDirectoryName(CharacterConfigPath));
-            asset = ScriptableObject.CreateInstance<CharacterConfigAsset>();
-            AssetDatabase.CreateAsset(asset, CharacterConfigPath);
-            return asset;
+            return WritePresetCharacter(CharacterConfigPath, CharacterPresets.Standard(), CharacterPresets.StandardName);
         }
 
         /// <summary>
         /// 選べるキャラクターの一覧（docs/13 T5-5、T5-6）を作り直す: character（STANDARD）と、CharacterPresets から作るキャラクター
-        /// （RISK TAKER）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す（値はコードの 1 か所で決める）。
+        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
+        /// （値はコードの 1 か所で決める）。仮のロゴ（CharacterLogoPainter）も描き直して設定する（docs/13 T5-8）。
         /// </summary>
         internal static CharacterRoster LoadOrCreateCharacterRoster(CharacterConfigAsset character)
         {
             CharacterConfigAsset riskTaker = WritePresetCharacter(RiskTakerPath, CharacterPresets.RiskTaker(), CharacterPresets.RiskTakerName);
             CharacterConfigAsset stormRunner = WritePresetCharacter(StormRunnerPath, CharacterPresets.StormRunner(), CharacterPresets.StormRunnerName);
             CharacterConfigAsset spaceTraveler = WritePresetCharacter(SpaceTravelerPath, CharacterPresets.SpaceTraveler(), CharacterPresets.SpaceTravelerName);
+            AssignLogo(character, "Standard", CharacterLogoPainter.Standard());
+            AssignLogo(riskTaker, "RiskTaker", CharacterLogoPainter.RiskTaker());
+            AssignLogo(stormRunner, "StormRunner", CharacterLogoPainter.StormRunner());
+            AssignLogo(spaceTraveler, "SpaceTraveler", CharacterLogoPainter.SpaceTraveler());
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
             if (roster == null)
             {
@@ -928,6 +950,18 @@ namespace Airerage.Editor
             EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return roster;
+        }
+
+        // 仮のロゴ（CharacterLogoPainter）を描き直して、キャラクターに設定する。ほかの絵（本番の絵）が設定されていれば、そのままにする。
+        private static void AssignLogo(CharacterConfigAsset character, string fileName, Color[] pixels)
+        {
+            string path = $"{CharacterLogoPainter.Folder}/{fileName}Logo.asset";
+            Texture2D logo = CharacterLogoPainter.Write(path, pixels);
+            if (character.Logo == null || AssetDatabase.GetAssetPath(character.Logo) == path)
+            {
+                character.SetLogo(logo);
+                EditorUtility.SetDirty(character);
+            }
         }
 
         private static CharacterConfigAsset WritePresetCharacter(string path, Airerage.Core.Simulation.CharacterConfig config, string displayName)

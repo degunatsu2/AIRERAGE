@@ -43,6 +43,26 @@ namespace Airerage.PlayMode.Tests
             Assert.That(board.CrownCount, Is.EqualTo(1));
         }
 
+        [UnityTest]
+        public IEnumerator Rows_ShowTheCharacterLogo_AndItFollowsTheCharacter()
+        {
+            SceneManager.LoadScene("Sandbox_Combat");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            Assert.That(Object.FindFirstObjectByType<ScoreboardHud>(), Is.Not.Null, "右上の表がない");
+            ISimulationFeed feed = runner;
+            Texture2D standard = ScoreboardHud.LogoOf(feed, 0);
+            Assert.That(standard, Is.Not.Null, "札にキャラクターのロゴがない（docs/13 T5-8）");
+            Assert.That(standard, Is.SameAs(feed.CharacterOf(0).Logo));
+
+            // キャラクターを変えると、札のロゴも変わる。
+            runner.CycleCharacter();
+            yield return null;
+            Texture2D next = ScoreboardHud.LogoOf(feed, 0);
+            Assert.That(next, Is.Not.Null);
+            Assert.That(next, Is.Not.SameAs(standard), "キャラクターを変えても、ロゴが変わらない");
+        }
+
         private static IEnumerator WaitSeconds(float seconds)
         {
             float start = Time.time;

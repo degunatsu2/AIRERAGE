@@ -4,6 +4,7 @@ using Airerage.Core.Economy;
 using Airerage.Core.Match;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
 
@@ -11,7 +12,7 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 右上の全員の情報（ユーザーの要望、2026-10-14）。1 人 1 枚の札（PlayerStatusPlate）で、縁と斜めの線はプレイヤーの色。
-    /// 左にキャラクターの絵（今はプレイヤーの色の四角と番号）とプレイヤーネーム、右を 4 つに分けて BANK（確定コイン）/
+    /// 左にプレイヤーの色の四角と番号、キャラクターのロゴ（docs/13 T5-8）とプレイヤーネーム、右を 4 つに分けて BANK（確定コイン）/
     /// COIN（所持コイン）/ K（撃破した数）/ F（撃破された数）。BANK の文字と数だけ黄色。
     /// いつも今の順位（MatchResults.Rank。確定コインの順）に並べ、順位が変わると札が滑って入れ替わる。確定コインが最も多い人
     /// （1 枚以上）には、札の左に王冠をつける（同じ数なら全員）。
@@ -74,6 +75,13 @@ namespace Airerage.Runtime.Presentation
         public bool HasCrown(int index)
         {
             return IsLeader(_feed, index);
+        }
+
+        /// <summary>キャラクター index の札に出すロゴ（キャラクターのアセットの Logo。なければ null）。結果の画面でも使う。</summary>
+        public static Texture2D LogoOf(ISimulationFeed feed, int index)
+        {
+            CharacterConfigAsset character = index >= 0 && index < feed.CharacterCount ? feed.CharacterOf(index) : null;
+            return character != null ? character.Logo : null;
         }
 
         /// <summary>キャラクター index の札の今の見た目（テスト用）。</summary>
@@ -254,7 +262,7 @@ namespace Airerage.Runtime.Presentation
             {
                 var rect = new Rect(x, _rowY[index], _width, _rowHeight);
                 _plate.Draw(rect, index + 1, _feed.LabelOf(index), _feed.ColorOf(index), _feed.GetState(index),
-                    IsLeader(_feed, index), CurrentLook(index), _bankColor);
+                    IsLeader(_feed, index), CurrentLook(index), _bankColor, LogoOf(_feed, index));
             }
         }
     }

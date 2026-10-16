@@ -479,7 +479,7 @@ namespace Airerage.Net
                 : "Connected. The host starts the match.";
             float y = _waitingRoom.Draw(new Vector2(box.x + padding, box.y + padding), _session.Roster, _session.LocalPlayer,
                 index => index < _playerColors.Length ? _playerColors[index] : Color.white, subtitle,
-                character => CharacterAsset(character).DisplayName);
+                character => CharacterAsset(character).DisplayName, character => CharacterAsset(character).Logo);
 
             // 自分のキャラクターの選択（◀ ▶ で一覧を回る。docs/13 T5-5）。
             var row = new Rect(box.x + padding, y + 2f, WaitingRoomPanel.PlateWidth, CharacterRowHeight - 6f);
@@ -491,8 +491,18 @@ namespace Airerage.Net
             {
                 LocalCharacter = (_localCharacter + 1) % CharacterCount;
             }
-            GuidePlate.DrawText(new Rect(row.x + 44f, row.y, row.width - 88f, row.height),
-                $"CHARACTER: {CharacterAsset(_localCharacter).DisplayName}", _footer, Color.white);
+            // 選んでいるキャラクターのロゴ（docs/13 T5-8）と名前を、並べて中央に。
+            CharacterConfigAsset selected = CharacterAsset(_localCharacter);
+            string label = $"CHARACTER: {selected.DisplayName}";
+            float logoSize = row.height - 2f;
+            float labelWidth = _footer.CalcSize(new GUIContent(label)).x;
+            float logoWidth = selected.Logo != null ? logoSize + 6f : 0f;
+            float labelX = row.center.x - (labelWidth + logoWidth) * 0.5f;
+            if (selected.Logo != null)
+            {
+                GUI.DrawTexture(new Rect(labelX, row.y + 1f, logoSize, logoSize), selected.Logo, ScaleMode.ScaleToFit);
+            }
+            GuidePlate.DrawText(new Rect(labelX + logoWidth, row.y, labelWidth + 4f, row.height), label, _footer, Color.white);
             y += CharacterRowHeight;
 
             var footer = new Rect(box.x + padding, y + 4f, WaitingRoomPanel.PlateWidth, 56f);

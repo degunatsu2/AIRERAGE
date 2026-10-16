@@ -7,7 +7,7 @@ namespace Airerage.Runtime.Data
 {
     /// <summary>
     /// キャラクター 1 体のアセット（docs/03_architecture.md 4.4、docs/13 T5-5）。シミュレーションの調整値（Core の CharacterConfig。
-    /// 移動、ワイヤー、攻撃と技）と、表示だけに使う値（名前、技の絵）を持つ。仮値は CharacterConfig の初期値にある。
+    /// 移動、ワイヤー、攻撃と技）と、表示だけに使う値（名前、ロゴ、技の絵）を持つ。仮値は CharacterConfig の初期値にある。
     /// シミュレーションはこの CharacterConfig を参照で持つので、プレイ中にインスペクターで変えた値は次のティックから反映される
     /// （オンラインでは、開始のときにホストの値を全員へ送る）。
     /// </summary>
@@ -17,6 +17,8 @@ namespace Airerage.Runtime.Data
         [SerializeField] private CharacterConfig _config = new CharacterConfig();
         [Tooltip("表示用の名前（キャラクターの選択、右上の表など）")]
         [SerializeField] private string _displayName = "STANDARD";
+        [Tooltip("キャラクターのロゴ（キャラクターの選択、右上の札。docs/13 T5-8。なければ出さない）")]
+        [SerializeField] private Texture2D _logo;
         [Tooltip("特殊攻撃 1 の絵（なければ技の名前で表示する）")]
         [SerializeField] private Texture2D _special1Icon;
         [Tooltip("特殊攻撃 2 の絵（なければ技の名前で表示する）")]
@@ -27,6 +29,9 @@ namespace Airerage.Runtime.Data
         public CharacterConfig Config => _config;
 
         public string DisplayName => string.IsNullOrEmpty(_displayName) ? name : _displayName;
+
+        /// <summary>キャラクターのロゴ（なければ null）。</summary>
+        public Texture2D Logo => _logo;
 
         /// <summary>技の絵（特殊攻撃と必殺技。なければ null）。</summary>
         public Texture2D IconOf(AttackSlot slot)
@@ -45,6 +50,12 @@ namespace Airerage.Runtime.Data
         {
             _config = config ?? new CharacterConfig();
             _displayName = displayName ?? string.Empty;
+        }
+
+        /// <summary>シーンのビルダー用: ロゴを設定する。</summary>
+        public void SetLogo(Texture2D logo)
+        {
+            _logo = logo;
         }
 
         private void OnValidate()

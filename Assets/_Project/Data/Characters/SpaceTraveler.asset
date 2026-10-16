@@ -84,7 +84,19 @@ MonoBehaviour:
         Roulette: 0
         TotalTicks: 26
         WireCancelFromTick: 12
-        Hits: []
+        Hits:
+        - StartTick: 9
+          ActiveTicks: 4
+          UntilEnd: 0
+          OffsetX: 1.6
+          OffsetY: 0.3
+          HalfWidth: 1.6
+          HalfHeight: 1.75
+          Damage: 5
+          HitstopTicks: 10
+          HitstunTicks: 26
+          KnockbackX: 3
+          KnockbackY: 17
         Motions:
         - StartTick: 0
           Ticks: 9
@@ -94,7 +106,7 @@ MonoBehaviour:
         - StartTick: 9
           Ticks: 1
           VelocityX: -7
-          VelocityY: 13
+          VelocityY: 16.5
           RequiresHit: 0
       AirNeutral:
         Name: STARDUST
@@ -424,6 +436,7 @@ MonoBehaviour:
       SlowFall:
         MaxFallSpeed: 3
   _displayName: SPACE TRAVELER
+  _logo: {fileID: 2800000, guid: 067af2315ce115f62a3467acef1bc8ae, type: 2}
   _special1Icon: {fileID: 0}
   _special2Icon: {fileID: 0}
   _superIcon: {fileID: 0}

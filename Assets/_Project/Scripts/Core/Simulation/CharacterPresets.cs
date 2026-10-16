@@ -260,8 +260,8 @@ namespace Airerage.Core.Simulation
 
         /// <summary>
         /// SPACE TRAVELER（docs/14 1.1。ユーザーの案、2026-10-15。C-4〜C-9、D-62、D-63 の回答、2026-10-16）。ワープで戦うキャラクター。
-        /// - 地上技 MOON HOP: 少しためた後、斜め後ろへふわりと飛び上がる（攻撃の判定はない）。その後、別の移動をするまでゆっくり落ちる
-        ///   （毎秒 3m。左右には動ける。C-4）。
+        /// - 地上技 MOON HOP: 少しためた後、斜め後ろへ高く飛び上がる。飛び上がる瞬間に前へ攻撃の判定を出し、当たった相手を強く上へ
+        ///   飛ばす（ユーザーの要望、2026-10-16）。その後、別の移動をするまでゆっくり落ちる（毎秒 3m。左右には動ける。C-4）。
         /// - 空中・横 BLINK KICK: 前へ 2m ほど瞬間移動してから蹴る。
         /// - 空中・下（撃破技）GRAVITY DROP: ためた後、真下へ重く落ちて叩きつける（打つ直前の速さで強くなる。D-38）。
         /// - 空中・ニュートラル STARDUST: 体の周りに星を散らす 2 段。1 段目は相手を少し引き寄せる（コンボの始めに）。
@@ -287,11 +287,19 @@ namespace Airerage.Core.Simulation
                 WireCancelFromTick = 12,
                 Effect = SkillEffect.SlowFall,
                 EffectTick = 10,
-                Hits = new AttackHit[0],
+                Hits = new[]
+                {
+                    // 飛び上がる瞬間の、前への判定。吹き飛びは強い上向き。
+                    new AttackHit
+                    {
+                        StartTick = 9, ActiveTicks = 4, OffsetX = 1.6f, OffsetY = 0.3f, HalfWidth = 1.6f, HalfHeight = 1.75f,
+                        Damage = 5, HitstopTicks = 10, HitstunTicks = 26, KnockbackX = 3f, KnockbackY = 17f,
+                    },
+                },
                 Motions = new[]
                 {
                     new AttackMotion { StartTick = 0, Ticks = 9, VelocityX = 0f, VelocityY = 0f },
-                    new AttackMotion { StartTick = 9, Ticks = 1, VelocityX = -7f, VelocityY = 13f },
+                    new AttackMotion { StartTick = 9, Ticks = 1, VelocityX = -7f, VelocityY = 16.5f },
                 },
             };
 

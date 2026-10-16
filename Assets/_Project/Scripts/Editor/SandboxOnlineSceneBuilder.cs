@@ -253,6 +253,7 @@ namespace Airerage.Editor
                 characterGo.transform.SetParent(playersRoot, false);
                 characterGo.transform.position = SpawnPositions[p];
                 characterViews[p] = characterGo.AddComponent<CharacterView>();
+                SandboxWireSceneBuilder.AddFacingMarker(characterViews[p]);
                 SandboxWireSceneBuilder.SetReference(characterViews[p], "_hitboxLine", SandboxWireSceneBuilder.CreateHitboxLine($"Player{p + 1}Hitbox"));
                 SandboxWireSceneBuilder.SetReference(characterViews[p], "_chargeEffect", SandboxWireSceneBuilder.CreateChargeEffect($"Player{p + 1}Charge"));
                 SandboxWireSceneBuilder.AddCombatIndicators(characterViews[p], $"Player{p + 1}", playersRoot, PlayerColors[p].Color);

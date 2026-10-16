@@ -5,8 +5,9 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 1 人分の情報の札（右上の表 ScoreboardHud と、結果の画面 MatchHud で同じ見た目にする。ユーザーの要望、2026-10-14）。
-    /// 誘導表示の札（GuidePlate）と同じ形で、縁と斜めの線はプレイヤーの色。左にキャラクターの絵（今はプレイヤーの色の四角と番号）と
-    /// プレイヤーネーム、右を 4 つに分けて BANK / COIN / K / F（BANK の文字と数だけ黄色）。王冠は札の左に出す。
+    /// 誘導表示の札（GuidePlate）と同じ形で、縁と斜めの線はプレイヤーの色。左にプレイヤーの色の四角と番号、その右にキャラクターの
+    /// ロゴ（docs/13 T5-8。あれば）、下にプレイヤーネーム、右を 4 つに分けて BANK / COIN / K / F（BANK の文字と数だけ黄色）。
+    /// 王冠は札の左に出す。
     /// 撃破されたときの見た目（Look）: ひび割れ、灰色に暗く、文字（「RESPAWN n」）、白く光る。
     /// OnGUI の中で描く。使い終わったら Dispose でテクスチャを消す。
     /// </summary>
@@ -63,8 +64,12 @@ namespace Airerage.Runtime.Presentation
         /// <summary>札の左に出す王冠の幅（ピクセル）。</summary>
         public float CrownWidth => Height * 0.8f + 4f;
 
-        /// <summary>number は四角に書く番号、name はプレイヤーネーム。bankColor は BANK の文字と数の色。</summary>
-        public void Draw(Rect rect, int number, string name, Color color, in CharacterState state, bool crown, Look look, Color bankColor)
+        /// <summary>
+        /// number は四角に書く番号、name はプレイヤーネーム。bankColor は BANK の文字と数の色。logo はキャラクターのロゴ（なければ
+        /// null。番号の四角だけを出す）。
+        /// </summary>
+        public void Draw(Rect rect, int number, string name, Color color, in CharacterState state, bool crown, Look look, Color bankColor,
+            Texture2D logo = null)
         {
             EnsureStyles();
             rect.position += look.Shake;
@@ -78,16 +83,24 @@ namespace Airerage.Runtime.Presentation
             }
             _plate.DrawFrame(rect, frame);
 
-            // 左: キャラクターの絵（今はプレイヤーの色の四角と番号）と、その下にプレイヤーネーム。
+            // 左: プレイヤーの色の四角と番号、その右にキャラクターのロゴ、下にプレイヤーネーム。
             Rect area = _plate.IconRect(rect);
             float size = area.height * 0.66f;
-            var icon = new Rect(area.center.x - size * 0.5f, area.y, size, size);
+            const float logoGap = 3f;
+            float pair = logo != null ? size * 2f + logoGap : size;
+            var icon = new Rect(area.center.x - pair * 0.5f, area.y, size, size);
             GUI.color = Color.Lerp(Color.Lerp(color, Color.black, 0.45f), Gray * 0.6f, look.Gray);
             GUI.DrawTexture(icon, Texture2D.whiteTexture);
             GUI.color = Color.Lerp(color, Gray, look.Gray);
             GUI.DrawTexture(new Rect(icon.x + 2f, icon.y + 2f, icon.width - 4f, icon.height - 4f), Texture2D.whiteTexture);
             GUI.color = previous;
             GuidePlate.DrawText(icon, number.ToString(), _iconText, Color.white);
+            if (logo != null)
+            {
+                GUI.color = Color.Lerp(Color.white, Gray, look.Gray);
+                GUI.DrawTexture(new Rect(icon.xMax + logoGap, icon.y, size, size), logo, ScaleMode.ScaleToFit);
+                GUI.color = previous;
+            }
             float nameWidth = (area.center.x - rect.x) * 2f - 4f;
             var nameRect = new Rect(area.center.x - nameWidth * 0.5f, icon.yMax, nameWidth, rect.yMax - icon.yMax - 2f);
             GuidePlate.DrawText(nameRect, name, _name, Color.Lerp(Color.white, Gray, look.Gray));

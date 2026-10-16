@@ -106,6 +106,58 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
+        public void MoonHop_JumpsHigh_AndHitsForward_LaunchingUpward()
+        {
+            // 高く飛ぶ（ユーザーの要望、2026-10-16。前は 13 m/s で約 2.8m）。
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(CharacterPresets.SpaceTraveler(), new Vector3(0f, GroundY, 0f));
+            Step(world, 2);
+            Step(world, 1, Press(InputButtons.Attack));
+            float top = GroundY;
+            for (int t = 0; t < 80; t++)
+            {
+                Step(world, 1);
+                top = System.Math.Max(top, world.GetState(0).Position.Y);
+            }
+            Assert.That(top - GroundY, Is.GreaterThan(4f), "高く飛ばない");
+
+            // 飛び上がる瞬間に、前の相手を強く上へ飛ばす。
+            world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(CharacterPresets.SpaceTraveler(), new Vector3(0f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(2f, GroundY, 0f), -1);
+            Step(world, 2);
+            Step(world, 1, Press(InputButtons.Attack));
+            HitRecord? hit = null;
+            int at = -1;
+            for (int t = 0; t < 30 && hit == null; t++)
+            {
+                Step(world, 1);
+                if (world.LastHits.Count > 0)
+                {
+                    hit = world.LastHits[0];
+                    at = world.GetState(0).Action.Ticks;
+                }
+            }
+            Assert.That(hit.HasValue, Is.True, "前の相手に当たらない");
+            Assert.That(hit.Value.Attack, Is.EqualTo(AttackSlot.Ground));
+            Assert.That(at, Is.EqualTo(Space.Combat.Ground.Hits[0].StartTick + 1).Within(1), "飛び上がる瞬間に当たらない");
+            Assert.That(hit.Value.Knockback.Y, Is.GreaterThan(System.Math.Abs(hit.Value.Knockback.X) * 4f), "吹き飛びが強い上向きでない");
+            Assert.That(hit.Value.Knockback.X, Is.GreaterThan(0f), "前へ飛ばさない");
+
+            // 後ろの相手には当たらない。
+            world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(CharacterPresets.SpaceTraveler(), new Vector3(0f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(-2f, GroundY, 0f), 1);
+            Step(world, 2);
+            Step(world, 1, Press(InputButtons.Attack));
+            for (int t = 0; t < 30; t++)
+            {
+                Step(world, 1);
+                Assert.That(world.LastHits.Count, Is.Zero, "後ろの相手に当たった");
+            }
+        }
+
+        [Test]
         public void Portal_WarpsWhoeverEnters_KeepsTheVelocity_AndNotThePlacerAtOnce()
         {
             var world = new SimWorld(new BoxTerrain());
