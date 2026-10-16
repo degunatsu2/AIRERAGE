@@ -43,6 +43,9 @@ namespace Airerage.Core.Wire
 
         /// <summary>ガードした（接続中にガードすると、ワイヤーを解除して慣性を引き継ぐ。【仮】T3-5）。</summary>
         Guard,
+
+        /// <summary>つないでいた置かれた物（ミラーボール）が消えた（docs/14）。</summary>
+        AnchorGone,
     }
 
     /// <summary>

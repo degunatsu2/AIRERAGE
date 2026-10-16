@@ -4,6 +4,7 @@ using Airerage.Core.Common;
 using Airerage.Core.Economy;
 using Airerage.Core.Input;
 using Airerage.Core.Match;
+using Airerage.Core.Objects;
 using Airerage.Core.Physics;
 using Airerage.Core.Rollback;
 using Airerage.Core.Simulation;
@@ -120,6 +121,7 @@ namespace Airerage.Net
         MatchRules ISimulationFeed.Rules => Running ? _session.World.Rules : null;
         MatchState ISimulationFeed.Match => Running ? _session.World.Match : MatchState.None;
         CoinField ISimulationFeed.Coins => Running ? _session.World.Coins.Field : null;
+        WorldObjects ISimulationFeed.Objects => Running ? _session.World.Objects : null;
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => Running ? _session.World.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => Running ? _session.World.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
         Color ISimulationFeed.ColorOf(int index) => index < _playerColors.Length ? _playerColors[index] : Color.white;
@@ -421,7 +423,7 @@ namespace Airerage.Net
             Vector3 origin = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
             System.Numerics.Vector3 simOrigin = origin.ToNumerics();
             var frame = new InputFrame(_input.Peek(simOrigin), current.PreviousButtons);
-            WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _terrain);
+            WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _session.World.Collision);
             _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength);
         }
 

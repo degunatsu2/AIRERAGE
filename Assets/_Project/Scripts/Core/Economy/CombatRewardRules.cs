@@ -59,14 +59,15 @@ namespace Airerage.Core.Economy
         /// <param name="endedCombos">このティックに、別の人の新しいコンボに置き換わって終わったコンボ（HitResolver.LastEndedCombos）。</param>
         /// <param name="knockouts">このティックの撃破（KnockoutResolver）。</param>
         /// <param name="tick">このティック（進めた後のティック）。</param>
+        /// <param name="configs">キャラクターの調整値（効率のボーナスに使う。null なら足さない）。</param>
         public static void Step(CoinLedger ledger, List<CharacterState> states, IReadOnlyList<ComboEnd> endedCombos,
-            IReadOnlyList<KnockoutRecord> knockouts, MatchRules rules, int tick)
+            IReadOnlyList<KnockoutRecord> knockouts, MatchRules rules, int tick, IReadOnlyList<CharacterConfig> configs = null)
         {
             // 置き換わったコンボ。同じ人が1ティックに何回も置き換わることがあるので、連番は一覧の中の番号にする。
             for (int i = 0; i < endedCombos.Count; i++)
             {
                 ComboEnd end = endedCombos[i];
-                PayDamage(ledger, states, end.Attacker, end.Victim, end.Damage, i, rules, tick);
+                PayDamage(ledger, states, end.Attacker, end.Victim, end.Damage, i, rules, tick, configs);
             }
 
             // のけぞりが終わった（撃破されて復帰を待っている）コンボ。
@@ -82,28 +83,41 @@ namespace Airerage.Core.Economy
                 int attacker = victim.Combat.RewardAttacker;
                 victim.Combat.RewardDamage = 0;
                 states[v] = victim;
-                PayDamage(ledger, states, attacker, v, damage, endedCombos.Count, rules, tick);
+                PayDamage(ledger, states, attacker, v, damage, endedCombos.Count, rules, tick, configs);
             }
 
             // 撃破報酬。報酬は所持コインに入るので、順位（確定コイン）は払っても変わらない。
             foreach (KnockoutRecord ko in knockouts)
             {
                 int amount = KoRewardAmount(rules, states, ko.Attacker, ko.Victim);
-                if (amount > 0)
+                if (amount > 0 && ledger.Reward(new CoinEventId(tick, CoinEventKind.KoReward, ko.Victim), states, ko.Attacker, amount))
                 {
-                    ledger.Reward(new CoinEventId(tick, CoinEventKind.KoReward, ko.Victim), states, ko.Attacker, amount);
+                    AccrueBonus(states, configs, ko.Attacker, amount);
                 }
             }
         }
 
         private static void PayDamage(CoinLedger ledger, List<CharacterState> states, int attacker, int victim, int damage, int sequence,
-            MatchRules rules, int tick)
+            MatchRules rules, int tick, IReadOnlyList<CharacterConfig> configs)
         {
             int amount = DamageRewardAmount(rules, damage);
-            if (amount > 0 && attacker >= 0 && attacker < states.Count && attacker != victim)
+            if (amount > 0 && attacker >= 0 && attacker < states.Count && attacker != victim
+                && ledger.Reward(new CoinEventId(tick, CoinEventKind.DamageReward, victim, sequence), states, attacker, amount))
             {
-                ledger.Reward(new CoinEventId(tick, CoinEventKind.DamageReward, victim, sequence), states, attacker, amount);
+                AccrueBonus(states, configs, attacker, amount);
             }
+        }
+
+        // 効率が上がっていれば、報酬のボーナスをためる（フィーバータイム。CoinBonusRules）。
+        private static void AccrueBonus(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int character, int amount)
+        {
+            if (configs == null || character < 0 || character >= states.Count)
+            {
+                return;
+            }
+            CharacterState state = states[character];
+            CoinBonusRules.Accrue(ref state, configs[character], amount);
+            states[character] = state;
         }
     }
 }

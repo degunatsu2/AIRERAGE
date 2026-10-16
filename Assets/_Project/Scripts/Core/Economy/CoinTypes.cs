@@ -120,6 +120,15 @@ namespace Airerage.Core.Economy
 
         /// <summary>消滅（破棄。フィールド −）。</summary>
         Expire = 7,
+
+        /// <summary>預け入れ（移動。所持 → 置かれた物。セーフティボックス。docs/14）。</summary>
+        Deposit = 8,
+
+        /// <summary>ばらまき（置かれた物 → フィールド。預けた分は移動、増えた分は生成。セーフティボックスが壊れた・時間切れ）。</summary>
+        SafeSpill = 9,
+
+        /// <summary>効率のボーナス（生成。→ 所持。フィーバータイム）。</summary>
+        CoinBonus = 10,
     }
 
     /// <summary>

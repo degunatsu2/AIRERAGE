@@ -26,6 +26,9 @@ namespace Airerage.Core.Economy
         /// <summary>これまでに破棄した枚数（消滅）。</summary>
         public long Destroyed { get; internal set; }
 
+        /// <summary>置かれた物（セーフティボックス）に預けられている枚数の合計（総量の検査に使う。docs/14）。</summary>
+        public long Stored { get; internal set; }
+
         /// <summary>出現地点ごとの、次にコインを出せるティック（拾われたティック ＋ 間隔。まだ拾われていなければ 0）。</summary>
         public IReadOnlyList<int> SpawnReadyTicks => _spawnReadyTicks;
 
@@ -76,13 +79,15 @@ namespace Airerage.Core.Economy
             NextCoinId = other.NextCoinId;
             Generated = other.Generated;
             Destroyed = other.Destroyed;
+            Stored = other.Stored;
         }
 
         /// <summary>同じ状態か（テスト用）。</summary>
         public bool SameAs(CoinField other)
         {
             if (other == null || _coins.Count != other._coins.Count || NextCoinId != other.NextCoinId
-                || Generated != other.Generated || Destroyed != other.Destroyed || _spawnReadyTicks.Count != other._spawnReadyTicks.Count)
+                || Generated != other.Generated || Destroyed != other.Destroyed || Stored != other.Stored
+                || _spawnReadyTicks.Count != other._spawnReadyTicks.Count)
             {
                 return false;
             }

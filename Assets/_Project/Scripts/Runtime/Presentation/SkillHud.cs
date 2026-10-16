@@ -16,6 +16,7 @@ namespace Airerage.Runtime.Presentation
     /// - 必殺技: ゲージ（0〜100%）のたまった分だけ金色がつき、％を小数第 1 位まで出す。必殺技を出せる量（キャラクターごと）の位置に
     ///   虹色の線を引く。出せるようになったら縁が虹色に光って「READY!」（ユーザーの要望、2026-10-15）。
     /// - 使えるようになった瞬間は札が白く光り、小さな音を鳴らす（_audio があれば）。技を出している間は縁が白い。
+    /// - 長押しの技をためている間は「HOLD」（セーフティボックスなら預ける枚数）、効果が続いている間（置いた金庫がある）は「ACTIVE」。
     /// - 使えるようになった瞬間は、自分のキャラクターの頭上にも小さな通知（技の名前。絵があれば絵）を出す（札を見なくても分かるように。
     ///   ユーザーの要望、2026-10-15）。この PC で操作しているキャラクターのものだけなので、ほかのプレイヤーには見えない。
     /// 技の絵は、キャラクターのアセット（CharacterConfigAsset）にあれば使う（まだない）。
@@ -188,10 +189,29 @@ namespace Airerage.Runtime.Presentation
                 {
                     int total = combat.CooldownTicksOf(move);
                     int left = move == AttackSlot.Special1 ? state.Combat.Special1CooldownTicksLeft : state.Combat.Special2CooldownTicksLeft;
-                    slot.Fill = total <= 0 ? 1f : 1f - Mathf.Clamp01(left / (float)total);
                     slot.Line = -1f;
-                    slot.Text = ready ? slot.Name : (left * SimTime.DeltaTime).ToString("0.0");
-                    slot.Label = ready ? string.Empty : slot.Name;
+                    if (state.Combat.Holding && state.Combat.HoldSlot == move)
+                    {
+                        // 長押しでためている（セーフティボックスなら、預ける枚数）。
+                        int deposit = HoldDepositHud.DepositOf(state, _feed.GetConfig(local));
+                        int max = Mathf.Max(1, combat.Get(move).HoldMaxTicks);
+                        slot.Fill = Mathf.Clamp01(state.Combat.HoldTicks / (float)max);
+                        slot.Text = deposit >= 0 ? $"-{deposit}" : "HOLD";
+                        slot.Label = "HOLD";
+                    }
+                    else if (left == CombatState.CooldownWhileActive)
+                    {
+                        // 技の効果が続いている（セーフティボックスを置いている）。クールタイムは効果が終わってから。
+                        slot.Fill = 1f;
+                        slot.Text = "ACTIVE";
+                        slot.Label = slot.Name;
+                    }
+                    else
+                    {
+                        slot.Fill = total <= 0 ? 1f : 1f - Mathf.Clamp01(left / (float)total);
+                        slot.Text = ready ? slot.Name : (left * SimTime.DeltaTime).ToString("0.0");
+                        slot.Label = ready ? string.Empty : slot.Name;
+                    }
                 }
             }
             _notices.RemoveAll(n => Time.time - n.At >= HeadNoticeSeconds);

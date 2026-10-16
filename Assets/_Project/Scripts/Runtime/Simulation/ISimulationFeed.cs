@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Airerage.Core.Economy;
 using Airerage.Core.Match;
+using Airerage.Core.Objects;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Data;
 using UnityEngine;
@@ -45,6 +46,9 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>フィールドのコイン（始まっていなければ null）。</summary>
         CoinField Coins { get; }
+
+        /// <summary>ワールドに置かれた物と投射物（始まっていなければ null。docs/13 T5-6）。</summary>
+        WorldObjects Objects { get; }
 
         /// <summary>コインの出現地点（番号の順。CoinField.SpawnReadyTick と FieldCoin.Source の番号。始まっていなければ空）。</summary>
         IReadOnlyList<CoinSpawnPoint> CoinSpawns { get; }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Airerage.Core.Economy;
 using Airerage.Core.Match;
+using Airerage.Core.Objects;
 
 namespace Airerage.Core.Simulation
 {
@@ -22,6 +23,9 @@ namespace Airerage.Core.Simulation
         /// <summary>ワールド全体のコイン（フィールドのコインなど）の写し。</summary>
         public CoinField Coins { get; } = new CoinField();
 
+        /// <summary>置かれた物と投射物の写し。</summary>
+        public WorldObjects Objects { get; } = new WorldObjects();
+
         /// <summary>アディショナルタイムと勝者の写し。</summary>
         public MatchState Match { get; private set; } = MatchState.None;
 
@@ -37,12 +41,13 @@ namespace Airerage.Core.Simulation
         /// <summary>全状態のチェックサム（ティック数と全キャラクターの状態。PC が違っても同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, Coins, Match);
+            return StateCodec.WorldChecksum(Tick, _states, Coins, Match, Objects);
         }
 
-        internal void Capture(int tick, IReadOnlyList<CharacterState> states, CoinField coins, MatchState match)
+        internal void Capture(int tick, IReadOnlyList<CharacterState> states, CoinField coins, MatchState match, WorldObjects objects)
         {
             Coins.CopyFrom(coins);
+            Objects.CopyFrom(objects);
             Match = match;
             if (_states.Length != states.Count)
             {

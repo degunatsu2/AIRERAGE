@@ -166,6 +166,8 @@ namespace Airerage.Core.Economy
                     // 拾ったコインの価値の分だけ、ゲージも増える（ユーザーの要望、2026-10-15）。
                     CharacterState state = states[picker];
                     CombatTuning.AddGauge(ref state.Combat, coin.Value * configs[picker].Combat.GaugePerCoin);
+                    // 効率が上がっていれば、ボーナスをためる（フィーバータイム。CoinBonusRules）。
+                    CoinBonusRules.Accrue(ref state, configs[picker], coin.Value);
                     states[picker] = state;
                     if (coin.Source >= 0)
                     {

@@ -65,7 +65,7 @@ namespace Airerage.Core.Tests.Combat
             Assert.That(Combat.Get(AttackSlot.Special1), Is.SameAs(Combat.Special1));
             Assert.That(Combat.Get(AttackSlot.Special2), Is.SameAs(Combat.Special2));
             Assert.That(Combat.Get(AttackSlot.Super), Is.SameAs(Combat.Super));
-            Assert.That(Combat.SuperGaugeCost, Is.EqualTo(100 * CombatTuning.GaugePerPercent), "D-55: 必殺技はゲージ 100%");
+            Assert.That(Combat.SuperGaugeCost, Is.EqualTo(70 * CombatTuning.GaugePerPercent), "STANDARD の BURST はゲージ 70%（2026-10-16）");
             Assert.That(CombatTuning.IsSpecial(AttackSlot.AirDown), Is.False);
             Assert.That(CombatTuning.IsSpecial(AttackSlot.Super), Is.True);
         }
@@ -299,7 +299,7 @@ namespace Airerage.Core.Tests.Combat
             Assert.That(hit.HasValue, Is.True, "後ろにいる相手に当たらない");
             Assert.That(hit.Value.Attack, Is.EqualTo(AttackSlot.Super));
             Assert.That(world.GetState(1).Action.Kind, Is.EqualTo(ActionKind.Hitstun));
-            Assert.That(world.GetState(0).Combat.Gauge, Is.Zero, "必殺技を当てた側がゲージを得た");
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(CombatTuning.MaxGauge - Combat.SuperGaugeCost), "必殺技を当てた側がゲージを得た");
             Assert.That(world.GetState(1).Combat.Gauge, Is.EqualTo(Combat.GaugeOnDamaged), "受けた側はゲージを得る");
         }
 

@@ -87,13 +87,20 @@ namespace Airerage.Core.Combat
         /// </summary>
         public int CancelFromTick;
 
+        /// <summary>技の効果（AttackData.Effect）を起こしたか（ヒットストップで止まっていても 1 回だけ起こす）。</summary>
+        public bool EffectDone;
+
+        /// <summary>技を出す前にためた長さ（ティック。長押しの技。AttackData.HoldMaxTicks）。</summary>
+        public int Charge;
+
         public bool IsFree => Kind == ActionKind.Free;
 
         public bool Equals(ActionState other)
         {
             return Kind == other.Kind && Attack == other.Attack && Ticks == other.Ticks
                 && Duration == other.Duration && HitMask == other.HitMask && StrikeSpeed.Equals(other.StrikeSpeed)
-                && Connected == other.Connected && CancelFromTick == other.CancelFromTick;
+                && Connected == other.Connected && CancelFromTick == other.CancelFromTick
+                && EffectDone == other.EffectDone && Charge == other.Charge;
         }
 
         public override bool Equals(object obj)
@@ -103,7 +110,8 @@ namespace Airerage.Core.Combat
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed, Connected, CancelFromTick);
+            return HashCode.Combine(HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed, Connected, CancelFromTick),
+                EffectDone, Charge);
         }
 
         public override string ToString()

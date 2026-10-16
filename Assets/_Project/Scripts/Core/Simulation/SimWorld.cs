@@ -5,7 +5,9 @@ using Airerage.Core.Economy;
 using Airerage.Core.Combat;
 using Airerage.Core.Input;
 using Airerage.Core.Match;
+using Airerage.Core.Objects;
 using Airerage.Core.Physics;
+using Airerage.Core.Skills;
 
 namespace Airerage.Core.Simulation
 {
@@ -22,6 +24,9 @@ namespace Airerage.Core.Simulation
         private readonly List<CharacterState> _spawns = new List<CharacterState>();
         private readonly CoinField _coins = new CoinField();
         private readonly List<KnockoutRecord> _knockouts = new List<KnockoutRecord>();
+        private readonly WorldObjects _objects = new WorldObjects();
+        private readonly List<HitRecord> _projectileHits = new List<HitRecord>();
+        private readonly WorldCollision _collision;
         private MatchState _match = MatchState.None;
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
@@ -56,9 +61,16 @@ namespace Airerage.Core.Simulation
             }
             Zones = sorted;
             Coins = new CoinLedger(_coins);
-            _simulator = new CharacterSimulator(collision, sorted);
+            _collision = new WorldCollision(collision);
+            _simulator = new CharacterSimulator(_collision, sorted);
             Bounds = bounds;
         }
+
+        /// <summary>ワールドに置かれた物と投射物（docs/13 T5-6）。状態の一部（巻き戻しとチェックサムに乗る）。表示用に読むだけにする。</summary>
+        public WorldObjects Objects => _objects;
+
+        /// <summary>地形に、置かれた物のアンカーポイントを加えた当たりの調べ方（照準の表示の予測に使う）。</summary>
+        public ICollisionQuery Collision => _collision;
 
         /// <summary>ステージの範囲（null なら撃破はない）。</summary>
         public StageBounds? Bounds { get; }
@@ -124,7 +136,7 @@ namespace Airerage.Core.Simulation
             {
                 throw new ArgumentNullException(nameof(snapshot));
             }
-            snapshot.Capture(Tick, _states, _coins, _match);
+            snapshot.Capture(Tick, _states, _coins, _match, _objects);
         }
 
         /// <summary>snapshot の全状態に戻す（ロールバックの巻き戻し）。キャラクターの数が違えば ArgumentException。</summary>
@@ -144,6 +156,7 @@ namespace Airerage.Core.Simulation
                 _states[i] = snapshot.GetState(i);
             }
             _coins.CopyFrom(snapshot.Coins);
+            _objects.CopyFrom(snapshot.Objects);
             _match = snapshot.Match;
             Tick = snapshot.Tick;
         }
@@ -151,7 +164,7 @@ namespace Airerage.Core.Simulation
         /// <summary>今の全状態のチェックサム（WorldSnapshot.Checksum と同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, _coins, _match);
+            return StateCodec.WorldChecksum(Tick, _states, _coins, _match, _objects);
         }
 
         public CharacterConfig GetConfig(int index)
@@ -171,6 +184,8 @@ namespace Airerage.Core.Simulation
         /// 被弾と撃破でコインを落とし（CoinDropRules。docs/12 T4-6）、終わったコンボと撃破の報酬を払う（CombatRewardRules。T4-5）。
         /// 最後に、フィールドのコインの出現・拾得・消滅を決め（FieldCoinRules。docs/12 T4-4）、拠点に触れている人の所持コインを
         /// 確定する（BankRules。T4-7）。
+        /// 技の効果と置かれた物（docs/13 T5-6）: 全員を進めた後に効果を起こし、物を進め（投射物の命中は HitResolver で一緒に当てる）、
+        /// 命中の後に寿命が来た・壊れた物を取り除く（SkillRules）。効率のボーナスはティックの終わりに加える（CoinBonusRules）。
         /// 試合の段階（Phase）がカウントダウンの間は入力を無視し、終わった後は全員を止める（ティック数だけ進める）。
         /// 時間切れの瞬間に、アディショナルタイムに入るか終わるかを決め、アディショナルタイム中は勝者と終わりを決める（MatchFlow。T4-8）。
         /// </summary>
@@ -195,6 +210,8 @@ namespace Airerage.Core.Simulation
                 Tick++;
                 return;
             }
+            // 置かれた物のアンカーポイントは、このティックの初めの物から決める（巻き戻しても全員で同じ）。
+            _collision.Refresh(_objects);
             for (int i = 0; i < _states.Count; i++)
             {
                 CharacterState state = _states[i];
@@ -202,14 +219,18 @@ namespace Airerage.Core.Simulation
                 _states[i] = state;
             }
             Tick++;
-            _hits.Resolve(_states, _configs, Tick);
+            SkillRules.FireEffects(_objects, Coins, _states, _configs, Tick);
+            _projectileHits.Clear();
+            SkillRules.StepObjects(_objects, _collision, _states, _configs, Bounds, Tick, _projectileHits);
+            _hits.Resolve(_states, _configs, Tick, _objects, Rules.Seed, _projectileHits);
+            SkillRules.EndObjects(_objects, Coins, _states, _configs, Rules, Tick);
             CoinDropRules.DropOnHits(Coins, _states, _hits.LastHits, Rules, Tick);
             if (Bounds.HasValue)
             {
                 KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts);
                 CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, CoinSpawns, Rules, Tick);
             }
-            CombatRewardRules.Step(Coins, _states, _hits.LastEndedCombos, _knockouts, Rules, Tick);
+            CombatRewardRules.Step(Coins, _states, _hits.LastEndedCombos, _knockouts, Rules, Tick, _configs);
             bool active = phase == MatchPhase.Playing || phase == MatchPhase.Overtime;
             FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, active);
             if (phase == MatchPhase.Overtime)
@@ -217,6 +238,7 @@ namespace Airerage.Core.Simulation
                 MatchFlow.StepOvertime(ref _match, _states, _configs, BankSpots, Rules, Tick);
             }
             BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, active);
+            CoinBonusRules.Mint(Coins, _states, Tick);
             if (phase == MatchPhase.Playing && Rules.HasTimeLimit && Tick == Rules.CountdownTicks + Rules.DurationTicks)
             {
                 MatchFlow.DecideAtTimeUp(ref _match, _states, Tick);

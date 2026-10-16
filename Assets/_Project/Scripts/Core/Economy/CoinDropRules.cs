@@ -120,6 +120,31 @@ namespace Airerage.Core.Economy
             return remaining >= 20 ? 20 : remaining >= 3 ? 3 : 1;
         }
 
+        /// <summary>
+        /// 置かれた物（セーフティボックス。番号 objectId）のコイン total 枚を、その場（origin の周り。撃破ドロップと同じ並べ方）に
+        /// ばらまく（docs/14 1.3）。預けられていた stored 枚は台帳の Stored から移し、残りは新しく生まれる。拾えるまでの時間と寿命は
+        /// ドロップと同じ。
+        /// </summary>
+        public static void Spill(CoinLedger ledger, int objectId, int stored, int total, Vector2 origin, MatchRules rules, int tick)
+        {
+            int remaining = Math.Max(total, stored);
+            int storedLeft = stored;
+            for (int piece = 0; remaining > 0 && piece < MaxPieces; piece++)
+            {
+                int value = PieceValue(remaining, piece);
+                int fromStored = Math.Min(value, storedLeft);
+                int coinId = ledger.Release(new CoinEventId(tick, CoinEventKind.SafeSpill, objectId, piece), fromStored, value - fromStored,
+                    origin + KoOffsets[piece], tick + rules.DropPickableDelayTicks, tick + rules.DropLifetimeTicks);
+                if (coinId < 0)
+                {
+                    // 台帳が拒否した（理由は ledger.LastRejection）。残りはばらまかない。
+                    return;
+                }
+                storedLeft -= fromStored;
+                remaining -= value;
+            }
+        }
+
         /// <summary>被弾ドロップ。HitResolver の後、撃破を決める前に呼ぶ（当たった人がまだステージの中にいるうちに）。</summary>
         /// <param name="tick">このティック（進めた後のティック）。</param>
         public static void DropOnHits(CoinLedger ledger, List<CharacterState> states, IReadOnlyList<HitRecord> hits, MatchRules rules, int tick)

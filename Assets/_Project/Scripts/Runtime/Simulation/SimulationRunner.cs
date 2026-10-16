@@ -5,6 +5,7 @@ using Airerage.Core.Common;
 using Airerage.Core.Economy;
 using Airerage.Core.Input;
 using Airerage.Core.Match;
+using Airerage.Core.Objects;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Core.Wire;
@@ -110,6 +111,7 @@ namespace Airerage.Runtime.Simulation
         MatchRules ISimulationFeed.Rules => _world?.Rules;
         MatchState ISimulationFeed.Match => _world != null ? _world.Match : MatchState.None;
         CoinField ISimulationFeed.Coins => _world?.Coins.Field;
+        WorldObjects ISimulationFeed.Objects => _world?.Objects;
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => _world != null ? _world.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => _world != null ? _world.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
         Color ISimulationFeed.ColorOf(int index) => index == _player ? new Color(0.95f, 0.55f, 0.2f) : new Color(0.7f, 0.7f, 0.75f);
@@ -309,7 +311,8 @@ namespace Airerage.Runtime.Simulation
                 SimInput shown = InputOverride != null ? LastInput : _input.Peek(simOrigin);
                 var frame = new InputFrame(shown, current.PreviousButtons);
                 WireTuning wire = PlayerConfig.Wire;
-                WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _terrain);
+                // 置かれた物のアンカー（ミラーボール）も含めて予測する。
+                WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _world.Collision);
                 _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength);
             }
         }

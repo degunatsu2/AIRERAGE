@@ -15,6 +15,8 @@ namespace Airerage.Runtime.Presentation
     /// 攻撃を受けた瞬間は火花（_hitSpark）、FATAL を受けた瞬間は虹色の光と「FATAL!」（_fatalBurst）、攻撃をワイヤーで
     /// キャンセルした瞬間は紫の光（_wireCancelBurst）を出す（T3-7。あれば）。ジャンプ台・加速リングが効いた瞬間は _gimmickBurst。
     /// 特殊攻撃を出した瞬間は _specialBurst、必殺技を出した瞬間は虹色の光と「SUPER!」（_superBurst）を出す（docs/13 T5-4。あれば）。
+    /// ルーレットの最大（JACKPOT）を受けた瞬間は _jackpotBurst、コインの効率が上がっている間（フィーバータイム）は周りに金色のゲージ
+    /// （_feverGauge）を出す（RISK TAKER。docs/14。あれば）。
     /// 撃破されて復帰を待っている間は見えなくし、復帰した後の無敵の間は点滅させる（docs/12 T4-2）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
@@ -72,6 +74,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private BurstEffectView _specialBurst;
         [Tooltip("必殺技を出した瞬間の虹色の光と「SUPER!」（なくてもよい）")]
         [SerializeField] private BurstEffectView _superBurst;
+        [Tooltip("ルーレットの最大（JACKPOT）を受けた瞬間の光と「JACKPOT!」（なくてもよい）")]
+        [SerializeField] private BurstEffectView _jackpotBurst;
+        [Tooltip("コインの効率が上がっている残りのゲージ（フィーバータイム。なくてもよい）")]
+        [SerializeField] private RingGaugeView _feverGauge;
         [Tooltip("撃破されて復帰を待つ間の、出現位置の周りの大きなゲージ（なくてもよい）")]
         [SerializeField] private RingGaugeView _respawnGauge;
 
@@ -88,6 +94,8 @@ namespace Airerage.Runtime.Presentation
         private int _shownSpecial1Cooldown;
         private int _shownSpecial2Cooldown;
         private int _shownGauge;
+        private int _shownJackpots;
+        private int _feverTicks;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
         public AttackPhase? ShownPhase
@@ -131,6 +139,8 @@ namespace Airerage.Runtime.Presentation
         public BurstEffectView GimmickBurst => _gimmickBurst;
         public BurstEffectView SpecialBurst => _specialBurst;
         public BurstEffectView SuperBurst => _superBurst;
+        public BurstEffectView JackpotBurst => _jackpotBurst;
+        public RingGaugeView FeverGauge => _feverGauge;
 
         /// <summary>復帰までの残りのゲージ（なければ null）。</summary>
         public RingGaugeView RespawnGauge => _respawnGauge;
@@ -249,6 +259,28 @@ namespace Airerage.Runtime.Presentation
             if (super && _superBurst != null)
             {
                 _superBurst.Play(center);
+            }
+            if (c.JackpotHitCount > _shownJackpots && _jackpotBurst != null)
+            {
+                _jackpotBurst.Play(center);
+            }
+            _shownJackpots = c.JackpotHitCount;
+            if (_feverGauge != null)
+            {
+                if (c.CoinBoostTicksLeft > 0)
+                {
+                    // 全体の長さは、効率が上がったときの残り（いちばん大きかった値）。
+                    _feverTicks = Mathf.Max(_feverTicks, c.CoinBoostTicksLeft);
+                    _feverGauge.Show(center, c.CoinBoostTicksLeft / (float)_feverTicks);
+                }
+                else
+                {
+                    _feverTicks = 0;
+                    if (_feverGauge.IsShowing)
+                    {
+                        _feverGauge.Hide();
+                    }
+                }
             }
             _shownSpecial1Cooldown = c.Special1CooldownTicksLeft;
             _shownSpecial2Cooldown = c.Special2CooldownTicksLeft;

@@ -66,6 +66,17 @@ namespace Airerage.Core.Combat
             // 撃破で終わったコンボのダメージ報酬は、このティックの後で CombatRewardRules が払う（T4-5）。
             respawned.Combat.RewardDamage = state.Combat.RewardDamage;
             respawned.Combat.RewardAttacker = state.Combat.RewardAttacker;
+            // 攻撃の番号は増え続ける（壊せる物に、前の攻撃と同じ番号で当たらないように）。効果が続いている技（セーフティボックスなど）の
+            // 止めているクールタイムは残す（撃破されても、2 つ目を置けないように）。
+            respawned.Combat.AttackSerial = state.Combat.AttackSerial;
+            if (state.Combat.Special1CooldownTicksLeft == CombatState.CooldownWhileActive)
+            {
+                respawned.Combat.Special1CooldownTicksLeft = CombatState.CooldownWhileActive;
+            }
+            if (state.Combat.Special2CooldownTicksLeft == CombatState.CooldownWhileActive)
+            {
+                respawned.Combat.Special2CooldownTicksLeft = CombatState.CooldownWhileActive;
+            }
             return respawned;
         }
     }

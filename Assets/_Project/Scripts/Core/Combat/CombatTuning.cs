@@ -1,5 +1,6 @@
 using System;
 using Airerage.Core.Common;
+using Airerage.Core.Skills;
 
 namespace Airerage.Core.Combat
 {
@@ -73,6 +74,9 @@ namespace Airerage.Core.Combat
         public float VelocityX;
         public float VelocityY;
 
+        /// <summary>この攻撃が相手に当たっているときだけ動く（当たったら飛び出す、など。RISK TAKER のオールイン）。</summary>
+        public bool RequiresHit;
+
         public bool IsActiveAt(int ticks)
         {
             return ticks >= StartTick && ticks < StartTick + Ticks;
@@ -104,6 +108,24 @@ namespace Airerage.Core.Combat
         /// <summary>技の名前（表示用。特殊攻撃と必殺技の表示に使う。空なら表示しない）。</summary>
         public string Name = string.Empty;
 
+        /// <summary>技の効果（物を置く、投射物を撃つ、強化など。docs/13 T5-6）。None なら効果はない。</summary>
+        public SkillEffect Effect;
+
+        /// <summary>効果を起こすティック（攻撃を始めたティックが 0）。</summary>
+        public int EffectTick;
+
+        /// <summary>
+        /// 0 より大きければ、ボタンを押している間は技を出さずにためて（動ける）、離したときに出す（RISK TAKER の E。最大のティック数）。
+        /// ためた長さは ActionState.Charge に入る。
+        /// </summary>
+        public int HoldMaxTicks;
+
+        /// <summary>
+        /// 吹き飛びと威力の倍率を、当てたときにルーレットで決める（0.5〜2 倍のどれか。試合の種と攻撃の番号で決めるので全員で同じ。
+        /// 最大なら JACKPOT。RISK TAKER のルーレットスマッシュ）。
+        /// </summary>
+        public bool Roulette;
+
         /// <summary>攻撃の全体の長さ（ティック）。終わったティックから次の行動ができる。</summary>
         public int TotalTicks = 18;
 
@@ -130,6 +152,9 @@ namespace Airerage.Core.Combat
             }
         }
 
+        /// <summary>ルーレットの倍率（Roulette。順に 0.5〜2 倍。最後が JACKPOT）。</summary>
+        public static readonly float[] RouletteScales = { 0.5f, 0.8f, 1f, 1.2f, 1.5f, 2f };
+
         /// <summary>攻撃を始めてから ticks ティック目の段階。</summary>
         public AttackPhase PhaseAt(int ticks)
         {
@@ -150,11 +175,15 @@ namespace Airerage.Core.Combat
             v.InRange(nameof(WireCancelFromTick), WireCancelFromTick, 0f, TotalTicks);
             v.NotNull(nameof(Hits), Hits);
             v.NotNull(nameof(Motions), Motions);
+            v.InRange(nameof(EffectTick), EffectTick, 0f, TotalTicks - 1);
+            v.NonNegative(nameof(HoldMaxTicks), HoldMaxTicks);
             if (Hits != null)
             {
-                if (Hits.Length < 1 || Hits.Length > MaxHits)
+                // 効果のある技（物を置くなど）は、判定がなくてもよい。
+                int minHits = Effect != SkillEffect.None ? 0 : 1;
+                if (Hits.Length < minHits || Hits.Length > MaxHits)
                 {
-                    v.Fail($"判定は 1〜{MaxHits} つ（{Hits.Length} つ）");
+                    v.Fail($"判定は {minHits}〜{MaxHits} つ（{Hits.Length} つ）");
                 }
                 for (int i = 0; i < Hits.Length; i++)
                 {
@@ -364,10 +393,10 @@ namespace Airerage.Core.Combat
         };
 
         /// <summary>
-        /// 必殺技に使うゲージ（0.1% 単位。D-55: 100%）。出したときに減る。キャラクターごとに変える（ユーザーの要望、2026-10-15。
-        /// 最大の 100% 以下）。
+        /// 必殺技に使うゲージ（0.1% 単位）。出したときに減る。キャラクターごとに変える（ユーザーの要望、2026-10-15。最大の 100% 以下）。
+        /// デフォルトのキャラクター（STANDARD）の BURST は 70%（ユーザーの要望、2026-10-16）。
         /// </summary>
-        public int SuperGaugeCost = 1000;
+        public int SuperGaugeCost = 700;
 
         /// <summary>撃破技にする攻撃（キャラクターごとに1つ。D-38）。</summary>
         public AttackSlot KoAttack = AttackSlot.AirDown;

@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Airerage.Core.Common;
+using Airerage.Core.Objects;
 using Airerage.Core.Simulation;
+using Airerage.Core.Skills;
 using Airerage.Core.Wire;
 
 namespace Airerage.Core.Combat
@@ -29,6 +32,12 @@ namespace Airerage.Core.Combat
     /// - ゲージ（T3-6）: 当たれば当てた側が GaugeOnHit・受けた側が GaugeOnDamaged、ふつうのガードなら攻撃した側が GaugeOnGuarded・
     ///   守った側が GaugeOnGuard、ジャストガードなら守った側が GaugeOnJustGuard を得る（それぞれ自分の調整値。上限 MaxGauge）。
     ///   必殺技では、攻撃した側はゲージを得ない（続けて必殺技を出せないように。docs/13 T5-3）【仮】。受けた側・守った側は得る。
+    /// - 投射物の命中（docs/13 T5-6）: SkillRules が集めた命中（HitRecord.FromObject）も、キャラクターの攻撃の後に同じ規則で当てる。
+    ///   ただし、撃った人は止まらず（ヒットストップなし）、今の攻撃の「当たった」にもならず、ジャストガードされても隙にならない。
+    /// - 壊せる物（セーフティボックス）: 攻撃の判定が重なったら、物にダメージを与える（同じ攻撃の同じ判定は 1 回だけ）。攻撃した側は
+    ///   止まらない。壊れたかどうかは SkillRules が決める。
+    /// - ルーレット（AttackData.Roulette）: 吹き飛びと威力の倍率を、試合の種と攻撃の番号（CombatState.AttackSerial）で決める
+    ///   （AttackData.RouletteScales のどれか。最大なら JACKPOT で、受けた側の JackpotHitCount が増える）。
     /// </summary>
     public sealed class HitResolver
     {
@@ -57,8 +66,12 @@ namespace Airerage.Core.Combat
             _endedCombos.Clear();
         }
 
-        /// <summary>このティックの命中を決めて当てる。tick は進めた後のティック（記録に使う）。</summary>
-        public void Resolve(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick)
+        /// <summary>
+        /// このティックの命中を決めて当てる。tick は進めた後のティック（記録に使う）。objects は壊せる物を含むワールドの物
+        /// （null なら物はない）、seed は試合の種（ルーレット）、extraHits は投射物の命中（null ならない）。
+        /// </summary>
+        public void Resolve(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick, WorldObjects objects = null,
+            int seed = 0, IReadOnlyList<HitRecord> extraHits = null)
         {
             if (states.Count > MaxCharacters)
             {
@@ -78,6 +91,13 @@ namespace Airerage.Core.Combat
                 bool ko = attacker.Action.Attack == combat.KoAttack;
                 float scale = ko ? combat.KoKnockbackScale(attacker.Action.StrikeSpeed) : 1f;
                 bool fatal = ko && attacker.Action.StrikeSpeed >= combat.FatalStrikeSpeed;
+                bool jackpot = false;
+                if (attack.Roulette)
+                {
+                    int roll = RouletteRoll(seed, a, attacker.Combat.AttackSerial);
+                    scale *= AttackData.RouletteScales[roll];
+                    jackpot = roll == AttackData.RouletteScales.Length - 1;
+                }
                 for (int h = 0; h < attack.Hits.Length; h++)
                 {
                     AttackHit hitData = attack.Hits[h];
@@ -86,6 +106,10 @@ namespace Airerage.Core.Combat
                         continue;
                     }
                     Hitbox(attacker, hitData, out Vector2 center, out Vector2 half);
+                    if (objects != null)
+                    {
+                        DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, half, (int)MathF.Round(hitData.Damage * scale));
+                    }
                     for (int v = 0; v < states.Count; v++)
                     {
                         // 無敵（復帰を待つ間と、復帰した後。docs/12 T4-2）の相手には当たらない。
@@ -98,8 +122,20 @@ namespace Airerage.Core.Combat
                         if (MathF.Abs(target.X - center.X) < half.X + targetHalf.X
                             && MathF.Abs(target.Y - center.Y) < half.Y + targetHalf.Y)
                         {
-                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, scale, fatal));
+                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, scale, fatal, jackpot: jackpot));
                         }
+                    }
+                }
+            }
+
+            if (extraHits != null)
+            {
+                foreach (HitRecord extra in extraHits)
+                {
+                    // 無敵の相手には当たらない（集めた後に復帰や無敵が変わることはないが、念のため当てる直前にも調べる）。
+                    if (states[extra.Victim].Combat.InvincibleTicksLeft <= 0)
+                    {
+                        _hits.Add(extra);
                     }
                 }
             }
@@ -107,6 +143,43 @@ namespace Airerage.Core.Combat
             for (int i = 0; i < _hits.Count; i++)
             {
                 _hits[i] = Apply(states, configs, _hits[i], tick, _endedCombos);
+            }
+        }
+
+        /// <summary>ルーレットの目（AttackData.RouletteScales の番号）。試合の種、攻撃した人、攻撃の番号から決まる（全員で同じ）。</summary>
+        public static int RouletteRoll(int seed, int attacker, int attackSerial)
+        {
+            return StableHash.Range(seed, RouletteSalt + attacker, attackSerial, AttackData.RouletteScales.Length);
+        }
+
+        private const int RouletteSalt = 7100;
+
+        /// <summary>壊せる物に、攻撃した人 attacker の攻撃（番号 serial の判定 hit）を当てたときの、物が覚える値（0 ではない）。</summary>
+        public static int ObjectHitKey(int attacker, int serial, int hit)
+        {
+            return (attacker + 1) * 0x1000000 + (serial & 0xFFFFF) * 4 + (hit & 3);
+        }
+
+        // 判定の箱が重なった壊せる物（セーフティボックス）にダメージを与える（同じ攻撃の同じ判定は 1 回だけ）。
+        private static void DamageObjects(WorldObjects objects, IReadOnlyList<CharacterConfig> configs, int attacker, int serial, int hit,
+            Vector2 center, Vector2 half, int damage)
+        {
+            int key = ObjectHitKey(attacker, serial, hit);
+            for (int i = 0; i < objects.Count; i++)
+            {
+                WorldObject item = objects[i];
+                if (item.Kind != WorldObjectKind.Safe || item.Ended || item.HasHitKey(key) || item.Owner >= configs.Count)
+                {
+                    continue;
+                }
+                SafeTuning safe = configs[item.Owner].Skills.Safe;
+                if (MathF.Abs(item.Position.X - center.X) < half.X + safe.HalfWidth
+                    && MathF.Abs(item.Position.Y - center.Y) < half.Y + safe.HalfHeight)
+                {
+                    item.Damage += Math.Max(1, damage);
+                    item.AddHitKey(key);
+                    objects[i] = item;
+                }
             }
         }
 
@@ -143,12 +216,15 @@ namespace Airerage.Core.Combat
             int hitstop = data.HitstopTicks * (fatal ? attackerCombat.FatalHitstopMultiplier : 1);
 
             CharacterState attacker = states[hit.Attacker];
-            if (attacker.Action.Kind == ActionKind.Attack)
+            if (!hit.FromObject)
             {
-                attacker.Action.HitMask |= HitBit(hit.HitIndex, hit.Victim);
-                attacker.Action.Connected |= result == HitResult.Hit;
+                if (attacker.Action.Kind == ActionKind.Attack)
+                {
+                    attacker.Action.HitMask |= HitBit(hit.HitIndex, hit.Victim);
+                    attacker.Action.Connected |= result == HitResult.Hit;
+                }
+                attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, hitstop);
             }
-            attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, hitstop);
             if (hit.Attack != AttackSlot.Super)
             {
                 CombatTuning.AddGauge(ref attacker.Combat,
@@ -166,11 +242,15 @@ namespace Airerage.Core.Combat
             {
                 victim.Combat.FatalHitCount++;
             }
+            if (hit.Jackpot && result == HitResult.Hit)
+            {
+                victim.Combat.JackpotHitCount++;
+            }
             bool startsCombo = false;
             switch (result)
             {
                 case HitResult.JustGuarded:
-                    JustGuard(states, configs[hit.Victim].Combat, ref victim, hit);
+                    JustGuard(states, configs[hit.Victim].Combat, ref victim, hit, punishAttacker: !hit.FromObject);
                     break;
                 case HitResult.Guarded:
                     Guard(configs[hit.Victim].Combat, ref victim, hit, tick);
@@ -200,6 +280,9 @@ namespace Airerage.Core.Combat
             };
             victim.Velocity = new Vector3(hit.Knockback.X, hit.Knockback.Y, 0f);
             victim.JumpBufferTicksLeft = 0;
+            // ためている技（長押し）は、攻撃を受けたらやめる（何も出ない）。
+            victim.Combat.Holding = false;
+            victim.Combat.HoldTicks = 0;
             victim.Combat.HasLastAttacker = true;
             victim.Combat.LastAttacker = (byte)hit.Attacker;
             victim.Combat.LastDamagedTick = tick;
@@ -229,11 +312,17 @@ namespace Airerage.Core.Combat
         }
 
         // ジャストガード: 守った側はすぐに動けて、ガードのクールタイムが戻る（D-39）。攻撃した側は隙（のけぞり）になる。
-        private static void JustGuard(List<CharacterState> states, CombatTuning combat, ref CharacterState defender, HitRecord hit)
+        private static void JustGuard(List<CharacterState> states, CombatTuning combat, ref CharacterState defender, HitRecord hit,
+            bool punishAttacker)
         {
             defender.Action = default;
             defender.Combat.GuardCooldownTicksLeft = 0;
             defender.Combat.JustGuardCount++;
+            if (!punishAttacker)
+            {
+                // 投射物をジャストガードしても、撃った人（離れている）は隙にならない。
+                return;
+            }
 
             CharacterState attacker = states[hit.Attacker];
             attacker.Action = new ActionState
@@ -311,8 +400,14 @@ namespace Airerage.Core.Combat
         /// <summary>当たって、当たった側の新しいコンボの最初の命中になったか（被弾ドロップ。docs/12 T4-6）。</summary>
         public readonly bool StartsCombo;
 
+        /// <summary>投射物の命中か（撃った人は止まらず、今の攻撃にも影響しない。docs/13 T5-6）。</summary>
+        public readonly bool FromObject;
+
+        /// <summary>ルーレットの最大（JACKPOT）の攻撃か。</summary>
+        public readonly bool Jackpot;
+
         public HitRecord(int attacker, int victim, AttackSlot attack, int hitIndex, AttackHit data, int facing, float knockbackScale,
-            bool fatal = false, HitResult result = HitResult.Hit, bool startsCombo = false)
+            bool fatal = false, HitResult result = HitResult.Hit, bool startsCombo = false, bool fromObject = false, bool jackpot = false)
         {
             Attacker = attacker;
             Victim = victim;
@@ -324,11 +419,13 @@ namespace Airerage.Core.Combat
             Fatal = fatal;
             Result = result;
             StartsCombo = startsCombo;
+            FromObject = fromObject;
+            Jackpot = jackpot;
         }
 
         public HitRecord WithResult(HitResult result, bool startsCombo = false)
         {
-            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, Fatal, result, startsCombo);
+            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, Fatal, result, startsCombo, FromObject, Jackpot);
         }
 
         /// <summary>当たった側の吹き飛びの速度（m/s、X は右が正）。</summary>

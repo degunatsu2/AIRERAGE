@@ -139,7 +139,7 @@ namespace Airerage.PlayMode.Tests
                 sawBurst |= runner.PlayerView.SuperBurst.IsPlaying;
                 yield return null;
             }
-            Assert.That(runner.PlayerState.Combat.Gauge, Is.Zero, "前提: 必殺技を出してゲージを使った");
+            Assert.That(runner.PlayerState.Combat.Gauge, Is.EqualTo(CombatTuning.MaxGauge - runner.PlayerConfig.Combat.SuperGaugeCost), "前提: 必殺技を出してゲージを使った");
             Assert.That(sawFlash, Is.True, "暗転しない");
             Assert.That(flash.FlashCount, Is.EqualTo(1));
             Assert.That(flash.LastTarget, Is.EqualTo(0), "出した人に光を当てない");

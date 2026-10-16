@@ -40,6 +40,13 @@ namespace Airerage.Runtime.Data
             }
         }
 
+        /// <summary>シーンのビルダー用の設定（CharacterPresets から作るとき）。</summary>
+        public void Configure(CharacterConfig config, string displayName)
+        {
+            _config = config ?? new CharacterConfig();
+            _displayName = displayName ?? string.Empty;
+        }
+
         private void OnValidate()
         {
             // 編集中の不正な値は、アセット名と項目名を出して知らせる（シミュレーションへの追加時には例外で止まる）。

@@ -105,6 +105,11 @@ namespace Airerage.Runtime.Audio
             {
                 _audio.Play(SoundId.Fatal);
             }
+            if (n.JackpotHitCount > b.JackpotHitCount)
+            {
+                // ルーレットの最大（JACKPOT）を受けた（RISK TAKER）。
+                _audio.Play(SoundId.JackpotGet, 0.8f);
+            }
             else if (now.Action.Kind == ActionKind.Hitstun && n.LastDamagedTick != b.LastDamagedTick && n.GuardedCount == b.GuardedCount)
             {
                 bool heavy = now.Velocity.Length() >= HeavyKnockbackSpeed;

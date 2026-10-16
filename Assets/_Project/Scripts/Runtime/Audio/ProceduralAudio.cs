@@ -90,6 +90,18 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>自分の特殊攻撃のクールタイムが終わった・必殺技のゲージがたまった（小さく明るい音）。</summary>
         SkillReady,
+
+        /// <summary>ミラーボールを置いた（きらめく和音。RISK TAKER の Q）。</summary>
+        MirrorBall,
+
+        /// <summary>セーフティボックスを置いた（重い金属の音と、鍵の音）。</summary>
+        SafePlace,
+
+        /// <summary>セーフティボックスが壊れた・時間切れでばらまいた（割れる音と、たくさんのコインの音）。</summary>
+        SafeBreak,
+
+        /// <summary>コイントス（コインをはじく「キン」）。</summary>
+        CoinToss,
     }
 
     /// <summary>
@@ -392,6 +404,39 @@ namespace Airerage.Runtime.Audio
                     b = new float[Samples(0.25f, r)];
                     AddTone(b, r, 0f, 0.12f, NoteFrequency(88), NoteFrequency(88), Wave.Sine, 0.35f, 0.002f, 0.05f);
                     AddTone(b, r, 0.06f, 0.18f, NoteFrequency(95), NoteFrequency(95), Wave.Sine, 0.35f, 0.002f, 0.07f);
+                    break;
+                case SoundId.MirrorBall:
+                    b = new float[Samples(0.8f, r)];
+                    int[] sparkle = { 84, 88, 91, 95, 100 };
+                    for (int i = 0; i < sparkle.Length; i++)
+                    {
+                        float f = NoteFrequency(sparkle[i]);
+                        AddTone(b, r, i * 0.04f, 0.5f, f, f, Wave.Sine, 0.25f, 0.002f, 0.2f);
+                        AddTone(b, r, i * 0.04f, 0.3f, f * 2f, f * 2f, Wave.Sine, 0.08f, 0.002f, 0.1f);
+                    }
+                    ApplyTremolo(b, r, 12f, 0.3f);
+                    break;
+                case SoundId.SafePlace:
+                    b = new float[Samples(0.45f, r)];
+                    AddTone(b, r, 0f, 0.3f, 110f, 70f, Wave.Sine, 0.9f, 0.001f, 0.12f);
+                    AddNoise(b, r, rng, 0f, 0.06f, 0.6f, 0.001f, 0.02f, 3000f, 1200f, 200f);
+                    AddTone(b, r, 0.18f, 0.08f, 2400f, 2400f, Wave.Square, 0.12f, 0.001f, 0.02f);
+                    AddTone(b, r, 0.26f, 0.08f, 1800f, 1800f, Wave.Square, 0.12f, 0.001f, 0.02f);
+                    break;
+                case SoundId.SafeBreak:
+                    b = new float[Samples(1.2f, r)];
+                    AddNoise(b, r, rng, 0f, 0.3f, 1f, 0.001f, 0.1f, 6000f, 1500f, 300f);
+                    AddTone(b, r, 0f, 0.4f, 160f, 50f, Wave.Saw, 0.5f, 0.002f, 0.15f);
+                    for (int i = 0; i < 14; i++)
+                    {
+                        float f = NoteFrequency(93 + (i * 7) % 12);
+                        AddTone(b, r, 0.15f + i * 0.05f, 0.2f, f, f, Wave.Sine, 0.16f, 0.001f, 0.08f);
+                    }
+                    break;
+                case SoundId.CoinToss:
+                    b = new float[Samples(0.3f, r)];
+                    AddTone(b, r, 0f, 0.25f, NoteFrequency(98), NoteFrequency(98), Wave.Sine, 0.4f, 0.001f, 0.1f);
+                    AddTone(b, r, 0f, 0.2f, NoteFrequency(105), NoteFrequency(105), Wave.Sine, 0.2f, 0.001f, 0.07f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

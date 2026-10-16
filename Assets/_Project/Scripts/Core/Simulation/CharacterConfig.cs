@@ -2,6 +2,7 @@ using System;
 using Airerage.Core.Combat;
 using Airerage.Core.Common;
 using Airerage.Core.Movement;
+using Airerage.Core.Skills;
 using Airerage.Core.Wire;
 
 namespace Airerage.Core.Simulation
@@ -17,6 +18,9 @@ namespace Airerage.Core.Simulation
         public WireTuning Wire = new WireTuning();
         public CombatTuning Combat = new CombatTuning();
 
+        /// <summary>技の効果の値（置く物、投射物、強化。docs/13 T5-6）。</summary>
+        public SkillTuning Skills = new SkillTuning();
+
         /// <summary>不正な値があれば InvalidTuningException を投げる。</summary>
         public void Validate()
         {
@@ -24,6 +28,7 @@ namespace Airerage.Core.Simulation
             v.NotNull(nameof(Movement), Movement);
             v.NotNull(nameof(Wire), Wire);
             v.NotNull(nameof(Combat), Combat);
+            v.NotNull(nameof(Skills), Skills);
             if (Movement != null)
             {
                 v.Merge(Movement.Validate());
@@ -35,6 +40,10 @@ namespace Airerage.Core.Simulation
             if (Combat != null)
             {
                 v.Merge(Combat.Validate());
+            }
+            if (Skills != null)
+            {
+                v.Merge(Skills.Validate());
             }
             v.ThrowIfInvalid();
         }

@@ -5,6 +5,7 @@ using System.Numerics;
 using Airerage.Core.Economy;
 using Airerage.Core.Combat;
 using Airerage.Core.Input;
+using Airerage.Core.Objects;
 using Airerage.Core.Wire;
 
 namespace Airerage.Core.Simulation
@@ -18,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 17;
+        public const int FormatVersion = 18;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -65,8 +66,12 @@ namespace Airerage.Core.Simulation
             return hash;
         }
 
-        /// <summary>ワールドの全状態（ティック数、全キャラクターの状態、ワールド全体のコイン、試合の進み具合）のチェックサム。</summary>
-        public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states, CoinField coins, Match.MatchState match)
+        /// <summary>
+        /// ワールドの全状態（ティック数、全キャラクターの状態、ワールド全体のコイン、試合の進み具合、置かれた物）のチェックサム。
+        /// objects が null なら、置かれた物はない（空の一覧と同じ値）。
+        /// </summary>
+        public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states, CoinField coins, Match.MatchState match,
+            WorldObjects objects = null)
         {
             ulong hash = Mix(FnvOffsetBasis, tick);
             for (int i = 0; i < states.Count; i++)
@@ -74,6 +79,7 @@ namespace Airerage.Core.Simulation
                 hash = Mix(hash, Checksum(states[i]));
             }
             hash = Mix(hash, Checksum(coins));
+            hash = Mix(hash, Checksum(objects));
             hash = Mix(hash, match.OvertimeStartTick);
             hash = Mix(hash, match.EndTick);
             return Mix(hash, match.Winner);
@@ -109,6 +115,50 @@ namespace Airerage.Core.Simulation
                 writer.Write(coins.NextCoinId);
                 writer.Write(coins.Generated);
                 writer.Write(coins.Destroyed);
+                writer.Write(coins.Stored);
+                writer.Flush();
+                ulong hash = FnvOffsetBasis;
+                foreach (byte b in stream.ToArray())
+                {
+                    hash = MixByte(hash, b);
+                }
+                return hash;
+            }
+        }
+
+        /// <summary>置かれた物（番号の順のすべての値と、次の番号）のチェックサム。null は空の一覧と同じ。</summary>
+        public static ulong Checksum(WorldObjects objects)
+        {
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write(objects != null ? objects.Count : 0);
+                if (objects != null)
+                {
+                    foreach (WorldObject item in objects.Items)
+                    {
+                        writer.Write(item.Id);
+                        writer.Write((byte)item.Kind);
+                        writer.Write(item.Owner);
+                        writer.Write((byte)item.Slot);
+                        writer.Write(item.Position.X);
+                        writer.Write(item.Position.Y);
+                        writer.Write(item.Velocity.X);
+                        writer.Write(item.Velocity.Y);
+                        writer.Write(item.SpawnTick);
+                        writer.Write(item.ExpireTick);
+                        writer.Write(item.Damage);
+                        writer.Write(item.ChargeMilli);
+                        writer.Write(item.Stored);
+                        writer.Write(item.HitMask);
+                        writer.Write(item.HitKey0);
+                        writer.Write(item.HitKey1);
+                        writer.Write(item.HitKey2);
+                        writer.Write(item.HitKey3);
+                        writer.Write(item.Ended);
+                    }
+                }
+                writer.Write(objects != null ? objects.NextId : 1);
                 writer.Flush();
                 ulong hash = FnvOffsetBasis;
                 foreach (byte b in stream.ToArray())
@@ -187,6 +237,8 @@ namespace Airerage.Core.Simulation
             writer.Write(action.StrikeSpeed);
             writer.Write(action.Connected);
             writer.Write(action.CancelFromTick);
+            writer.Write(action.EffectDone);
+            writer.Write(action.Charge);
 
             CombatState combat = state.Combat;
             writer.Write(combat.HitstopTicksLeft);
@@ -215,6 +267,13 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.InvincibleTicksLeft);
             writer.Write(combat.RewardDamage);
             writer.Write(combat.RewardAttacker);
+            writer.Write(combat.Holding);
+            writer.Write((byte)combat.HoldSlot);
+            writer.Write(combat.HoldTicks);
+            writer.Write(combat.AttackSerial);
+            writer.Write(combat.CoinBoostTicksLeft);
+            writer.Write(combat.CoinBonusMilli);
+            writer.Write(combat.JackpotHitCount);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -270,6 +329,8 @@ namespace Airerage.Core.Simulation
                 StrikeSpeed = reader.ReadSingle(),
                 Connected = reader.ReadBoolean(),
                 CancelFromTick = reader.ReadInt32(),
+                EffectDone = reader.ReadBoolean(),
+                Charge = reader.ReadInt32(),
             };
             state.Combat = new CombatState
             {
@@ -299,6 +360,13 @@ namespace Airerage.Core.Simulation
                 InvincibleTicksLeft = reader.ReadInt32(),
                 RewardDamage = reader.ReadInt32(),
                 RewardAttacker = reader.ReadByte(),
+                Holding = reader.ReadBoolean(),
+                HoldSlot = (AttackSlot)reader.ReadByte(),
+                HoldTicks = reader.ReadInt32(),
+                AttackSerial = reader.ReadInt32(),
+                CoinBoostTicksLeft = reader.ReadInt32(),
+                CoinBonusMilli = reader.ReadInt32(),
+                JackpotHitCount = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

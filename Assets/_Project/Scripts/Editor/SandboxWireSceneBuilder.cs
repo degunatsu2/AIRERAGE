@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.DebugTools;
@@ -28,6 +29,7 @@ namespace Airerage.Editor
         public const string ScenePath = "Assets/_Project/Scenes/Sandbox_Wire.unity";
         public const string CharacterConfigPath = "Assets/_Project/Data/Characters/DefaultCharacter.asset";
         public const string CharacterRosterPath = "Assets/_Project/Data/Characters/CharacterRoster.asset";
+        public const string RiskTakerPath = "Assets/_Project/Data/Characters/RiskTaker.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
@@ -324,6 +326,12 @@ namespace Airerage.Editor
             BurstEffectView super = CreateBurst(name + "SuperBurst", parent);
             super.Configure(Color.white, true, 0.8f, 0.5f, 4.5f, 16, 2.6f, 0.22f, "SUPER!", 56, 0f);
             SetReference(view, "_superBurst", super);
+            // ルーレットの最大（JACKPOT。RISK TAKER の撃破技）を受けた（虹色の光と「JACKPOT!」）。
+            BurstEffectView jackpot = CreateBurst(name + "JackpotBurst", parent);
+            jackpot.Configure(Color.white, true, 1f, 0.4f, 4.5f, 12, 3f, 0.24f, "JACKPOT!", 60, 0.3f);
+            SetReference(view, "_jackpotBurst", jackpot);
+            // コインの効率が上がっている残り（フィーバータイム。金色）。
+            SetReference(view, "_feverGauge", CreateRingGauge(name + "FeverGauge", parent, "FEVER", 1.9f, new Color(1f, 0.8f, 0.2f, 0.75f)));
             // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。
             RingGaugeView respawn = CreateRingGauge(name + "RespawnGauge", parent, "RESPAWN", 2.6f,
                 new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f));
@@ -353,10 +361,15 @@ namespace Airerage.Editor
         }
 
         /// <summary>
-        /// 自分の特殊攻撃と必殺技の表示（画面の下の中央）と、必殺技の暗転（docs/13 T5-4）。source は ISimulationFeed。
+        /// 技の表示: 自分の特殊攻撃と必殺技の札（画面の下の中央）、必殺技の暗転（docs/13 T5-4）、置かれた物と投射物、長押しで預ける
+        /// 枚数（T5-6）。source は ISimulationFeed。
         /// </summary>
         internal static void CreateSkillHud(MonoBehaviour source, GameAudio audio)
         {
+            CreateWorldObjectsView(source, audio);
+            var hold = new GameObject("HoldDepositHud").AddComponent<HoldDepositHud>();
+            SetReference(hold, "_source", source);
+            SetReference(hold, "_camera", Object.FindFirstObjectByType<Camera>());
             var root = new GameObject("SkillHud");
             var hud = root.AddComponent<SkillHud>();
             SetReference(hud, "_source", source);
@@ -365,6 +378,44 @@ namespace Airerage.Editor
             var flash = root.AddComponent<SuperFlashHud>();
             SetReference(flash, "_source", source);
             SetReference(flash, "_camera", Object.FindFirstObjectByType<Camera>());
+        }
+
+        /// <summary>置かれた物と投射物の表示（WorldObjectsView。見本はミラーボール、セーフティボックス、投射物の順）。</summary>
+        internal static void CreateWorldObjectsView(MonoBehaviour source, GameAudio audio)
+        {
+            var view = new GameObject("WorldObjects").AddComponent<WorldObjectsView>();
+            var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+
+            GameObject ball = CreateVisual(PrimitiveType.Sphere, "MirrorBallTemplate", LoadOrCreateMaterial("MirrorBall", new Color(0.85f, 0.88f, 0.95f)),
+                Vector3.one * 0.9f);
+            ball.transform.SetParent(view.transform, false);
+            CreateIndicatorLine(ball.transform, "Rays", lineMaterial, 0.06f);
+
+            GameObject safe = CreateVisual(PrimitiveType.Cube, "SafeTemplate", LoadOrCreateMaterial("Safe", new Color(0.32f, 0.34f, 0.38f)),
+                new Vector3(1.4f, 1.4f, 1f));
+            safe.transform.SetParent(view.transform, false);
+            GameObject dial = CreateVisual(PrimitiveType.Cylinder, "Dial", LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f)),
+                new Vector3(0.35f, 0.05f, 0.35f));
+            dial.transform.SetParent(safe.transform, false);
+            dial.transform.localPosition = new Vector3(0.15f, 0f, -0.52f);
+            dial.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+            GameObject coin = CreateVisual(PrimitiveType.Cylinder, "ProjectileTemplate", LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f)),
+                new Vector3(0.55f, 0.06f, 0.55f));
+            coin.transform.SetParent(view.transform, false);
+
+            foreach (GameObject template in new[] { ball, safe, coin })
+            {
+                foreach (Collider collider in template.GetComponentsInChildren<Collider>())
+                {
+                    Object.DestroyImmediate(collider);
+                }
+                template.SetActive(false);
+            }
+            SetReference(view, "_source", source);
+            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin });
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            SetReference(view, "_audio", audio);
         }
 
         /// <summary>試合の表示（始まる前の演出、残り時間、結果。docs/12）。source は ISimulationFeed、controls は結果のボタン（IMatchControls）。</summary>
@@ -774,22 +825,37 @@ namespace Airerage.Editor
         }
 
         /// <summary>
-        /// 選べるキャラクターの一覧（docs/13 T5-5）。なければ、character だけの一覧を作る。あれば、そのまま使う（キャラクターを足したら、
-        /// このアセットに加える）。
+        /// 選べるキャラクターの一覧（docs/13 T5-5、T5-6）を作り直す: character（STANDARD）と、CharacterPresets から作るキャラクター
+        /// （RISK TAKER）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す（値はコードの 1 か所で決める）。
         /// </summary>
         internal static CharacterRoster LoadOrCreateCharacterRoster(CharacterConfigAsset character)
         {
+            CharacterConfigAsset riskTaker = WritePresetCharacter(RiskTakerPath, CharacterPresets.RiskTaker(), CharacterPresets.RiskTakerName);
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
-            if (roster != null)
+            if (roster == null)
             {
-                return roster;
+                EnsureFolder(Path.GetDirectoryName(CharacterRosterPath));
+                roster = ScriptableObject.CreateInstance<CharacterRoster>();
+                AssetDatabase.CreateAsset(roster, CharacterRosterPath);
             }
-            EnsureFolder(Path.GetDirectoryName(CharacterRosterPath));
-            roster = ScriptableObject.CreateInstance<CharacterRoster>();
-            roster.Configure(new[] { character });
-            AssetDatabase.CreateAsset(roster, CharacterRosterPath);
+            roster.Configure(new[] { character, riskTaker });
+            EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return roster;
+        }
+
+        private static CharacterConfigAsset WritePresetCharacter(string path, Airerage.Core.Simulation.CharacterConfig config, string displayName)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<CharacterConfigAsset>(path);
+            if (asset == null)
+            {
+                EnsureFolder(Path.GetDirectoryName(path));
+                asset = ScriptableObject.CreateInstance<CharacterConfigAsset>();
+                AssetDatabase.CreateAsset(asset, path);
+            }
+            asset.Configure(config, displayName);
+            EditorUtility.SetDirty(asset);
+            return asset;
         }
 
         internal static Material LoadOrCreateMaterial(string name, Color color, bool unlit = false)

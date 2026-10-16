@@ -9,7 +9,8 @@ namespace Airerage.Core.Economy
     /// - 取引ごとにイベント ID（CoinEventId）を受け取り、同じティックに同じ ID の取引が来たら拒否する（二重の加算を防ぐ）。
     ///   ID は取引を出す側が、ティック・種類・対象から決める（同じことを2回やろうとすると、同じ ID になる）。
     /// - 量が 0 以下、所持コインが足りない、コインがない・まだ拾えない、などの不正な取引は拒否し、何も変えない。
-    /// - 生成（出現、報酬）と破棄（消滅）以外では、コインの総量が変わらない（Totals で調べられる）。
+    /// - 生成（出現、報酬、ボーナス、ばらまきで増えた分）と破棄（消滅）以外では、コインの総量が変わらない（Totals で調べられる）。
+    ///   置かれた物（セーフティボックス）に預けたコインは CoinField.Stored に数える。
     /// - 状態は、ワールド全体の CoinField と、キャラクターごとの CharacterState.Coins にある（巻き戻しに乗る）。
     ///   ここが持つのは、このティックに受け付けた ID と取引の記録だけ（ティックごとに空にする）。
     /// </summary>
@@ -132,10 +133,72 @@ namespace Airerage.Core.Economy
             return true;
         }
 
-        /// <summary>報酬（生成。kind は DamageReward か KoReward）。キャラクター character の所持コインに amount 枚を加える。</summary>
+        /// <summary>
+        /// 預け入れ（移動。セーフティボックス）。キャラクター character の所持コインから amount 枚を、置かれた物に預ける
+        /// （CoinField.Stored に数える。どの物に預けたかは呼ぶ側が物に記録する）。
+        /// </summary>
+        public bool Deposit(CoinEventId id, List<CharacterState> states, int character, int amount)
+        {
+            if (id.Kind != CoinEventKind.Deposit)
+            {
+                return Reject(id, "預け入れの種類ではない");
+            }
+            CharacterState state = states[character];
+            if (amount > state.Coins.Held)
+            {
+                return Reject(id, $"所持コインが足りない（{state.Coins.Held} 枚に {amount} 枚）");
+            }
+            if (!Accept(id, amount))
+            {
+                return false;
+            }
+            state.Coins.Held -= amount;
+            states[character] = state;
+            Field.Stored += amount;
+            Record(id, character, -1, amount, Vector2.Zero);
+            return true;
+        }
+
+        /// <summary>
+        /// ばらまき（置かれた物 → フィールド）。預けられていた fromStored 枚と、新しく生まれた minted 枚を合わせた 1 つのコインを
+        /// フィールドに出し、その番号を返す（拒否したら -1）。
+        /// </summary>
+        public int Release(CoinEventId id, int fromStored, int minted, Vector2 position, int pickableFromTick, int expireTick)
+        {
+            if (id.Kind != CoinEventKind.SafeSpill)
+            {
+                Reject(id, "ばらまきの種類ではない");
+                return -1;
+            }
+            if (fromStored < 0 || minted < 0)
+            {
+                Reject(id, $"枚数が負（預けた分 {fromStored}、増えた分 {minted}）");
+                return -1;
+            }
+            if (fromStored > Field.Stored)
+            {
+                Reject(id, $"預けられている枚数が足りない（{Field.Stored} 枚に {fromStored} 枚）");
+                return -1;
+            }
+            int value = fromStored + minted;
+            if (!Accept(id, value))
+            {
+                return -1;
+            }
+            Field.Stored -= fromStored;
+            Field.Generated += minted;
+            int coinId = Field.NextCoinId++;
+            Field.Add(new FieldCoin(coinId, position, value, pickableFromTick, expireTick, -1, id.Kind));
+            Record(id, -1, coinId, value, position);
+            return coinId;
+        }
+
+        /// <summary>
+        /// 報酬（生成。kind は DamageReward、KoReward、CoinBonus）。キャラクター character の所持コインに amount 枚を加える。
+        /// </summary>
         public bool Reward(CoinEventId id, List<CharacterState> states, int character, int amount)
         {
-            if (id.Kind != CoinEventKind.DamageReward && id.Kind != CoinEventKind.KoReward)
+            if (id.Kind != CoinEventKind.DamageReward && id.Kind != CoinEventKind.KoReward && id.Kind != CoinEventKind.CoinBonus)
             {
                 return Reject(id, "報酬の種類ではない");
             }
@@ -180,7 +243,7 @@ namespace Airerage.Core.Economy
                 held += states[i].Coins.Held;
                 banked += states[i].Coins.Banked;
             }
-            return new CoinTotals(Field.FieldTotal, held, banked, Field.Generated, Field.Destroyed);
+            return new CoinTotals(Field.FieldTotal, held, banked, Field.Generated, Field.Destroyed, Field.Stored);
         }
 
         // ID とティック、量を調べ、受け付けるなら ID を記録する。
@@ -215,7 +278,7 @@ namespace Airerage.Core.Economy
         }
     }
 
-    /// <summary>コインの枚数の合計。生成 − 破棄 = フィールド ＋ 所持 ＋ 確定 が成り立つ（総量の保存）。</summary>
+    /// <summary>コインの枚数の合計。生成 − 破棄 = フィールド ＋ 所持 ＋ 確定 ＋ 預け入れ が成り立つ（総量の保存）。</summary>
     public readonly struct CoinTotals
     {
         public readonly long Field;
@@ -224,21 +287,25 @@ namespace Airerage.Core.Economy
         public readonly long Generated;
         public readonly long Destroyed;
 
-        public CoinTotals(long field, long held, long banked, long generated, long destroyed)
+        /// <summary>置かれた物（セーフティボックス）に預けられている枚数。</summary>
+        public readonly long Stored;
+
+        public CoinTotals(long field, long held, long banked, long generated, long destroyed, long stored = 0)
         {
             Field = field;
             Held = held;
             Banked = banked;
             Generated = generated;
             Destroyed = destroyed;
+            Stored = stored;
         }
 
         /// <summary>総量が保存されているか。</summary>
-        public bool IsConserved => Field + Held + Banked == Generated - Destroyed;
+        public bool IsConserved => Field + Held + Banked + Stored == Generated - Destroyed;
 
         public override string ToString()
         {
-            return $"field={Field} held={Held} banked={Banked} generated={Generated} destroyed={Destroyed}";
+            return $"field={Field} held={Held} banked={Banked} stored={Stored} generated={Generated} destroyed={Destroyed}";
         }
     }
 }

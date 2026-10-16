@@ -34,6 +34,10 @@ namespace Airerage.Core.Combat
     ///   地上でも空中でも同じ技。違うのは使う条件だけ: 特殊攻撃はそれぞれのクールタイム（使い始めたときから数える）が 0 のとき、
     ///   必殺技はゲージが SuperGaugeCost 以上のとき（出したときに減る）。条件を満たさない間は出ず、先行入力の間に満たせば出る。
     ///   同じティックに複数を押したら、必殺技 → 特殊攻撃 2 → 特殊攻撃 1 → 通常攻撃 の順に優先する【仮】。
+    /// - 長押しの技（AttackData.HoldMaxTicks。docs/13 T5-6）: 出せるときにボタンを押したままなら、技を出さずにためる（Free のまま
+    ///   動ける。CombatState.Holding）。離したときに技を出し、ためた長さを ActionState.Charge に入れる。ためている間に攻撃を受けたり、
+    ///   ほかの行動を始めたりしたら、ためるのをやめる（何も出ない）。
+    /// - 攻撃を始めるたびに CombatState.AttackSerial を 1 増やす（攻撃 1 回ごとの番号）。
     /// </summary>
     public static class ActionController
     {
@@ -49,6 +53,10 @@ namespace Airerage.Core.Combat
             if (state.Wire.Phase == WirePhase.Attached)
             {
                 state.Combat.AttackCancelUsed = false;
+            }
+            if (state.Combat.Holding && UpdateHold(ref state, input, config))
+            {
+                return;
             }
 
             switch (state.Action.Kind)
@@ -107,11 +115,76 @@ namespace Airerage.Core.Combat
             {
                 return;
             }
+            if (TryBeginHold(ref state, slot, input, combat))
+            {
+                return;
+            }
             if (state.Wire.Phase == WirePhase.Attached)
             {
                 WireController.Release(ref state, WireReleaseReason.Attack, config.Wire);
             }
             StartAttack(ref state, slot, combat);
+        }
+
+        /// <summary>技の枠のボタン（特殊攻撃と必殺技。それ以外は攻撃ボタン）。</summary>
+        public static InputButtons ButtonOf(AttackSlot slot)
+        {
+            switch (slot)
+            {
+                case AttackSlot.Special1: return InputButtons.Special1;
+                case AttackSlot.Special2: return InputButtons.Special2;
+                case AttackSlot.Super: return InputButtons.Super;
+                default: return InputButtons.Attack;
+            }
+        }
+
+        // 長押しの技で、ボタンを押したままなら、ためるのを始める（先行入力は使い切る）。始めたら true。
+        private static bool TryBeginHold(ref CharacterState state, AttackSlot slot, in InputFrame input, CombatTuning combat)
+        {
+            if (combat.Get(slot).HoldMaxTicks <= 0 || !input.IsHeld(ButtonOf(slot)))
+            {
+                return false;
+            }
+            state.Combat.Holding = true;
+            state.Combat.HoldSlot = slot;
+            state.Combat.HoldTicks = 0;
+            state.Combat.AttackBufferTicksLeft = 0;
+            return true;
+        }
+
+        // ためている技: 押している間はためる。離したら技を出す（出したら true）。Free でなくなったら、ためるのをやめる。
+        private static bool UpdateHold(ref CharacterState state, in InputFrame input, CharacterConfig config)
+        {
+            CombatTuning combat = config.Combat;
+            AttackSlot slot = state.Combat.HoldSlot;
+            if (!state.Action.IsFree)
+            {
+                state.Combat.Holding = false;
+                state.Combat.HoldTicks = 0;
+                return false;
+            }
+            if (input.IsHeld(ButtonOf(slot)))
+            {
+                if (state.Combat.HoldTicks < combat.Get(slot).HoldMaxTicks)
+                {
+                    state.Combat.HoldTicks++;
+                }
+                return false;
+            }
+            int charge = state.Combat.HoldTicks;
+            state.Combat.Holding = false;
+            state.Combat.HoldTicks = 0;
+            if (!CanUse(state, slot, combat) || state.Wire.Phase == WirePhase.Firing)
+            {
+                return false;
+            }
+            if (state.Wire.Phase == WirePhase.Attached)
+            {
+                WireController.Release(ref state, WireReleaseReason.Attack, config.Wire);
+            }
+            StartAttack(ref state, slot, combat);
+            state.Action.Charge = charge;
+            return true;
         }
 
         /// <summary>
@@ -183,7 +256,7 @@ namespace Airerage.Core.Combat
             }
             foreach (AttackMotion motion in attack.Motions)
             {
-                if (motion.IsActiveAt(ticks))
+                if (motion.IsActiveAt(ticks) && (!motion.RequiresHit || state.Action.Connected))
                 {
                     state.Velocity.X = motion.VelocityX * state.Facing;
                     state.Velocity.Y = motion.VelocityY;
@@ -231,6 +304,7 @@ namespace Airerage.Core.Combat
             CountDown(ref state.Combat.GuardCooldownTicksLeft);
             CountDown(ref state.Combat.Special1CooldownTicksLeft);
             CountDown(ref state.Combat.Special2CooldownTicksLeft);
+            CountDown(ref state.Combat.CoinBoostTicksLeft);
         }
 
         private static void CountDown(ref int ticksLeft)
@@ -252,7 +326,10 @@ namespace Airerage.Core.Combat
             if (state.Combat.AttackBufferTicksLeft > 0 && CanUse(state, BufferedSlot(state), config.Combat))
             {
                 EndGuard(ref state, config.Combat);
-                StartAttack(ref state, BufferedSlot(state), config.Combat);
+                if (!TryBeginHold(ref state, BufferedSlot(state), input, config.Combat))
+                {
+                    StartAttack(ref state, BufferedSlot(state), config.Combat);
+                }
             }
         }
 
@@ -354,7 +431,12 @@ namespace Airerage.Core.Combat
             bool groundToAir = state.Action.Attack == AttackSlot.Ground && !state.Grounded;
             if (CombatTuning.IsSpecial(next) || groundToAir)
             {
-                StartAttack(ref state, next, combat);
+                // 長押しの技なら、攻撃を終えてためるのを始める。
+                state.Action = default;
+                if (!TryBeginHold(ref state, next, input, combat))
+                {
+                    StartAttack(ref state, next, combat);
+                }
                 return;
             }
             if (state.Combat.AttackCancelUsed || (state.Action.Attack == AttackSlot.Ground && next == AttackSlot.Ground))
@@ -380,6 +462,7 @@ namespace Airerage.Core.Combat
                 Ticks = 0,
             };
             state.Combat.AttackBufferTicksLeft = 0;
+            state.Combat.AttackSerial++;
             switch (slot)
             {
                 case AttackSlot.Special1:
