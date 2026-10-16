@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Airerage.Core.Combat;
+using Airerage.Core.Common;
 using Airerage.Core.Economy;
 using Airerage.Core.Input;
 using Airerage.Core.Match;
@@ -71,6 +72,8 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(Risk.Combat.Super.Effect, Is.EqualTo(SkillEffect.CoinBoost));
             Assert.That(Risk.Combat.AirDown.Roulette, Is.True);
             Assert.That(CharacterPresets.Standard().Combat.SuperGaugeCost, Is.EqualTo(70 * CombatTuning.GaugePerPercent));
+            Assert.That(Risk.Combat.Special1CooldownTicks, Is.EqualTo(15 * SimTime.TicksPerSecond), "LIGHT のクールタイムが 15 秒でない");
+            Assert.That(Risk.Combat.Ground.ChargeLevels.Select(l => l.BonusPercent), Is.EqualTo(new[] { 0, 20, 50, 100, 200, 500 }));
         }
 
         [Test]
@@ -298,9 +301,11 @@ namespace Airerage.Core.Tests.Skills
                 }
             }
             Assert.That(hit.HasValue, Is.True, "撃破技が当たらない");
-            CombatTuning combat = Risk.Combat;
-            float expected = combat.KoKnockbackScale(world.GetState(0).Action.StrikeSpeed) * AttackData.RouletteScales[AttackData.RouletteScales.Length - 1];
-            Assert.That(hit.Value.KnockbackScale, Is.EqualTo(expected).Within(1e-4f), "ルーレットの倍率をかけていない");
+            // 速さの倍率の代わりに、ルーレットの目がそのまま倍率になる（ユーザーの要望、2026-10-16）。
+            float expected = AttackData.RouletteScales[AttackData.RouletteScales.Length - 1];
+            Assert.That(hit.Value.KnockbackScale, Is.EqualTo(expected), "ルーレットの目がそのまま倍率になっていない");
+            Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(Risk.Combat.AirDown.Hits[0].Damage, expected, 0)));
+            Assert.That(hit.Value.Fatal, Is.False, "ルーレットの技が速さで FATAL になった");
             Assert.That(hit.Value.Jackpot, Is.True);
             Assert.That(world.GetState(1).Combat.JackpotHitCount, Is.EqualTo(1), "JACKPOT を数えない");
         }
@@ -373,6 +378,151 @@ namespace Airerage.Core.Tests.Skills
             }
             Assert.That(hitWorld.GetState(1).Combat.HasLastAttacker, Is.True, "前提: 当たった");
             Assert.That(hitRise, Is.GreaterThan(5f), "当たったのに飛び出さない");
+        }
+
+        [TestCase(0, 0)]
+        [TestCase(30, 20)]
+        [TestCase(50, 50)]
+        [TestCase(100, 100)]
+        [TestCase(130, 200)]
+        [TestCase(400, 500)]
+        public void AllIn_HoldingRaisesThePower_AndTheTopLevelIsAJackpot(int holdTicks, int bonus)
+        {
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(CharacterPresets.RiskTaker(), new Vector3(0f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(2f, GroundY, 0f), -1);
+            Step(world, 1);
+            Step(world, 1 + holdTicks, Press(InputButtons.Attack));
+            Assert.That(world.GetState(0).Combat.Holding, Is.True, "前提: ためている");
+            Assert.That(world.GetState(0).Combat.HoldTicks, Is.EqualTo(System.Math.Min(holdTicks, Risk.Combat.Ground.HoldMaxTicks)));
+
+            HitRecord? hit = null;
+            for (int t = 0; t < 30 && hit == null; t++)
+            {
+                Step(world, 1);
+                if (world.LastHits.Count > 0)
+                {
+                    hit = world.LastHits[0];
+                }
+            }
+            Assert.That(hit.HasValue, Is.True, "離しても当たらない");
+            Assert.That(hit.Value.Attack, Is.EqualTo(AttackSlot.Ground));
+            Assert.That(hit.Value.BonusPercent, Is.EqualTo(bonus), "ためた長さの上乗せでない");
+            Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(Risk.Combat.Ground.Hits[0].Damage, 1f, bonus)));
+            Assert.That(hit.Value.KnockbackScale, Is.EqualTo(1f), "ためても吹き飛びは変えない");
+            bool top = bonus == 500;
+            Assert.That(hit.Value.Jackpot, Is.EqualTo(top), "虹（最後の段階）だけが JACKPOT");
+            Assert.That(world.GetState(1).Combat.JackpotHitCount, Is.EqualTo(top ? 1 : 0));
+        }
+
+        [Test]
+        public void AllIn_HoldingKeepsTheCharacterInPlace_ButItCanTurn()
+        {
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(CharacterPresets.RiskTaker(), new Vector3(0f, GroundY, 0f));
+            Step(world, 1);
+            Step(world, 1, Press(InputButtons.Attack));
+            Step(world, 40, Press(InputButtons.Attack, -1f));
+            Step(world, 5, Press(InputButtons.Attack | InputButtons.Jump, -1f));
+            CharacterState holding = world.GetState(0);
+            Assert.That(holding.Combat.Holding, Is.True, "前提: ためている");
+            Assert.That(holding.Position.X, Is.EqualTo(0f).Within(1e-3f), "ためている間に動いた");
+            Assert.That(holding.Grounded, Is.True, "ためている間にジャンプした");
+            Assert.That(holding.Facing, Is.EqualTo(-1), "ためている間に向きを変えられない");
+
+            Step(world, 1);
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Ground), "離しても出ない");
+            Assert.That(world.GetState(0).Facing, Is.EqualTo(-1), "離したときの向きで出ない");
+            Assert.That(world.GetState(0).Action.Charge, Is.EqualTo(45));
+        }
+
+        [Test]
+        public void CoinToss_PowerGrowsWithTheHeldCoins_UpTo300()
+        {
+            ProjectileTuning shot = Risk.Skills.Projectile;
+            Assert.That(shot.HeldCoinBonusPercent(2), Is.EqualTo(0));
+            Assert.That(shot.HeldCoinBonusPercent(3), Is.EqualTo(1), "3 枚で 1%");
+            Assert.That(shot.HeldCoinBonusPercent(150), Is.EqualTo(50));
+            Assert.That(shot.HeldCoinBonusPercent(300), Is.EqualTo(100), "300 枚で +100%");
+            Assert.That(shot.HeldCoinBonusPercent(900), Is.EqualTo(100), "+100% より上がった");
+            Assert.That(new ProjectileTuning().HeldCoinBonusPercent(300), Is.Zero, "ほかの投射物まで上がる");
+
+            var world = new SimWorld(new BoxTerrain());
+            world.AddCharacter(CharacterPresets.RiskTaker(), new Vector3(0f, 50f, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(0.3f, 53f, 0f));
+            Edit(world, 0, s => { s.Coins.Held = 150; return s; });
+            Step(world, 1, Press(InputButtons.Attack, 0f, 1f));
+            HitRecord? hit = null;
+            for (int t = 0; t < 40 && hit == null; t++)
+            {
+                Edit(world, 1, s => { s.Position = new Vector3(0.3f, world.GetState(0).Position.Y + 3f, 0f); s.Velocity = Vector3.Zero; return s; });
+                Step(world, 1);
+                if (world.LastHits.Count > 0)
+                {
+                    hit = world.LastHits[0];
+                }
+            }
+            Assert.That(hit.HasValue, Is.True, "前提: 当たった");
+            Assert.That(hit.Value.BonusPercent, Is.EqualTo(50), "手持ちのコインで上がらない");
+            Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(shot.Hit.Damage, 1f, 50)));
+        }
+
+        [Test]
+        public void Safe_HittingItStopsTheAttackerLikeAHit_AndAFullSafeStopsCharging()
+        {
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(CharacterPresets.RiskTaker(), new Vector3(0f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(-6f, GroundY, 0f));
+            Step(world, 1);
+            Step(world, 10, Press(InputButtons.Special2));
+            Step(world, 1);
+            Assert.That(world.Objects.Count, Is.EqualTo(1), "前提: 置いた");
+            WorldObject safe = world.Objects[0];
+
+            Edit(world, 1, s =>
+            {
+                s.Position = new Vector3(safe.Position.X, safe.Position.Y + 1.5f, 0f);
+                s.Velocity = Vector3.Zero;
+                s.Grounded = false;
+                return s;
+            });
+            Step(world, 1, default, Press(InputButtons.Attack));
+            for (int t = 0; t < 20 && world.Objects[0].Damage == 0; t++)
+            {
+                Step(world, 1);
+            }
+            Assert.That(world.Objects[0].Damage, Is.GreaterThan(0), "前提: 当たった");
+            Assert.That(world.GetState(1).Combat.HitstopTicksLeft, Is.EqualTo(new CharacterConfig().Combat.AirNeutral.Hits[0].HitstopTicks),
+                "金庫に当てても止まらない");
+
+            // 上限に着いた金庫は、もうチャージしない。
+            SafeTuning tuning = Risk.Skills.Safe;
+            var objects = new WorldObjects();
+            objects.Add(new WorldObject { Kind = WorldObjectKind.Safe, ChargeMilli = tuning.MaxCoins * 1000L, ExpireTick = int.MaxValue });
+            Assert.That(SkillRules.IsSafeFull(objects[0], tuning), Is.True);
+            SkillRules.StepObjects(objects, new BoxTerrain(), new List<CharacterState> { CharacterState.Spawn(Vector3.Zero, 1) },
+                new List<CharacterConfig> { CharacterPresets.RiskTaker() }, null, tuning.ChargeIntervalTicks, new List<HitRecord>());
+            Assert.That(objects[0].ChargeMilli, Is.EqualTo(tuning.MaxCoins * 1000L));
+            Assert.That(SkillRules.SafeChargeProgress(objects[0], tuning, tuning.ChargeIntervalTicks / 2), Is.EqualTo(0.5f).Within(1e-4f));
+        }
+
+        [Test]
+        public void Fever_AlsoBoostsTheGauge_AndKeepsTheFraction()
+        {
+            CoinBoostTuning boost = Risk.Skills.CoinBoost;
+            var combat = new CombatState { CoinBoostTicksLeft = 10 };
+            CombatTuning.AddGauge(ref combat, 80, boost);
+            Assert.That(combat.Gauge, Is.EqualTo(96), "8% が 9.6% にならない");
+            CombatTuning.AddGauge(ref combat, 2, boost);
+            Assert.That(combat.Gauge, Is.EqualTo(98));
+            Assert.That(combat.GaugeBonusRemainder, Is.EqualTo(40), "端数をためない");
+            CombatTuning.AddGauge(ref combat, 4, boost);
+            Assert.That(combat.Gauge, Is.EqualTo(103), "たまった端数を足さない");
+            Assert.That(combat.GaugeBonusRemainder, Is.EqualTo(20));
+
+            combat.CoinBoostTicksLeft = 0;
+            CombatTuning.AddGauge(ref combat, 80, boost);
+            Assert.That(combat.Gauge, Is.EqualTo(183), "切れた後も増える");
         }
 
         [Test]

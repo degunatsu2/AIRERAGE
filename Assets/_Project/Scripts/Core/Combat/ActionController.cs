@@ -1,8 +1,10 @@
 using System;
 using System.Numerics;
+using Airerage.Core.Common;
 using Airerage.Core.Input;
 using Airerage.Core.Movement;
 using Airerage.Core.Simulation;
+using Airerage.Core.Skills;
 using Airerage.Core.Wire;
 
 namespace Airerage.Core.Combat
@@ -36,8 +38,14 @@ namespace Airerage.Core.Combat
     ///   同じティックに複数を押したら、必殺技 → 特殊攻撃 2 → 特殊攻撃 1 → 通常攻撃 の順に優先する【仮】。
     /// - 長押しの技（AttackData.HoldMaxTicks。docs/13 T5-6）: 出せるときにボタンを押したままなら、技を出さずにためる（Free のまま
     ///   動ける。CombatState.Holding）。離したときに技を出し、ためた長さを ActionState.Charge に入れる。ためている間に攻撃を受けたり、
-    ///   ほかの行動を始めたりしたら、ためるのをやめる（何も出ない）。
+    ///   ほかの行動を始めたりしたら、ためるのをやめる（何も出ない）。AttackData.HoldRooted の技は、ためている間その場から動かない
+    ///   （向きは変えられる。RISK TAKER のオールイン）。
     /// - 攻撃を始めるたびに CombatState.AttackSerial を 1 増やす（攻撃 1 回ごとの番号）。
+    /// - 走り続ける地上技（AttackData.Run。STORM RUNNER）: TotalTicks で終わらず、別の行動（ジャンプ・ワイヤー・ガード・空中の攻撃・
+    ///   技）の入力で終わって、そのティックにその行動を始める（当たっていなくてもよい）。地上技の入力は無視する。だんだん加速し、
+    ///   逆向きに入力すると反転する。足場が途切れたら・壁にぶつかったら浅い角度で跳ぶ（AfterMove）。
+    /// - 行動の速さの強化（SpeedBoosts）の間は、攻撃のフレームを速く進める（ヒットストップ・のけぞり・ガードは速くしない）。
+    /// - 効果中にもう一度出せる技（行動の速さの強化）は、効果中なら止めているクールタイムのままでも出せる（CanRecast）。
     /// </summary>
     public static class ActionController
     {
@@ -72,7 +80,16 @@ namespace Airerage.Core.Combat
                     break;
 
                 case ActionKind.Attack:
-                    state.Action.Ticks++;
+                    AdvanceAttack(ref state, config);
+                    if (combat.Get(state.Action.Attack).Run)
+                    {
+                        if (UpdateRun(ref state, input, config))
+                        {
+                            return;
+                        }
+                        // 別の行動で走るのをやめた。このティックに、その行動を始める。
+                        break;
+                    }
                     if (state.Action.Ticks < combat.Get(state.Action.Attack).TotalTicks)
                     {
                         TryCancel(ref state, input, config);
@@ -123,7 +140,7 @@ namespace Airerage.Core.Combat
             {
                 WireController.Release(ref state, WireReleaseReason.Attack, config.Wire);
             }
-            StartAttack(ref state, slot, combat);
+            StartAttack(ref state, slot, combat, input);
         }
 
         /// <summary>技の枠のボタン（特殊攻撃と必殺技。それ以外は攻撃ボタン）。</summary>
@@ -149,7 +166,19 @@ namespace Airerage.Core.Combat
             state.Combat.HoldSlot = slot;
             state.Combat.HoldTicks = 0;
             state.Combat.AttackBufferTicksLeft = 0;
+            // 押したときに横を入れていれば、その向きを向く。ためている間は向きを変えられ、離したときの向きで出す。
+            if (state.Combat.BufferedFacing != 0)
+            {
+                state.Facing = state.Combat.BufferedFacing;
+                state.Combat.BufferedFacing = 0;
+            }
             return true;
+        }
+
+        /// <summary>その場から動かずにためている（AttackData.HoldRooted）か。移動・ジャンプ・ワイヤーの入力を無視する。</summary>
+        public static bool IsRootedHold(in CharacterState state, CombatTuning combat)
+        {
+            return state.Combat.Holding && combat.Get(state.Combat.HoldSlot).HoldRooted;
         }
 
         // ためている技: 押している間はためる。離したら技を出す（出したら true）。Free でなくなったら、ためるのをやめる。
@@ -182,7 +211,7 @@ namespace Airerage.Core.Combat
             {
                 WireController.Release(ref state, WireReleaseReason.Attack, config.Wire);
             }
-            StartAttack(ref state, slot, combat);
+            StartAttack(ref state, slot, combat, input);
             state.Action.Charge = charge;
             return true;
         }
@@ -195,20 +224,31 @@ namespace Airerage.Core.Combat
         {
             switch (slot)
             {
-                case AttackSlot.Special1: return state.Combat.Special1CooldownTicksLeft == 0;
-                case AttackSlot.Special2: return state.Combat.Special2CooldownTicksLeft == 0;
+                case AttackSlot.Special1: return state.Combat.Special1CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
+                case AttackSlot.Special2: return state.Combat.Special2CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
                 case AttackSlot.Super: return state.Combat.Gauge >= combat.SuperGaugeCost;
                 default: return true;
             }
         }
 
         /// <summary>
-        /// アクション中にシミュレーションへ渡す入力。攻撃中・のけぞり中は移動・ジャンプ・ワイヤーの入力を無視する
-        /// （空中では勢いのまま動く）。Free ならそのまま。
+        /// 効果中にもう一度出せる技（行動の速さの強化。もう一度出すと強化を解いて突風を撃つ）を、今もう一度出せるか。
         /// </summary>
-        public static PlayerInput ControlInput(in CharacterState state, PlayerInput input)
+        public static bool CanRecast(in CharacterState state, AttackSlot slot, CombatTuning combat)
         {
-            if (state.Action.IsFree)
+            int cooldown = slot == AttackSlot.Special1 ? state.Combat.Special1CooldownTicksLeft
+                : slot == AttackSlot.Special2 ? state.Combat.Special2CooldownTicksLeft : 0;
+            return cooldown == CombatState.CooldownWhileActive && combat.Get(slot).Effect == SkillEffect.SpeedBoost
+                && state.Combat.SpeedBoostTicksLeft > 0;
+        }
+
+        /// <summary>
+        /// アクション中にシミュレーションへ渡す入力。攻撃中・のけぞり中・その場でためている間は、移動・ジャンプ・ワイヤーの入力を
+        /// 無視する（空中では勢いのまま動く）。それ以外の Free ならそのまま。
+        /// </summary>
+        public static PlayerInput ControlInput(in CharacterState state, PlayerInput input, CombatTuning combat)
+        {
+            if (state.Action.IsFree && !IsRootedHold(state, combat))
             {
                 return input;
             }
@@ -242,26 +282,54 @@ namespace Airerage.Core.Combat
         /// 通常の移動の計算の後に呼ぶ。攻撃のデータが決める速度を当てる（踏み込み、飛び出し、飛び込み。X は向いている方向が正）。
         /// 決めていない間は慣性のまま。撃破技なら、最初の判定が出るティックに、その時点の（慣性の）速さを覚える（D-38）。
         /// </summary>
-        public static void ApplyMotion(ref CharacterState state, CombatTuning combat)
+        public static void ApplyMotion(ref CharacterState state, CharacterConfig config)
         {
             if (state.Action.Kind != ActionKind.Attack)
             {
                 return;
             }
+            CombatTuning combat = config.Combat;
             AttackData attack = combat.Get(state.Action.Attack);
+            float scale = SpeedBoosts.ScaleOf(state, config);
+            if (attack.Run)
+            {
+                ApplyRun(ref state, config.Skills.Run, scale);
+                return;
+            }
+            // 行動の速さの強化でフレームを飛ばしたティックは、飛ばしたフレームの分も順に調べる（1 ティックだけの動きを落とさない）。
             int ticks = state.Action.Ticks;
-            if (state.Action.Attack == combat.KoAttack && ticks == attack.FirstHitTick)
+            int from = ticks - Math.Max(1, state.Action.Advance) + 1;
+            if (state.Action.Attack == combat.KoAttack && from <= attack.FirstHitTick && attack.FirstHitTick <= ticks)
             {
                 state.Action.StrikeSpeed = state.Velocity.Length();
             }
-            foreach (AttackMotion motion in attack.Motions)
+            for (int t = from; t <= ticks; t++)
             {
-                if (motion.IsActiveAt(ticks) && (!motion.RequiresHit || state.Action.Connected))
+                foreach (AttackMotion motion in attack.Motions)
                 {
-                    state.Velocity.X = motion.VelocityX * state.Facing;
-                    state.Velocity.Y = motion.VelocityY;
+                    if (motion.IsActiveAt(t) && (!motion.RequiresHit || state.Action.Connected))
+                    {
+                        state.Velocity.X = motion.VelocityX * state.Facing * scale;
+                        state.Velocity.Y = motion.VelocityY * scale;
+                    }
                 }
             }
+        }
+
+        // 走る速さを当てる（反転の間は止まっていく）。縦の速さは重力と跳ぶ動きのまま。
+        private static void ApplyRun(ref CharacterState state, RunTuning run, float scale)
+        {
+            if (state.Action.RunSpeed <= 0f)
+            {
+                // 走り始めたティック。
+                state.Action.RunSpeed = run.InitialSpeed;
+            }
+            float speed = state.Action.RunSpeed * scale;
+            if (state.Action.TurnTicksLeft > 0)
+            {
+                speed *= (float)state.Action.TurnTicksLeft / run.TurnTicks;
+            }
+            state.Velocity.X = speed * state.Facing;
         }
 
         /// <summary>今の攻撃の段階（攻撃中でなければ null）。</summary>
@@ -305,6 +373,129 @@ namespace Airerage.Core.Combat
             CountDown(ref state.Combat.Special1CooldownTicksLeft);
             CountDown(ref state.Combat.Special2CooldownTicksLeft);
             CountDown(ref state.Combat.CoinBoostTicksLeft);
+            CountDown(ref state.Combat.SpeedBoostTicksLeft);
+            CountDown(ref state.Combat.SkyBoostTicksLeft);
+            // 行動の速さの強化が終わったら（時間切れ・撃破）、止めていたクールタイムを数え始める。
+            if (state.Combat.SpeedBoostTicksLeft == 0)
+            {
+                ReleaseBoostCooldown(ref state.Combat.Special1CooldownTicksLeft, combat, AttackSlot.Special1);
+                ReleaseBoostCooldown(ref state.Combat.Special2CooldownTicksLeft, combat, AttackSlot.Special2);
+            }
+        }
+
+        private static void ReleaseBoostCooldown(ref int cooldown, CombatTuning combat, AttackSlot slot)
+        {
+            if (cooldown == CombatState.CooldownWhileActive && combat.Get(slot).Effect == SkillEffect.SpeedBoost)
+            {
+                cooldown = combat.CooldownTicksOf(slot);
+            }
+        }
+
+        // 攻撃のフレームを進める（行動の速さの強化の間は速く。1 ティックに 2 つまで。SpeedBoosts）。
+        private static void AdvanceAttack(ref CharacterState state, CharacterConfig config)
+        {
+            int advance = 1;
+            int percent = SpeedBoosts.PercentOf(state, config);
+            if (percent > 0)
+            {
+                state.Action.TickRemainder += percent;
+                if (state.Action.TickRemainder >= 100)
+                {
+                    state.Action.TickRemainder -= 100;
+                    advance = 2;
+                }
+            }
+            state.Action.Ticks += advance;
+            state.Action.Advance = advance;
+        }
+
+        // 走り続ける地上技（AttackData.Run。SkillTuning.Run）。走り続けるなら true。別の行動の入力があったら、走るのをやめて false
+        // （呼ぶ側が、このティックにその行動を始める）。地上技の入力は無視する（走ったまま）。
+        private static bool UpdateRun(ref CharacterState state, in InputFrame input, CharacterConfig config)
+        {
+            RunTuning run = config.Skills.Run;
+            CombatTuning combat = config.Combat;
+            ref ActionState action = ref state.Action;
+            if (action.RunSpeed <= 0f)
+            {
+                action.RunSpeed = run.InitialSpeed;
+            }
+            bool other = (input.WasPressed(InputButtons.Jump) && CanJump(state, config.Movement))
+                || (input.WasPressed(InputButtons.Wire) && state.Wire.Phase == WirePhase.Ready)
+                || (input.WasPressed(InputButtons.Guard) && state.Combat.GuardCooldownTicksLeft == 0);
+            if (!other && state.Combat.AttackBufferTicksLeft > 0)
+            {
+                AttackSlot next = BufferedSlot(state);
+                if (next == AttackSlot.Ground)
+                {
+                    state.Combat.AttackBufferTicksLeft = 0;
+                }
+                else
+                {
+                    other = CanUse(state, next, combat);
+                }
+            }
+            if (other)
+            {
+                state.Action = default;
+                return false;
+            }
+
+            // 同じ相手には RehitTicks に 1 回まで当たる（最後に当たってから RehitTicks たったら、当てた相手の記録を消す）。
+            if (action.HitMask != 0 && action.Ticks - action.LastHitTicks >= run.RehitTicks)
+            {
+                action.HitMask = 0;
+            }
+            if (action.TurnTicksLeft > 0)
+            {
+                action.TurnTicksLeft--;
+                if (action.TurnTicksLeft == 0)
+                {
+                    state.Facing = -state.Facing;
+                    action.RunSpeed = run.InitialSpeed;
+                }
+            }
+            else if (state.Grounded && input.Move.X * state.Facing <= -config.Movement.MoveDeadzone)
+            {
+                // 逆向きに入力した: 止まってから、速さを初めに戻して逆向きに走る（ユーザーの回答、2026-10-16）。
+                action.TurnTicksLeft = run.TurnTicks;
+            }
+            else if (state.Grounded)
+            {
+                action.RunSpeed = MathF.Min(run.MaxSpeed, action.RunSpeed + run.Acceleration * SimTime.DeltaTime);
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// 移動と接地の後に呼ぶ。走り続ける地上技なら、足場が途切れたとき・壁にぶつかったときに浅い角度で跳ぶ（壁なら反対側へ）。
+        /// wasGrounded はこのティックの移動の前に接地していたか、velocityBeforeMove は移動の前の速度。
+        /// </summary>
+        public static void AfterMove(ref CharacterState state, bool wasGrounded, Vector3 velocityBeforeMove, CharacterConfig config)
+        {
+            if (state.Action.Kind != ActionKind.Attack || !config.Combat.Get(state.Action.Attack).Run || state.Action.TurnTicksLeft > 0)
+            {
+                return;
+            }
+            RunTuning run = config.Skills.Run;
+            float speed = state.Action.RunSpeed * SpeedBoosts.ScaleOf(state, config);
+            float rise = speed * MathF.Tan(run.JumpAngleDeg * (MathF.PI / 180f));
+            bool forward = velocityBeforeMove.X * state.Facing > 1f;
+            if (forward && MathF.Abs(state.Velocity.X) < MathF.Abs(velocityBeforeMove.X) * 0.5f)
+            {
+                // 壁にぶつかった: 壁ジャンプの要領で反対側へ。
+                state.Facing = -state.Facing;
+                state.Velocity = new Vector3(state.Facing * speed, rise, 0f);
+                state.Grounded = false;
+                state.CoyoteTicksLeft = 0;
+                return;
+            }
+            if (wasGrounded && !state.Grounded && state.Velocity.Y <= 0f)
+            {
+                // 足場が途切れた。
+                state.Velocity.Y = rise;
+                state.CoyoteTicksLeft = 0;
+            }
         }
 
         private static void CountDown(ref int ticksLeft)
@@ -328,7 +519,7 @@ namespace Airerage.Core.Combat
                 EndGuard(ref state, config.Combat);
                 if (!TryBeginHold(ref state, BufferedSlot(state), input, config.Combat))
                 {
-                    StartAttack(ref state, BufferedSlot(state), config.Combat);
+                    StartAttack(ref state, BufferedSlot(state), config.Combat, input);
                 }
             }
         }
@@ -435,7 +626,7 @@ namespace Airerage.Core.Combat
                 state.Action = default;
                 if (!TryBeginHold(ref state, next, input, combat))
                 {
-                    StartAttack(ref state, next, combat);
+                    StartAttack(ref state, next, combat, input);
                 }
                 return;
             }
@@ -443,13 +634,17 @@ namespace Airerage.Core.Combat
             {
                 return;
             }
-            StartAttack(ref state, next, combat);
+            state.Action = default;
+            if (!TryBeginHold(ref state, next, input, combat))
+            {
+                StartAttack(ref state, next, combat, input);
+            }
             state.Combat.AttackCancelUsed = true;
         }
 
-        // 攻撃を始める（先行入力を使い切る）。押したときに横を入れていれば、その向きを向く。
+        // 攻撃を始める（先行入力を使い切る）。押したときに横を入れていれば、その向きを向く。照準の方向を覚える（照準の向きに置く技）。
         // 特殊攻撃ならクールタイムを始め、必殺技ならゲージを使う。
-        private static void StartAttack(ref CharacterState state, AttackSlot slot, CombatTuning combat)
+        private static void StartAttack(ref CharacterState state, AttackSlot slot, CombatTuning combat, in InputFrame input)
         {
             if (state.Combat.BufferedFacing != 0)
             {
@@ -460,6 +655,8 @@ namespace Airerage.Core.Combat
                 Kind = ActionKind.Attack,
                 Attack = slot,
                 Ticks = 0,
+                Advance = 1,
+                Aim = input.Aim,
             };
             state.Combat.AttackBufferTicksLeft = 0;
             state.Combat.AttackSerial++;

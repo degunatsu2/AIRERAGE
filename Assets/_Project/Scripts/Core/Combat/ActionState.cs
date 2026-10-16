@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 
 namespace Airerage.Core.Combat
 {
@@ -93,6 +94,24 @@ namespace Airerage.Core.Combat
         /// <summary>技を出す前にためた長さ（ティック。長押しの技。AttackData.HoldMaxTicks）。</summary>
         public int Charge;
 
+        /// <summary>攻撃を始めたときの照準の方向（InputFrame.Aim。長さ 1 以下。照準の向きに置く技に使う）。</summary>
+        public Vector2 Aim;
+
+        /// <summary>走り続ける地上技（AttackData.Run）の今の速さ（m/s。強化の倍率をかける前）。</summary>
+        public float RunSpeed;
+
+        /// <summary>走り続ける地上技で、逆向きに入力してからの反転の残り（ティック。0 なら反転していない）。</summary>
+        public int TurnTicksLeft;
+
+        /// <summary>行動の速さの強化（SpeedBoosts）で、攻撃のフレームを進める端数（%）。100 になったら 1 ティック多く進める。</summary>
+        public int TickRemainder;
+
+        /// <summary>このティックに攻撃のフレームを進めた数（ふつうは 1。強化で 2 になることがある。飛ばしたフレームの動きに使う）。</summary>
+        public int Advance;
+
+        /// <summary>今の攻撃が最後に当たった（ガードを含む）ときの Ticks（走り続ける地上技で、同じ相手にまた当たれるまでを数える）。</summary>
+        public int LastHitTicks;
+
         public bool IsFree => Kind == ActionKind.Free;
 
         public bool Equals(ActionState other)
@@ -100,7 +119,9 @@ namespace Airerage.Core.Combat
             return Kind == other.Kind && Attack == other.Attack && Ticks == other.Ticks
                 && Duration == other.Duration && HitMask == other.HitMask && StrikeSpeed.Equals(other.StrikeSpeed)
                 && Connected == other.Connected && CancelFromTick == other.CancelFromTick
-                && EffectDone == other.EffectDone && Charge == other.Charge;
+                && EffectDone == other.EffectDone && Charge == other.Charge && Aim.Equals(other.Aim) && RunSpeed.Equals(other.RunSpeed)
+                && TurnTicksLeft == other.TurnTicksLeft && TickRemainder == other.TickRemainder && Advance == other.Advance
+                && LastHitTicks == other.LastHitTicks;
         }
 
         public override bool Equals(object obj)
@@ -111,7 +132,7 @@ namespace Airerage.Core.Combat
         public override int GetHashCode()
         {
             return HashCode.Combine(HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed, Connected, CancelFromTick),
-                EffectDone, Charge);
+                EffectDone, Charge, Aim, RunSpeed, TurnTicksLeft, TickRemainder, HashCode.Combine(Advance, LastHitTicks));
         }
 
         public override string ToString()

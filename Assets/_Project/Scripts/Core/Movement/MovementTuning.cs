@@ -52,6 +52,12 @@ namespace Airerage.Core.Movement
 
         public Vector3 HalfExtents => new Vector3(HalfWidth, HalfHeight, HalfWidth);
 
+        /// <summary>同じ値を持つ別のインスタンス（行動の速さの強化で、値を変えた調整値を作るのに使う。SpeedBoosts）。</summary>
+        public MovementTuning Clone()
+        {
+            return (MovementTuning)MemberwiseClone();
+        }
+
         public TuningValidator Validate()
         {
             var v = new TuningValidator(nameof(MovementTuning));

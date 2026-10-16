@@ -15,6 +15,18 @@ namespace Airerage.Core.Objects
 
         /// <summary>投射物（RISK TAKER のコイントスなど）。攻撃の判定を持って飛び、当たるか地形に触れると消える。</summary>
         Projectile = 3,
+
+        /// <summary>
+        /// 突風（STORM RUNNER のウインドクロークを解いたときに撃つ風）。まっすぐ進み、触れたキャラクターと投射物を進む向きへ押す
+        /// （攻撃の判定はない）。持ち主は押さない。地形は通り抜ける。
+        /// </summary>
+        Gust = 4,
+
+        /// <summary>
+        /// 風の帯（STORM RUNNER のスカイロケット）。置いた点から向き（Velocity。長さ 1）へ伸びる長方形で、中の全員と投射物を
+        /// その向きへ加速する。動かない。
+        /// </summary>
+        WindZone = 5,
     }
 
     /// <summary>
@@ -55,6 +67,12 @@ namespace Airerage.Core.Objects
         /// <summary>当てたキャラクター（投射物。ビット v）。同じ相手には 1 回だけ当たる。</summary>
         public uint HitMask;
 
+        /// <summary>威力の上乗せ（%。投射物。撃ったときに決める。AttackPower の上乗せ）。</summary>
+        public int BonusPercent;
+
+        /// <summary>最後にこの物を押した風の番号（投射物。同じ風に 2 回押されないように。0 はなし）。</summary>
+        public int LastPushId;
+
         /// <summary>
         /// 最近当たった攻撃（壊せる物。攻撃した人と攻撃の番号と判定の番号を 1 つの値にしたもの。0 はなし）。同じ攻撃の同じ判定は
         /// 1 回だけダメージを与える（4 つまで覚える）。
@@ -72,7 +90,8 @@ namespace Airerage.Core.Objects
             return Id == other.Id && Kind == other.Kind && Owner == other.Owner && Slot == other.Slot
                 && Position.Equals(other.Position) && Velocity.Equals(other.Velocity)
                 && SpawnTick == other.SpawnTick && ExpireTick == other.ExpireTick && Damage == other.Damage
-                && ChargeMilli == other.ChargeMilli && Stored == other.Stored && HitMask == other.HitMask
+                && ChargeMilli == other.ChargeMilli && Stored == other.Stored && HitMask == other.HitMask && BonusPercent == other.BonusPercent
+                && LastPushId == other.LastPushId
                 && HitKey0 == other.HitKey0 && HitKey1 == other.HitKey1 && HitKey2 == other.HitKey2 && HitKey3 == other.HitKey3
                 && Ended == other.Ended;
         }

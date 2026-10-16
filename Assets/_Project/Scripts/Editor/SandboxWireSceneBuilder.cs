@@ -30,6 +30,7 @@ namespace Airerage.Editor
         public const string CharacterConfigPath = "Assets/_Project/Data/Characters/DefaultCharacter.asset";
         public const string CharacterRosterPath = "Assets/_Project/Data/Characters/CharacterRoster.asset";
         public const string RiskTakerPath = "Assets/_Project/Data/Characters/RiskTaker.asset";
+        public const string StormRunnerPath = "Assets/_Project/Data/Characters/StormRunner.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
@@ -370,6 +371,16 @@ namespace Airerage.Editor
             var hold = new GameObject("HoldDepositHud").AddComponent<HoldDepositHud>();
             SetReference(hold, "_source", source);
             SetReference(hold, "_camera", Object.FindFirstObjectByType<Camera>());
+            CreateChargeAura(source, audio);
+            var boost = new GameObject("BoostAura").AddComponent<BoostAuraView>();
+            LineRenderer boostLine = CreateIndicatorLine(boost.transform, "BoostLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
+            boostLine.gameObject.SetActive(false);
+            SetReference(boost, "_source", source);
+            SetReference(boost, "_lineTemplate", boostLine);
+            var roulette = new GameObject("RouletteView").AddComponent<RouletteView>();
+            SetReference(roulette, "_source", source);
+            SetReference(roulette, "_camera", Object.FindFirstObjectByType<Camera>());
+            SetReference(roulette, "_audio", audio);
             var root = new GameObject("SkillHud");
             var hud = root.AddComponent<SkillHud>();
             SetReference(hud, "_source", source);
@@ -380,14 +391,31 @@ namespace Airerage.Editor
             SetReference(flash, "_camera", Object.FindFirstObjectByType<Camera>());
         }
 
-        /// <summary>置かれた物と投射物の表示（WorldObjectsView。見本はミラーボール、セーフティボックス、投射物の順）。</summary>
+        /// <summary>ためる技のオーラ（ChargeAuraView。見本の線と光は隠しておく）。</summary>
+        internal static void CreateChargeAura(MonoBehaviour source, GameAudio audio)
+        {
+            var view = new GameObject("ChargeAura").AddComponent<ChargeAuraView>();
+            var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            LineRenderer line = CreateIndicatorLine(view.transform, "AuraLineTemplate", lineMaterial, 0.1f);
+            line.loop = true;
+            BurstEffectView burst = CreateBurst("AuraBurstTemplate", view.transform);
+            line.gameObject.SetActive(false);
+            burst.gameObject.SetActive(false);
+            SetReference(view, "_source", source);
+            SetReference(view, "_lineTemplate", line);
+            SetReference(view, "_burstTemplate", burst);
+            SetReference(view, "_audio", audio);
+        }
+
+        /// <summary>置かれた物と投射物の表示（WorldObjectsView。見本はミラーボール、セーフティボックス、投射物、突風、風の帯の順）。</summary>
         internal static void CreateWorldObjectsView(MonoBehaviour source, GameAudio audio)
         {
             var view = new GameObject("WorldObjects").AddComponent<WorldObjectsView>();
             var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
 
+            // ミラーボールは 2026-10-16 の要望で大きくした（直径 0.9m → 1.5m）。
             GameObject ball = CreateVisual(PrimitiveType.Sphere, "MirrorBallTemplate", LoadOrCreateMaterial("MirrorBall", new Color(0.85f, 0.88f, 0.95f)),
-                Vector3.one * 0.9f);
+                Vector3.one * 1.5f);
             ball.transform.SetParent(view.transform, false);
             CreateIndicatorLine(ball.transform, "Rays", lineMaterial, 0.06f);
 
@@ -399,12 +427,36 @@ namespace Airerage.Editor
             dial.transform.SetParent(safe.transform, false);
             dial.transform.localPosition = new Vector3(0.15f, 0f, -0.52f);
             dial.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            // 次のチャージまでの円形のゲージ（下地と、伸びる弧）。
+            LineRenderer ringBack = CreateIndicatorLine(safe.transform, "ChargeRingBack", lineMaterial, 0.08f);
+            ringBack.loop = true;
+            ringBack.startColor = ringBack.endColor = new Color(1f, 0.85f, 0.3f, 0.22f);
+            LineRenderer ring = CreateIndicatorLine(safe.transform, "ChargeRing", lineMaterial, 0.12f);
+            ring.startColor = ring.endColor = new Color(1f, 0.82f, 0.2f, 0.95f);
 
             GameObject coin = CreateVisual(PrimitiveType.Cylinder, "ProjectileTemplate", LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f)),
                 new Vector3(0.55f, 0.06f, 0.55f));
             coin.transform.SetParent(view.transform, false);
 
-            foreach (GameObject template in new[] { ball, safe, coin })
+            // 突風（弧の形の風の線 3 本）と風の帯（枠と流れる線 6 本）。線だけで作る。
+            var gust = new GameObject("GustTemplate");
+            gust.transform.SetParent(view.transform, false);
+            for (int i = 0; i < 3; i++)
+            {
+                CreateIndicatorLine(gust.transform, "Streak" + i, lineMaterial, 0.12f - 0.02f * i);
+            }
+            var windZone = new GameObject("WindZoneTemplate");
+            windZone.transform.SetParent(view.transform, false);
+            LineRenderer outline = CreateIndicatorLine(windZone.transform, "Outline", lineMaterial, 0.06f);
+            outline.startColor = outline.endColor = new Color(0.6f, 1f, 0.45f, 0.35f);
+            for (int i = 0; i < 6; i++)
+            {
+                LineRenderer streak = CreateIndicatorLine(windZone.transform, "Streak" + i, lineMaterial, 0.08f);
+                streak.startColor = new Color(0.85f, 1f, 0.75f, 0f);
+                streak.endColor = new Color(0.7f, 1f, 0.5f, 0.75f);
+            }
+
+            foreach (GameObject template in new[] { ball, safe, coin, gust, windZone })
             {
                 foreach (Collider collider in template.GetComponentsInChildren<Collider>())
                 {
@@ -413,7 +465,7 @@ namespace Airerage.Editor
                 template.SetActive(false);
             }
             SetReference(view, "_source", source);
-            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin });
+            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin, gust, windZone });
             SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
             SetReference(view, "_audio", audio);
         }
@@ -831,6 +883,7 @@ namespace Airerage.Editor
         internal static CharacterRoster LoadOrCreateCharacterRoster(CharacterConfigAsset character)
         {
             CharacterConfigAsset riskTaker = WritePresetCharacter(RiskTakerPath, CharacterPresets.RiskTaker(), CharacterPresets.RiskTakerName);
+            CharacterConfigAsset stormRunner = WritePresetCharacter(StormRunnerPath, CharacterPresets.StormRunner(), CharacterPresets.StormRunnerName);
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
             if (roster == null)
             {
@@ -838,7 +891,7 @@ namespace Airerage.Editor
                 roster = ScriptableObject.CreateInstance<CharacterRoster>();
                 AssetDatabase.CreateAsset(roster, CharacterRosterPath);
             }
-            roster.Configure(new[] { character, riskTaker });
+            roster.Configure(new[] { character, riskTaker, stormRunner });
             EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return roster;

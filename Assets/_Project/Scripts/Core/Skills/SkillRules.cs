@@ -13,7 +13,7 @@ using Airerage.Core.Wire;
 namespace Airerage.Core.Skills
 {
     /// <summary>
-    /// 技の効果とワールドに置かれた物の規則（docs/13 T5-6、docs/14）。SimWorld が 1 ティックの中で次の順に呼ぶ:
+    /// 技の効果とワールドに置かれた物の規則（docs/13 T5-6、docs/14。STORM RUNNER の強化と風も）。SimWorld が 1 ティックの中で次の順に呼ぶ:
     /// 1. FireEffects（全員を進めた後）: 攻撃のデータの効果（AttackData.Effect）を、出してから EffectTick のティックに 1 回だけ起こす
     ///    （物を置く、投射物を撃つ、強化）。
     /// 2. StepObjects: 物を進める（寿命、ミラーボールのゲージ、セーフティボックスのチャージ、投射物の移動と命中）。投射物の命中は
@@ -70,13 +70,19 @@ namespace Airerage.Core.Skills
                 switch (item.Kind)
                 {
                     case WorldObjectKind.MirrorBall:
-                        StepMirrorBall(item, states, owner.Skills.MirrorBall, tick);
+                        StepMirrorBall(item, states, configs, owner.Skills.MirrorBall, tick);
                         break;
                     case WorldObjectKind.Safe:
                         StepSafe(ref item, owner.Skills.Safe, tick);
                         break;
                     case WorldObjectKind.Projectile:
                         StepProjectile(ref item, objects, terrain, states, configs, bounds, owner.Skills.Projectile, hits);
+                        break;
+                    case WorldObjectKind.Gust:
+                        StepGust(ref item, objects, states, configs, owner.Skills.SpeedBoost);
+                        break;
+                    case WorldObjectKind.WindZone:
+                        StepWindZone(item, objects, states, configs, owner.Skills.WindZone);
                         break;
                 }
                 objects[o] = item;
@@ -115,6 +121,19 @@ namespace Airerage.Core.Skills
         public static int SafeCoins(in WorldObject safe)
         {
             return (int)(safe.ChargeMilli / 1000);
+        }
+
+        /// <summary>セーフティボックスが上限に着いたか（もうチャージしない）。</summary>
+        public static bool IsSafeFull(in WorldObject safe, SafeTuning tuning)
+        {
+            return safe.ChargeMilli >= tuning.MaxCoins * 1000L;
+        }
+
+        /// <summary>次のチャージまでの割合（0〜1。置いた直後とチャージした直後が 0）。表示用。</summary>
+        public static float SafeChargeProgress(in WorldObject safe, SafeTuning tuning, int tick)
+        {
+            int age = Math.Max(0, tick - safe.SpawnTick);
+            return (float)(age % tuning.ChargeIntervalTicks) / tuning.ChargeIntervalTicks;
         }
 
         /// <summary>ワイヤーが、物 item（アンカーになる物）につながっているか。</summary>
@@ -166,8 +185,49 @@ namespace Airerage.Core.Skills
                     state.Combat.CoinBoostTicksLeft = config.Skills.CoinBoost.DurationTicks;
                     states[index] = state;
                     break;
+                case SkillEffect.SpeedBoost:
+                {
+                    SpeedBoostTuning boost = config.Skills.SpeedBoost;
+                    if (state.Combat.SpeedBoostTicksLeft > 0)
+                    {
+                        // 効果中にもう一度出した: 強化を解いて、向いている方向へ突風を撃つ。クールタイムはここから数える。
+                        state.Combat.SpeedBoostTicksLeft = 0;
+                        SetCooldown(ref state.Combat, state.Action.Attack, config.Combat.CooldownTicksOf(state.Action.Attack));
+                        objects.Add(new WorldObject
+                        {
+                            Kind = WorldObjectKind.Gust, Owner = index, Slot = state.Action.Attack,
+                            Position = position + new Vector2(0.6f * state.Facing, 0f),
+                            Velocity = new Vector2(boost.GustSpeed * state.Facing, 0f),
+                            SpawnTick = tick, ExpireTick = tick + boost.GustTicks,
+                        });
+                    }
+                    else
+                    {
+                        // クールタイムは、強化が終わってから数える（ActionController が時間切れで始める）。
+                        state.Combat.SpeedBoostTicksLeft = boost.DurationTicks;
+                        SetCooldown(ref state.Combat, state.Action.Attack, CombatState.CooldownWhileActive);
+                    }
+                    states[index] = state;
+                    break;
+                }
+                case SkillEffect.WindZone:
+                {
+                    WindZoneTuning wind = config.Skills.WindZone;
+                    objects.Add(new WorldObject
+                    {
+                        Kind = WorldObjectKind.WindZone, Owner = index, Slot = state.Action.Attack, Position = position,
+                        Velocity = AimDirection(state.Action.Aim, state.Facing, config.Wire.AimDeadzone),
+                        SpawnTick = tick, ExpireTick = tick + wind.DurationTicks,
+                    });
+                    break;
+                }
+                case SkillEffect.SkyBoost:
+                    state.Combat.SkyBoostTicksLeft = config.Skills.SkyBoost.DurationTicks;
+                    states[index] = state;
+                    break;
                 case SkillEffect.Projectile:
                 {
+                    // 威力の上乗せは、撃ったときの手持ちのコインで決める（コイントス。AttackPower の上乗せ）。
                     ProjectileTuning shot = config.Skills.Projectile;
                     objects.Add(new WorldObject
                     {
@@ -175,6 +235,7 @@ namespace Airerage.Core.Skills
                         Position = position + new Vector2(shot.OffsetX * state.Facing, shot.OffsetY),
                         Velocity = new Vector2(shot.VelocityX * state.Facing, shot.VelocityY),
                         SpawnTick = tick, ExpireTick = tick + shot.LifetimeTicks,
+                        BonusPercent = shot.HeldCoinBonusPercent(state.Coins.Held),
                     });
                     break;
                 }
@@ -182,7 +243,8 @@ namespace Airerage.Core.Skills
         }
 
         // ミラーボール: つないでいる人（敵も含む）のゲージが、GaugeIntervalTicks ごとにたまる（C-14）。
-        private static void StepMirrorBall(in WorldObject ball, List<CharacterState> states, MirrorBallTuning tuning, int tick)
+        private static void StepMirrorBall(in WorldObject ball, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+            MirrorBallTuning tuning, int tick)
         {
             int age = tick - ball.SpawnTick;
             if (age <= 0 || age % tuning.GaugeIntervalTicks != 0)
@@ -194,18 +256,19 @@ namespace Airerage.Core.Skills
                 CharacterState state = states[i];
                 if (IsAttachedTo(state, ball))
                 {
-                    CombatTuning.AddGauge(ref state.Combat, tuning.GaugePerInterval);
+                    CombatTuning.AddGauge(ref state.Combat, tuning.GaugePerInterval, configs[i].Skills.CoinBoost);
                     states[i] = state;
                 }
             }
         }
 
         // セーフティボックス: ChargeIntervalTicks ごとに ChargeCoins 枚を足し、ChargeRatePercent % にする（上限 MaxCoins）。
+        // 上限に着いたら、もうチャージしない（ユーザーの要望、2026-10-16）。
         // 1/1000 枚単位の整数で計算する（PC が違っても同じ。小数まで記録し、ばらまくときに切り捨てる）。
         private static void StepSafe(ref WorldObject safe, SafeTuning tuning, int tick)
         {
             int age = tick - safe.SpawnTick;
-            if (age <= 0 || age % tuning.ChargeIntervalTicks != 0)
+            if (age <= 0 || age % tuning.ChargeIntervalTicks != 0 || IsSafeFull(safe, tuning))
             {
                 return;
             }
@@ -250,7 +313,7 @@ namespace Airerage.Core.Skills
                     && MathF.Abs(target.Position.Y - shot.Position.Y) < half.Y + tuning.Radius)
                 {
                     int facing = shot.Velocity.X > 0f ? 1 : shot.Velocity.X < 0f ? -1 : states[shot.Owner].Facing;
-                    hits.Add(new HitRecord(shot.Owner, v, shot.Slot, 0, tuning.Hit, facing, 1f, fromObject: true));
+                    hits.Add(new HitRecord(shot.Owner, v, shot.Slot, 0, tuning.Hit, facing, 1f, fromObject: true, bonusPercent: shot.BonusPercent));
                     shot.HitMask |= 1u << v;
                     shot.Ended = true;
                     return;
@@ -268,12 +331,135 @@ namespace Airerage.Core.Skills
                 if (MathF.Abs(other.Position.X - shot.Position.X) < safe.HalfWidth + tuning.Radius
                     && MathF.Abs(other.Position.Y - shot.Position.Y) < safe.HalfHeight + tuning.Radius)
                 {
-                    other.Damage += Math.Max(1, tuning.Hit.Damage);
+                    other.Damage += Math.Max(1, AttackPower.Damage(tuning.Hit.Damage, 1f, shot.BonusPercent));
                     objects[o] = other;
                     shot.Ended = true;
                     return;
                 }
             }
+        }
+
+        /// <summary>照準の方向 aim（長さが deadzone より小さければ、向いている方向 facing の水平）を長さ 1 にしたもの。</summary>
+        public static Vector2 AimDirection(Vector2 aim, int facing, float deadzone)
+        {
+            float length = aim.Length();
+            return length >= deadzone && length > SimMath.Epsilon ? aim / length : new Vector2(facing >= 0 ? 1f : -1f, 0f);
+        }
+
+        /// <summary>風の帯 zone の中に、点 point（キャラクターなら中心。margin はその大きさの分の余裕）があるか。</summary>
+        public static bool InWindZone(in WorldObject zone, WindZoneTuning tuning, Vector2 point, float margin)
+        {
+            Vector2 rel = point - zone.Position;
+            float along = Vector2.Dot(rel, zone.Velocity);
+            float across = MathF.Abs(rel.X * zone.Velocity.Y - rel.Y * zone.Velocity.X);
+            return along >= -margin && along <= tuning.Length + margin && across <= tuning.HalfWidth + margin;
+        }
+
+        // 突風: まっすぐ進み（地形は通り抜ける）、触れたキャラクター（持ち主を除く）と投射物を、進む向きへ押す（それぞれ 1 回）。
+        private static void StepGust(ref WorldObject gust, WorldObjects objects, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+            SpeedBoostTuning tuning)
+        {
+            gust.Position += gust.Velocity * SimTime.DeltaTime;
+            float speed = gust.Velocity.Length();
+            if (speed <= SimMath.Epsilon)
+            {
+                return;
+            }
+            Vector2 direction = gust.Velocity / speed;
+            const float thickness = 0.6f;
+            for (int v = 0; v < states.Count; v++)
+            {
+                CharacterState target = states[v];
+                if (v == gust.Owner || (gust.HitMask & (1u << v)) != 0 || target.Combat.IsWaitingToRespawn)
+                {
+                    continue;
+                }
+                Vector3 half = configs[v].Movement.HalfExtents;
+                Vector2 rel = new Vector2(target.Position.X, target.Position.Y) - gust.Position;
+                float along = Vector2.Dot(rel, direction);
+                float across = MathF.Abs(rel.X * direction.Y - rel.Y * direction.X);
+                if (MathF.Abs(along) > thickness + half.X || across > tuning.GustHalfWidth + half.Y)
+                {
+                    continue;
+                }
+                target.Velocity.X += direction.X * tuning.GustPush;
+                target.Velocity.Y += direction.Y * tuning.GustPush;
+                if (target.Grounded && direction.Y >= 0f)
+                {
+                    // 地上の相手は少し浮かせる（地面の摩擦ですぐに止まらないように）【仮】。
+                    target.Velocity.Y = MathF.Max(target.Velocity.Y, 3f);
+                    target.Grounded = false;
+                }
+                states[v] = target;
+                gust.HitMask |= 1u << v;
+            }
+            for (int o = 0; o < objects.Count; o++)
+            {
+                WorldObject other = objects[o];
+                if (other.Kind != WorldObjectKind.Projectile || other.Ended || other.LastPushId == gust.Id)
+                {
+                    continue;
+                }
+                Vector2 rel = other.Position - gust.Position;
+                float along = Vector2.Dot(rel, direction);
+                float across = MathF.Abs(rel.X * direction.Y - rel.Y * direction.X);
+                if (MathF.Abs(along) <= thickness + 0.5f && across <= tuning.GustHalfWidth + 0.5f)
+                {
+                    other.Velocity += direction * tuning.GustPush;
+                    other.LastPushId = gust.Id;
+                    objects[o] = other;
+                }
+            }
+        }
+
+        // 風の帯: 中にいるキャラクター（持ち主も）と投射物を、向きへ加速する（向きの速さの上限まで）。止まっている（ヒットストップ・
+        // 復帰を待つ）キャラクターには効かない。
+        private static void StepWindZone(in WorldObject zone, WorldObjects objects, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+            WindZoneTuning tuning)
+        {
+            float add = tuning.Acceleration * SimTime.DeltaTime;
+            for (int v = 0; v < states.Count; v++)
+            {
+                CharacterState target = states[v];
+                if (target.Combat.IsWaitingToRespawn || target.Combat.HitstopTicksLeft > 0)
+                {
+                    continue;
+                }
+                Vector3 half = configs[v].Movement.HalfExtents;
+                if (!InWindZone(zone, tuning, new Vector2(target.Position.X, target.Position.Y), MathF.Min(half.X, half.Y)))
+                {
+                    continue;
+                }
+                var velocity = new Vector2(target.Velocity.X, target.Velocity.Y);
+                velocity = Blow(velocity, zone.Velocity, add, tuning.SpeedLimit);
+                target.Velocity.X = velocity.X;
+                target.Velocity.Y = velocity.Y;
+                if (target.Velocity.Y > 0f)
+                {
+                    target.Grounded = false;
+                }
+                states[v] = target;
+            }
+            for (int o = 0; o < objects.Count; o++)
+            {
+                WorldObject other = objects[o];
+                if (other.Kind == WorldObjectKind.Projectile && !other.Ended && InWindZone(zone, tuning, other.Position, 0.3f))
+                {
+                    other.Velocity = Blow(other.Velocity, zone.Velocity, add, tuning.SpeedLimit);
+                    objects[o] = other;
+                }
+            }
+        }
+
+        // 速度 velocity の、向き direction の成分を add だけ上げる（上限 limit。直交する成分は残す）。
+        private static Vector2 Blow(Vector2 velocity, Vector2 direction, float add, float limit)
+        {
+            float along = Vector2.Dot(velocity, direction);
+            if (along >= limit)
+            {
+                return velocity;
+            }
+            return velocity + direction * MathF.Min(add, limit - along);
         }
 
         // 消えたミラーボールにつないでいた人のワイヤーを外し、向かって飛んでいたフックは狙いをやめさせる（射程まで飛んで外れる）。

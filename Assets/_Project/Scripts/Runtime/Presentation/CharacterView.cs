@@ -9,7 +9,7 @@ namespace Airerage.Runtime.Presentation
     /// キャラクターの状態を箱で表示する（プロトタイプ用）。直前と現在のティックの状態を補間する。
     /// 戦闘の状態を色で示す（判定と見た目ができるまでの仮の表示。docs/11_combat_plan.md）: 攻撃の段階（発生・持続・硬直。
     /// 撃破技の発生は金色のチャージ）、ヒットストップ、のけぞり。攻撃の判定が出ている間は、その箱を線で描く（_hitboxLine があれば）。
-    /// 撃破技のチャージの間は、チャージのエフェクトと「CHARGE!」を出す（_chargeEffect があれば）。
+    /// 撃破技のチャージの間は、チャージのエフェクトと「CHARGE!」を出す（_chargeEffect があれば。ルーレットの技は出さない）。
     /// ワイヤーキャンセルのクールタイムの間は、周りに円形のゲージと「WIRE CANCEL」を出す（_wireCancelGauge があれば。P-1）。
     /// ガード中・ジャストガードの成功は _guardEffect、ガードのクールタイムは _guardGauge で示す（T3-5。あれば）。
     /// 攻撃を受けた瞬間は火花（_hitSpark）、FATAL を受けた瞬間は虹色の光と「FATAL!」（_fatalBurst）、攻撃をワイヤーで
@@ -377,7 +377,9 @@ namespace Airerage.Runtime.Presentation
                 case ActionKind.Attack:
                     switch (combat.Get(state.Action.Attack).PhaseAt(state.Action.Ticks))
                     {
-                        case AttackPhase.Startup: return state.Action.Attack == combat.KoAttack ? Tint.Charge : Tint.Startup;
+                        // ルーレットの技は、チャージの代わりに頭上のルーレット（RouletteView）で示す。
+                        case AttackPhase.Startup:
+                            return state.Action.Attack == combat.KoAttack && !combat.Get(state.Action.Attack).Roulette ? Tint.Charge : Tint.Startup;
                         case AttackPhase.Active: return Tint.Active;
                         default: return Tint.Recovery;
                     }

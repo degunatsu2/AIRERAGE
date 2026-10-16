@@ -72,14 +72,15 @@ namespace Airerage.Core.Simulation
                 // 復帰した後の無敵は、自分が攻撃を出すと終わる【仮】（無敵のまま一方的に攻撃できないように）。
                 state.Combat.InvincibleTicksLeft = 0;
             }
-            if (!state.Action.IsFree)
+            if (!state.Action.IsFree || ActionController.IsRootedHold(state, config.Combat))
             {
-                frame = new InputFrame(ActionController.ControlInput(state, effectiveInput), state.PreviousButtons);
+                frame = new InputFrame(ActionController.ControlInput(state, effectiveInput, config.Combat), state.PreviousButtons);
                 state.JumpBufferTicksLeft = 0;
             }
 
             _wire.UpdatePhase(ref state, frame, config.Wire);
 
+            bool wasGrounded = state.Grounded;
             bool attached = state.Wire.Phase == WirePhase.Attached;
             if (attached)
             {
@@ -89,7 +90,7 @@ namespace Airerage.Core.Simulation
             else
             {
                 Locomotion.UpdateVelocity(ref state, frame, movement);
-                ActionController.ApplyMotion(ref state, config.Combat);
+                ActionController.ApplyMotion(ref state, config);
             }
 
             System.Numerics.Vector3 beforeMove = state.Position;
@@ -103,6 +104,7 @@ namespace Airerage.Core.Simulation
             }
 
             Locomotion.ApplyGroundState(ref state, _motor.ProbeGround(state.Position, halfExtents), movement);
+            ActionController.AfterMove(ref state, wasGrounded, velocityBeforeMove, config);
             Bounce(ref state, velocityBeforeMove, config.Combat);
             StageZones.Apply(ref state, startPosition, new System.Numerics.Vector2(halfExtents.X, halfExtents.Y), _zones);
 

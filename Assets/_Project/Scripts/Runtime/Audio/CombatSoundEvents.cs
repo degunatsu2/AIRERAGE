@@ -67,12 +67,12 @@ namespace Airerage.Runtime.Audio
             {
                 CharacterState current = _feed.GetState(i);
                 CharacterConfig config = _feed.GetConfig(i);
-                Compare(_previous[i], current, config.Movement.JumpSpeed, config.Combat.KoAttack);
+                Compare(_previous[i], current, config.Movement.JumpSpeed, config.Combat);
                 _previous[i] = current;
             }
         }
 
-        private void Compare(in CharacterState before, in CharacterState now, float jumpSpeed, AttackSlot koAttack)
+        private void Compare(in CharacterState before, in CharacterState now, float jumpSpeed, CombatTuning combat)
         {
             CombatState b = before.Combat;
             CombatState n = now.Combat;
@@ -131,7 +131,10 @@ namespace Airerage.Runtime.Audio
                         _audio.Play(SoundId.SpecialMove, 0.85f, 0.05f);
                         break;
                     default:
-                        _audio.Play(now.Action.Attack == koAttack ? SoundId.Charge : SoundId.Swing, 0.8f, 0.08f);
+                        // ルーレットの技は、チャージの代わりにルーレットが回る音（ユーザーの要望、2026-10-16）。
+                        bool roulette = combat.Get(now.Action.Attack).Roulette;
+                        _audio.Play(roulette ? SoundId.RouletteSpin : now.Action.Attack == combat.KoAttack ? SoundId.Charge : SoundId.Swing,
+                            0.8f, roulette ? 0f : 0.08f);
                         break;
                 }
             }

@@ -15,7 +15,7 @@ namespace Airerage.Core.Combat
     /// - 先に全員分の命中を集めてから、攻撃した側の番号、判定の順、当たった側の番号の順に当てる（同じティックの相打ちが順番で変わらない）。
     /// - 同じ判定は同じ相手に1回だけ当たる（二段技は、それぞれの判定が1回ずつ当たる）。ヒットストップ中の攻撃は新しく当たらない。
     /// - 当たった側: ワイヤーを外し、のけぞり（Hitstun）にして、吹き飛ばす（攻撃ごとに固定。撃破技は打つ直前の速さで倍率。D-38）。
-    ///   撃破技の倍率は威力（ダメージ）にもかかる。FatalStrikeSpeed 以上で打った撃破技が当たると「FATAL」で、ヒットストップが
+    ///   倍率と威力の上乗せは AttackPower が決める（D-64【提案】）。撃破技の倍率は威力（ダメージ）にもかかる。FatalStrikeSpeed 以上で打った撃破技が当たると「FATAL」で、ヒットストップが
     ///   FatalHitstopMultiplier 倍になり、当たった側の FatalHitCount が増える（表示と効果音。ガードされたら FATAL にならない）。
     ///   最後にダメージを与えた人と時刻、コンボの数とダメージを記録する。HP はない（D-23）。
     ///   コンボは当てた人ごとで、のけぞりが終わるまで続く（別の人が当てると、その人の新しいコンボになる）。
@@ -35,9 +35,11 @@ namespace Airerage.Core.Combat
     /// - 投射物の命中（docs/13 T5-6）: SkillRules が集めた命中（HitRecord.FromObject）も、キャラクターの攻撃の後に同じ規則で当てる。
     ///   ただし、撃った人は止まらず（ヒットストップなし）、今の攻撃の「当たった」にもならず、ジャストガードされても隙にならない。
     /// - 壊せる物（セーフティボックス）: 攻撃の判定が重なったら、物にダメージを与える（同じ攻撃の同じ判定は 1 回だけ）。攻撃した側は
-    ///   止まらない。壊れたかどうかは SkillRules が決める。
+    ///   キャラクターに当てたときと同じヒットストップで止まる（ユーザーの要望、2026-10-16）。壊れたかどうかは SkillRules が決める。
     /// - ルーレット（AttackData.Roulette）: 吹き飛びと威力の倍率を、試合の種と攻撃の番号（CombatState.AttackSerial）で決める
-    ///   （AttackData.RouletteScales のどれか。最大なら JACKPOT で、受けた側の JackpotHitCount が増える）。
+    ///   （AttackData.RouletteScales のどれか。撃破技の速さの倍率の代わり）。最大なら JACKPOT で、受けた側の JackpotHitCount が増える。
+    ///   ためた技の最後の段階（オールインの虹）で当てたときも JACKPOT。
+    /// - FEVER（CombatState.CoinBoostTicksLeft）の間に得るゲージは、CoinBoostTuning.GaugeBonusPercent だけ増える（CombatTuning.AddGauge）。
     /// </summary>
     public sealed class HitResolver
     {
@@ -88,16 +90,7 @@ namespace Airerage.Core.Combat
                 }
                 CombatTuning combat = configs[a].Combat;
                 AttackData attack = combat.Get(attacker.Action.Attack);
-                bool ko = attacker.Action.Attack == combat.KoAttack;
-                float scale = ko ? combat.KoKnockbackScale(attacker.Action.StrikeSpeed) : 1f;
-                bool fatal = ko && attacker.Action.StrikeSpeed >= combat.FatalStrikeSpeed;
-                bool jackpot = false;
-                if (attack.Roulette)
-                {
-                    int roll = RouletteRoll(seed, a, attacker.Combat.AttackSerial);
-                    scale *= AttackData.RouletteScales[roll];
-                    jackpot = roll == AttackData.RouletteScales.Length - 1;
-                }
+                AttackPower power = AttackPower.Of(attacker, a, configs[a], seed);
                 for (int h = 0; h < attack.Hits.Length; h++)
                 {
                     AttackHit hitData = attack.Hits[h];
@@ -106,9 +99,13 @@ namespace Airerage.Core.Combat
                         continue;
                     }
                     Hitbox(attacker, hitData, out Vector2 center, out Vector2 half);
-                    if (objects != null)
+                    if (objects != null && DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, half,
+                            AttackPower.Damage(hitData.Damage, power.Multiplier, power.BonusPercent)))
                     {
-                        DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, half, (int)MathF.Round(hitData.Damage * scale));
+                        // 壊せる物に当てたら、キャラクターに当てたときと同じように止まる（ユーザーの要望、2026-10-16）。
+                        CharacterState stopped = states[a];
+                        stopped.Combat.HitstopTicksLeft = Math.Max(stopped.Combat.HitstopTicksLeft, hitData.HitstopTicks);
+                        states[a] = stopped;
                     }
                     for (int v = 0; v < states.Count; v++)
                     {
@@ -122,7 +119,8 @@ namespace Airerage.Core.Combat
                         if (MathF.Abs(target.X - center.X) < half.X + targetHalf.X
                             && MathF.Abs(target.Y - center.Y) < half.Y + targetHalf.Y)
                         {
-                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, scale, fatal, jackpot: jackpot));
+                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, power.Multiplier, power.Fatal,
+                                jackpot: power.Jackpot, bonusPercent: power.BonusPercent));
                         }
                     }
                 }
@@ -160,11 +158,12 @@ namespace Airerage.Core.Combat
             return (attacker + 1) * 0x1000000 + (serial & 0xFFFFF) * 4 + (hit & 3);
         }
 
-        // 判定の箱が重なった壊せる物（セーフティボックス）にダメージを与える（同じ攻撃の同じ判定は 1 回だけ）。
-        private static void DamageObjects(WorldObjects objects, IReadOnlyList<CharacterConfig> configs, int attacker, int serial, int hit,
+        // 判定の箱が重なった壊せる物（セーフティボックス）にダメージを与える（同じ攻撃の同じ判定は 1 回だけ）。与えたら true。
+        private static bool DamageObjects(WorldObjects objects, IReadOnlyList<CharacterConfig> configs, int attacker, int serial, int hit,
             Vector2 center, Vector2 half, int damage)
         {
             int key = ObjectHitKey(attacker, serial, hit);
+            bool damaged = false;
             for (int i = 0; i < objects.Count; i++)
             {
                 WorldObject item = objects[i];
@@ -179,8 +178,10 @@ namespace Airerage.Core.Combat
                     item.Damage += Math.Max(1, damage);
                     item.AddHitKey(key);
                     objects[i] = item;
+                    damaged = true;
                 }
             }
+            return damaged;
         }
 
         /// <summary>判定 hit の箱（中心と半分の大きさ）。表示にも使う。</summary>
@@ -222,13 +223,15 @@ namespace Airerage.Core.Combat
                 {
                     attacker.Action.HitMask |= HitBit(hit.HitIndex, hit.Victim);
                     attacker.Action.Connected |= result == HitResult.Hit;
+                    attacker.Action.LastHitTicks = attacker.Action.Ticks;
                 }
                 attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, hitstop);
             }
             if (hit.Attack != AttackSlot.Super)
             {
                 CombatTuning.AddGauge(ref attacker.Combat,
-                    result == HitResult.Hit ? attackerCombat.GaugeOnHit : result == HitResult.Guarded ? attackerCombat.GaugeOnGuarded : 0);
+                    result == HitResult.Hit ? attackerCombat.GaugeOnHit : result == HitResult.Guarded ? attackerCombat.GaugeOnGuarded : 0,
+                    configs[hit.Attacker].Skills.CoinBoost);
             }
             states[hit.Attacker] = attacker;
 
@@ -236,7 +239,8 @@ namespace Airerage.Core.Combat
             CombatTuning victimCombat = configs[hit.Victim].Combat;
             CombatTuning.AddGauge(ref victim.Combat,
                 result == HitResult.Hit ? victimCombat.GaugeOnDamaged
-                : result == HitResult.Guarded ? victimCombat.GaugeOnGuard : victimCombat.GaugeOnJustGuard);
+                : result == HitResult.Guarded ? victimCombat.GaugeOnGuard : victimCombat.GaugeOnJustGuard,
+                configs[hit.Victim].Skills.CoinBoost);
             victim.Combat.HitstopTicksLeft = Math.Max(victim.Combat.HitstopTicksLeft, hitstop);
             if (fatal)
             {
@@ -388,7 +392,7 @@ namespace Airerage.Core.Combat
         public readonly AttackHit Data;
         public readonly int Facing;
 
-        /// <summary>吹き飛びと威力の倍率（撃破技は打つ直前の速さによる。それ以外は 1。D-38）。</summary>
+        /// <summary>吹き飛びと威力の倍率（撃破技は打つ直前の速さ、ルーレットの技は目による。それ以外は 1。D-38、AttackPower）。</summary>
         public readonly float KnockbackScale;
 
         /// <summary>FatalStrikeSpeed 以上で打った撃破技か（当たれば FATAL。ガードされたら FATAL にならない）。</summary>
@@ -403,11 +407,15 @@ namespace Airerage.Core.Combat
         /// <summary>投射物の命中か（撃った人は止まらず、今の攻撃にも影響しない。docs/13 T5-6）。</summary>
         public readonly bool FromObject;
 
-        /// <summary>ルーレットの最大（JACKPOT）の攻撃か。</summary>
+        /// <summary>JACKPOT の攻撃か（ルーレットの最大か、ためた技の最後の段階。当たれば JACKPOT の演出）。</summary>
         public readonly bool Jackpot;
 
+        /// <summary>威力の上乗せ（%。ため、手持ちのコインなど。威力だけにかかる。AttackPower）。</summary>
+        public readonly int BonusPercent;
+
         public HitRecord(int attacker, int victim, AttackSlot attack, int hitIndex, AttackHit data, int facing, float knockbackScale,
-            bool fatal = false, HitResult result = HitResult.Hit, bool startsCombo = false, bool fromObject = false, bool jackpot = false)
+            bool fatal = false, HitResult result = HitResult.Hit, bool startsCombo = false, bool fromObject = false, bool jackpot = false,
+            int bonusPercent = 0)
         {
             Attacker = attacker;
             Victim = victim;
@@ -421,18 +429,22 @@ namespace Airerage.Core.Combat
             StartsCombo = startsCombo;
             FromObject = fromObject;
             Jackpot = jackpot;
+            BonusPercent = bonusPercent;
         }
 
         public HitRecord WithResult(HitResult result, bool startsCombo = false)
         {
-            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, Fatal, result, startsCombo, FromObject, Jackpot);
+            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, Fatal, result, startsCombo, FromObject, Jackpot,
+                BonusPercent);
         }
 
         /// <summary>当たった側の吹き飛びの速度（m/s、X は右が正）。</summary>
         public Vector2 Knockback => new Vector2(Data.KnockbackX * Facing, Data.KnockbackY) * KnockbackScale;
 
-        /// <summary>威力（ダメージ。撃破技は倍率をかけて四捨五入）。コンボが終わったときに、ダメージ報酬になる（docs/12 T4-5）。</summary>
-        public int Damage => (int)MathF.Round(Data.Damage * KnockbackScale);
+        /// <summary>
+        /// 威力（ダメージ。倍率と上乗せをかけて四捨五入。AttackPower）。コンボが終わったときに、ダメージ報酬になる（docs/12 T4-5）。
+        /// </summary>
+        public int Damage => AttackPower.Damage(Data.Damage, KnockbackScale, BonusPercent);
 
         /// <summary>FATAL として当たったか。</summary>
         public bool IsFatalHit => Fatal && Result == HitResult.Hit;

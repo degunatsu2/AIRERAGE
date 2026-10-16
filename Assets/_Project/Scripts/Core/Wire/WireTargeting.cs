@@ -149,13 +149,16 @@ namespace Airerage.Core.Wire
 
             if (reach > 0f && collision.Raycast(origin, aim.Direction, reach, out CastHit hit))
             {
-                return new WireShotPreview(aim, hit.Attachable ? WireShotResult.Attach : WireShotResult.HitNonAttachable, hit.Point);
+                return new WireShotPreview(aim, hit.Attachable || tuning.AttachAnySurface ? WireShotResult.Attach : WireShotResult.HitNonAttachable,
+                    hit.Point);
             }
             if (aim.HasTargetPoint)
             {
                 return new WireShotPreview(aim, WireShotResult.Attach, aim.TargetPoint);
             }
-            return new WireShotPreview(aim, WireShotResult.OutOfRange, origin + aim.Direction * tuning.MaxLength);
+            // 空中につながる強化の間は、最大射程の点につながる（キャッスルインジエアー）。
+            return new WireShotPreview(aim, tuning.AttachInAir ? WireShotResult.Attach : WireShotResult.OutOfRange,
+                origin + aim.Direction * tuning.MaxLength);
         }
 
         /// <summary>

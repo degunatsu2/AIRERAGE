@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 18;
+        public const int FormatVersion = 19;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -151,6 +151,8 @@ namespace Airerage.Core.Simulation
                         writer.Write(item.ChargeMilli);
                         writer.Write(item.Stored);
                         writer.Write(item.HitMask);
+                        writer.Write(item.BonusPercent);
+                        writer.Write(item.LastPushId);
                         writer.Write(item.HitKey0);
                         writer.Write(item.HitKey1);
                         writer.Write(item.HitKey2);
@@ -239,6 +241,13 @@ namespace Airerage.Core.Simulation
             writer.Write(action.CancelFromTick);
             writer.Write(action.EffectDone);
             writer.Write(action.Charge);
+            writer.Write(action.Aim.X);
+            writer.Write(action.Aim.Y);
+            writer.Write(action.RunSpeed);
+            writer.Write(action.TurnTicksLeft);
+            writer.Write(action.TickRemainder);
+            writer.Write(action.Advance);
+            writer.Write(action.LastHitTicks);
 
             CombatState combat = state.Combat;
             writer.Write(combat.HitstopTicksLeft);
@@ -274,6 +283,9 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.CoinBoostTicksLeft);
             writer.Write(combat.CoinBonusMilli);
             writer.Write(combat.JackpotHitCount);
+            writer.Write(combat.GaugeBonusRemainder);
+            writer.Write(combat.SpeedBoostTicksLeft);
+            writer.Write(combat.SkyBoostTicksLeft);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -331,6 +343,12 @@ namespace Airerage.Core.Simulation
                 CancelFromTick = reader.ReadInt32(),
                 EffectDone = reader.ReadBoolean(),
                 Charge = reader.ReadInt32(),
+                Aim = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                RunSpeed = reader.ReadSingle(),
+                TurnTicksLeft = reader.ReadInt32(),
+                TickRemainder = reader.ReadInt32(),
+                Advance = reader.ReadInt32(),
+                LastHitTicks = reader.ReadInt32(),
             };
             state.Combat = new CombatState
             {
@@ -367,6 +385,9 @@ namespace Airerage.Core.Simulation
                 CoinBoostTicksLeft = reader.ReadInt32(),
                 CoinBonusMilli = reader.ReadInt32(),
                 JackpotHitCount = reader.ReadInt32(),
+                GaugeBonusRemainder = reader.ReadInt32(),
+                SpeedBoostTicksLeft = reader.ReadInt32(),
+                SkyBoostTicksLeft = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

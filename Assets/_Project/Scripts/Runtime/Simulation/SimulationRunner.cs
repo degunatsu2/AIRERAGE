@@ -310,7 +310,8 @@ namespace Airerage.Runtime.Simulation
                 System.Numerics.Vector3 simOrigin = origin.ToNumerics();
                 SimInput shown = InputOverride != null ? LastInput : _input.Peek(simOrigin);
                 var frame = new InputFrame(shown, current.PreviousButtons);
-                WireTuning wire = PlayerConfig.Wire;
+                // 強化（キャッスルインジエアーの空中への接続など）も含めた調整値で予測する。
+                WireTuning wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, PlayerConfig).Wire;
                 // 置かれた物のアンカー（ミラーボール）も含めて予測する。
                 WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _world.Collision);
                 _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength);

@@ -223,7 +223,7 @@ namespace Airerage.Core.Wire
             float castDistance = targetDistance < step ? targetDistance : step;
             if (castDistance > 0f && _collision.Raycast(wire.HookPosition, wire.HookDirection, castDistance, out CastHit hit))
             {
-                if (hit.Attachable)
+                if (hit.Attachable || tuning.AttachAnySurface)
                 {
                     Attach(ref state, hit.Point, tuning);
                 }
@@ -246,6 +246,12 @@ namespace Airerage.Core.Wire
             wire.HookTraveled += step;
             if (wire.HookTraveled >= tuning.MaxLength - SimMath.Epsilon)
             {
+                if (tuning.AttachInAir)
+                {
+                    // 何もなくても、最大射程の点（空中）につながる（キャッスルインジエアー）。
+                    Attach(ref state, wire.HookPosition, tuning);
+                    return;
+                }
                 Miss(ref state, WireMissReason.OutOfRange);
             }
         }

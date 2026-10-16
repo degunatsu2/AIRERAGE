@@ -161,7 +161,9 @@ namespace Airerage.Runtime.Presentation
                 CombatTuning combat = _feed.GetConfig(local).Combat;
                 CharacterConfigAsset character = _feed.CharacterOf(local);
                 AttackSlot move = Slots[i];
-                bool ready = ActionController.CanUse(state, move, combat);
+                // 効果中にもう一度出せる技（ウインドクローク）は、効果中は「使える」として知らせない（札に GUST と出す）。
+                bool recast = move != AttackSlot.Super && ActionController.CanRecast(state, move, combat);
+                bool ready = ActionController.CanUse(state, move, combat) && !recast;
                 string moveName = combat.Get(move).Name;
                 slot.Name = string.IsNullOrEmpty(moveName) ? (move == AttackSlot.Super ? "SUPER" : $"SPECIAL {i + 1}") : moveName;
                 slot.Icon = character != null ? character.IconOf(move) : null;
@@ -203,8 +205,8 @@ namespace Airerage.Runtime.Presentation
                     {
                         // 技の効果が続いている（セーフティボックスを置いている）。クールタイムは効果が終わってから。
                         slot.Fill = 1f;
-                        slot.Text = "ACTIVE";
-                        slot.Label = slot.Name;
+                        slot.Text = recast ? "GUST" : "ACTIVE";
+                        slot.Label = recast ? "ACTIVE" : slot.Name;
                     }
                     else
                     {

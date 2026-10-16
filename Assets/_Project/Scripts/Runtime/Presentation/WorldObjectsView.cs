@@ -11,10 +11,14 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// ワールドに置かれた物と投射物の表示（docs/13 T5-6、docs/14）。種類ごとの見本を複製して、物の番号ごとに 1 つずつ出す。
-    /// - ミラーボール: 回る球と、回りながら色が変わる光の筋。消える前の 1 秒は点滅する。
-    /// - セーフティボックス: 金庫の箱。上に「X/300」（今の枚数/上限）を出す。150 枚で金色、300 枚で虹色に光る（ユーザーの決定、
-    ///   2026-10-16）。攻撃を受けると白く光って揺れる。
+    /// - ミラーボール: 回る球と、回りながら色が変わる光の筋。消える前の 1 秒は点滅する（2026-10-16 の要望で大きくした）。
+    /// - セーフティボックス: 金庫の箱。上に「X/300」（今の枚数/上限）と、耐久の HP バーを出す。150 枚で金色、300 枚で虹色に光る
+    ///   （ユーザーの決定、2026-10-16）。攻撃を受けると白く光って揺れる。周りの円形のゲージで次のチャージまでを示し、チャージした
+    ///   瞬間に光って音が鳴る。150 枚に着いたら少し派手な音で強く光り、300 枚に着いたらとても派手な音で光り続ける（チャージは止まり、
+    ///   ゲージは消える。ユーザーの要望、2026-10-16）。
     /// - 投射物（コイントス）: 回る小さなコイン。
+    /// - 突風（ウインドクロークを解いたとき）: 進む向きに並んだ、弧の形の風の線。
+    /// - 風の帯（スカイロケット）: 長方形の枠と、向きへ流れる風の線。消える前の 1 秒は点滅する。
     /// 物が出たとき・セーフティボックスが消えたとき（ばらまき）に音を鳴らす（_audio があれば）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class WorldObjectsView : MonoBehaviour
@@ -22,12 +26,18 @@ namespace Airerage.Runtime.Presentation
         private const float BlinkSeconds = 1f;
         private const float FlashSeconds = 0.2f;
         private const int RaySegments = 16;
+        private const int RingPoints = 48;
+        private const float RingRadius = 1.25f;
+
+        // ミラーボールの光の筋の長さ（m。2026-10-16 の要望で、球と一緒に 1.6 倍に大きくした）。
+        private const float RayOuterRadius = 2.6f;
+        private const float RayInnerRadius = 1.05f;
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly Color Gold = new Color(1f, 0.8f, 0.2f);
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
-        [Tooltip("見た目の見本（ミラーボール、セーフティボックス、投射物の順）。シーンでは隠しておく")]
+        [Tooltip("見た目の見本（ミラーボール、セーフティボックス、投射物、突風、風の帯の順）。シーンでは隠しておく")]
         [SerializeField] private GameObject[] _templates = new GameObject[0];
         [Tooltip("セーフティボックスの枚数を画面に写すカメラ")]
         [SerializeField] private Camera _camera;
@@ -55,6 +65,32 @@ namespace Airerage.Runtime.Presentation
             public string Label = string.Empty;
             public SafeGlow Glow;
             public Vector3 Anchor;
+            public LineRenderer Ring;
+            public LineRenderer RingBack;
+            public int Coins = -1;
+            public float ChargeAt = -10f;
+            public float ChargeSeconds = 0.3f;
+            public float ChargeStrength;
+            public SafeEvent LastEvent;
+            public float Health = 1f;
+            public float RingProgress = -1f;
+            public LineRenderer Outline;
+            public LineRenderer[] Streaks = new LineRenderer[0];
+        }
+
+        /// <summary>セーフティボックスのチャージの演出の種類（表示用）。</summary>
+        public enum SafeEvent
+        {
+            None,
+
+            /// <summary>ふつうのチャージ（光と小さな音）。</summary>
+            Charge,
+
+            /// <summary>150 枚に着いた（強い光と少し派手な音）。</summary>
+            Gold,
+
+            /// <summary>上限の 300 枚に着いた（とても派手な音。光り続ける）。</summary>
+            Max,
         }
 
         /// <summary>セーフティボックスの光り方（表示用）。</summary>
@@ -75,6 +111,33 @@ namespace Airerage.Runtime.Presentation
             label = found ? shown.Label : string.Empty;
             glow = found ? shown.Glow : SafeGlow.None;
             return found;
+        }
+
+        /// <summary>
+        /// 番号 id のセーフティボックスの、最後のチャージの演出・耐久の残り（0〜1）・次のチャージまでのゲージ（0〜1。上限なら -1）
+        /// （テスト用。表示していなければ false）。
+        /// </summary>
+        public bool TryGetSafeState(int id, out SafeEvent lastEvent, out float health, out float ringProgress)
+        {
+            bool found = _shown.TryGetValue(id, out Shown shown) && shown.Kind == WorldObjectKind.Safe;
+            lastEvent = found ? shown.LastEvent : SafeEvent.None;
+            health = found ? shown.Health : 0f;
+            ringProgress = found ? shown.RingProgress : -1f;
+            return found;
+        }
+
+        /// <summary>チャージで枚数が before から after になったときの演出（増えていなければ None）。</summary>
+        public static SafeEvent EventOf(int before, int after, SafeTuning tuning)
+        {
+            if (after <= before)
+            {
+                return SafeEvent.None;
+            }
+            if (before < tuning.MaxCoins && after >= tuning.MaxCoins)
+            {
+                return SafeEvent.Max;
+            }
+            return before < tuning.GoldCoins && after >= tuning.GoldCoins ? SafeEvent.Gold : SafeEvent.Charge;
         }
 
         /// <summary>セーフティボックスの枚数の文字（「X/300」）。</summary>
@@ -162,6 +225,23 @@ namespace Airerage.Runtime.Presentation
             };
             Transform rays = visual.transform.Find("Rays");
             shown.Rays = rays != null ? rays.GetComponent<LineRenderer>() : null;
+            Transform ring = visual.transform.Find("ChargeRing");
+            shown.Ring = ring != null ? ring.GetComponent<LineRenderer>() : null;
+            Transform ringBack = visual.transform.Find("ChargeRingBack");
+            shown.RingBack = ringBack != null ? ringBack.GetComponent<LineRenderer>() : null;
+            Transform outline = visual.transform.Find("Outline");
+            shown.Outline = outline != null ? outline.GetComponent<LineRenderer>() : null;
+            var streaks = new List<LineRenderer>();
+            for (int i = 0; visual.transform.Find("Streak" + i) is Transform streak; i++)
+            {
+                streaks.Add(streak.GetComponent<LineRenderer>());
+            }
+            shown.Streaks = streaks.ToArray();
+            if (item.Kind == WorldObjectKind.Safe)
+            {
+                // 置いたときに預けた枚数は、チャージとして数えない。
+                shown.Coins = SkillRules.SafeCoins(item);
+            }
             shown.BaseColor = shown.Renderers.Length > 0 ? shown.Renderers[0].sharedMaterial.GetColor(BaseColorId) : Color.white;
             return shown;
         }
@@ -182,6 +262,12 @@ namespace Airerage.Runtime.Presentation
                     break;
                 case WorldObjectKind.Projectile:
                     _audio.Play(SoundId.CoinToss, 0.8f, 0.05f);
+                    break;
+                case WorldObjectKind.Gust:
+                    _audio.Play(SoundId.Gust);
+                    break;
+                case WorldObjectKind.WindZone:
+                    _audio.Play(SoundId.SkyRocket);
                     break;
             }
         }
@@ -205,7 +291,81 @@ namespace Airerage.Runtime.Presentation
                 case WorldObjectKind.Projectile:
                     t.rotation = Quaternion.Euler(0f, Time.time * 720f, 90f);
                     break;
+                case WorldObjectKind.Gust:
+                    UpdateGust(shown, item);
+                    break;
+                case WorldObjectKind.WindZone:
+                    UpdateWindZone(shown, item);
+                    break;
             }
+        }
+
+        // 突風: 進む向きに並んだ弧（「)」の形）。生まれてからの時間で薄くなる。
+        private static void UpdateGust(Shown shown, in WorldObject gust)
+        {
+            var velocity = new Vector2(gust.Velocity.X, gust.Velocity.Y);
+            Vector2 dir = velocity.sqrMagnitude > 1e-6f ? velocity.normalized : Vector2.right;
+            var side = new Vector2(-dir.y, dir.x);
+            float fade = Mathf.Clamp01(1f - (Time.time - shown.BornAt) / 0.6f);
+            for (int s = 0; s < shown.Streaks.Length; s++)
+            {
+                LineRenderer line = shown.Streaks[s];
+                const int points = 9;
+                line.positionCount = points;
+                float back = s * 0.7f;
+                float bend = 0.5f + 0.15f * s;
+                for (int k = 0; k < points; k++)
+                {
+                    float u = k / (float)(points - 1) * 2f - 1f;
+                    Vector2 p = -dir * (back + bend * (1f - u * u)) + side * (u * (1.1f - 0.15f * s));
+                    line.SetPosition(k, shown.Anchor + new Vector3(p.x, p.y, -0.6f));
+                }
+                var color = new Color(0.75f, 1f, 0.55f, 0.8f * fade * (1f - 0.2f * s));
+                line.startColor = color;
+                line.endColor = color;
+            }
+        }
+
+        // 風の帯: 置いた点から向きへ伸びる長方形の枠と、向きへ流れる線。
+        private void UpdateWindZone(Shown shown, in WorldObject zone)
+        {
+            Airerage.Core.Skills.WindZoneTuning tuning = _feed.GetConfig(zone.Owner).Skills.WindZone;
+            shown.Visual.transform.localScale = Vector3.one;
+            var dir = new Vector2(zone.Velocity.X, zone.Velocity.Y);
+            var side = new Vector2(-dir.y, dir.x);
+            Vector3 origin = shown.Anchor;
+            float secondsLeft = (zone.ExpireTick - _feed.CurrentTick) / (float)SimTime.TicksPerSecond;
+            bool visible = secondsLeft > BlinkSeconds || Mathf.Repeat(Time.time * 8f, 1f) < 0.6f;
+            if (shown.Outline != null)
+            {
+                shown.Outline.enabled = visible;
+                shown.Outline.loop = true;
+                shown.Outline.positionCount = 4;
+                Vector2 w = side * tuning.HalfWidth;
+                Vector2 l = dir * tuning.Length;
+                shown.Outline.SetPosition(0, origin + ToWorld(-w));
+                shown.Outline.SetPosition(1, origin + ToWorld(-w + l));
+                shown.Outline.SetPosition(2, origin + ToWorld(w + l));
+                shown.Outline.SetPosition(3, origin + ToWorld(w));
+            }
+            for (int s = 0; s < shown.Streaks.Length; s++)
+            {
+                LineRenderer line = shown.Streaks[s];
+                line.enabled = visible;
+                float lane = (s + 0.5f) / shown.Streaks.Length * 2f - 1f;
+                float head = Mathf.Repeat(Time.time * 12f + s * 3.7f, tuning.Length + 2f) - 1f;
+                float tail = Mathf.Max(0f, head - 2.2f);
+                head = Mathf.Clamp(head, 0f, tuning.Length);
+                line.positionCount = 2;
+                Vector2 offset = side * (lane * tuning.HalfWidth * 0.85f);
+                line.SetPosition(0, origin + ToWorld(offset + dir * tail));
+                line.SetPosition(1, origin + ToWorld(offset + dir * head));
+            }
+        }
+
+        private static Vector3 ToWorld(Vector2 v)
+        {
+            return new Vector3(v.x, v.y, -0.5f);
         }
 
         private void UpdateMirrorBall(Shown shown, in WorldObject ball)
@@ -229,7 +389,7 @@ namespace Airerage.Runtime.Presentation
             for (int i = 0; i < RaySegments * 2; i++)
             {
                 float angle = spin + Mathf.PI * i / RaySegments;
-                float radius = i % 2 == 0 ? 1.6f + 0.25f * Mathf.Sin(Time.time * 6f + i) : 0.65f;
+                float radius = i % 2 == 0 ? RayOuterRadius + 0.4f * Mathf.Sin(Time.time * 6f + i) : RayInnerRadius;
                 shown.Rays.SetPosition(i, shown.Anchor + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, -0.6f));
             }
             Color color = Color.HSVToRGB(Mathf.Repeat(Time.time * 0.5f, 1f), 0.6f, 1f);
@@ -244,11 +404,14 @@ namespace Airerage.Runtime.Presentation
             int coins = SkillRules.SafeCoins(safe);
             shown.Label = SafeLabel(coins, tuning.MaxCoins);
             shown.Glow = GlowOf(coins, tuning);
+            shown.Health = Mathf.Clamp01(1f - (float)safe.Damage / tuning.Durability);
             if (safe.Damage > shown.Damage)
             {
                 shown.FlashAt = Time.time;
             }
             shown.Damage = safe.Damage;
+            UpdateCharge(shown, coins, tuning);
+            UpdateRing(shown, safe, tuning);
 
             Color color = shown.BaseColor;
             float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 6f);
@@ -261,13 +424,25 @@ namespace Airerage.Runtime.Presentation
                     color = Color.HSVToRGB(Mathf.Repeat(Time.time * 0.8f, 1f), 0.65f, 1f);
                     break;
             }
+            // チャージの光（150 枚と 300 枚は強く、長く）。
+            float charge = 1f - (Time.time - shown.ChargeAt) / shown.ChargeSeconds;
+            if (charge > 0f)
+            {
+                color = Color.Lerp(color, new Color(1f, 0.95f, 0.6f), Mathf.Clamp01(charge * shown.ChargeStrength));
+                shown.Visual.transform.localScale *= 1f + 0.12f * charge * shown.ChargeStrength;
+            }
             float flash = 1f - (Time.time - shown.FlashAt) / FlashSeconds;
             if (flash > 0f)
             {
                 color = Color.Lerp(color, Color.white, flash);
                 shown.Visual.transform.position = shown.Anchor + new Vector3(Mathf.Sin(Time.time * 90f) * 0.08f * flash, 0f, 0f);
             }
-            if (shown.Glow != SafeGlow.None)
+            if (shown.Glow == SafeGlow.Rainbow)
+            {
+                // 上限: 光り続ける（大きく脈打つ）。
+                shown.Visual.transform.localScale *= 1.06f + 0.06f * pulse;
+            }
+            else if (shown.Glow != SafeGlow.None)
             {
                 shown.Visual.transform.localScale *= 1f + 0.05f * pulse;
             }
@@ -275,6 +450,80 @@ namespace Airerage.Runtime.Presentation
             foreach (Renderer renderer in shown.Renderers)
             {
                 renderer.SetPropertyBlock(_block);
+            }
+        }
+
+        // チャージで枚数が増えたら、光らせて音を鳴らす（巻き戻しで減ったときは何もしない）。
+        private void UpdateCharge(Shown shown, int coins, SafeTuning tuning)
+        {
+            SafeEvent happened = shown.Coins >= 0 ? EventOf(shown.Coins, coins, tuning) : SafeEvent.None;
+            shown.Coins = coins;
+            if (happened == SafeEvent.None)
+            {
+                return;
+            }
+            shown.LastEvent = happened;
+            shown.ChargeAt = Time.time;
+            switch (happened)
+            {
+                case SafeEvent.Max:
+                    shown.ChargeSeconds = 0.9f;
+                    shown.ChargeStrength = 2.5f;
+                    PlaySafe(SoundId.SafeMax);
+                    break;
+                case SafeEvent.Gold:
+                    shown.ChargeSeconds = 0.6f;
+                    shown.ChargeStrength = 1.8f;
+                    PlaySafe(SoundId.SafeGold);
+                    break;
+                default:
+                    shown.ChargeSeconds = 0.3f;
+                    shown.ChargeStrength = 1f;
+                    PlaySafe(SoundId.SafeCharge);
+                    break;
+            }
+        }
+
+        private void PlaySafe(SoundId id)
+        {
+            if (_primed && _audio != null)
+            {
+                _audio.Play(id, id == SoundId.SafeCharge ? 0.7f : 1f);
+            }
+        }
+
+        // 次のチャージまでの円形のゲージ（上から時計回りに伸びる）。上限に着いたら出さない。
+        private void UpdateRing(Shown shown, in WorldObject safe, SafeTuning tuning)
+        {
+            bool full = SkillRules.IsSafeFull(safe, tuning);
+            shown.RingProgress = full ? -1f : SkillRules.SafeChargeProgress(safe, tuning, _feed.CurrentTick);
+            if (shown.RingBack != null)
+            {
+                shown.RingBack.enabled = !full;
+                if (!full)
+                {
+                    SetArc(shown.RingBack, shown.Anchor, 1f);
+                }
+            }
+            if (shown.Ring == null)
+            {
+                return;
+            }
+            shown.Ring.enabled = !full && shown.RingProgress > 0f;
+            if (shown.Ring.enabled)
+            {
+                SetArc(shown.Ring, shown.Anchor, shown.RingProgress);
+            }
+        }
+
+        private static void SetArc(LineRenderer line, Vector3 center, float fraction)
+        {
+            int points = Mathf.Max(2, Mathf.CeilToInt(RingPoints * fraction) + 1);
+            line.positionCount = points;
+            for (int k = 0; k < points; k++)
+            {
+                float angle = Mathf.PI * 2f * fraction * k / (points - 1);
+                line.SetPosition(k, center + new Vector3(Mathf.Sin(angle) * RingRadius, Mathf.Cos(angle) * RingRadius, -0.7f));
             }
         }
 
@@ -304,7 +553,19 @@ namespace Airerage.Runtime.Presentation
                 Color color = shown.Glow == SafeGlow.Rainbow ? Color.HSVToRGB(Mathf.Repeat(Time.time * 0.8f + 0.3f, 1f), 0.5f, 1f)
                     : shown.Glow == SafeGlow.Gold ? Gold : Color.white;
                 GuidePlate.DrawText(rect, shown.Label, _label, color);
+                DrawHealth(new Rect(p.x - 40f, rect.yMax + 1f, 80f, 8f), shown.Health);
             }
+        }
+
+        // 耐久の HP バー（残りが減ると緑 → 黄 → 赤）。
+        private static void DrawHealth(Rect rect, float health)
+        {
+            Color saved = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.7f);
+            GUI.DrawTexture(new Rect(rect.x - 1f, rect.y - 1f, rect.width + 2f, rect.height + 2f), Texture2D.whiteTexture);
+            GUI.color = health > 0.5f ? new Color(0.35f, 0.95f, 0.35f) : health > 0.25f ? new Color(1f, 0.85f, 0.2f) : new Color(1f, 0.25f, 0.2f);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * health, rect.height), Texture2D.whiteTexture);
+            GUI.color = saved;
         }
     }
 }

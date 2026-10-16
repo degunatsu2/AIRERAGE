@@ -49,6 +49,8 @@ MonoBehaviour:
       ExitSpeedCap: 18
       AttachTurnSpeed: 1
       AttachTurnBehind: 0.5
+      AttachAnySurface: 0
+      AttachInAir: 0
       Inertial:
         NeutralMode: 1
         UpMode: 0
@@ -74,13 +76,29 @@ MonoBehaviour:
         Name: ALL IN
         Effect: 0
         EffectTick: 0
-        HoldMaxTicks: 0
+        HoldMaxTicks: 180
+        HoldRooted: 1
+        Run: 0
+        ChargeLevels:
+        - FromTicks: 0
+          BonusPercent: 0
+        - FromTicks: 24
+          BonusPercent: 20
+        - FromTicks: 48
+          BonusPercent: 50
+        - FromTicks: 78
+          BonusPercent: 100
+        - FromTicks: 120
+          BonusPercent: 200
+        - FromTicks: 180
+          BonusPercent: 500
         Roulette: 0
         TotalTicks: 42
         WireCancelFromTick: 8
         Hits:
         - StartTick: 8
           ActiveTicks: 8
+          UntilEnd: 0
           OffsetX: 1.8
           OffsetY: 0
           HalfWidth: 2
@@ -106,12 +124,16 @@ MonoBehaviour:
         Effect: 0
         EffectTick: 0
         HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        ChargeLevels: []
         Roulette: 0
         TotalTicks: 19
         WireCancelFromTick: 5
         Hits:
         - StartTick: 5
           ActiveTicks: 4
+          UntilEnd: 0
           OffsetX: 0
           OffsetY: 0
           HalfWidth: 2.75
@@ -127,12 +149,16 @@ MonoBehaviour:
         Effect: 0
         EffectTick: 0
         HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        ChargeLevels: []
         Roulette: 0
         TotalTicks: 25
         WireCancelFromTick: 7
         Hits:
         - StartTick: 7
           ActiveTicks: 4
+          UntilEnd: 0
           OffsetX: 2
           OffsetY: 0.1
           HalfWidth: 2
@@ -148,6 +174,9 @@ MonoBehaviour:
         Effect: 4
         EffectTick: 5
         HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        ChargeLevels: []
         Roulette: 0
         TotalTicks: 22
         WireCancelFromTick: 6
@@ -158,12 +187,16 @@ MonoBehaviour:
         Effect: 0
         EffectTick: 0
         HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        ChargeLevels: []
         Roulette: 1
         TotalTicks: 40
         WireCancelFromTick: 16
         Hits:
         - StartTick: 16
           ActiveTicks: 12
+          UntilEnd: 0
           OffsetX: 1
           OffsetY: -2
           HalfWidth: 1.75
@@ -184,17 +217,23 @@ MonoBehaviour:
         Effect: 1
         EffectTick: 4
         HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        ChargeLevels: []
         Roulette: 0
         TotalTicks: 16
         WireCancelFromTick: 4
         Hits: []
         Motions: []
-      Special1CooldownTicks: 1200
+      Special1CooldownTicks: 900
       Special2:
         Name: SAFE
         Effect: 2
         EffectTick: 0
         HoldMaxTicks: 600
+        HoldRooted: 0
+        Run: 0
+        ChargeLevels: []
         Roulette: 0
         TotalTicks: 14
         WireCancelFromTick: 4
@@ -206,6 +245,9 @@ MonoBehaviour:
         Effect: 3
         EffectTick: 0
         HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        ChargeLevels: []
         Roulette: 0
         TotalTicks: 24
         WireCancelFromTick: 12
@@ -255,6 +297,7 @@ MonoBehaviour:
       CoinBoost:
         DurationTicks: 300
         BonusPercent: 20
+        GaugeBonusPercent: 20
       Projectile:
         OffsetX: 0.3
         OffsetY: 1
@@ -266,6 +309,7 @@ MonoBehaviour:
         Hit:
           StartTick: 5
           ActiveTicks: 3
+          UntilEnd: 0
           OffsetX: 0.9
           OffsetY: 0
           HalfWidth: 0.6
@@ -275,6 +319,31 @@ MonoBehaviour:
           HitstunTicks: 22
           KnockbackX: 2
           KnockbackY: 13
+        HeldCoinsPerBonusPercent: 3
+        MaxHeldCoinBonusPercent: 100
+      Run:
+        InitialSpeed: 10
+        Acceleration: 6
+        MaxSpeed: 24
+        JumpAngleDeg: 20
+        TurnTicks: 8
+        RehitTicks: 30
+      SpeedBoost:
+        DurationTicks: 300
+        SpeedPercent: 20
+        GustSpeed: 30
+        GustRange: 15
+        GustHalfWidth: 1
+        GustPush: 12
+      WindZone:
+        DurationTicks: 600
+        Length: 10
+        HalfWidth: 1.5
+        Acceleration: 70
+        SpeedLimit: 20
+      SkyBoost:
+        DurationTicks: 600
+        SpeedPercent: 50
   _displayName: RISK TAKER
   _special1Icon: {fileID: 0}
   _special2Icon: {fileID: 0}

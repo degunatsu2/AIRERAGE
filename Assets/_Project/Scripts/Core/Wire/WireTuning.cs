@@ -130,8 +130,23 @@ namespace Airerage.Core.Wire
         /// </summary>
         public float AttachTurnBehind = 0.5f;
 
+        /// <summary>弾く物（Attachable でない地形）にもつながる（STORM RUNNER のキャッスルインジエアーの間。SpeedBoosts が立てる）。</summary>
+        public bool AttachAnySurface;
+
+        /// <summary>最大射程まで何にも当たらなければ、その点（空中）につながる（キャッスルインジエアーの間）。</summary>
+        public bool AttachInAir;
+
         public InertialWireTuning Inertial = new InertialWireTuning();
         public ResponsiveWireTuning Responsive = new ResponsiveWireTuning();
+
+        /// <summary>同じ値を持つ別のインスタンス（モデルごとの値も複製する。行動の速さの強化で使う。SpeedBoosts）。</summary>
+        public WireTuning Clone()
+        {
+            var clone = (WireTuning)MemberwiseClone();
+            clone.Inertial = Inertial.Clone();
+            clone.Responsive = Responsive.Clone();
+            return clone;
+        }
 
         public TuningValidator Validate()
         {
@@ -223,6 +238,11 @@ namespace Airerage.Core.Wire
         /// <summary>その後、下限を巻き取りの速さ（ReelSpeed）まで直線的に下げるティック数。</summary>
         public int StartPullFadeTicks = 20;
 
+        public InertialWireTuning Clone()
+        {
+            return (InertialWireTuning)MemberwiseClone();
+        }
+
         public TuningValidator Validate()
         {
             var v = new TuningValidator(nameof(InertialWireTuning));
@@ -258,6 +278,11 @@ namespace Airerage.Core.Wire
 
         /// <summary>接続点に到着したとみなす距離（m）。到着後はその場で静止してぶら下がる。</summary>
         public float ArrivalRadius = 1f;
+
+        public ResponsiveWireTuning Clone()
+        {
+            return (ResponsiveWireTuning)MemberwiseClone();
+        }
 
         public TuningValidator Validate()
         {

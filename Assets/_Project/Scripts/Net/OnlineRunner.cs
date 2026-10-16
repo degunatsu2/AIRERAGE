@@ -423,6 +423,8 @@ namespace Airerage.Net
             Vector3 origin = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
             System.Numerics.Vector3 simOrigin = origin.ToNumerics();
             var frame = new InputFrame(_input.Peek(simOrigin), current.PreviousButtons);
+            // 強化（キャッスルインジエアーの空中への接続など）も含めた調整値で予測する。
+            wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, _session.World.GetConfig(_session.LocalPlayer)).Wire;
             WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _session.World.Collision);
             _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength);
         }

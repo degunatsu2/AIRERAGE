@@ -18,6 +18,9 @@ namespace Airerage.Core.Combat
         /// <summary>判定が出ている長さ（ティック）。</summary>
         public int ActiveTicks = 3;
 
+        /// <summary>出始めたら、技が終わるまで出し続ける（走り続ける地上技の体の判定。ActiveTicks は使わない）。</summary>
+        public bool UntilEnd;
+
         /// <summary>判定の箱の、キャラクターの中心からの位置（m）。</summary>
         public float OffsetX = 0.9f;
         public float OffsetY;
@@ -41,7 +44,7 @@ namespace Airerage.Core.Combat
 
         public bool IsActiveAt(int ticks)
         {
-            return ticks >= StartTick && ticks < StartTick + ActiveTicks;
+            return ticks >= StartTick && (UntilEnd || ticks < StartTick + ActiveTicks);
         }
 
         public TuningValidator Validate(string name, int totalTicks)
@@ -49,7 +52,7 @@ namespace Airerage.Core.Combat
             var v = new TuningValidator(name);
             v.NonNegative(nameof(StartTick), StartTick);
             v.Positive(nameof(ActiveTicks), ActiveTicks);
-            if (StartTick + ActiveTicks > totalTicks)
+            if (!UntilEnd && StartTick + ActiveTicks > totalTicks)
             {
                 v.Fail($"判定（{StartTick}〜{StartTick + ActiveTicks} ティック）が攻撃の長さ（{totalTicks}）を超えています");
             }
@@ -96,6 +99,20 @@ namespace Airerage.Core.Combat
     }
 
     /// <summary>
+    /// ための段階 1 つ（長押しの攻撃。RISK TAKER のオールイン）。ためた長さが FromTicks 以上なら、この段階の上乗せ（BonusPercent %）を
+    /// 威力にのせる（AttackPower）。表示（オーラの色）は段階の番号で決める。
+    /// </summary>
+    [Serializable]
+    public sealed class ChargeLevel
+    {
+        /// <summary>この段階になる、ためた長さ（ティック）。</summary>
+        public int FromTicks;
+
+        /// <summary>威力の上乗せ（%）。</summary>
+        public int BonusPercent;
+    }
+
+    /// <summary>
     /// 1つの攻撃のデータ（docs/01_game_design.md 6.4）。全体の長さ、判定（1〜4つ）、攻撃中の動き。
     /// 段階（表示用）は判定から決まる: 最初の判定の前が発生、判定が出ている間が持続、それ以外が硬直。
     /// </summary>
@@ -119,6 +136,41 @@ namespace Airerage.Core.Combat
         /// ためた長さは ActionState.Charge に入る。
         /// </summary>
         public int HoldMaxTicks;
+
+        /// <summary>長押しでためている間は、その場から動かない（向きだけ変えられる。ジャンプ・ワイヤーもできない）。</summary>
+        public bool HoldRooted;
+
+        /// <summary>
+        /// 走り続ける地上技（STORM RUNNER。SkillTuning.Run の値で動く）。別の行動（ジャンプ・ワイヤー・ガード・空中の攻撃・技）を
+        /// するまで終わらない（TotalTicks で終わらない）。判定は UntilEnd にする。
+        /// </summary>
+        public bool Run;
+
+        /// <summary>
+        /// ための段階（長押しの攻撃。FromTicks の小さい順。最初は 0）。空なら、ためても威力は変わらない。
+        /// 最後の段階で当てたら JACKPOT（ルーレットの最大と同じ演出。ユーザーの要望、2026-10-16）。
+        /// </summary>
+        public ChargeLevel[] ChargeLevels = new ChargeLevel[0];
+
+        /// <summary>ためた長さ charge の段階の番号（段階がなければ -1）。</summary>
+        public int ChargeLevelOf(int charge)
+        {
+            int level = -1;
+            for (int i = 0; i < ChargeLevels.Length; i++)
+            {
+                if (charge >= ChargeLevels[i].FromTicks)
+                {
+                    level = i;
+                }
+            }
+            return level;
+        }
+
+        /// <summary>段階 level が最後の段階か（JACKPOT になる）。</summary>
+        public bool IsTopChargeLevel(int level)
+        {
+            return ChargeLevels.Length > 1 && level == ChargeLevels.Length - 1;
+        }
 
         /// <summary>
         /// 吹き飛びと威力の倍率を、当てたときにルーレットで決める（0.5〜2 倍のどれか。試合の種と攻撃の番号で決めるので全員で同じ。
@@ -177,6 +229,21 @@ namespace Airerage.Core.Combat
             v.NotNull(nameof(Motions), Motions);
             v.InRange(nameof(EffectTick), EffectTick, 0f, TotalTicks - 1);
             v.NonNegative(nameof(HoldMaxTicks), HoldMaxTicks);
+            v.NotNull(nameof(ChargeLevels), ChargeLevels);
+            if (ChargeLevels != null)
+            {
+                for (int i = 0; i < ChargeLevels.Length; i++)
+                {
+                    v.NotNull($"ChargeLevels[{i}]", ChargeLevels[i]);
+                    if (ChargeLevels[i] == null)
+                    {
+                        continue;
+                    }
+                    v.NonNegative($"ChargeLevels[{i}].BonusPercent", ChargeLevels[i].BonusPercent);
+                    v.InRange($"ChargeLevels[{i}].FromTicks", ChargeLevels[i].FromTicks, i == 0 ? 0f : ChargeLevels[i - 1]?.FromTicks + 1 ?? 0f,
+                        i == 0 ? 0f : HoldMaxTicks);
+                }
+            }
             if (Hits != null)
             {
                 // 効果のある技（物を置くなど）は、判定がなくてもよい。
@@ -523,9 +590,18 @@ namespace Airerage.Core.Combat
             }
         }
 
-        /// <summary>ゲージを amount だけ増やす（最大 MaxGauge）。</summary>
-        public static void AddGauge(ref CombatState combat, int amount)
+        /// <summary>
+        /// ゲージを amount だけ増やす（最大 MaxGauge）。FEVER の間（CoinBoostTicksLeft）は、boost.GaugeBonusPercent だけ多く増やす
+        /// （端数は CombatState.GaugeBonusRemainder にためる。ユーザーの要望、2026-10-16）。ゲージを得るところは、すべてここを通す。
+        /// </summary>
+        public static void AddGauge(ref CombatState combat, int amount, CoinBoostTuning boost)
         {
+            if (amount > 0 && combat.CoinBoostTicksLeft > 0 && boost.GaugeBonusPercent > 0)
+            {
+                int bonus = amount * boost.GaugeBonusPercent + combat.GaugeBonusRemainder;
+                amount += bonus / 100;
+                combat.GaugeBonusRemainder = bonus % 100;
+            }
             combat.Gauge = Math.Min(MaxGauge, combat.Gauge + amount);
         }
 

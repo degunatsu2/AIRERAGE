@@ -167,7 +167,17 @@ namespace Airerage.Runtime.DebugTools
                 _text.Append(" #").Append(hit.HitIndex + 1);
             }
             _text.Append("  KB (").Append(hit.Knockback.X.ToString("0.0")).Append(", ").Append(hit.Knockback.Y.ToString("0.0"))
-                .Append(") x").Append(hit.KnockbackScale.ToString("0.00")).Append("  Power ").Append(hit.Damage);
+                .Append(") x").Append(hit.KnockbackScale.ToString("0.00"));
+            if (hit.BonusPercent != 0)
+            {
+                // 威力の上乗せ（ため、手持ちのコインなど。AttackPower）。
+                _text.Append(" +").Append(hit.BonusPercent).Append('%');
+            }
+            _text.Append("  Power ").Append(hit.Damage);
+            if (hit.Jackpot)
+            {
+                _text.Append("  JACKPOT");
+            }
             if (hit.IsFatalHit)
             {
                 _text.Append("  FATAL");

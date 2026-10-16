@@ -102,6 +102,33 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>コイントス（コインをはじく「キン」）。</summary>
         CoinToss,
+
+        /// <summary>ためている技の段階が上がった（上がっていく短いきらめき。RISK TAKER のオールイン）。</summary>
+        ChargeUp,
+
+        /// <summary>ためている技が最後の段階（虹）になった（明るい和音のきらめき）。</summary>
+        ChargeMax,
+
+        /// <summary>ルーレットが回り始めた（速いカチカチという音。ルーレットスマッシュ）。</summary>
+        RouletteSpin,
+
+        /// <summary>ルーレットが止まった（「カチャン」と鐘の音）。</summary>
+        RouletteStop,
+
+        /// <summary>セーフティボックスにコインがチャージされた（コインの音と小さなチャイム）。</summary>
+        SafeCharge,
+
+        /// <summary>セーフティボックスが 150 枚に着いた（少し派手な上がっていく和音）。</summary>
+        SafeGold,
+
+        /// <summary>セーフティボックスが上限の 300 枚に着いた（とても派手なファンファーレとコインのきらめき）。</summary>
+        SafeMax,
+
+        /// <summary>突風を撃った（強く吹き抜ける風の音。STORM RUNNER のウインドクローク）。</summary>
+        Gust,
+
+        /// <summary>風の帯を置いた（吹き上がっていく風の音。STORM RUNNER のスカイロケット）。</summary>
+        SkyRocket,
     }
 
     /// <summary>
@@ -437,6 +464,102 @@ namespace Airerage.Runtime.Audio
                     b = new float[Samples(0.3f, r)];
                     AddTone(b, r, 0f, 0.25f, NoteFrequency(98), NoteFrequency(98), Wave.Sine, 0.4f, 0.001f, 0.1f);
                     AddTone(b, r, 0f, 0.2f, NoteFrequency(105), NoteFrequency(105), Wave.Sine, 0.2f, 0.001f, 0.07f);
+                    break;
+                case SoundId.ChargeUp:
+                    b = new float[Samples(0.35f, r)];
+                    AddTone(b, r, 0f, 0.2f, 520f, 1040f, Wave.Triangle, 0.35f, 0.003f, 0.08f);
+                    AddTone(b, r, 0.08f, 0.25f, NoteFrequency(91), NoteFrequency(91), Wave.Sine, 0.25f, 0.002f, 0.12f);
+                    AddTone(b, r, 0.12f, 0.2f, NoteFrequency(96), NoteFrequency(96), Wave.Sine, 0.15f, 0.002f, 0.1f);
+                    break;
+                case SoundId.ChargeMax:
+                {
+                    b = new float[Samples(1.1f, r)];
+                    AddTone(b, r, 0f, 0.4f, 300f, 1500f, Wave.Saw, 0.12f, 0.005f, 0.1f);
+                    int[] maxChord = { 84, 88, 91, 96, 100 };
+                    for (int i = 0; i < maxChord.Length; i++)
+                    {
+                        float f = NoteFrequency(maxChord[i]);
+                        AddTone(b, r, i * 0.04f, 0.8f, f, f, Wave.Sine, 0.18f, 0.002f, 0.35f);
+                        AddTone(b, r, i * 0.04f, 0.4f, f * 2f, f * 2f, Wave.Sine, 0.05f, 0.002f, 0.15f);
+                    }
+                    ApplyTremolo(b, r, 16f, 0.35f);
+                    break;
+                }
+                case SoundId.RouletteSpin:
+                    b = new float[Samples(0.4f, r)];
+                    for (int i = 0; i < 12; i++)
+                    {
+                        AddTone(b, r, i * 0.028f, 0.012f, 2600f, 2200f, Wave.Square, 0.16f, 0.0005f, 0.006f);
+                    }
+                    AddNoise(b, r, rng, 0f, 0.35f, 0.12f, 0.02f, 0.15f, 1800f, 900f, 300f);
+                    break;
+                case SoundId.RouletteStop:
+                    b = new float[Samples(0.8f, r)];
+                    AddNoise(b, r, rng, 0f, 0.05f, 0.5f, 0.001f, 0.02f, 4000f, 1500f, 400f);
+                    AddTone(b, r, 0f, 0.05f, 180f, 90f, Wave.Sine, 0.6f, 0.001f, 0.03f);
+                    AddTone(b, r, 0.05f, 0.7f, NoteFrequency(91), NoteFrequency(91), Wave.Sine, 0.35f, 0.002f, 0.4f);
+                    AddTone(b, r, 0.05f, 0.5f, NoteFrequency(103), NoteFrequency(103), Wave.Sine, 0.1f, 0.002f, 0.25f);
+                    break;
+                case SoundId.SafeCharge:
+                    b = new float[Samples(0.4f, r)];
+                    AddTone(b, r, 0f, 0.15f, NoteFrequency(98), NoteFrequency(98), Wave.Sine, 0.3f, 0.001f, 0.08f);
+                    AddTone(b, r, 0.06f, 0.2f, NoteFrequency(103), NoteFrequency(103), Wave.Sine, 0.25f, 0.001f, 0.1f);
+                    AddTone(b, r, 0.12f, 0.25f, NoteFrequency(91), NoteFrequency(91), Wave.Triangle, 0.15f, 0.002f, 0.12f);
+                    break;
+                case SoundId.SafeGold:
+                {
+                    b = new float[Samples(1f, r)];
+                    int[] goldRise = { 79, 84, 88, 91, 96 };
+                    for (int i = 0; i < goldRise.Length; i++)
+                    {
+                        float f = NoteFrequency(goldRise[i]);
+                        float length = i == goldRise.Length - 1 ? 0.6f : 0.1f;
+                        AddTone(b, r, i * 0.07f, length, f, f, Wave.Pulse25, 0.18f, 0.002f, i == goldRise.Length - 1 ? 0.35f : 0.05f);
+                        AddTone(b, r, i * 0.07f, length, f * 0.5f, f * 0.5f, Wave.Triangle, 0.2f, 0.002f, i == goldRise.Length - 1 ? 0.35f : 0.05f);
+                    }
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float f = NoteFrequency(98 + (i * 5) % 9);
+                        AddTone(b, r, 0.35f + i * 0.06f, 0.15f, f, f, Wave.Sine, 0.12f, 0.001f, 0.06f);
+                    }
+                    break;
+                }
+                case SoundId.SafeMax:
+                {
+                    // 低い打撃、3 オクターブを駆け上がるアルペジオ、長い和音の伸ばし、降り注ぐコインのきらめき。
+                    b = new float[Samples(2.4f, r)];
+                    AddTone(b, r, 0f, 0.3f, 120f, 60f, Wave.Sine, 0.7f, 0.001f, 0.15f);
+                    AddNoise(b, r, rng, 0f, 0.15f, 0.4f, 0.001f, 0.08f, 5000f, 2000f, 300f);
+                    int[] safeClimb = { 67, 72, 76, 79, 84, 88, 91, 96, 100, 103 };
+                    for (int i = 0; i < safeClimb.Length; i++)
+                    {
+                        float f = NoteFrequency(safeClimb[i]);
+                        AddTone(b, r, 0.1f + i * 0.045f, 0.16f, f, f, Wave.Pulse25, 0.16f, 0.002f, 0.07f);
+                    }
+                    int[] safeChord = { 72, 76, 79, 84, 88 };
+                    foreach (int note in safeChord)
+                    {
+                        float f = NoteFrequency(note);
+                        AddTone(b, r, 0.6f, 1.6f, f, f, Wave.Triangle, 0.12f, 0.01f, 0.9f);
+                        AddTone(b, r, 0.6f, 1.6f, f * 1.005f, f * 1.005f, Wave.Sine, 0.08f, 0.01f, 0.9f);
+                    }
+                    for (int i = 0; i < 22; i++)
+                    {
+                        float f = NoteFrequency(91 + (i * 7) % 15);
+                        AddTone(b, r, 0.6f + i * 0.07f, 0.18f, f, f, Wave.Sine, 0.1f, 0.001f, 0.07f);
+                    }
+                    break;
+                }
+                case SoundId.Gust:
+                    b = new float[Samples(0.6f, r)];
+                    AddNoise(b, r, rng, 0f, 0.55f, 0.8f, 0.03f, 0.3f, 1200f, 5000f, 300f);
+                    AddTone(b, r, 0f, 0.4f, 300f, 900f, Wave.Sine, 0.12f, 0.02f, 0.2f);
+                    break;
+                case SoundId.SkyRocket:
+                    b = new float[Samples(0.9f, r)];
+                    AddNoise(b, r, rng, 0f, 0.85f, 0.6f, 0.08f, 0.4f, 600f, 4500f, 200f);
+                    AddTone(b, r, 0.05f, 0.7f, 200f, 1100f, Wave.Triangle, 0.15f, 0.05f, 0.3f);
+                    AddTone(b, r, 0.3f, 0.5f, NoteFrequency(88), NoteFrequency(95), Wave.Sine, 0.1f, 0.02f, 0.25f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

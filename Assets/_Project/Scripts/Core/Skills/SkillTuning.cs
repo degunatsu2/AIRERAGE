@@ -23,6 +23,147 @@ namespace Airerage.Core.Skills
 
         /// <summary>投射物を撃つ（RISK TAKER のコイントス）。</summary>
         Projectile,
+
+        /// <summary>
+        /// 行動の速さを上げる（STORM RUNNER の Q。ウインドクローク）。効果中にもう一度出すと、強化を解いて突風を撃つ。
+        /// クールタイムは効果が終わってから数える。
+        /// </summary>
+        SpeedBoost,
+
+        /// <summary>照準の向きへ吹く風の帯を置く（STORM RUNNER の E。スカイロケット）。</summary>
+        WindZone,
+
+        /// <summary>速さとワイヤーを強くする（STORM RUNNER の R。キャッスルインジエアー）。</summary>
+        SkyBoost,
+    }
+
+    /// <summary>
+    /// 走り続ける地上技（AttackData.Run。STORM RUNNER。docs/14 1.2、C-10、C-11。値は【仮】）。向いている方向へ走り、だんだん加速する。
+    /// 足場が途切れたら・壁にぶつかったら浅い角度で跳ぶ（壁なら反対側へ）。着地したらそのまま走る。逆向きに入力すると、反転の後に
+    /// 速さを初めに戻して逆向きに走る。体の判定のダメージは速さに比例する（初速で判定のダメージ。速さ × 0.4）。
+    /// </summary>
+    [Serializable]
+    public sealed class RunTuning
+    {
+        /// <summary>初速（m/s）。</summary>
+        public float InitialSpeed = 10f;
+
+        /// <summary>加速（m/s²。地上を走っている間だけ）。</summary>
+        public float Acceleration = 6f;
+
+        /// <summary>最大の速さ（m/s）。</summary>
+        public float MaxSpeed = 24f;
+
+        /// <summary>足場が途切れた・壁にぶつかったときに跳ぶ角度（度。水平から上へ）。</summary>
+        public float JumpAngleDeg = 20f;
+
+        /// <summary>逆向きに入力したときの反転の長さ（ティック。この間に止まる）。</summary>
+        public int TurnTicks = 8;
+
+        /// <summary>同じ相手にもう一度当たれるまで（ティック。C-11: 0.5 秒）。</summary>
+        public int RehitTicks = 30;
+
+        /// <summary>速さ speed のときの、威力の上乗せ（%。初速で 0、速さに比例してダメージが増える）。</summary>
+        public int BonusPercentAt(float speed)
+        {
+            return InitialSpeed > 0f ? Math.Max(0, (int)MathF.Round((speed / InitialSpeed - 1f) * 100f)) : 0;
+        }
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(RunTuning));
+            v.Positive(nameof(InitialSpeed), InitialSpeed);
+            v.NonNegative(nameof(Acceleration), Acceleration);
+            v.AtMost(nameof(InitialSpeed), InitialSpeed, nameof(MaxSpeed), MaxSpeed);
+            v.InRange(nameof(JumpAngleDeg), JumpAngleDeg, 0f, 80f);
+            v.Positive(nameof(TurnTicks), TurnTicks);
+            v.Positive(nameof(RehitTicks), RehitTicks);
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// 行動の速さの強化（STORM RUNNER の Q。ウインドクローク。docs/14 1.2、C-3、C-12。値は【仮】）と、解いたときの突風。
+    /// 強化の間は、移動・ワイヤー・攻撃のフレームが SpeedPercent % 速くなる（ヒットストップはそのまま。SpeedBoosts）。
+    /// </summary>
+    [Serializable]
+    public sealed class SpeedBoostTuning
+    {
+        /// <summary>続く長さ（ティック。5 秒）。</summary>
+        public int DurationTicks = 300;
+
+        /// <summary>速さの上がる割合（%）。</summary>
+        public int SpeedPercent = 20;
+
+        /// <summary>突風の速さ（m/s）、届く距離（m）、幅の半分（m）、押す強さ（m/s。触れた相手と投射物の速度に、風の向きへ足す）。</summary>
+        public float GustSpeed = 30f;
+        public float GustRange = 15f;
+        public float GustHalfWidth = 1f;
+        public float GustPush = 12f;
+
+        /// <summary>突風が消えるまで（ティック。届く距離 ÷ 速さ）。</summary>
+        public int GustTicks => GustSpeed > 0f ? Math.Max(1, (int)MathF.Ceiling(GustRange / GustSpeed * SimTime.TicksPerSecond)) : 1;
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(SpeedBoostTuning));
+            v.Positive(nameof(DurationTicks), DurationTicks);
+            v.InRange(nameof(SpeedPercent), SpeedPercent, 0f, 100f);
+            v.Positive(nameof(GustSpeed), GustSpeed);
+            v.Positive(nameof(GustRange), GustRange);
+            v.Positive(nameof(GustHalfWidth), GustHalfWidth);
+            v.NonNegative(nameof(GustPush), GustPush);
+            return v;
+        }
+    }
+
+    /// <summary>風の帯（STORM RUNNER の E。スカイロケット。docs/14 1.2、C-13。値は【仮】）。全員と投射物に効く。</summary>
+    [Serializable]
+    public sealed class WindZoneTuning
+    {
+        /// <summary>残る長さ（ティック。10 秒）。</summary>
+        public int DurationTicks = 600;
+
+        /// <summary>長さ（m。置いた点から照準の向きへ）と、幅の半分（m。幅 3m）。</summary>
+        public float Length = 10f;
+        public float HalfWidth = 1.5f;
+
+        /// <summary>中にいる物を、向きへ加速する強さ（m/s²）と、向きの速さの上限（m/s）。</summary>
+        public float Acceleration = 70f;
+        public float SpeedLimit = 20f;
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(WindZoneTuning));
+            v.Positive(nameof(DurationTicks), DurationTicks);
+            v.Positive(nameof(Length), Length);
+            v.Positive(nameof(HalfWidth), HalfWidth);
+            v.NonNegative(nameof(Acceleration), Acceleration);
+            v.Positive(nameof(SpeedLimit), SpeedLimit);
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// 空の強化（STORM RUNNER の R。キャッスルインジエアー。docs/14 1.2。値は【仮】）。強化の間は、速さが SpeedPercent % 上がり
+    /// （ウインドクロークと重なったら足す）、ワイヤーが弾く物にもつながり、最大射程まで何もなければ空中につながる。
+    /// </summary>
+    [Serializable]
+    public sealed class SkyBoostTuning
+    {
+        /// <summary>続く長さ（ティック。10 秒）。</summary>
+        public int DurationTicks = 600;
+
+        /// <summary>速さの上がる割合（%）。</summary>
+        public int SpeedPercent = 50;
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(SkyBoostTuning));
+            v.Positive(nameof(DurationTicks), DurationTicks);
+            v.InRange(nameof(SpeedPercent), SpeedPercent, 0f, 100f);
+            return v;
+        }
     }
 
     /// <summary>ミラーボール（docs/14 1.3。値はすべて【仮】）。</summary>
@@ -109,11 +250,15 @@ namespace Airerage.Core.Skills
         /// <summary>拾ったコインと戦闘の報酬に足す割合（%）。端数はためて 1 枚になったら加える。</summary>
         public int BonusPercent = 20;
 
+        /// <summary>得るゲージに足す割合（%。ユーザーの要望、2026-10-16）。端数はためて加える（CombatState.GaugeBonusRemainder）。</summary>
+        public int GaugeBonusPercent = 20;
+
         public TuningValidator Validate()
         {
             var v = new TuningValidator(nameof(CoinBoostTuning));
             v.Positive(nameof(DurationTicks), DurationTicks);
             v.NonNegative(nameof(BonusPercent), BonusPercent);
+            v.NonNegative(nameof(GaugeBonusPercent), GaugeBonusPercent);
             return v;
         }
     }
@@ -145,6 +290,19 @@ namespace Airerage.Core.Skills
             Damage = 5, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 13f,
         };
 
+        /// <summary>
+        /// 撃ったときの手持ちのコイン（拠点で確定していない分）この枚数ごとに、威力に 1% を上乗せする（0 なら上乗せしない）。
+        /// 上乗せは MaxHeldCoinBonusPercent まで（RISK TAKER のコイントス: 3 枚ごとに 1%、300 枚で +100%。ユーザーの要望、2026-10-16）。
+        /// </summary>
+        public int HeldCoinsPerBonusPercent;
+        public int MaxHeldCoinBonusPercent;
+
+        /// <summary>手持ちのコイン held 枚で撃ったときの、威力の上乗せ（%）。</summary>
+        public int HeldCoinBonusPercent(int held)
+        {
+            return HeldCoinsPerBonusPercent > 0 ? Math.Min(Math.Max(held, 0) / HeldCoinsPerBonusPercent, MaxHeldCoinBonusPercent) : 0;
+        }
+
         public TuningValidator Validate()
         {
             var v = new TuningValidator(nameof(ProjectileTuning));
@@ -158,6 +316,8 @@ namespace Airerage.Core.Skills
                 v.NonNegative("Hit.HitstopTicks", Hit.HitstopTicks);
                 v.NonNegative("Hit.HitstunTicks", Hit.HitstunTicks);
             }
+            v.NonNegative(nameof(HeldCoinsPerBonusPercent), HeldCoinsPerBonusPercent);
+            v.NonNegative(nameof(MaxHeldCoinBonusPercent), MaxHeldCoinBonusPercent);
             return v;
         }
     }
@@ -170,6 +330,10 @@ namespace Airerage.Core.Skills
         public SafeTuning Safe = new SafeTuning();
         public CoinBoostTuning CoinBoost = new CoinBoostTuning();
         public ProjectileTuning Projectile = new ProjectileTuning();
+        public RunTuning Run = new RunTuning();
+        public SpeedBoostTuning SpeedBoost = new SpeedBoostTuning();
+        public WindZoneTuning WindZone = new WindZoneTuning();
+        public SkyBoostTuning SkyBoost = new SkyBoostTuning();
 
         public TuningValidator Validate()
         {
@@ -178,6 +342,26 @@ namespace Airerage.Core.Skills
             v.NotNull(nameof(Safe), Safe);
             v.NotNull(nameof(CoinBoost), CoinBoost);
             v.NotNull(nameof(Projectile), Projectile);
+            v.NotNull(nameof(Run), Run);
+            v.NotNull(nameof(SpeedBoost), SpeedBoost);
+            v.NotNull(nameof(WindZone), WindZone);
+            v.NotNull(nameof(SkyBoost), SkyBoost);
+            if (Run != null)
+            {
+                v.Merge(Run.Validate());
+            }
+            if (SpeedBoost != null)
+            {
+                v.Merge(SpeedBoost.Validate());
+            }
+            if (WindZone != null)
+            {
+                v.Merge(WindZone.Validate());
+            }
+            if (SkyBoost != null)
+            {
+                v.Merge(SkyBoost.Validate());
+            }
             if (MirrorBall != null)
             {
                 v.Merge(MirrorBall.Validate());

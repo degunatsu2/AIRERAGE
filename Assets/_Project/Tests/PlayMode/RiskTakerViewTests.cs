@@ -80,13 +80,23 @@ namespace Airerage.PlayMode.Tests
             Assert.That(hud.SlotOf(1).Text, Is.EqualTo("ACTIVE"), "置いている間は ACTIVE でない");
             Assert.That(audio.History.Contains(SoundId.SafePlace), Is.True);
 
-            // 150 枚で金色、300 枚で虹色（表示を確かめるため、チャージを書き換える）。
+            // 次のチャージまでの円形のゲージと、耐久の HP バー。
+            Assert.That(objectsView.TryGetSafeState(safe.Id, out WorldObjectsView.SafeEvent safeEvent, out float health, out float ring), Is.True);
+            Assert.That(health, Is.EqualTo(1f), "耐久が満タンでない");
+            Assert.That(ring, Is.InRange(0f, 1f), "チャージのゲージを出さない");
+
+            // 150 枚で金色、300 枚で虹色（表示を確かめるため、チャージを書き換える）。チャージした瞬間の演出と音。
             safe.ChargeMilli = 150_000;
+            safe.Damage = 15;
             objects[safeIndex] = safe;
             yield return null;
             yield return null;
             objectsView.TryGetSafe(safe.Id, out label, out glow);
             Assert.That(glow, Is.EqualTo(WorldObjectsView.SafeGlow.Gold), "150 枚で金色に光らない");
+            objectsView.TryGetSafeState(safe.Id, out safeEvent, out health, out ring);
+            Assert.That(safeEvent, Is.EqualTo(WorldObjectsView.SafeEvent.Gold), "150 枚の演出がない");
+            Assert.That(health, Is.EqualTo(0.5f).Within(1e-4f), "HP バーが減らない");
+            Assert.That(audio.History.Contains(SoundId.SafeGold), Is.True, "150 枚の音が鳴らない");
             safe.ChargeMilli = 300_000;
             objects[safeIndex] = safe;
             yield return null;
@@ -94,6 +104,10 @@ namespace Airerage.PlayMode.Tests
             objectsView.TryGetSafe(safe.Id, out label, out glow);
             Assert.That(label, Is.EqualTo("300/300"));
             Assert.That(glow, Is.EqualTo(WorldObjectsView.SafeGlow.Rainbow), "300 枚で虹色に光らない");
+            objectsView.TryGetSafeState(safe.Id, out safeEvent, out health, out ring);
+            Assert.That(safeEvent, Is.EqualTo(WorldObjectsView.SafeEvent.Max), "300 枚の演出がない");
+            Assert.That(ring, Is.EqualTo(-1f), "上限なのにチャージのゲージを出している");
+            Assert.That(audio.History.Contains(SoundId.SafeMax), Is.True, "300 枚の音が鳴らない");
 
             // 一覧を一周して STANDARD に戻す（ほかのテストに影響しないように）。
             runner.CycleCharacter();
@@ -128,6 +142,85 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
             }
             Assert.That(sawBurst, Is.True, "JACKPOT! の光が出ない");
+            runner.CycleCharacter();
+        }
+
+        [UnityTest]
+        public IEnumerator AllIn_ShowsTheAuraByChargeLevel_UpToRainbow()
+        {
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            var aura = Object.FindFirstObjectByType<ChargeAuraView>();
+            var audio = Object.FindFirstObjectByType<GameAudio>();
+            Assert.That(aura, Is.Not.Null, "ためのオーラの表示がない");
+            runner.CycleCharacter();
+            yield return WaitSeconds(0.6f);
+            Assert.That(runner.PlayerState.Grounded, Is.True, "前提: 地上");
+
+            var inputs = Enumerable.Repeat(new SimInput(0, 0, InputButtons.Attack), 200).ToList();
+            inputs.Add(default);
+            runner.InputOverride = new Script(inputs);
+            var levels = new HashSet<int>();
+            bool sawRainbow = false;
+            float start = Time.time;
+            while (runner.InputOverride != null && Time.time - start < 6f)
+            {
+                levels.Add(aura.LevelOf(0));
+                sawRainbow |= aura.IsRainbow(0);
+                yield return null;
+            }
+            Assert.That(levels.Contains(0), Is.True, "白（ため始め）のオーラを出さない");
+            Assert.That(levels.Contains(3), Is.True, "途中の段階のオーラを出さない");
+            Assert.That(sawRainbow, Is.True, "最後まで貯めても虹色にならない");
+            Assert.That(audio.History.Contains(SoundId.ChargeUp), Is.True, "段階が上がった音が鳴らない");
+            Assert.That(audio.History.Contains(SoundId.ChargeMax), Is.True, "虹の音が鳴らない");
+            yield return WaitSeconds(1f);
+            Assert.That(aura.LevelOf(0), Is.EqualTo(-1), "技が終わってもオーラが残る");
+            runner.CycleCharacter();
+        }
+
+        [UnityTest]
+        public IEnumerator RouletteSmash_SpinsAboveTheHead_AndStopsOnTheRoll()
+        {
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            var roulette = Object.FindFirstObjectByType<RouletteView>();
+            var audio = Object.FindFirstObjectByType<GameAudio>();
+            Assert.That(roulette, Is.Not.Null, "ルーレットの表示がない");
+            runner.CycleCharacter();
+            yield return WaitSeconds(0.5f);
+
+            CharacterState state = runner.PlayerState;
+            state.Position = new System.Numerics.Vector3(state.Position.X, state.Position.Y + 12f, 0f);
+            state.Velocity = System.Numerics.Vector3.Zero;
+            state.Grounded = false;
+            runner.SetPlayerState(state);
+            yield return null;
+            runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, -127, InputButtons.Attack), default });
+            bool spun = false;
+            bool stopped = false;
+            int roll = -1;
+            float start = Time.time;
+            while (Time.time - start < 1.5f && !stopped)
+            {
+                spun |= roulette.IsSpinning(0);
+                if (roulette.IsStopped(0))
+                {
+                    stopped = true;
+                    roll = roulette.RollOf(0);
+                }
+                yield return null;
+            }
+            Assert.That(spun, Is.True, "発生の間にルーレットが回らない");
+            Assert.That(stopped, Is.True, "攻撃が出てもルーレットが止まらない");
+            ISimulationFeed feed = runner;
+            int expected = HitResolver.RouletteRoll(feed.Rules.Seed, 0, runner.PlayerState.Combat.AttackSerial);
+            Assert.That(roll, Is.EqualTo(expected), "止まった目がシミュレーションの目と違う");
+            Assert.That(audio.History.Contains(SoundId.RouletteSpin), Is.True, "回る音が鳴らない");
+            Assert.That(audio.History.Contains(SoundId.RouletteStop), Is.True, "止まる音が鳴らない");
+            Assert.That(runner.PlayerView.ChargeEffect == null || !runner.PlayerView.ChargeEffect.IsShowing, Is.True, "ルーレットの技で CHARGE! を出した");
             runner.CycleCharacter();
         }
 

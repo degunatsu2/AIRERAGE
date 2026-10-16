@@ -122,6 +122,15 @@ namespace Airerage.Core.Combat
         /// <summary>ルーレットの最大（JACKPOT）の攻撃を受けた数（表示の「JACKPOT!」に使う）。</summary>
         public int JackpotHitCount;
 
+        /// <summary>FEVER の間に得たゲージの上乗せの端数（ゲージの 1/100。CombatTuning.AddGauge）。</summary>
+        public int GaugeBonusRemainder;
+
+        /// <summary>行動の速さの強化の残り（ティック。STORM RUNNER のウインドクローク。SpeedBoosts）。</summary>
+        public int SpeedBoostTicksLeft;
+
+        /// <summary>空の強化の残り（ティック。速さとワイヤー。STORM RUNNER のキャッスルインジエアー。SpeedBoosts）。</summary>
+        public int SkyBoostTicksLeft;
+
         /// <summary>クールタイムを、技の効果が終わるまで止めておく印（Special1CooldownTicksLeft などの値）。</summary>
         public const int CooldownWhileActive = -1;
 
@@ -162,7 +171,9 @@ namespace Airerage.Core.Combat
                 && AttackSerial == other.AttackSerial
                 && CoinBoostTicksLeft == other.CoinBoostTicksLeft
                 && CoinBonusMilli == other.CoinBonusMilli
-                && JackpotHitCount == other.JackpotHitCount;
+                && JackpotHitCount == other.JackpotHitCount
+                && GaugeBonusRemainder == other.GaugeBonusRemainder
+                && SpeedBoostTicksLeft == other.SpeedBoostTicksLeft && SkyBoostTicksLeft == other.SkyBoostTicksLeft;
         }
 
         public override bool Equals(object obj)
@@ -178,14 +189,16 @@ namespace Airerage.Core.Combat
                     Special1CooldownTicksLeft, Special2CooldownTicksLeft),
                 HashCode.Combine(Gauge, GuardCooldownTicksLeft, BounceCount, FatalHitCount, JustGuardCount, GuardedCount, HitstopPresses),
                 HashCode.Combine(RespawnTicksLeft, InvincibleTicksLeft, RewardDamage, RewardAttacker),
-                HashCode.Combine(Holding, HoldSlot, HoldTicks, AttackSerial, CoinBoostTicksLeft, CoinBonusMilli, JackpotHitCount));
+                HashCode.Combine(Holding, HoldSlot, HoldTicks, AttackSerial, CoinBoostTicksLeft, CoinBonusMilli, JackpotHitCount,
+                    GaugeBonusRemainder),
+                HashCode.Combine(SpeedBoostTicksLeft, SkyBoostTicksLeft));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft}";
         }
     }
 }
