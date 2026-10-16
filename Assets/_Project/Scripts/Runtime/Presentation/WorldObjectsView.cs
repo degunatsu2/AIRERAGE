@@ -19,6 +19,10 @@ namespace Airerage.Runtime.Presentation
     /// - 投射物（コイントス）: 回る小さなコイン。
     /// - 突風（ウインドクロークを解いたとき）: 進む向きに並んだ、弧の形の風の線。
     /// - 風の帯（スカイロケット）: 長方形の枠と、向きへ流れる風の線。消える前の 1 秒は点滅する。
+    /// - ワープポータル: 持ち主の色を混ぜた紫の輪と回るらせん。つながっている 2 つの間に薄い線。消える前の 3 秒は点滅する。
+    /// - ミサイル: 飛ぶ向きを向いた弾と軌跡。消えたら爆発の光と音。
+    /// - コズミックレイ: ポータルの間の太い紫の光と白い芯（当たる瞬間に明るくなる）。撃ち終わって手持ちが確定されたら、
+    ///   いちばん古いポータルから拠点へ金色のコインが飛ぶ。
     /// 物が出たとき・セーフティボックスが消えたとき（ばらまき）に音を鳴らす（_audio があれば）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class WorldObjectsView : MonoBehaviour
@@ -37,14 +41,37 @@ namespace Airerage.Runtime.Presentation
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
-        [Tooltip("見た目の見本（ミラーボール、セーフティボックス、投射物、突風、風の帯の順）。シーンでは隠しておく")]
+        [Tooltip("見た目の見本（ミラーボール、セーフティボックス、投射物、突風、風の帯、ワープポータル、ミサイル、ビームの順）。シーンでは隠しておく")]
         [SerializeField] private GameObject[] _templates = new GameObject[0];
         [Tooltip("セーフティボックスの枚数を画面に写すカメラ")]
         [SerializeField] private Camera _camera;
         [Tooltip("物が出た・壊れたときの音（なくてもよい）")]
         [SerializeField] private GameAudio _audio;
+        [Tooltip("ミサイルの爆発の光の見本（なくてもよい。隠しておく）")]
+        [SerializeField] private BurstEffectView _explosionTemplate;
+
+        private const int TrailLength = 14;
+        private const float PortalBlinkSeconds = 3f;
+        private const float CoinFlightSeconds = 0.8f;
 
         private readonly Dictionary<int, Shown> _shown = new Dictionary<int, Shown>();
+        private readonly List<CoinFlight> _flights = new List<CoinFlight>();
+        private readonly List<BurstEffectView> _explosions = new List<BurstEffectView>();
+        private int _nextExplosion;
+
+        private sealed class CoinFlight
+        {
+            public LineRenderer Line;
+            public Vector3 From;
+            public Vector3 To;
+            public float At;
+        }
+
+        /// <summary>今飛んでいる、拠点へのコインの数（テスト用）。</summary>
+        public int CoinFlightCount => _flights.Count;
+
+        /// <summary>これまでに出したミサイルの爆発の数（テスト用）。</summary>
+        public int ExplosionCount { get; private set; }
         private readonly List<int> _gone = new List<int>();
         private readonly HashSet<int> _present = new HashSet<int>();
         private ISimulationFeed _feed;
@@ -76,6 +103,20 @@ namespace Airerage.Runtime.Presentation
             public float RingProgress = -1f;
             public LineRenderer Outline;
             public LineRenderer[] Streaks = new LineRenderer[0];
+            public readonly List<WindShadow> Winds = new List<WindShadow>();
+            public LineRenderer RingBorder;
+            public LineRenderer RingRim;
+            public int Owner;
+            public LineRenderer PortalRing;
+            public LineRenderer Swirl;
+            public LineRenderer Link;
+            public LineRenderer Trail;
+            public Vector3[] TrailPoints;
+            public int TrailCount;
+            public LineRenderer BeamCore;
+            public LineRenderer BeamGlow;
+            public Vector3 BeamStart;
+            public int BankedAtSpawn;
         }
 
         /// <summary>セーフティボックスのチャージの演出の種類（表示用）。</summary>
@@ -166,6 +207,10 @@ namespace Airerage.Runtime.Presentation
             {
                 template.SetActive(false);
             }
+            if (_explosionTemplate != null)
+            {
+                _explosionTemplate.gameObject.SetActive(false);
+            }
             _block = new MaterialPropertyBlock();
         }
 
@@ -202,9 +247,19 @@ namespace Airerage.Runtime.Presentation
                 {
                     _audio.Play(SoundId.SafeBreak);
                 }
+                if (shown.Kind == WorldObjectKind.Missile && _primed)
+                {
+                    Explode(shown.Anchor);
+                }
+                if (shown.Kind == WorldObjectKind.Beam && _primed && shown.Owner < _feed.CharacterCount
+                    && _feed.GetState(shown.Owner).Coins.Banked > shown.BankedAtSpawn)
+                {
+                    StartCoinFlight(shown.BeamStart);
+                }
                 Destroy(shown.Visual);
                 _shown.Remove(id);
             }
+            UpdateCoinFlights();
             // 最初のフレーム（シーンを開いたとき、巻き戻しで物が戻ったとき）には、出た音を鳴らさない。
             _primed = true;
         }
@@ -229,6 +284,22 @@ namespace Airerage.Runtime.Presentation
             shown.Ring = ring != null ? ring.GetComponent<LineRenderer>() : null;
             Transform ringBack = visual.transform.Find("ChargeRingBack");
             shown.RingBack = ringBack != null ? ringBack.GetComponent<LineRenderer>() : null;
+            shown.Owner = item.Owner;
+            shown.Swirl = FindLine(visual, "Swirl");
+            shown.Link = FindLine(visual, "Link");
+            shown.Trail = FindLine(visual, "Trail");
+            shown.BeamCore = FindLine(visual, "Core");
+            shown.BeamGlow = FindLine(visual, "Glow");
+            shown.PortalRing = item.Kind == WorldObjectKind.Portal ? FindLine(visual, "Ring") : null;
+            if (item.Kind == WorldObjectKind.Missile)
+            {
+                shown.TrailPoints = new Vector3[TrailLength];
+            }
+            if (item.Kind == WorldObjectKind.Beam)
+            {
+                shown.BeamStart = new Vector3(item.Position.X, item.Position.Y, 0f);
+                shown.BankedAtSpawn = item.Owner < _feed.CharacterCount ? _feed.GetState(item.Owner).Coins.Banked : 0;
+            }
             Transform outline = visual.transform.Find("Outline");
             shown.Outline = outline != null ? outline.GetComponent<LineRenderer>() : null;
             var streaks = new List<LineRenderer>();
@@ -237,10 +308,27 @@ namespace Airerage.Runtime.Presentation
                 streaks.Add(streak.GetComponent<LineRenderer>());
             }
             shown.Streaks = streaks.ToArray();
+            if (item.Kind == WorldObjectKind.Gust || item.Kind == WorldObjectKind.WindZone)
+            {
+                // 風の線には濃い緑の影を付ける（背景と見分けられるように。ユーザーの要望、2026-10-16）。
+                if (shown.Outline != null)
+                {
+                    shown.Winds.Add(new WindShadow(shown.Outline));
+                }
+                foreach (LineRenderer streak in shown.Streaks)
+                {
+                    shown.Winds.Add(new WindShadow(streak));
+                }
+            }
             if (item.Kind == WorldObjectKind.Safe)
             {
                 // 置いたときに預けた枚数は、チャージとして数えない。
                 shown.Coins = SkillRules.SafeCoins(item);
+                if (shown.Ring != null)
+                {
+                    // 円形のゲージの縁（ほかのゲージと同じ。ユーザーの要望、2026-10-16）。
+                    RingGaugeView.CreateFrame(shown.Ring, out shown.RingBorder, out shown.RingRim);
+                }
             }
             shown.BaseColor = shown.Renderers.Length > 0 ? shown.Renderers[0].sharedMaterial.GetColor(BaseColorId) : Color.white;
             return shown;
@@ -269,6 +357,142 @@ namespace Airerage.Runtime.Presentation
                 case WorldObjectKind.WindZone:
                     _audio.Play(SoundId.SkyRocket);
                     break;
+                case WorldObjectKind.Portal:
+                    _audio.Play(SoundId.PortalPlace);
+                    break;
+                case WorldObjectKind.Missile:
+                    _audio.Play(SoundId.MissileFire);
+                    break;
+                case WorldObjectKind.Beam:
+                    _audio.Play(SoundId.CosmicRay);
+                    break;
+            }
+        }
+
+        private static LineRenderer FindLine(GameObject visual, string child)
+        {
+            Transform found = visual.transform.Find(child);
+            return found != null ? found.GetComponent<LineRenderer>() : null;
+        }
+
+        // ポータル: 持ち主の色を混ぜた紫。古い方のポータルが、つながっているもう 1 つへの線を描く。
+        private void UpdatePortal(Shown shown, in WorldObject portal)
+        {
+            shown.Visual.transform.localScale = Vector3.one;
+            float radius = _feed.GetConfig(portal.Owner).Skills.Portal.Radius;
+            Color color = Color.Lerp(SpaceObjectLines.Purple, _feed.ColorOf(portal.Owner), 0.35f);
+            float secondsLeft = (portal.ExpireTick - _feed.CurrentTick) / (float)SimTime.TicksPerSecond;
+            bool visible = secondsLeft > PortalBlinkSeconds || Mathf.Repeat(Time.time * 6f, 1f) < 0.65f;
+            float pop = Mathf.Clamp01((Time.time - shown.BornAt) / 0.25f);
+            SpaceObjectLines.DrawPortal(shown.PortalRing, shown.Swirl, shown.Anchor, radius * pop, color, Time.time, visible);
+            bool linked = false;
+            Vector3 partner = shown.Anchor;
+            foreach (WorldObject other in _feed.Objects.Items)
+            {
+                if (other.Kind == WorldObjectKind.Portal && other.Owner == portal.Owner && other.Id > portal.Id && !other.Ended)
+                {
+                    linked = true;
+                    partner = new Vector3(other.Position.X, other.Position.Y, 0f);
+                    break;
+                }
+            }
+            SpaceObjectLines.DrawLink(shown.Link, shown.Anchor, partner, color, Time.time, linked && visible);
+        }
+
+        // ミサイル: 飛ぶ向きを向き、通った点を軌跡に残す（ポータルで移ったら軌跡を始め直す）。
+        private static void UpdateMissile(Shown shown, in WorldObject missile)
+        {
+            Transform t = shown.Visual.transform;
+            t.localScale = Vector3.one;
+            t.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(missile.Velocity.Y, missile.Velocity.X) * Mathf.Rad2Deg);
+            if (shown.TrailCount > 0 && Vector3.Distance(shown.TrailPoints[shown.TrailCount - 1], shown.Anchor) > 3f)
+            {
+                shown.TrailCount = 0;
+            }
+            if (shown.TrailCount == TrailLength)
+            {
+                System.Array.Copy(shown.TrailPoints, 1, shown.TrailPoints, 0, TrailLength - 1);
+                shown.TrailCount--;
+            }
+            shown.TrailPoints[shown.TrailCount++] = shown.Anchor + new Vector3(0f, 0f, -0.5f);
+            SpaceObjectLines.DrawTrail(shown.Trail, shown.TrailPoints, shown.TrailCount, SpaceObjectLines.Purple);
+        }
+
+        // ビーム: 当たる瞬間（IntervalTicks ごと）に明るくなる。
+        private void UpdateBeam(Shown shown, in WorldObject beam)
+        {
+            shown.Visual.transform.localScale = Vector3.one;
+            BeamTuning tuning = _feed.GetConfig(beam.Owner).Skills.Beam;
+            int age = _feed.CurrentTick - beam.SpawnTick;
+            float sinceHit = age % tuning.IntervalTicks;
+            float flash = Mathf.Clamp01(1f - sinceHit / 4f);
+            SpaceObjectLines.DrawBeam(shown.BeamGlow, shown.BeamCore, shown.BeamStart, new Vector3(beam.End.X, beam.End.Y, 0f), tuning.HalfWidth, flash,
+                Time.time);
+        }
+
+        private void Explode(Vector3 at)
+        {
+            ExplosionCount++;
+            if (_audio != null)
+            {
+                _audio.Play(SoundId.MissileExplode, 0.9f, 0.04f);
+            }
+            if (_explosionTemplate == null)
+            {
+                return;
+            }
+            // 重なっても途切れないように、いくつかを順に使う。
+            if (_explosions.Count < 4)
+            {
+                BurstEffectView burst = Instantiate(_explosionTemplate, transform);
+                burst.gameObject.SetActive(true);
+                _explosions.Add(burst);
+            }
+            _explosions[_nextExplosion % _explosions.Count].Play(at);
+            _nextExplosion++;
+        }
+
+        // いちばん古いポータル（ビームの始まり）から、今の拠点へコインが飛ぶ。
+        private void StartCoinFlight(Vector3 from)
+        {
+            IReadOnlyList<Airerage.Core.Economy.BankSpot> spots = _feed.BankSpots;
+            if (spots == null || spots.Count == 0 || _feed.Rules == null)
+            {
+                return;
+            }
+            Vector2 bank = ToUnity(spots[Airerage.Core.Economy.BankRules.SpotAt(_feed.Rules, spots.Count, _feed.CurrentTick)].Position);
+            var line = new GameObject("CoinFlight").AddComponent<LineRenderer>();
+            line.transform.SetParent(transform, false);
+            line.useWorldSpace = true;
+            line.widthMultiplier = 0.3f;
+            line.numCapVertices = 4;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            LineRenderer like = _templates[(int)WorldObjectKind.Beam - 1].GetComponentInChildren<LineRenderer>(true);
+            if (like != null)
+            {
+                line.sharedMaterial = like.sharedMaterial;
+            }
+            _flights.Add(new CoinFlight { Line = line, From = from, To = new Vector3(bank.x, bank.y, 0f), At = Time.time });
+        }
+
+        private static Vector2 ToUnity(System.Numerics.Vector2 v)
+        {
+            return new Vector2(v.X, v.Y);
+        }
+
+        private void UpdateCoinFlights()
+        {
+            for (int i = _flights.Count - 1; i >= 0; i--)
+            {
+                CoinFlight flight = _flights[i];
+                float progress = (Time.time - flight.At) / CoinFlightSeconds;
+                if (progress >= 1f)
+                {
+                    Destroy(flight.Line.gameObject);
+                    _flights.RemoveAt(i);
+                    continue;
+                }
+                SpaceObjectLines.DrawCoinFlight(flight.Line, flight.From, flight.To, progress);
             }
         }
 
@@ -297,7 +521,43 @@ namespace Airerage.Runtime.Presentation
                 case WorldObjectKind.WindZone:
                     UpdateWindZone(shown, item);
                     break;
+                case WorldObjectKind.Portal:
+                    UpdatePortal(shown, item);
+                    break;
+                case WorldObjectKind.Missile:
+                    UpdateMissile(shown, item);
+                    break;
+                case WorldObjectKind.Beam:
+                    UpdateBeam(shown, item);
+                    break;
             }
+            foreach (WindShadow wind in shown.Winds)
+            {
+                wind.Sync();
+            }
+        }
+
+        /// <summary>番号 id の物の風の線が、すべて影を持っているか（表示していなければ false。テスト用）。</summary>
+        public bool WindsHaveShadows(int id)
+        {
+            if (!_shown.TryGetValue(id, out Shown shown) || shown.Winds.Count == 0)
+            {
+                return false;
+            }
+            foreach (WindShadow wind in shown.Winds)
+            {
+                if (wind.Main.enabled && !wind.Shadow.enabled)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>番号 id の金庫のチャージのゲージに縁を描いているか（テスト用）。</summary>
+        public bool SafeRingHasFrame(int id)
+        {
+            return _shown.TryGetValue(id, out Shown shown) && shown.RingBorder != null && shown.RingBorder.enabled && shown.RingRim.enabled;
         }
 
         // 突風: 進む向きに並んだ弧（「)」の形）。生まれてからの時間で薄くなる。
@@ -497,6 +757,8 @@ namespace Airerage.Runtime.Presentation
         {
             bool full = SkillRules.IsSafeFull(safe, tuning);
             shown.RingProgress = full ? -1f : SkillRules.SafeChargeProgress(safe, tuning, _feed.CurrentTick);
+            RingGaugeView.DrawFrame(shown.RingBorder, shown.RingRim, shown.Anchor, RingRadius, shown.Ring != null ? shown.Ring.widthMultiplier : 0.12f,
+                -0.7f, !full);
             if (shown.RingBack != null)
             {
                 shown.RingBack.enabled = !full;

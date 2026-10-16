@@ -18,6 +18,7 @@ namespace Airerage.Runtime.Presentation
     /// ルーレットの最大（JACKPOT）を受けた瞬間は _jackpotBurst、コインの効率が上がっている間（フィーバータイム）は周りに金色のゲージ
     /// （_feverGauge）を出す（RISK TAKER。docs/14。あれば）。
     /// 撃破されて復帰を待っている間は見えなくし、復帰した後の無敵の間は点滅させる（docs/12 T4-2）。
+    /// 回る技（AttackData.SpinPerHit）の間は、判定 1 つにつき 1 回転させる。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class CharacterView : MonoBehaviour
@@ -164,6 +165,7 @@ namespace Airerage.Runtime.Presentation
         public void RenderAction(in CharacterState current, CombatTuning combat, int respawnDelayTicks = 0)
         {
             RenderHitbox(current, combat);
+            RenderSpin(current, combat);
             Tint tint = TintOf(current, combat);
             RenderCharge(current, combat, tint == Tint.Charge);
             RenderCooldownGauges(current, combat);
@@ -191,6 +193,28 @@ namespace Airerage.Runtime.Presentation
             }
             _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        /// <summary>回る技で、今回している角度（度。回っていなければ 0）。</summary>
+        public float SpinDegrees { get; private set; }
+
+        // 回る技（AttackData.SpinPerHit。つむじ風）: 判定 1 つにつき 1 回転し、終わったら元の向きで止まる（ユーザーの要望、2026-10-16）。
+        private void RenderSpin(in CharacterState state, CombatTuning combat)
+        {
+            float degrees = 0f;
+            if (state.Action.Kind == ActionKind.Attack)
+            {
+                AttackData attack = combat.Get(state.Action.Attack);
+                if (attack.SpinPerHit)
+                {
+                    degrees = Mathf.Repeat(BoostAuraView.SpinAngle(attack, state.Action.Ticks), 360f) * state.Facing;
+                }
+            }
+            if (degrees != SpinDegrees)
+            {
+                SpinDegrees = degrees;
+                transform.rotation = Quaternion.Euler(0f, degrees, 0f);
+            }
         }
 
         // 復帰を待つ間、出現位置の周りに大きなゲージ（残りの割合）を出す（数字ではなくゲージで。ユーザーの要望、2026-10-13）。

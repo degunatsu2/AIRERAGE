@@ -79,6 +79,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 1
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 12
@@ -91,7 +92,7 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.1
           HalfHeight: 1.2
-          Damage: 4
+          Damage: 5
           HitstopTicks: 6
           HitstunTicks: 16
           KnockbackX: 11
@@ -104,6 +105,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 1
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 26
@@ -153,6 +155,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 22
@@ -178,6 +181,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 24
@@ -203,6 +207,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 36
@@ -233,6 +238,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 10
@@ -240,6 +246,8 @@ MonoBehaviour:
         Hits: []
         Motions: []
       Special1CooldownTicks: 600
+      Special1MaxCharges: 1
+      Special2MaxCharges: 1
       Special2:
         Name: SKY ROCKET
         Effect: 6
@@ -247,6 +255,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 14
@@ -261,6 +270,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 20
@@ -336,9 +346,9 @@ MonoBehaviour:
         HeldCoinsPerBonusPercent: 0
         MaxHeldCoinBonusPercent: 0
       Run:
-        InitialSpeed: 10
+        InitialSpeed: 12.5
         Acceleration: 6
-        MaxSpeed: 24
+        MaxSpeed: 28
         JumpAngleDeg: 20
         TurnTicks: 8
         RehitTicks: 30
@@ -349,6 +359,10 @@ MonoBehaviour:
         GustRange: 15
         GustHalfWidth: 1
         GustPush: 12
+        GustWindupTicks: 10
+        GustRecoveryTicks: 14
+        GustRecoilSpeed: 9
+        GustWindupBrake: 0.8
       WindZone:
         DurationTicks: 600
         Length: 10
@@ -358,6 +372,51 @@ MonoBehaviour:
       SkyBoost:
         DurationTicks: 600
         SpeedPercent: 50
+      Portal:
+        DurationTicks: 1800
+        Radius: 1.2
+        MaxPerOwner: 2
+        WarpCooldownTicks: 30
+        EnterHoldTicks: 12
+      Missile:
+        Speed: 18
+        Radius: 0.4
+        ExplosionRadius: 1.6
+        OffsetY: 0.2
+        BonusPercentPerSecond: 200
+        LifetimeTicks: 1200
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          HitstopTicks: 10
+          HitstunTicks: 24
+          KnockbackX: 9
+          KnockbackY: 7
+      Beam:
+        HalfWidth: 0.75
+        IntervalTicks: 10
+        Hits: 6
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 15
+          HitstopTicks: 6
+          HitstunTicks: 20
+          KnockbackX: 3
+          KnockbackY: 4
+      SlowFall:
+        MaxFallSpeed: 3
   _displayName: STORM RUNNER
   _special1Icon: {fileID: 0}
   _special2Icon: {fileID: 0}

@@ -12,6 +12,7 @@ namespace Airerage.Runtime.Presentation
     /// - ためている間と、離して出した技の間、キャラクターの周りに揺らめくオーラを出す。色は段階で変わる:
     ///   白（+0%）→ 緑（+20%）→ 青（+50%）→ 紫（+100%）→ 金（+200%）→ 虹（+500%）。段階が高いほど太く大きい。
     /// - 段階が上がった瞬間に光って音が鳴る（最後の段階は特別な音）。
+    /// - ためている間は、技が出る側（向いている方向）の前に、段階の色の矢印「>>」を出す（ユーザーの要望、2026-10-16）。
     /// - ためた技が当たった瞬間（ActionState.Connected）に、段階の色の大きな光を出す（段階が高いほど大きく、重い音）。
     ///   最後の段階（虹）で当てたときの JACKPOT の演出は、当たった側の CharacterView と CombatSoundEvents が出す。
     /// 見た目の動きは表示の時間で決める。状態を読むだけで、書き換えない。
@@ -45,11 +46,16 @@ namespace Airerage.Runtime.Presentation
         private Gradient _gradient;
         private GradientColorKey[] _colorKeys;
         private GradientAlphaKey[] _alphaKeys;
+        private readonly Gradient _solid = new Gradient();
+        private readonly GradientColorKey[] _solidColors = new GradientColorKey[2];
+        private readonly GradientAlphaKey[] _solidAlphas = new GradientAlphaKey[2];
 
         private sealed class Aura
         {
             public LineRenderer Outer;
             public LineRenderer Inner;
+            public LineRenderer[] Arrows;
+            public int ArrowFacing;
             public BurstEffectView Burst;
             public int Level = -1;
             public bool Rainbow;
@@ -68,6 +74,18 @@ namespace Airerage.Runtime.Presentation
         public bool IsRainbow(int index)
         {
             return index >= 0 && index < _auras.Count && _auras[index].Level >= 0 && _auras[index].Rainbow;
+        }
+
+        /// <summary>キャラクター index のオーラの線の、真ん中の色（テスト用。虹色の後に白へ戻るか）。</summary>
+        public Color AuraColorOf(int index)
+        {
+            return index >= 0 && index < _auras.Count ? _auras[index].Outer.colorGradient.Evaluate(0.5f) : Color.clear;
+        }
+
+        /// <summary>キャラクター index の向きの矢印を出していれば、その向き（1 か -1。出していなければ 0。テスト用）。</summary>
+        public int ArrowFacingOf(int index)
+        {
+            return index >= 0 && index < _auras.Count ? _auras[index].ArrowFacing : 0;
         }
 
         /// <summary>キャラクター index のためた技が当たって、大きな光を出した回数（テスト用）。</summary>
@@ -160,6 +178,7 @@ namespace Airerage.Runtime.Presentation
                 aura.Rainbow = top;
                 UpdateHit(aura, state, center, color, level, top);
                 Draw(aura, center, color, level, top);
+                DrawArrows(aura, state, attack, center, color, top);
             }
         }
 
@@ -216,6 +235,40 @@ namespace Airerage.Runtime.Presentation
             aura.Inner.enabled = true;
         }
 
+        // ためている間、技が出る側（判定の位置）に、前へ流れる矢印を 2 つ出す。
+        private void DrawArrows(Aura aura, in CharacterState state, AttackData attack, Vector3 center, Color color, bool top)
+        {
+            bool show = state.Combat.Holding;
+            aura.ArrowFacing = show ? state.Facing : 0;
+            float offset = attack.Hits.Length > 0 ? attack.Hits[0].OffsetX : 1.5f;
+            float slide = Mathf.Repeat(Time.time * 2.5f, 1f) * 0.35f;
+            for (int a = 0; a < aura.Arrows.Length; a++)
+            {
+                LineRenderer line = aura.Arrows[a];
+                line.enabled = show;
+                if (!show)
+                {
+                    continue;
+                }
+                float x = (offset - 0.3f + a * 0.55f + slide) * state.Facing;
+                const float half = 0.55f;
+                const float depth = 0.4f;
+                line.positionCount = 3;
+                line.SetPosition(0, center + new Vector3(x - depth * state.Facing, half, Z));
+                line.SetPosition(1, center + new Vector3(x, 0f, Z));
+                line.SetPosition(2, center + new Vector3(x - depth * state.Facing, -half, Z));
+                float alpha = a == 0 ? 0.95f : 0.6f;
+                if (top)
+                {
+                    SetRainbow(line, Time.time + a * 0.3f, alpha);
+                }
+                else
+                {
+                    SetColor(line, Color.Lerp(color, Color.white, 0.2f), alpha);
+                }
+            }
+        }
+
         // 揺らめく輪（炎のように、上の側ほど大きく揺れて伸びる）。
         private static void DrawFlame(LineRenderer line, Vector3 center, float rx, float ry, float amp, float time, float salt)
         {
@@ -231,11 +284,16 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        private static void SetColor(LineRenderer line, Color color, float alpha)
+        // 単色にする（キーを 2 つに戻す。startColor だけを変えると、虹色のときの途中のキーが残ってしまう。2 回目のためで白に
+        // 戻らなかった不具合。ユーザーの指摘、2026-10-16）。
+        private void SetColor(LineRenderer line, Color color, float alpha)
         {
-            color.a = alpha;
-            line.startColor = color;
-            line.endColor = color;
+            _solidColors[0] = new GradientColorKey(color, 0f);
+            _solidColors[1] = new GradientColorKey(color, 1f);
+            _solidAlphas[0] = new GradientAlphaKey(alpha, 0f);
+            _solidAlphas[1] = new GradientAlphaKey(alpha, 1f);
+            _solid.SetKeys(_solidColors, _solidAlphas);
+            line.colorGradient = _solid;
         }
 
         private void SetRainbow(LineRenderer line, float time, float alpha)
@@ -256,10 +314,15 @@ namespace Airerage.Runtime.Presentation
             aura.Level = -1;
             aura.Rainbow = false;
             aura.Serial = -1;
+            aura.ArrowFacing = 0;
             if (aura.Outer.enabled)
             {
                 aura.Outer.enabled = false;
                 aura.Inner.enabled = false;
+            }
+            foreach (LineRenderer arrow in aura.Arrows)
+            {
+                arrow.enabled = false;
             }
         }
 
@@ -269,17 +332,25 @@ namespace Airerage.Runtime.Presentation
             {
                 Outer = Instantiate(_lineTemplate, transform),
                 Inner = Instantiate(_lineTemplate, transform),
+                Arrows = new[] { Instantiate(_lineTemplate, transform), Instantiate(_lineTemplate, transform) },
                 Burst = Instantiate(_burstTemplate, transform),
             };
             aura.Outer.name = $"Aura{index}Outer";
             aura.Inner.name = $"Aura{index}Inner";
+            aura.Arrows[0].name = $"Aura{index}Arrow0";
+            aura.Arrows[1].name = $"Aura{index}Arrow1";
             aura.Burst.name = $"Aura{index}Burst";
-            foreach (LineRenderer line in new[] { aura.Outer, aura.Inner })
+            foreach (LineRenderer line in new[] { aura.Outer, aura.Inner, aura.Arrows[0], aura.Arrows[1] })
             {
                 line.gameObject.SetActive(true);
                 line.useWorldSpace = true;
                 line.loop = true;
                 line.enabled = false;
+            }
+            foreach (LineRenderer arrow in aura.Arrows)
+            {
+                arrow.loop = false;
+                arrow.widthMultiplier = 0.14f;
             }
             aura.Burst.gameObject.SetActive(true);
             return aura;

@@ -8,6 +8,8 @@ namespace Airerage.Runtime.Presentation
     /// ワイヤーキャンセルのクールタイム（キャラクターの周り。「WIRE CANCEL」）、ワイヤーの接続の残り時間（接続点の周り）、
     /// 撃破された後の復帰までの残り（出現位置の周りに大きく。「RESPAWN」。docs/12 T4-2）に使う。
     /// 呼ぶ側が毎フレーム Show / Hide を呼ぶ。状態は読むだけ。
+    /// ゲージには縁を付ける（暗い帯の上に弧を描き、外側に明るい細い線。ユーザーの要望、2026-10-16: 同じ色のオーラと見分けにくい）。
+    /// 縁は DrawFrame で、ほかの円形のゲージ（強化の残り、金庫のチャージ）にも同じものを付ける。
     /// </summary>
     public sealed class RingGaugeView : MonoBehaviour
     {
@@ -33,13 +35,24 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private Color _sparkColor = new Color(1f, 0.92f, 0.65f, 0.95f);
         [SerializeField] private int _fontSize = 20;
 
+        /// <summary>縁の暗い帯（ゲージの太さに足す分。m）と、外側の明るい線の太さ（m）。</summary>
+        public const float FrameExtra = 0.08f;
+        public const float RimWidth = 0.025f;
+        private static readonly Color FrameColor = new Color(0.04f, 0.04f, 0.07f, 0.85f);
+        private static readonly Color RimColor = new Color(1f, 1f, 1f, 0.75f);
+
         private GUIStyle _style;
         private Vector3 _center;
+        private LineRenderer _border;
+        private LineRenderer _rim;
         private float _layoutRadius = -1f;
         private bool _labelBelow;
 
         /// <summary>今表示しているか。</summary>
         public bool IsShowing { get; private set; }
+
+        /// <summary>縁を描いているか（テスト用）。</summary>
+        public bool ShowsFrame => _border != null && _border.enabled && _rim != null && _rim.enabled;
 
         /// <summary>表示している残りの割合（0〜1）。</summary>
         public float Fraction { get; private set; }
@@ -67,7 +80,68 @@ namespace Airerage.Runtime.Presentation
 
         private void Awake()
         {
+            if (_fuse != null)
+            {
+                CreateFrame(_fuse, out _border, out _rim);
+                if (_track != null)
+                {
+                    _track.sortingOrder = _fuse.sortingOrder;
+                }
+                if (_spark != null)
+                {
+                    _spark.sortingOrder = _fuse.sortingOrder + 1;
+                }
+            }
             Hide();
+        }
+
+        /// <summary>
+        /// 円形のゲージの縁の線（暗い帯と、外側の明るい線）を、ゲージの弧 like と同じ親の下に作る（弧より先・後に描く）。
+        /// </summary>
+        public static void CreateFrame(LineRenderer like, out LineRenderer border, out LineRenderer rim)
+        {
+            border = Object.Instantiate(like, like.transform.parent);
+            border.name = like.name + "Frame";
+            border.sortingOrder = like.sortingOrder - 1;
+            border.loop = true;
+            border.enabled = false;
+            rim = Object.Instantiate(like, like.transform.parent);
+            rim.name = like.name + "Rim";
+            rim.sortingOrder = like.sortingOrder + 1;
+            rim.loop = true;
+            rim.enabled = false;
+        }
+
+        /// <summary>中心 center、半径 radius、太さ width のゲージの縁を描く（show が false なら隠す）。z はゲージの奥行き。</summary>
+        public static void DrawFrame(LineRenderer border, LineRenderer rim, Vector3 center, float radius, float width, float z, bool show)
+        {
+            if (border == null || rim == null)
+            {
+                return;
+            }
+            border.enabled = show;
+            rim.enabled = show;
+            if (!show)
+            {
+                return;
+            }
+            Circle(border, center, radius, z + 0.01f);
+            border.widthMultiplier = width + FrameExtra;
+            border.startColor = border.endColor = FrameColor;
+            Circle(rim, center, radius + (width + FrameExtra) * 0.5f, z - 0.005f);
+            rim.widthMultiplier = RimWidth;
+            rim.startColor = rim.endColor = RimColor;
+        }
+
+        private static void Circle(LineRenderer line, Vector3 center, float radius, float z)
+        {
+            line.loop = true;
+            line.positionCount = FullCirclePoints;
+            for (int i = 0; i < FullCirclePoints; i++)
+            {
+                float angle = Mathf.PI * 2f * i / FullCirclePoints;
+                line.SetPosition(i, new Vector3(center.x + Mathf.Cos(angle) * radius, center.y + Mathf.Sin(angle) * radius, z));
+            }
         }
 
         /// <summary>文字と半径（と色、太さ、文字の大きさ）を設定する（シーンのビルダー用）。</summary>
@@ -101,6 +175,7 @@ namespace Airerage.Runtime.Presentation
             Fraction = Mathf.Min(fraction, 1f);
             _center = center;
 
+            DrawFrame(_border, _rim, center, Radius, _width, Z, true);
             if (_track != null)
             {
                 Color track = _color;
@@ -133,6 +208,8 @@ namespace Airerage.Runtime.Presentation
             SetEnabled(_track, false);
             SetEnabled(_fuse, false);
             SetEnabled(_spark, false);
+            SetEnabled(_border, false);
+            SetEnabled(_rim, false);
         }
 
         // 上（12 時）から時計回りに、全周の fraction の弧を描き、先端の位置を返す。

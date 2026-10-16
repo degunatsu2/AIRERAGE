@@ -13,7 +13,7 @@ using Airerage.Core.Wire;
 namespace Airerage.Core.Skills
 {
     /// <summary>
-    /// 技の効果とワールドに置かれた物の規則（docs/13 T5-6、docs/14。STORM RUNNER の強化と風も）。SimWorld が 1 ティックの中で次の順に呼ぶ:
+    /// 技の効果とワールドに置かれた物の規則（docs/13 T5-6、docs/14。STORM RUNNER の強化と風、SPACE TRAVELER の技は SpaceRules）。SimWorld が 1 ティックの中で次の順に呼ぶ:
     /// 1. FireEffects（全員を進めた後）: 攻撃のデータの効果（AttackData.Effect）を、出してから EffectTick のティックに 1 回だけ起こす
     ///    （物を置く、投射物を撃つ、強化）。
     /// 2. StepObjects: 物を進める（寿命、ミラーボールのゲージ、セーフティボックスのチャージ、投射物の移動と命中）。投射物の命中は
@@ -39,7 +39,9 @@ namespace Airerage.Core.Skills
                 }
                 CharacterConfig config = configs[i];
                 AttackData attack = config.Combat.Get(state.Action.Attack);
-                if (attack.Effect == SkillEffect.None || state.Action.Ticks < attack.EffectTick)
+                // 効果中にもう一度出した突風は、溜めの後に撃つ。
+                int effectTick = state.Action.Recast ? config.Skills.SpeedBoost.GustWindupTicks : attack.EffectTick;
+                if (attack.Effect == SkillEffect.None || state.Action.Ticks < effectTick)
                 {
                     continue;
                 }
@@ -84,14 +86,24 @@ namespace Airerage.Core.Skills
                     case WorldObjectKind.WindZone:
                         StepWindZone(item, objects, states, configs, owner.Skills.WindZone);
                         break;
+                    case WorldObjectKind.Missile:
+                        SpaceRules.StepMissile(ref item, objects, terrain, states, configs, bounds, owner.Skills.Missile, hits, tick);
+                        break;
+                    case WorldObjectKind.Beam:
+                        SpaceRules.StepBeam(item, objects, states, configs, owner.Skills.Beam, hits, tick);
+                        break;
                 }
                 objects[o] = item;
             }
+            SpaceRules.WarpThroughPortals(objects, states, configs);
         }
 
-        /// <summary>3. 寿命が来た・壊れた物を取り除く。tick は進めた後のティック。</summary>
+        /// <summary>
+        /// 3. 寿命が来た・壊れた物を取り除く。tick は進めた後のティック。spots と playing は、撃ち終わったビームの拠点での確定に使う
+        /// （spots が null なら確定しない）。最後に、キャラクターごとのワープポータルの数を数え直す。
+        /// </summary>
         public static void EndObjects(WorldObjects objects, CoinLedger ledger, List<CharacterState> states,
-            IReadOnlyList<CharacterConfig> configs, MatchRules rules, int tick)
+            IReadOnlyList<CharacterConfig> configs, MatchRules rules, int tick, IReadOnlyList<BankSpot> spots = null, bool playing = false)
         {
             for (int o = 0; o < objects.Count; o++)
             {
@@ -111,10 +123,14 @@ namespace Airerage.Core.Skills
                         CoinDropRules.Spill(ledger, item.Id, item.Stored, SafeCoins(item), item.Position, rules, tick);
                         ReleaseCooldown(states, item.Owner, item.Slot, owner.Combat);
                         break;
+                    case WorldObjectKind.Beam:
+                        SpaceRules.BankByBeam(item, ledger, states, configs, spots, rules, tick, playing);
+                        break;
                 }
                 objects.RemoveAt(o);
                 o--;
             }
+            SpaceRules.CountPortals(objects, states);
         }
 
         /// <summary>セーフティボックスの今の枚数（チャージの小数は切り捨て）。</summary>
@@ -188,16 +204,26 @@ namespace Airerage.Core.Skills
                 case SkillEffect.SpeedBoost:
                 {
                     SpeedBoostTuning boost = config.Skills.SpeedBoost;
-                    if (state.Combat.SpeedBoostTicksLeft > 0)
+                    if (state.Action.Recast)
                     {
-                        // 効果中にもう一度出した: 強化を解いて、向いている方向へ突風を撃つ。クールタイムはここから数える。
+                        // 効果中にもう一度出した: 強化を解いて、溜めの後に照準の方向へ突風を撃ち、反動で逆へ下がる（ユーザーの要望、
+                        // 2026-10-16）。クールタイムは出したときから数えている（StartAttack）。
+                        Vector2 direction = AimDirection(state.Action.Aim, state.Facing, config.Wire.AimDeadzone);
                         state.Combat.SpeedBoostTicksLeft = 0;
-                        SetCooldown(ref state.Combat, state.Action.Attack, config.Combat.CooldownTicksOf(state.Action.Attack));
+                        if (MathF.Abs(direction.X) > 0.1f)
+                        {
+                            state.Facing = direction.X > 0f ? 1 : -1;
+                        }
+                        state.Velocity = new Vector3(-direction.X * boost.GustRecoilSpeed, -direction.Y * boost.GustRecoilSpeed, 0f);
+                        if (state.Velocity.Y > 0f)
+                        {
+                            state.Grounded = false;
+                        }
                         objects.Add(new WorldObject
                         {
                             Kind = WorldObjectKind.Gust, Owner = index, Slot = state.Action.Attack,
-                            Position = position + new Vector2(0.6f * state.Facing, 0f),
-                            Velocity = new Vector2(boost.GustSpeed * state.Facing, 0f),
+                            Position = position + direction * 0.6f,
+                            Velocity = direction * boost.GustSpeed,
                             SpawnTick = tick, ExpireTick = tick + boost.GustTicks,
                         });
                     }
@@ -223,6 +249,20 @@ namespace Airerage.Core.Skills
                 }
                 case SkillEffect.SkyBoost:
                     state.Combat.SkyBoostTicksLeft = config.Skills.SkyBoost.DurationTicks;
+                    states[index] = state;
+                    break;
+                case SkillEffect.Portal:
+                    SpaceRules.FirePortal(objects, states, index, config, tick);
+                    break;
+                case SkillEffect.Missile:
+                    SpaceRules.FireMissile(objects, state, index, config, tick);
+                    break;
+                case SkillEffect.CosmicRay:
+                    SpaceRules.FireCosmicRay(objects, index, config, tick);
+                    break;
+                case SkillEffect.SlowFall:
+                    // ゆっくり落ちる（別の移動をするまで。CharacterSimulator が終わりを決める）。
+                    state.Combat.SlowFallSerial = state.Combat.AttackSerial + 1;
                     states[index] = state;
                     break;
                 case SkillEffect.Projectile:
@@ -313,7 +353,8 @@ namespace Airerage.Core.Skills
                     && MathF.Abs(target.Position.Y - shot.Position.Y) < half.Y + tuning.Radius)
                 {
                     int facing = shot.Velocity.X > 0f ? 1 : shot.Velocity.X < 0f ? -1 : states[shot.Owner].Facing;
-                    hits.Add(new HitRecord(shot.Owner, v, shot.Slot, 0, tuning.Hit, facing, 1f, fromObject: true, bonusPercent: shot.BonusPercent));
+                    hits.Add(new HitRecord(shot.Owner, v, shot.Slot, 0, tuning.Hit, facing,
+                        AttackPower.OfProjectile(shot.BonusPercent, PowerSource.HeldCoins), fromObject: true));
                     shot.HitMask |= 1u << v;
                     shot.Ended = true;
                     return;

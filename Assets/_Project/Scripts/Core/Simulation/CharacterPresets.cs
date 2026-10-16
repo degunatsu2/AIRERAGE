@@ -13,6 +13,7 @@ namespace Airerage.Core.Simulation
         public const string StandardName = "STANDARD";
         public const string RiskTakerName = "RISK TAKER";
         public const string StormRunnerName = "STORM RUNNER";
+        public const string SpaceTravelerName = "SPACE TRAVELER";
 
         /// <summary>STANDARD（基準のキャラクター。DASH・RISE・BURST）。</summary>
         public static CharacterConfig Standard()
@@ -23,7 +24,8 @@ namespace Airerage.Core.Simulation
         /// <summary>
         /// RISK TAKER（docs/14 1.3。ユーザーの案、2026-10-15）。コインで勝負するキャラクター。
         /// - 地上技 ALL IN: 長押しでためて、離すと大きく踏み込む一撃（ユーザーの要望、2026-10-16）。ためている間はその場から動かず、
-        ///   ためた長さで威力が上がる（白 +0% → 緑 +20% → 青 +50% → 紫 +100% → 金 +200% → 虹 +500%）。虹で当てると JACKPOT。
+        ///   ためた長さで威力と吹き飛びが上がる（白 +0% → 緑 +20% → 青 +50% → 紫 +100% → 金 +200% → 虹 +500%。吹き飛びは
+        ///   ユーザーの要望、2026-10-16）。虹で当てると JACKPOT。
         ///   当たると斜め上へ飛び出す。外すと隙が大きい。
         /// - 空中・上 COIN TOSS: コインを投げ上げて頭上を攻撃する（投射物。Claude の案）。撃ったときの手持ちのコイン 3 枚ごとに
         ///   威力 +1%（300 枚で +100% が最大。ユーザーの要望、2026-10-16）。
@@ -50,12 +52,12 @@ namespace Airerage.Core.Simulation
                 HoldRooted = true,
                 ChargeLevels = new[]
                 {
-                    new ChargeLevel { FromTicks = 0, BonusPercent = 0 },
-                    new ChargeLevel { FromTicks = 24, BonusPercent = 20 },
-                    new ChargeLevel { FromTicks = 48, BonusPercent = 50 },
-                    new ChargeLevel { FromTicks = 78, BonusPercent = 100 },
-                    new ChargeLevel { FromTicks = 120, BonusPercent = 200 },
-                    new ChargeLevel { FromTicks = 180, BonusPercent = 500 },
+                    new ChargeLevel { FromTicks = 0, BonusPercent = 0, KnockbackPercent = 0 },
+                    new ChargeLevel { FromTicks = 24, BonusPercent = 20, KnockbackPercent = 20 },
+                    new ChargeLevel { FromTicks = 48, BonusPercent = 50, KnockbackPercent = 50 },
+                    new ChargeLevel { FromTicks = 78, BonusPercent = 100, KnockbackPercent = 100 },
+                    new ChargeLevel { FromTicks = 120, BonusPercent = 200, KnockbackPercent = 200 },
+                    new ChargeLevel { FromTicks = 180, BonusPercent = 500, KnockbackPercent = 500 },
                 },
                 Hits = new[]
                 {
@@ -126,14 +128,16 @@ namespace Airerage.Core.Simulation
 
         /// <summary>
         /// STORM RUNNER（docs/14 1.2。ユーザーの案、2026-10-15。C-3、C-10〜C-13 の回答、2026-10-16）。速さで戦うキャラクター。
-        /// - 地上技 STORM DASH: 向いている方向へ走り続ける（SkillTuning.Run。初速 10 m/s、毎秒 +6、最大 24）。別の行動をするまで終わらない。
+        /// - 地上技 STORM DASH: 向いている方向へ走り続ける（SkillTuning.Run。初速 12.5 m/s、毎秒 +6、最大 28。2026-10-16 に速くした）。
+        ///   別の行動をするまで終わらない。
         ///   足場が途切れたら・壁にぶつかったら浅い角度（20°）で跳ぶ。逆向きに入力すると、反転の後に初速で逆向きに走る。体の判定の
-        ///   ダメージは速さ × 0.4（初速で 4）。同じ相手には 0.5 秒に 1 回。
+        ///   ダメージは速さ × 0.4（初速で 5）。同じ相手には 0.5 秒に 1 回。
         /// - 空中・横 GALE SLASH: 速さを落とさずに横へ切り抜ける（動きを決めない）。
         /// - 空中・下（撃破技）DOWNBURST: 斜め下へ急降下して蹴る（打つ直前の速さで強くなる）。
-        /// - 空中・ニュートラル WHIRLWIND（つむじ風）: 体の周りを回る 3 段。
+        /// - 空中・ニュートラル WHIRLWIND（つむじ風）: 竜巻をまとって回る 3 段（1 段で 1 回転。表示）。
         /// - Q CLOAK（ウインドクローク）: 5 秒間、行動の速さ +20%（移動・ワイヤー・攻撃のフレーム。ヒットストップはそのまま）。効果中に
-        ///   もう一度押すと、強化を解いて向いている方向へ突風を撃つ（押すだけで攻撃の判定はない）。クールタイム 10 秒（効果が終わってから）。
+        ///   もう一度押すと、強化を解き、短く溜めてから照準の方向へ突風を撃つ（反動で少し下がる。押すだけで攻撃の判定はない。
+        ///   ユーザーの要望、2026-10-16）。クールタイム 10 秒（効果が終わってから）。
         /// - E SKY ROCKET（スカイロケット）: 照準の方向へ吹く風の帯（長さ 10m、幅 3m）を 10 秒置く。全員と投射物に効く。クールタイム 15 秒。
         /// - R CASTLE（キャッスルインジエアー）: 10 秒間、速さ +50% で、ワイヤーが弾く物にも・何もない空中にもつながる。必要なゲージ 80%。
         /// </summary>
@@ -153,7 +157,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 1, UntilEnd = true, OffsetX = 0.4f, HalfWidth = 1.1f, HalfHeight = 1.2f,
-                        Damage = 4, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 11f, KnockbackY = 9f,
+                        Damage = 5, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 11f, KnockbackY = 9f,
                     },
                 },
             };
@@ -196,6 +200,7 @@ namespace Airerage.Core.Simulation
             combat.AirNeutral = new AttackData
             {
                 Name = "WHIRLWIND",
+                SpinPerHit = true,
                 TotalTicks = 26,
                 WireCancelFromTick = 5,
                 Hits = new[]
@@ -250,6 +255,148 @@ namespace Airerage.Core.Simulation
                 Hits = new AttackHit[0],
             };
             combat.SuperGaugeCost = 80 * CombatTuning.GaugePerPercent;
+            return config;
+        }
+
+        /// <summary>
+        /// SPACE TRAVELER（docs/14 1.1。ユーザーの案、2026-10-15。C-4〜C-9、D-62、D-63 の回答、2026-10-16）。ワープで戦うキャラクター。
+        /// - 地上技 MOON HOP: 少しためた後、斜め後ろへふわりと飛び上がる（攻撃の判定はない）。その後、別の移動をするまでゆっくり落ちる
+        ///   （毎秒 3m。左右には動ける。C-4）。
+        /// - 空中・横 BLINK KICK: 前へ 2m ほど瞬間移動してから蹴る。
+        /// - 空中・下（撃破技）GRAVITY DROP: ためた後、真下へ重く落ちて叩きつける（打つ直前の速さで強くなる。D-38）。
+        /// - 空中・ニュートラル STARDUST: 体の周りに星を散らす 2 段。1 段目は相手を少し引き寄せる（コンボの始めに）。
+        /// - Q PORTAL（ワープポータル）: 自分のいる位置に 30 秒のポータルを置く（半径 1.2m。壊せない）。自分のものは 2 つまで（3 つ目で
+        ///   いちばん古いものが消える）。片方に入るともう片方へ移る（全員と投射物。速度はそのまま。出た直後の 0.5 秒は移らない）。
+        ///   置いた直後は自分が入らず、長押ししてから離すと、置いたポータルにそのまま入る（ユーザーの要望、2026-10-16）。2 回まで続けて
+        ///   使え、減っている間は 10 秒ごとに 1 つ戻る（C-6）。
+        /// - E MISSILE（スペースミサイル）: 長押しで狙い（狙いの表示）、離すと照準の方向へまっすぐ飛ぶミサイル（18 m/s）。触れたものか
+        ///   ステージの外で爆発する（D-63）。威力は最低 5、1 秒ごとに +10。壊せる物は壊す。クールタイム 6 秒。
+        /// - R COSMIC RAY（コズミックレイ）: 自分のポータル 2 つの間に、壁を貫通するビーム（太さ 1.5m）を撃つ（撃つ間は止まる）。
+        ///   10 ティックごとに 15 ダメージを 6 回。撃ち終わったときにビームの線が拠点に触れていれば、手持ちのコインを全部確定する（C-9）。
+        ///   ポータルが 2 つないと出せない。必要なゲージ 100%（D-62）。
+        /// </summary>
+        public static CharacterConfig SpaceTraveler()
+        {
+            var config = new CharacterConfig();
+            CombatTuning combat = config.Combat;
+
+            combat.Ground = new AttackData
+            {
+                Name = "MOON HOP",
+                TotalTicks = 26,
+                WireCancelFromTick = 12,
+                Effect = SkillEffect.SlowFall,
+                EffectTick = 10,
+                Hits = new AttackHit[0],
+                Motions = new[]
+                {
+                    new AttackMotion { StartTick = 0, Ticks = 9, VelocityX = 0f, VelocityY = 0f },
+                    new AttackMotion { StartTick = 9, Ticks = 1, VelocityX = -7f, VelocityY = 13f },
+                },
+            };
+
+            combat.AirSide = new AttackData
+            {
+                Name = "BLINK KICK",
+                TotalTicks = 24,
+                WireCancelFromTick = 7,
+                Hits = new[]
+                {
+                    new AttackHit
+                    {
+                        StartTick = 6, ActiveTicks = 5, OffsetX = 1.4f, HalfWidth = 1.6f, HalfHeight = 1.3f,
+                        Damage = 6, HitstopTicks = 12, HitstunTicks = 22, KnockbackX = 12f, KnockbackY = 6f,
+                    },
+                },
+                Motions = new[]
+                {
+                    // 1 ティックで 2m 進む（瞬間移動。地形は通り抜けない）。その後はゆっくり。
+                    new AttackMotion { StartTick = 4, Ticks = 1, VelocityX = 120f, VelocityY = 0f },
+                    new AttackMotion { StartTick = 5, Ticks = 1, VelocityX = 4f, VelocityY = 0f },
+                },
+            };
+
+            combat.AirDown = new AttackData
+            {
+                Name = "GRAVITY DROP",
+                TotalTicks = 40,
+                WireCancelFromTick = 16,
+                Hits = new[]
+                {
+                    new AttackHit
+                    {
+                        StartTick = 16, ActiveTicks = 14, OffsetX = 0f, OffsetY = -1.2f, HalfWidth = 1.4f, HalfHeight = 1.8f,
+                        Damage = 9, HitstopTicks = 20, HitstunTicks = 28, KnockbackX = 3f, KnockbackY = -14f,
+                    },
+                },
+                Motions = new[]
+                {
+                    new AttackMotion { StartTick = 0, Ticks = 16, VelocityX = 0f, VelocityY = 0f },
+                    new AttackMotion { StartTick = 16, Ticks = 14, VelocityX = 0f, VelocityY = -26f },
+                },
+            };
+            combat.KoAttack = AttackSlot.AirDown;
+
+            combat.AirNeutral = new AttackData
+            {
+                Name = "STARDUST",
+                TotalTicks = 22,
+                WireCancelFromTick = 5,
+                Hits = new[]
+                {
+                    new AttackHit
+                    {
+                        StartTick = 4, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 2.4f, HalfHeight = 2.4f,
+                        Damage = 3, HitstopTicks = 8, HitstunTicks = 18, KnockbackX = -3f, KnockbackY = 3f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 12, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 2.6f, HalfHeight = 2.6f,
+                        Damage = 4, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 6f, KnockbackY = 7f,
+                    },
+                },
+            };
+
+            combat.Special1 = new AttackData
+            {
+                Name = "PORTAL",
+                TotalTicks = 10,
+                WireCancelFromTick = 2,
+                Effect = SkillEffect.Portal,
+                EffectTick = 0,
+                HoldMaxTicks = 30,
+                Hits = new AttackHit[0],
+            };
+            combat.Special1CooldownTicks = 600;
+            combat.Special1MaxCharges = 2;
+
+            combat.Special2 = new AttackData
+            {
+                Name = "MISSILE",
+                TotalTicks = 16,
+                WireCancelFromTick = 4,
+                Effect = SkillEffect.Missile,
+                EffectTick = 2,
+                HoldMaxTicks = 600,
+                Hits = new AttackHit[0],
+            };
+            combat.Special2CooldownTicks = 360;
+
+            combat.Super = new AttackData
+            {
+                Name = "COSMIC RAY",
+                TotalTicks = 80,
+                WireCancelFromTick = 72,
+                Effect = SkillEffect.CosmicRay,
+                EffectTick = 10,
+                Hits = new AttackHit[0],
+                Motions = new[]
+                {
+                    // 撃つ間は止まる（C-9）。
+                    new AttackMotion { StartTick = 0, Ticks = 72, VelocityX = 0f, VelocityY = 0f },
+                },
+            };
+            combat.SuperGaugeCost = 100 * CombatTuning.GaugePerPercent;
             return config;
         }
     }

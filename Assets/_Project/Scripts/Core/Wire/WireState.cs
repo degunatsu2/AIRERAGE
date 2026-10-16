@@ -46,6 +46,9 @@ namespace Airerage.Core.Wire
 
         /// <summary>つないでいた置かれた物（ミラーボール）が消えた（docs/14）。</summary>
         AnchorGone,
+
+        /// <summary>ワープポータルで移った（ロープがつながらなくなる。SPACE TRAVELER）。</summary>
+        Warped,
     }
 
     /// <summary>

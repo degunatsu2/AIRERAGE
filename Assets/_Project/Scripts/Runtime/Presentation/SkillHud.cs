@@ -185,7 +185,10 @@ namespace Airerage.Runtime.Presentation
                     slot.Fill = Mathf.Clamp01(state.Combat.Gauge / (float)CombatTuning.MaxGauge);
                     slot.Line = Mathf.Clamp01(combat.SuperGaugeCost / (float)CombatTuning.MaxGauge);
                     slot.Text = PercentText(state.Combat.Gauge);
-                    slot.Label = ready ? "READY!" : slot.Name;
+                    // コズミックレイは、ゲージがたまっていても自分のポータルが 2 つないと出せない。
+                    bool needsPortals = combat.Super.Effect == Airerage.Core.Skills.SkillEffect.CosmicRay
+                        && state.Combat.Gauge >= combat.SuperGaugeCost && state.Combat.PortalCount < 2;
+                    slot.Label = ready ? "READY!" : needsPortals ? "PORTAL x2" : slot.Name;
                 }
                 else
                 {
@@ -198,7 +201,8 @@ namespace Airerage.Runtime.Presentation
                         int deposit = HoldDepositHud.DepositOf(state, _feed.GetConfig(local));
                         int max = Mathf.Max(1, combat.Get(move).HoldMaxTicks);
                         slot.Fill = Mathf.Clamp01(state.Combat.HoldTicks / (float)max);
-                        slot.Text = deposit >= 0 ? $"-{deposit}" : "HOLD";
+                        bool aiming = combat.Get(move).Effect == Airerage.Core.Skills.SkillEffect.Missile;
+                        slot.Text = deposit >= 0 ? $"-{deposit}" : aiming ? "AIM" : "HOLD";
                         slot.Label = "HOLD";
                     }
                     else if (left == CombatState.CooldownWhileActive)
@@ -213,6 +217,13 @@ namespace Airerage.Runtime.Presentation
                         slot.Fill = total <= 0 ? 1f : 1f - Mathf.Clamp01(left / (float)total);
                         slot.Text = ready ? slot.Name : (left * SimTime.DeltaTime).ToString("0.0");
                         slot.Label = ready ? string.Empty : slot.Name;
+                        int charges = combat.MaxChargesOf(move);
+                        if (charges > 1)
+                        {
+                            // 続けて使える技（ワープポータル）: 残りの回数と、次が戻るまで。
+                            int spent = move == AttackSlot.Special1 ? state.Combat.Special1Spent : state.Combat.Special2Spent;
+                            slot.Label = left > 0 && ready ? $"x{charges - spent}  {left * SimTime.DeltaTime:0.0}" : $"x{charges - spent}";
+                        }
                     }
                 }
             }

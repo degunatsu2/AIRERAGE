@@ -99,8 +99,8 @@ namespace Airerage.Core.Combat
     }
 
     /// <summary>
-    /// ための段階 1 つ（長押しの攻撃。RISK TAKER のオールイン）。ためた長さが FromTicks 以上なら、この段階の上乗せ（BonusPercent %）を
-    /// 威力にのせる（AttackPower）。表示（オーラの色）は段階の番号で決める。
+    /// ための段階 1 つ（長押しの攻撃。RISK TAKER のオールイン）。ためた長さが FromTicks 以上なら、この段階の上乗せ（威力に BonusPercent %、
+    /// 吹き飛びに KnockbackPercent %）をのせる（AttackPower）。表示（オーラの色）は段階の番号で決める（最後の段階は虹色）。
     /// </summary>
     [Serializable]
     public sealed class ChargeLevel
@@ -110,6 +110,9 @@ namespace Airerage.Core.Combat
 
         /// <summary>威力の上乗せ（%）。</summary>
         public int BonusPercent;
+
+        /// <summary>吹き飛びの上乗せ（%。ユーザーの要望、2026-10-16: 吹き飛びもためで強くする）。</summary>
+        public int KnockbackPercent;
     }
 
     /// <summary>
@@ -145,6 +148,12 @@ namespace Airerage.Core.Combat
         /// するまで終わらない（TotalTicks で終わらない）。判定は UntilEnd にする。
         /// </summary>
         public bool Run;
+
+        /// <summary>
+        /// 回る技（表示だけに使う。STORM RUNNER のつむじ風）。判定 1 つにつき 1 回転し、最後の判定の後で元の向きで止まる
+        /// （ユーザーの要望、2026-10-16）。
+        /// </summary>
+        public bool SpinPerHit;
 
         /// <summary>
         /// ための段階（長押しの攻撃。FromTicks の小さい順。最初は 0）。空なら、ためても威力は変わらない。
@@ -240,6 +249,7 @@ namespace Airerage.Core.Combat
                         continue;
                     }
                     v.NonNegative($"ChargeLevels[{i}].BonusPercent", ChargeLevels[i].BonusPercent);
+                    v.NonNegative($"ChargeLevels[{i}].KnockbackPercent", ChargeLevels[i].KnockbackPercent);
                     v.InRange($"ChargeLevels[{i}].FromTicks", ChargeLevels[i].FromTicks, i == 0 ? 0f : ChargeLevels[i - 1]?.FromTicks + 1 ?? 0f,
                         i == 0 ? 0f : HoldMaxTicks);
                 }
@@ -411,6 +421,13 @@ namespace Airerage.Core.Combat
         public int Special1CooldownTicks = 240;
 
         /// <summary>
+        /// 特殊攻撃を続けて使える回数（2 以上ならスタック。SPACE TRAVELER のワープポータル: 2。C-6）。使うと 1 つ減り、減っている間は
+        /// クールタイムごとに 1 つずつ戻る。1 ならふつうのクールタイム。
+        /// </summary>
+        public int Special1MaxCharges = 1;
+        public int Special2MaxCharges = 1;
+
+        /// <summary>
         /// 特殊攻撃 2（デフォルトのキャラクター。docs/13 T5-2 の仮の技）: すぐに斜め上へ飛び上がりながら、頭上を打ち上げる
         /// （上への移動技にもなる。ステージの外から戻るのにも使える）。
         /// </summary>
@@ -579,6 +596,12 @@ namespace Airerage.Core.Combat
             return slot == AttackSlot.Special1 || slot == AttackSlot.Special2 || slot == AttackSlot.Super;
         }
 
+        /// <summary>特殊攻撃を続けて使える回数（それ以外は 1）。</summary>
+        public int MaxChargesOf(AttackSlot slot)
+        {
+            return slot == AttackSlot.Special1 ? Special1MaxCharges : slot == AttackSlot.Special2 ? Special2MaxCharges : 1;
+        }
+
         /// <summary>特殊攻撃のクールタイム（ティック。それ以外は 0）。</summary>
         public int CooldownTicksOf(AttackSlot slot)
         {
@@ -629,6 +652,8 @@ namespace Airerage.Core.Combat
             }
             v.NonNegative(nameof(Special1CooldownTicks), Special1CooldownTicks);
             v.NonNegative(nameof(Special2CooldownTicks), Special2CooldownTicks);
+            v.InRange(nameof(Special1MaxCharges), Special1MaxCharges, 1f, 9f);
+            v.InRange(nameof(Special2MaxCharges), Special2MaxCharges, 1f, 9f);
             v.Positive(nameof(SuperGaugeCost), SuperGaugeCost);
             v.AtMost(nameof(SuperGaugeCost), SuperGaugeCost, nameof(MaxGauge), MaxGauge);
             v.NonNegative(nameof(KoKnockbackBase), KoKnockbackBase);

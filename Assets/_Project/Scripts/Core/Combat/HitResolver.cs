@@ -15,7 +15,7 @@ namespace Airerage.Core.Combat
     /// - 先に全員分の命中を集めてから、攻撃した側の番号、判定の順、当たった側の番号の順に当てる（同じティックの相打ちが順番で変わらない）。
     /// - 同じ判定は同じ相手に1回だけ当たる（二段技は、それぞれの判定が1回ずつ当たる）。ヒットストップ中の攻撃は新しく当たらない。
     /// - 当たった側: ワイヤーを外し、のけぞり（Hitstun）にして、吹き飛ばす（攻撃ごとに固定。撃破技は打つ直前の速さで倍率。D-38）。
-    ///   倍率と威力の上乗せは AttackPower が決める（D-64【提案】）。撃破技の倍率は威力（ダメージ）にもかかる。FatalStrikeSpeed 以上で打った撃破技が当たると「FATAL」で、ヒットストップが
+    ///   倍率と上乗せは AttackPower が決める（D-64）。撃破技の倍率は威力（ダメージ）にもかかる。FatalStrikeSpeed 以上で打った撃破技が当たると「FATAL」で、ヒットストップが
     ///   FatalHitstopMultiplier 倍になり、当たった側の FatalHitCount が増える（表示と効果音。ガードされたら FATAL にならない）。
     ///   最後にダメージを与えた人と時刻、コンボの数とダメージを記録する。HP はない（D-23）。
     ///   コンボは当てた人ごとで、のけぞりが終わるまで続く（別の人が当てると、その人の新しいコンボになる）。
@@ -119,8 +119,7 @@ namespace Airerage.Core.Combat
                         if (MathF.Abs(target.X - center.X) < half.X + targetHalf.X
                             && MathF.Abs(target.Y - center.Y) < half.Y + targetHalf.Y)
                         {
-                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, power.Multiplier, power.Fatal,
-                                jackpot: power.Jackpot, bonusPercent: power.BonusPercent));
+                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, power));
                         }
                     }
                 }
@@ -392,11 +391,8 @@ namespace Airerage.Core.Combat
         public readonly AttackHit Data;
         public readonly int Facing;
 
-        /// <summary>吹き飛びと威力の倍率（撃破技は打つ直前の速さ、ルーレットの技は目による。それ以外は 1。D-38、AttackPower）。</summary>
-        public readonly float KnockbackScale;
-
-        /// <summary>FatalStrikeSpeed 以上で打った撃破技か（当たれば FATAL。ガードされたら FATAL にならない）。</summary>
-        public readonly bool Fatal;
+        /// <summary>強さ（倍率・上乗せと内訳。集めたときのもの。AttackPower。D-64）。</summary>
+        public readonly AttackPower Power;
 
         /// <summary>結果（命中、ガード、ジャストガード）。</summary>
         public readonly HitResult Result;
@@ -407,15 +403,8 @@ namespace Airerage.Core.Combat
         /// <summary>投射物の命中か（撃った人は止まらず、今の攻撃にも影響しない。docs/13 T5-6）。</summary>
         public readonly bool FromObject;
 
-        /// <summary>JACKPOT の攻撃か（ルーレットの最大か、ためた技の最後の段階。当たれば JACKPOT の演出）。</summary>
-        public readonly bool Jackpot;
-
-        /// <summary>威力の上乗せ（%。ため、手持ちのコインなど。威力だけにかかる。AttackPower）。</summary>
-        public readonly int BonusPercent;
-
-        public HitRecord(int attacker, int victim, AttackSlot attack, int hitIndex, AttackHit data, int facing, float knockbackScale,
-            bool fatal = false, HitResult result = HitResult.Hit, bool startsCombo = false, bool fromObject = false, bool jackpot = false,
-            int bonusPercent = 0)
+        public HitRecord(int attacker, int victim, AttackSlot attack, int hitIndex, AttackHit data, int facing, AttackPower power,
+            HitResult result = HitResult.Hit, bool startsCombo = false, bool fromObject = false)
         {
             Attacker = attacker;
             Victim = victim;
@@ -423,28 +412,39 @@ namespace Airerage.Core.Combat
             HitIndex = hitIndex;
             Data = data;
             Facing = facing;
-            KnockbackScale = knockbackScale;
-            Fatal = fatal;
+            Power = power;
             Result = result;
             StartsCombo = startsCombo;
             FromObject = fromObject;
-            Jackpot = jackpot;
-            BonusPercent = bonusPercent;
         }
 
         public HitRecord WithResult(HitResult result, bool startsCombo = false)
         {
-            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, KnockbackScale, Fatal, result, startsCombo, FromObject, Jackpot,
-                BonusPercent);
+            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, Power, result, startsCombo, FromObject);
         }
 
-        /// <summary>当たった側の吹き飛びの速度（m/s、X は右が正）。</summary>
-        public Vector2 Knockback => new Vector2(Data.KnockbackX * Facing, Data.KnockbackY) * KnockbackScale;
+        /// <summary>倍率（吹き飛びと威力。撃破技は打つ直前の速さ、ルーレットの技は目による。それ以外は 1。D-38）。</summary>
+        public float Multiplier => Power.Multiplier;
+
+        /// <summary>威力の上乗せ（%）。</summary>
+        public int BonusPercent => Power.BonusPercent;
+
+        /// <summary>吹き飛びの上乗せ（%）。</summary>
+        public int KnockbackBonusPercent => Power.KnockbackBonusPercent;
+
+        /// <summary>FatalStrikeSpeed 以上で打った撃破技か（当たれば FATAL。ガードされたら FATAL にならない）。</summary>
+        public bool Fatal => Power.Fatal;
+
+        /// <summary>JACKPOT の攻撃か（ルーレットの最大か、ためた技の最後の段階。当たれば JACKPOT の演出）。</summary>
+        public bool Jackpot => Power.Jackpot;
+
+        /// <summary>当たった側の吹き飛びの速度（m/s、X は右が正。倍率と吹き飛びの上乗せをかける）。</summary>
+        public Vector2 Knockback => new Vector2(Data.KnockbackX * Facing, Data.KnockbackY) * Power.KnockbackScale;
 
         /// <summary>
-        /// 威力（ダメージ。倍率と上乗せをかけて四捨五入。AttackPower）。コンボが終わったときに、ダメージ報酬になる（docs/12 T4-5）。
+        /// 威力（ダメージ。倍率と威力の上乗せをかけて四捨五入。AttackPower）。コンボが終わったときに、ダメージ報酬になる（docs/12 T4-5）。
         /// </summary>
-        public int Damage => AttackPower.Damage(Data.Damage, KnockbackScale, BonusPercent);
+        public int Damage => AttackPower.Damage(Data.Damage, Power.Multiplier, Power.BonusPercent);
 
         /// <summary>FATAL として当たったか。</summary>
         public bool IsFatalHit => Fatal && Result == HitResult.Hit;

@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 19;
+        public const int FormatVersion = 20;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -153,6 +153,9 @@ namespace Airerage.Core.Simulation
                         writer.Write(item.HitMask);
                         writer.Write(item.BonusPercent);
                         writer.Write(item.LastPushId);
+                        writer.Write(item.InPortalId);
+                        writer.Write(item.End.X);
+                        writer.Write(item.End.Y);
                         writer.Write(item.HitKey0);
                         writer.Write(item.HitKey1);
                         writer.Write(item.HitKey2);
@@ -248,6 +251,7 @@ namespace Airerage.Core.Simulation
             writer.Write(action.TickRemainder);
             writer.Write(action.Advance);
             writer.Write(action.LastHitTicks);
+            writer.Write(action.Recast);
 
             CombatState combat = state.Combat;
             writer.Write(combat.HitstopTicksLeft);
@@ -286,6 +290,15 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.GaugeBonusRemainder);
             writer.Write(combat.SpeedBoostTicksLeft);
             writer.Write(combat.SkyBoostTicksLeft);
+            writer.Write(combat.Special1Spent);
+            writer.Write(combat.Special2Spent);
+            writer.Write(combat.HoldAim.X);
+            writer.Write(combat.HoldAim.Y);
+            writer.Write(combat.SlowFallSerial);
+            writer.Write(combat.PortalCount);
+            writer.Write(combat.InPortalId);
+            writer.Write(combat.WarpCooldownTicks);
+            writer.Write(combat.WarpCount);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -349,6 +362,7 @@ namespace Airerage.Core.Simulation
                 TickRemainder = reader.ReadInt32(),
                 Advance = reader.ReadInt32(),
                 LastHitTicks = reader.ReadInt32(),
+                Recast = reader.ReadBoolean(),
             };
             state.Combat = new CombatState
             {
@@ -388,6 +402,14 @@ namespace Airerage.Core.Simulation
                 GaugeBonusRemainder = reader.ReadInt32(),
                 SpeedBoostTicksLeft = reader.ReadInt32(),
                 SkyBoostTicksLeft = reader.ReadInt32(),
+                Special1Spent = reader.ReadInt32(),
+                Special2Spent = reader.ReadInt32(),
+                HoldAim = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                SlowFallSerial = reader.ReadInt32(),
+                PortalCount = reader.ReadInt32(),
+                InPortalId = reader.ReadInt32(),
+                WarpCooldownTicks = reader.ReadInt32(),
+                WarpCount = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

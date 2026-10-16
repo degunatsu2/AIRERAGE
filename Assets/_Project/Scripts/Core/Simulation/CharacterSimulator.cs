@@ -81,6 +81,7 @@ namespace Airerage.Core.Simulation
             _wire.UpdatePhase(ref state, frame, config.Wire);
 
             bool wasGrounded = state.Grounded;
+            int airJumpsBefore = state.AirJumpsUsed;
             bool attached = state.Wire.Phase == WirePhase.Attached;
             if (attached)
             {
@@ -91,6 +92,7 @@ namespace Airerage.Core.Simulation
             {
                 Locomotion.UpdateVelocity(ref state, frame, movement);
                 ActionController.ApplyMotion(ref state, config);
+                LimitSlowFall(ref state, airJumpsBefore, config);
             }
 
             System.Numerics.Vector3 beforeMove = state.Position;
@@ -104,6 +106,11 @@ namespace Airerage.Core.Simulation
             }
 
             Locomotion.ApplyGroundState(ref state, _motor.ProbeGround(state.Position, halfExtents), movement);
+            if (state.Grounded || attached)
+            {
+                // 着地・ワイヤーの接続で、ゆっくり落ちるのは終わる。
+                state.Combat.SlowFallSerial = 0;
+            }
             ActionController.AfterMove(ref state, wasGrounded, velocityBeforeMove, config);
             Bounce(ref state, velocityBeforeMove, config.Combat);
             StageZones.Apply(ref state, startPosition, new System.Numerics.Vector2(halfExtents.X, halfExtents.Y), _zones);
@@ -112,6 +119,31 @@ namespace Airerage.Core.Simulation
             state.Position.Z = 0f;
             state.Velocity.Z = 0f;
             state.PreviousButtons = input.Buttons;
+        }
+
+        /// <summary>
+        /// ゆっくり落ちる（SPACE TRAVELER の地上技の後。C-4）: 落ちる速さを SlowFallTuning.MaxFallSpeed までにする。ジャンプ・空中ジャンプ・
+        /// ワイヤー・ほかの攻撃や技・ガード・被弾（とその後の着地）で終わる。左右には動ける。
+        /// </summary>
+        private static void LimitSlowFall(ref CharacterState state, int airJumpsBefore, CharacterConfig config)
+        {
+            if (state.Combat.SlowFallSerial == 0)
+            {
+                return;
+            }
+            bool otherAttack = state.Action.Kind == ActionKind.Attack && state.Combat.AttackSerial + 1 != state.Combat.SlowFallSerial;
+            if (otherAttack || state.Action.Kind == ActionKind.Guard || state.Action.Kind == ActionKind.Hitstun
+                || state.Wire.Phase != WirePhase.Ready && state.Wire.Phase != WirePhase.Cooldown
+                || state.AirJumpsUsed != airJumpsBefore)
+            {
+                state.Combat.SlowFallSerial = 0;
+                return;
+            }
+            float max = config.Skills.SlowFall.MaxFallSpeed;
+            if (state.Velocity.Y < -max)
+            {
+                state.Velocity.Y = -max;
+            }
         }
 
         /// <summary>

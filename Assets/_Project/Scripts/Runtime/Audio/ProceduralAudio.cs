@@ -129,6 +129,21 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>風の帯を置いた（吹き上がっていく風の音。STORM RUNNER のスカイロケット）。</summary>
         SkyRocket,
+
+        /// <summary>ワープポータルを置いた（宇宙的な揺れる和音。SPACE TRAVELER）。</summary>
+        PortalPlace,
+
+        /// <summary>ワープポータルで移った（吸い込まれて飛び出す音）。</summary>
+        Warp,
+
+        /// <summary>スペースミサイルを撃った（低い噴射音）。</summary>
+        MissileFire,
+
+        /// <summary>スペースミサイルが爆発した（重い爆発音）。</summary>
+        MissileExplode,
+
+        /// <summary>コズミックレイを撃った（唸りながら伸びるビームの音）。</summary>
+        CosmicRay,
     }
 
     /// <summary>
@@ -561,6 +576,48 @@ namespace Airerage.Runtime.Audio
                     AddTone(b, r, 0.05f, 0.7f, 200f, 1100f, Wave.Triangle, 0.15f, 0.05f, 0.3f);
                     AddTone(b, r, 0.3f, 0.5f, NoteFrequency(88), NoteFrequency(95), Wave.Sine, 0.1f, 0.02f, 0.25f);
                     break;
+                case SoundId.PortalPlace:
+                {
+                    b = new float[Samples(0.9f, r)];
+                    int[] portalChord = { 72, 79, 83, 88 };
+                    for (int i = 0; i < portalChord.Length; i++)
+                    {
+                        float f = NoteFrequency(portalChord[i]);
+                        AddTone(b, r, i * 0.03f, 0.75f, f * 0.98f, f * 1.02f, Wave.Sine, 0.18f, 0.02f, 0.4f);
+                    }
+                    ApplyTremolo(b, r, 7f, 0.5f);
+                    break;
+                }
+                case SoundId.Warp:
+                    b = new float[Samples(0.5f, r)];
+                    AddTone(b, r, 0f, 0.2f, 1400f, 200f, Wave.Sine, 0.35f, 0.005f, 0.05f);
+                    AddTone(b, r, 0.18f, 0.25f, 220f, 1600f, Wave.Triangle, 0.3f, 0.005f, 0.1f);
+                    AddNoise(b, r, rng, 0.15f, 0.12f, 0.2f, 0.01f, 0.06f, 5000f, 2000f, 600f);
+                    break;
+                case SoundId.MissileFire:
+                    b = new float[Samples(0.6f, r)];
+                    AddNoise(b, r, rng, 0f, 0.5f, 0.55f, 0.01f, 0.3f, 900f, 2500f, 120f);
+                    AddTone(b, r, 0f, 0.35f, 140f, 260f, Wave.Saw, 0.2f, 0.01f, 0.2f);
+                    break;
+                case SoundId.MissileExplode:
+                    b = new float[Samples(1.1f, r)];
+                    AddNoise(b, r, rng, 0f, 0.9f, 1f, 0.001f, 0.5f, 3000f, 300f, 40f);
+                    AddTone(b, r, 0f, 0.6f, 120f, 35f, Wave.Sine, 0.9f, 0.001f, 0.35f);
+                    break;
+                case SoundId.CosmicRay:
+                {
+                    b = new float[Samples(1.4f, r)];
+                    AddTone(b, r, 0f, 1.3f, 110f, 220f, Wave.Saw, 0.22f, 0.05f, 0.4f);
+                    AddTone(b, r, 0f, 1.3f, 440f, 880f, Wave.Sine, 0.18f, 0.05f, 0.4f);
+                    int[] rayNotes = { 84, 91, 96 };
+                    foreach (int note in rayNotes)
+                    {
+                        float f = NoteFrequency(note);
+                        AddTone(b, r, 0.1f, 1.1f, f, f, Wave.Sine, 0.08f, 0.05f, 0.4f);
+                    }
+                    ApplyTremolo(b, r, 18f, 0.35f);
+                    break;
+                }
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");
             }

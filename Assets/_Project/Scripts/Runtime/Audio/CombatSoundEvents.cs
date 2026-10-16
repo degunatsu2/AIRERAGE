@@ -101,6 +101,11 @@ namespace Airerage.Runtime.Audio
             {
                 _audio.Play(SoundId.Bounce, 1f, 0.06f);
             }
+            if (n.WarpCount > b.WarpCount)
+            {
+                // ワープポータルで移った（SPACE TRAVELER）。
+                _audio.Play(SoundId.Warp, 0.9f, 0.04f);
+            }
             if (n.FatalHitCount > b.FatalHitCount)
             {
                 _audio.Play(SoundId.Fatal);

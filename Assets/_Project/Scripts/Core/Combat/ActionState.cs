@@ -112,6 +112,9 @@ namespace Airerage.Core.Combat
         /// <summary>今の攻撃が最後に当たった（ガードを含む）ときの Ticks（走り続ける地上技で、同じ相手にまた当たれるまでを数える）。</summary>
         public int LastHitTicks;
 
+        /// <summary>効果中にもう一度出した技か（ウインドクロークを解いて突風を撃つ。溜めと反動がある。SpeedBoostTuning）。</summary>
+        public bool Recast;
+
         public bool IsFree => Kind == ActionKind.Free;
 
         public bool Equals(ActionState other)
@@ -121,7 +124,7 @@ namespace Airerage.Core.Combat
                 && Connected == other.Connected && CancelFromTick == other.CancelFromTick
                 && EffectDone == other.EffectDone && Charge == other.Charge && Aim.Equals(other.Aim) && RunSpeed.Equals(other.RunSpeed)
                 && TurnTicksLeft == other.TurnTicksLeft && TickRemainder == other.TickRemainder && Advance == other.Advance
-                && LastHitTicks == other.LastHitTicks;
+                && LastHitTicks == other.LastHitTicks && Recast == other.Recast;
         }
 
         public override bool Equals(object obj)
@@ -132,7 +135,7 @@ namespace Airerage.Core.Combat
         public override int GetHashCode()
         {
             return HashCode.Combine(HashCode.Combine(Kind, Attack, Ticks, Duration, HitMask, StrikeSpeed, Connected, CancelFromTick),
-                EffectDone, Charge, Aim, RunSpeed, TurnTicksLeft, TickRemainder, HashCode.Combine(Advance, LastHitTicks));
+                EffectDone, Charge, Aim, RunSpeed, TurnTicksLeft, TickRemainder, HashCode.Combine(Advance, LastHitTicks, Recast));
         }
 
         public override string ToString()

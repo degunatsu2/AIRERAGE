@@ -79,19 +79,26 @@ MonoBehaviour:
         HoldMaxTicks: 180
         HoldRooted: 1
         Run: 0
+        SpinPerHit: 0
         ChargeLevels:
         - FromTicks: 0
           BonusPercent: 0
+          KnockbackPercent: 0
         - FromTicks: 24
           BonusPercent: 20
+          KnockbackPercent: 20
         - FromTicks: 48
           BonusPercent: 50
+          KnockbackPercent: 50
         - FromTicks: 78
           BonusPercent: 100
+          KnockbackPercent: 100
         - FromTicks: 120
           BonusPercent: 200
+          KnockbackPercent: 200
         - FromTicks: 180
           BonusPercent: 500
+          KnockbackPercent: 500
         Roulette: 0
         TotalTicks: 42
         WireCancelFromTick: 8
@@ -126,6 +133,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 19
@@ -151,6 +159,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 25
@@ -176,6 +185,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 22
@@ -189,6 +199,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 1
         TotalTicks: 40
@@ -219,6 +230,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 16
@@ -226,6 +238,8 @@ MonoBehaviour:
         Hits: []
         Motions: []
       Special1CooldownTicks: 900
+      Special1MaxCharges: 1
+      Special2MaxCharges: 1
       Special2:
         Name: SAFE
         Effect: 2
@@ -233,6 +247,7 @@ MonoBehaviour:
         HoldMaxTicks: 600
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 14
@@ -247,6 +262,7 @@ MonoBehaviour:
         HoldMaxTicks: 0
         HoldRooted: 0
         Run: 0
+        SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
         TotalTicks: 24
@@ -322,9 +338,9 @@ MonoBehaviour:
         HeldCoinsPerBonusPercent: 3
         MaxHeldCoinBonusPercent: 100
       Run:
-        InitialSpeed: 10
+        InitialSpeed: 12.5
         Acceleration: 6
-        MaxSpeed: 24
+        MaxSpeed: 28
         JumpAngleDeg: 20
         TurnTicks: 8
         RehitTicks: 30
@@ -335,6 +351,10 @@ MonoBehaviour:
         GustRange: 15
         GustHalfWidth: 1
         GustPush: 12
+        GustWindupTicks: 10
+        GustRecoveryTicks: 14
+        GustRecoilSpeed: 9
+        GustWindupBrake: 0.8
       WindZone:
         DurationTicks: 600
         Length: 10
@@ -344,6 +364,51 @@ MonoBehaviour:
       SkyBoost:
         DurationTicks: 600
         SpeedPercent: 50
+      Portal:
+        DurationTicks: 1800
+        Radius: 1.2
+        MaxPerOwner: 2
+        WarpCooldownTicks: 30
+        EnterHoldTicks: 12
+      Missile:
+        Speed: 18
+        Radius: 0.4
+        ExplosionRadius: 1.6
+        OffsetY: 0.2
+        BonusPercentPerSecond: 200
+        LifetimeTicks: 1200
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          HitstopTicks: 10
+          HitstunTicks: 24
+          KnockbackX: 9
+          KnockbackY: 7
+      Beam:
+        HalfWidth: 0.75
+        IntervalTicks: 10
+        Hits: 6
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 15
+          HitstopTicks: 6
+          HitstunTicks: 20
+          KnockbackX: 3
+          KnockbackY: 4
+      SlowFall:
+        MaxFallSpeed: 3
   _displayName: RISK TAKER
   _special1Icon: {fileID: 0}
   _special2Icon: {fileID: 0}

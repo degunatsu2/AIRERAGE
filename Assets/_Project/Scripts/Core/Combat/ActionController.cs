@@ -46,6 +46,8 @@ namespace Airerage.Core.Combat
     ///   逆向きに入力すると反転する。足場が途切れたら・壁にぶつかったら浅い角度で跳ぶ（AfterMove）。
     /// - 行動の速さの強化（SpeedBoosts）の間は、攻撃のフレームを速く進める（ヒットストップ・のけぞり・ガードは速くしない）。
     /// - 効果中にもう一度出せる技（行動の速さの強化）は、効果中なら止めているクールタイムのままでも出せる（CanRecast）。
+    /// - 続けて使える特殊攻撃（CombatTuning.Special1MaxCharges が 2 以上。ワープポータル）は、回数が残っていれば出せる。減っている間は
+    ///   クールタイムごとに 1 つずつ戻る（C-6）。コズミックレイ（必殺技）は、自分のワープポータルが 2 つあるときだけ出せる。
     /// </summary>
     public static class ActionController
     {
@@ -90,7 +92,7 @@ namespace Airerage.Core.Combat
                         // 別の行動で走るのをやめた。このティックに、その行動を始める。
                         break;
                     }
-                    if (state.Action.Ticks < combat.Get(state.Action.Attack).TotalTicks)
+                    if (state.Action.Ticks < LengthOf(state, config))
                     {
                         TryCancel(ref state, input, config);
                         return;
@@ -165,6 +167,7 @@ namespace Airerage.Core.Combat
             state.Combat.Holding = true;
             state.Combat.HoldSlot = slot;
             state.Combat.HoldTicks = 0;
+            state.Combat.HoldAim = input.Aim;
             state.Combat.AttackBufferTicksLeft = 0;
             // 押したときに横を入れていれば、その向きを向く。ためている間は向きを変えられ、離したときの向きで出す。
             if (state.Combat.BufferedFacing != 0)
@@ -198,6 +201,8 @@ namespace Airerage.Core.Combat
                 {
                     state.Combat.HoldTicks++;
                 }
+                // ためている間の照準（ミサイルの狙いの表示）。
+                state.Combat.HoldAim = input.Aim;
                 return false;
             }
             int charge = state.Combat.HoldTicks;
@@ -224,11 +229,31 @@ namespace Airerage.Core.Combat
         {
             switch (slot)
             {
-                case AttackSlot.Special1: return state.Combat.Special1CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
-                case AttackSlot.Special2: return state.Combat.Special2CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
-                case AttackSlot.Super: return state.Combat.Gauge >= combat.SuperGaugeCost;
+                case AttackSlot.Special1:
+                    return combat.Special1MaxCharges > 1 ? state.Combat.Special1Spent < combat.Special1MaxCharges
+                        : state.Combat.Special1CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
+                case AttackSlot.Special2:
+                    return combat.Special2MaxCharges > 1 ? state.Combat.Special2Spent < combat.Special2MaxCharges
+                        : state.Combat.Special2CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
+                case AttackSlot.Super:
+                    // コズミックレイは、自分のワープポータルが 2 つないと出せない（docs/14 1.1）。
+                    return state.Combat.Gauge >= combat.SuperGaugeCost
+                        && (combat.Super.Effect != SkillEffect.CosmicRay || state.Combat.PortalCount >= 2);
                 default: return true;
             }
+        }
+
+        /// <summary>
+        /// 今の攻撃の長さ（ティック。ふつうは AttackData.TotalTicks。効果中にもう一度出した突風は、溜めと硬直の合計）。
+        /// </summary>
+        public static int LengthOf(in CharacterState state, CharacterConfig config)
+        {
+            if (state.Action.Recast)
+            {
+                SpeedBoostTuning boost = config.Skills.SpeedBoost;
+                return boost.GustWindupTicks + boost.GustRecoveryTicks;
+            }
+            return config.Combat.Get(state.Action.Attack).TotalTicks;
         }
 
         /// <summary>
@@ -294,6 +319,12 @@ namespace Airerage.Core.Combat
             if (attack.Run)
             {
                 ApplyRun(ref state, config.Skills.Run, scale);
+                return;
+            }
+            if (state.Action.Recast && state.Action.Ticks < config.Skills.SpeedBoost.GustWindupTicks)
+            {
+                // 突風の溜め: ほとんど止まる（撃つと反動で下がる。SkillRules）。
+                state.Velocity *= config.Skills.SpeedBoost.GustWindupBrake;
                 return;
             }
             // 行動の速さの強化でフレームを飛ばしたティックは、飛ばしたフレームの分も順に調べる（1 ティックだけの動きを落とさない）。
@@ -375,6 +406,9 @@ namespace Airerage.Core.Combat
             CountDown(ref state.Combat.CoinBoostTicksLeft);
             CountDown(ref state.Combat.SpeedBoostTicksLeft);
             CountDown(ref state.Combat.SkyBoostTicksLeft);
+            CountDown(ref state.Combat.WarpCooldownTicks);
+            Recharge(ref state.Combat.Special1Spent, ref state.Combat.Special1CooldownTicksLeft, combat.Special1MaxCharges, combat.Special1CooldownTicks);
+            Recharge(ref state.Combat.Special2Spent, ref state.Combat.Special2CooldownTicksLeft, combat.Special2MaxCharges, combat.Special2CooldownTicks);
             // 行動の速さの強化が終わったら（時間切れ・撃破）、止めていたクールタイムを数え始める。
             if (state.Combat.SpeedBoostTicksLeft == 0)
             {
@@ -600,7 +634,9 @@ namespace Airerage.Core.Combat
                 return;
             }
 
-            if (input.WasPressed(InputButtons.Wire) && state.Action.Ticks >= attack.WireCancelFromTick
+            int wireCancelFrom = state.Action.Recast ? Math.Max(attack.WireCancelFromTick, config.Skills.SpeedBoost.GustWindupTicks + 1)
+                : attack.WireCancelFromTick;
+            if (input.WasPressed(InputButtons.Wire) && state.Action.Ticks >= wireCancelFrom
                 && state.Combat.WireCancelCooldownTicksLeft == 0 && state.Wire.Phase == WirePhase.Ready)
             {
                 state.Action = default;
@@ -650,6 +686,7 @@ namespace Airerage.Core.Combat
             {
                 state.Facing = state.Combat.BufferedFacing;
             }
+            bool recast = CanRecast(state, slot, combat);
             state.Action = new ActionState
             {
                 Kind = ActionKind.Attack,
@@ -657,20 +694,50 @@ namespace Airerage.Core.Combat
                 Ticks = 0,
                 Advance = 1,
                 Aim = input.Aim,
+                Recast = recast,
             };
             state.Combat.AttackBufferTicksLeft = 0;
             state.Combat.AttackSerial++;
             switch (slot)
             {
                 case AttackSlot.Special1:
-                    state.Combat.Special1CooldownTicksLeft = combat.Special1CooldownTicks;
+                    Spend(ref state.Combat.Special1Spent, ref state.Combat.Special1CooldownTicksLeft, combat.Special1MaxCharges, combat.Special1CooldownTicks);
                     break;
                 case AttackSlot.Special2:
-                    state.Combat.Special2CooldownTicksLeft = combat.Special2CooldownTicks;
+                    Spend(ref state.Combat.Special2Spent, ref state.Combat.Special2CooldownTicksLeft, combat.Special2MaxCharges, combat.Special2CooldownTicks);
                     break;
                 case AttackSlot.Super:
                     state.Combat.Gauge -= combat.SuperGaugeCost;
                     break;
+            }
+        }
+
+        // 特殊攻撃を 1 回使う。続けて使える技（スタック）は回数を 1 つ減らし、戻るのを待っていなければクールタイムを始める。
+        // ふつうの技は、クールタイムを始める。
+        private static void Spend(ref int spent, ref int cooldown, int maxCharges, int cooldownTicks)
+        {
+            if (maxCharges > 1)
+            {
+                spent++;
+                if (cooldown <= 0)
+                {
+                    cooldown = cooldownTicks;
+                }
+                return;
+            }
+            cooldown = cooldownTicks;
+        }
+
+        // スタックの技: クールタイムが終わったら 1 つ戻し、まだ減っていれば次のクールタイムを始める。
+        private static void Recharge(ref int spent, ref int cooldown, int maxCharges, int cooldownTicks)
+        {
+            if (maxCharges > 1 && cooldown == 0 && spent > 0)
+            {
+                spent--;
+                if (spent > 0)
+                {
+                    cooldown = cooldownTicks;
+                }
             }
         }
 

@@ -129,6 +129,9 @@ namespace Airerage.Core.Economy
 
         /// <summary>効率のボーナス（生成。→ 所持。フィーバータイム）。</summary>
         CoinBonus = 10,
+
+        /// <summary>コズミックレイでの確定（移動。所持 → 確定。ビームが拠点に触れていたとき。SPACE TRAVELER）。</summary>
+        RayBank = 11,
     }
 
     /// <summary>

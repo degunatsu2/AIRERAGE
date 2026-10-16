@@ -44,25 +44,59 @@ namespace Airerage.PlayMode.Tests
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Attack), default, default, default });
             yield return WaitSeconds(0.3f);
             Assert.That(runner.PlayerState.Action.Kind, Is.EqualTo(ActionKind.Attack), "前提: 走っている");
-            Assert.That(boost.ShowsRun(0), Is.True, "走る線を出さない");
+            Assert.That(boost.ShowsRun(0), Is.True, "走る線とオーラを出さない");
+            Assert.That(boost.WindsHaveShadows(0), Is.True, "走る線に影がない");
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Guard), default });
             yield return WaitSeconds(0.8f);
 
-            // Q: ウインドクローク。札は GUST（もう一度押すと突風）。
+            // 空中でつむじ風: 竜巻をまとって回り、終わったら元の向き（0 度）で止まる。
+            CharacterState air = runner.PlayerState;
+            air.Position = new System.Numerics.Vector3(air.Position.X, air.Position.Y + 10f, 0f);
+            air.Velocity = System.Numerics.Vector3.Zero;
+            air.Grounded = false;
+            runner.SetPlayerState(air);
+            yield return null;
+            runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Attack), default });
+            bool sawTornado = false;
+            float maxSpin = 0f;
+            float spinStart = Time.time;
+            while (Time.time - spinStart < 0.5f)
+            {
+                sawTornado |= boost.ShowsTornado(0);
+                maxSpin = Mathf.Max(maxSpin, Mathf.Abs(runner.PlayerView.SpinDegrees));
+                yield return null;
+            }
+            Assert.That(sawTornado, Is.True, "つむじ風で竜巻を出さない");
+            Assert.That(maxSpin, Is.GreaterThan(90f), "つむじ風で回らない");
+            Assert.That(runner.PlayerView.SpinDegrees, Is.EqualTo(0f), "回り終わっても元の向きに戻らない");
+            Assert.That(boost.WindsHaveShadows(0), Is.True, "風の線に影がない");
+            yield return WaitSeconds(0.6f);
+
+            // Q: ウインドクローク。札は GUST（もう一度押すと突風）。残りのゲージには縁。
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special1), default });
             yield return WaitSeconds(0.3f);
             Assert.That(boost.ShowsCloak(0), Is.True, "ウインドクロークの風を出さない");
+            Assert.That(boost.CloakGaugeHasFrame(0), Is.True, "残りのゲージに縁がない");
             Assert.That(hud.SlotOf(0).Text, Is.EqualTo("GUST"), "効果中の札が GUST でない");
-            runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special1), default });
+            runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special1, 0, 127), default });
             bool sawGust = false;
+            bool sawWindup = false;
+            bool gustShadow = false;
             float start = Time.time;
-            while (Time.time - start < 0.5f)
+            while (Time.time - start < 0.6f)
             {
                 ISimulationFeed feed = runner;
-                sawGust |= feed.Objects.Items.Any(o => o.Kind == WorldObjectKind.Gust) && objectsView.ShownCount > 0;
+                sawWindup |= boost.ShowsGustWindup(0);
+                foreach (WorldObject gust in feed.Objects.Items.Where(o => o.Kind == WorldObjectKind.Gust))
+                {
+                    sawGust |= objectsView.ShownCount > 0;
+                    gustShadow |= objectsView.WindsHaveShadows(gust.Id);
+                }
                 yield return null;
             }
+            Assert.That(sawWindup, Is.True, "突風の溜めを表示しない");
             Assert.That(sawGust, Is.True, "突風を表示しない");
+            Assert.That(gustShadow, Is.True, "突風の線に影がない");
             Assert.That(audio.History.Contains(SoundId.Gust), Is.True, "突風の音が鳴らない");
             Assert.That(boost.ShowsCloak(0), Is.False, "解いたのにウインドクロークの風が残る");
 

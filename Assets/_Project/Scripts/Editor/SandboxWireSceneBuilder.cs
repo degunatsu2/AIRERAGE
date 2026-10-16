@@ -31,6 +31,7 @@ namespace Airerage.Editor
         public const string CharacterRosterPath = "Assets/_Project/Data/Characters/CharacterRoster.asset";
         public const string RiskTakerPath = "Assets/_Project/Data/Characters/RiskTaker.asset";
         public const string StormRunnerPath = "Assets/_Project/Data/Characters/StormRunner.asset";
+        public const string SpaceTravelerPath = "Assets/_Project/Data/Characters/SpaceTraveler.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
@@ -372,6 +373,15 @@ namespace Airerage.Editor
             SetReference(hold, "_source", source);
             SetReference(hold, "_camera", Object.FindFirstObjectByType<Camera>());
             CreateChargeAura(source, audio);
+            var space = new GameObject("SpaceEffects").AddComponent<SpaceEffectsView>();
+            LineRenderer spaceLine = CreateIndicatorLine(space.transform, "SpaceLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
+            spaceLine.gameObject.SetActive(false);
+            BurstEffectView warp = CreateBurst("WarpBurstTemplate", space.transform);
+            warp.Configure(new Color(0.75f, 0.5f, 1f), false, 0.35f, 0.2f, 1.8f, 10, 1.4f, 0.14f, string.Empty, 0, 0f);
+            warp.gameObject.SetActive(false);
+            SetReference(space, "_source", source);
+            SetReference(space, "_lineTemplate", spaceLine);
+            SetReference(space, "_burstTemplate", warp);
             var boost = new GameObject("BoostAura").AddComponent<BoostAuraView>();
             LineRenderer boostLine = CreateIndicatorLine(boost.transform, "BoostLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
             boostLine.gameObject.SetActive(false);
@@ -407,7 +417,10 @@ namespace Airerage.Editor
             SetReference(view, "_audio", audio);
         }
 
-        /// <summary>置かれた物と投射物の表示（WorldObjectsView。見本はミラーボール、セーフティボックス、投射物、突風、風の帯の順）。</summary>
+        /// <summary>
+        /// 置かれた物と投射物の表示（WorldObjectsView。見本はミラーボール、セーフティボックス、投射物、突風、風の帯、ワープポータル、
+        /// ミサイル、ビームの順）。
+        /// </summary>
         internal static void CreateWorldObjectsView(MonoBehaviour source, GameAudio audio)
         {
             var view = new GameObject("WorldObjects").AddComponent<WorldObjectsView>();
@@ -456,7 +469,22 @@ namespace Airerage.Editor
                 streak.endColor = new Color(0.7f, 1f, 0.5f, 0.75f);
             }
 
-            foreach (GameObject template in new[] { ball, safe, coin, gust, windZone })
+            // ワープポータル（輪、らせん、つながりの線）、ミサイル（弾と軌跡）、ビーム（光と芯）。
+            var portal = new GameObject("PortalTemplate");
+            portal.transform.SetParent(view.transform, false);
+            CreateIndicatorLine(portal.transform, "Ring", lineMaterial, 0.14f);
+            CreateIndicatorLine(portal.transform, "Swirl", lineMaterial, 0.07f);
+            CreateIndicatorLine(portal.transform, "Link", lineMaterial, 0.05f);
+            GameObject missile = CreateVisual(PrimitiveType.Cube, "MissileTemplate", LoadOrCreateMaterial("Missile", new Color(0.85f, 0.7f, 1f), unlit: true),
+                new Vector3(0.8f, 0.28f, 0.28f));
+            missile.transform.SetParent(view.transform, false);
+            CreateIndicatorLine(missile.transform, "Trail", lineMaterial, 0.18f);
+            var beam = new GameObject("BeamTemplate");
+            beam.transform.SetParent(view.transform, false);
+            CreateIndicatorLine(beam.transform, "Glow", lineMaterial, 1.5f);
+            CreateIndicatorLine(beam.transform, "Core", lineMaterial, 0.4f);
+
+            foreach (GameObject template in new[] { ball, safe, coin, gust, windZone, portal, missile, beam })
             {
                 foreach (Collider collider in template.GetComponentsInChildren<Collider>())
                 {
@@ -465,7 +493,11 @@ namespace Airerage.Editor
                 template.SetActive(false);
             }
             SetReference(view, "_source", source);
-            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin, gust, windZone });
+            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin, gust, windZone, portal, missile, beam });
+            BurstEffectView explosion = CreateBurst("ExplosionTemplate", view.transform);
+            explosion.Configure(new Color(0.85f, 0.6f, 1f), false, 0.45f, 0.3f, 2.6f, 12, 2.4f, 0.22f, string.Empty, 0, 0.12f);
+            explosion.gameObject.SetActive(false);
+            SetReference(view, "_explosionTemplate", explosion);
             SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
             SetReference(view, "_audio", audio);
         }
@@ -884,6 +916,7 @@ namespace Airerage.Editor
         {
             CharacterConfigAsset riskTaker = WritePresetCharacter(RiskTakerPath, CharacterPresets.RiskTaker(), CharacterPresets.RiskTakerName);
             CharacterConfigAsset stormRunner = WritePresetCharacter(StormRunnerPath, CharacterPresets.StormRunner(), CharacterPresets.StormRunnerName);
+            CharacterConfigAsset spaceTraveler = WritePresetCharacter(SpaceTravelerPath, CharacterPresets.SpaceTraveler(), CharacterPresets.SpaceTravelerName);
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
             if (roster == null)
             {
@@ -891,7 +924,7 @@ namespace Airerage.Editor
                 roster = ScriptableObject.CreateInstance<CharacterRoster>();
                 AssetDatabase.CreateAsset(roster, CharacterRosterPath);
             }
-            roster.Configure(new[] { character, riskTaker, stormRunner });
+            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler });
             EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return roster;

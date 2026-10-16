@@ -224,7 +224,8 @@ namespace Airerage.Core.Simulation
             _projectileHits.Clear();
             SkillRules.StepObjects(_objects, _collision, _states, _configs, Bounds, Tick, _projectileHits);
             _hits.Resolve(_states, _configs, Tick, _objects, Rules.Seed, _projectileHits);
-            SkillRules.EndObjects(_objects, Coins, _states, _configs, Rules, Tick);
+            SkillRules.EndObjects(_objects, Coins, _states, _configs, Rules, Tick, BankSpots,
+                phase == MatchPhase.Playing || phase == MatchPhase.Overtime);
             CoinDropRules.DropOnHits(Coins, _states, _hits.LastHits, Rules, Tick);
             if (Bounds.HasValue)
             {

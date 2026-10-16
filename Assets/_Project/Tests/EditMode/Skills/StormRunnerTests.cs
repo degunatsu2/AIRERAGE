@@ -184,7 +184,7 @@ namespace Airerage.Core.Tests.Skills
             int bonus = run.BonusPercentAt(runner.Action.RunSpeed);
             Assert.That(bonus, Is.GreaterThan(0), "前提: 初速より速い");
             Assert.That(hit.Value.BonusPercent, Is.EqualTo(bonus), "速さで強くならない");
-            Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(4, 1f, bonus)));
+            Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(Storm.Combat.Ground.Hits[0].Damage, 1f, bonus)));
             Assert.That(hit.Value.Damage, Is.EqualTo((int)System.MathF.Round(runner.Action.RunSpeed * 0.4f)).Within(1), "ダメージが速さ × 0.4 でない");
             Assert.That(runner.Action.Attack, Is.EqualTo(AttackSlot.Ground), "当てたら走るのが終わった");
 
@@ -247,10 +247,22 @@ namespace Airerage.Core.Tests.Skills
 
             Step(world, 20);
             Edit(world, 1, s => { s.Position = new Vector3(6f, world.GetState(0).Position.Y, 0f); s.Velocity = Vector3.Zero; return s; });
-            Step(world, 1, Press(InputButtons.Special1));
-            Assert.That(world.GetState(0).Combat.SpeedBoostTicksLeft, Is.Zero, "もう一度押しても強化が解けない");
+            // 照準を右（相手の方）へ向けて、もう一度押す。短く溜めてから撃つ（ユーザーの要望、2026-10-16）。
+            Step(world, 1, new PlayerInput(0, 0, InputButtons.Special1, 127, 0));
+            Assert.That(world.GetState(0).Action.Recast, Is.True, "もう一度出した技になっていない");
             Assert.That(world.GetState(0).Combat.Special1CooldownTicksLeft, Is.EqualTo(Storm.Combat.Special1CooldownTicks), "解いたときにクールタイムが始まらない");
-            Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Gust), Is.True, "突風を撃たない");
+            Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Gust), Is.False, "溜めずに撃った");
+            int waited = 0;
+            while (!world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Gust) && waited < 30)
+            {
+                Step(world, 1);
+                waited++;
+            }
+            Assert.That(waited, Is.InRange(Storm.Skills.SpeedBoost.GustWindupTicks * 3 / 4, Storm.Skills.SpeedBoost.GustWindupTicks), "溜めの長さが違う");
+            Assert.That(world.GetState(0).Combat.SpeedBoostTicksLeft, Is.Zero, "もう一度押しても強化が解けない");
+            WorldObject gust = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Gust);
+            Assert.That(gust.Velocity.X, Is.EqualTo(Storm.Skills.SpeedBoost.GustSpeed).Within(1e-3f), "照準の方向へ撃たない");
+            Assert.That(world.GetState(0).Velocity.X, Is.LessThan(-Storm.Skills.SpeedBoost.GustRecoilSpeed * 0.5f), "撃った反動で下がらない");
 
             float before = world.GetState(1).Velocity.X;
             Step(world, 15);
@@ -258,6 +270,17 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(world.GetState(1).Action.Kind, Is.Not.EqualTo(ActionKind.Hitstun), "突風に攻撃の判定がある");
             Step(world, Storm.Skills.SpeedBoost.GustTicks);
             Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Gust), Is.False, "届く距離を過ぎても消えない");
+
+            // 照準を上へ向けると、上へ撃って下へ下がる。
+            world = new SimWorld(new BoxTerrain());
+            world.AddCharacter(CharacterPresets.StormRunner(), new Vector3(0f, 50f, 0f));
+            Step(world, 1, Press(InputButtons.Special1));
+            Step(world, 15);
+            Step(world, 1, new PlayerInput(0, 0, InputButtons.Special1, 0, 127));
+            Step(world, Storm.Skills.SpeedBoost.GustWindupTicks);
+            WorldObject up = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Gust);
+            Assert.That(up.Velocity.Y, Is.EqualTo(Storm.Skills.SpeedBoost.GustSpeed).Within(1e-3f), "照準の方向（上）へ撃たない");
+            Assert.That(world.GetState(0).Velocity.Y, Is.LessThan(-Storm.Skills.SpeedBoost.GustRecoilSpeed * 0.5f), "上へ撃った反動で下がらない");
 
             // 時間切れでも、効果が終わってからクールタイムが始まる。
             world = new SimWorld(new BoxTerrain());

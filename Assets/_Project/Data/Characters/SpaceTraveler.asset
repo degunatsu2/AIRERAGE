@@ -1,0 +1,429 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17401b775c1c455396f260bce2a3c785, type: 3}
+  m_Name: SpaceTraveler
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Data.CharacterConfigAsset
+  _config:
+    Movement:
+      RunSpeed: 8
+      GroundAcceleration: 80
+      AirAcceleration: 30
+      AirDrag: 2
+      Gravity: 30
+      MaxFallSpeed: 20
+      JumpSpeed: 12
+      AirJumps: 1
+      CoyoteTicks: 6
+      JumpBufferTicks: 6
+      MoveDeadzone: 0.2
+      HalfWidth: 0.4
+      HalfHeight: 0.9
+    Wire:
+      ModelType: 0
+      ButtonMode: 0
+      MaxLength: 12
+      FireSpeed: 60
+      MissRetractTicks: 10
+      CooldownTicks: 20
+      ReleaseCooldownTicks: 0
+      RestoreAirJumpsOnRelease: 1
+      AttachedInputInfluence: 0.25
+      AimAssistAngleDeg: 6
+      AimAssistRadius: 0.8
+      NeutralAimAngleDeg: 45
+      AimDeadzone: 0.3
+      MinRopeLength: 1
+      ReleaseWhenLineBlocked: 0
+      RopeWrapping: 1
+      MaxAttachTicks: 180
+      MaxAttachedSpeed: 22
+      ExitSpeedCap: 18
+      AttachTurnSpeed: 1
+      AttachTurnBehind: 0.5
+      AttachAnySurface: 0
+      AttachInAir: 0
+      Inertial:
+        NeutralMode: 1
+        UpMode: 0
+        DownMode: 2
+        ReelSpeed: 8
+        ReelOutSpeed: 6
+        UpInputThreshold: 0.9
+        DownInputThreshold: 0.5
+        HoldSwingAcceleration: 16
+        SwingAcceleration: 10
+        Damping: 0
+        StartPullSpeed: 16
+        StartPullTicks: 20
+        StartPullFadeTicks: 20
+      Responsive:
+        PullSpeed: 16
+        PullAcceleration: 120
+        SteerSpeed: 6
+        GravityScale: 0.2
+        ArrivalRadius: 1
+    Combat:
+      Ground:
+        Name: MOON HOP
+        Effect: 11
+        EffectTick: 10
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 26
+        WireCancelFromTick: 12
+        Hits: []
+        Motions:
+        - StartTick: 0
+          Ticks: 9
+          VelocityX: 0
+          VelocityY: 0
+          RequiresHit: 0
+        - StartTick: 9
+          Ticks: 1
+          VelocityX: -7
+          VelocityY: 13
+          RequiresHit: 0
+      AirNeutral:
+        Name: STARDUST
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 22
+        WireCancelFromTick: 5
+        Hits:
+        - StartTick: 4
+          ActiveTicks: 4
+          UntilEnd: 0
+          OffsetX: 0
+          OffsetY: 0
+          HalfWidth: 2.4
+          HalfHeight: 2.4
+          Damage: 3
+          HitstopTicks: 8
+          HitstunTicks: 18
+          KnockbackX: -3
+          KnockbackY: 3
+        - StartTick: 12
+          ActiveTicks: 4
+          UntilEnd: 0
+          OffsetX: 0
+          OffsetY: 0
+          HalfWidth: 2.6
+          HalfHeight: 2.6
+          Damage: 4
+          HitstopTicks: 10
+          HitstunTicks: 22
+          KnockbackX: 6
+          KnockbackY: 7
+        Motions: []
+      AirSide:
+        Name: BLINK KICK
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 24
+        WireCancelFromTick: 7
+        Hits:
+        - StartTick: 6
+          ActiveTicks: 5
+          UntilEnd: 0
+          OffsetX: 1.4
+          OffsetY: 0
+          HalfWidth: 1.6
+          HalfHeight: 1.3
+          Damage: 6
+          HitstopTicks: 12
+          HitstunTicks: 22
+          KnockbackX: 12
+          KnockbackY: 6
+        Motions:
+        - StartTick: 4
+          Ticks: 1
+          VelocityX: 120
+          VelocityY: 0
+          RequiresHit: 0
+        - StartTick: 5
+          Ticks: 1
+          VelocityX: 4
+          VelocityY: 0
+          RequiresHit: 0
+      AirUp:
+        Name: 
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 24
+        WireCancelFromTick: 6
+        Hits:
+        - StartTick: 6
+          ActiveTicks: 4
+          UntilEnd: 0
+          OffsetX: 0.2
+          OffsetY: 1.75
+          HalfWidth: 1.75
+          HalfHeight: 1.75
+          Damage: 5
+          HitstopTicks: 12
+          HitstunTicks: 22
+          KnockbackX: 2
+          KnockbackY: 14
+        Motions: []
+      AirDown:
+        Name: GRAVITY DROP
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 40
+        WireCancelFromTick: 16
+        Hits:
+        - StartTick: 16
+          ActiveTicks: 14
+          UntilEnd: 0
+          OffsetX: 0
+          OffsetY: -1.2
+          HalfWidth: 1.4
+          HalfHeight: 1.8
+          Damage: 9
+          HitstopTicks: 20
+          HitstunTicks: 28
+          KnockbackX: 3
+          KnockbackY: -14
+        Motions:
+        - StartTick: 0
+          Ticks: 16
+          VelocityX: 0
+          VelocityY: 0
+          RequiresHit: 0
+        - StartTick: 16
+          Ticks: 14
+          VelocityX: 0
+          VelocityY: -26
+          RequiresHit: 0
+      Special1:
+        Name: PORTAL
+        Effect: 8
+        EffectTick: 0
+        HoldMaxTicks: 30
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 10
+        WireCancelFromTick: 2
+        Hits: []
+        Motions: []
+      Special1CooldownTicks: 600
+      Special1MaxCharges: 2
+      Special2MaxCharges: 1
+      Special2:
+        Name: MISSILE
+        Effect: 9
+        EffectTick: 2
+        HoldMaxTicks: 600
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 16
+        WireCancelFromTick: 4
+        Hits: []
+        Motions: []
+      Special2CooldownTicks: 360
+      Super:
+        Name: COSMIC RAY
+        Effect: 10
+        EffectTick: 10
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 80
+        WireCancelFromTick: 72
+        Hits: []
+        Motions:
+        - StartTick: 0
+          Ticks: 72
+          VelocityX: 0
+          VelocityY: 0
+          RequiresHit: 0
+      SuperGaugeCost: 1000
+      KoAttack: 4
+      KoKnockbackBase: 0.5
+      KoKnockbackPerSpeed: 0.3
+      FatalStrikeSpeed: 14
+      FatalHitstopMultiplier: 2
+      BounceMinSpeed: 10
+      BounceRestitution: 0.6
+      WireCancelCooldownTicks: 180
+      AttackBufferTicks: 10
+      GuardTicks: 30
+      JustGuardTicks: 6
+      GuardCooldownTicks: 120
+      GuardStunTicks: 12
+      GuardKnockbackScale: 0.4
+      ParriedStunTicks: 30
+      ParriedPushbackX: 4
+      ParriedPushbackY: 6
+      GaugeOnHit: 80
+      GaugeOnGuarded: 30
+      GaugeOnDamaged: 40
+      GaugeOnGuard: 20
+      GaugeOnJustGuard: 200
+      GaugePerCoin: 2
+    Skills:
+      MirrorBall:
+        DurationTicks: 300
+        OffsetY: 2.2
+        GaugeIntervalTicks: 12
+        GaugePerInterval: 10
+      Safe:
+        DurationTicks: 10800
+        ChargeIntervalTicks: 300
+        ChargeCoins: 2
+        ChargeRatePercent: 110
+        MaxCoins: 300
+        GoldCoins: 150
+        Durability: 30
+        DepositPerSecond: 30
+        HalfWidth: 0.7
+        HalfHeight: 0.7
+      CoinBoost:
+        DurationTicks: 300
+        BonusPercent: 20
+        GaugeBonusPercent: 20
+      Projectile:
+        OffsetX: 0.3
+        OffsetY: 1
+        VelocityX: 2
+        VelocityY: 16
+        Gravity: 30
+        LifetimeTicks: 40
+        Radius: 0.5
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          HitstopTicks: 10
+          HitstunTicks: 22
+          KnockbackX: 2
+          KnockbackY: 13
+        HeldCoinsPerBonusPercent: 0
+        MaxHeldCoinBonusPercent: 0
+      Run:
+        InitialSpeed: 12.5
+        Acceleration: 6
+        MaxSpeed: 28
+        JumpAngleDeg: 20
+        TurnTicks: 8
+        RehitTicks: 30
+      SpeedBoost:
+        DurationTicks: 300
+        SpeedPercent: 20
+        GustSpeed: 30
+        GustRange: 15
+        GustHalfWidth: 1
+        GustPush: 12
+        GustWindupTicks: 10
+        GustRecoveryTicks: 14
+        GustRecoilSpeed: 9
+        GustWindupBrake: 0.8
+      WindZone:
+        DurationTicks: 600
+        Length: 10
+        HalfWidth: 1.5
+        Acceleration: 70
+        SpeedLimit: 20
+      SkyBoost:
+        DurationTicks: 600
+        SpeedPercent: 50
+      Portal:
+        DurationTicks: 1800
+        Radius: 1.2
+        MaxPerOwner: 2
+        WarpCooldownTicks: 30
+        EnterHoldTicks: 12
+      Missile:
+        Speed: 18
+        Radius: 0.4
+        ExplosionRadius: 1.6
+        OffsetY: 0.2
+        BonusPercentPerSecond: 200
+        LifetimeTicks: 1200
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          HitstopTicks: 10
+          HitstunTicks: 24
+          KnockbackX: 9
+          KnockbackY: 7
+      Beam:
+        HalfWidth: 0.75
+        IntervalTicks: 10
+        Hits: 6
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 15
+          HitstopTicks: 6
+          HitstunTicks: 20
+          KnockbackX: 3
+          KnockbackY: 4
+      SlowFall:
+        MaxFallSpeed: 3
+  _displayName: SPACE TRAVELER
+  _special1Icon: {fileID: 0}
+  _special2Icon: {fileID: 0}
+  _superIcon: {fileID: 0}

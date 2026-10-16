@@ -303,7 +303,8 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(hit.HasValue, Is.True, "撃破技が当たらない");
             // 速さの倍率の代わりに、ルーレットの目がそのまま倍率になる（ユーザーの要望、2026-10-16）。
             float expected = AttackData.RouletteScales[AttackData.RouletteScales.Length - 1];
-            Assert.That(hit.Value.KnockbackScale, Is.EqualTo(expected), "ルーレットの目がそのまま倍率になっていない");
+            Assert.That(hit.Value.Multiplier, Is.EqualTo(expected), "ルーレットの目がそのまま倍率になっていない");
+            Assert.That(hit.Value.Power.Sources, Is.EqualTo(PowerSource.Roulette), "速さの倍率もかかっている");
             Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(Risk.Combat.AirDown.Hits[0].Damage, expected, 0)));
             Assert.That(hit.Value.Fatal, Is.False, "ルーレットの技が速さで FATAL になった");
             Assert.That(hit.Value.Jackpot, Is.True);
@@ -409,7 +410,10 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(hit.Value.Attack, Is.EqualTo(AttackSlot.Ground));
             Assert.That(hit.Value.BonusPercent, Is.EqualTo(bonus), "ためた長さの上乗せでない");
             Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(Risk.Combat.Ground.Hits[0].Damage, 1f, bonus)));
-            Assert.That(hit.Value.KnockbackScale, Is.EqualTo(1f), "ためても吹き飛びは変えない");
+            Assert.That(hit.Value.Multiplier, Is.EqualTo(1f));
+            Assert.That(hit.Value.KnockbackBonusPercent, Is.EqualTo(bonus), "ためても吹き飛びが強くならない（ユーザーの要望、2026-10-16）");
+            AttackHit data = Risk.Combat.Ground.Hits[0];
+            Assert.That(hit.Value.Knockback.Length(), Is.EqualTo(new Vector2(data.KnockbackX, data.KnockbackY).Length() * (1f + bonus / 100f)).Within(1e-3f));
             bool top = bonus == 500;
             Assert.That(hit.Value.Jackpot, Is.EqualTo(top), "虹（最後の段階）だけが JACKPOT");
             Assert.That(world.GetState(1).Combat.JackpotHitCount, Is.EqualTo(top ? 1 : 0));

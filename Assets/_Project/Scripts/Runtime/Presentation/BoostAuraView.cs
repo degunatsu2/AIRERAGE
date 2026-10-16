@@ -8,19 +8,24 @@ using UnityEngine;
 namespace Airerage.Runtime.Presentation
 {
     /// <summary>
-    /// 速さの強化と走る地上技の表示（STORM RUNNER。docs/14 1.2）。
-    /// - ウインドクローク（CombatState.SpeedBoostTicksLeft）: 体の周りを回る黄緑の風と、残りの時間の弧。
-    /// - キャッスルインジエアー（SkyBoostTicksLeft）: 体の周りを大きく回る空色の風と、残りの時間の弧（外側）。
-    /// - 走り続ける地上技（AttackData.Run）: 後ろへ流れる風の線（速いほど長い）。
+    /// STORM RUNNER の風の表示（docs/14 1.2）。風の線には濃い緑の影を付ける（WindShadow。ユーザーの要望、2026-10-16）。
+    /// - ウインドクローク（CombatState.SpeedBoostTicksLeft）: 体の周りを回る黄緑の風と、残りの時間の円形のゲージ（縁つき）。
+    /// - キャッスルインジエアー（SkyBoostTicksLeft）: 体の周りを大きく回る空色の風と、残りの時間の円形のゲージ（縁つき。外側）。
+    /// - 走り続ける地上技（AttackData.Run）: 黄緑のオーラと、後ろへ流れる黄緑の風の線（速いほど長い）。
+    /// - 回る技（AttackData.SpinPerHit。つむじ風）: 体を包む竜巻（キャラクターの回転は CharacterView）。
+    /// - 突風の溜め（ActionState.Recast）: 体に集まってくる風の輪。
     /// 見た目の動きは表示の時間で決める。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class BoostAuraView : MonoBehaviour
     {
         private const int Points = 36;
         private const int StreakCount = 3;
+        private const int TornadoLines = 3;
+        private const int TornadoPoints = 40;
         private const float Z = -0.65f;
+        private const float ArcWidth = 0.09f;
 
-        /// <summary>ウインドクロークの色（黄緑）とキャッスルインジエアーの色（空色）。</summary>
+        /// <summary>ウインドクローク・走りの色（黄緑）とキャッスルインジエアーの色（空色）。</summary>
         public static readonly Color CloakColor = new Color(0.6f, 1f, 0.3f);
         public static readonly Color CastleColor = new Color(0.5f, 0.85f, 1f);
 
@@ -32,24 +37,61 @@ namespace Airerage.Runtime.Presentation
         private readonly List<Lines> _lines = new List<Lines>();
         private ISimulationFeed _feed;
 
+        private sealed class Gauge
+        {
+            public LineRenderer Arc;
+            public LineRenderer Border;
+            public LineRenderer Rim;
+        }
+
         private sealed class Lines
         {
+            public readonly List<WindShadow> Winds = new List<WindShadow>();
             public LineRenderer[] Cloak;
-            public LineRenderer CloakArc;
+            public Gauge CloakGauge;
             public LineRenderer[] Castle;
-            public LineRenderer CastleArc;
+            public Gauge CastleGauge;
+            public LineRenderer RunAura;
             public LineRenderer[] Streaks;
+            public LineRenderer[] Tornado;
+            public LineRenderer[] Gather;
             public bool ShowingCloak;
             public bool ShowingCastle;
             public bool ShowingRun;
+            public bool ShowingTornado;
+            public bool ShowingGather;
         }
 
-        /// <summary>キャラクター index にウインドクローク・キャッスルインジエアー・走りの表示を出しているか（テスト用）。</summary>
+        /// <summary>キャラクター index に、それぞれの表示を出しているか（テスト用）。</summary>
         public bool ShowsCloak(int index) => index >= 0 && index < _lines.Count && _lines[index].ShowingCloak;
 
         public bool ShowsCastle(int index) => index >= 0 && index < _lines.Count && _lines[index].ShowingCastle;
 
         public bool ShowsRun(int index) => index >= 0 && index < _lines.Count && _lines[index].ShowingRun;
+
+        public bool ShowsTornado(int index) => index >= 0 && index < _lines.Count && _lines[index].ShowingTornado;
+
+        public bool ShowsGustWindup(int index) => index >= 0 && index < _lines.Count && _lines[index].ShowingGather;
+
+        /// <summary>キャラクター index のウインドクロークの残りのゲージに縁を描いているか（テスト用）。</summary>
+        public bool CloakGaugeHasFrame(int index) => ShowsCloak(index) && _lines[index].CloakGauge.Border.enabled && _lines[index].CloakGauge.Rim.enabled;
+
+        /// <summary>キャラクター index の風の線に影を付けているか（出している線がすべて影を持つ。テスト用）。</summary>
+        public bool WindsHaveShadows(int index)
+        {
+            if (index < 0 || index >= _lines.Count)
+            {
+                return false;
+            }
+            foreach (WindShadow wind in _lines[index].Winds)
+            {
+                if (wind.Main.enabled && !wind.Shadow.enabled)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
 
         private void Awake()
         {
@@ -76,32 +118,87 @@ namespace Airerage.Runtime.Presentation
                 Lines lines = _lines[i];
                 if (i >= count)
                 {
-                    Show(lines, false, false, false);
+                    Show(lines, false, false, false, false, false);
+                    SyncShadows(lines);
                     continue;
                 }
                 CharacterState state = _feed.GetState(i);
                 CharacterConfig config = _feed.GetConfig(i);
                 bool alive = !state.Combat.IsWaitingToRespawn;
+                bool attacking = alive && state.Action.Kind == ActionKind.Attack;
+                AttackData attack = attacking ? config.Combat.Get(state.Action.Attack) : null;
                 bool cloak = alive && state.Combat.SpeedBoostTicksLeft > 0;
                 bool castle = alive && state.Combat.SkyBoostTicksLeft > 0;
-                bool run = alive && state.Action.Kind == ActionKind.Attack && config.Combat.Get(state.Action.Attack).Run;
-                Show(lines, cloak, castle, run);
+                bool run = attacking && attack.Run;
+                bool tornado = attacking && attack.SpinPerHit && attack.Hits.Length > 0 && state.Action.Ticks < SpinEndTick(attack) + 4;
+                SpeedBoostTuning boost = config.Skills.SpeedBoost;
+                bool gather = attacking && state.Action.Recast && state.Action.Ticks < boost.GustWindupTicks;
+                Show(lines, cloak, castle, run, tornado, gather);
                 var center = new Vector3(state.Position.X, state.Position.Y, 0f);
                 if (cloak)
                 {
                     DrawSwirl(lines.Cloak, center, 1.1f, 1.5f, time * 7f, CloakColor);
-                    DrawArc(lines.CloakArc, center, 1.75f, state.Combat.SpeedBoostTicksLeft / (float)config.Skills.SpeedBoost.DurationTicks, CloakColor);
+                    DrawGauge(lines.CloakGauge, center, 1.85f, state.Combat.SpeedBoostTicksLeft / (float)boost.DurationTicks, CloakColor);
                 }
                 if (castle)
                 {
                     DrawSwirl(lines.Castle, center, 1.6f, 2f, -time * 4f, CastleColor);
-                    DrawArc(lines.CastleArc, center, 2.35f, state.Combat.SkyBoostTicksLeft / (float)config.Skills.SkyBoost.DurationTicks, CastleColor);
+                    DrawGauge(lines.CastleGauge, center, 2.45f, state.Combat.SkyBoostTicksLeft / (float)config.Skills.SkyBoost.DurationTicks, CastleColor);
                 }
                 if (run)
                 {
                     float speed = state.Action.RunSpeed * SpeedBoosts.ScaleOf(state, config);
-                    DrawStreaks(lines.Streaks, center, state.Facing, speed / config.Skills.Run.MaxSpeed, time);
+                    float speed01 = speed / config.Skills.Run.MaxSpeed;
+                    DrawFlame(lines.RunAura, center, 0.95f, 1.35f, 0.12f + 0.1f * speed01, time, CloakColor);
+                    DrawStreaks(lines.Streaks, center, state.Facing, speed01, time);
                 }
+                if (tornado)
+                {
+                    DrawTornado(lines.Tornado, center, time);
+                }
+                if (gather)
+                {
+                    DrawGather(lines.Gather, center, state.Action.Ticks / (float)Mathf.Max(1, boost.GustWindupTicks));
+                }
+                SyncShadows(lines);
+            }
+        }
+
+        /// <summary>回る技の、最後の判定が終わるティック（ここで元の向きに戻る）。</summary>
+        public static int SpinEndTick(AttackData attack)
+        {
+            AttackHit last = attack.Hits[attack.Hits.Length - 1];
+            return last.StartTick + last.ActiveTicks;
+        }
+
+        /// <summary>
+        /// 回る技の、攻撃を始めてから ticks ティック目の回転（度。判定 1 つにつき 360 度。最後の判定の後は 360 × 判定の数で止まる）。
+        /// 判定 i の始まりから次の判定の始まりまで（最後は判定が終わるまで）に 1 回転する。
+        /// </summary>
+        public static float SpinAngle(AttackData attack, float ticks)
+        {
+            AttackHit[] hits = attack.Hits;
+            if (hits.Length == 0 || ticks <= hits[0].StartTick)
+            {
+                return 0f;
+            }
+            for (int i = 0; i < hits.Length; i++)
+            {
+                float from = hits[i].StartTick;
+                float to = i + 1 < hits.Length ? hits[i + 1].StartTick : hits[i].StartTick + hits[i].ActiveTicks;
+                if (ticks < to)
+                {
+                    return 360f * (i + Mathf.Clamp01((ticks - from) / Mathf.Max(1f, to - from)));
+                }
+            }
+            return 360f * hits.Length;
+        }
+
+        private static void SyncShadows(Lines lines)
+        {
+            foreach (WindShadow wind in lines.Winds)
+            {
+                wind.Sync();
             }
         }
 
@@ -122,30 +219,49 @@ namespace Airerage.Runtime.Presentation
                     line.SetPosition(k, center + new Vector3(x * Mathf.Cos(tilt) - y * Mathf.Sin(tilt), x * Mathf.Sin(tilt) + y * Mathf.Cos(tilt), Z));
                 }
                 // 回る向きに合わせて濃さを変える（流れて見えるように）。
-                var start = new Color(color.r, color.g, color.b, 0.05f);
-                var end = new Color(color.r, color.g, color.b, 0.75f);
-                line.startColor = start;
-                line.endColor = end;
+                line.startColor = new Color(color.r, color.g, color.b, 0.1f);
+                line.endColor = new Color(color.r, color.g, color.b, 0.8f);
             }
         }
 
-        // 残りの時間の弧（上から時計回りに減る）。
-        private static void DrawArc(LineRenderer line, Vector3 center, float radius, float fraction, Color color)
+        // 残りの時間の円形のゲージ（上から時計回りに減る弧。暗い帯と明るい外の線の縁つき。オーラと見分けられるように）。
+        private static void DrawGauge(Gauge gauge, Vector3 center, float radius, float fraction, Color color)
         {
+            RingGaugeView.DrawFrame(gauge.Border, gauge.Rim, center, radius, ArcWidth, Z, true);
             fraction = Mathf.Clamp01(fraction);
             int points = Mathf.Max(2, Mathf.CeilToInt(48 * fraction) + 1);
+            LineRenderer line = gauge.Arc;
             line.positionCount = points;
             for (int k = 0; k < points; k++)
             {
                 float a = Mathf.PI * 2f * fraction * k / (points - 1);
                 line.SetPosition(k, center + new Vector3(Mathf.Sin(a) * radius, Mathf.Cos(a) * radius, Z));
             }
-            var c = new Color(color.r, color.g, color.b, 0.55f);
+            line.widthMultiplier = ArcWidth;
+            var c = new Color(color.r, color.g, color.b, 0.95f);
             line.startColor = c;
             line.endColor = c;
         }
 
-        // 走っている後ろへ流れる線（速いほど長く、濃い）。
+        // 揺らめくオーラ（炎のように、上の側ほど大きく揺れて伸びる）。
+        private static void DrawFlame(LineRenderer line, Vector3 center, float rx, float ry, float amp, float time, Color color)
+        {
+            line.positionCount = Points;
+            for (int k = 0; k < Points; k++)
+            {
+                float angle = Mathf.PI * 2f * k / Points;
+                float up = 0.5f + 0.5f * Mathf.Cos(angle);
+                float noise = Mathf.PerlinNoise(angle * 1.7f + time * 4f, time * 2.6f);
+                float r = 1f + amp * (noise - 0.3f) * (0.6f + up);
+                float lift = amp * up * up * (0.6f + 0.4f * Mathf.Sin(time * 13f + angle * 5f));
+                line.SetPosition(k, center + new Vector3(Mathf.Sin(angle) * rx * r, Mathf.Cos(angle) * ry * r + lift, Z));
+            }
+            var c = new Color(color.r, color.g, color.b, 0.6f);
+            line.startColor = c;
+            line.endColor = c;
+        }
+
+        // 走っている後ろへ流れる黄緑の線（速いほど長く、濃い）。
         private static void DrawStreaks(LineRenderer[] streaks, Vector3 center, int facing, float speed01, float time)
         {
             speed01 = Mathf.Clamp01(speed01);
@@ -158,30 +274,89 @@ namespace Airerage.Runtime.Presentation
                 float start = 0.5f + 0.3f * Mathf.Repeat(time * 6f + s * 0.37f, 1f);
                 line.SetPosition(0, center + new Vector3(-facing * start, y, Z));
                 line.SetPosition(1, center + new Vector3(-facing * (start + length), y, Z));
-                line.startColor = new Color(1f, 1f, 1f, 0.25f + 0.5f * speed01);
-                line.endColor = new Color(0.7f, 1f, 0.5f, 0f);
+                line.startColor = new Color(CloakColor.r, CloakColor.g, CloakColor.b, 0.35f + 0.55f * speed01);
+                line.endColor = new Color(CloakColor.r, CloakColor.g, CloakColor.b, 0f);
             }
         }
 
-        private static void Show(Lines lines, bool cloak, bool castle, bool run)
+        // 体を包む竜巻（下が細く上が太いらせん。速く回る）。
+        private static void DrawTornado(LineRenderer[] tornado, Vector3 center, float time)
+        {
+            for (int s = 0; s < tornado.Length; s++)
+            {
+                LineRenderer line = tornado[s];
+                line.positionCount = TornadoPoints;
+                float phase = time * 14f + s * Mathf.PI * 2f / tornado.Length;
+                for (int k = 0; k < TornadoPoints; k++)
+                {
+                    float u = k / (float)(TornadoPoints - 1);
+                    float height = Mathf.Lerp(-1.3f, 2f, u);
+                    float radius = Mathf.Lerp(0.5f, 1.8f, u * u);
+                    float a = phase + u * Mathf.PI * 5f;
+                    line.SetPosition(k, center + new Vector3(Mathf.Cos(a) * radius, height, Z + Mathf.Sin(a) * radius * 0.3f));
+                }
+                line.startColor = new Color(CloakColor.r, CloakColor.g, CloakColor.b, 0.35f);
+                line.endColor = new Color(0.85f, 1f, 0.7f, 0.85f);
+            }
+        }
+
+        // 突風の溜め: 外から体へ集まってくる風の輪（progress は溜めの進み具合 0〜1）。
+        private static void DrawGather(LineRenderer[] rings, Vector3 center, float progress)
+        {
+            for (int r = 0; r < rings.Length; r++)
+            {
+                LineRenderer line = rings[r];
+                float p = Mathf.Repeat(progress * 1.5f + r * 0.5f, 1f);
+                float radius = Mathf.Lerp(2.4f, 0.5f, p);
+                line.positionCount = Points;
+                for (int k = 0; k < Points; k++)
+                {
+                    float a = Mathf.PI * 2f * k / Points;
+                    line.SetPosition(k, center + new Vector3(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius, Z));
+                }
+                var c = new Color(CloakColor.r, CloakColor.g, CloakColor.b, 0.25f + 0.65f * p);
+                line.startColor = c;
+                line.endColor = c;
+            }
+        }
+
+        private static void Show(Lines lines, bool cloak, bool castle, bool run, bool tornado, bool gather)
         {
             if (lines.ShowingCloak != cloak)
             {
                 SetEnabled(lines.Cloak, cloak);
-                lines.CloakArc.enabled = cloak;
+                SetGauge(lines.CloakGauge, cloak);
                 lines.ShowingCloak = cloak;
             }
             if (lines.ShowingCastle != castle)
             {
                 SetEnabled(lines.Castle, castle);
-                lines.CastleArc.enabled = castle;
+                SetGauge(lines.CastleGauge, castle);
                 lines.ShowingCastle = castle;
             }
             if (lines.ShowingRun != run)
             {
                 SetEnabled(lines.Streaks, run);
+                lines.RunAura.enabled = run;
                 lines.ShowingRun = run;
             }
+            if (lines.ShowingTornado != tornado)
+            {
+                SetEnabled(lines.Tornado, tornado);
+                lines.ShowingTornado = tornado;
+            }
+            if (lines.ShowingGather != gather)
+            {
+                SetEnabled(lines.Gather, gather);
+                lines.ShowingGather = gather;
+            }
+        }
+
+        private static void SetGauge(Gauge gauge, bool enabled)
+        {
+            gauge.Arc.enabled = enabled;
+            gauge.Border.enabled = enabled;
+            gauge.Rim.enabled = enabled;
         }
 
         private static void SetEnabled(LineRenderer[] lines, bool enabled)
@@ -194,28 +369,48 @@ namespace Airerage.Runtime.Presentation
 
         private Lines Create(int index)
         {
-            var lines = new Lines
-            {
-                Cloak = new[] { NewLine(index, "Cloak0", 0.07f), NewLine(index, "Cloak1", 0.07f) },
-                CloakArc = NewLine(index, "CloakArc", 0.06f),
-                Castle = new[] { NewLine(index, "Castle0", 0.1f), NewLine(index, "Castle1", 0.1f) },
-                CastleArc = NewLine(index, "CastleArc", 0.08f),
-                Streaks = new LineRenderer[StreakCount],
-            };
+            var lines = new Lines();
+            lines.Cloak = new[] { NewWind(lines, index, "Cloak0", 0.07f, true), NewWind(lines, index, "Cloak1", 0.07f, true) };
+            lines.CloakGauge = NewGauge(index, "CloakGauge");
+            lines.Castle = new[] { NewWind(lines, index, "Castle0", 0.1f, true), NewWind(lines, index, "Castle1", 0.1f, true) };
+            lines.CastleGauge = NewGauge(index, "CastleGauge");
+            lines.RunAura = NewWind(lines, index, "RunAura", 0.09f, true);
+            lines.Streaks = new LineRenderer[StreakCount];
             for (int s = 0; s < StreakCount; s++)
             {
-                lines.Streaks[s] = NewLine(index, "Streak" + s, 0.07f);
+                lines.Streaks[s] = NewWind(lines, index, "Streak" + s, 0.08f, false);
             }
+            lines.Tornado = new LineRenderer[TornadoLines];
+            for (int s = 0; s < TornadoLines; s++)
+            {
+                lines.Tornado[s] = NewWind(lines, index, "Tornado" + s, 0.08f, false);
+            }
+            lines.Gather = new[] { NewWind(lines, index, "Gather0", 0.08f, true), NewWind(lines, index, "Gather1", 0.08f, true) };
             return lines;
         }
 
-        private LineRenderer NewLine(int index, string name, float width)
+        private LineRenderer NewWind(Lines lines, int index, string name, float width, bool loop)
+        {
+            LineRenderer line = NewLine(index, name, width, loop);
+            lines.Winds.Add(new WindShadow(line));
+            return line;
+        }
+
+        private Gauge NewGauge(int index, string name)
+        {
+            var gauge = new Gauge { Arc = NewLine(index, name, ArcWidth, false) };
+            gauge.Arc.sortingOrder = 2;
+            RingGaugeView.CreateFrame(gauge.Arc, out gauge.Border, out gauge.Rim);
+            return gauge;
+        }
+
+        private LineRenderer NewLine(int index, string name, float width, bool loop)
         {
             LineRenderer line = Instantiate(_lineTemplate, transform);
             line.name = $"Boost{index}{name}";
             line.gameObject.SetActive(true);
             line.useWorldSpace = true;
-            line.loop = false;
+            line.loop = loop;
             line.widthMultiplier = width;
             line.enabled = false;
             return line;

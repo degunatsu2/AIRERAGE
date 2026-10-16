@@ -27,6 +27,15 @@ namespace Airerage.Core.Objects
         /// その向きへ加速する。動かない。
         /// </summary>
         WindZone = 5,
+
+        /// <summary>ワープポータル（SPACE TRAVELER の Q）。同じ持ち主のポータル 2 つがつながる。壊せない。</summary>
+        Portal = 6,
+
+        /// <summary>スペースミサイル（SPACE TRAVELER の E）。まっすぐ飛び、触れたら爆発する。</summary>
+        Missile = 7,
+
+        /// <summary>コズミックレイのビーム（SPACE TRAVELER の R）。Position から End までの線分。壁を貫通する。</summary>
+        Beam = 8,
     }
 
     /// <summary>
@@ -73,6 +82,12 @@ namespace Airerage.Core.Objects
         /// <summary>最後にこの物を押した風の番号（投射物。同じ風に 2 回押されないように。0 はなし）。</summary>
         public int LastPushId;
 
+        /// <summary>今いるワープポータルの番号（投射物。外から入ったときだけ移る。0 はなし）。</summary>
+        public int InPortalId;
+
+        /// <summary>もう一方の端（ビームの終わりの点。m）。</summary>
+        public Vector2 End;
+
         /// <summary>
         /// 最近当たった攻撃（壊せる物。攻撃した人と攻撃の番号と判定の番号を 1 つの値にしたもの。0 はなし）。同じ攻撃の同じ判定は
         /// 1 回だけダメージを与える（4 つまで覚える）。
@@ -91,7 +106,7 @@ namespace Airerage.Core.Objects
                 && Position.Equals(other.Position) && Velocity.Equals(other.Velocity)
                 && SpawnTick == other.SpawnTick && ExpireTick == other.ExpireTick && Damage == other.Damage
                 && ChargeMilli == other.ChargeMilli && Stored == other.Stored && HitMask == other.HitMask && BonusPercent == other.BonusPercent
-                && LastPushId == other.LastPushId
+                && LastPushId == other.LastPushId && InPortalId == other.InPortalId && End.Equals(other.End)
                 && HitKey0 == other.HitKey0 && HitKey1 == other.HitKey1 && HitKey2 == other.HitKey2 && HitKey3 == other.HitKey3
                 && Ended == other.Ended;
         }

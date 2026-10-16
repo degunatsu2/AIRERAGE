@@ -239,7 +239,7 @@ namespace Airerage.Core.Tests.Combat
             Assert.That(hit.Victim, Is.EqualTo(1));
             Assert.That(hit.Attack, Is.EqualTo(AttackSlot.Ground));
             Assert.That(hit.HitIndex, Is.EqualTo(0));
-            Assert.That(hit.KnockbackScale, Is.EqualTo(1f));
+            Assert.That(hit.Multiplier, Is.EqualTo(1f));
             Assert.That(hit.Knockback, Is.EqualTo(new Vector2(Ground1.KnockbackX, Ground1.KnockbackY)));
             Assert.That(world.GetState(1).Velocity, Is.EqualTo(new Vector3(hit.Knockback.X, hit.Knockback.Y, 0f)));
 

@@ -84,6 +84,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(objectsView.TryGetSafeState(safe.Id, out WorldObjectsView.SafeEvent safeEvent, out float health, out float ring), Is.True);
             Assert.That(health, Is.EqualTo(1f), "耐久が満タンでない");
             Assert.That(ring, Is.InRange(0f, 1f), "チャージのゲージを出さない");
+            Assert.That(objectsView.SafeRingHasFrame(safe.Id), Is.True, "チャージのゲージに縁がない");
 
             // 150 枚で金色、300 枚で虹色（表示を確かめるため、チャージを書き換える）。チャージした瞬間の演出と音。
             safe.ChargeMilli = 150_000;
@@ -129,6 +130,7 @@ namespace Airerage.PlayMode.Tests
             yield return WaitSeconds(0.3f);
             Assert.That(runner.PlayerState.Combat.CoinBoostTicksLeft, Is.GreaterThan(0), "前提: フィーバータイム");
             Assert.That(runner.PlayerView.FeverGauge.IsShowing, Is.True, "フィーバーのゲージを出さない");
+            Assert.That(runner.PlayerView.FeverGauge.ShowsFrame, Is.True, "円形のゲージに縁がない");
 
             // JACKPOT を受けたら（受けた数が増えたら）光る。
             state = runner.PlayerState;
@@ -177,6 +179,24 @@ namespace Airerage.PlayMode.Tests
             Assert.That(audio.History.Contains(SoundId.ChargeMax), Is.True, "虹の音が鳴らない");
             yield return WaitSeconds(1f);
             Assert.That(aura.LevelOf(0), Is.EqualTo(-1), "技が終わってもオーラが残る");
+
+            // 2 回目のため: 白から始まる（虹色が残らない。ユーザーの指摘、2026-10-16）。技が出る向きに矢印。
+            float wait = Time.time;
+            while ((!runner.PlayerState.Grounded || !runner.PlayerState.Action.IsFree) && Time.time - wait < 3f)
+            {
+                yield return null;
+            }
+            Assert.That(runner.PlayerState.Grounded, Is.True, "前提: 地上に戻った");
+            runner.InputOverride = new Script(Enumerable.Repeat(new SimInput(0, 0, InputButtons.Attack), 20).Append(default).ToList());
+            yield return WaitSeconds(0.15f);
+            Assert.That(aura.LevelOf(0), Is.EqualTo(0), "2 回目のためが白から始まらない");
+            Assert.That(aura.IsRainbow(0), Is.False);
+            Color white = aura.AuraColorOf(0);
+            Assert.That(white.r, Is.GreaterThan(0.95f), "2 回目のためで白に戻らない");
+            Assert.That(white.g, Is.GreaterThan(0.95f), "2 回目のためで白に戻らない");
+            Assert.That(white.b, Is.GreaterThan(0.95f), "2 回目のためで白に戻らない");
+            Assert.That(aura.ArrowFacingOf(0), Is.EqualTo(runner.PlayerState.Facing), "技が出る向きの矢印を出さない");
+            yield return WaitSeconds(1f);
             runner.CycleCharacter();
         }
 
