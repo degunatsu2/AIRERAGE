@@ -152,8 +152,8 @@ namespace Airerage.Editor
             image.texture = logo;
             image.raycastTarget = false;
 
-            Text text = CreateText(go.transform, "Name", displayName, 26, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0f), new Vector2(0f, 34f), new Vector2(size.x - 20f, 40f), Color.white);
+            Text text = CreateText(go.transform, "Name", displayName, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(size.x - 20f, 40f), Color.white);
             var option = go.AddComponent<MenuOption>();
             option.Configure(plate, text, null, Accent);
             option.SetSelectedShift(new Vector2(0f, 16f));
@@ -161,9 +161,10 @@ namespace Airerage.Editor
         }
 
         /// <summary>
-        /// 一時停止のメニュー（Esc かゲームパッドの Start。RESUME、RESET POSITION、BACK TO MENU）。オフラインの試合と検証用のシーンに置く。
+        /// 一時停止のメニュー（Esc かゲームパッドの Start。RESUME、RESET POSITION、BACK TO MENU）。オフラインの試合と検証用のシーンに置く
+        /// （runner は IPauseTarget）。
         /// </summary>
-        public static PauseMenu CreatePauseMenu(SimulationRunner runner, InputActionAsset inputActions)
+        public static PauseMenu CreatePauseMenu(MonoBehaviour runner, InputActionAsset inputActions)
         {
             Canvas canvas = CreateCanvas("PauseMenu", 20);
             RectTransform panel = CreateFull(canvas.transform, "Panel");

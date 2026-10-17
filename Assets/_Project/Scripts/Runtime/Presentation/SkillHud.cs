@@ -20,6 +20,8 @@ namespace Airerage.Runtime.Presentation
     /// - 使えるようになった瞬間は、自分のキャラクターの頭上にも小さな通知（技の名前。絵があれば絵）を出す（札を見なくても分かるように。
     ///   ユーザーの要望、2026-10-15）。この PC で操作しているキャラクターのものだけなので、ほかのプレイヤーには見えない。
     /// 技の絵は、キャラクターのアセット（CharacterConfigAsset）にあれば使う（まだない）。
+    /// ローカル対戦（docs/15 T6-5）では人ごとに 1 つ置く（_player）。画面の下を人数で等分して、自分の番号の場所に札と名前（P1 など）を出す
+    /// （狭ければ縮める）。頭上の通知も、その人のキャラクターに出す。
     /// オフライン（SimulationRunner）とオンライン（OnlineRunner）のどちらでも使う（ISimulationFeed）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class SkillHud : MonoBehaviour
@@ -53,6 +55,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private GameAudio _audio;
         [Tooltip("頭上の通知の位置を画面に写すカメラ（なければ頭上の通知を出さない）")]
         [SerializeField] private Camera _camera;
+        [Tooltip("表示するキャラクターの番号（-1 ならこの PC で操作しているキャラクター。0 以上なら、画面の下を人数で等分した場所に出す。ローカル対戦）")]
+        [SerializeField] private int _player = -1;
 
         private readonly Slot[] _slots = { new Slot(), new Slot(), new Slot() };
         private readonly List<HeadNotice> _notices = new List<HeadNotice>();
@@ -160,9 +164,12 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
+        // 表示するキャラクターの番号（いなければ範囲の外）。
+        private int Shown => _player >= 0 ? _player : _feed.LocalCharacter;
+
         private void Update()
         {
-            int local = _feed.LocalCharacter;
+            int local = Shown;
             bool shown = local >= 0 && local < _feed.CharacterCount;
             for (int i = 0; i < SlotCount; i++)
             {
@@ -266,12 +273,30 @@ namespace Airerage.Runtime.Presentation
             }
             EnsureResources();
             float total = SlotCount * SlotWidth + (SlotCount - 1) * SlotGap;
-            float x = (Screen.width - total) * 0.5f;
+            float center = Screen.width * 0.5f;
+            Matrix4x4 matrix = GUI.matrix;
+            if (_player >= 0)
+            {
+                // 画面の下を人数で等分した、自分の番号の場所（狭ければ縮める）。
+                float width = Screen.width / (float)Mathf.Max(1, _feed.CharacterCount);
+                center = width * (_player + 0.5f);
+                float scale = Mathf.Min(1f, width * 0.92f / (total + 2f * (StackSpacing + StackWidth)));
+                if (scale < 1f)
+                {
+                    GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), new Vector2(center, Screen.height));
+                }
+            }
+            float x = center - total * 0.5f;
             float y = Screen.height - BottomMargin - SlotHeight;
             for (int i = 0; i < SlotCount; i++)
             {
                 DrawSlot(_slots[i], i, new Rect(x + i * (SlotWidth + SlotGap), y, SlotWidth, SlotHeight));
             }
+            if (_player >= 0)
+            {
+                GuidePlate.DrawText(new Rect(x, y - 24f, total, 22f), _feed.LabelOf(_player), _name, _feed.ColorOf(_player));
+            }
+            GUI.matrix = matrix;
             DrawHeadNotices();
         }
 
@@ -352,7 +377,7 @@ namespace Airerage.Runtime.Presentation
         // 頭上の通知: 自分のキャラクターの頭の上に、小さな札（技の名前か絵）が浮かび上がって消える。重なったら上へ積む。
         private void DrawHeadNotices()
         {
-            int local = _feed.LocalCharacter;
+            int local = Shown;
             if (_notices.Count == 0 || _camera == null || local < 0 || local >= _feed.CharacterCount)
             {
                 return;

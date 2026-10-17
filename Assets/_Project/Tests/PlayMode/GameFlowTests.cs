@@ -10,6 +10,8 @@ using Airerage.Runtime.UI;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
@@ -46,14 +48,14 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingMain, Is.True, "タイトルの後にメインメニューを出さない");
-                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Network.gameObject), "使える最初の項目を選んでいない");
+                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Local.gameObject), "使える最初の項目（LOCAL VS）を選んでいない");
                 Assert.That(sounds.History, Is.EqualTo(new[] { SoundId.UiConfirm }), "タイトルを抜けたときに決定の音だけを鳴らさない（最初の項目は音なしで選ぶ）");
 
                 // カーソルを動かすと移動の音、決定すると決定の音（ユーザーの要望、2026-10-16）。
                 EventSystem.current.SetSelectedGameObject(menu.Training.gameObject);
                 Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiMove), "カーソルを動かしても音が鳴らない");
                 Assert.That(menu.Single.Button.interactable, Is.False, "SINGLE は Phase 7 まで選べない");
-                Assert.That(menu.Local.Button.interactable, Is.False, "LOCAL VS は T6-5 まで選べない");
+                Assert.That(menu.Local.Button.interactable, Is.True, "LOCAL VS を選べない（T6-5）");
                 Assert.That(menu.Options.Button.interactable, Is.False, "OPTIONS は T6-9 まで選べない");
                 Assert.That(menu.Training.Button.interactable && menu.Quit.Button.interactable, Is.True);
 
@@ -69,8 +71,19 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(characters.Card(1).gameObject), "前に選んだキャラクターから始まらない");
                 EventSystem.current.SetSelectedGameObject(characters.Card(3).gameObject);
                 Assert.That(characters.ShownName, Is.EqualTo(CharacterPresets.SpaceTravelerName), "カーソルのキャラクターの名前を出さない");
-                Assert.That(characters.ShownMoves, Does.Contain("PORTAL").And.Contain("MISSILE").And.Contain("COSMIC RAY").And.Contain("MOON HOP"),
-                    "技の名前を出さない");
+                // 名前の隣にハッシュタグ、その下に Q・E・R の技（カタカナの名前、説明、クールタイムとスタック数、R は必要なゲージ）。
+                Assert.That(characters.ShownTags, Is.EqualTo("#変則的  #遠距離"), "ハッシュタグを出さない");
+                Assert.That(characters.ShownSkillName(0), Is.EqualTo("ワープポータル"));
+                Assert.That(characters.ShownSkillName(1), Is.EqualTo("スペースミサイル"));
+                Assert.That(characters.ShownSkillName(2), Is.EqualTo("コズミックレイ"));
+                Assert.That(characters.ShownSkillDescription(0), Does.Contain("ポータル"), "技の説明を出さない");
+                Assert.That(characters.ShownSkillCooldown(0), Is.EqualTo("クールタイム 10 秒  ／  スタック 2"));
+                Assert.That(characters.ShownSkillCooldown(1), Is.EqualTo("クールタイム 6 秒"));
+                Assert.That(characters.ShownSkillCooldown(2), Is.EqualTo("必要ゲージ 100%"));
+                EventSystem.current.SetSelectedGameObject(characters.Card(2).gameObject);
+                Assert.That(characters.ShownName, Is.EqualTo(CharacterPresets.StormRunnerName));
+                Assert.That(characters.ShownSkillCooldown(0), Is.EqualTo("クールタイム 10 秒（効果が終わってから）"));
+                EventSystem.current.SetSelectedGameObject(characters.Card(3).gameObject);
 
                 // 戻る操作で 1 つ前の画面へ（キャラクター選択 → メインメニューの TRAINING）。
                 characters.Card(3).OnCancel(null);
@@ -193,6 +206,71 @@ namespace Airerage.PlayMode.Tests
             Assert.That(pause.IsOpen, Is.False, "RESET POSITION の後に閉じない");
             Assert.That(runner.SpeedScale, Is.EqualTo(1f), "閉じた後に動き出さない");
             Assert.That(Mathf.Abs(runner.PlayerState.Position.X - spawn.x), Is.LessThan(0.5f), "出現位置に戻らない");
+        }
+
+        [UnityTest]
+        public IEnumerator PauseMenu_EscapeAgain_Closes()
+        {
+            // 一時停止のメニューは、もう一度 Esc を押すと閉じる（RESUME と同じ。ユーザーの要望、2026-10-17）。Esc は UI の「戻る」でも
+            // あるので、同じ押下で閉じてから開き直さないこと。
+            InputSettings.EditorInputBehaviorInPlayMode savedBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSettings.BackgroundBehavior savedBackground = InputSystem.settings.backgroundBehavior;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                SceneManager.LoadScene("Sandbox_Wire");
+                yield return null;
+                var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
+                var pause = UnityEngine.Object.FindFirstObjectByType<PauseMenu>();
+                yield return WaitSeconds(0.3f);
+
+                yield return Tap(keyboard, Key.Escape);
+                Assert.That(pause.IsOpen, Is.True, "Esc で開かない");
+                yield return null;
+                yield return null;
+                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(pause.Resume.gameObject), "RESUME を選んでいない");
+                var sounds = UnityEngine.Object.FindFirstObjectByType<UiSounds>();
+                int opened = CountOf(sounds, SoundId.UiPause);
+
+                yield return Tap(keyboard, Key.Escape);
+                yield return null;
+                Assert.That(pause.IsOpen, Is.False, "もう一度 Esc を押しても閉じない");
+                Assert.That(runner.SpeedScale, Is.EqualTo(1f), "閉じた後に動き出さない");
+                Assert.That(CountOf(sounds, SoundId.UiPause), Is.EqualTo(opened), "閉じた直後に開き直した");
+
+                yield return Tap(keyboard, Key.Escape);
+                Assert.That(pause.IsOpen, Is.True, "閉じた後に、もう一度 Esc で開かない");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keyboard);
+                InputSystem.settings.editorInputBehaviorInPlayMode = savedBehavior;
+                InputSystem.settings.backgroundBehavior = savedBackground;
+            }
+        }
+
+        // キーを押して、次のフレームで離す。
+        private static IEnumerator Tap(Keyboard keyboard, Key key)
+        {
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
+            yield return null;
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            yield return null;
+        }
+
+        private static int CountOf(UiSounds sounds, SoundId id)
+        {
+            int count = 0;
+            foreach (SoundId played in sounds.History)
+            {
+                if (played == id)
+                {
+                    count++;
+                }
+            }
+            return count;
         }
 
         private static IEnumerator WaitFor(Func<bool> condition, float seconds, string message)

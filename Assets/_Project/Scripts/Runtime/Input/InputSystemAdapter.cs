@@ -15,6 +15,7 @@ namespace Airerage.Runtime.Input
     /// 照準（D-08）: 最後に使った機器がキーボードかマウスなら、マウスポインターの方向に照準する（PlayerInput の照準の方向）。
     /// ゲームパッドなら、右スティックを倒しているときはその方向に照準する。倒していなければ照準の方向を指定せず、
     /// シミュレーションが左スティックの方向で照準する。
+    /// ローカル対戦（docs/15 T6-5）では、人ごとに機器を限った入力のアセット（InputActionAsset.devices）を渡す。
     /// </summary>
     public sealed class InputSystemAdapter : IDisposable
     {
@@ -60,7 +61,24 @@ namespace Airerage.Runtime.Input
             _point = _map.FindAction("Point", throwIfNotFound: true);
             _aim = _map.FindAction("Aim", throwIfNotFound: true);
             _deviceActions = new[] { _move, _jump, _wire, _attack, _guard, _special1, _special2, _super, _reset, _aim };
-            UsingPointer = Mouse.current != null;
+            UsingPointer = HasMouse(actions);
+        }
+
+        // 使える機器にマウスがあるか（ローカル対戦では、人ごとに機器を限った入力を使う。ゲームパッドだけの人はポインターで照準しない）。
+        private static bool HasMouse(InputActionAsset actions)
+        {
+            if (!actions.devices.HasValue)
+            {
+                return Mouse.current != null;
+            }
+            foreach (InputDevice device in actions.devices.Value)
+            {
+                if (device is Mouse)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>このフレームで位置のリセットが押されたか（Poll で更新する）。</summary>
@@ -213,7 +231,7 @@ namespace Airerage.Runtime.Input
 
         private void UpdateActiveDevice()
         {
-            if (_point.WasPerformedThisFrame())
+            if (_point.WasPerformedThisFrame() && _point.activeControl != null)
             {
                 UsingPointer = true;
             }

@@ -377,17 +377,22 @@ namespace Airerage.Editor
         }
 
         /// <summary>操作するキャラクターのコンボの表示（T3-7）。source は SimulationRunner か OnlineRunner（ISimulationFeed）。</summary>
-        internal static void CreateComboHud(MonoBehaviour source)
+        internal static void CreateComboHud(MonoBehaviour source, bool everyone = false)
         {
             var hud = new GameObject("ComboHud").AddComponent<ComboHud>();
             SetReference(hud, "_source", source);
+            if (everyone)
+            {
+                // ローカル対戦: だれのコンボでも出す（docs/15 T6-5）。
+                SetBool(hud, "_everyone", true);
+            }
         }
 
         /// <summary>
         /// 技の表示: 自分の特殊攻撃と必殺技の札（画面の下の中央）、必殺技の暗転（docs/13 T5-4）、置かれた物と投射物、長押しで預ける
-        /// 枚数（T5-6）。source は ISimulationFeed。
+        /// 枚数（T5-6）。source は ISimulationFeed。players が 1 以上なら、技の札を人ごとに players 個（ローカル対戦。docs/15 T6-5）。
         /// </summary>
-        internal static void CreateSkillHud(MonoBehaviour source, GameAudio audio)
+        internal static void CreateSkillHud(MonoBehaviour source, GameAudio audio, int players = 0)
         {
             CreateWorldObjectsView(source, audio);
             var hold = new GameObject("HoldDepositHud").AddComponent<HoldDepositHud>();
@@ -420,6 +425,14 @@ namespace Airerage.Editor
             var flash = root.AddComponent<SuperFlashHud>();
             SetReference(flash, "_source", source);
             SetReference(flash, "_camera", Object.FindFirstObjectByType<Camera>());
+            for (int player = 0; player < players; player++)
+            {
+                SkillHud playerHud = player == 0 ? hud : new GameObject($"SkillHudP{player + 1}").AddComponent<SkillHud>();
+                SetReference(playerHud, "_source", source);
+                SetReference(playerHud, "_audio", audio);
+                SetReference(playerHud, "_camera", Object.FindFirstObjectByType<Camera>());
+                SetInt(playerHud, "_player", player);
+            }
         }
 
         /// <summary>ためる技のオーラ（ChargeAuraView。見本の線と光は隠しておく）。</summary>
@@ -1007,6 +1020,7 @@ namespace Airerage.Editor
                 AssetDatabase.CreateAsset(asset, path);
             }
             asset.Configure(config, displayName);
+            CharacterProfiles.Apply(asset, displayName);
             EditorUtility.SetDirty(asset);
             return asset;
         }
@@ -1057,6 +1071,30 @@ namespace Airerage.Editor
             {
                 throw new InvalidOperationException($"{target.GetType().Name}.{field} に参照を設定できなかった");
             }
+        }
+
+        internal static void SetInt(Object target, string field, int value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(field);
+            if (property == null)
+            {
+                throw new InvalidOperationException($"{target.GetType().Name} に {field} がない");
+            }
+            property.intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        internal static void SetBool(Object target, string field, bool value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(field);
+            if (property == null)
+            {
+                throw new InvalidOperationException($"{target.GetType().Name} に {field} がない");
+            }
+            property.boolValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         internal static void SetReferenceArray(Object target, string field, Object[] values)

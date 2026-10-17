@@ -20,7 +20,7 @@
 | Unity でのコンパイル確認（エラー・警告） | できる |
 | EditMode / PlayMode テストの実行 | できる（どちらも確認済み） |
 | シーンを起動し、記録した入力やスクリプトで操作して、結果（位置、状態、ログ）を検証する | できる |
-| 画面のスクリーンショット（仮想ディスプレイ Xvfb＋ソフトウェア描画） | できる見込み（描画は遅い） |
+| 画面のスクリーンショット（仮想ディスプレイ Xvfb＋ソフトウェア描画） | できる（uGUI のメニューの画面。2026-10-17 に確認。4.2 の `UiSnapshot`）。試合中の HUD（IMGUI）は撮れない |
 | ビルドの作成（Linux 向け。Windows 向けはモジュール次第） | できる見込み |
 | **操作感の評価（手触り、気持ちよさ、遅延の体感）** | **できない**。人が実際に遊ぶ必要がある |
 | ゲームパッドでの操作 | できない |
@@ -131,6 +131,8 @@ exit 0
 | 入力の記録の照合 | `bash tools/unity/run_unity_tests.sh EditMode Airerage.Runtime.Tests.RecordedReplayTests` | `InputRecordings/` の記録を再生し、最後の状態が記録と一致するかを確かめる（別の PC で記録したファイルでの決定性の確認。docs/04 3.5） |
 | 検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxWireSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Wire.unity` を作り直す（地形の配置はビルダーのコード）。エディタではメニューの「Airerage」から |
 | オンライン用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxOnlineSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Online.unity` を作り直す（オンライン対戦用のアスレチックステージ。docs/10 T2-7、docs/11 T3-8） |
+| ゲームの流れのシーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.FlowSceneBuilder.Build` | App・Menu・Stage_Athletic・Match_Training・Match_Local（docs/15） |
+| メニューの画面の画像 | `xvfb-run -a -s "-screen 0 1920x1080x24" Unity -batchmode -quit -projectPath . -force-glcore -executeMethod Airerage.Editor.UiSnapshot.CaptureMenus -logFile Logs/snapshot.log` | キャラクター選択（キャラクターごと）とローカル対戦の参加の画面を、16:9・横に長い画面・16:10 で `Logs/Snapshots/` に PNG で保存する（配置の確認。`-nographics` は付けない）。日本語の字は、PC の日本語の字体（ここでは WenQuanYi Zen Hei）で描く |
 | 空中戦の検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxCombatSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Combat.unity` を作り直す（足場が少なく、外に出ると撃破。docs/11 T3-3） |
 
 ## 5. うまくいかない場合の代案

@@ -7,6 +7,7 @@ using Airerage.Runtime.Flow;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
 using Airerage.Runtime.UI;
+using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -25,6 +26,7 @@ namespace Airerage.Editor
     /// - Stage_Athletic: アスレチックステージ（地形、ギミック、撃破の範囲、コインの出現地点、拠点の候補、出現位置、光）。
     ///   Sandbox_Online と同じ配置（値は SandboxOnlineSceneBuilder の 1 か所）。
     /// - Match_Training: トレーニングの試合の仕組み（自分＋ダミー 3 体、表示、HUD、カメラ、一時停止）。ステージのシーンに重ねる。
+    /// - Match_Local: ローカル対戦の試合の仕組み（4 人分の表示、全員が入るカメラ、人ごとの技の札、HUD、一時停止。T6-5）。ステージのシーンに重ねる。
     /// ステージの設定（StageDefinition）と一覧（StageCatalog）も作る。
     /// </summary>
     public static class FlowSceneBuilder
@@ -33,6 +35,7 @@ namespace Airerage.Editor
         public const string MenuScenePath = "Assets/_Project/Scenes/Menu.unity";
         public const string AthleticStagePath = "Assets/_Project/Scenes/Stages/Stage_Athletic.unity";
         public const string TrainingScenePath = "Assets/_Project/Scenes/Modes/Match_Training.unity";
+        public const string LocalScenePath = "Assets/_Project/Scenes/Modes/Match_Local.unity";
         public const string StageFolder = "Assets/_Project/Data/Stages";
         public const string AthleticStageAssetPath = StageFolder + "/Athletic.asset";
         public const string StageCatalogPath = StageFolder + "/StageCatalog.asset";
@@ -43,7 +46,7 @@ namespace Airerage.Editor
         // ビルドの設定のシーンの順（最初が起動するシーン）。ほかのシーンは後ろに並べる。テンプレートの SampleScene は外す。
         private static readonly string[] BuildOrder =
         {
-            AppScenePath, MenuScenePath, AthleticStagePath, TrainingScenePath,
+            AppScenePath, MenuScenePath, AthleticStagePath, TrainingScenePath, LocalScenePath,
         };
 
         private const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
@@ -51,7 +54,7 @@ namespace Airerage.Editor
         [MenuItem("Airerage/ゲームの流れのシーンを作り直す")]
         private static void BuildFromMenu()
         {
-            if (!EditorUtility.DisplayDialog("ゲームの流れ", "App・Menu・Stage_Athletic・Match_Training を作り直します。シーンを手で編集した内容は消えます。",
+            if (!EditorUtility.DisplayDialog("ゲームの流れ", "App・Menu・Stage_Athletic・Match_Training・Match_Local を作り直します。シーンを手で編集した内容は消えます。",
                     "作り直す", "やめる"))
             {
                 return;
@@ -68,10 +71,11 @@ namespace Airerage.Editor
         {
             BuildAthleticStage();
             BuildTraining();
+            BuildLocal();
             BuildMenu();
             BuildApp();
             ArrangeBuildSettings();
-            Debug.Log("FlowSceneBuilder: App、Menu、Stage_Athletic、Match_Training を作った");
+            Debug.Log("FlowSceneBuilder: App、Menu、Stage_Athletic、Match_Training、Match_Local を作った");
         }
 
         private static void BuildAthleticStage()
@@ -128,7 +132,7 @@ namespace Airerage.Editor
             var runner = new GameObject("Simulation").AddComponent<SimulationRunner>();
             SandboxWireSceneBuilder.SetReference(runner, "_character", character);
             SandboxWireSceneBuilder.SetReference(runner, "_roster", SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(character));
-            SetBool(runner, "_rememberCharacter", true);
+            SandboxWireSceneBuilder.SetBool(runner, "_rememberCharacter", true);
             SandboxWireSceneBuilder.SetReference(runner, "_inputActions", inputActions);
             SandboxWireSceneBuilder.SetReference(runner, "_characterView", characterView);
             SandboxWireSceneBuilder.SetReference(runner, "_wireView", wireView);
@@ -151,6 +155,78 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
             MenuUiBuilder.CreatePauseMenu(runner, inputActions);
             Save(scene, TrainingScenePath);
+        }
+
+        // ローカル対戦の試合の仕組み（docs/15 T6-5）: 4 人分の表示（オンラインと同じ色）、全員が入るカメラ、人ごとの技の札、HUD、一時停止。
+        private static void BuildLocal()
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+            Object.DestroyImmediate(Object.FindFirstObjectByType<Light>().gameObject);
+
+            CharacterRoster roster = SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(SandboxWireSceneBuilder.LoadOrCreateCharacterConfig());
+            InputActionAsset inputActions = LoadInputActions();
+            Material wireMaterial = SandboxWireSceneBuilder.LoadOrCreateMaterial("Wire", new Color(0.6f, 0.2f, 0.85f), unlit: true);
+            Material attachedAnchorMaterial = SandboxWireSceneBuilder.LoadOrCreateMaterial("WireAnchor", new Color(1f, 0.5f, 0f), unlit: true);
+
+            int count = LocalMatchRunner.MaxPlayers;
+            var characterViews = new Object[count];
+            var wireViews = new Object[count];
+            var aimIndicators = new Object[count];
+            var colors = new Color[count];
+            var playersRoot = new GameObject("Players").transform;
+            for (int p = 0; p < count; p++)
+            {
+                var (materialName, color) = SandboxOnlineSceneBuilder.PlayerColors[p];
+                colors[p] = color;
+                Material material = SandboxWireSceneBuilder.LoadOrCreateMaterial(materialName, color);
+                GameObject characterGo = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Cube, $"Player{p + 1}", material, Vector3.one);
+                characterGo.transform.SetParent(playersRoot, false);
+                var view = characterGo.AddComponent<CharacterView>();
+                SandboxWireSceneBuilder.AddFacingMarker(view);
+                SandboxWireSceneBuilder.SetReference(view, "_hitboxLine", SandboxWireSceneBuilder.CreateHitboxLine($"Player{p + 1}Hitbox"));
+                SandboxWireSceneBuilder.SetReference(view, "_chargeEffect", SandboxWireSceneBuilder.CreateChargeEffect($"Player{p + 1}Charge"));
+                SandboxWireSceneBuilder.AddCombatIndicators(view, $"Player{p + 1}", playersRoot, color);
+                characterViews[p] = view;
+                wireViews[p] = SandboxWireSceneBuilder.CreateWireView($"Player{p + 1}Wire", playersRoot, wireMaterial, attachedAnchorMaterial);
+                AimIndicatorView aim = SandboxWireSceneBuilder.CreateAimIndicator();
+                aim.name = $"Player{p + 1}Aim";
+                aimIndicators[p] = aim;
+            }
+
+            // 全員が入るカメラ: Cinemachine が追う点を SharedCamera が全員の中心へ動かし、距離を変える（ホイールのズームは使わない）。
+            var cameraTarget = new GameObject("CameraTarget").transform;
+            CinemachineCamera follow = SandboxWireSceneBuilder.CreateFollowCamera(cameraTarget, inputActions);
+            Object.DestroyImmediate(follow.GetComponent<CameraZoom>());
+            Camera camera = Object.FindFirstObjectByType<Camera>();
+
+            var runner = new GameObject("LocalMatch").AddComponent<LocalMatchRunner>();
+            SandboxWireSceneBuilder.SetReference(runner, "_roster", roster);
+            SandboxWireSceneBuilder.SetReference(runner, "_inputActions", inputActions);
+            SandboxWireSceneBuilder.SetReference(runner, "_camera", camera);
+            SandboxWireSceneBuilder.SetReferenceArray(runner, "_characterViews", characterViews);
+            SandboxWireSceneBuilder.SetReferenceArray(runner, "_wireViews", wireViews);
+            SandboxWireSceneBuilder.SetReferenceArray(runner, "_aimIndicators", aimIndicators);
+            SandboxOnlineSceneBuilder.SetColors(runner, "_playerColors", colors);
+
+            var shared = new GameObject("SharedCamera").AddComponent<SharedCamera>();
+            SandboxWireSceneBuilder.SetReference(shared, "_source", runner);
+            SandboxWireSceneBuilder.SetReference(shared, "_composer", follow.GetComponent<CinemachinePositionComposer>());
+            SandboxWireSceneBuilder.SetReference(shared, "_target", cameraTarget);
+            SandboxWireSceneBuilder.SetReference(shared, "_camera", camera);
+
+            GameAudio audio = SandboxWireSceneBuilder.CreateAudio(runner);
+            SandboxWireSceneBuilder.CreateComboHud(runner, everyone: true);
+            SandboxWireSceneBuilder.CreateSkillHud(runner, audio, count);
+            SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
+            SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
+            EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
+            SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
+            SandboxWireSceneBuilder.CreateBankView(runner, audio, guides);
+            SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
+            SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
+            SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
+            MenuUiBuilder.CreatePauseMenu(runner, inputActions);
+            Save(scene, LocalScenePath);
         }
 
         private static void BuildMenu()
@@ -192,10 +268,12 @@ namespace Airerage.Editor
 
             CharacterSelectScreen characterSelect = CreateCharacterSelect(canvas.transform);
             StageSelectScreen stageSelect = CreateStageSelect(canvas.transform);
+            LocalJoinScreen localJoin = CreateLocalJoin(canvas.transform);
 
             var screens = canvas.gameObject.AddComponent<MenuScreens>();
             SandboxWireSceneBuilder.SetReference(screens, "_characterSelect", characterSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_stageSelect", stageSelect);
+            SandboxWireSceneBuilder.SetReference(screens, "_localJoin", localJoin);
             SandboxWireSceneBuilder.SetReference(screens, "_title", title.gameObject);
             SandboxWireSceneBuilder.SetReference(screens, "_pressAnyButton", press);
             SandboxWireSceneBuilder.SetReference(screens, "_main", main.gameObject);
@@ -208,48 +286,202 @@ namespace Airerage.Editor
             Save(scene, MenuScenePath);
         }
 
-        // キャラクター選択（docs/15 T6-3）: 上に題、真ん中にキャラクターの札を横に並べ、下にカーソルのあるキャラクターの名前・ロゴ・技。
+        // キャラクター選択（docs/15 T6-3、6.6）: 上に題、その下にキャラクターの札を横に並べ、画面の下にカーソルのあるキャラクター
+        // （左にロゴ、名前とハッシュタグ、その下に Q・E・R の技の名前・説明・クールタイム）。上の部分は画面の上から、下の部分は画面の
+        // 下から置く（横に長い画面で高さが 1080 より小さくなっても重ならない。高さ 1000 まで）。
         private static CharacterSelectScreen CreateCharacterSelect(Transform canvas)
         {
             CharacterRoster roster = SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(SandboxWireSceneBuilder.LoadOrCreateCharacterConfig());
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CharacterSelect");
             MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.45f), Vector2.zero, Vector2.one);
-            MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
-            var size = new Vector2(300f, 360f);
-            const float gap = 40f;
+            MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 56, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -36f), new Vector2(1200f, 80f), Color.white);
+            var size = new Vector2(250f, 300f);
+            const float gap = 36f;
             float total = roster.Count * size.x + (roster.Count - 1) * gap;
             var cards = new Object[roster.Count];
             for (int i = 0; i < roster.Count; i++)
             {
                 var character = roster.Get(i);
                 cards[i] = MenuUiBuilder.CreateCharacterCard(panel, $"Card{i + 1}", character.Logo, character.DisplayName,
-                    new Vector2(0.5f, 0.5f), new Vector2(-total * 0.5f + i * (size.x + gap), 300f), size);
+                    new Vector2(0.5f, 1f), new Vector2(-total * 0.5f + i * (size.x + gap), -140f), size);
             }
-            // 下の説明: ロゴ、名前、技。
+
+            // 下の説明（高さ 450。画面の下から 64）。
             RectTransform info = MenuUiBuilder.CreateFull(panel, "Info");
-            MenuUiBuilder.CreateFill(info, "Band", new Color(0f, 0f, 0f, 0.5f), new Vector2(0f, 0.05f), new Vector2(1f, 0.36f));
+            info.anchorMin = new Vector2(0f, 0f);
+            info.anchorMax = new Vector2(1f, 0f);
+            info.pivot = new Vector2(0.5f, 0f);
+            info.offsetMin = new Vector2(0f, 64f);
+            info.offsetMax = new Vector2(0f, 64f + 450f);
+            MenuUiBuilder.CreateFill(info, "Band", new Color(0f, 0f, 0f, 0.75f), Vector2.zero, Vector2.one);
+
             var logoGo = new GameObject("Logo", typeof(RectTransform));
             logoGo.transform.SetParent(info, false);
             var logoRect = (RectTransform)logoGo.transform;
-            logoRect.anchorMin = logoRect.anchorMax = logoRect.pivot = new Vector2(0.5f, 0.2f);
-            logoRect.anchoredPosition = new Vector2(-520f, 0f);
-            logoRect.sizeDelta = new Vector2(220f, 220f);
+            logoRect.anchorMin = logoRect.anchorMax = logoRect.pivot = new Vector2(0f, 1f);
+            logoRect.anchoredPosition = new Vector2(90f, -22f);
+            logoRect.sizeDelta = new Vector2(150f, 150f);
             var logo = logoGo.AddComponent<UnityEngine.UI.RawImage>();
             logo.raycastTarget = false;
-            UnityEngine.UI.Text name = MenuUiBuilder.CreateText(info, "Name", string.Empty, 56, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0.5f, 0.3f), new Vector2(-370f, 0f), new Vector2(900f, 80f), Color.white);
-            UnityEngine.UI.Text moves = MenuUiBuilder.CreateText(info, "Moves", string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft,
-                new Vector2(0.5f, 0.26f), new Vector2(-370f, -20f), new Vector2(900f, 200f), new Color(1f, 1f, 1f, 0.85f));
+
+            // 名前とハッシュタグ（横に並べる。ハッシュタグは名前の長さに合わせて名前のすぐ右）。
+            var header = new GameObject("Header", typeof(RectTransform));
+            header.transform.SetParent(info, false);
+            var headerRect = (RectTransform)header.transform;
+            headerRect.anchorMin = headerRect.anchorMax = headerRect.pivot = new Vector2(0f, 1f);
+            headerRect.anchoredPosition = new Vector2(270f, -58f);
+            headerRect.sizeDelta = new Vector2(1500f, 90f);
+            var row = header.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+            row.childAlignment = TextAnchor.LowerLeft;
+            row.spacing = 36f;
+            row.childControlWidth = true;
+            row.childControlHeight = false;
+            row.childForceExpandWidth = false;
+            row.childForceExpandHeight = false;
+            UnityEngine.UI.Text name = MenuUiBuilder.CreateText(header.transform, "Name", string.Empty, 60, FontStyle.BoldAndItalic,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), Vector2.zero, new Vector2(500f, 84f), Color.white);
+            UnityEngine.UI.Text tags = MenuUiBuilder.CreateText(header.transform, "Tags", string.Empty, 30, FontStyle.Bold,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), Vector2.zero, new Vector2(500f, 52f), MenuUiBuilder.Accent);
+
+            // Q・E・R の技（左から。3 つの列）。
+            var skills = new GameObject("Skills", typeof(RectTransform));
+            skills.transform.SetParent(info, false);
+            var skillsRect = (RectTransform)skills.transform;
+            skillsRect.anchorMin = new Vector2(0f, 1f);
+            skillsRect.anchorMax = new Vector2(1f, 1f);
+            skillsRect.pivot = new Vector2(0.5f, 1f);
+            skillsRect.offsetMin = new Vector2(90f, -190f - 236f);
+            skillsRect.offsetMax = new Vector2(-90f, -190f);
+            string[] keys = { "Q", "E", "R" };
+            int count = CharacterSelectScreen.SkillSlots.Length;
+            var skillNames = new Object[count];
+            var descriptions = new Object[count];
+            var cooldowns = new Object[count];
+            for (int i = 0; i < count; i++)
+            {
+                RectTransform column = MenuUiBuilder.CreateFull(skills.transform, $"Skill{keys[i]}");
+                column.anchorMin = new Vector2((float)i / count, 0f);
+                column.anchorMax = new Vector2((float)(i + 1) / count, 1f);
+                column.offsetMin = Vector2.zero;
+                column.offsetMax = new Vector2(-30f, 0f);
+                var plate = column.gameObject.AddComponent<SlantedPlate>();
+                plate.Configure(0.06f, 2f, new Color(0.03f, 0.05f, 0.09f, 0.7f), new Color(1f, 1f, 1f, 0.25f));
+                plate.raycastTarget = false;
+                MenuUiBuilder.CreateText(column, "Key", keys[i], 36, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+                    new Vector2(0f, 1f), new Vector2(26f, -12f), new Vector2(50f, 48f), MenuUiBuilder.Accent);
+                UnityEngine.UI.Text skillName = MenuUiBuilder.CreateText(column, "Name", string.Empty, 32, FontStyle.Bold, TextAnchor.MiddleLeft,
+                    new Vector2(0f, 1f), Vector2.zero, Vector2.zero, Color.white);
+                StretchTop(skillName, 80f, 20f, 12f, 48f);
+                // 説明は 4 行まで（細い字。クールタイムの行は列の下に固定する）。
+                UnityEngine.UI.Text description = MenuUiBuilder.CreateText(column, "Description", string.Empty, 22, FontStyle.Normal,
+                    TextAnchor.UpperLeft, new Vector2(0f, 1f), Vector2.zero, Vector2.zero, new Color(1f, 1f, 1f, 0.92f));
+                StretchTop(description, 26f, 30f, 68f, 120f);
+                description.horizontalOverflow = HorizontalWrapMode.Wrap;
+                UnityEngine.UI.Text cooldown = MenuUiBuilder.CreateText(column, "Cooldown", string.Empty, 22, FontStyle.Bold, TextAnchor.MiddleLeft,
+                    new Vector2(0f, 1f), Vector2.zero, Vector2.zero, new Color(1f, 0.85f, 0.3f));
+                StretchTop(cooldown, 26f, 20f, 192f, 34f);
+                skillNames[i] = skillName;
+                descriptions[i] = description;
+                cooldowns[i] = cooldown;
+            }
             MenuUiBuilder.CreateText(panel, "Hint", "Left / Right: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
-                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 20f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 16f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
 
             var screen = panel.gameObject.AddComponent<CharacterSelectScreen>();
             SandboxWireSceneBuilder.SetReference(screen, "_roster", roster);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_cards", cards);
             SandboxWireSceneBuilder.SetReference(screen, "_logo", logo);
             SandboxWireSceneBuilder.SetReference(screen, "_name", name);
-            SandboxWireSceneBuilder.SetReference(screen, "_moves", moves);
+            SandboxWireSceneBuilder.SetReference(screen, "_tags", tags);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_skillNames", skillNames);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_skillDescriptions", descriptions);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_skillCooldowns", cooldowns);
+            panel.gameObject.SetActive(false);
+            return screen;
+        }
+
+        // 文字を親の横幅いっぱいに広げる（左右の余白 left・right、親の上から top の位置に高さ height）。
+        private static void StretchTop(UnityEngine.UI.Text text, float left, float right, float top, float height)
+        {
+            RectTransform rect = text.rectTransform;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.offsetMin = new Vector2(left, -top - height);
+            rect.offsetMax = new Vector2(-right, -top);
+        }
+
+        // ローカル対戦の参加とキャラクター選択（docs/15 T6-5）: 上に題、真ん中に 4 人分の枠（番号、機器、ロゴ、名前、案内）、下に時間の制限と案内。
+        private static LocalJoinScreen CreateLocalJoin(Transform canvas)
+        {
+            CharacterRoster roster = SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(SandboxWireSceneBuilder.LoadOrCreateCharacterConfig());
+            RectTransform panel = MenuUiBuilder.CreateFull(canvas, "LocalJoin");
+            MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, Vector2.one);
+            MenuUiBuilder.CreateText(panel, "Title", "LOCAL VS", 56, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -36f), new Vector2(1200f, 80f), Color.white);
+            int count = LocalJoinScreen.MaxPlayers;
+            var size = new Vector2(360f, 480f);
+            const float gap = 28f;
+            float total = count * size.x + (count - 1) * gap;
+            var plates = new Object[count];
+            var numbers = new Object[count];
+            var devices = new Object[count];
+            var logos = new Object[count];
+            var names = new Object[count];
+            var states = new Object[count];
+            var colors = new Color[count];
+            for (int i = 0; i < count; i++)
+            {
+                colors[i] = SandboxOnlineSceneBuilder.PlayerColors[i].Color;
+                var slot = new GameObject($"Slot{i + 1}", typeof(RectTransform));
+                slot.transform.SetParent(panel, false);
+                var rect = (RectTransform)slot.transform;
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.anchoredPosition = new Vector2(-total * 0.5f + i * (size.x + gap), -150f);
+                rect.sizeDelta = size;
+                var plate = slot.AddComponent<SlantedPlate>();
+                plate.Configure(0.08f, 3f, new Color(0.03f, 0.05f, 0.09f, 0.55f), new Color(1f, 1f, 1f, 0.25f));
+                plate.raycastTarget = false;
+                plates[i] = plate;
+                numbers[i] = MenuUiBuilder.CreateText(slot.transform, "Number", $"P{i + 1}", 44, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                    new Vector2(0f, 1f), new Vector2(40f, -14f), new Vector2(120f, 56f), colors[i]);
+                devices[i] = MenuUiBuilder.CreateText(slot.transform, "Device", string.Empty, 18, FontStyle.Bold, TextAnchor.UpperRight,
+                    new Vector2(1f, 1f), new Vector2(-24f, -26f), new Vector2(200f, 30f), new Color(1f, 1f, 1f, 0.75f));
+                var logoGo = new GameObject("Logo", typeof(RectTransform));
+                logoGo.transform.SetParent(slot.transform, false);
+                var logoRect = (RectTransform)logoGo.transform;
+                logoRect.anchorMin = logoRect.anchorMax = logoRect.pivot = new Vector2(0.5f, 1f);
+                logoRect.anchoredPosition = new Vector2(12f, -84f);
+                logoRect.sizeDelta = new Vector2(190f, 190f);
+                var logo = logoGo.AddComponent<UnityEngine.UI.RawImage>();
+                logo.raycastTarget = false;
+                logo.enabled = false;
+                logos[i] = logo;
+                names[i] = MenuUiBuilder.CreateText(slot.transform, "Name", string.Empty, 30, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                    new Vector2(0.5f, 1f), new Vector2(6f, -296f), new Vector2(size.x - 40f, 44f), Color.white);
+                states[i] = MenuUiBuilder.CreateText(slot.transform, "State", string.Empty, 24, FontStyle.Bold, TextAnchor.MiddleCenter,
+                    new Vector2(0.5f, 1f), new Vector2(0f, -370f), new Vector2(size.x - 40f, 80f), Color.white);
+            }
+            UnityEngine.UI.Text timeLimit = MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 28, FontStyle.BoldAndItalic,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 110f), new Vector2(900f, 44f), MenuUiBuilder.Accent);
+            UnityEngine.UI.Text message = MenuUiBuilder.CreateText(panel, "Message", string.Empty, 24, FontStyle.Bold,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 64f), new Vector2(1400f, 40f), Color.white);
+            MenuUiBuilder.CreateText(panel, "Hint", "Left / Right: character     Enter / A: join, ready     Esc / B: back     T / Y: time limit", 22,
+                FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 16f), new Vector2(1400f, 40f), new Color(1f, 1f, 1f, 0.7f));
+
+            var screen = panel.gameObject.AddComponent<LocalJoinScreen>();
+            SandboxWireSceneBuilder.SetReference(screen, "_roster", roster);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_plates", plates);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_numbers", numbers);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_devices", devices);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_logos", logos);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_names", names);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_states", states);
+            SandboxWireSceneBuilder.SetReference(screen, "_timeLimit", timeLimit);
+            SandboxWireSceneBuilder.SetReference(screen, "_message", message);
+            SandboxOnlineSceneBuilder.SetColors(screen, "_colors", colors);
             panel.gameObject.SetActive(false);
             return screen;
         }
@@ -356,18 +588,6 @@ namespace Airerage.Editor
                 throw new InvalidOperationException($"入力アクションのアセットがない: {SandboxWireSceneBuilder.InputActionsPath}");
             }
             return inputActions;
-        }
-
-        private static void SetBool(Object target, string field, bool value)
-        {
-            var serialized = new SerializedObject(target);
-            SerializedProperty property = serialized.FindProperty(field);
-            if (property == null)
-            {
-                throw new InvalidOperationException($"{target.GetType().Name} に {field} がない");
-            }
-            property.boolValue = value;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void Save(Scene scene, string path)

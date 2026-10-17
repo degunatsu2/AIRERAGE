@@ -9,6 +9,8 @@ namespace Airerage.Runtime.Flow
     /// ゲームの流れ（docs/15 T6-1。D-54、D-66）。いつも読み込んでおく App のシーンに 1 つだけ置き、画面ごとのシーンを重ねて読み込む:
     /// - メニュー: メニューのシーン（タイトル、メインメニュー）＋背景のステージ（ステージの一覧の最初）。
     /// - トレーニング: 選んだステージのシーン＋トレーニングの試合の仕組みのシーン（ステージを先に読み込む。実行がステージの物を探すため）。
+    /// - ローカル対戦（T6-5）: 選んだステージのシーン＋ローカル対戦の試合の仕組みのシーン。参加した人（機器とキャラクター）と、時間の
+    ///   制限を渡す（LocalPlayers、LocalTimed）。
     /// - ネットワーク対戦: 今はオンラインの検証用のシーン（Sandbox_Online）をそのまま（T6-7 でステージと分ける）。
     /// 光と空はステージのシーンのものを使う（ステージのシーンを有効にする）。読み込んでいる間の操作は受け付けない。
     /// ほかの部品は、シーンの中からこれを探して使う（静的な変数は使わない）。
@@ -20,15 +22,18 @@ namespace Airerage.Runtime.Flow
             None,
             Menu,
             Training,
+            Local,
             Online,
         }
 
         [SerializeField] private StageCatalog _stages;
         [SerializeField] private string _menuScene = "Menu";
         [SerializeField] private string _trainingScene = "Match_Training";
+        [SerializeField] private string _localScene = "Match_Local";
         [SerializeField] private string _onlineScene = "Sandbox_Online";
 
         private readonly List<string> _loaded = new List<string>();
+        private readonly List<LocalPlayerSetup> _localPlayers = new List<LocalPlayerSetup>();
 
         /// <summary>今の画面。</summary>
         public FlowScreen Current { get; private set; }
@@ -43,6 +48,12 @@ namespace Airerage.Runtime.Flow
         public StageDefinition CurrentStage { get; private set; }
 
         public StageCatalog Stages => _stages;
+
+        /// <summary>ローカル対戦に参加した人（P1 から順。ローカル対戦を始めるまでは空）。</summary>
+        public IReadOnlyList<LocalPlayerSetup> LocalPlayers => _localPlayers;
+
+        /// <summary>ローカル対戦を時間の制限ありで始めるか。</summary>
+        public bool LocalTimed { get; private set; } = true;
 
         /// <summary>今読み込んでいる、画面のシーンの名前（テスト用）。</summary>
         public IReadOnlyList<string> LoadedScenes => _loaded;
@@ -76,6 +87,21 @@ namespace Airerage.Runtime.Flow
         {
             stage = stage != null ? stage : _stages.Get(0);
             Go(FlowScreen.Training, stage, stage.SceneName, _trainingScene);
+        }
+
+        /// <summary>ローカル対戦を始める（stage のシーンに、ローカル対戦の試合の仕組みを重ねる。参加した人と時間の制限を渡す）。</summary>
+        public void StartLocal(StageDefinition stage, IReadOnlyList<LocalPlayerSetup> players, bool timed)
+        {
+            if (IsLoading)
+            {
+                Debug.LogWarning($"{name}: 読み込みの途中なので、ローカル対戦は始めない", this);
+                return;
+            }
+            _localPlayers.Clear();
+            _localPlayers.AddRange(players);
+            LocalTimed = timed;
+            stage = stage != null ? stage : _stages.Get(0);
+            Go(FlowScreen.Local, stage, stage.SceneName, _localScene);
         }
 
         /// <summary>ネットワーク対戦を始める（今はオンラインの検証用のシーン。T6-7 でステージと分ける）。</summary>

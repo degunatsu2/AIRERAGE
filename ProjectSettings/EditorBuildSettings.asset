@@ -18,6 +18,9 @@ EditorBuildSettings:
     path: Assets/_Project/Scenes/Modes/Match_Training.unity
     guid: 6e06c256619b418bfb4d041913d107e9
   - enabled: 1
+    path: Assets/_Project/Scenes/Modes/Match_Local.unity
+    guid: 49ffdf4d5605a7eb0bf4bf381dba57c5
+  - enabled: 1
     path: Assets/_Project/Scenes/Sandbox_Wire.unity
     guid: 068413bac2d0e46c4ae8a281ab18e14d
   - enabled: 1

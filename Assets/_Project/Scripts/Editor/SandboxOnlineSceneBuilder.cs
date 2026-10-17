@@ -363,7 +363,7 @@ namespace Airerage.Editor
             return material;
         }
 
-        private static void SetColors(Object target, string field, Color[] colors)
+        internal static void SetColors(Object target, string field, Color[] colors)
         {
             var serialized = new SerializedObject(target);
             SerializedProperty property = serialized.FindProperty(field);

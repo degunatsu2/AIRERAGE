@@ -1,6 +1,7 @@
 using System;
-using System.Text;
+using System.Globalization;
 using Airerage.Core.Combat;
+using Airerage.Core.Common;
 using Airerage.Runtime.Data;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,20 +10,29 @@ namespace Airerage.Runtime.UI
 {
     /// <summary>
     /// キャラクター選択の画面（docs/15 T6-3。D-65）。キャラクターの一覧（CharacterRoster の順）の札（ロゴと名前）を横に並べ、左右で選ぶ。
-    /// カーソルのある札のキャラクターの名前・ロゴ・技（地上技、撃破技、Q、E、R）を下に出す。決定で Confirmed（キャラクターの番号）、
-    /// 戻る操作で Cancelled。今はトレーニングの 1 人（ローカル対戦の 4 人の参加は T6-5）。
+    /// カーソルのある札のキャラクターを下に出す: 左にロゴ、名前、名前の隣に性能の種類のハッシュタグ、その下に Q・E・R の技（カタカナの
+    /// 名前、何ができるか、クールタイムとスタック数。R は必要なゲージ。ユーザーの要望、2026-10-17）。決定で Confirmed（キャラクターの
+    /// 番号）、戻る操作で Cancelled。今はトレーニングの 1 人（ローカル対戦の 4 人の参加は T6-5）。
     /// </summary>
     public sealed class CharacterSelectScreen : MonoBehaviour
     {
+        /// <summary>下に出す技の枠（左から Q、E、R）。</summary>
+        public static readonly AttackSlot[] SkillSlots = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
+
         [SerializeField] private CharacterRoster _roster;
         [Tooltip("キャラクターの札（一覧と同じ順）")]
         [SerializeField] private MenuOption[] _cards = new MenuOption[0];
         [SerializeField] private RawImage _logo;
         [SerializeField] private Text _name;
-        [SerializeField] private Text _moves;
+        [SerializeField] private Text _tags;
+        [Tooltip("技の名前・説明・クールタイム（SkillSlots と同じ順。Q、E、R）")]
+        [SerializeField] private Text[] _skillNames = new Text[0];
+        [SerializeField] private Text[] _skillDescriptions = new Text[0];
+        [SerializeField] private Text[] _skillCooldowns = new Text[0];
 
         private int _selectAtFrame = -1;
         private int _initial;
+        private Font _japanese;
 
         /// <summary>決定した（キャラクターの番号）。</summary>
         public event Action<int> Confirmed;
@@ -38,24 +48,55 @@ namespace Airerage.Runtime.UI
         /// <summary>番号 index の札（テスト用）。</summary>
         public MenuOption Card(int index) => _cards[index];
 
-        /// <summary>下に出している名前と技（テスト用）。</summary>
+        /// <summary>下に出している名前・ハッシュタグ・技（テスト用。技は SkillSlots の順）。</summary>
         public string ShownName => _name != null ? _name.text : string.Empty;
-        public string ShownMoves => _moves != null ? _moves.text : string.Empty;
+        public string ShownTags => _tags != null ? _tags.text : string.Empty;
+        public string ShownSkillName(int index) => _skillNames[index].text;
+        public string ShownSkillDescription(int index) => _skillDescriptions[index].text;
+        public string ShownSkillCooldown(int index) => _skillCooldowns[index].text;
 
         private void Awake()
         {
-            if (_roster == null || _cards.Length != _roster.Count)
+            int skills = SkillSlots.Length;
+            if (_roster == null || _cards.Length != _roster.Count || _name == null || _tags == null
+                || _skillNames.Length != skills || _skillDescriptions.Length != skills || _skillCooldowns.Length != skills)
             {
-                Debug.LogError($"{name}: キャラクターの一覧がないか、札の数（{_cards.Length}）が一覧と違います", this);
+                Debug.LogError($"{name}: キャラクターの一覧がないか、札の数（{_cards.Length}）が一覧と違うか、名前・ハッシュタグ・技の文字がありません", this);
                 enabled = false;
                 return;
             }
+            UseJapaneseFont();
             for (int i = 0; i < _cards.Length; i++)
             {
                 int index = i;
                 _cards[i].Selected += () => Highlight(index);
                 _cards[i].Clicked.AddListener(() => Confirmed?.Invoke(index));
                 _cards[i].Cancelled += () => Cancelled?.Invoke();
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_japanese != null)
+            {
+                Destroy(_japanese);
+            }
+        }
+
+        // ハッシュタグと技の文字（日本語）を、PC の日本語の字体で書く（なければ Unity に入っている字体のまま）。
+        private void UseJapaneseFont()
+        {
+            _japanese = JapaneseFont.Create(32);
+            if (_japanese == null)
+            {
+                return;
+            }
+            _tags.font = _japanese;
+            for (int i = 0; i < SkillSlots.Length; i++)
+            {
+                _skillNames[i].font = _japanese;
+                _skillDescriptions[i].font = _japanese;
+                _skillCooldowns[i].font = _japanese;
             }
         }
 
@@ -94,44 +135,66 @@ namespace Airerage.Runtime.UI
             {
                 return;
             }
-            if (_name != null)
-            {
-                _name.text = character.DisplayName;
-            }
+            _name.text = character.DisplayName;
+            _tags.text = TagsText(character.Tags);
             if (_logo != null)
             {
                 _logo.texture = character.Logo;
                 _logo.enabled = character.Logo != null;
             }
-            if (_moves != null)
+            CombatTuning combat = character.Config.Combat;
+            for (int i = 0; i < SkillSlots.Length; i++)
             {
-                _moves.text = MovesOf(character.Config.Combat);
+                AttackSlot slot = SkillSlots[i];
+                SkillText text = character.TextOf(slot);
+                string skillName = text != null && !string.IsNullOrEmpty(text.Name) ? text.Name : combat.Get(slot).Name;
+                _skillNames[i].text = skillName;
+                _skillDescriptions[i].text = text != null ? text.Description : string.Empty;
+                _skillCooldowns[i].text = CooldownText(combat, slot, text != null ? text.CooldownNote : string.Empty);
             }
         }
 
-        // 技の名前の一覧（名前のない技は出さない）。
-        private static string MovesOf(CombatTuning combat)
+        /// <summary>ハッシュタグを 1 行に並べる。</summary>
+        public static string TagsText(string[] tags)
         {
-            var text = new StringBuilder();
-            Append(text, "GROUND", combat.Ground.Name);
-            Append(text, "KO", combat.Get(combat.KoAttack).Name);
-            Append(text, "Q", combat.Special1.Name);
-            Append(text, "E", combat.Special2.Name);
-            Append(text, "R", combat.Super.Name);
-            return text.ToString();
+            return tags == null ? string.Empty : string.Join("  ", tags);
         }
 
-        private static void Append(StringBuilder text, string slot, string move)
+        /// <summary>
+        /// 技の説明の下に出す行: 特殊攻撃はクールタイム（数え始めるときの注記と、2 回以上続けて使えるならスタック数）、必殺技は必要なゲージ。
+        /// </summary>
+        public static string CooldownText(CombatTuning combat, AttackSlot slot, string cooldownNote)
         {
-            if (string.IsNullOrEmpty(move))
+            if (slot == AttackSlot.Super)
             {
-                return;
+                return $"必要ゲージ {GaugeText(combat.SuperGaugeCost)}";
             }
-            if (text.Length > 0)
+            string text = $"クールタイム {SecondsText(combat.CooldownTicksOf(slot))}";
+            if (!string.IsNullOrEmpty(cooldownNote))
             {
-                text.Append('\n');
+                text += $"（{cooldownNote}）";
             }
-            text.Append(slot.PadRight(8)).Append(move);
+            int charges = combat.MaxChargesOf(slot);
+            if (charges >= 2)
+            {
+                text += $"  ／  スタック {charges}";
+            }
+            return text;
+        }
+
+        // 秒（端数があれば小数 1 桁）。
+        private static string SecondsText(int ticks)
+        {
+            return ticks % SimTime.TicksPerSecond == 0
+                ? $"{ticks / SimTime.TicksPerSecond} 秒"
+                : ((float)ticks / SimTime.TicksPerSecond).ToString("0.0", CultureInfo.InvariantCulture) + " 秒";
+        }
+
+        // ゲージ（0.1% 単位）を % で（端数があれば小数 1 桁。D-60）。
+        private static string GaugeText(int gauge)
+        {
+            int per = CombatTuning.GaugePerPercent;
+            return gauge % per == 0 ? $"{gauge / per}%" : $"{gauge / per}.{gauge % per}%";
         }
     }
 }

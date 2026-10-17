@@ -9,14 +9,16 @@ using UnityEngine.InputSystem.UI;
 namespace Airerage.Runtime.UI
 {
     /// <summary>
-    /// 一時停止のメニュー（docs/15 T6-1。オフラインの試合: トレーニングと検証用のシーン）。Esc かゲームパッドの Start（入力の Pause）で
-    /// 開き、シミュレーションを止める。項目: RESUME（続ける）、RESET POSITION（出現位置に戻す。Backspace と同じ）、BACK TO MENU（App の
-    /// シーンから始めたときだけ）。もう一度 Pause か、戻る操作で閉じる。
+    /// 一時停止のメニュー（docs/15 T6-1。オフラインの試合: トレーニング、検証用のシーン、ローカル対戦）。Esc かゲームパッドの Start
+    /// （入力の Pause。ローカル対戦ではだれの機器でも）で開き、シミュレーションを止める（IPauseTarget）。項目: RESUME（続ける）、
+    /// RESET POSITION（出現位置に戻す。Backspace と同じ。対戦では出さない）、BACK TO MENU（App のシーンから始めたときだけ）。もう一度 Pause か、戻る操作で閉じる（RESUME と同じ）。Esc は Pause でも UI の戻る操作でもあるので、
+    /// 1 回の押下で開け閉めは 1 回だけにする（戻る操作で閉じた同じフレームに、Pause で開き直さない。ユーザーの指摘、2026-10-17）。
     /// 検証用のシーンを直接再生したときは EventSystem がないので、開くときに作る。
     /// </summary>
     public sealed class PauseMenu : MonoBehaviour
     {
-        [SerializeField] private SimulationRunner _runner;
+        [Tooltip("止める実行（SimulationRunner か LocalMatchRunner。IPauseTarget）")]
+        [SerializeField] private MonoBehaviour _runner;
         [SerializeField] private InputActionAsset _inputActions;
         [SerializeField] private GameObject _panel;
         [SerializeField] private MenuOption _resume;
@@ -24,9 +26,11 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption _menu;
 
         private InputAction _pause;
+        private IPauseTarget _target;
         private GameFlow _flow;
         private float _speedBefore = 1f;
         private int _selectAtFrame = -1;
+        private int _toggledAtFrame = -1;
 
         /// <summary>開いているか。</summary>
         public bool IsOpen => _panel != null && _panel.activeSelf;
@@ -37,9 +41,10 @@ namespace Airerage.Runtime.UI
 
         private void Awake()
         {
-            if (_runner == null || _inputActions == null || _panel == null || _resume == null || _reset == null || _menu == null)
+            _target = _runner as IPauseTarget;
+            if (_target == null || _inputActions == null || _panel == null || _resume == null || _reset == null || _menu == null)
             {
-                Debug.LogError($"{name}: 実行・入力・画面・項目のどれかが設定されていません", this);
+                Debug.LogError($"{name}: 実行（IPauseTarget）・入力・画面・項目のどれかが設定されていません", this);
                 enabled = false;
                 return;
             }
@@ -47,7 +52,7 @@ namespace Airerage.Runtime.UI
             _resume.Clicked.AddListener(Close);
             _reset.Clicked.AddListener(() =>
             {
-                _runner.ResetPlayer();
+                _target.ResetPlayer();
                 Close();
             });
             _menu.Clicked.AddListener(() =>
@@ -69,6 +74,7 @@ namespace Airerage.Runtime.UI
         {
             _flow = FindFirstObjectByType<GameFlow>();
             _menu.gameObject.SetActive(_flow != null);
+            _reset.gameObject.SetActive(_target.CanResetPosition);
         }
 
         private void OnEnable()
@@ -88,7 +94,7 @@ namespace Airerage.Runtime.UI
                 _selectAtFrame = -1;
                 _resume.SelectQuietly();
             }
-            if (_pause.WasPressedThisFrame())
+            if (_pause.WasPressedThisFrame() && _toggledAtFrame != Time.frameCount)
             {
                 if (IsOpen)
                 {
@@ -109,8 +115,9 @@ namespace Airerage.Runtime.UI
                 return;
             }
             EnsureEventSystem();
-            _speedBefore = _runner.SpeedScale;
-            _runner.SpeedScale = 0f;
+            _toggledAtFrame = Time.frameCount;
+            _speedBefore = _target.SpeedScale;
+            _target.SpeedScale = 0f;
             UiSounds.Find().Play(SoundId.UiPause);
             _panel.SetActive(true);
             // 開いたボタン（Esc は戻る操作でもある）で、そのまま閉じないよう、項目を選ぶのは次のフレーム。
@@ -127,7 +134,8 @@ namespace Airerage.Runtime.UI
             }
             _panel.SetActive(false);
             _selectAtFrame = -1;
-            _runner.SpeedScale = _speedBefore > 0f ? _speedBefore : 1f;
+            _toggledAtFrame = Time.frameCount;
+            _target.SpeedScale = _speedBefore > 0f ? _speedBefore : 1f;
             if (EventSystem.current != null)
             {
                 EventSystem.current.SetSelectedGameObject(null);

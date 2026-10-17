@@ -26,7 +26,7 @@ namespace Airerage.Runtime.Simulation
     /// シーンにステージの範囲（KnockoutBounds）があれば、外に出たキャラクターは撃破されて出現位置に戻る（T3-3）。
     /// シーンにギミック（StageZoneAuthoring）、コインの出現地点（CoinSpawnAuthoring）、拠点の候補（BankSpotAuthoring）があれば、それも使う。
     /// </summary>
-    public sealed class SimulationRunner : MonoBehaviour, ISimulationFeed
+    public sealed class SimulationRunner : MonoBehaviour, ISimulationFeed, IPauseTarget
     {
         // 1フレームで進める最大のティック数。処理が遅れたときに追いつこうとして、さらに遅れるのを防ぐ（技術的な上限）。
         private const int MaxTicksPerFrame = 5;
@@ -155,6 +155,9 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>シミュレーションの速さの倍率（デバッグ用。1 = 等速、0 = 一時停止）。</summary>
         public float SpeedScale { get; set; } = 1f;
+
+        /// <summary>一時停止のメニューの RESET POSITION を出す（IPauseTarget）。</summary>
+        public bool CanResetPosition => true;
 
         /// <summary>
         /// 設定されている間は、プレイヤーの入力の代わりにこの入力を使う（入力の再生など、デバッグ用）。

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
@@ -13,10 +14,11 @@ namespace Airerage.Runtime.UI
     /// <summary>
     /// メニューのシーンの画面（docs/15 T6-1。D-54、D-65、D-69）:
     /// - タイトル: 「AIRERAGE」と「PRESS ANY BUTTON」（どれかのキー・ボタンでメインメニューへ。最初の 1 回だけ）。
-    /// - メインメニュー: SINGLE（Phase 7 の CPU まで選べない）、LOCAL VS（T6-5 まで選べない）、NETWORK VS、TRAINING、OPTIONS（T6-9 まで
-    ///   選べない）、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
+    /// - メインメニュー: SINGLE（Phase 7 の CPU まで選べない）、LOCAL VS、NETWORK VS、TRAINING、OPTIONS（T6-9 まで選べない）、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
     /// - TRAINING → キャラクター選択（T6-3）→ ステージ選択（T6-4）→ トレーニング。戻る操作で 1 つ前の画面へ。選んだキャラクターは
     ///   覚えておき（PlayerPrefs。オンラインの待機所と同じ）、トレーニングの試合の仕組みがそのキャラクターで始める。
+    /// - LOCAL VS → 参加とキャラクター選択（LocalJoinScreen。T6-5）→ ステージ選択 → ローカル対戦。ステージ選択から戻ると、参加した人は
+    ///   そのまま（READY だけ外す）。
     /// 画面の移り変わりは App のシーンの GameFlow に頼む（App のシーンから始めないと、試合へは移らない）。
     /// </summary>
     public sealed class MenuScreens : MonoBehaviour
@@ -32,12 +34,17 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption _quit;
         [SerializeField] private CharacterSelectScreen _characterSelect;
         [SerializeField] private StageSelectScreen _stageSelect;
+        [SerializeField] private LocalJoinScreen _localJoin;
 
         private GameFlow _flow;
         private IDisposable _anyButton;
         private float _shownAt;
         private int _selectAtFrame = -1;
         private MenuOption _focus;
+        // ステージ選択の後に始めるもの（トレーニングかローカル対戦）と、ローカル対戦に参加した人。
+        private bool _localMode;
+        private IReadOnlyList<LocalPlayerSetup> _localPlayers;
+        private bool _localTimed = true;
 
         /// <summary>タイトルを出しているか（テスト用）。</summary>
         public bool ShowingTitle => _title != null && _title.activeSelf;
@@ -48,9 +55,11 @@ namespace Airerage.Runtime.UI
         /// <summary>キャラクター選択・ステージ選択を出しているか（テスト用）。</summary>
         public bool ShowingCharacterSelect => _characterSelect != null && _characterSelect.gameObject.activeSelf;
         public bool ShowingStageSelect => _stageSelect != null && _stageSelect.gameObject.activeSelf;
+        public bool ShowingLocalJoin => _localJoin != null && _localJoin.gameObject.activeSelf;
 
         public CharacterSelectScreen CharacterSelect => _characterSelect;
         public StageSelectScreen StageSelect => _stageSelect;
+        public LocalJoinScreen LocalJoin => _localJoin;
 
         public MenuOption Single => _single;
         public MenuOption Local => _local;
@@ -62,25 +71,60 @@ namespace Airerage.Runtime.UI
         private void Awake()
         {
             if (_title == null || _main == null || _single == null || _local == null || _network == null || _training == null
-                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null)
+                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null || _localJoin == null)
             {
                 Debug.LogError($"{name}: 画面か項目が設定されていません", this);
                 enabled = false;
                 return;
             }
             _single.SetAvailable(false, "COMING SOON (CPU)");
-            _local.SetAvailable(false, "COMING SOON");
             _options.SetAvailable(false, "COMING SOON");
             _network.Clicked.AddListener(() => Run(flow => flow.StartOnline()));
-            _training.Clicked.AddListener(ShowCharacterSelect);
+            _training.Clicked.AddListener(() =>
+            {
+                _localMode = false;
+                ShowCharacterSelect();
+            });
+            _local.Clicked.AddListener(() =>
+            {
+                _localMode = true;
+                ShowLocalJoin(true);
+            });
+            _localJoin.Confirmed += (players, timed) =>
+            {
+                _localPlayers = players;
+                _localTimed = timed;
+                ShowStageSelect();
+            };
+            _localJoin.Cancelled += () => ShowMain(_local);
             _characterSelect.Confirmed += index =>
             {
                 PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, index);
                 ShowStageSelect();
             };
             _characterSelect.Cancelled += () => ShowMain(_training);
-            _stageSelect.Confirmed += stage => Run(flow => flow.StartTraining(stage));
-            _stageSelect.Cancelled += ShowCharacterSelect;
+            _stageSelect.Confirmed += stage => Run(flow =>
+            {
+                if (_localMode)
+                {
+                    flow.StartLocal(stage, _localPlayers, _localTimed);
+                }
+                else
+                {
+                    flow.StartTraining(stage);
+                }
+            });
+            _stageSelect.Cancelled += () =>
+            {
+                if (_localMode)
+                {
+                    ShowLocalJoin(false);
+                }
+                else
+                {
+                    ShowCharacterSelect();
+                }
+            };
             _quit.Clicked.AddListener(() => Run(flow => flow.QuitGame()));
             foreach (MenuOption item in new[] { _single, _local, _network, _training, _options, _quit })
             {
@@ -165,6 +209,16 @@ namespace Airerage.Runtime.UI
             _characterSelect.Show(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0));
         }
 
+        private void ShowLocalJoin(bool reset)
+        {
+            HideAll();
+            if (EventSystem.current != null)
+            {
+                EventSystem.current.SetSelectedGameObject(null);
+            }
+            _localJoin.Show(reset);
+        }
+
         private void ShowStageSelect()
         {
             HideAll();
@@ -177,6 +231,7 @@ namespace Airerage.Runtime.UI
             _main.SetActive(false);
             _characterSelect.Hide();
             _stageSelect.Hide();
+            _localJoin.Hide();
             _selectAtFrame = -1;
         }
 

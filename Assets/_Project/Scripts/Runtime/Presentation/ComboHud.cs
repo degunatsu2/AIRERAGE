@@ -15,6 +15,7 @@ namespace Airerage.Runtime.Presentation
     /// - コンボが切れたら（相手ののけぞりが終わったら）、最後の数を少しの間残して消す。
     /// オフライン（SimulationRunner。相手はダミー）とオンライン（OnlineRunner。相手はほかのプレイヤー）のどちらでも使う
     /// （ISimulationFeed。T3-8）。状態を読むだけで、書き換えない。
+    /// ローカル対戦（docs/15 T6-5）では、だれのコンボでも出す（_everyone。名前は「当てた人 > 相手」）。
     /// </summary>
     public sealed class ComboHud : MonoBehaviour
     {
@@ -27,6 +28,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private Color _countColor = new Color(1f, 0.85f, 0.25f);
         [SerializeField] private Color _coinColor = new Color(1f, 0.95f, 0.55f);
         [SerializeField] private Color _gaugeColor = new Color(1f, 0.45f, 0.3f);
+        [Tooltip("この PC で操作しているキャラクターだけでなく、だれのコンボでも出す（ローカル対戦）")]
+        [SerializeField] private bool _everyone;
 
         private readonly List<Entry> _entries = new List<Entry>();
         private ISimulationFeed _feed;
@@ -72,15 +75,16 @@ namespace Airerage.Runtime.Presentation
                 }
                 CharacterState target = _feed.GetState(i);
                 CombatState c = target.Combat;
-                bool active = local >= 0 && target.Action.Kind == ActionKind.Hitstun && c.HasLastAttacker && c.LastAttacker == local
-                    && c.ComboCount >= 2;
+                bool byShownAttacker = _everyone ? c.LastAttacker != i : local >= 0 && c.LastAttacker == local;
+                bool active = target.Action.Kind == ActionKind.Hitstun && c.HasLastAttacker && byShownAttacker && c.ComboCount >= 2;
                 Entry entry = Find(i);
                 if (active)
                 {
                     if (entry == null || !entry.Active || c.ComboCount < entry.Count)
                     {
                         _entries.Remove(entry);
-                        entry = new Entry { Target = i, Label = _feed.LabelOf(i) };
+                        string label = _everyone ? $"{_feed.LabelOf(c.LastAttacker)} > {_feed.LabelOf(i)}" : _feed.LabelOf(i);
+                        entry = new Entry { Target = i, Label = label };
                         _entries.Insert(0, entry);
                     }
                     entry.Count = c.ComboCount;
