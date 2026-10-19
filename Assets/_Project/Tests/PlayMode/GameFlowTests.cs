@@ -28,6 +28,11 @@ namespace Airerage.PlayMode.Tests
         public IEnumerator App_ShowsTheTitle_TheMenu_AndTraining_OnTheStage_ThenGoesBack()
         {
             int savedCharacter = PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0);
+            InputSettings.EditorInputBehaviorInPlayMode savedBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSettings.BackgroundBehavior savedBackground = InputSystem.settings.backgroundBehavior;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            var keyboard = InputSystem.AddDevice<Keyboard>();
             try
             {
                 // キャラクター選択のカーソルは、前に選んだキャラクター（オンラインの待機所と同じ）から始まる。
@@ -67,12 +72,22 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "TRAINING でキャラクター選択を出さない");
                 Assert.That(menu.ShowingMain, Is.False);
                 CharacterSelectScreen characters = menu.CharacterSelect;
-                Assert.That(characters.Count, Is.EqualTo(4), "4 体の札がない");
-                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(characters.Card(1).gameObject), "前に選んだキャラクターから始まらない");
-                EventSystem.current.SetSelectedGameObject(characters.Card(3).gameObject);
-                Assert.That(characters.ShownName, Is.EqualTo(CharacterPresets.SpaceTravelerName), "カーソルのキャラクターの名前を出さない");
-                // 名前の隣にハッシュタグ、その下に Q・E・R の技（カタカナの名前、説明、クールタイムとスタック数、R は必要なゲージ）。
-                Assert.That(characters.ShownTags, Is.EqualTo("#変則的  #遠距離"), "ハッシュタグを出さない");
+                Assert.That(characters.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Single));
+                Assert.That(characters.Count, Is.EqualTo(4), "4 体のアイコンがない");
+                Assert.That(characters.CharacterOf(0), Is.EqualTo(1), "前に選んだキャラクターから始まらない");
+                Assert.That(characters.ShownName(0), Is.EqualTo(CharacterPresets.RiskTakerName), "1P の枠にカーソルのキャラクターを出さない");
+                Assert.That(characters.ShownTags(0), Is.EqualTo("#コイン重視  #大器晩成"), "1P の枠にハッシュタグを出さない");
+                Assert.That(characters.DetailsOpen, Is.False, "技の説明をはじめから出している");
+
+                // 矢印でアイコンを移る。F1 で技の説明が下から出て、カーソルを動かすとついてくる。もう一度 F1 で引っ込む。
+                yield return Tap(keyboard, Key.RightArrow);
+                yield return Tap(keyboard, Key.RightArrow);
+                Assert.That(characters.CharacterOf(0), Is.EqualTo(3), "矢印でカーソルが動かない");
+                Assert.That(characters.ShownName(0), Is.EqualTo(CharacterPresets.SpaceTravelerName));
+                Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiMove), "カーソルを動かしても音が鳴らない");
+                yield return Tap(keyboard, Key.F1);
+                Assert.That(characters.DetailsOpen, Is.True, "F1 で技の説明を出さない");
+                Assert.That(characters.ShownDetailName, Is.EqualTo(CharacterPresets.SpaceTravelerName));
                 Assert.That(characters.ShownSkillName(0), Is.EqualTo("ワープポータル"));
                 Assert.That(characters.ShownSkillName(1), Is.EqualTo("スペースミサイル"));
                 Assert.That(characters.ShownSkillName(2), Is.EqualTo("コズミックレイ"));
@@ -80,24 +95,25 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(characters.ShownSkillCooldown(0), Is.EqualTo("クールタイム 10 秒  ／  スタック 2"));
                 Assert.That(characters.ShownSkillCooldown(1), Is.EqualTo("クールタイム 6 秒"));
                 Assert.That(characters.ShownSkillCooldown(2), Is.EqualTo("必要ゲージ 100%"));
-                EventSystem.current.SetSelectedGameObject(characters.Card(2).gameObject);
-                Assert.That(characters.ShownName, Is.EqualTo(CharacterPresets.StormRunnerName));
+                yield return Tap(keyboard, Key.LeftArrow);
+                Assert.That(characters.ShownDetailName, Is.EqualTo(CharacterPresets.StormRunnerName), "技の説明がカーソルについてこない");
                 Assert.That(characters.ShownSkillCooldown(0), Is.EqualTo("クールタイム 10 秒（効果が終わってから）"));
-                EventSystem.current.SetSelectedGameObject(characters.Card(3).gameObject);
+                yield return Tap(keyboard, Key.F1);
+                Assert.That(characters.DetailsOpen, Is.False, "もう一度 F1 で引っ込まない");
+                yield return Tap(keyboard, Key.RightArrow);
 
                 // 戻る操作で 1 つ前の画面へ（キャラクター選択 → メインメニューの TRAINING）。
-                characters.Card(3).OnCancel(null);
-                yield return null;
+                yield return Tap(keyboard, Key.Escape);
                 yield return null;
                 Assert.That(menu.ShowingMain, Is.True, "キャラクター選択から戻れない");
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Training.gameObject), "戻ったときに TRAINING を選んでいない");
                 menu.Training.Button.onClick.Invoke();
                 yield return null;
                 yield return null;
-                EventSystem.current.SetSelectedGameObject(characters.Card(3).gameObject);
-                characters.Card(3).Button.onClick.Invoke();
+                yield return Tap(keyboard, Key.RightArrow);
+                yield return Tap(keyboard, Key.RightArrow);
+                yield return Tap(keyboard, Key.Enter);
                 Assert.That(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0), Is.EqualTo(3), "選んだキャラクターを覚えない");
-                yield return null;
                 yield return null;
 
                 // ステージ選択（T6-4）: 戻るとキャラクター選択、決定でトレーニング。
@@ -109,9 +125,8 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "ステージ選択から戻れない");
-                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(characters.Card(3).gameObject), "戻ったときに選んだキャラクターにいない");
-                characters.Card(3).Button.onClick.Invoke();
-                yield return null;
+                Assert.That(characters.CharacterOf(0), Is.EqualTo(3), "戻ったときに選んだキャラクターにいない");
+                yield return Tap(keyboard, Key.Enter);
                 yield return null;
                 stages.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
@@ -154,6 +169,9 @@ namespace Airerage.PlayMode.Tests
             finally
             {
                 PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, savedCharacter);
+                InputSystem.RemoveDevice(keyboard);
+                InputSystem.settings.editorInputBehaviorInPlayMode = savedBehavior;
+                InputSystem.settings.backgroundBehavior = savedBackground;
             }
         }
 

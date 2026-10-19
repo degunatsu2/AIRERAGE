@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.IO;
 using System.Reflection;
 using Airerage.Runtime.UI;
@@ -13,7 +12,7 @@ namespace Airerage.Editor
 {
     /// <summary>
     /// メニューの画面の画像を撮る（クラウドで配置を確かめる。docs/08 4.2）。ステージとメニューのシーンを開き、キャラクター選択の画面
-    /// （キャラクターごと）とローカル対戦の参加の画面を、いくつかの画面の大きさ（16:9、横に長い画面、16:10）で PNG にする。画面に重ねる Canvas は、撮る間だけカメラの
+    /// （トレーニングのキャラクターごと、技の説明、ローカル対戦）を、いくつかの画面の大きさ（16:9、横に長い画面、16:10）で PNG にする。画面に重ねる Canvas は、撮る間だけカメラの
     /// 前に置く。保存先は Logs/Snapshots/。仮想の画面が要る（-nographics は使えない）:
     /// xvfb-run -a Unity -batchmode -quit -projectPath . -executeMethod Airerage.Editor.UiSnapshot.CaptureMenus -logFile Logs/snapshot.log
     /// </summary>
@@ -25,76 +24,87 @@ namespace Airerage.Editor
 
         private static readonly Vector2Int[] Sizes = { new Vector2Int(1920, 1080), new Vector2Int(1421, 682), new Vector2Int(1440, 900) };
 
-        /// <summary>メニューの画面をまとめて撮る（キャラクター選択、ローカル対戦の参加）。</summary>
+        private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        /// <summary>メニューの画面をまとめて撮る（キャラクター選択: トレーニング、技の説明、ローカル対戦）。</summary>
         public static void CaptureMenus()
         {
             CaptureCharacterSelect();
-            CaptureLocalJoin();
+            CaptureLocalSelect();
         }
 
+        /// <summary>トレーニングのキャラクター選択（1P のカーソルをキャラクターごとに。最後のキャラクターでは技の説明も開く）。</summary>
         public static void CaptureCharacterSelect()
         {
             MenuScreens screens = OpenMenu();
+            CharacterSelectScreen screen = PrepareSelect(screens);
+            for (int index = 0; index < screen.Count; index++)
+            {
+                screen.ShowSingle(index);
+                CaptureAll(screens, $"CharacterSelect_{index}");
+            }
+            OpenDetails(screen, 0);
+            CaptureAll(screens, "CharacterSelect_Details");
+        }
+
+        /// <summary>
+        /// ローカル対戦のキャラクター選択（1P がキーボードで READY、2P・3P がゲームパッドで選んでいる途中、4P は空き）。参加は機器の操作で
+        /// しか起きないので、中の枠に直接入れる。
+        /// </summary>
+        public static void CaptureLocalSelect()
+        {
+            MenuScreens screens = OpenMenu();
+            CharacterSelectScreen screen = PrepareSelect(screens);
+            screen.ShowLocal(true);
+            Type slotType = typeof(CharacterSelectScreen).GetNestedType("Slot", BindingFlags.NonPublic);
+            var slots = (Array)typeof(CharacterSelectScreen).GetField("_slots", Private).GetValue(screen);
+            slots.SetValue(PreviewSlot(slotType, "KEYBOARD", 0, true), 0);
+            slots.SetValue(PreviewSlot(slotType, "GAMEPAD 1", 2, false), 1);
+            slots.SetValue(PreviewSlot(slotType, "GAMEPAD 2", 2, false), 2);
+            typeof(CharacterSelectScreen).GetMethod("Refresh", Private).Invoke(screen, null);
+            CaptureAll(screens, "LocalSelect");
+        }
+
+        // メニューを開いてキャラクター選択だけを出す（再生していないので Awake は呼ばれない。日本語の字体を直接用意する）。
+        private static CharacterSelectScreen PrepareSelect(MenuScreens screens)
+        {
             var screen = Object.FindFirstObjectByType<CharacterSelectScreen>(FindObjectsInactive.Include);
             if (screen == null)
             {
                 throw new InvalidOperationException("メニューのシーンにキャラクター選択の画面がない");
             }
             ShowOnly(screens, screen.transform);
-            // 再生していないので Awake は呼ばれない。日本語の字体と、カーソルのあるキャラクターの表示を直接呼ぶ。
-            typeof(CharacterSelectScreen).GetMethod("UseJapaneseFont", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(screen, null);
-            MethodInfo highlight = typeof(CharacterSelectScreen).GetMethod("Highlight", BindingFlags.Instance | BindingFlags.NonPublic);
-            Directory.CreateDirectory(OutputFolder);
-            for (int index = 0; index < screen.Count; index++)
-            {
-                highlight.Invoke(screen, new object[] { index });
-                screen.Card(index).SetSelectedShift(new Vector2(0f, 16f));
-                foreach (Vector2Int size in Sizes)
-                {
-                    string path = $"{OutputFolder}/CharacterSelect_{index}_{size.x}x{size.y}.png";
-                    Capture(screens.GetComponent<Canvas>(), size, path);
-                    Debug.Log($"[UiSnapshot] {path}");
-                }
-            }
+            typeof(CharacterSelectScreen).GetMethod("UseJapaneseFont", Private).Invoke(screen, null);
+            return screen;
         }
 
-        /// <summary>
-        /// ローカル対戦の参加の画面を撮る（P1 がキーボードで READY、P2 がゲームパッドで選んでいる途中、P3・P4 は空き）。参加は機器の操作で
-        /// しか起きないので、中の一覧に直接入れる。
-        /// </summary>
-        public static void CaptureLocalJoin()
+        // 技の説明をせり出しきった状態にする（効果音を鳴らさずに）。
+        private static void OpenDetails(CharacterSelectScreen screen, int slot)
         {
-            MenuScreens screens = OpenMenu();
-            var screen = Object.FindFirstObjectByType<LocalJoinScreen>(FindObjectsInactive.Include);
-            if (screen == null)
-            {
-                throw new InvalidOperationException("メニューのシーンにローカル対戦の参加の画面がない");
-            }
-            ShowOnly(screens, screen.transform);
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-            Type entryType = typeof(LocalJoinScreen).GetNestedType("Entry", BindingFlags.NonPublic);
-            var entries = (IList)typeof(LocalJoinScreen).GetField("_entries", flags).GetValue(screen);
-            entries.Clear();
-            entries.Add(PreviewEntry(entryType, "KEYBOARD", 0, true));
-            entries.Add(PreviewEntry(entryType, "GAMEPAD 1", 2, false));
-            typeof(LocalJoinScreen).GetMethod("Refresh", flags).Invoke(screen, null);
+            typeof(CharacterSelectScreen).GetField("_detailsSlot", Private).SetValue(screen, slot);
+            typeof(CharacterSelectScreen).GetField("_detailsOpen", Private).SetValue(screen, 1f);
+            typeof(CharacterSelectScreen).GetMethod("UpdateDetailsSlide", Private).Invoke(screen, null);
+        }
+
+        private static object PreviewSlot(Type slotType, string device, int character, bool ready)
+        {
+            object slot = Activator.CreateInstance(slotType, true);
+            slotType.GetField("Joined").SetValue(slot, true);
+            slotType.GetField("DeviceName").SetValue(slot, device);
+            slotType.GetField("Character").SetValue(slot, character);
+            slotType.GetField("Ready").SetValue(slot, ready);
+            return slot;
+        }
+
+        private static void CaptureAll(MenuScreens screens, string name)
+        {
             Directory.CreateDirectory(OutputFolder);
             foreach (Vector2Int size in Sizes)
             {
-                string path = $"{OutputFolder}/LocalJoin_{size.x}x{size.y}.png";
+                string path = $"{OutputFolder}/{name}_{size.x}x{size.y}.png";
                 Capture(screens.GetComponent<Canvas>(), size, path);
                 Debug.Log($"[UiSnapshot] {path}");
             }
-        }
-
-        private static object PreviewEntry(Type entryType, string device, int character, bool ready)
-        {
-            object entry = Activator.CreateInstance(entryType, true);
-            entryType.GetField("DeviceName").SetValue(entry, device);
-            entryType.GetField("Character").SetValue(entry, character);
-            entryType.GetField("Ready").SetValue(entry, ready);
-            entryType.GetField("Devices").SetValue(entry, new UnityEngine.InputSystem.InputDevice[0]);
-            return entry;
         }
 
         private static MenuScreens OpenMenu()

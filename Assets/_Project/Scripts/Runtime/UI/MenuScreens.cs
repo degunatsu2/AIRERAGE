@@ -17,7 +17,10 @@ namespace Airerage.Runtime.UI
     /// - メインメニュー: SINGLE（Phase 7 の CPU まで選べない）、LOCAL VS、NETWORK VS、TRAINING、OPTIONS（T6-9 まで選べない）、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
     /// - TRAINING → キャラクター選択（T6-3）→ ステージ選択（T6-4）→ トレーニング。戻る操作で 1 つ前の画面へ。選んだキャラクターは
     ///   覚えておき（PlayerPrefs。オンラインの待機所と同じ）、トレーニングの試合の仕組みがそのキャラクターで始める。
-    /// - LOCAL VS → 参加とキャラクター選択（LocalJoinScreen。T6-5）→ ステージ選択 → ローカル対戦。ステージ選択から戻ると、参加した人は
+    /// - キャラクター選択はアイコンを選ぶ形（CharacterSelectScreen。トレーニングは 1P だけ、ローカル対戦は機器ごとに参加。docs/15 6.9）。
+    /// - NETWORK VS → ネットワーク対戦のメニュー（IOnlineMenu。Net のアセンブリにある。ホスト・参加 → 待機所 → キャラクター選択 →
+    ///   ステージ選択 → 試合。docs/15 T6-7）。つながったまま試合から戻ったときは、最初からネットワーク対戦のメニューを開く。
+    /// - LOCAL VS → 参加とキャラクター選択（T6-5）→ ステージ選択 → ローカル対戦。ステージ選択から戻ると、参加した人は
     ///   そのまま（READY だけ外す）。
     /// 画面の移り変わりは App のシーンの GameFlow に頼む（App のシーンから始めないと、試合へは移らない）。
     /// </summary>
@@ -34,7 +37,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption _quit;
         [SerializeField] private CharacterSelectScreen _characterSelect;
         [SerializeField] private StageSelectScreen _stageSelect;
-        [SerializeField] private LocalJoinScreen _localJoin;
+        [Tooltip("ネットワーク対戦のメニュー（IOnlineMenu。なければ、NETWORK VS は今のオンラインの検証用のシーンを開く）")]
+        [SerializeField] private MonoBehaviour _online;
 
         private GameFlow _flow;
         private IDisposable _anyButton;
@@ -55,11 +59,9 @@ namespace Airerage.Runtime.UI
         /// <summary>キャラクター選択・ステージ選択を出しているか（テスト用）。</summary>
         public bool ShowingCharacterSelect => _characterSelect != null && _characterSelect.gameObject.activeSelf;
         public bool ShowingStageSelect => _stageSelect != null && _stageSelect.gameObject.activeSelf;
-        public bool ShowingLocalJoin => _localJoin != null && _localJoin.gameObject.activeSelf;
 
         public CharacterSelectScreen CharacterSelect => _characterSelect;
         public StageSelectScreen StageSelect => _stageSelect;
-        public LocalJoinScreen LocalJoin => _localJoin;
 
         public MenuOption Single => _single;
         public MenuOption Local => _local;
@@ -71,7 +73,7 @@ namespace Airerage.Runtime.UI
         private void Awake()
         {
             if (_title == null || _main == null || _single == null || _local == null || _network == null || _training == null
-                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null || _localJoin == null)
+                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null)
             {
                 Debug.LogError($"{name}: 画面か項目が設定されていません", this);
                 enabled = false;
@@ -79,7 +81,18 @@ namespace Airerage.Runtime.UI
             }
             _single.SetAvailable(false, "COMING SOON (CPU)");
             _options.SetAvailable(false, "COMING SOON");
-            _network.Clicked.AddListener(() => Run(flow => flow.StartOnline()));
+            _network.Clicked.AddListener(() =>
+            {
+                if (Online != null)
+                {
+                    HideAll();
+                    Online.Open();
+                }
+                else
+                {
+                    Run(flow => flow.StartOnline());
+                }
+            });
             _training.Clicked.AddListener(() =>
             {
                 _localMode = false;
@@ -90,19 +103,29 @@ namespace Airerage.Runtime.UI
                 _localMode = true;
                 ShowLocalJoin(true);
             });
-            _localJoin.Confirmed += (players, timed) =>
+            _characterSelect.LocalConfirmed += (players, timed) =>
             {
                 _localPlayers = players;
                 _localTimed = timed;
                 ShowStageSelect();
             };
-            _localJoin.Cancelled += () => ShowMain(_local);
             _characterSelect.Confirmed += index =>
             {
                 PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, index);
                 ShowStageSelect();
             };
-            _characterSelect.Cancelled += () => ShowMain(_training);
+            _characterSelect.Cancelled += () =>
+            {
+                // ネットワーク対戦のキャラクター選択の「戻る」は、ネットワーク対戦のメニューが受け持つ。
+                if (_characterSelect.Mode == CharacterSelectScreen.SelectMode.Single)
+                {
+                    ShowMain(_training);
+                }
+                else if (_characterSelect.Mode == CharacterSelectScreen.SelectMode.Local)
+                {
+                    ShowMain(_local);
+                }
+            };
             _stageSelect.Confirmed += stage => Run(flow =>
             {
                 if (_localMode)
@@ -139,7 +162,14 @@ namespace Airerage.Runtime.UI
             {
                 Debug.LogWarning($"{name}: GameFlow がありません（App のシーンから始めてください）。項目を選んでも画面は移りません", this);
             }
-            if (_flow != null && _flow.TitlePassed)
+            if (Online != null && Online.IsConnected)
+            {
+                // つながったまま試合から戻った（ネットワーク対戦のメニューが、今の段階の画面を出す）。
+                HideAll();
+                _flow?.MarkTitlePassed();
+                Online.Open();
+            }
+            else if (_flow != null && _flow.TitlePassed)
             {
                 ShowMain();
             }
@@ -206,7 +236,21 @@ namespace Airerage.Runtime.UI
         private void ShowCharacterSelect()
         {
             HideAll();
-            _characterSelect.Show(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0));
+            _characterSelect.ShowSingle(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0));
+        }
+
+        private IOnlineMenu Online => _online as IOnlineMenu;
+
+        /// <summary>ネットワーク対戦のメニューから、メインメニューの NETWORK VS へ戻る。</summary>
+        public void ShowMainFromOnline()
+        {
+            ShowMain(_network);
+        }
+
+        /// <summary>ほかの画面（ネットワーク対戦のメニュー）が使う前に、メニューの画面を全部隠す。</summary>
+        public void HideMenus()
+        {
+            HideAll();
         }
 
         private void ShowLocalJoin(bool reset)
@@ -216,7 +260,7 @@ namespace Airerage.Runtime.UI
             {
                 EventSystem.current.SetSelectedGameObject(null);
             }
-            _localJoin.Show(reset);
+            _characterSelect.ShowLocal(reset);
         }
 
         private void ShowStageSelect()
@@ -231,7 +275,6 @@ namespace Airerage.Runtime.UI
             _main.SetActive(false);
             _characterSelect.Hide();
             _stageSelect.Hide();
-            _localJoin.Hide();
             _selectAtFrame = -1;
         }
 

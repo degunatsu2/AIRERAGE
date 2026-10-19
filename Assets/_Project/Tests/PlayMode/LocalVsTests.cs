@@ -14,7 +14,7 @@ using UnityEngine.TestTools;
 namespace Airerage.PlayMode.Tests
 {
     /// <summary>
-    /// ローカル対戦（docs/15 T6-5。D-67）: メインメニューの LOCAL VS → 機器ごとの参加とキャラクター選択（キーボードとゲームパッド）→
+    /// ローカル対戦（docs/15 T6-5。D-67）: メインメニューの LOCAL VS → 機器ごとの参加とキャラクター選択（アイコンを選ぶ形）（キーボードとゲームパッド）→
     /// ステージ選択 → 試合。人ごとの機器でそのキャラクターだけが動き、全員が入るカメラ、人ごとの技の札、一時停止（RESET POSITION なし）、
     /// メニューへ戻る。機器は仮想のキーボードとゲームパッドを足して、状態の出来事を送る。
     /// </summary>
@@ -41,8 +41,9 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.Local.Button.interactable, Is.True, "LOCAL VS を選べない");
                 menu.Local.Button.onClick.Invoke();
                 yield return null;
-                Assert.That(menu.ShowingLocalJoin, Is.True, "LOCAL VS で参加の画面を出さない");
-                LocalJoinScreen join = menu.LocalJoin;
+                Assert.That(menu.ShowingCharacterSelect, Is.True, "LOCAL VS でキャラクター選択を出さない");
+                CharacterSelectScreen join = menu.CharacterSelect;
+                Assert.That(join.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Local));
 
                 // 機器ごとに参加する（キーボードが P1、ゲームパッドが P2）。
                 yield return Tap(keyboard, Key.Enter);
@@ -53,6 +54,11 @@ namespace Airerage.PlayMode.Tests
                 yield return Press(gamepad, GamepadButton.DpadRight);
                 int character = join.CharacterOf(1);
                 Assert.That(character, Is.Not.EqualTo(before), "十字キーでキャラクターが変わらない");
+                Assert.That(join.ShownState(1), Is.EqualTo("SELECTING"), "2P の枠に状態を出さない");
+                yield return Press(gamepad, GamepadButton.Select);
+                Assert.That(join.DetailsOpen, Is.True, "ゲームパッドの Select で技の説明を出さない");
+                yield return Press(gamepad, GamepadButton.Select);
+                Assert.That(join.DetailsOpen, Is.False);
                 Assert.That(join.CharacterOf(0), Is.Not.EqualTo(-1));
                 yield return Press(gamepad, GamepadButton.North);
                 Assert.That(join.Timed, Is.False, "Y で時間の制限が変わらない");
@@ -62,7 +68,7 @@ namespace Airerage.PlayMode.Tests
                 // 1 人だけ READY ではまだ進まない。全員 READY でステージ選択へ。
                 yield return Tap(keyboard, Key.Enter);
                 Assert.That(join.IsReady(0), Is.True, "Enter で READY にならない");
-                Assert.That(menu.ShowingLocalJoin, Is.True, "全員が READY になる前に進んだ");
+                Assert.That(menu.ShowingCharacterSelect, Is.True, "全員が READY になる前に進んだ");
                 yield return Press(gamepad, GamepadButton.South);
                 yield return null;
                 Assert.That(menu.ShowingStageSelect, Is.True, "全員が READY でステージ選択に進まない");
@@ -70,7 +76,7 @@ namespace Airerage.PlayMode.Tests
                 // ステージ選択から戻ると、参加した人はそのまま（READY だけ外す）。
                 menu.StageSelect.Option(0).OnCancel(null);
                 yield return null;
-                Assert.That(menu.ShowingLocalJoin, Is.True, "ステージ選択から参加の画面へ戻らない");
+                Assert.That(menu.ShowingCharacterSelect, Is.True, "ステージ選択からキャラクター選択へ戻らない");
                 Assert.That(join.JoinedCount, Is.EqualTo(2), "戻ったら参加した人が消えた");
                 Assert.That(join.IsReady(0) || join.IsReady(1), Is.False, "戻ったのに READY のまま");
                 Assert.That(join.CharacterOf(1), Is.EqualTo(character), "戻ったらキャラクターが変わった");
