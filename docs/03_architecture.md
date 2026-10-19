@@ -76,7 +76,7 @@ Airerage.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを�
 | Core/Movement | 走行、ジャンプ、重力、地形との衝突解決（すり抜け防止の連続判定） | `KinematicMotor`, `MovementConfig` | 1 |
 | Core/Wire | ワイヤーのフェーズ管理、照準、接続判定、解除、強制解除、クールダウン、ロープの巻き付き（D-33） | `WireController`, `WireState`, `WireTargeting`, `RopeWrapping`, `RopePivots` | 1 |
 | Core/Wire/Models | 接続中の運動計算（差し替え可能） | `IWireMotionModel`, `InertialWireModel`, `ResponsiveWireModel` | 1 |
-| Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態、状態のバイト列とチェックサム（PC 間で同じ値）、ステージの範囲、ステージのギミック（ジャンプ台・上昇気流・加速リング） | `SimWorld`, `CharacterState`, `StateCodec`, `StageBounds`, `StageZone`, `StageZones` | 1 |
+| Core/Simulation | ワールドの状態、ティックの進行、キャラクター状態、状態のバイト列とチェックサム（PC 間で同じ値）、ステージの範囲、ステージのギミック（ジャンプ台・上昇気流・加速リング、ステージ固有のスピードレーン・発射台・バンパー・風・氷・低重力・ワープゲート） | `SimWorld`, `CharacterState`, `StateCodec`, `StageBounds`, `StageZone`, `StageZones` | 1 |
 | Core/Replay | 入力の記録と再生（開始時の状態＋入力列＋最後の状態のチェックサム。テキストで保存） | `InputRecorder`, `InputRecording` | 1 |
 | Core/Rollback | ロールバックの層（入力の管理、入力遅延、予測、巻き戻しと再計算、確定ティック）と入力の送受信の規則（冗長送信、確認応答、メッセージのバイト列）。通信はしない。docs/10 | `RollbackSession`, `RollbackSettings`, `InputExchange`, `InputMessage`, `InputNormalizer`, `TimeSync`（状態の保存は Simulation の `WorldSnapshot`） | 2 |
 | Core/Combat | アクション状態（Free / Attack など）と遷移、攻撃のデータ（フレームデータ）、キャンセル規則、命中判定、ガード。docs/11 | `ActionController`, `ActionState`, `CombatState`, `CombatTuning`, `AttackData`（判定 `AttackHit` と動き `AttackMotion` の並び）, `HitResolver`, `KnockoutResolver`（ステージの外に出たら撃破） | 3 |
@@ -108,7 +108,7 @@ Airerage.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを�
   - 操作感（加速、空中制御、ワイヤーの拘束）を直接制御できる。
   - 決定性を保ちやすい。
 - 地形は静的。動く足場などのギミックは「ティックから位置が一意に決まる」形で作る（予測と矛盾させないため）。
-- 今のギミック（ジャンプ台、上昇気流、加速リング。docs/11 3.14）は、動かない長方形の範囲（Core の `StageZone`）で、ギミック自体は状態を持たない（巻き戻しても同じ結果）。キャラクターの1ティックの最後（接地と跳ね返りの後）に `StageZones.Apply` が効かせる。シーンでは `StageZoneAuthoring` を置き、`SimWorld` が決まった順に並べ替える（シーンで見つかった順によらない）。表示と効果音のための数（`CharacterState.JumpPadCount` / `BoostRingCount`）だけを状態に持つ。
+- 今のギミック（ジャンプ台、上昇気流、加速リング。docs/11 3.14。ステージ固有のスピードレーン、発射台、バンパー、風、氷、低重力、ワープゲート。docs/15 6.12）は、動かない長方形の範囲（Core の `StageZone`）で、ギミック自体は状態を持たない（巻き戻しても同じ結果。周期のある風は試合のティック数で決まる）。キャラクターの1ティックの最後（接地と跳ね返りの後）に `StageZones.Apply` が効かせる（氷だけは速度を決めた直後に `StageZones.ApplyFriction`）。ステージのシーンはエディタの `Editor/Stages/`（`StageLayout` の値から `StageSceneBuilder` が作る）。シーンでは `StageZoneAuthoring` を置き、`SimWorld` が決まった順に並べ替える（シーンで見つかった順によらない）。表示と効果音のための数（`CharacterState.JumpPadCount` / `BoostRingCount`）だけを状態に持つ。
 - **地形の衝突判定は Core の `BoxTerrain`（純C#）で行い、Unity の物理クエリ（PhysX）は使わない**（D-32）。
   - シーンには地形を `BoxCollider` で置き、開始時に `SceneTerrainBuilder` が `BoxTerrain` に読み込む。条件は「地形の層にある」「回転していない」「Z = 0 の面を横切る」。条件に合わないコライダーはエラーを出して除く。
   - 理由: PhysX の `BoxCast` は形状を約2mm膨らませて扱い（距離が短くなる、表面から2mm以内で始めると当たらない）、テストの結果と一致しなかった（2026-10-12 の計測）。純C#なら決定的で、テスト（`dotnet test`）と同じ結果になる。

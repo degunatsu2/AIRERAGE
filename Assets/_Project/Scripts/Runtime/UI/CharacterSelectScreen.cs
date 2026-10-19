@@ -252,6 +252,33 @@ namespace Airerage.Runtime.UI
             Refresh();
         }
 
+        /// <summary>
+        /// ローカル対戦: 試合の結果から戻ったときに出す（docs/15 T6-8）。players の人（機器）とキャラクターで参加した状態にし、READY は外す。
+        /// 今はつながっていない機器の人は入れない。
+        /// </summary>
+        public void ShowLocal(IReadOnlyList<LocalPlayerSetup> players, bool timed)
+        {
+            Open(SelectMode.Local);
+            ClearSlots();
+            _timed = timed;
+            int index = 0;
+            foreach (LocalPlayerSetup player in players)
+            {
+                if (index >= MaxPlayers || player.Devices.Length == 0 || !player.Devices[0].added)
+                {
+                    continue;
+                }
+                Slot slot = _slots[index++];
+                slot.Joined = true;
+                slot.Key = player.Devices[0];
+                slot.Devices = player.Devices;
+                slot.DeviceName = player.DeviceName;
+                slot.Character = _roster.Clamp(player.Character);
+                slot.Ready = false;
+            }
+            Refresh();
+        }
+
         /// <summary>ネットワーク対戦: 自分の番号 localSlot の枠を、この PC の機器で操作する（カーソルは initial のキャラクター）。</summary>
         public void ShowNetwork(int localSlot, int initial)
         {

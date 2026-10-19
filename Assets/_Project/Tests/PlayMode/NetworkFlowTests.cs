@@ -20,7 +20,7 @@ namespace Airerage.PlayMode.Tests
     /// ネットワーク対戦の流れ（docs/15 T6-7。ユーザーの要望、2026-10-19）: メインメニューの NETWORK VS → ホスト → 待機所で全員が READY →
     /// キャラクター選択（アイコンを選ぶ画面。相手の枠も出る）→ 全員が決定 → ステージ選択（ホスト）→ 全員が選んだステージを読み込んで
     /// 試合。相手は、テストの中で同じ PC から本当の通信（127.0.0.1）でつなぐもう 1 つのセッション（画面なし）。最後まで同じ状態になる
-    /// こと、Quit で接続を閉じてメニューへ戻ることを確かめる。
+    /// こと、結果の CHARACTER SELECT で全員がロビーのキャラクター選択へ戻ること（T6-8）、抜けると相手の接続も切れることを確かめる。
     /// </summary>
     public sealed class NetworkFlowTests
     {
@@ -102,7 +102,9 @@ namespace Airerage.PlayMode.Tests
                 StageSelectScreen stages = menu.StageSelect;
                 Assert.That(stages.NetworkMode && !stages.ReadOnly, Is.True, "ホストがステージを選べない");
 
-                // ホストがステージを決めると、全員がそのステージを読み込む。
+                // ホストがステージを決めると、全員がそのステージを読み込む（結果まで見るので、短い試合にする）。
+                connection.MatchRules.CountdownTicks = 30;
+                connection.MatchRules.DurationTicks = 60;
                 stages.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.OnlineMatch && !flow.IsLoading, 15f, "試合のシーンを読み込まない");
                 Assert.That(flow.LoadedScenes, Is.EqualTo(new[] { "Stage_Athletic", "Match_Online" }), "選んだステージに試合の仕組みを重ねていない");
@@ -112,7 +114,8 @@ namespace Airerage.PlayMode.Tests
 
                 // 相手も同じステージ（読み込んだシーン）で始める。
                 bot.BeginPending(StageFromScene(), bot.PendingStage);
-                const int ticks = 120;
+                // カウントダウン 30＋試合 60＋同点のアディショナルタイム（5 秒）が終わるまで。
+                const int ticks = 480;
                 host.TickLimit = ticks;
                 bot.TickLimit = ticks;
                 yield return WaitFor(() => host.Session.CurrentTick == ticks && bot.Session.CurrentTick == ticks
@@ -124,10 +127,25 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(host.PlayerCharacters, Is.EqualTo(new[] { hostCharacter, 2 }), "選んだキャラクターで始まらない");
                 Assert.That(host.PlayerNames, Is.EqualTo(new[] { "HOST", "BOT" }));
 
-                // Quit で接続を閉じて、メニューへ戻る。
-                var runner = UnityEngine.Object.FindFirstObjectByType<OnlineRunner>();
-                runner.Quit();
+                // 結果の項目（ホストは REMATCH と CHARACTER SELECT を押せる）。CHARACTER SELECT で、全員がロビーのキャラクター選択へ。
+                var results = UnityEngine.Object.FindFirstObjectByType<ResultsMenu>();
+                Assert.That(results, Is.Not.Null, "結果の画面の項目がない");
+                yield return WaitFor(() => results.IsOpen, 10f, "試合が終わっても結果の項目を出さない");
+                Assert.That(results.Rematch.Button.interactable && results.CharacterSelect.Button.interactable, Is.True, "ホストが選べない");
+                results.CharacterSelect.Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューに戻らない");
+                // メニューのシーンを読み込み直したので、画面を探し直す。
+                menu = UnityEngine.Object.FindFirstObjectByType<MenuScreens>();
+                online = UnityEngine.Object.FindFirstObjectByType<OnlineMenu>();
+                yield return WaitFor(() => online.ShownPanel == "CharacterSelect" && bot.State == OnlineSession.SessionState.Lobby
+                    && bot.Phase == LobbyPhase.CharacterSelect, 10f, "全員がキャラクター選択へ戻らない");
+                Assert.That(connection.IsConnected, Is.True, "接続が切れた");
+                Assert.That(host.LobbyPlayerCount, Is.EqualTo(2), "相手がロビーにいない");
+                Assert.That(menu.CharacterSelect.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Network));
+                Assert.That(menu.CharacterSelect.CharacterOf(0), Is.EqualTo(hostCharacter), "選んでいたキャラクターでない");
+
+                // 抜けると、相手の接続も切れる。
+                connection.Leave();
                 Assert.That(connection.Session, Is.Null, "接続が残っている");
                 yield return WaitFor(() => bot.State == OnlineSession.SessionState.Ended, 5f, "相手の接続が切れない");
             }

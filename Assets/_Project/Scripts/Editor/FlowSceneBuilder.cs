@@ -28,8 +28,9 @@ namespace Airerage.Editor
     ///   Sandbox_Online と同じ配置（値は SandboxOnlineSceneBuilder の 1 か所）。
     /// - Stage_CityDay・Stage_CityNight・Stage_Volcano・Stage_SnowSea・Stage_SpaceStation: 追加のステージ（StageSceneBuilder。docs/15 6.11）。
     /// - Match_Training: トレーニングの試合の仕組み（自分＋ダミー 3 体、表示、HUD、カメラ、一時停止）。ステージのシーンに重ねる。
-    /// - Match_Local: ローカル対戦の試合の仕組み（4 人分の表示、全員が入るカメラ、人ごとの技の札、HUD、一時停止。T6-5）。ステージのシーンに重ねる。
-    /// - Match_Online: ネットワーク対戦の試合の仕組み（App の接続を使う OnlineRunner。T6-7）。ステージのシーンに重ねる。
+    /// - Match_Local: ローカル対戦の試合の仕組み（4 人分の表示、全員が入るカメラ、人ごとの技の札、HUD、一時停止、結果の項目。T6-5、T6-8）。
+    ///   ステージのシーンに重ねる。
+    /// - Match_Online: ネットワーク対戦の試合の仕組み（App の接続を使う OnlineRunner、結果の項目。T6-7、T6-8）。ステージのシーンに重ねる。
     /// ステージの設定（StageDefinition）と一覧（StageCatalog）も作る。
     /// </summary>
     public static class FlowSceneBuilder
@@ -206,7 +207,7 @@ namespace Airerage.Editor
             GameAudio audio = SandboxWireSceneBuilder.CreateAudio(runner);
             SandboxWireSceneBuilder.CreateComboHud(runner, everyone: true);
             SandboxWireSceneBuilder.CreateSkillHud(runner, audio, count);
-            SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
+            MatchHud matchHud = SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
             SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
@@ -215,6 +216,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
             MenuUiBuilder.CreatePauseMenu(runner, inputActions);
+            MenuUiBuilder.CreateResultsMenu(runner, matchHud, inputActions);
             Save(scene, LocalScenePath);
         }
 
@@ -284,7 +286,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(runner, "_audio", audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateSkillHud(runner, audio);
-            SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
+            MatchHud matchHud = SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
             SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
@@ -292,6 +294,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
             SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
+            MenuUiBuilder.CreateResultsMenu(runner, matchHud, inputActions);
             Save(scene, OnlineMatchScenePath);
         }
 

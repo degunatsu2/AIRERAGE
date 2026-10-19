@@ -179,6 +179,26 @@ namespace Airerage.Net
             _notifiedTick = -1;
         }
 
+        /// <summary>
+        /// 「キャラクター選択へ」を押せるか（App の接続を使う試合のホストだけ。IMatchControls）。クライアントはホストを待つ。
+        /// </summary>
+        public bool CanReturnToCharacterSelect => _connection != null && CanRestart;
+
+        /// <summary>
+        /// ホスト: 全員でロビーのキャラクター選択へ戻る（docs/15 T6-8）。接続はそのまま。全員の接続（OnlineConnection）がメニューを読み込み、
+        /// ネットワーク対戦のメニューがキャラクター選択の画面を出す。
+        /// </summary>
+        public void ReturnToCharacterSelect()
+        {
+            if (!CanReturnToCharacterSelect)
+            {
+                return;
+            }
+            _session.ReturnToLobby(LobbyPhase.CharacterSelect);
+            _smoother = null;
+            _notifiedTick = -1;
+        }
+
         /// <summary>ゲームを終える（エディタでは再生を止める）。App のシーンから始めたときは、メニューへ戻る（docs/15 T6-1）。</summary>
         public void Quit()
         {

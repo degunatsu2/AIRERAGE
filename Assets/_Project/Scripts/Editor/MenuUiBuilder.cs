@@ -1,3 +1,4 @@
+using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
 using Airerage.Runtime.UI;
 using UnityEngine;
@@ -200,6 +201,41 @@ namespace Airerage.Editor
             option.Configure(plate, text, null, Accent);
             option.SetSelectedShift(new Vector2(0f, 16f));
             return option;
+        }
+
+        /// <summary>
+        /// 結果の画面の項目（docs/15 T6-8。REMATCH、CHARACTER SELECT、MAIN MENU を画面の下に横に並べる）。controls は IMatchControls、
+        /// hud は結果を出しているかを知る MatchHud。
+        /// </summary>
+        public static ResultsMenu CreateResultsMenu(MonoBehaviour controls, MatchHud hud, InputActionAsset inputActions)
+        {
+            Canvas canvas = CreateCanvas("ResultsMenu", 15);
+            RectTransform panel = CreateFull(canvas.transform, "Panel");
+            var bottom = new Vector2(0.5f, 0f);
+            var size = new Vector2(420f, 72f);
+            const float gap = 30f;
+            float left = -(size.x * 3f + gap * 2f) * 0.5f;
+            MenuOption rematch = CreateMenuItem(panel, "Rematch", "REMATCH", bottom, new Vector2(left, 150f), size);
+            MenuOption characters = CreateMenuItem(panel, "CharacterSelect", "CHARACTER SELECT", bottom, new Vector2(left + size.x + gap, 150f), size);
+            MenuOption menu = CreateMenuItem(panel, "MainMenu", "MAIN MENU", bottom, new Vector2(left + (size.x + gap) * 2f, 150f), size);
+            foreach (MenuOption option in new[] { rematch, characters, menu })
+            {
+                option.Button.navigation = new Navigation { mode = Navigation.Mode.Horizontal };
+                option.SetSelectedShift(new Vector2(0f, 12f));
+            }
+            Text note = CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                bottom, new Vector2(0f, 46f), new Vector2(1400f, 40f), Accent);
+
+            var results = canvas.gameObject.AddComponent<ResultsMenu>();
+            SandboxWireSceneBuilder.SetReference(results, "_controls", controls);
+            SandboxWireSceneBuilder.SetReference(results, "_hud", hud);
+            SandboxWireSceneBuilder.SetReference(results, "_inputActions", inputActions);
+            SandboxWireSceneBuilder.SetReference(results, "_panel", panel.gameObject);
+            SandboxWireSceneBuilder.SetReference(results, "_rematch", rematch);
+            SandboxWireSceneBuilder.SetReference(results, "_characterSelect", characters);
+            SandboxWireSceneBuilder.SetReference(results, "_menu", menu);
+            SandboxWireSceneBuilder.SetReference(results, "_note", note);
+            return results;
         }
 
         /// <summary>

@@ -178,6 +178,18 @@ namespace Airerage.Runtime.UI
                 _flow?.MarkTitlePassed();
                 Online.Open();
             }
+            else if (_flow != null && _flow.ConsumeLocalSelectReturn())
+            {
+                // ローカル対戦の結果の「キャラクター選択へ」（同じ人とキャラクターで。docs/15 T6-8）。
+                _flow.MarkTitlePassed();
+                _localMode = true;
+                HideAll();
+                if (EventSystem.current != null)
+                {
+                    EventSystem.current.SetSelectedGameObject(null);
+                }
+                _characterSelect.ShowLocal(_flow.LocalPlayers, _flow.LocalTimed);
+            }
             else if (_flow != null && _flow.TitlePassed)
             {
                 ShowMain();

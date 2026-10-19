@@ -54,6 +54,9 @@ namespace Airerage.Net
 
         public RollbackSettings Rollback => _rollback;
 
+        /// <summary>次の試合のルール（値はシーンの設定。テストで短くするのに使う）。</summary>
+        public MatchRules MatchRules => _match;
+
         private void Awake()
         {
             if (_roster == null || _roster.Count == 0)

@@ -76,6 +76,29 @@ namespace Airerage.Editor
             CaptureAll(screens, "StageSelect");
         }
 
+        /// <summary>
+        /// 結果の画面の項目（docs/15 T6-8）。ステージとローカル対戦の試合のシーンを開き、項目を出して撮る（順位の表は IMGUI なので写らない）。
+        /// ネットワーク対戦のホストでない人の例（REMATCH と CHARACTER SELECT は押せず、ホストを待つ）。
+        /// </summary>
+        public static void CaptureResults()
+        {
+            EditorSceneManager.OpenScene(StageScenePath, OpenSceneMode.Single);
+            EditorSceneManager.OpenScene(FlowSceneBuilder.LocalScenePath, OpenSceneMode.Additive);
+            var results = Object.FindFirstObjectByType<ResultsMenu>(FindObjectsInactive.Include);
+            Transform panel = results.transform.Find("Panel");
+            panel.gameObject.SetActive(true);
+            results.Rematch.SetAvailable(false);
+            results.CharacterSelect.SetAvailable(false);
+            panel.Find("Note").GetComponent<Text>().text = "WAITING FOR THE HOST TO CHOOSE REMATCH OR CHARACTER SELECT";
+            Directory.CreateDirectory(OutputFolder);
+            foreach (Vector2Int size in Sizes)
+            {
+                string path = $"{OutputFolder}/Results_{size.x}x{size.y}.png";
+                Capture(results.GetComponent<Canvas>(), size, path);
+                Debug.Log($"[UiSnapshot] {path}");
+            }
+        }
+
         private static void RenderCamera(Camera camera, Vector2Int size, string path)
         {
             var texture = new RenderTexture(size.x, size.y, 24);

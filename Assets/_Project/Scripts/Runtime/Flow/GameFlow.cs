@@ -38,6 +38,7 @@ namespace Airerage.Runtime.Flow
 
         private readonly List<string> _loaded = new List<string>();
         private readonly List<LocalPlayerSetup> _localPlayers = new List<LocalPlayerSetup>();
+        private bool _returnToLocalSelect;
 
         /// <summary>今の画面。</summary>
         public FlowScreen Current { get; private set; }
@@ -84,6 +85,24 @@ namespace Airerage.Runtime.Flow
         {
             StageDefinition background = _stages.Get(0);
             Go(FlowScreen.Menu, background, background.SceneName, _menuScene);
+        }
+
+        /// <summary>
+        /// ローカル対戦の結果から、同じ人（機器）とキャラクターでキャラクター選択へ戻る（docs/15 T6-8）。メニューを読み込み、メニューが
+        /// ConsumeLocalSelectReturn でローカル対戦のキャラクター選択を出す。
+        /// </summary>
+        public void ReturnToLocalSelect()
+        {
+            _returnToLocalSelect = _localPlayers.Count > 0;
+            ShowMenu();
+        }
+
+        /// <summary>メニューを、ローカル対戦のキャラクター選択から始めるか（1 回だけ true を返す）。</summary>
+        public bool ConsumeLocalSelectReturn()
+        {
+            bool value = _returnToLocalSelect;
+            _returnToLocalSelect = false;
+            return value;
         }
 
         /// <summary>トレーニングを始める（stage のシーンに、トレーニングの試合の仕組みを重ねる）。</summary>

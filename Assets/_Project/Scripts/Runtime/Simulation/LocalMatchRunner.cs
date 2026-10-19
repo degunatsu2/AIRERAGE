@@ -25,7 +25,8 @@ namespace Airerage.Runtime.Simulation
     ///   ときは、キーボード＋マウスとつながっているゲームパッドで参加する（足りなければ 2 人目は操作なしで立つ）。
     /// - 人ごとに、入力のアセットを複製して機器を限る（InputActionAsset.devices）。照準は人ごとの機器で決まる（マウスはキーボードの人だけ）。
     /// - カメラは全員が入る 1 つのカメラ（SharedCamera）。技の札は人ごと（SkillHud の _player）、コンボはだれのものでも出す（ComboHud）。
-    /// - 結果の Restart で同じ人で始め直し、Quit でメニューへ（IMatchControls）。Esc・Start で一時停止（IPauseTarget）。
+    /// - 結果の REMATCH で同じ人で始め直し、CHARACTER SELECT で同じ人のままキャラクター選択へ、MAIN MENU でメニューへ（IMatchControls。
+    ///   結果の画面は ResultsMenu。docs/15 T6-8）。Esc・Start で一時停止（IPauseTarget）。
     /// ステージの地形・範囲・ギミック・コインの出現地点・拠点・出現位置は、読み込んだステージのシーンから探す（D-66）。
     /// </summary>
     public sealed class LocalMatchRunner : MonoBehaviour, ISimulationFeed, IMatchControls, IPauseTarget
@@ -102,6 +103,9 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>今の試合のワールド（テスト用）。</summary>
         public SimWorld World => _world;
+
+        /// <summary>次の試合（Restart）のルール（値はシーンの設定。テストで短くするのに使う）。</summary>
+        public MatchRules MatchRules => _match;
 
         // 表示と効果音の読み取り口（ISimulationFeed）。番号はプレイヤーの番号（P1 が 0）。この PC の全員が操作するので LocalCharacter はない。
         public int CharacterCount => _world == null ? 0 : _world.CharacterCount;
@@ -242,6 +246,18 @@ namespace Airerage.Runtime.Simulation
         public void Restart()
         {
             StartMatch();
+        }
+
+        /// <summary>キャラクター選択へ戻れるか（App のシーンから始めたときだけ。IMatchControls）。</summary>
+        public bool CanReturnToCharacterSelect => _flow != null;
+
+        /// <summary>同じ人（機器）とキャラクターで、ローカル対戦のキャラクター選択へ戻る（IMatchControls。docs/15 T6-8）。</summary>
+        public void ReturnToCharacterSelect()
+        {
+            if (_flow != null && !_flow.IsLoading)
+            {
+                _flow.ReturnToLocalSelect();
+            }
         }
 
         /// <summary>メニューへ戻る（App のシーンから始めていなければ、再生を止める。IMatchControls）。</summary>

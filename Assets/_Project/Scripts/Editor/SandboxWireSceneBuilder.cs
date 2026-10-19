@@ -536,8 +536,11 @@ namespace Airerage.Editor
             SetReference(view, "_audio", audio);
         }
 
-        /// <summary>試合の表示（始まる前の演出、残り時間、結果。docs/12）。source は ISimulationFeed、controls は結果のボタン（IMatchControls）。</summary>
-        internal static void CreateMatchHud(MonoBehaviour source, GameAudio audio, MonoBehaviour controls = null)
+        /// <summary>
+        /// 試合の表示（始まる前の演出、残り時間、結果。docs/12）。source は ISimulationFeed、controls は結果の IMGUI のボタン（IMatchControls。
+        /// ゲームの流れの試合のシーンでは、ボタンの代わりに ResultsMenu を置く）。
+        /// </summary>
+        internal static MatchHud CreateMatchHud(MonoBehaviour source, GameAudio audio, MonoBehaviour controls = null)
         {
             var hud = new GameObject("MatchHud").AddComponent<MatchHud>();
             SetReference(hud, "_source", source);
@@ -546,6 +549,7 @@ namespace Airerage.Editor
             {
                 SetReference(hud, "_controls", controls);
             }
+            return hud;
         }
 
         /// <summary>試合中のお知らせ（タイマーの下の札と、画面を横切る帯。ユーザーの選択、2026-10-14）。source は ISimulationFeed。</summary>

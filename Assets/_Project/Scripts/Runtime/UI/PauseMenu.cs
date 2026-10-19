@@ -155,7 +155,8 @@ namespace Airerage.Runtime.UI
             }
         }
 
-        private static void EnsureEventSystem()
+        /// <summary>EventSystem がなければ作る（検証用のシーン・試合のシーンを直接再生したとき。App のシーンにはある）。</summary>
+        internal static void EnsureEventSystem()
         {
             if (EventSystem.current != null)
             {
