@@ -321,11 +321,12 @@ namespace Airerage.Editor.Stages
                 material = new Material(shader);
                 AssetDatabase.CreateAsset(material, path);
             }
+            // URP の材質は _BaseColor だけを決める（_Color は URP が合わせる。両方を書くと、作り直すたびに丸めの差が出る）。
             if (material.HasProperty("_BaseColor"))
             {
                 material.SetColor("_BaseColor", color);
             }
-            if (material.HasProperty("_Color"))
+            else if (material.HasProperty("_Color"))
             {
                 material.SetColor("_Color", color);
             }
