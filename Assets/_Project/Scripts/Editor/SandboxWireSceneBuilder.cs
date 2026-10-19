@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
@@ -262,6 +263,7 @@ namespace Airerage.Editor
                     go.AddComponent<WireAttachable>();
                 }
             }
+            CreateAttachableGlow(boxes);
 
             var anchorRoot = new GameObject("AnchorPoints").transform;
             foreach (Vector2 point in anchorPoints)
@@ -274,6 +276,99 @@ namespace Airerage.Editor
                 go.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
                 go.AddComponent<WireAnchorPoint>();
             }
+        }
+
+        /// <summary>ワイヤーが刺さる足場の光（色）。</summary>
+        internal static readonly Color AttachableGlowColor = new Color(1f, 0.5f, 0.08f);
+
+        // ワイヤーが刺さる足場の正面に、オレンジの縁の枠と薄い面の光、縁を回る光の粒を付ける（AttachableGlow。ユーザーの要望、2026-10-19）。
+        // 見た目だけ（コライダーを外すので、地形として読み込まれない）。地形の箱の子にしない（箱の大きさで伸びないように）。
+        private static void CreateAttachableGlow(TerrainBox[] boxes)
+        {
+            const float rimWidth = 0.14f;
+            float front = -TerrainDepth * 0.5f - 0.03f;
+            Material rimMaterial = LoadOrCreateMaterial("AttachableGlowRim", AttachableGlowColor, unlit: true);
+            Material surfaceMaterial = LoadOrCreateTransparentMaterial("AttachableGlowSurface", new Color(1f, 0.55f, 0.1f, 0.1f));
+            var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var root = new GameObject("AttachableGlow");
+            var rims = new List<Renderer>();
+            var sparks = new List<LineRenderer>();
+            var rects = new List<Vector4>();
+            foreach (TerrainBox box in boxes)
+            {
+                if (!box.Attachable)
+                {
+                    continue;
+                }
+                var glow = new GameObject(box.Name + "Glow").transform;
+                glow.SetParent(root.transform, false);
+                Vector2 center = (box.Min + box.Max) * 0.5f;
+                Vector2 size = box.Max - box.Min;
+                float w = Mathf.Min(rimWidth, size.x * 0.5f, size.y * 0.5f);
+                (Vector3 Center, Vector3 Size)[] edges =
+                {
+                    (new Vector3(center.x, box.Max.y - w * 0.5f, front), new Vector3(size.x, w, 0.02f)),
+                    (new Vector3(center.x, box.Min.y + w * 0.5f, front), new Vector3(size.x, w, 0.02f)),
+                    (new Vector3(box.Min.x + w * 0.5f, center.y, front), new Vector3(w, size.y, 0.02f)),
+                    (new Vector3(box.Max.x - w * 0.5f, center.y, front), new Vector3(w, size.y, 0.02f)),
+                };
+                foreach (var edge in edges)
+                {
+                    GameObject rim = CreateVisual(PrimitiveType.Cube, "Rim", rimMaterial, edge.Size);
+                    rim.transform.SetParent(glow, false);
+                    rim.transform.localPosition = edge.Center;
+                    var renderer = rim.GetComponent<MeshRenderer>();
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    rims.Add(renderer);
+                }
+                // 上の面（足を乗せる面）の縁も光らせる（カメラの高さによっては見える）。
+                GameObject top = CreateVisual(PrimitiveType.Cube, "TopRim", rimMaterial, new Vector3(size.x, 0.03f, TerrainDepth * 0.98f));
+                top.transform.SetParent(glow, false);
+                top.transform.localPosition = new Vector3(center.x, box.Max.y + 0.005f, 0f);
+                top.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                rims.Add(top.GetComponent<MeshRenderer>());
+                GameObject surface = CreateVisual(PrimitiveType.Quad, "Surface", surfaceMaterial, new Vector3(size.x, size.y, 1f));
+                surface.transform.SetParent(glow, false);
+                surface.transform.localPosition = new Vector3(center.x, center.y, front + 0.01f);
+                surface.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+                var spark = new GameObject("Spark").AddComponent<LineRenderer>();
+                spark.transform.SetParent(glow, false);
+                spark.sharedMaterial = lineMaterial;
+                spark.useWorldSpace = true;
+                spark.positionCount = 3;
+                spark.startWidth = 0.22f;
+                spark.endWidth = 0.22f;
+                spark.numCapVertices = 3;
+                spark.startColor = new Color(1f, 0.75f, 0.3f, 0f);
+                spark.endColor = new Color(1f, 0.95f, 0.75f, 1f);
+                spark.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                spark.receiveShadows = false;
+                sparks.Add(spark);
+                rects.Add(new Vector4(box.Min.x, box.Min.y, box.Max.x, box.Max.y));
+            }
+            root.AddComponent<AttachableGlow>().Configure(rims.ToArray(), sparks.ToArray(), rects.ToArray(), AttachableGlowColor, front - 0.01f);
+        }
+
+        // 半透明の材質（Sprites/Default。色は作るたびに決める）。
+        private static Material LoadOrCreateTransparentMaterial(string name, Color color)
+        {
+            string path = $"{MaterialFolder}/{name}.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                Shader shader = Shader.Find("Sprites/Default");
+                if (shader == null)
+                {
+                    throw new InvalidOperationException("シェーダーが見つからない: Sprites/Default");
+                }
+                EnsureFolder(MaterialFolder);
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, path);
+            }
+            material.SetColor("_Color", color);
+            EditorUtility.SetDirty(material);
+            return material;
         }
 
         /// <summary>キャラクターの箱の表示と、攻撃の判定を描く線、撃破技のチャージのエフェクトを作る。</summary>

@@ -12,12 +12,13 @@ namespace Airerage.Core.Movement
     /// </summary>
     public static class Locomotion
     {
-        public static void UpdateVelocity(ref CharacterState state, in InputFrame input, MovementTuning tuning)
+        /// <param name="groundDrift">地面に立っているときに足す、走る速さの目標（m/s。横向きの風で流される分。StageZones.GroundDrift）。</param>
+        public static void UpdateVelocity(ref CharacterState state, in InputFrame input, MovementTuning tuning, float groundDrift = 0f)
         {
             float dt = SimTime.DeltaTime;
             float inputX = MathF.Abs(input.Move.X) >= tuning.MoveDeadzone ? input.Move.X : 0f;
 
-            state.Velocity.X = ComputeHorizontalVelocity(state.Velocity.X, inputX, state.Grounded, tuning, dt);
+            state.Velocity.X = ComputeHorizontalVelocity(state.Velocity.X, inputX, state.Grounded, tuning, dt, groundDrift);
 
             float fallSpeedBefore = state.Velocity.Y;
             state.Velocity.Y -= tuning.Gravity * dt;
@@ -52,12 +53,12 @@ namespace Airerage.Core.Movement
             }
         }
 
-        private static float ComputeHorizontalVelocity(float vx, float inputX, bool grounded, MovementTuning tuning, float dt)
+        private static float ComputeHorizontalVelocity(float vx, float inputX, bool grounded, MovementTuning tuning, float dt, float groundDrift)
         {
             float target = inputX * tuning.RunSpeed;
             if (grounded)
             {
-                return SimMath.MoveTowards(vx, target, tuning.GroundAcceleration * dt);
+                return SimMath.MoveTowards(vx, target + groundDrift, tuning.GroundAcceleration * dt);
             }
 
             if (inputX == 0f)

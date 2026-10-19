@@ -10,6 +10,8 @@ namespace Airerage.Runtime.UI
     /// 右に出す。決定で Confirmed（ステージ）、戻る操作で Cancelled。
     /// ネットワーク対戦（docs/15 T6-7）: ホストは同じように選び、カーソルを動かすたびに HighlightedIndexChanged（全員へ送る）。
     /// ほかの人は選べず（ReadOnly）、ホストのカーソル（ShowRemoteCursor）を見る。
+    /// 最後の札は RANDOM（決めたときに、ステージの一覧からランダムに選ぶ。ユーザーの要望、2026-10-19）。カーソルのあるステージは
+    /// HighlightedStageChanged で知らせる（メニューの背景に映す。RANDOM では null）。
     /// </summary>
     public sealed class StageSelectScreen : MonoBehaviour
     {
@@ -22,6 +24,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Image _band;
         [Tooltip("ネットワーク対戦の案内（ホストが選んでいる、など。なくてもよい）")]
         [SerializeField] private Text _note;
+        [Tooltip("RANDOM の札（ステージの札の後ろ。なくてもよい）")]
+        [SerializeField] private MenuOption _random;
 
         private int _selectAtFrame = -1;
         private int _selectIndex;
@@ -42,8 +46,20 @@ namespace Airerage.Runtime.UI
         /// <summary>選べない（ネットワーク対戦のホスト以外。ホストのカーソルを見るだけ）。</summary>
         public bool ReadOnly { get; private set; }
 
-        /// <summary>ネットワーク対戦のホストがカーソルを動かした（ステージの番号）。</summary>
+        /// <summary>ネットワーク対戦のホストがカーソルを動かした（ステージの番号。RANDOM は RandomIndex）。</summary>
         public event Action<int> HighlightedIndexChanged;
+
+        /// <summary>カーソルのあるステージが変わった（RANDOM では null）。</summary>
+        public event Action<StageDefinition> HighlightedStageChanged;
+
+        /// <summary>RANDOM の札の番号（ステージの札の後ろ）。</summary>
+        public int RandomIndex => _options.Length;
+
+        /// <summary>RANDOM の札（なければ null。テスト用）。</summary>
+        public MenuOption RandomOption => _random;
+
+        /// <summary>RANDOM にカーソルがあるか。</summary>
+        public bool RandomHighlighted { get; private set; }
 
         public int Count => _options.Length;
 
@@ -92,6 +108,35 @@ namespace Airerage.Runtime.UI
                     }
                 };
             }
+            if (_random != null)
+            {
+                _random.Selected += () =>
+                {
+                    if (ReadOnly)
+                    {
+                        return;
+                    }
+                    Highlight(null);
+                    if (NetworkMode)
+                    {
+                        HighlightedIndexChanged?.Invoke(RandomIndex);
+                    }
+                };
+                _random.Clicked.AddListener(() =>
+                {
+                    if (!ReadOnly)
+                    {
+                        Confirmed?.Invoke(_stages[UnityEngine.Random.Range(0, _stages.Length)]);
+                    }
+                });
+                _random.Cancelled += () =>
+                {
+                    if (!ReadOnly)
+                    {
+                        Cancelled?.Invoke();
+                    }
+                };
+            }
         }
 
         /// <summary>出す（カーソルは最初のステージ。押したボタンで決まらないよう、札を選ぶのは次のフレーム）。</summary>
@@ -111,13 +156,13 @@ namespace Airerage.Runtime.UI
         /// <summary>ネットワーク対戦（選べない人）: ホストのカーソルを index に出す。</summary>
         public void ShowRemoteCursor(int index)
         {
-            if (!ReadOnly || index == _remoteIndex || index < 0 || index >= _stages.Length)
+            if (!ReadOnly || index == _remoteIndex || OptionAt(index) == null)
             {
                 return;
             }
             _remoteIndex = index;
-            Highlight(_stages[index]);
-            _options[index].SelectQuietly();
+            Highlight(index < _stages.Length ? _stages[index] : null);
+            OptionAt(index).SelectQuietly();
         }
 
         private void Open(bool network, bool readOnly, int index)
@@ -158,18 +203,47 @@ namespace Airerage.Runtime.UI
                 }
             }
             else if (ReadOnly && _remoteIndex >= 0 && UnityEngine.EventSystems.EventSystem.current != null
-                && UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject != _options[_remoteIndex].gameObject)
+                && UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject != OptionAt(_remoteIndex).gameObject)
             {
                 // 選べない人がカーソルを動かしても、ホストのカーソルに戻す。
-                _options[_remoteIndex].SelectQuietly();
+                OptionAt(_remoteIndex).SelectQuietly();
             }
+        }
+
+        // 番号 index の札（RandomIndex なら RANDOM の札。範囲の外なら null）。
+        private MenuOption OptionAt(int index)
+        {
+            if (index >= 0 && index < _options.Length)
+            {
+                return _options[index];
+            }
+            return index == RandomIndex ? _random : null;
         }
 
         private void Highlight(StageDefinition stage)
         {
+            bool changed = stage != Highlighted || RandomHighlighted != (stage == null);
             Highlighted = stage;
+            RandomHighlighted = stage == null;
+            if (changed)
+            {
+                HighlightedStageChanged?.Invoke(stage);
+            }
             if (stage == null)
             {
+                // RANDOM。
+                if (_name != null)
+                {
+                    _name.text = "RANDOM";
+                }
+                if (_description != null)
+                {
+                    _description.text = "Picks one of the stages at random.";
+                }
+                if (_band != null)
+                {
+                    _band.color = new Color(0.7f, 0.7f, 0.75f, 0.35f);
+                }
                 return;
             }
             if (_name != null)

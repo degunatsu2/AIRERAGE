@@ -153,6 +153,18 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>一時停止のメニューを開いた（下がる 2 音と、低い「トン」）。</summary>
         UiPause,
+
+        /// <summary>溶岩流・つららの予告（低いうなりと、速い警告音。ユーザーの要望、2026-10-19）。</summary>
+        HazardWarning,
+
+        /// <summary>吹雪の予告（上下するサイレンと、強まる風）。</summary>
+        BlizzardWarning,
+
+        /// <summary>吹雪で凍った（パキッと割れるような高い音と、冷たいきらめき）。</summary>
+        Freeze,
+
+        /// <summary>間欠泉が噴き出した（強く噴き上がる蒸気の音）。</summary>
+        Geyser,
     }
 
     /// <summary>
@@ -643,6 +655,38 @@ namespace Airerage.Runtime.Audio
                     AddTone(b, r, 0f, 0.1f, NoteFrequency(88), NoteFrequency(88), Wave.Triangle, 0.3f, 0.002f, 0.05f);
                     AddTone(b, r, 0.08f, 0.2f, NoteFrequency(76), NoteFrequency(76), Wave.Triangle, 0.3f, 0.002f, 0.08f);
                     AddTone(b, r, 0f, 0.15f, 160f, 90f, Wave.Sine, 0.35f, 0.001f, 0.05f);
+                    break;
+                case SoundId.HazardWarning:
+                    // 地鳴り（低い正弦波を揺らす）と、速く 3 回鳴る警告音。
+                    b = new float[Samples(1.1f, r)];
+                    AddTone(b, r, 0f, 1.05f, 55f, 70f, Wave.Saw, 0.3f, 0.1f, 0.8f);
+                    AddNoise(b, r, rng, 0f, 1f, 0.35f, 0.15f, 0.6f, 300f, 500f, 30f);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        AddTone(b, r, 0.1f + i * 0.22f, 0.14f, 880f, 880f, Wave.Square, 0.16f, 0.003f, 0.12f);
+                    }
+                    break;
+                case SoundId.BlizzardWarning:
+                    // 上下するサイレン（2 往復）と、だんだん強まる風。
+                    b = new float[Samples(2.2f, r)];
+                    for (int i = 0; i < 2; i++)
+                    {
+                        AddTone(b, r, i * 1f, 0.5f, 520f, 880f, Wave.Triangle, 0.22f, 0.02f, 0.6f);
+                        AddTone(b, r, i * 1f + 0.5f, 0.5f, 880f, 520f, Wave.Triangle, 0.22f, 0.02f, 0.6f);
+                    }
+                    AddNoise(b, r, rng, 0f, 2.1f, 0.4f, 1.2f, 1.5f, 800f, 3500f, 250f);
+                    break;
+                case SoundId.Freeze:
+                    b = new float[Samples(0.7f, r)];
+                    AddNoise(b, r, rng, 0f, 0.08f, 0.7f, 0.001f, 0.03f, 9000f, 6000f, 2500f);
+                    AddTone(b, r, 0f, 0.5f, NoteFrequency(96), NoteFrequency(103), Wave.Sine, 0.18f, 0.003f, 0.25f);
+                    AddTone(b, r, 0.06f, 0.5f, NoteFrequency(100), NoteFrequency(108), Wave.Sine, 0.12f, 0.003f, 0.2f);
+                    AddTone(b, r, 0f, 0.3f, 300f, 120f, Wave.Triangle, 0.25f, 0.002f, 0.1f);
+                    break;
+                case SoundId.Geyser:
+                    b = new float[Samples(0.9f, r)];
+                    AddNoise(b, r, rng, 0f, 0.85f, 0.85f, 0.01f, 0.45f, 2500f, 6000f, 350f);
+                    AddTone(b, r, 0f, 0.4f, 120f, 60f, Wave.Sine, 0.4f, 0.005f, 0.2f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

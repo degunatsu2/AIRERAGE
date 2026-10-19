@@ -128,26 +128,44 @@ namespace Airerage.Editor.Stages
                 go.transform.position = new Vector3(zone.Center.x, zone.Center.y, 0f);
                 var authoring = go.AddComponent<StageZoneAuthoring>();
                 authoring.Configure(zone.Kind, zone.Size, zone.Direction, zone.Power, zone.Limit);
-                authoring.ConfigureTiming(zone.PeriodSeconds, zone.ActiveSeconds, zone.PhaseSeconds);
+                authoring.ConfigureTiming(zone.PeriodSeconds, zone.ActiveSeconds, zone.PhaseSeconds, zone.JitterSeconds, zone.WarningSeconds);
                 authoring.ConfigureTarget(zone.Target);
+                authoring.ConfigureShape(zone.Width, zone.Travel, zone.TravelSeconds);
                 Color color = theme.ZoneColors.TryGetValue(zone.Kind, out Color themed) ? themed : DefaultColor(zone.Kind);
                 var view = go.AddComponent<StageZoneView>();
                 view.Configure(lineMaterial, color);
-                GameObject active = CreateProp(go.transform, zone, color, decor);
-                if (zone.Kind == StageZoneKind.Gust)
+                Transform propParent = go.transform;
+                if (zone.TravelSeconds > 0f)
                 {
-                    // 吹き始めるまでは出さない（StageZoneView が吹いている間だけ出す）。
+                    // 動くギミック: 見た目をこの子に入れて、StageZoneView が動かす（ギミックの物体は動かさない）。
+                    propParent = new GameObject("Moving").transform;
+                    propParent.SetParent(go.transform, false);
+                    view.ConfigureMoving(propParent);
+                }
+                GameObject active = CreateProp(propParent, go.transform, zone, color, decor, out GameObject warning);
+                bool periodic = zone.PeriodSeconds > 0f;
+                if (zone.Kind == StageZoneKind.Gust || zone.Kind == StageZoneKind.Hazard || zone.Kind == StageZoneKind.Blizzard
+                    || (zone.Kind == StageZoneKind.Launcher && periodic))
+                {
+                    // 効き始めるまでは出さない（StageZoneView が効いている間だけ出す）。
                     view.ConfigureActiveVisual(active);
-                    active.SetActive(zone.PeriodSeconds <= 0f);
+                    active.SetActive(!periodic);
+                }
+                if (warning != null)
+                {
+                    view.ConfigureWarningVisual(warning);
+                    warning.SetActive(false);
                 }
             }
         }
 
-        // ギミックの台・柱などの見た目（当たりはない）。風の柱は、吹いている間だけ出す（StageZoneView）。
-        private static GameObject CreateProp(Transform parent, ZoneSpec zone, Color color, StageDecor decor)
+        // ギミックの台・柱などの見た目（当たりはない）。風の柱・間欠泉の噴き出し・危険の柱・吹雪の幕は、効いている間だけ出す（StageZoneView）。
+        // warning は予告の間だけ点滅させる見た目（危険・吹雪だけ）。parent は動くギミックの見た目の親、root はギミックの物体。
+        private static GameObject CreateProp(Transform parent, Transform root, ZoneSpec zone, Color color, StageDecor decor, out GameObject warning)
         {
             Vector2 size = zone.Size;
             string kind = zone.Kind.ToString();
+            warning = null;
             switch (zone.Kind)
             {
                 case StageZoneKind.JumpPad:
@@ -156,6 +174,10 @@ namespace Airerage.Editor.Stages
                     return decor.Box("Lane", parent, new Vector3(0f, -size.y * 0.5f + 0.05f, 0f), new Vector3(size.x, 0.1f, 2.4f),
                         decor.Lit(kind, Color.Lerp(color, Color.black, 0.75f)));
                 case StageZoneKind.Launcher:
+                    if (zone.PeriodSeconds > 0f)
+                    {
+                        return CreateGeyser(parent, zone, color, decor);
+                    }
                     return decor.Box("Vent", parent, new Vector3(0f, -size.y * 0.5f + 0.15f, 0f), new Vector3(size.x, 0.3f, 1.8f),
                         decor.Lit(kind, Color.Lerp(color, Color.black, 0.4f)));
                 case StageZoneKind.Bumper:
@@ -171,15 +193,54 @@ namespace Airerage.Editor.Stages
                 case StageZoneKind.Gust:
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, 1f), size, decor.Transparent(kind, WithAlpha(color, 0.14f)));
                 case StageZoneKind.LowGravity:
-                    return decor.Quad("Field", parent, new Vector3(0f, 0f, 3f), size, decor.Transparent(kind, WithAlpha(color, 0.025f)));
+                    // 見やすく（ユーザーの要望、2026-10-19）: 奥の板を濃くし、手前にも薄い色を重ねる。
+                    decor.Quad("FieldFront", parent, new Vector3(0f, 0f, -1.5f), size, decor.Transparent(kind + "Front", WithAlpha(color, 0.06f)));
+                    return decor.Quad("Field", parent, new Vector3(0f, 0f, 3f), size, decor.Transparent(kind, WithAlpha(color, 0.12f)));
                 case StageZoneKind.Warp:
                     GameObject gate = decor.Sphere("Gate", parent, Vector3.zero, new Vector3(size.x, size.y, 0.3f), decor.Transparent(kind, WithAlpha(color, 0.35f)));
+                    // 出口は動かない（動くゲートでも、ギミックの物体の子にする）。
                     Vector3 exit = new Vector3(zone.Target.x - zone.Center.x, zone.Target.y - zone.Center.y, 0f);
-                    decor.Sphere("Exit", parent, exit, new Vector3(1f, 1f, 0.2f), decor.Transparent(kind + "Exit", WithAlpha(color, 0.25f)));
+                    decor.Sphere("Exit", root, exit, new Vector3(1f, 1f, 0.2f), decor.Transparent(kind + "Exit", WithAlpha(color, 0.25f)));
                     return gate;
+                case StageZoneKind.Hazard:
+                {
+                    // 幅 1 の柱の板（StageZoneView が周期ごとの柱の位置と幅に合わせる）。予告は赤い板を点滅させる。
+                    warning = decor.Quad("Warning", parent, new Vector3(0f, 0f, -0.6f), new Vector2(1f, size.y),
+                        decor.Transparent(kind + "Warning", new Color(1f, 0.1f, 0.05f, 0.32f)));
+                    return decor.Quad("Column", parent, new Vector3(0f, 0f, -0.5f), new Vector2(1f, size.y), decor.Transparent(kind, WithAlpha(color, 0.78f)));
+                }
+                case StageZoneKind.Blizzard:
+                {
+                    // 範囲の全体の幕（手前。キャラクターの前にかかる）。予告は青い幕を点滅させる。
+                    warning = decor.Quad("Warning", parent, new Vector3(0f, 0f, -2.6f), size,
+                        decor.Transparent(kind + "Warning", new Color(0.35f, 0.7f, 1f, 0.16f)));
+                    return decor.Quad("Storm", parent, new Vector3(0f, 0f, -2.5f), size, decor.Transparent(kind, WithAlpha(color, 0.22f)));
+                }
                 default:
                     return null;
             }
+        }
+
+        // 壁の間欠泉: 噴き出し口（範囲の、向きと反対側の辺の真ん中）と、向きへ斜めに伸びる噴き出し（噴いている間だけ出す）。
+        private static GameObject CreateGeyser(Transform parent, ZoneSpec zone, Color color, StageDecor decor)
+        {
+            Vector2 direction = zone.Direction.normalized;
+            Vector2 half = zone.Size * 0.5f;
+            // 範囲の中心から、向きの逆へ範囲の端まで（噴き出し口）。
+            float toEdge = Mathf.Min(Mathf.Abs(direction.x) > 1e-3f ? half.x / Mathf.Abs(direction.x) : float.MaxValue,
+                Mathf.Abs(direction.y) > 1e-3f ? half.y / Mathf.Abs(direction.y) : float.MaxValue);
+            Vector2 mouth = -direction * toEdge;
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+            GameObject vent = decor.Box("Mouth", parent, new Vector3(mouth.x, mouth.y, 0f), new Vector3(1.6f, 0.6f, 2.2f),
+                decor.Lit("GeyserMouth", Color.Lerp(color, Color.black, 0.65f)));
+            vent.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            float length = toEdge * 2f + 2f;
+            float width = Mathf.Min(zone.Size.x, zone.Size.y) * 0.8f;
+            Vector2 middle = mouth + direction * length * 0.5f;
+            GameObject jet = decor.Quad("Jet", parent, new Vector3(middle.x, middle.y, -0.4f), new Vector2(width, length),
+                decor.Transparent("GeyserJet", WithAlpha(Color.Lerp(color, Color.white, 0.55f), 0.55f)));
+            jet.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            return jet;
         }
 
         private static Color DefaultColor(StageZoneKind kind)
@@ -196,6 +257,8 @@ namespace Airerage.Editor.Stages
                 case StageZoneKind.Ice: return new Color(0.8f, 0.95f, 1f);
                 case StageZoneKind.LowGravity: return new Color(0.7f, 0.5f, 1f);
                 case StageZoneKind.Warp: return new Color(0.65f, 0.4f, 1f);
+                case StageZoneKind.Hazard: return new Color(1f, 0.4f, 0.08f);
+                case StageZoneKind.Blizzard: return new Color(0.9f, 0.96f, 1f);
                 default: return Color.white;
             }
         }

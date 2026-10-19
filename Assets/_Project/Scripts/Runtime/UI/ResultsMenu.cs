@@ -14,6 +14,8 @@ namespace Airerage.Runtime.UI
     /// 押せる（ほかの人は「ホストを待つ」）。
     /// 出している間は、カメラの操作（十字キーのズーム）を止める（一時停止と同じ。項目を選ぶとカメラが寄り引きしないように）。
     /// 一時停止のメニューを開いている間は、選んでいる項目を奪わない。
+    /// 結果を出している間は、試合中の表示（技の札、右上の表、お知らせ、コンボ、画面の端の札、頭上の数など）を止めて消す
+    /// （_hideDuringResults。結果に重なって見えなかった。ユーザーの指摘、2026-10-19）。閉じたら（再戦）戻す。
     /// </summary>
     public sealed class ResultsMenu : MonoBehaviour
     {
@@ -28,6 +30,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption _characterSelect;
         [SerializeField] private MenuOption _menu;
         [SerializeField] private Text _note;
+        [Tooltip("結果を出している間は止める、試合中の表示")]
+        [SerializeField] private Behaviour[] _hideDuringResults = new Behaviour[0];
 
         private IMatchControls _target;
         private PauseMenu _pause;
@@ -36,6 +40,7 @@ namespace Airerage.Runtime.UI
         private bool _canRestart;
         private bool _canReturn;
         private int _selectAtFrame = -1;
+        private readonly System.Collections.Generic.List<Behaviour> _hidden = new System.Collections.Generic.List<Behaviour>();
 
         /// <summary>出しているか。</summary>
         public bool IsOpen => _panel != null && _panel.activeSelf;
@@ -118,10 +123,21 @@ namespace Airerage.Runtime.UI
             }
         }
 
+        /// <summary>結果を出している間に止めている表示の数（テスト用）。</summary>
+        public int HiddenCount => _hidden.Count;
+
         private void Open()
         {
             PauseMenu.EnsureEventSystem();
             _panel.SetActive(true);
+            foreach (Behaviour hud in _hideDuringResults)
+            {
+                if (hud != null && hud.enabled)
+                {
+                    hud.enabled = false;
+                    _hidden.Add(hud);
+                }
+            }
             _canRestart = !_target.CanRestart;
             _canReturn = !_target.CanReturnToCharacterSelect;
             RefreshAvailability();
@@ -138,6 +154,14 @@ namespace Airerage.Runtime.UI
         private void Close()
         {
             _panel.SetActive(false);
+            foreach (Behaviour hud in _hidden)
+            {
+                if (hud != null)
+                {
+                    hud.enabled = true;
+                }
+            }
+            _hidden.Clear();
             _selectAtFrame = -1;
             if (_camera != null && _cameraWasEnabled)
             {

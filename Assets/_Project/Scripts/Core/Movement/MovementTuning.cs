@@ -44,6 +44,19 @@ namespace Airerage.Core.Movement
         /// <summary>スティックの入力を無視する範囲（0〜1）。</summary>
         public float MoveDeadzone = 0.2f;
 
+        /// <summary>壁ジャンプの横・縦の初速（m/s。壁から離れる向き。ユーザーの要望、2026-10-19）【仮】。</summary>
+        public float WallJumpSpeedX = 9f;
+        public float WallJumpSpeedY = 13f;
+
+        /// <summary>壁に張り付いたまま止まっていられる長さ（ティック）。過ぎたら WallSlideSpeed でゆっくりずり落ちる【仮】。</summary>
+        public int WallClingHoldTicks = 90;
+
+        /// <summary>壁をずり落ちる速さ（m/s）【仮】。</summary>
+        public float WallSlideSpeed = 2.5f;
+
+        /// <summary>この速さ（m/s）より速く上へ動いているときは、壁に当たっても張り付かない（ジャンプ台などで昇っている途中）【仮】。</summary>
+        public float WallClingMaxRiseSpeed = 6f;
+
         /// <summary>当たり判定の箱の半分の幅（m）。</summary>
         public float HalfWidth = 0.4f;
 
@@ -72,6 +85,11 @@ namespace Airerage.Core.Movement
             v.NonNegative(nameof(CoyoteTicks), CoyoteTicks);
             v.NonNegative(nameof(JumpBufferTicks), JumpBufferTicks);
             v.InRange(nameof(MoveDeadzone), MoveDeadzone, 0f, 0.95f);
+            v.NonNegative(nameof(WallJumpSpeedX), WallJumpSpeedX);
+            v.NonNegative(nameof(WallJumpSpeedY), WallJumpSpeedY);
+            v.NonNegative(nameof(WallClingHoldTicks), WallClingHoldTicks);
+            v.NonNegative(nameof(WallSlideSpeed), WallSlideSpeed);
+            v.NonNegative(nameof(WallClingMaxRiseSpeed), WallClingMaxRiseSpeed);
             v.Positive(nameof(HalfWidth), HalfWidth);
             v.Positive(nameof(HalfHeight), HalfHeight);
             return v;

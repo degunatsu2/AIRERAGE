@@ -25,6 +25,11 @@ MonoBehaviour:
       CoyoteTicks: 6
       JumpBufferTicks: 6
       MoveDeadzone: 0.2
+      WallJumpSpeedX: 9
+      WallJumpSpeedY: 13
+      WallClingHoldTicks: 90
+      WallSlideSpeed: 2.5
+      WallClingMaxRiseSpeed: 6
       HalfWidth: 0.4
       HalfHeight: 0.9
     Wire:

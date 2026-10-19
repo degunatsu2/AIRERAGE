@@ -15,6 +15,8 @@ namespace Airerage.Runtime.Flow
     ///   ステージのシーン＋ネットワーク対戦の試合の仕組みのシーン（StartOnlineMatch）。接続は App のシーンの OnlineConnection が持つ。
     ///   検証用のシーン（Sandbox_Online）は StartOnline で開ける（メニューからは使わない）。
     /// 光と空はステージのシーンのものを使う（ステージのシーンを有効にする）。読み込んでいる間の操作は受け付けない。
+    /// メニューの背景のステージは、ステージ選択でカーソルのあるステージに入れ替える（PreviewStage。カーソルが止まってから少し待って
+    /// 読み込む。ユーザーの要望、2026-10-19）。入れ替えの途中に画面を移るときは、入れ替えが済んでから移る。
     /// ほかの部品は、シーンの中からこれを探して使う（静的な変数は使わない）。
     /// </summary>
     public sealed class GameFlow : MonoBehaviour
@@ -39,6 +41,12 @@ namespace Airerage.Runtime.Flow
         private readonly List<string> _loaded = new List<string>();
         private readonly List<LocalPlayerSetup> _localPlayers = new List<LocalPlayerSetup>();
         private bool _returnToLocalSelect;
+
+        // メニューの背景に映したいステージと、頼まれた時刻（カーソルが止まってから PreviewDelay 秒で読み込む）。
+        private const float PreviewDelay = 0.25f;
+        private StageDefinition _previewWanted;
+        private float _previewRequestedAt;
+        private bool _previewLoading;
 
         /// <summary>今の画面。</summary>
         public FlowScreen Current { get; private set; }
@@ -85,6 +93,73 @@ namespace Airerage.Runtime.Flow
         {
             StageDefinition background = _stages.Get(0);
             Go(FlowScreen.Menu, background, background.SceneName, _menuScene);
+        }
+
+        /// <summary>
+        /// メニューの背景のステージを stage にする（ステージ選択のカーソル。null なら変えない）。すぐには読み込まず、カーソルが止まって
+        /// から入れ替える。メニュー以外では何もしない。
+        /// </summary>
+        public void PreviewStage(StageDefinition stage)
+        {
+            if (stage == null || Current != FlowScreen.Menu)
+            {
+                return;
+            }
+            _previewWanted = stage;
+            _previewRequestedAt = Time.unscaledTime;
+        }
+
+        /// <summary>背景のステージを入れ替えている途中か（テスト用）。</summary>
+        public bool PreviewLoading => _previewLoading;
+
+        private void Update()
+        {
+            if (_previewWanted == null || IsLoading || _previewLoading || Current != FlowScreen.Menu)
+            {
+                return;
+            }
+            if (_previewWanted == CurrentStage)
+            {
+                _previewWanted = null;
+                return;
+            }
+            if (Time.unscaledTime - _previewRequestedAt >= PreviewDelay)
+            {
+                StageDefinition stage = _previewWanted;
+                _previewWanted = null;
+                StartCoroutine(Preview(stage));
+            }
+        }
+
+        // 背景のステージだけを入れ替える（新しいステージを読み込んで有効にしてから、前のステージを外す。空が一瞬でも消えないように）。
+        private IEnumerator Preview(StageDefinition stage)
+        {
+            _previewLoading = true;
+            string previous = _loaded.Count > 0 ? _loaded[0] : null;
+            AsyncOperation load = SceneManager.LoadSceneAsync(stage.SceneName, LoadSceneMode.Additive);
+            if (load == null)
+            {
+                Debug.LogError($"{name}: シーン {stage.SceneName} を読み込めない（ビルドの設定のシーンの一覧にあるか）", this);
+                _previewLoading = false;
+                yield break;
+            }
+            yield return load;
+            SceneManager.SetActiveScene(SceneManager.GetSceneByName(stage.SceneName));
+            if (previous != null)
+            {
+                AsyncOperation unload = SceneManager.UnloadSceneAsync(previous);
+                if (unload != null)
+                {
+                    yield return unload;
+                }
+                _loaded[0] = stage.SceneName;
+            }
+            else
+            {
+                _loaded.Insert(0, stage.SceneName);
+            }
+            CurrentStage = stage;
+            _previewLoading = false;
         }
 
         /// <summary>
@@ -164,6 +239,12 @@ namespace Airerage.Runtime.Flow
         private IEnumerator Load(FlowScreen screen, StageDefinition stage, string[] scenes)
         {
             IsLoading = true;
+            _previewWanted = null;
+            while (_previewLoading)
+            {
+                // 背景のステージを入れ替えている途中（済んでから外す）。
+                yield return null;
+            }
             for (int i = _loaded.Count - 1; i >= 0; i--)
             {
                 AsyncOperation unload = SceneManager.UnloadSceneAsync(_loaded[i]);

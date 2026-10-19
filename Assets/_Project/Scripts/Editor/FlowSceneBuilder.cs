@@ -372,6 +372,9 @@ namespace Airerage.Editor
                 options[i] = MenuUiBuilder.CreateMenuItem(panel, $"Stage{i + 1}", stage.DisplayName, new Vector2(0f, 1f),
                     new Vector2(110f, -230f - i * 88f), new Vector2(560f, 72f));
             }
+            // 最後に RANDOM（ユーザーの要望、2026-10-19）。
+            MenuOption random = MenuUiBuilder.CreateMenuItem(panel, "Random", "RANDOM", new Vector2(0f, 1f),
+                new Vector2(110f, -230f - catalog.Count * 88f), new Vector2(560f, 72f));
             UnityEngine.UI.Image band = MenuUiBuilder.CreateFill(panel, "Band", new Color(0.35f, 0.85f, 1f, 0.35f),
                 new Vector2(0.45f, 0.55f), new Vector2(1f, 0.75f));
             // 名前と説明は右の帯の側に、右の端から置く（左の札と重ならないように。説明は折り返す）。
@@ -392,6 +395,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_description", description);
             SandboxWireSceneBuilder.SetReference(screen, "_band", band);
             SandboxWireSceneBuilder.SetReference(screen, "_note", note);
+            SandboxWireSceneBuilder.SetReference(screen, "_random", random);
             panel.gameObject.SetActive(false);
             return screen;
         }

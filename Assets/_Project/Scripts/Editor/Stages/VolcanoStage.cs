@@ -6,8 +6,9 @@ namespace Airerage.Editor.Stages
 {
     /// <summary>
     /// 火山の火口（CRATER）。左右の火口の縁（段になった岩）と、溶岩の湖の真ん中の岩の柱、浮かぶ岩。溶岩に落ちると撃破。
-    /// 固有のギミック: 溶岩の噴き上げ（周期のある上向きの強い風。左右が交互に噴く）、噴火口（Launcher。縁から火口の真ん中へ飛ばす）、
-    /// 噴石（Bumper。浮かぶ岩に当たると弾かれる）。熱の上昇気流が、縁の下に落ちた人を押し上げる。
+    /// 固有のギミック（ユーザーの要望、2026-10-19 に変えた）: 溶岩流（Hazard。溶岩の湖のランダムな場所から、浮かぶ岩の下の段の高さまで
+    /// 噴き出す。威力 60。噴く前に当たる柱の全体に警告と警告音）、壁の間欠泉（周期のある Launcher。縁の上の段と下の段の内側の壁から、
+    /// 火口の内側へ斜めに噴き出し、強い風よりも強く吹き飛ばす）、噴火口（Launcher。縁から火口の真ん中へ飛ばす）、噴石（Bumper）。
     /// </summary>
     internal static class VolcanoStage
     {
@@ -33,7 +34,7 @@ namespace Airerage.Editor.Stages
                 FogStart = 45f,
                 FogEnd = 150f,
             };
-            theme.ZoneColors[StageZoneKind.Gust] = new Color(1f, 0.45f, 0.1f);
+            theme.ZoneColors[StageZoneKind.Hazard] = new Color(1f, 0.42f, 0.06f);
             theme.ZoneColors[StageZoneKind.Launcher] = new Color(1f, 0.3f, 0.1f);
             theme.ZoneColors[StageZoneKind.Bumper] = new Color(0.9f, 0.25f, 0.08f);
             theme.ZoneColors[StageZoneKind.Updraft] = new Color(1f, 0.7f, 0.45f);
@@ -42,7 +43,7 @@ namespace Airerage.Editor.Stages
             {
                 Id = "Volcano",
                 DisplayName = "CRATER",
-                Description = "Inside an active crater. Lava geysers erupt in turn, vents fire you across, molten rocks bounce you away.",
+                Description = "Inside an active crater. Lava bursts from random spots, steam geysers blast from the walls, molten rocks bounce you away.",
                 Color = new Color(1f, 0.45f, 0.15f),
                 Terrain = new[]
                 {
@@ -68,8 +69,9 @@ namespace Airerage.Editor.Stages
                     new Vector2(0f, 30f), new Vector2(-15f, 26f), new Vector2(15f, 26f), new Vector2(-30f, 20f), new Vector2(30f, 20f),
                     new Vector2(-36f, 12f), new Vector2(36f, 12f), new Vector2(-13f, 7f), new Vector2(13f, 7f),
                 },
-                BoundsMin = new Vector2(-48f, -22f),
-                BoundsMax = new Vector2(48f, 46f),
+                // 左右は縁の外へ広めに（ユーザーの要望、2026-10-19）。
+                BoundsMin = new Vector2(-60f, -22f),
+                BoundsMax = new Vector2(60f, 46f),
                 Theme = theme,
                 Zones = new[]
                 {
@@ -84,12 +86,22 @@ namespace Airerage.Editor.Stages
                     // 縁から火口の真ん中へ向かう加速リング。
                     new ZoneSpec("RimRingWest", StageZoneKind.BoostRing, new Vector2(-28f, 13f), new Vector2(2.4f, 3f), new Vector2(1f, 0.15f), 18f),
                     new ZoneSpec("RimRingEast", StageZoneKind.BoostRing, new Vector2(28f, 13f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.15f), 18f),
-                    // 熱の上昇気流（縁の下に落ちた人を、縁の高さまで押し上げる）。
-                    new ZoneSpec("HeatWest", StageZoneKind.Updraft, new Vector2(-29f, -10f), new Vector2(8f, 24f), Vector2.up, 55f, 12f),
-                    new ZoneSpec("HeatEast", StageZoneKind.Updraft, new Vector2(29f, -10f), new Vector2(8f, 24f), Vector2.up, 55f, 12f),
-                    // 溶岩の噴き上げ: 7 秒ごとに 2.2 秒、左右が半分ずれて噴く（噴く 1 秒前に点滅）。乗ると火口の上まで打ち上がる。
-                    new ZoneSpec("LavaGeyserWest", StageZoneKind.Gust, new Vector2(-14f, -6f), new Vector2(5f, 32f), Vector2.up, 95f, 24f).Every(7f, 2.2f, 0f),
-                    new ZoneSpec("LavaGeyserEast", StageZoneKind.Gust, new Vector2(14f, -6f), new Vector2(5f, 32f), Vector2.up, 95f, 24f).Every(7f, 2.2f, 3.5f),
+                    // 溶岩流: 溶岩の湖（柱の左右）のランダムな場所から、幅 4m の柱が浮かぶ岩の下の段（y = 4）まで 1 秒噴き出す（5 秒ごと。
+                    // 左右が半分ずれる）。噴く 1.5 秒前から当たる柱の全体に警告。当たると上へ吹き飛ぶ（威力 60）。
+                    new ZoneSpec("LavaFlowWest", StageZoneKind.Hazard, new Vector2(-20f, -8f), new Vector2(28f, 24f), Vector2.up, 60f)
+                        .Every(5f, 1f, 0f, 0f, 1.5f).Column(4f),
+                    new ZoneSpec("LavaFlowEast", StageZoneKind.Hazard, new Vector2(20f, -8f), new Vector2(28f, 24f), Vector2.up, 60f)
+                        .Every(5f, 1f, 2.5f, 0f, 1.5f).Column(4f),
+                    // 壁の間欠泉: 縁の上の段（x = ±45）の上のほうと、下の段（x = ±34）の下のほうの内側の壁から、火口の内側へ斜めに噴く
+                    // （6 秒ごとに 1.2 秒。1.5 秒前から口の枠が点滅）。触れると速度をまるごと噴く向きにする（強い風より強い）。
+                    new ZoneSpec("GeyserHighWest", StageZoneKind.Launcher, new Vector2(-42.5f, 14f), new Vector2(5f, 5f), new Vector2(1f, 0.35f), 34f)
+                        .Every(6f, 1.2f, 0f, 0f, 1.5f),
+                    new ZoneSpec("GeyserHighEast", StageZoneKind.Launcher, new Vector2(42.5f, 14f), new Vector2(5f, 5f), new Vector2(-1f, 0.35f), 34f)
+                        .Every(6f, 1.2f, 3f, 0f, 1.5f),
+                    new ZoneSpec("GeyserLowWest", StageZoneKind.Launcher, new Vector2(-31.5f, -6.5f), new Vector2(5f, 5f), new Vector2(1f, 0.8f), 32f)
+                        .Every(6f, 1.2f, 1.5f, 0f, 1.5f),
+                    new ZoneSpec("GeyserLowEast", StageZoneKind.Launcher, new Vector2(31.5f, -6.5f), new Vector2(5f, 5f), new Vector2(-1f, 0.8f), 32f)
+                        .Every(6f, 1.2f, 4.5f, 0f, 1.5f),
                     // 噴火口: 縁の低い段から、火口の真ん中の柱へ飛ばす。
                     ZoneSpec.OnFloor("VentWest", StageZoneKind.Launcher, -37f, -35f, 2f, new Vector2(0.7f, 1f), 32f),
                     ZoneSpec.OnFloor("VentEast", StageZoneKind.Launcher, 35f, 37f, 2f, new Vector2(-0.7f, 1f), 32f),
@@ -106,21 +118,23 @@ namespace Airerage.Editor.Stages
                     (new Vector2(0f, 3.5f), 1), (new Vector2(0f, 10.5f), 1), (new Vector2(0f, 13.5f), 1), (new Vector2(0f, 20f), 1), (new Vector2(0f, 23f), 1),
                     // 噴火口で飛ぶ道。
                     (new Vector2(-30f, 9.8f), 1), (new Vector2(-20f, 13.6f), 1), (new Vector2(30f, 9.8f), 1), (new Vector2(20f, 13.6f), 1),
-                    // 浮かぶ岩のジャンプ台の上、噴き上げの中、縁の中段のジャンプ台の上。
+                    // 浮かぶ岩のジャンプ台の上、浮かぶ岩と柱の間、縁の中段のジャンプ台の上。
                     (new Vector2(-21.5f, 9f), 1), (new Vector2(-21.5f, 12.5f), 1), (new Vector2(21.5f, 9f), 1), (new Vector2(21.5f, 12.5f), 1),
                     (new Vector2(-14f, 4f), 1), (new Vector2(-14f, 12f), 1), (new Vector2(-14f, 17f), 1),
                     (new Vector2(14f, 4f), 1), (new Vector2(14f, 12f), 1), (new Vector2(14f, 17f), 1),
+                    // 間欠泉の通り道。
+                    (new Vector2(-33.5f, 17.5f), 1), (new Vector2(33.5f, 17.5f), 1), (new Vector2(-26f, -1f), 1), (new Vector2(26f, -1f), 1),
                     (new Vector2(-43f, 12f), 1), (new Vector2(43f, 12f), 1),
                     // 3 枚: 頂の岩の上、縁のいちばん上、リングの上の高い所。
                     (new Vector2(-7f, 25f), 3), (new Vector2(7f, 25f), 3), (new Vector2(-46.5f, 19f), 3), (new Vector2(46.5f, 19f), 3), (new Vector2(0f, 27f), 3),
-                    // 20 枚: 噴き上げと熱の上昇気流の底（溶岩のすぐ上）、いちばん上、ステージの端。
-                    (new Vector2(-14f, -14f), 20), (new Vector2(14f, -14f), 20), (new Vector2(-29f, -15f), 20), (new Vector2(29f, -15f), 20),
+                    // 20 枚: 溶岩の上（溶岩流が噴く所。壁の間欠泉か壁ジャンプで戻る）、いちばん上、ステージの端。
+                    (new Vector2(-14f, -6f), 20), (new Vector2(14f, -6f), 20), (new Vector2(-28f, -5f), 20), (new Vector2(28f, -5f), 20),
                     (new Vector2(0f, 38f), 20), (new Vector2(-46f, 30f), 20), (new Vector2(46f, 30f), 20),
                 },
                 Jackpots = new[]
                 {
-                    new Vector2(0f, 42f), new Vector2(-46f, 36f), new Vector2(46f, 36f), new Vector2(-14f, -18f), new Vector2(14f, -18f),
-                    new Vector2(-29f, -18f), new Vector2(29f, -18f),
+                    new Vector2(0f, 42f), new Vector2(-46f, 36f), new Vector2(46f, 36f), new Vector2(-14f, -9f), new Vector2(14f, -9f),
+                    new Vector2(-28f, -9f), new Vector2(28f, -9f),
                 },
                 Banks = new[]
                 {
@@ -141,10 +155,10 @@ namespace Airerage.Editor.Stages
             Material ash = decor.Lit("Ash", new Color(0.32f, 0.27f, 0.25f));
             Material ember = decor.Unlit("Ember", new Color(1f, 0.55f, 0.15f));
 
-            decor.Box("LavaLake", new Vector3(0f, -20f, 5f), new Vector3(120f, 2f, 40f), lava);
-            // 噴き上げの根もとの明るい溶岩。
-            decor.Box("GeyserPoolWest", new Vector3(-14f, -18.9f, 0f), new Vector3(6f, 0.3f, 4f), lavaHot);
-            decor.Box("GeyserPoolEast", new Vector3(14f, -18.9f, 0f), new Vector3(6f, 0.3f, 4f), lavaHot);
+            decor.Box("LavaLake", new Vector3(0f, -20f, 5f), new Vector3(140f, 2f, 40f), lava);
+            // 溶岩流が噴く湖の、明るい溶岩の帯。
+            decor.Box("BubblingLavaWest", new Vector3(-20f, -18.9f, 0f), new Vector3(28f, 0.3f, 4f), lavaHot);
+            decor.Box("BubblingLavaEast", new Vector3(20f, -18.9f, 0f), new Vector3(28f, 0.3f, 4f), lavaHot);
 
             // 火口の壁（ステージの奥を囲む高い岩）。
             for (float x = -70f; x <= 70f; x += 10f)

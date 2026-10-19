@@ -299,7 +299,7 @@ namespace Airerage.Runtime.Presentation
                 DrawIntro(1f, Ease((Time.time - _openAt) / _openSeconds));
             }
             GUI.matrix = matrix;
-            if (TimerText.Length > 0)
+            if (TimerText.Length > 0 && !ShowingResults)
             {
                 DrawTimer();
             }

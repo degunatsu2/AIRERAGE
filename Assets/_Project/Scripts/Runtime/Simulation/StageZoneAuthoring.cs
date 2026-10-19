@@ -22,14 +22,24 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private float _power = 24f;
         [Tooltip("上昇気流・風の速さの上限、低重力の落ちる速さの上限（m/s）")]
         [SerializeField] private float _limit = 10f;
-        [Tooltip("風の周期（秒。0 ならいつも吹く）")]
+        [Tooltip("周期（秒。0 ならいつも。風・発射台・危険・吹雪）")]
         [SerializeField] private float _periodSeconds;
-        [Tooltip("風が 1 周期のうち吹いている長さ（秒）")]
+        [Tooltip("1 周期のうち効いている長さ（秒）")]
         [SerializeField] private float _activeSeconds;
-        [Tooltip("風の周期のずれ（秒）")]
+        [Tooltip("周期のずれ（秒）")]
         [SerializeField] private float _phaseSeconds;
+        [Tooltip("周期ごとにランダムに足す長さの上限（秒。0 なら決まった周期）")]
+        [SerializeField] private float _jitterSeconds;
+        [Tooltip("効き始める何秒前から予告するか（表示と音）")]
+        [SerializeField] private float _warningSeconds;
         [Tooltip("ワープゲートの出口（ワールドの位置）")]
         [SerializeField] private Vector2 _target;
+        [Tooltip("危険の柱の幅（m）")]
+        [SerializeField] private float _width;
+        [Tooltip("動く量（行きの分。m）")]
+        [SerializeField] private Vector2 _travel;
+        [Tooltip("1 往復の長さ（秒。0 なら動かない）")]
+        [SerializeField] private float _travelSeconds;
 
         public StageZoneKind Kind => _kind;
         public Vector2 Size => _size;
@@ -46,12 +56,22 @@ namespace Airerage.Runtime.Simulation
             _limit = limit;
         }
 
-        /// <summary>周期のある風にする（シーンのビルダー用。秒）。</summary>
-        public void ConfigureTiming(float periodSeconds, float activeSeconds, float phaseSeconds)
+        /// <summary>周期を決める（シーンのビルダー用。秒）。</summary>
+        public void ConfigureTiming(float periodSeconds, float activeSeconds, float phaseSeconds, float jitterSeconds = 0f, float warningSeconds = 0f)
         {
             _periodSeconds = periodSeconds;
             _activeSeconds = activeSeconds;
             _phaseSeconds = phaseSeconds;
+            _jitterSeconds = jitterSeconds;
+            _warningSeconds = warningSeconds;
+        }
+
+        /// <summary>危険の柱の幅と、動き（行きの量と 1 往復の秒数）を決める（シーンのビルダー用）。</summary>
+        public void ConfigureShape(float width, Vector2 travel, float travelSeconds)
+        {
+            _width = width;
+            _travel = travel;
+            _travelSeconds = travelSeconds;
         }
 
         /// <summary>ワープゲートの出口を決める（シーンのビルダー用）。</summary>
@@ -66,9 +86,11 @@ namespace Airerage.Runtime.Simulation
             Vector3 center = transform.position;
             Vector2 half = _size * 0.5f;
             var direction = new System.Numerics.Vector2(_direction.x, _direction.y);
+            var timing = new StageZoneTiming(SimTime.SecondsToTicks(_periodSeconds), SimTime.SecondsToTicks(_activeSeconds),
+                SimTime.SecondsToTicks(_phaseSeconds), SimTime.SecondsToTicks(_jitterSeconds), SimTime.SecondsToTicks(_warningSeconds));
             return new StageZone(_kind, center.x - half.x, center.y - half.y, center.x + half.x, center.y + half.y, direction, _power, _limit,
-                SimTime.SecondsToTicks(_periodSeconds), SimTime.SecondsToTicks(_activeSeconds), SimTime.SecondsToTicks(_phaseSeconds),
-                new System.Numerics.Vector2(_target.x, _target.y));
+                timing, new System.Numerics.Vector2(_target.x, _target.y), _width, new System.Numerics.Vector2(_travel.x, _travel.y),
+                SimTime.SecondsToTicks(_travelSeconds));
         }
 
         /// <summary>

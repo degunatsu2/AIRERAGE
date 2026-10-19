@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 20;
+        public const int FormatVersion = 21;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -299,9 +299,16 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.InPortalId);
             writer.Write(combat.WarpCooldownTicks);
             writer.Write(combat.WarpCount);
+            writer.Write(combat.FrozenTicksLeft);
+            writer.Write(combat.FreezeCount);
+            writer.Write(combat.HazardImmunityTicks);
+            writer.Write(combat.HazardHitCount);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
+            writer.Write(state.WallSide);
+            writer.Write(state.WallClingTicks);
+            writer.Write(state.WallJumpCount);
             writer.Write(state.Coins.Held);
             writer.Write(state.Coins.Banked);
         }
@@ -410,9 +417,16 @@ namespace Airerage.Core.Simulation
                 InPortalId = reader.ReadInt32(),
                 WarpCooldownTicks = reader.ReadInt32(),
                 WarpCount = reader.ReadInt32(),
+                FrozenTicksLeft = reader.ReadInt32(),
+                FreezeCount = reader.ReadInt32(),
+                HazardImmunityTicks = reader.ReadInt32(),
+                HazardHitCount = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();
+            state.WallSide = reader.ReadInt32();
+            state.WallClingTicks = reader.ReadInt32();
+            state.WallJumpCount = reader.ReadInt32();
             state.Coins = new CoinPurse { Held = reader.ReadInt32(), Banked = reader.ReadInt32() };
             return state;
         }

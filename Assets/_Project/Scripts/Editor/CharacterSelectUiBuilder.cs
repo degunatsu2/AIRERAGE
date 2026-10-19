@@ -37,8 +37,8 @@ namespace Airerage.Editor
                 colors[i] = SandboxOnlineSceneBuilder.PlayerColors[i].Color;
             }
 
-            // アイコンの並び（真ん中。横に Columns 個ずつ）。
-            int count = roster.Count;
+            // アイコンの並び（真ん中。横に Columns 個ずつ。最後は RANDOM。ユーザーの要望、2026-10-19）。
+            int count = roster.Count + 1;
             int columns = Mathf.Min(Columns, count);
             int rows = (count + columns - 1) / columns;
             var grid = new GameObject("Grid", typeof(RectTransform));
@@ -50,7 +50,7 @@ namespace Airerage.Editor
             var icons = new Object[count];
             for (int i = 0; i < count; i++)
             {
-                CharacterConfigAsset character = roster.Get(i);
+                CharacterConfigAsset character = i < roster.Count ? roster.Get(i) : null;
                 int row = i / columns;
                 int rowLength = Mathf.Min(columns, count - row * columns);
                 // 最後の行が短いときは真ん中に寄せる。
@@ -126,7 +126,7 @@ namespace Airerage.Editor
             return screen;
         }
 
-        // アイコン 1 つ（斜めの札に、ロゴと小さな名前）。中心を center に置く。
+        // アイコン 1 つ（斜めの札に、ロゴと小さな名前）。中心を center に置く。character が null なら RANDOM（大きな「?」）。
         private static CharacterIcon CreateIcon(RectTransform grid, int index, CharacterConfigAsset character, Vector2 center)
         {
             var go = new GameObject($"Icon{index + 1}", typeof(RectTransform));
@@ -144,10 +144,18 @@ namespace Airerage.Editor
             logoRect.anchorMin = logoRect.anchorMax = logoRect.pivot = new Vector2(0.5f, 1f);
             logoRect.anchoredPosition = new Vector2(IconSize * 0.05f, -12f);
             logoRect.sizeDelta = new Vector2(IconSize * 0.62f, IconSize * 0.62f);
-            var logo = logoGo.AddComponent<RawImage>();
-            logo.texture = character.Logo;
-            logo.raycastTarget = false;
-            BestFit(MenuUiBuilder.CreateText(go.transform, "Name", character.DisplayName, 16, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+            if (character != null)
+            {
+                var logo = logoGo.AddComponent<RawImage>();
+                logo.texture = character.Logo;
+                logo.raycastTarget = false;
+            }
+            else
+            {
+                MenuUiBuilder.CreateText(logoGo.transform, "Question", "?", 72, FontStyle.Bold, TextAnchor.MiddleCenter,
+                    new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(IconSize * 0.62f, IconSize * 0.62f), MenuUiBuilder.Accent);
+            }
+            BestFit(MenuUiBuilder.CreateText(go.transform, "Name", character != null ? character.DisplayName : "RANDOM", 16, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(IconSize - 16f, 26f), Color.white), 10);
             var icon = go.AddComponent<CharacterIcon>();
             icon.Configure(index);

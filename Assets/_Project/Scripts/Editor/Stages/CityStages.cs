@@ -7,10 +7,11 @@ namespace Airerage.Editor.Stages
     /// <summary>
     /// 昼のビル街（SKYLINE DAY）と夜のビル街（SKYLINE NIGHT）。地形は同じ（ユーザーの要望、2026-10-19）で、固有のギミックとギミックの
     /// 置き場所が違う。ビルの屋上を跳び移り、ガラスの壁（接続できる）にワイヤーを掛けて谷を渡る。ビルの間の谷に落ちると撃破。
+    /// 真ん中のビルの下のほうはくりぬいてあり（ユーザーの要望、2026-10-19）、中の床から左右の谷の風へ出られる。中の真ん中に拠点の候補。
     /// - 昼: 動く歩道（SpeedLane。走ったまま跳ぶと隣のビルへ）、屋上のダクト（Launcher。塔の屋上へ打ち上げる）、
-    ///   ビル風（周期のある横風。左向きと右向きが交互に吹く）。
-    /// - 夜: ネオン看板（Bumper。当たると弾かれる）、地下鉄の通風口（周期のある上向きの風。谷の底から噴き上げる）、
-    ///   谷の上昇気流の代わりに、狭い谷に上昇気流。
+    ///   ビル風（周期のある横風。左向きと右向きが交互に吹く）。中央の左の谷は下向きの風（くりぬいた中へ降りる）、右の谷は上昇気流。
+    /// - 夜: ネオン看板（Bumper。当たると弾かれる。ステージの外側と、左右のビルの内側の壁にも左右対称に）、
+    ///   地下鉄の通風口（周期のある上向きの風。谷の底から噴き上げる）、谷の上昇気流の代わりに、狭い谷に上昇気流。
     /// </summary>
     internal static class CityStages
     {
@@ -19,7 +20,9 @@ namespace Airerage.Editor.Stages
         {
             new TerrainBox("TowerWest", -46f, -30f, -35f, 15f, attachable: true),
             new TerrainBox("OfficeWest", -29f, -30f, -18f, 4f, attachable: true),
-            new TerrainBox("Plaza", -9f, -30f, 9f, 0f, attachable: true),
+            // 真ん中のビル: 屋上の板と、くりぬいた中の床（y = -10〜-4 が空いていて、左右の谷へ出られる）。
+            new TerrainBox("Plaza", -9f, -4f, 9f, 0f, attachable: true),
+            new TerrainBox("PlazaBase", -9f, -30f, 9f, -10f, attachable: true),
             new TerrainBox("OfficeEast", 18f, -30f, 29f, 4f, attachable: true),
             new TerrainBox("TowerEast", 35f, -30f, 46f, 15f, attachable: true),
             // 塔の内側の壁のバルコニー（屋上から塔へ上る足がかり）。
@@ -50,8 +53,12 @@ namespace Airerage.Editor.Stages
             new Vector2(32f, 16f),
         };
 
-        private static readonly Vector2 BoundsMin = new Vector2(-48f, -22f);
-        private static readonly Vector2 BoundsMax = new Vector2(48f, 46f);
+        // 左右は塔の外へ広めに（横へ飛ばされてすぐ撃破されないように。ユーザーの要望、2026-10-19）。
+        private static readonly Vector2 BoundsMin = new Vector2(-60f, -22f);
+        private static readonly Vector2 BoundsMax = new Vector2(60f, 46f);
+
+        /// <summary>くりぬいた中の真ん中の拠点の候補。</summary>
+        private static readonly Vector2 HollowBank = new Vector2(0f, -7.5f);
 
         public static StageLayout Day()
         {
@@ -91,8 +98,8 @@ namespace Airerage.Editor.Stages
                     // 広場のジャンプ台と、真上の加速リング（クレーンの下まで）。
                     ZoneSpec.OnFloor("PlazaPad", StageZoneKind.JumpPad, -1f, 1f, 0f, Vector2.up, 28f, 0.4f),
                     new ZoneSpec("PlazaRing", StageZoneKind.BoostRing, new Vector2(0f, 16f), new Vector2(3f, 3.5f), Vector2.up, 21f),
-                    // 広い谷の上昇気流（落ちた人を屋上の高さまで押し上げる）。
-                    new ZoneSpec("CanyonUpdraftWest", StageZoneKind.Updraft, new Vector2(-13.5f, -9f), new Vector2(9f, 26f), Vector2.up, 60f, 13f),
+                    // 広い谷: 左は下向きの風（くりぬいた中へ速く降りる。中へ逃げないと谷の底へ）、右は上昇気流（屋上の高さまで押し上げる）。
+                    new ZoneSpec("CanyonDowndraftWest", StageZoneKind.Gust, new Vector2(-13.5f, -9f), new Vector2(9f, 26f), Vector2.down, 45f, 14f),
                     new ZoneSpec("CanyonUpdraftEast", StageZoneKind.Updraft, new Vector2(13.5f, -9f), new Vector2(9f, 26f), Vector2.up, 60f, 13f),
                     // 狭い谷の上の加速リング（塔から跳ぶと中央へ飛ばす）。
                     new ZoneSpec("GapRingWest", StageZoneKind.BoostRing, new Vector2(-32f, 11f), new Vector2(2.4f, 3f), new Vector2(1f, 0.15f), 18f),
@@ -105,12 +112,12 @@ namespace Airerage.Editor.Stages
                     ZoneSpec.OnFloor("PlazaWalkwayEast", StageZoneKind.SpeedLane, 6.3f, 8.8f, 0f, Vector2.right, 16f),
                     ZoneSpec.OnFloor("OfficeWalkwayWest", StageZoneKind.SpeedLane, -24f, -19f, 4f, Vector2.right, 16f),
                     ZoneSpec.OnFloor("OfficeWalkwayEast", StageZoneKind.SpeedLane, 19f, 24f, 4f, Vector2.left, 16f),
-                    // 屋上のダクト: 外側の塔の屋上へ打ち上げる。
-                    ZoneSpec.OnFloor("DuctWest", StageZoneKind.Launcher, -28.6f, -26.6f, 4f, new Vector2(-0.35f, 1f), 28f),
-                    ZoneSpec.OnFloor("DuctEast", StageZoneKind.Launcher, 26.6f, 28.6f, 4f, new Vector2(0.35f, 1f), 28f),
-                    // ビル風: 上空を、左向きと右向きが 5 秒ずつずれて 3.5 秒ずつ吹く（吹く 1 秒前に点滅で知らせる）。
-                    new ZoneSpec("BuildingWindWest", StageZoneKind.Gust, new Vector2(0f, 21f), new Vector2(68f, 10f), Vector2.left, 24f, 9f).Every(10f, 3.5f, 0f),
-                    new ZoneSpec("BuildingWindEast", StageZoneKind.Gust, new Vector2(0f, 21f), new Vector2(68f, 10f), Vector2.right, 24f, 9f).Every(10f, 3.5f, 5f),
+                    // 屋上のダクト: 外側の塔の屋上へ打ち上げる（縁の下で壁に張り付かないように、屋上の縁より十分高く飛ばす）。
+                    ZoneSpec.OnFloor("DuctWest", StageZoneKind.Launcher, -28.6f, -26.6f, 4f, new Vector2(-0.35f, 1f), 30f),
+                    ZoneSpec.OnFloor("DuctEast", StageZoneKind.Launcher, 26.6f, 28.6f, 4f, new Vector2(0.35f, 1f), 30f),
+                    // ビル風: 上空を、左向きと右向きが 5 秒ずつずれて 3.5 秒ずつ吹く（吹く 1 秒前に点滅で知らせる。強め。ユーザーの要望、2026-10-19）。
+                    new ZoneSpec("BuildingWindWest", StageZoneKind.Gust, new Vector2(0f, 21f), new Vector2(68f, 10f), Vector2.left, 36f, 13f).Every(10f, 3.5f, 0f),
+                    new ZoneSpec("BuildingWindEast", StageZoneKind.Gust, new Vector2(0f, 21f), new Vector2(68f, 10f), Vector2.right, 36f, 13f).Every(10f, 3.5f, 5f),
                 },
                 Coins = new (Vector2, int)[]
                 {
@@ -128,19 +135,21 @@ namespace Airerage.Editor.Stages
                     // 3 枚: クレーンの上、ビル風の中、塔の上空。
                     (new Vector2(0f, 30f), 3), (new Vector2(-22f, 17f), 3), (new Vector2(22f, 17f), 3),
                     (new Vector2(-41f, 24f), 3), (new Vector2(41f, 24f), 3),
-                    // 20 枚: 谷の底（広い谷は上昇気流、狭い谷は助からない）、いちばん上、ステージの端。
-                    (new Vector2(-13.5f, -14f), 20), (new Vector2(13.5f, -14f), 20), (new Vector2(-32f, -5f), 20), (new Vector2(32f, -5f), 20),
+                    // くりぬいた中の床の上。
+                    (new Vector2(-5f, -8f), 1), (new Vector2(5f, -8f), 1),
+                    // 20 枚: 広い谷のくりぬいた中の入り口（左は下向きの風の中）、狭い谷（助からない）、いちばん上、ステージの端。
+                    (new Vector2(-11.5f, -6.5f), 20), (new Vector2(11.5f, -6.5f), 20), (new Vector2(-32f, -5f), 20), (new Vector2(32f, -5f), 20),
                     (new Vector2(0f, 37f), 20), (new Vector2(-46f, 27f), 20), (new Vector2(46f, 27f), 20),
                 },
                 Jackpots = new[]
                 {
-                    new Vector2(0f, 41f), new Vector2(-46f, 33f), new Vector2(46f, 33f), new Vector2(-13.5f, -18f), new Vector2(13.5f, -18f),
+                    new Vector2(0f, 41f), new Vector2(-46f, 33f), new Vector2(46f, 33f), new Vector2(-13.5f, -12f), new Vector2(13.5f, -12f),
                     new Vector2(-32f, -12f), new Vector2(32f, -12f),
                 },
                 Banks = new[]
                 {
                     new Vector2(0f, 7f), new Vector2(-13.5f, 9.5f), new Vector2(13.5f, 9.5f), new Vector2(-39f, 22f), new Vector2(39f, 22f),
-                    new Vector2(-28f, 26.5f), new Vector2(28f, 26.5f),
+                    new Vector2(-28f, 26.5f), new Vector2(28f, 26.5f), HollowBank,
                 },
                 Spawns = new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f), new Vector3(-25.5f, 5f, 0f), new Vector3(25.5f, 5f, 0f) },
                 Decorate = decor => DecorateCity(decor, night: false),
@@ -206,6 +215,15 @@ namespace Airerage.Editor.Stages
                     new ZoneSpec("NeonOfficeEast", StageZoneKind.Bumper, new Vector2(23f, 19f), new Vector2(1.2f, 3f), Vector2.up, 20f),
                     new ZoneSpec("NeonVentWest", StageZoneKind.Bumper, new Vector2(-15.5f, 17f), new Vector2(1f, 2.4f), Vector2.up, 20f),
                     new ZoneSpec("NeonVentEast", StageZoneKind.Bumper, new Vector2(15.5f, 17f), new Vector2(1f, 2.4f), Vector2.up, 20f),
+                    // ステージの外側（塔の外。飛ばされた人を内側へ弾き返す）と、左右のビルの内側の壁（ユーザーの要望、2026-10-19。左右対称）。
+                    new ZoneSpec("NeonEdgeLowWest", StageZoneKind.Bumper, new Vector2(-52f, 8f), new Vector2(1.2f, 3.6f), Vector2.up, 22f),
+                    new ZoneSpec("NeonEdgeLowEast", StageZoneKind.Bumper, new Vector2(52f, 8f), new Vector2(1.2f, 3.6f), Vector2.up, 22f),
+                    new ZoneSpec("NeonEdgeHighWest", StageZoneKind.Bumper, new Vector2(-52f, 24f), new Vector2(1.2f, 3.6f), Vector2.up, 22f),
+                    new ZoneSpec("NeonEdgeHighEast", StageZoneKind.Bumper, new Vector2(52f, 24f), new Vector2(1.2f, 3.6f), Vector2.up, 22f),
+                    new ZoneSpec("NeonTowerWallWest", StageZoneKind.Bumper, new Vector2(-34.3f, 11.5f), new Vector2(1f, 3f), Vector2.up, 20f),
+                    new ZoneSpec("NeonTowerWallEast", StageZoneKind.Bumper, new Vector2(34.3f, 11.5f), new Vector2(1f, 3f), Vector2.up, 20f),
+                    new ZoneSpec("NeonOfficeWallWest", StageZoneKind.Bumper, new Vector2(-17.4f, -2f), new Vector2(1f, 3f), Vector2.up, 20f),
+                    new ZoneSpec("NeonOfficeWallEast", StageZoneKind.Bumper, new Vector2(17.4f, -2f), new Vector2(1f, 3f), Vector2.up, 20f),
                 },
                 Coins = new (Vector2, int)[]
                 {
@@ -225,6 +243,8 @@ namespace Airerage.Editor.Stages
                     // 20 枚: 通風口の底、狭い谷の底、いちばん上、ステージの端。
                     (new Vector2(-11.25f, -12f), 20), (new Vector2(11.25f, -12f), 20), (new Vector2(-32f, -12f), 20), (new Vector2(32f, -12f), 20),
                     (new Vector2(0f, 38f), 20), (new Vector2(-46f, 25f), 20), (new Vector2(46f, 25f), 20),
+                    // くりぬいた中の床の上。
+                    (new Vector2(-5f, -8f), 1), (new Vector2(5f, -8f), 1),
                 },
                 Jackpots = new[]
                 {
@@ -234,7 +254,7 @@ namespace Airerage.Editor.Stages
                 Banks = new[]
                 {
                     new Vector2(0f, 7.5f), new Vector2(-21f, 8.5f), new Vector2(21f, 8.5f), new Vector2(-38f, 21f), new Vector2(38f, 21f),
-                    new Vector2(-28f, 25f), new Vector2(28f, 25f),
+                    new Vector2(-28f, 25f), new Vector2(28f, 25f), HollowBank,
                 },
                 Spawns = new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f), new Vector3(-22f, 5f, 0f), new Vector3(22f, 5f, 0f) },
                 Decorate = decor => DecorateCity(decor, night: true),
@@ -265,6 +285,11 @@ namespace Airerage.Editor.Stages
                     new Vector3(width, height, 10f), building.Top > 10f ? glass : facade);
                 for (float y = building.Top - 2f; y > -21f; y -= 2.6f)
                 {
+                    if (building.MinX < 0f && building.MaxX > 0f && y > -11f && y < -3f)
+                    {
+                        // 真ん中のビルのくりぬいた所には窓を付けない。
+                        continue;
+                    }
                     Material m = decor.Random.NextDouble() < 0.3 ? windowCool : window;
                     if (night && decor.Random.NextDouble() < 0.35)
                     {
@@ -273,6 +298,13 @@ namespace Airerage.Editor.Stages
                     }
                     decor.Quad("Windows", new Vector3((building.MinX + building.MaxX) * 0.5f, y, -2.02f), new Vector2(width - 1.2f, 0.9f), m);
                 }
+            }
+            // くりぬいた中の奥の壁と天井の灯り（中が空いているのが分かるように）。
+            decor.Box("HollowBack", new Vector3(0f, -7f, 1.8f), new Vector3(18f, 6f, 0.4f),
+                decor.Lit("HollowWall", night ? new Color(0.08f, 0.08f, 0.12f) : new Color(0.32f, 0.33f, 0.36f)));
+            for (float x = -6f; x <= 6f; x += 4f)
+            {
+                decor.Box("HollowLight", new Vector3(x, -4.15f, 0f), new Vector3(2f, 0.15f, 1.2f), decor.Unlit("HollowLamp", new Color(1f, 0.92f, 0.7f)));
             }
             // 谷の底の道路（撃破の範囲の下）。
             decor.Box("Street", new Vector3(0f, -24f, 6f), new Vector3(110f, 0.5f, 30f), street);

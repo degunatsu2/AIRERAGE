@@ -106,6 +106,15 @@ namespace Airerage.Runtime.Audio
                 // ワープポータルで移った（SPACE TRAVELER）。
                 _audio.Play(SoundId.Warp, 0.9f, 0.04f);
             }
+            if (n.HazardHitCount > b.HazardHitCount)
+            {
+                // 溶岩流・つららに当たった（ステージの危険）。
+                _audio.Play(SoundId.HeavyHit, 1f, 0.06f);
+            }
+            if (n.FreezeCount > b.FreezeCount)
+            {
+                _audio.Play(SoundId.Freeze, 0.9f, 0.04f);
+            }
             if (n.FatalHitCount > b.FatalHitCount)
             {
                 _audio.Play(SoundId.Fatal);
@@ -159,9 +168,10 @@ namespace Airerage.Runtime.Audio
             }
             bool airJump = now.AirJumpsUsed > before.AirJumpsUsed;
             bool groundJump = before.Grounded && !now.Grounded && now.Action.IsFree && now.Velocity.Y >= jumpSpeed * 0.8f;
-            if (!pad && (airJump || groundJump))
+            bool wallJump = now.WallJumpCount > before.WallJumpCount;
+            if (!pad && (airJump || groundJump || wallJump))
             {
-                _audio.Play(SoundId.Jump, 0.6f, 0.05f);
+                _audio.Play(SoundId.Jump, wallJump ? 0.75f : 0.6f, 0.05f);
             }
 
             if (n.WireCancelCooldownTicksLeft > b.WireCancelCooldownTicksLeft)

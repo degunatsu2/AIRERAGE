@@ -570,6 +570,229 @@ namespace Airerage.Core.Tests.Simulation
         }
 
         [Test]
+        public void HorizontalWind_PushesAGroundedCharacterToo()
+        {
+            var wind = new StageZone(StageZoneKind.Gust, -40f, 0f, 40f, 5f, Vector2.UnitX, 30f, 10f);
+            SimWorld world = World(wind);
+            Step(world, 60);
+
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Grounded, Is.True, "前提: 地面に立ったまま");
+            Assert.That(state.Position.X, Is.GreaterThan(3f), "地面に立っている人が風で流されない");
+            // 走る速さの目標が風の分だけずれる（＋このティックの風の加速）。
+            Assert.That(state.Velocity.X, Is.EqualTo(10f * StageZones.GroundWindRatio + 30f / 60f).Within(1e-3f));
+
+            // 風に向かって走ると遅くなる。
+            SimWorld against = World(wind);
+            Step(against, 60, PlayerInput.FromAxes(-1f, 0f, InputButtons.None));
+            Assert.That(against.GetState(0).Velocity.X, Is.EqualTo(-8f + 10f * StageZones.GroundWindRatio + 30f / 60f).Within(1e-3f));
+        }
+
+        [Test]
+        public void PeriodicLauncher_FiresOnlyWhileActive()
+        {
+            var timing = new StageZoneTiming(120, 20, 60);
+            var geyser = new StageZone(StageZoneKind.Launcher, -1f, 0f, 1f, 0.3f, Vector2.UnitY, 20f, 0f, timing, Vector2.Zero);
+            Assert.That(geyser.IsActive(0), Is.False);
+            Assert.That(geyser.IsActive(60), Is.True);
+            SimWorld world = World(geyser);
+            Step(world, 55);
+            Assert.That(world.GetState(0).JumpPadCount, Is.EqualTo(0), "止んでいる間に打ち出した");
+            Step(world, 10);
+            Assert.That(world.GetState(0).JumpPadCount, Is.EqualTo(1), "噴いている間に打ち出さない");
+        }
+
+        [Test]
+        public void MovingZone_GoesThereAndBack()
+        {
+            var pad = new StageZone(StageZoneKind.JumpPad, -1f, 0f, 1f, 0.3f, Vector2.UnitY, 20f, 0f, default, Vector2.Zero, 0f,
+                new Vector2(10f, 0f), 200);
+            Assert.That(pad.At(0).MinX, Is.EqualTo(-1f));
+            Assert.That(pad.At(100).MinX, Is.EqualTo(9f));
+            Assert.That(pad.At(50).MinX, Is.EqualTo(4f));
+            Assert.That(pad.At(150).MinX, Is.EqualTo(4f));
+            Assert.That(pad.At(200).MinX, Is.EqualTo(-1f));
+
+            // x = 10 に立っている人は、台が来たときに打ち上がる。
+            var world = new SimWorld(Floor(), null, new[] { pad });
+            world.AddCharacter(new CharacterConfig(), new Vector3(10f, Movement.HalfHeight, 0f), 1);
+            Step(world, 80);
+            Assert.That(world.GetState(0).JumpPadCount, Is.EqualTo(0), "台が来る前に打ち上がった");
+            Step(world, 30);
+            Assert.That(world.GetState(0).JumpPadCount, Is.EqualTo(1), "台が来ても打ち上がらない");
+        }
+
+        [Test]
+        public void JitteredCycles_AreDeterministic_AndWithinTheRange()
+        {
+            var timing = new StageZoneTiming(100, 10, 5, 50, 30);
+            var zone = new StageZone(StageZoneKind.Blizzard, -10f, 0f, 10f, 10f, Vector2.UnitX, 2f, 0f, timing, Vector2.Zero);
+            zone.Cycle(0, 7, out int first, out _, out int firstStart);
+            Assert.That(first, Is.EqualTo(-1), "最初の周期は試合の始まりより後");
+            Assert.That(firstStart, Is.InRange(105, 155));
+            int previous = firstStart;
+            for (int k = 1; k < 6; k++)
+            {
+                zone.Cycle(previous, 7, out int index, out int start, out int next);
+                Assert.That(index, Is.EqualTo(k - 1));
+                Assert.That(start, Is.EqualTo(previous));
+                Assert.That(next - start, Is.InRange(100, 150), "周期のばらつきが範囲の外");
+                Assert.That(zone.IsActive(start, 7) && zone.IsActive(start + 9, 7) && !zone.IsActive(start + 10, 7), Is.True);
+                previous = next;
+            }
+            zone.Cycle(0, 7, out _, out _, out int again);
+            Assert.That(again, Is.EqualTo(firstStart), "同じ種で同じ周期にならない");
+        }
+
+        [Test]
+        public void Hazard_HitsOnlyInsideTheColumn_OncePerEruption_AndTheColumnMoves()
+        {
+            var timing = new StageZoneTiming(120, 30, 0, 0, 60);
+            var lava = new StageZone(StageZoneKind.Hazard, -20f, -1f, 20f, 8f, Vector2.UnitY, 60f, 0f, timing, Vector2.Zero, 4f);
+            const int seed = 12345;
+            Assert.That(StageZones.HazardColumnAt(lava, 0, seed, out float minX, out float maxX), Is.True);
+            Assert.That(maxX - minX, Is.EqualTo(4f).Within(1e-4f));
+            Assert.That(StageZones.HazardColumnAt(lava, 40, seed, out _, out _), Is.False, "噴いていない間にも柱がある");
+
+            var columns = new System.Collections.Generic.HashSet<float>();
+            for (int cycle = 0; cycle < 6; cycle++)
+            {
+                lava.HazardColumn(cycle, seed, out float columnMin, out _);
+                Assert.That(columnMin, Is.InRange(-20f, 16f));
+                columns.Add(columnMin);
+            }
+            Assert.That(columns.Count, Is.GreaterThan(2), "噴き出す場所が変わらない");
+
+            var world = new SimWorld(Floor(), null, new[] { lava }, new Airerage.Core.Match.MatchRules { CountdownTicks = 0, DurationTicks = 0, Seed = seed });
+            world.AddCharacter(new CharacterConfig(), new Vector3((minX + maxX) * 0.5f, Movement.HalfHeight, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(maxX + 3f, Movement.HalfHeight, 0f), 1);
+            world.Step(new PlayerInput[2]);
+            CharacterState hit = world.GetState(0);
+            Assert.That(hit.Combat.HazardHitCount, Is.EqualTo(1), "柱の中の人に当たらない");
+            Assert.That(hit.Action.Kind, Is.EqualTo(ActionKind.Hitstun));
+            Assert.That(hit.Velocity.Y, Is.EqualTo(StageZones.HazardKnockbackSpeed(60f)).Within(1e-3f), "威力の分だけ吹き飛ばない");
+            Assert.That(world.GetState(1).Combat.HazardHitCount, Is.EqualTo(0), "柱の外の人に当たった");
+            for (int i = 0; i < 40; i++)
+            {
+                world.Step(new PlayerInput[2]);
+            }
+            Assert.That(world.GetState(0).Combat.HazardHitCount, Is.EqualTo(1), "同じ噴き出しに何度も当たった");
+        }
+
+        [Test]
+        public void Blizzard_FreezesExposedCharacters_ButNotThoseInShelter()
+        {
+            var timing = new StageZoneTiming(600, 30, 0);
+            var blizzard = new StageZone(StageZoneKind.Blizzard, -40f, 0f, 40f, 30f, Vector2.UnitX, 2f, 0f, timing, Vector2.Zero);
+            // 風上（左）に壁がある人は隠れている。
+            BoxTerrain terrain = Floor().AddBox(-10f, 0f, -9f, 6f);
+            var world = new SimWorld(terrain, null, new[] { blizzard });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-6f, Movement.HalfHeight, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(-12f, Movement.HalfHeight, 0f), 1);
+            var right = PlayerInput.FromAxes(1f, 0f, InputButtons.None);
+            world.Step(new[] { right, right });
+
+            Assert.That(world.GetState(0).Combat.IsFrozen, Is.False, "壁の影にいる人が凍った");
+            CharacterState frozen = world.GetState(1);
+            Assert.That(frozen.Combat.IsFrozen, Is.True, "風上に何もない人が凍らない");
+            Assert.That(frozen.Combat.FreezeCount, Is.EqualTo(1));
+            float x = frozen.Position.X;
+            for (int i = 0; i < 100; i++)
+            {
+                world.Step(new[] { right, right });
+            }
+            Assert.That(world.GetState(1).Position.X, Is.EqualTo(x).Within(1e-3f), "凍っているのに動いた");
+            for (int i = 0; i < 40; i++)
+            {
+                world.Step(new[] { right, right });
+            }
+            Assert.That(world.GetState(1).Combat.IsFrozen, Is.False, "2 秒たっても解けない");
+            Assert.That(world.GetState(1).Position.X, Is.GreaterThan(x + 0.5f), "解けても動けない");
+        }
+
+        [Test]
+        public void Blizzard_ShelterDistance_IsTheLimit()
+        {
+            var timing = new StageZoneTiming(600, 30, 0);
+            // 影になる距離 3m: 風上 3m の中に壁があれば隠れ、それより遠ければ凍る。
+            var blizzard = new StageZone(StageZoneKind.Blizzard, -40f, 0f, 40f, 30f, Vector2.UnitX, 2f, 3f, timing, Vector2.Zero);
+            BoxTerrain terrain = Floor().AddBox(-10f, 0f, -9f, 6f);
+            var world = new SimWorld(terrain, null, new[] { blizzard });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-7f, Movement.HalfHeight, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(-3f, Movement.HalfHeight, 0f), 1);
+            Step(world, 1);
+
+            Assert.That(world.GetState(0).Combat.IsFrozen, Is.False, "壁のすぐそばの人が凍った");
+            Assert.That(world.GetState(1).Combat.IsFrozen, Is.True, "壁から遠い人が凍らない");
+        }
+
+        [Test]
+        public void MovingWarpGate_TakesSomeoneItSlidesOnto()
+        {
+            // 横へ動くゲート（120 ティックで 20m 行って戻る）が、止まって立っている人の所まで来たら移す。
+            var gate = new StageZone(StageZoneKind.Warp, -12f, 0f, -10f, 2f, Vector2.UnitY, 1f, 0f, default, new Vector2(0f, 20f), 0f,
+                new Vector2(20f, 0f), 240);
+            var world = new SimWorld(Floor(), null, new[] { gate });
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, Movement.HalfHeight, 0f), 1);
+            Step(world, 40);
+            Assert.That(world.GetState(0).Combat.WarpCount, Is.EqualTo(0), "ゲートが来る前に移った");
+            Step(world, 40);
+            Assert.That(world.GetState(0).Combat.WarpCount, Is.EqualTo(1), "動くゲートが来ても移らない");
+            Assert.That(world.GetState(0).Position.Y, Is.GreaterThan(15f));
+        }
+
+        [Test]
+        public void RandomGimmicks_CannotMove()
+        {
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Hazard, -10f, 0f, 10f, 5f, Vector2.UnitY, 30f, 0f,
+                new StageZoneTiming(100, 10), Vector2.Zero, 2f, new Vector2(5f, 0f), 100));
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Blizzard, -10f, 0f, 10f, 5f, Vector2.UnitX, 2f, -1f,
+                new StageZoneTiming(100, 10), Vector2.Zero));
+        }
+
+        [Test]
+        public void NewGimmicks_RollBackToTheSameResult()
+        {
+            StageZone[] zones =
+            {
+                new StageZone(StageZoneKind.Gust, -10f, 0f, 10f, 4f, Vector2.UnitX, 25f, 8f, new StageZoneTiming(90, 40, 13), Vector2.Zero),
+                new StageZone(StageZoneKind.Launcher, 2f, 0f, 3f, 0.3f, new Vector2(-0.4f, 1f), 22f, 0f, new StageZoneTiming(60, 20, 5), Vector2.Zero),
+                new StageZone(StageZoneKind.Hazard, -12f, -1f, 12f, 6f, Vector2.UnitY, 40f, 0f, new StageZoneTiming(80, 20, 0, 0, 30), Vector2.Zero, 3f),
+                new StageZone(StageZoneKind.Blizzard, -40f, 0f, 40f, 30f, Vector2.UnitX, 1f, 0f, new StageZoneTiming(150, 20, 0, 60, 60), Vector2.Zero),
+                new StageZone(StageZoneKind.JumpPad, -6f, 0f, -4f, 0.3f, Vector2.UnitY, 18f, 0f, default, Vector2.Zero, 0f, new Vector2(6f, 0f), 120),
+            };
+            var rules = new Airerage.Core.Match.MatchRules { CountdownTicks = 0, DurationTicks = 0, Seed = 99 };
+            BoxTerrain terrain = Floor().AddBox(8f, 0f, 9f, 10f);
+            var a = new SimWorld(terrain, null, zones, rules);
+            a.AddCharacter(new CharacterConfig(), new Vector3(0f, Movement.HalfHeight, 0f), 1);
+            var snapshot = new WorldSnapshot();
+            var checksums = new List<ulong>();
+            for (int i = 0; i < 500; i++)
+            {
+                if (i == 150)
+                {
+                    a.SaveTo(snapshot);
+                }
+                a.Step(new[] { InputAt(i) });
+                if (i >= 150)
+                {
+                    checksums.Add(a.Checksum());
+                }
+            }
+            a.LoadFrom(snapshot);
+            for (int i = 150; i < 500; i++)
+            {
+                a.Step(new[] { InputAt(i) });
+                Assert.That(a.Checksum(), Is.EqualTo(checksums[i - 150]), $"巻き戻した後のティック {a.Tick} の結果が違う");
+            }
+        }
+
+        private static PlayerInput InputAt(int i)
+        {
+            return PlayerInput.FromAxes(i % 150 < 100 ? 1f : -1f, 0f, i % 37 == 18 ? InputButtons.Jump : InputButtons.None);
+        }
+
+        [Test]
         public void Respawn_KeepsTheGimmickCounts()
         {
             var world = new SimWorld(Floor(), new StageBounds(-10f, -10f, 10f, 30f), new List<StageZone> { Pad() });

@@ -76,6 +76,61 @@ namespace Airerage.Editor
             CaptureAll(screens, "StageSelect");
         }
 
+        // ステージの見どころ（ステージのシーンの名前と、撮る所の中心）。
+        private static readonly (string Scene, string Name, Vector2 Center)[] StageDetails =
+        {
+            ("Stage_CityDay", "Hollow", new Vector2(0f, -6f)),
+            ("Stage_CityNight", "Bumpers", new Vector2(-40f, 8f)),
+            ("Stage_Volcano", "GeyserWest", new Vector2(-36f, 4f)),
+            ("Stage_SnowSea", "Cave", new Vector2(-34f, 0f)),
+            ("Stage_SnowSea", "Ship", new Vector2(40f, 2f)),
+            ("Stage_SpaceStation", "ShipWest", new Vector2(-29f, 26f)),
+            ("Stage_SpaceStation", "RescueGate", new Vector2(-30f, -14f)),
+        };
+
+        /// <summary>
+        /// ステージの見どころを近くから撮る（ユーザーの要望、2026-10-19 の変更の確認）。効いている間・予告の間だけ出す見た目
+        /// （間欠泉の噴き出し、溶岩流の柱、吹雪の幕など）も出して撮る。
+        /// </summary>
+        public static void CaptureStageDetails()
+        {
+            Directory.CreateDirectory(OutputFolder);
+            foreach (var detail in StageDetails)
+            {
+                string[] found = AssetDatabase.FindAssets($"{detail.Scene} t:Scene");
+                if (found.Length == 0)
+                {
+                    throw new InvalidOperationException($"ステージのシーンがない: {detail.Scene}");
+                }
+                EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(found[0]), OpenSceneMode.Single);
+                GameObject gimmicks = GameObject.Find("Gimmicks");
+                if (gimmicks != null)
+                {
+                    foreach (Transform child in gimmicks.GetComponentsInChildren<Transform>(true))
+                    {
+                        if (child.name != "Warning" && child.name != "Storm")
+                        {
+                            child.gameObject.SetActive(true);
+                        }
+                    }
+                }
+                var go = new GameObject("SnapshotCamera");
+                Camera camera = go.AddComponent<Camera>();
+                camera.clearFlags = CameraClearFlags.Skybox;
+                camera.farClipPlane = 1000f;
+                try
+                {
+                    camera.fieldOfView = 40f;
+                    go.transform.position = new Vector3(detail.Center.x, detail.Center.y, -30f);
+                    RenderCamera(camera, new Vector2Int(1600, 900), $"{OutputFolder}/Detail_{detail.Scene}_{detail.Name}.png");
+                }
+                finally
+                {
+                    Object.DestroyImmediate(go);
+                }
+            }
+        }
+
         /// <summary>
         /// 結果の画面の項目（docs/15 T6-8）。ステージとローカル対戦の試合のシーンを開き、項目を出して撮る（順位の表は IMGUI なので写らない）。
         /// ネットワーク対戦のホストでない人の例（REMATCH と CHARACTER SELECT は押せず、ホストを待つ）。

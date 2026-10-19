@@ -41,6 +41,7 @@ namespace Airerage.Runtime.Presentation
             Recovery,
             Hitstop,
             Hitstun,
+            Frozen,
         }
 
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -52,6 +53,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private Color _recoveryColor = new Color(0.45f, 0.5f, 0.8f);
         [SerializeField] private Color _hitstopColor = Color.white;
         [SerializeField] private Color _hitstunColor = new Color(1f, 0.55f, 0.85f);
+        [Tooltip("吹雪で凍っている間の色")]
+        [SerializeField] private Color _frozenColor = new Color(0.6f, 0.9f, 1f);
         [Tooltip("攻撃の判定を描く線（4辺。なくてもよい）")]
         [SerializeField] private LineRenderer _hitboxLine;
         [Tooltip("撃破技のチャージのエフェクト（なくてもよい）")]
@@ -95,6 +98,7 @@ namespace Airerage.Runtime.Presentation
         private int _shownWireCancelCooldown;
         private int _shownBounces;
         private int _shownGimmicks;
+        private int _shownHazardHits;
         private int _shownSpecial1Cooldown;
         private int _shownSpecial2Cooldown;
         private int _shownGauge;
@@ -290,10 +294,13 @@ namespace Airerage.Runtime.Presentation
             {
                 _fatalBurst.Play(center);
             }
-            else if (c.LastDamagedTick != _shownDamagedTick && state.Action.Kind == ActionKind.Hitstun && _hitSpark != null)
+            else if (((c.LastDamagedTick != _shownDamagedTick && state.Action.Kind == ActionKind.Hitstun) || c.HazardHitCount > _shownHazardHits)
+                && _hitSpark != null)
             {
+                // 攻撃と、ステージの危険（溶岩流・つらら）に当たったとき。
                 _hitSpark.Play(center);
             }
+            _shownHazardHits = c.HazardHitCount;
             if (c.WireCancelCooldownTicksLeft > _shownWireCancelCooldown && _wireCancelBurst != null)
             {
                 _wireCancelBurst.Play(center);
@@ -302,7 +309,8 @@ namespace Airerage.Runtime.Presentation
             {
                 _bounceBurst.Play(center);
             }
-            int gimmicks = state.JumpPadCount + state.BoostRingCount;
+            // ジャンプ台・加速リング・壁ジャンプ。
+            int gimmicks = state.JumpPadCount + state.BoostRingCount + state.WallJumpCount;
             if (gimmicks > _shownGimmicks && _gimmickBurst != null)
             {
                 _gimmickBurst.Play(center);
@@ -428,6 +436,10 @@ namespace Airerage.Runtime.Presentation
             {
                 return Tint.Hitstop;
             }
+            if (state.Combat.IsFrozen)
+            {
+                return Tint.Frozen;
+            }
             switch (state.Action.Kind)
             {
                 case ActionKind.Hitstun:
@@ -455,6 +467,7 @@ namespace Airerage.Runtime.Presentation
                 case Tint.Active: return _activeColor;
                 case Tint.Recovery: return _recoveryColor;
                 case Tint.Hitstop: return _hitstopColor;
+                case Tint.Frozen: return _frozenColor;
                 default: return _hitstunColor;
             }
         }

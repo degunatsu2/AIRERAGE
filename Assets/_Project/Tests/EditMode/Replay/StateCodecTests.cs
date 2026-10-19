@@ -14,8 +14,8 @@ namespace Airerage.Core.Tests.Replay
     /// </summary>
     public class StateCodecTests
     {
-        // Checksum_IsStableAcrossRunsAndMachines の期待値（形式の版 20。2026-10-16、クラウドの Linux / .NET 8 で計算）。
-        private const string ExpectedChecksum = "bcae63d33da2e8c4";
+        // Checksum_IsStableAcrossRunsAndMachines の期待値（形式の版 21。2026-10-19、クラウドの Linux / .NET 8 で計算）。
+        private const string ExpectedChecksum = "6832b5aa65021084";
 
         [Test]
         public void EveryField_RoundTripsAndChangesTheChecksum()

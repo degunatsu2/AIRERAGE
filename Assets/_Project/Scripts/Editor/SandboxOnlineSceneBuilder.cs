@@ -177,9 +177,9 @@ namespace Airerage.Editor
             new Vector2(7f, 26f),
         };
 
-        // ステージの範囲（外に出ると撃破）【仮】。
-        internal static readonly Vector2 BoundsMin = new Vector2(-46f, -22f);
-        internal static readonly Vector2 BoundsMax = new Vector2(46f, 44f);
+        // ステージの範囲（外に出ると撃破）【仮】。左右は広めに（横へ飛ばされてすぐ撃破されないように。ユーザーの要望、2026-10-19）。
+        internal static readonly Vector2 BoundsMin = new Vector2(-58f, -22f);
+        internal static readonly Vector2 BoundsMax = new Vector2(58f, 44f);
 
         // 試合の前にカメラを向ける位置。
         internal static readonly Vector3 CameraFocus = new Vector3(0f, 1f, 0f);

@@ -126,6 +126,8 @@ namespace Airerage.Runtime.UI
                     ShowMain(_local);
                 }
             };
+            // カーソルのあるステージをメニューの背景に映す（ユーザーの要望、2026-10-19）。
+            _stageSelect.HighlightedStageChanged += stage => _flow?.PreviewStage(stage);
             _stageSelect.Confirmed += stage => Run(flow =>
             {
                 // ネットワーク対戦のステージ選択は、ネットワーク対戦のメニューが受け持つ。

@@ -35,8 +35,8 @@ namespace Airerage.Runtime.Tests
         {
             { "Stage_CityDay", new[] { StageZoneKind.SpeedLane, StageZoneKind.Launcher, StageZoneKind.Gust } },
             { "Stage_CityNight", new[] { StageZoneKind.Bumper, StageZoneKind.Gust } },
-            { "Stage_Volcano", new[] { StageZoneKind.Gust, StageZoneKind.Launcher, StageZoneKind.Bumper } },
-            { "Stage_SnowSea", new[] { StageZoneKind.Ice, StageZoneKind.SpeedLane, StageZoneKind.Launcher, StageZoneKind.Gust } },
+            { "Stage_Volcano", new[] { StageZoneKind.Hazard, StageZoneKind.Launcher, StageZoneKind.Bumper } },
+            { "Stage_SnowSea", new[] { StageZoneKind.Ice, StageZoneKind.SpeedLane, StageZoneKind.Launcher, StageZoneKind.Hazard, StageZoneKind.Blizzard } },
             { "Stage_SpaceStation", new[] { StageZoneKind.LowGravity, StageZoneKind.Warp, StageZoneKind.Launcher } },
         };
 
@@ -138,7 +138,8 @@ namespace Airerage.Runtime.Tests
             foreach (StageZone zone in _zones)
             {
                 var center = new NVector3((zone.MinX + zone.MaxX) * 0.5f, zone.MinY, 0f);
-                if (zone.Kind == StageZoneKind.JumpPad || zone.Kind == StageZoneKind.SpeedLane || zone.Kind == StageZoneKind.Launcher
+                // 周期のある発射台（壁の間欠泉）は床の上に置かない。
+                if (zone.Kind == StageZoneKind.JumpPad || zone.Kind == StageZoneKind.SpeedLane || (zone.Kind == StageZoneKind.Launcher && zone.Period == 0)
                     || zone.Kind == StageZoneKind.Ice)
                 {
                     Assert.That(_terrain.Raycast(center + new NVector3(0f, 0.05f, 0f), -NVector3.UnitY, 0.1f, out _), Is.True,
@@ -174,7 +175,8 @@ namespace Airerage.Runtime.Tests
         public void PadsLaunchersAndBumpers_SendThePlayerFlying(string stage)
         {
             Open(stage);
-            foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.JumpPad || z.Kind == StageZoneKind.Launcher || z.Kind == StageZoneKind.Bumper))
+            foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.JumpPad || (z.Kind == StageZoneKind.Launcher && z.Period == 0)
+                || z.Kind == StageZoneKind.Bumper))
             {
                 NVector3 start = zone.Kind == StageZoneKind.Bumper
                     ? new NVector3(zone.Center.X, zone.Center.Y, 0f)
@@ -189,7 +191,7 @@ namespace Airerage.Runtime.Tests
         public void EveryLauncher_LandsThePlayerOnTheStage(string stage)
         {
             Open(stage);
-            foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.Launcher))
+            foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.Launcher && z.Period == 0))
             {
                 // 飛ぶ向きへ入れ続ける（プレイヤーがふつうにすること）。床に降りるか、床の上のジャンプ台に乗ったら（続けて飛ぶ）降りたとみなす。
                 SimWorld world = World(new NVector3(zone.Center.X, zone.MinY + CharacterHalf.Y + 0.01f, 0f));
@@ -211,6 +213,91 @@ namespace Airerage.Runtime.Tests
                 Assert.That(Landed(state), Is.True, $"{zone} で飛んだ先に降りる所がない:{path}");
                 Assert.That(NVector3.Distance(state.Position, new NVector3(zone.Center.X, zone.Center.Y, 0f)), Is.GreaterThan(6f),
                     $"{zone} で飛んでも、ほとんど同じ所に戻る（{state.Position}）");
+            }
+        }
+
+        [TestCaseSource(nameof(Stages))]
+        public void PeriodicLaunchers_FireOnlyWhileActive(string stage)
+        {
+            Open(stage);
+            foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.Launcher && z.Period > 0))
+            {
+                int active = Enumerable.Range(0, zone.Period * 2).First(t => zone.IsActive(t));
+                int quiet = Enumerable.Range(0, zone.Period * 2).First(t => !zone.IsActive(t));
+                Assert.That(Fire(zone, active).JumpPadCount, Is.EqualTo(1), $"{zone} が噴いている間に飛ばない");
+                Assert.That(Fire(zone, quiet).JumpPadCount, Is.EqualTo(0), $"{zone} が止んでいる間に飛ぶ");
+                Assert.That(zone.Timing.WarningTicks, Is.GreaterThan(0), $"{zone} に予告がない");
+            }
+        }
+
+        // 範囲の真ん中にいる人に、ティック tick の発射台を効かせる。
+        private static CharacterState Fire(StageZone zone, int tick)
+        {
+            var state = new CharacterState { Position = new NVector3(zone.Center.X, zone.Center.Y, 0f) };
+            StageZones.Apply(ref state, state.Position, new CharacterConfig(), new[] { zone }, tick);
+            return state;
+        }
+
+        [TestCaseSource(nameof(Stages))]
+        public void HazardsAndBlizzards_WarnBeforeTheyStrike(string stage)
+        {
+            Open(stage);
+            foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.Hazard || z.Kind == StageZoneKind.Blizzard))
+            {
+                Assert.That(zone.Timing.WarningTicks, Is.GreaterThanOrEqualTo(zone.Kind == StageZoneKind.Blizzard ? 5 * 60 : 60),
+                    $"{zone} の予告が短い");
+                Assert.That(_bounds.Contains(new NVector3(zone.Center.X, zone.Center.Y, 0f)), Is.True, $"{zone} がステージの外");
+            }
+        }
+
+        [TestCaseSource(nameof(Stages))]
+        public void SideKnockoutLines_AreWellOutsideTheTerrain_AndTheCoins(string stage)
+        {
+            Open(stage);
+            // 左右の撃破の線は、いちばん外の地形から 10m 以上、コインから 6m 以上離す（ユーザーの要望、2026-10-19）。
+            var boxes = Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None);
+            float left = boxes.Min(b => b.bounds.min.x);
+            float right = boxes.Max(b => b.bounds.max.x);
+            Assert.That(left - _bounds.MinX, Is.GreaterThanOrEqualTo(10f), "左の撃破の線が地形に近い");
+            Assert.That(_bounds.MaxX - right, Is.GreaterThanOrEqualTo(10f), "右の撃破の線が地形に近い");
+            foreach (CoinSpawnPoint coin in _coins)
+            {
+                Assert.That(coin.Position.X - _bounds.MinX, Is.GreaterThanOrEqualTo(6f), $"コイン {coin.Position} が左の撃破の線に近い");
+                Assert.That(_bounds.MaxX - coin.Position.X, Is.GreaterThanOrEqualTo(6f), $"コイン {coin.Position} が右の撃破の線に近い");
+            }
+        }
+
+        [Test]
+        public void SnowSea_Blizzard_HasShelters_InTheCaveAndTheShip()
+        {
+            Open("Stage_SnowSea");
+            StageZone blizzard = _zones.Single(z => z.Kind == StageZoneKind.Blizzard);
+            bool Sheltered(float x, float y) => StageZones.Sheltered(new NVector3(x, y, 0f), blizzard.Direction, _terrain, blizzard.Limit);
+            Assert.That(Sheltered(-36f, -2.1f), Is.True, "洞窟の中が吹雪の影にならない");
+            Assert.That(Sheltered(-26f, -2.1f), Is.True, "洞窟の入り口が吹雪の影にならない");
+            Assert.That(Sheltered(45f, -0.6f), Is.True, "船の中が吹雪の影にならない");
+            Assert.That(Sheltered(0f, 1.9f), Is.False, "真ん中の氷の上が吹雪の影になる（隠れなくてよくなる）");
+            Assert.That(Sheltered(-43f, 12.9f), Is.False, "尾根の上が吹雪の影になる");
+            // 洞窟の中の拠点の候補と、船の中を通り抜けられる。
+            Assert.That(_banks.Any(b => b.Position.X < -24f && b.Position.Y < 2f), Is.True, "洞窟の中に拠点の候補がない");
+            Assert.That(_terrain.IsOverlapping(new NVector3(42f, 0.2f, 0f), CharacterHalf), Is.False, "船の中を通れない");
+            Assert.That(_terrain.IsOverlapping(new NVector3(-40f, -2f, 0f), CharacterHalf), Is.False, "洞窟の中を通れない");
+            Assert.That(_terrain.IsOverlapping(new NVector3(-47.4f, -1f, 0f), new NVector3(0.2f, 0.5f, 0.2f)), Is.True, "洞窟が左の端を貫いている");
+        }
+
+        [Test]
+        public void Cities_HaveTheHollowWithABank_UnderTheCenterBuilding()
+        {
+            foreach (string stage in new[] { "Stage_CityDay", "Stage_CityNight" })
+            {
+                Open(stage);
+                Assert.That(_terrain.IsOverlapping(new NVector3(0f, -9.05f, 0f), CharacterHalf), Is.False, $"{stage}: 真ん中のビルの中に立てない");
+                Assert.That(_terrain.Raycast(new NVector3(0f, -9.05f, 0f), -NVector3.UnitY, 1f, out _), Is.True, $"{stage}: くりぬいた中に床がない");
+                Assert.That(_terrain.IsOverlapping(new NVector3(-9.5f, -8f, 0f), CharacterHalf), Is.False, $"{stage}: くりぬいた中から左の谷へ出られない");
+                Assert.That(_terrain.IsOverlapping(new NVector3(9.5f, -8f, 0f), CharacterHalf), Is.False, $"{stage}: くりぬいた中から右の谷へ出られない");
+                Assert.That(_banks.Any(b => NVector2.Distance(b.Position, new NVector2(0f, -7.5f)) < 0.5f), Is.True, $"{stage}: くりぬいた中に拠点の候補がない");
+                EditorSceneManager.CloseScene(_scene, true);
+                _scene = default;
             }
         }
 

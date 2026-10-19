@@ -7,7 +7,9 @@ namespace Airerage.Editor.Stages
     /// <summary>
     /// 雪原と海（FROST COAST）。左は雪原と尾根、右は海に浮かぶ氷と氷山、右の端に船。海に落ちると撃破（ほかのステージより下の範囲が浅い）。
     /// 固有のギミック: 氷（滑る。止まりにくく曲がりにくい）、スキージャンプ（尾根のスピードレーンから発射台で海の上へ。着いた氷の上を
-    /// 滑ったまま跳ぶ）、吹雪（周期のある横風。左右が交互）。海の波（周期のある上向きの風）が、落ちた人を氷の上へ押し上げる。
+    /// 滑ったまま跳ぶ）、海の波（周期のある上向きの風。落ちた人を氷の上へ押し上げる）。ユーザーの要望（2026-10-19）で、船の中を
+    /// 通り抜けられるようにし、雪原の下を右からくりぬいた洞窟（中につららが落ちる。落ちる前に警告。奥に拠点の候補）を作り、上空の風を
+    /// なくして、30〜40 秒に 1 回の吹雪（Blizzard。5 秒前に警告と警告音。何かの影に隠れていないと 2 秒凍る）にした。
     /// </summary>
     internal static class SnowSeaStage
     {
@@ -39,26 +41,31 @@ namespace Airerage.Editor.Stages
             theme.ZoneColors[StageZoneKind.Gust] = new Color(1f, 1f, 1f);
             theme.ZoneColors[StageZoneKind.SpeedLane] = new Color(0.35f, 0.75f, 1f);
             theme.ZoneColors[StageZoneKind.Launcher] = new Color(1f, 0.4f, 0.3f);
+            theme.ZoneColors[StageZoneKind.Hazard] = new Color(0.75f, 0.93f, 1f);
+            theme.ZoneColors[StageZoneKind.Blizzard] = new Color(0.92f, 0.97f, 1f);
             var blue = new Vector2(1f, 0f);
 
             return new StageLayout
             {
                 Id = "SnowSea",
                 DisplayName = "FROST COAST",
-                Description = "Slippery ice floes on a freezing sea. Ski-jump off the ridge, ride the waves, mind the blizzard.",
+                Description = "Slippery ice floes on a freezing sea. Ski-jump off the ridge, ride the waves, hide from the blizzard.",
                 Color = new Color(0.6f, 0.9f, 1f),
                 Terrain = new[]
                 {
-                    // 雪原と尾根（雪は接続できない）。
-                    new TerrainBox("Snowfield", -48f, -30f, -24f, 6f),
+                    // 雪原と尾根（雪は接続できない）。雪原の下は右からくりぬいた洞窟（y = -3〜2。左の端は貫かない）。
+                    new TerrainBox("Snowfield", -48f, 2f, -24f, 6f),
+                    new TerrainBox("SnowfieldEnd", -48f, -3f, -46.5f, 2f),
+                    new TerrainBox("SnowfieldBase", -48f, -30f, -24f, -3f),
                     new TerrainBox("Ridge", -48f, 6f, -38f, 12f),
                     // 海に浮かぶ氷（接続できる）。
                     new TerrainBox("IceFloeWest", -18f, -30f, -11f, 0.5f, attachable: true),
                     new TerrainBox("IceFloeCenter", -5f, -30f, 5f, 1f, attachable: true),
                     new TerrainBox("Iceberg", 12f, -30f, 20f, 12f, attachable: true),
                     new TerrainBox("IceFloeEast", 26f, -30f, 32f, 2f, attachable: true),
-                    // 船（甲板は接続できない。マストは接続できる）。
-                    new TerrainBox("ShipHull", 37f, -30f, 47f, 3f),
+                    // 船（甲板は接続できない。マストは接続できる）。船の中（y = -1.5〜2）は両端が開いていて、通り抜けられる。
+                    new TerrainBox("ShipHull", 37f, 2f, 47f, 3f),
+                    new TerrainBox("ShipKeel", 37f, -30f, 47f, -1.5f),
                     new TerrainBox("Mast", 41.7f, 3f, 42.3f, 16f, attachable: true),
                     new TerrainBox("CrowsNest", 40.5f, 16f, 43.5f, 16.4f),
                     // 宙に張り出した氷の棚とアーチ。
@@ -71,9 +78,9 @@ namespace Airerage.Editor.Stages
                     new Vector2(0f, 29f), new Vector2(-20f, 22f), new Vector2(20f, 25f), new Vector2(-30f, 16f), new Vector2(34f, 22f),
                     new Vector2(-8f, 9f), new Vector2(8f, 9f), new Vector2(-21f, 13f),
                 },
-                // 海に落ちたら撃破（海面は y = -6）。
-                BoundsMin = new Vector2(-48f, -10f),
-                BoundsMax = new Vector2(48f, 46f),
+                // 海に落ちたら撃破（海面は y = -6）。左右は広めに（端の赤いコインを取っても撃破されないように。ユーザーの要望、2026-10-19）。
+                BoundsMin = new Vector2(-60f, -10f),
+                BoundsMax = new Vector2(60f, 46f),
                 Theme = theme,
                 Zones = new[]
                 {
@@ -104,9 +111,13 @@ namespace Airerage.Editor.Stages
                     Wave("WaveEast", 5f, 12f, 2.5f),
                     Wave("WaveFar", 20f, 26f, 3.75f),
                     Wave("WaveShip", 32f, 37f, 0.6f),
-                    // 吹雪: 上空を、右向きと左向きが 6 秒ずれて 4 秒ずつ吹く（少し下向き）。
-                    new ZoneSpec("BlizzardEast", StageZoneKind.Gust, new Vector2(0f, 24f), new Vector2(96f, 14f), new Vector2(1f, -0.15f), 20f, 8f).Every(12f, 4f, 0f),
-                    new ZoneSpec("BlizzardWest", StageZoneKind.Gust, new Vector2(0f, 24f), new Vector2(96f, 14f), new Vector2(-1f, -0.15f), 20f, 8f).Every(12f, 4f, 6f),
+                    // 洞窟のつらら: 天井のランダムな場所から、幅 1.6m のつららが 3.5 秒ごとに落ちる（1.2 秒前から当たる柱の全体に警告）。
+                    new ZoneSpec("Icicles", StageZoneKind.Hazard, new Vector2(-35.5f, -0.5f), new Vector2(20f, 5f), Vector2.down, 30f)
+                        .Every(3.5f, 0.5f, 1f, 0f, 1.2f).Column(1.6f),
+                    // 吹雪: 30〜40 秒ごとに 1.5 秒、左上から吹きつける。風上 14m の中に地形がない（何かの影に隠れていない）と 2 秒凍る。
+                    // 5 秒前から範囲の全体に警告と警告音。
+                    new ZoneSpec("Blizzard", StageZoneKind.Blizzard, new Vector2(0f, 18f), new Vector2(120f, 56f), new Vector2(1f, -0.5f), 2f, 14f)
+                        .Every(30f, 1.5f, 0f, 10f, 5f),
                 },
                 Coins = new (Vector2, int)[]
                 {
@@ -124,6 +135,8 @@ namespace Airerage.Editor.Stages
                     (new Vector2(-13f, 16.6f), 1), (new Vector2(27f, 18.6f), 1),
                     // 3 枚: アーチの上、ゲレンデの上、見張り台の上、吹雪の中。
                     (new Vector2(0f, 26.8f), 3), (new Vector2(-43f, 15f), 3), (new Vector2(42f, 21f), 3), (new Vector2(16f, 23f), 3), (new Vector2(-46f, 18f), 3),
+                    // 洞窟の中と、船の中。
+                    (new Vector2(-40f, -1.5f), 1), (new Vector2(-30f, -1.5f), 1), (new Vector2(42f, 0.2f), 1),
                     // 20 枚: 海の中（波で戻れる）、いちばん上、ステージの端。
                     (new Vector2(-21f, -8f), 20), (new Vector2(-8f, -8f), 20), (new Vector2(8.5f, -8f), 20), (new Vector2(23f, -8f), 20),
                     (new Vector2(0f, 36f), 20), (new Vector2(-47f, 24f), 20), (new Vector2(47f, 27f), 20),
@@ -137,6 +150,8 @@ namespace Airerage.Editor.Stages
                 {
                     new Vector2(0f, 8f), new Vector2(-30f, 10f), new Vector2(-14.5f, 6f), new Vector2(19.5f, 17.5f), new Vector2(29f, 8f),
                     new Vector2(44f, 10f), new Vector2(-41f, 17f),
+                    // 雪原の下の洞窟の奥（ユーザーの要望、2026-10-19）。
+                    new Vector2(-36f, -1f),
                 },
                 Spawns = new[] { new Vector3(-3f, 2f, 0f), new Vector3(3f, 2f, 0f), new Vector3(-33f, 7f, 0f), new Vector3(29f, 3f, 0f) },
                 Decorate = Decorate,
@@ -170,6 +185,14 @@ namespace Airerage.Editor.Stages
             }
             // 雪原と尾根の奥行き、針葉樹（45° 回した箱）。
             decor.Box("SnowfieldBack", new Vector3(-36f, -2f, 8f), new Vector3(24f, 16f, 12f), snow);
+            // 洞窟の奥の氷の壁と、天井の小さなつらら（飾り）。
+            decor.Box("CaveWall", new Vector3(-35.25f, -0.5f, 1.8f), new Vector3(22.5f, 5f, 0.4f), decor.Lit("CaveIce", new Color(0.45f, 0.65f, 0.82f)));
+            for (float x = -45.5f; x < -24.5f; x += 1.4f)
+            {
+                float length = decor.Range(0.3f, 0.7f);
+                GameObject icicle = decor.Box("CeilingIcicle", new Vector3(x, 2f - length * 0.35f, decor.Range(-1.5f, 1.5f)), new Vector3(0.25f, length, 0.25f), ice);
+                icicle.transform.rotation = Quaternion.Euler(0f, 45f, 0f);
+            }
             for (int i = 0; i < 9; i++)
             {
                 float size = decor.Range(1.6f, 3f);
@@ -178,9 +201,13 @@ namespace Airerage.Editor.Stages
                 tree.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
             }
             // 船の飾り（木の船体と見張り台、帆、船首）。地形の箱を少し大きな木の箱で覆う。
-            decor.Box("ShipHullSkin", new Vector3(42f, -3.49f, 0f), new Vector3(10.02f, 13f, 4.2f), wood);
+            decor.Box("ShipDeckSkin", new Vector3(42f, 2.5f, 0f), new Vector3(10.02f, 1.02f, 4.2f), wood);
+            decor.Box("ShipKeelSkin", new Vector3(42f, -6.25f, 0f), new Vector3(10.02f, 9.5f, 4.2f), wood);
+            // 船の中（奥の板と、灯り）。
+            decor.Box("ShipHold", new Vector3(42f, 0.25f, 1.8f), new Vector3(10f, 3.5f, 0.4f), decor.Lit("Hold", new Color(0.25f, 0.17f, 0.12f)));
+            decor.Sphere("HoldLamp", new Vector3(42f, 1.6f, 0f), new Vector3(0.4f, 0.4f, 0.4f), decor.Unlit("Lamp", new Color(1f, 0.85f, 0.5f)));
             decor.Box("CrowsNestSkin", new Vector3(42f, 16.2f, 0f), new Vector3(3.02f, 0.42f, 2f), wood);
-            decor.Box("ShipBow", new Vector3(36f, -1f, 0f), new Vector3(2f, 6f, 3.5f), wood);
+            decor.Box("ShipBow", new Vector3(36f, -3.75f, 0f), new Vector3(2f, 4.5f, 3.5f), wood);
             decor.Quad("Sail", new Vector3(42f, 10f, 0.4f), new Vector2(6f, 8f), sail);
             // 遠くの雪山と氷山。
             for (int i = 0; i < 6; i++)

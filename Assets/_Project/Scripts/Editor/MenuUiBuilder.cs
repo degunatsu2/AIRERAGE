@@ -131,6 +131,8 @@ namespace Airerage.Editor
             colors.selectedColor = Accent;
             field.colors = colors;
             field.navigation = new Navigation { mode = Navigation.Mode.Vertical };
+            // ゲームパッドでは、選んだだけでは入力を始めない（決定で始める）。
+            box.AddComponent<InputFieldGamepadControl>();
             return field;
         }
 
@@ -209,6 +211,17 @@ namespace Airerage.Editor
         /// </summary>
         public static ResultsMenu CreateResultsMenu(MonoBehaviour controls, MatchHud hud, InputActionAsset inputActions)
         {
+            // 結果を出している間に止める、試合中の表示（画面に描く表示。結果の表 MatchHud と、版の表示は残す）。
+            var huds = new System.Collections.Generic.List<Object>();
+            foreach (MonoBehaviour behaviour in Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID))
+            {
+                System.Type type = behaviour.GetType();
+                if (type.Namespace == typeof(MatchHud).Namespace && type != typeof(MatchHud)
+                    && type.GetMethod("OnGUI", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public) != null)
+                {
+                    huds.Add(behaviour);
+                }
+            }
             Canvas canvas = CreateCanvas("ResultsMenu", 15);
             RectTransform panel = CreateFull(canvas.transform, "Panel");
             var bottom = new Vector2(0.5f, 0f);
@@ -235,6 +248,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(results, "_characterSelect", characters);
             SandboxWireSceneBuilder.SetReference(results, "_menu", menu);
             SandboxWireSceneBuilder.SetReference(results, "_note", note);
+            SandboxWireSceneBuilder.SetReferenceArray(results, "_hideDuringResults", huds.ToArray());
             return results;
         }
 

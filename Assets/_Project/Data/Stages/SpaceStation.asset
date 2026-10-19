@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: ORBITAL STATION
   _sceneName: Stage_SpaceStation
-  _description: Low gravity above the modules, warp gates that wrap around the edges,
-    mass drivers between the modules.
+  _description: Zero-g inside the hollow starships, warp gates that wrap around the
+    edges, a roaming rescue gate below.
   _color: {r: 0.65, g: 0.45, b: 1, a: 1}

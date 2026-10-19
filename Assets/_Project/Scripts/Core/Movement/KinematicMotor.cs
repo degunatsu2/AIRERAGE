@@ -84,6 +84,15 @@ namespace Airerage.Core.Movement
             return _collision.SweepBox(position, halfExtents, down, out CastHit hit) && hit.Normal.Y >= GroundNormalMinY;
         }
 
+        /// <summary>
+        /// 横の side の側（-1 = 左、+1 = 右）のすぐ近くに壁があるか（壁ジャンプ。縦に近い面だけ）。
+        /// </summary>
+        public bool ProbeWall(Vector3 position, Vector3 halfExtents, int side)
+        {
+            var sideways = new Vector3(side * (GroundProbeDistance + SkinWidth), 0f, 0f);
+            return _collision.SweepBox(position, halfExtents, sideways, out CastHit hit) && hit.Normal.X * side <= -GroundNormalMinY;
+        }
+
         private static Vector3 RemoveIntoSurface(Vector3 vector, Vector3 normal)
         {
             float into = Vector3.Dot(vector, normal);

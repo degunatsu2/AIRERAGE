@@ -154,6 +154,17 @@ namespace Airerage.Core.Combat
         /// <summary>ワープポータルで移った数（表示と効果音に使う）。</summary>
         public int WarpCount;
 
+        /// <summary>凍って動けない残り（ティック。吹雪。StageZones）と、凍った数（表示と効果音に使う）。</summary>
+        public int FrozenTicksLeft;
+        public int FreezeCount;
+
+        /// <summary>ステージの危険（溶岩流、つらら）にもう当たらない残り（ティック。同じ噴き出しに 1 回だけ当たる）と、当たった数（表示と効果音）。</summary>
+        public int HazardImmunityTicks;
+        public int HazardHitCount;
+
+        /// <summary>凍っているか。</summary>
+        public bool IsFrozen => FrozenTicksLeft > 0;
+
         /// <summary>クールタイムを、技の効果が終わるまで止めておく印（Special1CooldownTicksLeft などの値）。</summary>
         public const int CooldownWhileActive = -1;
 
@@ -199,7 +210,9 @@ namespace Airerage.Core.Combat
                 && SpeedBoostTicksLeft == other.SpeedBoostTicksLeft && SkyBoostTicksLeft == other.SkyBoostTicksLeft
                 && Special1Spent == other.Special1Spent && Special2Spent == other.Special2Spent && SkillAim.Equals(other.SkillAim)
                 && SlowFallSerial == other.SlowFallSerial && PortalCount == other.PortalCount && InPortalId == other.InPortalId
-                && WarpCooldownTicks == other.WarpCooldownTicks && WarpCount == other.WarpCount;
+                && WarpCooldownTicks == other.WarpCooldownTicks && WarpCount == other.WarpCount
+                && FrozenTicksLeft == other.FrozenTicksLeft && FreezeCount == other.FreezeCount
+                && HazardImmunityTicks == other.HazardImmunityTicks && HazardHitCount == other.HazardHitCount;
         }
 
         public override bool Equals(object obj)
@@ -218,14 +231,14 @@ namespace Airerage.Core.Combat
                 HashCode.Combine(Holding, HoldSlot, HoldTicks, AttackSerial, CoinBoostTicksLeft, CoinBonusMilli, JackpotHitCount,
                     GaugeBonusRemainder),
                 HashCode.Combine(SpeedBoostTicksLeft, SkyBoostTicksLeft, Special1Spent, Special2Spent, SkillAim, SlowFallSerial, PortalCount,
-                    HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount)));
+                    HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount, FrozenTicksLeft, FreezeCount, HazardImmunityTicks, HazardHitCount)));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount})";
         }
     }
 }

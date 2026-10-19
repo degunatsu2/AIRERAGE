@@ -40,6 +40,16 @@ namespace Airerage.Core.Simulation
         /// <summary>加速リングで加速した数（表示と音に使う。StageZones）。</summary>
         public int BoostRingCount;
 
+        /// <summary>
+        /// 張り付いている壁の側（-1 = 左の壁、+1 = 右の壁、0 = 張り付いていない。WallJump。ユーザーの要望、2026-10-19）と、
+        /// 張り付いてからのティック数。
+        /// </summary>
+        public int WallSide;
+        public int WallClingTicks;
+
+        /// <summary>壁ジャンプをした数（表示と音に使う）。</summary>
+        public int WallJumpCount;
+
         /// <summary>コイン（所持と確定。docs/12 T4-3）。増減は CoinLedger だけが行う。</summary>
         public CoinPurse Coins;
 
@@ -67,6 +77,9 @@ namespace Airerage.Core.Simulation
                 && Combat.Equals(other.Combat)
                 && JumpPadCount == other.JumpPadCount
                 && BoostRingCount == other.BoostRingCount
+                && WallSide == other.WallSide
+                && WallClingTicks == other.WallClingTicks
+                && WallJumpCount == other.WallJumpCount
                 && Coins.Equals(other.Coins);
         }
 
@@ -91,6 +104,9 @@ namespace Airerage.Core.Simulation
             hash.Add(Combat);
             hash.Add(JumpPadCount);
             hash.Add(BoostRingCount);
+            hash.Add(WallSide);
+            hash.Add(WallClingTicks);
+            hash.Add(WallJumpCount);
             hash.Add(Coins);
             return hash.ToHashCode();
         }

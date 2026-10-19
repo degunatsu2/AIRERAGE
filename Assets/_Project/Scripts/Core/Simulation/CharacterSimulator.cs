@@ -12,7 +12,8 @@ namespace Airerage.Core.Simulation
     /// <summary>
     /// キャラクター1人分の1ティックの処理の順序を決める。
     /// 入力 → アクション（攻撃）→ ワイヤーのフェーズ → 速度（ワイヤーまたは通常移動）→ 移動と衝突 → ロープ長の補正 → 接地
-    /// → のけぞり中の跳ね返り → ステージのギミック（StageZones。氷だけは速度を決めた直後）。
+    /// → のけぞり中の跳ね返り → 壁への張り付き（WallCling） → ステージのギミック（StageZones。氷と地面の風は速度を決めるとき）。
+    /// 壁に張り付いている間は、走る・跳ぶ代わりに WallCling.Hold（ジャンプで壁ジャンプ）。凍っている間（吹雪）は入力を受け付けず、横に動かない。
     /// アクション中（攻撃中・のけぞり中）は、移動・ジャンプ・ワイヤーの入力を無視し、向きも変えない（ActionController.ControlInput）。
     /// キャンセル（攻撃→ジャンプ、攻撃→ワイヤー）で Free に戻ったティックは、入力をそのまま使い、このティックにジャンプ・射出する。
     /// ヒットストップの間は、何も進めずに止まる（ボタンの前の状態も変えないので、押し続けたボタンは止まりが解けてから効く。
@@ -24,6 +25,7 @@ namespace Airerage.Core.Simulation
         private readonly KinematicMotor _motor;
         private readonly WireController _wire;
         private readonly IReadOnlyList<StageZone> _zones;
+        private readonly ICollisionQuery _collision;
 
         /// <param name="zones">ステージのギミック（効かせる順に並べたもの）。null ならない。</param>
         public CharacterSimulator(ICollisionQuery collision, IReadOnlyList<StageZone> zones = null)
@@ -35,10 +37,12 @@ namespace Airerage.Core.Simulation
             _motor = new KinematicMotor(collision);
             _wire = new WireController(collision, _motor);
             _zones = zones;
+            _collision = collision;
         }
 
-        /// <param name="tick">試合のティック数（周期のあるステージのギミック）。</param>
-        public void Step(ref CharacterState state, PlayerInput input, CharacterConfig config, int tick = 0)
+        /// <param name="tick">試合のティック数（周期・動きのあるステージのギミック）。</param>
+        /// <param name="seed">試合の種（ステージのギミックのランダムな周期と位置）。</param>
+        public void Step(ref CharacterState state, PlayerInput input, CharacterConfig config, int tick = 0, int seed = 0)
         {
             if (state.Combat.IsWaitingToRespawn)
             {
@@ -58,15 +62,33 @@ namespace Airerage.Core.Simulation
             InputFrame frame = ActionController.TakeHitstopPresses(ref state, input, out PlayerInput effectiveInput);
             MovementTuning movement = config.Movement;
             var halfExtents = movement.HalfExtents;
+            var halfExtents2 = new System.Numerics.Vector2(halfExtents.X, halfExtents.Y);
+
+            // 吹雪で凍っている間は、入力を受け付けない（攻撃を受けてのけぞったら解ける）。
+            if (state.Action.Kind == ActionKind.Hitstun)
+            {
+                state.Combat.FrozenTicksLeft = 0;
+            }
+            bool frozen = state.Combat.FrozenTicksLeft > 0;
+            if (frozen)
+            {
+                state.Combat.FrozenTicksLeft--;
+                effectiveInput = default;
+                frame = new InputFrame(default, state.PreviousButtons);
+            }
 
             _motor.Depenetrate(ref state.Position, halfExtents);
             System.Numerics.Vector3 startPosition = state.Position;
-            if (state.Action.IsFree)
+            if (state.Action.IsFree && state.WallSide == 0)
             {
                 UpdateFacing(ref state, frame, movement);
             }
 
             CountDownInvincibility(ref state);
+            if (state.Combat.HazardImmunityTicks > 0)
+            {
+                state.Combat.HazardImmunityTicks--;
+            }
             ActionController.Update(ref state, frame, config);
             if (state.Action.Kind == ActionKind.Attack)
             {
@@ -84,18 +106,32 @@ namespace Airerage.Core.Simulation
             bool wasGrounded = state.Grounded;
             int airJumpsBefore = state.AirJumpsUsed;
             bool attached = state.Wire.Phase == WirePhase.Attached;
+            if (state.WallSide != 0 && !WallCling.Continues(state, frame, movement, _motor, halfExtents))
+            {
+                state.WallSide = 0;
+                state.WallClingTicks = 0;
+            }
             if (attached)
             {
                 state.Velocity = _wire.ComputeAttachedVelocity(ref state, frame, config.Wire, movement.Gravity);
                 state.JumpBufferTicksLeft = 0;
             }
+            else if (state.WallSide != 0)
+            {
+                WallCling.Hold(ref state, frame, movement);
+            }
             else
             {
                 System.Numerics.Vector3 velocityBefore = state.Velocity;
-                Locomotion.UpdateVelocity(ref state, frame, movement);
+                float drift = StageZones.GroundDrift(state, halfExtents2, _zones, tick, seed);
+                Locomotion.UpdateVelocity(ref state, frame, movement, drift);
                 ActionController.ApplyMotion(ref state, config);
                 LimitSlowFall(ref state, airJumpsBefore, config);
-                StageZones.ApplyFriction(ref state, velocityBefore, new System.Numerics.Vector2(halfExtents.X, halfExtents.Y), _zones);
+                StageZones.ApplyFriction(ref state, velocityBefore, halfExtents2, _zones, tick);
+            }
+            if (frozen)
+            {
+                state.Velocity.X = 0f;
             }
 
             System.Numerics.Vector3 beforeMove = state.Position;
@@ -109,6 +145,11 @@ namespace Airerage.Core.Simulation
             }
 
             Locomotion.ApplyGroundState(ref state, _motor.ProbeGround(state.Position, halfExtents), movement);
+            if (state.Grounded)
+            {
+                state.WallSide = 0;
+                state.WallClingTicks = 0;
+            }
             if (state.Grounded || attached)
             {
                 // 着地・ワイヤーの接続で、ゆっくり落ちるのは終わる。
@@ -116,7 +157,8 @@ namespace Airerage.Core.Simulation
             }
             ActionController.AfterMove(ref state, wasGrounded, velocityBeforeMove, config);
             Bounce(ref state, velocityBeforeMove, config.Combat);
-            StageZones.Apply(ref state, startPosition, config, _zones, tick);
+            WallCling.TryStart(ref state, velocityBeforeMove, movement, _motor, halfExtents);
+            StageZones.Apply(ref state, startPosition, config, _zones, tick, seed, _collision);
 
             // ゲームプレイは XY 平面（docs/01_game_design.md 4章）。
             state.Position.Z = 0f;

@@ -39,7 +39,7 @@ namespace Airerage.Editor.Stages
         public string SceneName => "Stage_" + Id;
     }
 
-    /// <summary>ギミック 1 つ（Core の StageZone の値と名前）。周期と出口は必要な種類だけ。</summary>
+    /// <summary>ギミック 1 つ（Core の StageZone の値と名前）。周期・出口・柱の幅・動きは必要な種類だけ。</summary>
     internal sealed class ZoneSpec
     {
         public readonly string Name;
@@ -52,7 +52,12 @@ namespace Airerage.Editor.Stages
         public float PeriodSeconds;
         public float ActiveSeconds;
         public float PhaseSeconds;
+        public float JitterSeconds;
+        public float WarningSeconds;
         public Vector2 Target;
+        public float Width;
+        public Vector2 Travel;
+        public float TravelSeconds;
 
         public ZoneSpec(string name, StageZoneKind kind, Vector2 center, Vector2 size, Vector2 direction, float power, float limit = 0f)
         {
@@ -65,12 +70,29 @@ namespace Airerage.Editor.Stages
             Limit = limit;
         }
 
-        /// <summary>周期のある風にする（秒）。</summary>
-        public ZoneSpec Every(float periodSeconds, float activeSeconds, float phaseSeconds)
+        /// <summary>周期のあるギミックにする（秒）。jitterSeconds は周期ごとにランダムに足す長さの上限、warningSeconds は予告の長さ。</summary>
+        public ZoneSpec Every(float periodSeconds, float activeSeconds, float phaseSeconds, float jitterSeconds = 0f, float warningSeconds = 0f)
         {
             PeriodSeconds = periodSeconds;
             ActiveSeconds = activeSeconds;
             PhaseSeconds = phaseSeconds;
+            JitterSeconds = jitterSeconds;
+            WarningSeconds = warningSeconds;
+            return this;
+        }
+
+        /// <summary>危険の柱の幅を決める（m）。</summary>
+        public ZoneSpec Column(float width)
+        {
+            Width = width;
+            return this;
+        }
+
+        /// <summary>travel だけ行って戻る動きにする（1 往復 seconds 秒）。</summary>
+        public ZoneSpec Moving(Vector2 travel, float seconds)
+        {
+            Travel = travel;
+            TravelSeconds = seconds;
             return this;
         }
 

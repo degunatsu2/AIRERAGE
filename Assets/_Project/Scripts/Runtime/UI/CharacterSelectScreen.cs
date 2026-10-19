@@ -106,7 +106,10 @@ namespace Airerage.Runtime.UI
         public SelectMode Mode { get; private set; }
 
         /// <summary>アイコンの数（テスト用）。</summary>
-        public int Count => _icons.Length;
+        public int Count => _roster != null ? _roster.Count : 0;
+
+        /// <summary>RANDOM のアイコンの番号（キャラクターの番号の後ろ。決めたときにランダムなキャラクターに変わる）。</summary>
+        public int RandomIndex => Count;
 
         /// <summary>番号 index のアイコン（テスト用）。</summary>
         public CharacterIcon Icon(int index) => _icons[index];
@@ -173,7 +176,7 @@ namespace Airerage.Runtime.UI
         private void Awake()
         {
             int skills = SkillSlots.Length;
-            if (_roster == null || _icons.Length != _roster.Count || _columns < 1
+            if (_roster == null || _icons.Length != _roster.Count + 1 || _columns < 1
                 || _cursors.Length != MaxPlayers || _cursorTags.Length != MaxPlayers || _corners.Length != MaxPlayers
                 || _cornerPlates.Length != MaxPlayers || _cornerDevices.Length != MaxPlayers || _cornerLogos.Length != MaxPlayers
                 || _cornerNames.Length != MaxPlayers || _cornerTags.Length != MaxPlayers || _cornerStates.Length != MaxPlayers
@@ -545,6 +548,11 @@ namespace Airerage.Runtime.UI
         {
             Slot slot = _slots[slotIndex];
             UiSounds.Find().Play(SoundId.UiConfirm);
+            if (slot.Character == RandomIndex)
+            {
+                // RANDOM: ここでキャラクターを決める（ネットワーク対戦では、決めたキャラクターをほかの人へ知らせてから準備完了にする）。
+                SetCharacter(slotIndex, UnityEngine.Random.Range(0, Count), quiet: true);
+            }
             switch (Mode)
             {
                 case SelectMode.Single:
@@ -587,7 +595,7 @@ namespace Airerage.Runtime.UI
             Cancelled?.Invoke();
         }
 
-        private void SetCharacter(int slotIndex, int character)
+        private void SetCharacter(int slotIndex, int character, bool quiet = false)
         {
             Slot slot = _slots[slotIndex];
             if (slot.Character == character)
@@ -595,8 +603,12 @@ namespace Airerage.Runtime.UI
                 return;
             }
             slot.Character = character;
-            UiSounds.Find().Play(SoundId.UiMove);
-            if (Mode == SelectMode.Network && slotIndex == _localSlot)
+            if (!quiet)
+            {
+                UiSounds.Find().Play(SoundId.UiMove);
+            }
+            // RANDOM にいる間は、ほかの人には前のキャラクターのまま見せる（決めたときに知らせる）。
+            if (Mode == SelectMode.Network && slotIndex == _localSlot && character != RandomIndex)
             {
                 NetworkHovered?.Invoke(character);
             }
@@ -747,14 +759,23 @@ namespace Airerage.Runtime.UI
                 _cornerStates[i].color = new Color(1f, 1f, 1f, 0.5f);
                 return;
             }
-            CharacterConfigAsset character = _roster.Get(slot.Character);
             _cornerPlates[i].color = JoinedFill;
             _cornerPlates[i].BorderColor = slot.Ready ? color : new Color(color.r, color.g, color.b, 0.55f);
             _cornerDevices[i].text = slot.DeviceName;
-            _cornerLogos[i].texture = character.Logo;
-            _cornerLogos[i].enabled = character.Logo != null;
-            _cornerNames[i].text = character.DisplayName;
-            _cornerTags[i].text = TagsText(character.Tags);
+            if (slot.Character == RandomIndex)
+            {
+                _cornerLogos[i].enabled = false;
+                _cornerNames[i].text = "RANDOM";
+                _cornerTags[i].text = "#？？？";
+            }
+            else
+            {
+                CharacterConfigAsset character = _roster.Get(slot.Character);
+                _cornerLogos[i].texture = character.Logo;
+                _cornerLogos[i].enabled = character.Logo != null;
+                _cornerNames[i].text = character.DisplayName;
+                _cornerTags[i].text = TagsText(character.Tags);
+            }
             _cornerStates[i].text = slot.Ready ? "READY!" : "SELECTING";
             _cornerStates[i].color = slot.Ready ? color : new Color(1f, 1f, 1f, 0.7f);
         }
@@ -815,6 +836,22 @@ namespace Airerage.Runtime.UI
 
         private void ShowDetails(int index)
         {
+            if (index == RandomIndex)
+            {
+                _detailName.text = "RANDOM";
+                _detailTags.text = "決めたときに、ランダムなキャラクターになる";
+                if (_detailLogo != null)
+                {
+                    _detailLogo.enabled = false;
+                }
+                for (int s = 0; s < _skillNames.Length; s++)
+                {
+                    _skillNames[s].text = string.Empty;
+                    _skillDescriptions[s].text = string.Empty;
+                    _skillCooldowns[s].text = string.Empty;
+                }
+                return;
+            }
             CharacterConfigAsset character = _roster.Get(index);
             if (character == null)
             {
