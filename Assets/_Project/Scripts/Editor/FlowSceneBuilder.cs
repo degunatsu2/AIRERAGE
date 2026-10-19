@@ -337,10 +337,12 @@ namespace Airerage.Editor
 
             CharacterSelectScreen characterSelect = CharacterSelectUiBuilder.Create(canvas.transform);
             StageSelectScreen stageSelect = CreateStageSelect(canvas.transform);
+            OptionsScreen options = OptionsUiBuilder.Create(canvas.transform, LoadInputActions());
 
             var screens = canvas.gameObject.AddComponent<MenuScreens>();
             SandboxWireSceneBuilder.SetReference(screens, "_characterSelect", characterSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_stageSelect", stageSelect);
+            SandboxWireSceneBuilder.SetReference(screens, "_optionsScreen", options);
             Airerage.Net.OnlineMenu online = OnlineMenuUiBuilder.Create(canvas.transform, screens, characterSelect, stageSelect, LoadOrCreateStages());
             SandboxWireSceneBuilder.SetReference(screens, "_online", online);
             SandboxWireSceneBuilder.SetReference(screens, "_title", title.gameObject);

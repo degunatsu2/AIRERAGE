@@ -1,5 +1,6 @@
 using System;
 using Airerage.Core.Input;
+using Airerage.Runtime.Settings;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using SimInput = Airerage.Core.Input.PlayerInput;
@@ -16,6 +17,7 @@ namespace Airerage.Runtime.Input
     /// ゲームパッドなら、右スティックを倒しているときはその方向に照準する。倒していなければ照準の方向を指定せず、
     /// シミュレーションが左スティックの方向で照準する。
     /// ローカル対戦（docs/15 T6-5）では、人ごとに機器を限った入力のアセット（InputActionAsset.devices）を渡す。
+    /// オプションで変えたキーの割り当て（BindingSettings。docs/15 T6-9）は、作るときにアセットへ当てる。
     /// </summary>
     public sealed class InputSystemAdapter : IDisposable
     {
@@ -51,6 +53,8 @@ namespace Airerage.Runtime.Input
             {
                 throw new ArgumentNullException(nameof(actions));
             }
+            // オプションで変えたキーの割り当てを当てる（docs/15 T6-9）。
+            BindingSettings.ApplySaved(actions);
             _map = actions.FindActionMap(MapName, throwIfNotFound: true);
             _move = _map.FindAction("Move", throwIfNotFound: true);
             _jump = _map.FindAction("Jump", throwIfNotFound: true);

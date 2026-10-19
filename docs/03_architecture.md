@@ -84,6 +84,7 @@ Airerage.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを�
 | Core/Match | 試合のルールと進行（カウントダウン、制限時間、アディショナルタイム、終了）、復帰、順位。時間切れの後の進み具合（アディショナルタイム、勝者）は `MatchState` として状態に持つ。docs/12 | `MatchRules`, `MatchState`, `MatchFlow`（`PhaseAt` / `TicksLeftAt` / アディショナルタイムの決まり）, `MatchResults` | 4 |
 | Runtime/Simulation | ティックループ、シーンの地形・ステージの範囲・ギミックの読み込み、表示と効果音のための状態の読み取り口（オフラインとオンラインで共通） | `SimulationRunner`, `SceneTerrainBuilder`, `KnockoutBounds`, `StageZoneAuthoring`, `CoinSpawnAuthoring`, `ISimulationFeed`, `IMatchControls`（結果のボタン） | 1 |
 | Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
+| Runtime/Settings | オプションの設定（音量・画面・キーの割り当て）の保存（PlayerPrefs）と適用。キーの割り当ての変更は Input System の上書きで、試合の入力を作るときに当てる（docs/15 T6-9） | `GameSettings`, `BindingSettings` | 6 |
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
 | Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom`, `ChargeEffectView`, `RingGaugeView`, `GuardEffectView`, `BurstEffectView`, `ComboHud`, `StageZoneView`（ギミックの動く見た目、予告の表示と音）, `AttachableGlow`（ワイヤーが刺さる足場の光）, `MatchHud`（始まる前の演出、残り時間、結果とボタン）, `CoinView`（フィールドのコイン）, `CoinHud`（所持コインの数と「+n」） | 1 |
 | Runtime/Audio | 仮の BGM と効果音（音声ファイルを使わず、その場で合成する。状態の変化から鳴らす。差し替え可能） | `GameAudio`, `ProceduralAudio`, `CombatSoundEvents` | 3 |

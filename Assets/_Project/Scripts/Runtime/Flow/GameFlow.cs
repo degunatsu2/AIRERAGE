@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Airerage.Runtime.Settings;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -73,6 +74,13 @@ namespace Airerage.Runtime.Flow
 
         private void Start()
         {
+            // 保存したオプションを当てる（全体の音量と、保存したことがあれば画面。docs/15 T6-9）。
+            GameSettings settings = GameSettings.Load();
+            settings.ApplyAudio();
+            if (settings.ScreenSaved)
+            {
+                settings.ApplyScreen();
+            }
             if (_stages == null || _stages.Count == 0)
             {
                 Debug.LogError($"{name}: ステージの一覧が設定されていないか、空です", this);

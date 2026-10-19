@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Airerage.Runtime.Settings;
 using UnityEngine;
 
 namespace Airerage.Runtime.Audio
@@ -8,6 +9,7 @@ namespace Airerage.Runtime.Audio
     /// BGM と効果音を鳴らす（仮の音。ユーザーの要望、2026-10-13）。音は ProceduralAudio がその場で合成する。
     /// 本番の音ができたら、_bgmOverride と _overrides に音声ファイルを設定すれば置き換わる（合成はしない）。
     /// 効果音は少数の AudioSource を順番に使い、重なっても切れないようにする。
+    /// 音量はオプション（GameSettings の BGM と効果音。docs/15 T6-9）を掛ける。
     /// </summary>
     public sealed class GameAudio : MonoBehaviour
     {
@@ -38,6 +40,8 @@ namespace Airerage.Runtime.Audio
         private AudioSource[] _se;
         private int _nextSe;
         private System.Random _pitchRandom = new System.Random(1);
+        private float _bgmScale = 1f;
+        private float _seScale = 1f;
 
         /// <summary>BGM の音源（テスト用）。</summary>
         public AudioSource BgmSource => _bgm;
@@ -111,7 +115,7 @@ namespace Airerage.Runtime.Audio
             _bgm.clip = _normalClip;
             _bgm.loop = true;
             _bgm.playOnAwake = false;
-            _bgm.volume = _bgmVolume;
+            ApplySettings(GameSettings.Load());
 
             _se = new AudioSource[SePoolSize];
             for (int i = 0; i < _se.Length; i++)
@@ -126,6 +130,23 @@ namespace Airerage.Runtime.Audio
             BgmOn = _playBgmOnStart;
         }
 
+        /// <summary>オプションの BGM と効果音の音量を当てる（docs/15 T6-9。全体の音量は AudioListener）。</summary>
+        public void ApplySettings(GameSettings settings)
+        {
+            _bgmScale = settings.Bgm01;
+            _seScale = settings.Se01;
+            if (_bgm != null)
+            {
+                _bgm.volume = _bgmVolume * _bgmScale;
+            }
+        }
+
+        /// <summary>今の BGM の音量（オプションを掛けたもの。テスト用）。</summary>
+        public float BgmVolume => _bgm != null ? _bgm.volume : 0f;
+
+        /// <summary>今の効果音の音量の倍率（オプション。テスト用）。</summary>
+        public float SeScale => _seScale;
+
         /// <summary>効果音を鳴らす。pitchJitter は音の高さの揺らぎ（0.05 なら ±5%。同じ音の連続を単調にしない）。</summary>
         public void Play(SoundId id, float volume = 1f, float pitchJitter = 0f)
         {
@@ -136,7 +157,7 @@ namespace Airerage.Runtime.Audio
             AudioSource source = _se[_nextSe];
             _nextSe = (_nextSe + 1) % _se.Length;
             source.pitch = 1f + pitchJitter * (float)(_pitchRandom.NextDouble() * 2.0 - 1.0);
-            source.PlayOneShot(clip, _seVolume * volume);
+            source.PlayOneShot(clip, _seVolume * _seScale * volume);
 
             _history.Add(id);
             if (_history.Count > 64)

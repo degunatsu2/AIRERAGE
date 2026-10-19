@@ -14,7 +14,7 @@ namespace Airerage.Runtime.UI
     /// <summary>
     /// メニューのシーンの画面（docs/15 T6-1。D-54、D-65、D-69）:
     /// - タイトル: 「AIRERAGE」と「PRESS ANY BUTTON」（どれかのキー・ボタンでメインメニューへ。最初の 1 回だけ）。
-    /// - メインメニュー: SINGLE（Phase 7 の CPU まで選べない）、LOCAL VS、NETWORK VS、TRAINING、OPTIONS（T6-9 まで選べない）、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
+    /// - メインメニュー: SINGLE（Phase 7 の CPU まで選べない）、LOCAL VS、NETWORK VS、TRAINING、OPTIONS、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
     /// - TRAINING → キャラクター選択（T6-3）→ ステージ選択（T6-4）→ トレーニング。戻る操作で 1 つ前の画面へ。選んだキャラクターは
     ///   覚えておき（PlayerPrefs。オンラインの待機所と同じ）、トレーニングの試合の仕組みがそのキャラクターで始める。
     /// - キャラクター選択はアイコンを選ぶ形（CharacterSelectScreen。トレーニングは 1P だけ、ローカル対戦は機器ごとに参加。docs/15 6.9）。
@@ -22,6 +22,7 @@ namespace Airerage.Runtime.UI
     ///   ステージ選択 → 試合。docs/15 T6-7）。つながったまま試合から戻ったときは、最初からネットワーク対戦のメニューを開く。
     /// - LOCAL VS → 参加とキャラクター選択（T6-5）→ ステージ選択 → ローカル対戦。ステージ選択から戻ると、参加した人は
     ///   そのまま（READY だけ外す）。
+    /// - OPTIONS → オプションの画面（OptionsScreen。音量・画面・キーの割り当て。docs/15 T6-9）。閉じるとメインメニューの OPTIONS へ。
     /// 画面の移り変わりは App のシーンの GameFlow に頼む（App のシーンから始めないと、試合へは移らない）。
     /// </summary>
     public sealed class MenuScreens : MonoBehaviour
@@ -37,6 +38,7 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption _quit;
         [SerializeField] private CharacterSelectScreen _characterSelect;
         [SerializeField] private StageSelectScreen _stageSelect;
+        [SerializeField] private OptionsScreen _optionsScreen;
         [Tooltip("ネットワーク対戦のメニュー（IOnlineMenu。なければ、NETWORK VS は今のオンラインの検証用のシーンを開く）")]
         [SerializeField] private MonoBehaviour _online;
 
@@ -60,6 +62,11 @@ namespace Airerage.Runtime.UI
         public bool ShowingCharacterSelect => _characterSelect != null && _characterSelect.gameObject.activeSelf;
         public bool ShowingStageSelect => _stageSelect != null && _stageSelect.gameObject.activeSelf;
 
+        /// <summary>オプションの画面を出しているか（テスト用）。</summary>
+        public bool ShowingOptions => _optionsScreen != null && _optionsScreen.IsShowing;
+
+        public OptionsScreen OptionsScreen => _optionsScreen;
+
         public CharacterSelectScreen CharacterSelect => _characterSelect;
         public StageSelectScreen StageSelect => _stageSelect;
 
@@ -73,14 +80,19 @@ namespace Airerage.Runtime.UI
         private void Awake()
         {
             if (_title == null || _main == null || _single == null || _local == null || _network == null || _training == null
-                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null)
+                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null || _optionsScreen == null)
             {
                 Debug.LogError($"{name}: 画面か項目が設定されていません", this);
                 enabled = false;
                 return;
             }
             _single.SetAvailable(false, "COMING SOON (CPU)");
-            _options.SetAvailable(false, "COMING SOON");
+            _options.Clicked.AddListener(() =>
+            {
+                HideAll();
+                _optionsScreen.Show();
+            });
+            _optionsScreen.Closed += () => ShowMain(_options);
             _network.Clicked.AddListener(() =>
             {
                 if (Online != null)
@@ -298,6 +310,7 @@ namespace Airerage.Runtime.UI
             _main.SetActive(false);
             _characterSelect.Hide();
             _stageSelect.Hide();
+            _optionsScreen.Hide();
             _selectAtFrame = -1;
         }
 

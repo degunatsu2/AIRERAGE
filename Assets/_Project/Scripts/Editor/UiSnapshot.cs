@@ -76,6 +76,18 @@ namespace Airerage.Editor
             CaptureAll(screens, "StageSelect");
         }
 
+        /// <summary>オプションの画面（docs/15 T6-9）の 2 つのページ。</summary>
+        public static void CaptureOptions()
+        {
+            MenuScreens screens = OpenMenu();
+            OptionsScreen options = screens.OptionsScreen;
+            ShowOnly(screens, options.transform);
+            options.Show();
+            CaptureAll(screens, "Options_General");
+            options.Page.Button.onClick.Invoke();
+            CaptureAll(screens, "Options_Controls");
+        }
+
         // ステージの見どころ（ステージのシーンの名前と、撮る所の中心）。
         private static readonly (string Scene, string Name, Vector2 Center)[] StageDetails =
         {

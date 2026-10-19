@@ -61,7 +61,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiMove), "カーソルを動かしても音が鳴らない");
                 Assert.That(menu.Single.Button.interactable, Is.False, "SINGLE は Phase 7 まで選べない");
                 Assert.That(menu.Local.Button.interactable, Is.True, "LOCAL VS を選べない（T6-5）");
-                Assert.That(menu.Options.Button.interactable, Is.False, "OPTIONS は T6-9 まで選べない");
+                Assert.That(menu.Options.Button.interactable, Is.True, "OPTIONS を選べない（T6-9）");
                 Assert.That(menu.Training.Button.interactable && menu.Quit.Button.interactable, Is.True);
 
                 // TRAINING → キャラクター選択（T6-3）。
