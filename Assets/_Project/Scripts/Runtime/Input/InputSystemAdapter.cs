@@ -38,6 +38,9 @@ namespace Airerage.Runtime.Input
         // 前のティックからの間に押されたボタン。ティックの間に押して離しても取りこぼさないようにする。
         private InputButtons _pressedSinceLastTick;
 
+        // 離すまで無視するボタン（一時停止のメニューを閉じたときに押したままのもの。SuppressHeld）。
+        private InputButtons _suppressed;
+
         private bool _hasPointer;
         private Vector2 _pointerWorld;
         private float _aimStickDeadzone;
@@ -133,6 +136,9 @@ namespace Airerage.Runtime.Input
                 _pressedSinceLastTick |= InputButtons.Super;
             }
             ResetRequested = _reset.WasPressedThisFrame();
+            // 離したボタンは、もう無視しない。
+            _suppressed &= Held();
+            _pressedSinceLastTick &= ~_suppressed;
 
             UpdateActiveDevice();
             _hasPointer = UsingPointer && camera != null
@@ -148,6 +154,17 @@ namespace Airerage.Runtime.Input
             SimInput input = Build(position, _pressedSinceLastTick);
             _pressedSinceLastTick = InputButtons.None;
             return input;
+        }
+
+        /// <summary>
+        /// 今押しているボタンを、離すまで無視する（一時停止のメニューを閉じたとき。決定に使ったボタンでキャラクターが動かないように）。
+        /// それまでに押したボタンの記録も捨てる。
+        /// </summary>
+        public void SuppressHeld()
+        {
+            _suppressed = Held();
+            _pressedSinceLastTick = InputButtons.None;
+            ResetRequested = false;
         }
 
         /// <summary>今の入力を、記録を消費せずに作る（照準のインジケーターの表示用）。</summary>
@@ -180,9 +197,10 @@ namespace Airerage.Runtime.Input
             return true;
         }
 
-        private SimInput Build(System.Numerics.Vector3 position, InputButtons latched)
+        // 今押しているボタン。
+        private InputButtons Held()
         {
-            InputButtons buttons = latched;
+            InputButtons buttons = InputButtons.None;
             if (_jump.IsPressed())
             {
                 buttons |= InputButtons.Jump;
@@ -211,6 +229,12 @@ namespace Airerage.Runtime.Input
             {
                 buttons |= InputButtons.Super;
             }
+            return buttons;
+        }
+
+        private SimInput Build(System.Numerics.Vector3 position, InputButtons latched)
+        {
+            InputButtons buttons = (latched | Held()) & ~_suppressed;
 
             Vector2 move = _move.ReadValue<Vector2>();
             SimInput input = SimInput.FromAxes(move.x, move.y, buttons);

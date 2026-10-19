@@ -66,6 +66,7 @@ namespace Airerage.Runtime.Simulation
         private GameFlow _flow;
         private bool _timed = true;
         private float _accumulator;
+        private bool _inputBlocked;
 
         /// <summary>1ティック進めるたびに通知する（ISimulationFeed）。</summary>
         public event Action Ticked;
@@ -78,6 +79,23 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>対戦なので、一時停止のメニューに RESET POSITION は出さない（IPauseTarget）。</summary>
         public bool CanResetPosition => false;
+
+        /// <summary>ゲームの入力を止めるか（一時停止のメニューを開いている間。IPauseTarget）。</summary>
+        public bool InputBlocked
+        {
+            get => _inputBlocked;
+            set
+            {
+                if (_inputBlocked && !value)
+                {
+                    foreach (InputSystemAdapter input in _inputs)
+                    {
+                        input.SuppressHeld();
+                    }
+                }
+                _inputBlocked = value;
+            }
+        }
 
         /// <summary>結果の Restart はいつでも押せる（IMatchControls）。</summary>
         public bool CanRestart => _world != null;
@@ -305,7 +323,7 @@ namespace Airerage.Runtime.Simulation
 
         private void Update()
         {
-            for (int p = 0; p < _inputs.Count; p++)
+            for (int p = 0; p < _inputs.Count && !_inputBlocked; p++)
             {
                 _inputs[p].Poll(_camera, _world.GetConfig(p).Wire.AimDeadzone);
             }

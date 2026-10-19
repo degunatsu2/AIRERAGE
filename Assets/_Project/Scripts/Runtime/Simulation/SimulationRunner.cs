@@ -69,6 +69,7 @@ namespace Airerage.Runtime.Simulation
         private float _accumulator;
         private bool _dummiesAttack;
         private int _dummyAttackTicks;
+        private bool _inputBlocked;
 
         /// <summary>操作するキャラクターの1ティックが終わるたびに、その状態を通知する（計測などのデバッグ機能用）。</summary>
         public event Action<CharacterState> PlayerTicked;
@@ -158,6 +159,20 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>一時停止のメニューの RESET POSITION を出す（IPauseTarget）。</summary>
         public bool CanResetPosition => true;
+
+        /// <summary>ゲームの入力を止めるか（一時停止のメニューを開いている間。IPauseTarget）。</summary>
+        public bool InputBlocked
+        {
+            get => _inputBlocked;
+            set
+            {
+                if (_inputBlocked && !value)
+                {
+                    _input?.SuppressHeld();
+                }
+                _inputBlocked = value;
+            }
+        }
 
         /// <summary>
         /// 設定されている間は、プレイヤーの入力の代わりにこの入力を使う（入力の再生など、デバッグ用）。
@@ -255,10 +270,13 @@ namespace Airerage.Runtime.Simulation
 
         private void Update()
         {
-            _input.Poll(_camera, PlayerConfig.Wire.AimDeadzone);
-            if (_input.ResetRequested)
+            if (!_inputBlocked)
             {
-                ResetPlayer();
+                _input.Poll(_camera, PlayerConfig.Wire.AimDeadzone);
+                if (_input.ResetRequested)
+                {
+                    ResetPlayer();
+                }
             }
 
             _accumulator += Time.deltaTime * SpeedScale;

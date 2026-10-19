@@ -251,6 +251,77 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator PauseMenu_BlocksGameInput_WhileOpen()
+        {
+            // 一時停止のメニューを開いている間は、十字キーでカメラが寄り引きせず、閉じたときの決定（A）でジャンプしない
+            // （ユーザーの指摘、2026-10-19）。閉じた後は、離してからもう一度押せば使える。
+            InputSettings.EditorInputBehaviorInPlayMode savedBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSettings.BackgroundBehavior savedBackground = InputSystem.settings.backgroundBehavior;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            var gamepad = InputSystem.AddDevice<Gamepad>();
+            try
+            {
+                SceneManager.LoadScene("Sandbox_Wire");
+                yield return null;
+                var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
+                var pause = UnityEngine.Object.FindFirstObjectByType<PauseMenu>();
+                var zoom = UnityEngine.Object.FindFirstObjectByType<Airerage.Runtime.Presentation.CameraZoom>();
+                Assert.That(zoom, Is.Not.Null);
+                yield return WaitFor(() => runner.PlayerState.Grounded, 3f, "地面に立たない");
+                float distance = zoom.TargetDistance;
+
+                yield return PressPad(gamepad, GamepadButton.Start);
+                Assert.That(pause.IsOpen, Is.True, "Start で一時停止しない");
+                InputSystem.QueueStateEvent(gamepad, new GamepadState().WithButton(GamepadButton.DpadDown));
+                yield return WaitSeconds(0.3f);
+                InputSystem.QueueStateEvent(gamepad, new GamepadState());
+                yield return null;
+                Assert.That(zoom.TargetDistance, Is.EqualTo(distance), "一時停止中に十字キーでカメラが寄り引きした");
+
+                // 十字キーはメニューの項目を移る（下で RESET POSITION、上で RESUME に戻る）。
+                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(pause.ResetPosition.gameObject), "十字キーで項目を移れない");
+                yield return PressPad(gamepad, GamepadButton.DpadUp);
+                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(pause.Resume.gameObject));
+                Assert.That(zoom.TargetDistance, Is.EqualTo(distance), "一時停止中に十字キーでカメラが寄り引きした");
+
+                // RESUME を A で決定して、そのまま押し続けてもジャンプしない。
+                InputSystem.QueueStateEvent(gamepad, new GamepadState().WithButton(GamepadButton.South));
+                yield return null;
+                yield return null;
+                Assert.That(pause.IsOpen, Is.False, "A で RESUME が決まらない");
+                yield return WaitSeconds(0.3f);
+                Assert.That(runner.PlayerState.Grounded, Is.True, "メニューの決定に使った A でジャンプした");
+                InputSystem.QueueStateEvent(gamepad, new GamepadState());
+                yield return null;
+
+                // 離した後は、A でジャンプでき、十字キーでカメラが動く。
+                yield return PressPad(gamepad, GamepadButton.South);
+                yield return WaitFor(() => !runner.PlayerState.Grounded, 1f, "閉じた後に A でジャンプできない");
+                InputSystem.QueueStateEvent(gamepad, new GamepadState().WithButton(GamepadButton.DpadDown));
+                yield return WaitSeconds(0.2f);
+                InputSystem.QueueStateEvent(gamepad, new GamepadState());
+                yield return null;
+                Assert.That(zoom.TargetDistance, Is.GreaterThan(distance), "閉じた後に十字キーでカメラが動かない");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(gamepad);
+                InputSystem.settings.editorInputBehaviorInPlayMode = savedBehavior;
+                InputSystem.settings.backgroundBehavior = savedBackground;
+            }
+        }
+
+        // ゲームパッドのボタンを押して、次のフレームで離す。
+        private static IEnumerator PressPad(Gamepad gamepad, GamepadButton button)
+        {
+            InputSystem.QueueStateEvent(gamepad, new GamepadState().WithButton(button));
+            yield return null;
+            InputSystem.QueueStateEvent(gamepad, new GamepadState());
+            yield return null;
+        }
+
         // キーを押して、次のフレームで離す。
         private static IEnumerator Tap(Keyboard keyboard, Key key)
         {

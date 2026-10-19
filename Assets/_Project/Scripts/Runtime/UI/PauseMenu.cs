@@ -26,6 +26,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption _menu;
 
         private InputAction _pause;
+        private InputActionMap _camera;
+        private bool _cameraWasEnabled;
         private IPauseTarget _target;
         private GameFlow _flow;
         private float _speedBefore = 1f;
@@ -49,6 +51,7 @@ namespace Airerage.Runtime.UI
                 return;
             }
             _pause = _inputActions.FindAction("Player/Pause", throwIfNotFound: true);
+            _camera = _inputActions.FindActionMap("Camera", throwIfNotFound: true);
             _resume.Clicked.AddListener(Close);
             _reset.Clicked.AddListener(() =>
             {
@@ -118,6 +121,11 @@ namespace Airerage.Runtime.UI
             _toggledAtFrame = Time.frameCount;
             _speedBefore = _target.SpeedScale;
             _target.SpeedScale = 0f;
+            // 開いている間は、ゲームの入力（キャラクターの操作、位置のリセット、カメラのズーム）を受け付けない（十字キーで項目を
+            // 選ぶとカメラが寄り引きしていた。ユーザーの指摘、2026-10-19）。
+            _target.InputBlocked = true;
+            _cameraWasEnabled = _camera.enabled;
+            _camera.Disable();
             UiSounds.Find().Play(SoundId.UiPause);
             _panel.SetActive(true);
             // 開いたボタン（Esc は戻る操作でもある）で、そのまま閉じないよう、項目を選ぶのは次のフレーム。
@@ -136,6 +144,11 @@ namespace Airerage.Runtime.UI
             _selectAtFrame = -1;
             _toggledAtFrame = Time.frameCount;
             _target.SpeedScale = _speedBefore > 0f ? _speedBefore : 1f;
+            _target.InputBlocked = false;
+            if (_cameraWasEnabled)
+            {
+                _camera.Enable();
+            }
             if (EventSystem.current != null)
             {
                 EventSystem.current.SetSelectedGameObject(null);

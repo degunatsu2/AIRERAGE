@@ -14,5 +14,11 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>出現位置に戻す（CanResetPosition のときだけ呼ぶ）。</summary>
         void ResetPlayer();
+
+        /// <summary>
+        /// ゲームの入力を止めるか（一時停止のメニューを開いている間。ユーザーの指摘、2026-10-19）。止めている間は入力を読まず
+        /// （位置のリセットも受け付けない）、戻したときに押したままのボタンは、離すまで無視する（メニューの決定でジャンプしない）。
+        /// </summary>
+        bool InputBlocked { get; set; }
     }
 }
