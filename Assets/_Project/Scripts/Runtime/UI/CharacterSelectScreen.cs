@@ -287,6 +287,17 @@ namespace Airerage.Runtime.UI
             Refresh();
         }
 
+        /// <summary>ネットワーク対戦: 自分の READY をそろえる（ホストが外したときなど。NetworkReadyChanged は出さない）。</summary>
+        public void SetLocalReady(bool ready)
+        {
+            if (Mode != SelectMode.Network || _slots[_localSlot].Ready == ready)
+            {
+                return;
+            }
+            _slots[_localSlot].Ready = ready;
+            Refresh();
+        }
+
         /// <summary>ネットワーク対戦: 下に出す案内（だれを待っているか、など）。</summary>
         public void SetNetworkMessage(string message)
         {

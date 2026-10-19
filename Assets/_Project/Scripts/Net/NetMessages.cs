@@ -32,6 +32,20 @@ namespace Airerage.Net
 
         /// <summary>クライアント → ホスト: 自分が選んだキャラクターの番号（ロビーで。変えるたびに送る。docs/13 T5-5）。</summary>
         Pick = 8,
+
+        /// <summary>クライアント → ホスト: 準備完了か（待機所の READY、キャラクター選択の決定。docs/15 T6-7）。</summary>
+        Ready = 9,
+    }
+
+    /// <summary>
+    /// ロビーの段階（docs/15 T6-7）: 待機所 → 全員が準備完了でキャラクター選択 → 全員が決定でステージ選択（ホストが選ぶ）→ 試合。
+    /// 段階はホストが決めて、ロビーのメッセージで全員へ送る。
+    /// </summary>
+    public enum LobbyPhase : byte
+    {
+        Waiting = 0,
+        CharacterSelect = 1,
+        StageSelect = 2,
     }
 
     /// <summary>ロビーの1つの番号（待機所の表示に使う）。</summary>
@@ -45,16 +59,20 @@ namespace Airerage.Net
         /// <summary>選んだキャラクターの番号（CharacterRoster の番号）。</summary>
         public readonly int Character;
 
-        public LobbySlot(bool connected, string name, int character = 0)
+        /// <summary>準備完了か（待機所の READY、キャラクター選択の決定）。</summary>
+        public readonly bool Ready;
+
+        public LobbySlot(bool connected, string name, int character = 0, bool ready = false)
         {
             Connected = connected;
             Name = name ?? string.Empty;
             Character = character;
+            Ready = ready;
         }
 
         public bool Equals(LobbySlot other)
         {
-            return Connected == other.Connected && Name == other.Name && Character == other.Character;
+            return Connected == other.Connected && Name == other.Name && Character == other.Character && Ready == other.Ready;
         }
 
         public override bool Equals(object obj)
@@ -64,12 +82,12 @@ namespace Airerage.Net
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Connected, Name, Character);
+            return HashCode.Combine(Connected, Name, Character, Ready);
         }
 
         public override string ToString()
         {
-            return Connected ? $"[{Name} #{Character}]" : "[-]";
+            return Connected ? $"[{Name} #{Character}{(Ready ? " ready" : string.Empty)}]" : "[-]";
         }
     }
 
@@ -132,19 +150,25 @@ namespace Airerage.Net
             return data[1];
         }
 
-        /// <summary>ロビーの顔ぶれ（番号の順。つながっているか、キャラクターの番号、プレイヤーネームの UTF-8）。</summary>
-        public static byte[] Lobby(IReadOnlyList<LobbySlot> slots)
+        /// <summary>
+        /// ロビーの顔ぶれと段階（段階、ホストが選んでいるステージの番号、番号の順に つながっているか・キャラクターの番号・準備完了か・
+        /// プレイヤーネームの UTF-8）。
+        /// </summary>
+        public static byte[] Lobby(IReadOnlyList<LobbySlot> slots, LobbyPhase phase = LobbyPhase.Waiting, int stage = 0)
         {
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream))
             {
                 writer.Write((byte)NetKind.Lobby);
                 writer.Write((byte)slots.Count);
+                writer.Write((byte)phase);
+                writer.Write((byte)Math.Max(0, Math.Min(byte.MaxValue, stage)));
                 foreach (LobbySlot slot in slots)
                 {
                     byte[] name = Encoding.UTF8.GetBytes(slot.Name);
                     writer.Write(slot.Connected);
                     writer.Write((byte)Math.Max(0, Math.Min(byte.MaxValue, slot.Character)));
+                    writer.Write(slot.Ready);
                     writer.Write((byte)Math.Min(name.Length, byte.MaxValue));
                     writer.Write(name, 0, Math.Min(name.Length, byte.MaxValue));
                 }
@@ -155,23 +179,47 @@ namespace Airerage.Net
 
         public static LobbySlot[] ReadLobby(byte[] data)
         {
-            Expect(data, NetKind.Lobby, 2);
+            return ReadLobby(data, out _, out _);
+        }
+
+        public static LobbySlot[] ReadLobby(byte[] data, out LobbyPhase phase, out int stage)
+        {
+            Expect(data, NetKind.Lobby, 4);
             int count = data[1];
+            if (data[2] > (byte)LobbyPhase.StageSelect)
+            {
+                throw new FormatException($"ロビーの段階が不正です（{data[2]}）");
+            }
+            phase = (LobbyPhase)data[2];
+            stage = data[3];
             var slots = new LobbySlot[count];
-            int offset = 2;
+            int offset = 4;
             for (int i = 0; i < count; i++)
             {
-                if (offset + 3 > data.Length || offset + 3 + data[offset + 2] > data.Length)
+                if (offset + 4 > data.Length || offset + 4 + data[offset + 3] > data.Length)
                 {
                     throw new FormatException($"ロビーのメッセージが途中で切れています（{data.Length} バイト）");
                 }
                 bool connected = data[offset] != 0;
                 int character = data[offset + 1];
-                int length = data[offset + 2];
-                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + 3, length), character);
-                offset += 3 + length;
+                bool ready = data[offset + 2] != 0;
+                int length = data[offset + 3];
+                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + 4, length), character, ready);
+                offset += 4 + length;
             }
             return slots;
+        }
+
+        /// <summary>準備完了か（クライアント → ホスト）。</summary>
+        public static byte[] Ready(bool ready)
+        {
+            return new[] { (byte)NetKind.Ready, (byte)(ready ? 1 : 0) };
+        }
+
+        public static bool ReadReady(byte[] data)
+        {
+            Expect(data, NetKind.Ready, 2);
+            return data[1] != 0;
         }
 
         /// <summary>

@@ -128,6 +128,11 @@ namespace Airerage.Runtime.UI
             };
             _stageSelect.Confirmed += stage => Run(flow =>
             {
+                // ネットワーク対戦のステージ選択は、ネットワーク対戦のメニューが受け持つ。
+                if (_stageSelect.NetworkMode)
+                {
+                    return;
+                }
                 if (_localMode)
                 {
                     flow.StartLocal(stage, _localPlayers, _localTimed);
@@ -139,6 +144,10 @@ namespace Airerage.Runtime.UI
             });
             _stageSelect.Cancelled += () =>
             {
+                if (_stageSelect.NetworkMode)
+                {
+                    return;
+                }
                 if (_localMode)
                 {
                     ShowLocalJoin(false);

@@ -176,28 +176,6 @@ namespace Airerage.PlayMode.Tests
         }
 
         [UnityTest]
-        public IEnumerator NetworkVs_OpensTheOnlineScene_AndQuitGoesBackToTheMenu()
-        {
-            SceneManager.LoadScene("App");
-            yield return null;
-            var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
-            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
-            var menu = UnityEngine.Object.FindFirstObjectByType<MenuScreens>();
-            menu.ContinueFromTitle();
-            yield return null;
-            menu.Network.Button.onClick.Invoke();
-            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Online && !flow.IsLoading, 10f, "ネットワーク対戦にならない");
-            var online = UnityEngine.Object.FindFirstObjectByType<OnlineRunner>();
-            Assert.That(online, Is.Not.Null, "オンラインのシーンがない");
-            Assert.That(online.enabled, Is.True);
-
-            // 結果の Quit（と、つなぐ前の「Back to menu」）は、ゲームを終えずにメニューへ戻る。
-            online.Quit();
-            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューに戻らない");
-            Assert.That(UnityEngine.Object.FindFirstObjectByType<OnlineRunner>(), Is.Null, "オンラインのシーンが残っている");
-        }
-
-        [UnityTest]
         public IEnumerator PauseMenu_InASandbox_Resets_AndHasNoBackToMenu()
         {
             SceneManager.LoadScene("Sandbox_Wire");

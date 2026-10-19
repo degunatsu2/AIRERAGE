@@ -23,6 +23,12 @@ namespace Airerage.Runtime.Flow
             return _stages[index >= 0 && index < _stages.Length ? index : 0];
         }
 
+        /// <summary>ステージの番号（一覧になければ -1。ネットワーク対戦では番号で送る）。</summary>
+        public int IndexOf(StageDefinition stage)
+        {
+            return System.Array.IndexOf(_stages, stage);
+        }
+
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(StageDefinition[] stages)
         {

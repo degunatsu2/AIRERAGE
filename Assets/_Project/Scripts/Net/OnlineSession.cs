@@ -29,6 +29,13 @@ namespace Airerage.Net
     ///   Welcome を送り直してから Start を送る。確実に届ける経路は順番どおりに届く）。
     /// - 再戦: ホストが RestartMatch を呼ぶと、同じ人で、新しい試合の番号で始め直す。入力とチェックサムのメッセージには
     ///   試合の番号をつけ、今の試合のものだけを使う（前の試合のメッセージが遅れて届いても混ざらない）。
+    /// - ロビーの段階（docs/15 T6-7）: 待機所（Waiting）→ 2 人以上が全員準備完了（LocalReady）でキャラクター選択 → 全員が決定で
+    ///   ステージ選択（ホストが StageCursor を動かして StartMatch(rules, stage)）。段階・準備完了・ステージの番号はロビーのメッセージで
+    ///   全員へ送る。段階が変わると全員の準備完了を外す。待機所の段階でだけ参加できる。2 人を下回ったら待機所へ戻る。
+    ///   準備完了を使わなければ段階は待機所のまま（検証用のシーン Sandbox_Online は、ホストが待機所から StartMatch する）。
+    /// - ステージを選ぶ流れ（GameFlow から）では、セッションを作るときにステージがない。開始のメッセージにステージの番号を入れ、
+    ///   全員がそのステージのシーンを読み込んでから BeginPending で始める（それまでは Loading）。今と同じステージなら（再戦）すぐ始める。
+    /// - 試合の後にホストが ReturnToLobby を呼ぶと、全員がロビー（キャラクター選択など）へ戻る。
     /// </summary>
     public sealed class OnlineSession : IDisposable
     {
@@ -36,6 +43,9 @@ namespace Airerage.Net
         {
             Connecting,
             Lobby,
+
+            /// <summary>試合の開始のメッセージを受けて、ステージを読み込んでいる（BeginPending で Running）。</summary>
+            Loading,
             Running,
             Ended,
         }
@@ -55,7 +65,7 @@ namespace Airerage.Net
         public const float StartResendSeconds = 0.5f;
 
         private readonly TransportLink _link;
-        private readonly OnlineStage _stage;
+        private OnlineStage _stage;
         private readonly RollbackSettings _settings;
         // ホスト: 選べるキャラクターの調整値（番号の順。CharacterRoster と同じ順）。
         private readonly IReadOnlyList<CharacterConfig> _characters;
@@ -72,6 +82,19 @@ namespace Airerage.Net
 
         // ホスト: プレイヤーの番号 → そのクライアントから最後に届いた入力の試合の番号（まだなら -1）。
         private readonly int[] _peerMatch = new int[MaxPlayers];
+
+        // ホスト: プレイヤーの番号 → 準備完了か（docs/15 T6-7）。
+        private readonly bool[] _lobbyReady = new bool[MaxPlayers];
+        private LobbyPhase _phase = LobbyPhase.Waiting;
+        private int _stageCursor;
+
+        // クライアント: ホストから届いたロビーの段階・ステージの番号と、自分の準備完了。
+        private LobbyPhase _clientPhase = LobbyPhase.Waiting;
+        private int _clientStage;
+        private bool _localReady;
+
+        // ステージを読み込んでから始める試合（なければ null）。
+        private PendingStart _pending;
 
         // ホスト: 送り直すかもしれない開始のメッセージ（全員が始めたら null）と、次に送り直すまでの秒数。
         private byte[] _startMessage;
@@ -197,6 +220,68 @@ namespace Airerage.Net
             return trimmed.Length > MaxNameLength ? trimmed.Substring(0, MaxNameLength).TrimEnd() : trimmed;
         }
 
+        /// <summary>ロビーの段階（ホストは今の値、クライアントはホストから最後に届いた値）。</summary>
+        public LobbyPhase Phase => IsHost ? _phase : _clientPhase;
+
+        /// <summary>
+        /// ステージ選択でホストが選んでいるステージの番号（StageCatalog の番号）。ホストが変えると全員へ送る。クライアントはホストから
+        /// 最後に届いた値。
+        /// </summary>
+        public int StageCursor
+        {
+            get => IsHost ? _stageCursor : _clientStage;
+            set
+            {
+                if (!IsHost)
+                {
+                    throw new InvalidOperationException("ステージを選べるのはホストだけです");
+                }
+                int stage = Math.Max(0, Math.Min(byte.MaxValue, value));
+                if (stage == _stageCursor)
+                {
+                    return;
+                }
+                _stageCursor = stage;
+                BroadcastLobby();
+            }
+        }
+
+        /// <summary>
+        /// 自分が準備完了か（待機所の READY、キャラクター選択の決定）。クライアントはホストへ送る。段階が変わると外れる。
+        /// </summary>
+        public bool LocalReady
+        {
+            get => IsHost ? _lobbyReady[0] : _localReady;
+            set
+            {
+                if (IsHost)
+                {
+                    if (_lobbyReady[0] == value)
+                    {
+                        return;
+                    }
+                    _lobbyReady[0] = value;
+                    CheckLobbyProgress();
+                    BroadcastLobby();
+                }
+                else
+                {
+                    _localReady = value;
+                    if (LocalPlayer >= 0)
+                    {
+                        _link.Send(0, NetMessages.Ready(value), reliable: true);
+                    }
+                }
+            }
+        }
+
+        /// <summary>今のステージの番号（StageCatalog の番号。ステージを選ぶ流れでなければ -1）。</summary>
+        public int StageIndex { get; private set; } = -1;
+
+        /// <summary>ステージを読み込んでから始める試合があるか（Loading の間）と、そのステージの番号。</summary>
+        public bool HasPendingStart => _pending != null;
+        public int PendingStage => _pending != null ? _pending.Settings.Stage : -1;
+
         /// <summary>今の試合の番号（始まるたびに 1 増える。0〜255 を繰り返す。始まるまで 0）。</summary>
         public int MatchNumber { get; private set; }
 
@@ -227,11 +312,12 @@ namespace Airerage.Net
                     return _clientRoster;
                 }
                 var slots = new LobbySlot[MaxPlayers];
-                slots[0] = new LobbySlot(true, _localName, _lobbyCharacters[0]);
+                slots[0] = new LobbySlot(true, _localName, _lobbyCharacters[0], _lobbyReady[0]);
                 for (int p = 1; p < MaxPlayers; p++)
                 {
                     bool connected = _playerPeer[p] >= 0;
-                    slots[p] = new LobbySlot(connected, connected ? _lobbyNames[p] : string.Empty, connected ? _lobbyCharacters[p] : 0);
+                    slots[p] = new LobbySlot(connected, connected ? _lobbyNames[p] : string.Empty, connected ? _lobbyCharacters[p] : 0,
+                        connected && _lobbyReady[p]);
                 }
                 return slots;
             }
@@ -299,6 +385,11 @@ namespace Airerage.Net
             {
                 throw new ArgumentNullException(nameof(stage));
             }
+            return HostWith(port, stage, characters, settings);
+        }
+
+        private static OnlineSession HostWith(ushort port, OnlineStage stage, IReadOnlyList<CharacterConfig> characters, RollbackSettings settings)
+        {
             if (characters == null || characters.Count == 0)
             {
                 throw new ArgumentException("選べるキャラクターが 1 体もありません", nameof(characters));
@@ -317,6 +408,26 @@ namespace Airerage.Net
                 State = SessionState.Lobby,
             };
             session.Status = $"Hosting on port {session.Port}";
+            return session;
+        }
+
+        /// <summary>
+        /// ホストとして待ち受ける（ステージを選ぶ流れ。docs/15 T6-7）。ステージは試合を始めるときに選び、読み込んでから BeginPending で
+        /// 渡す。characters は選べるキャラクターの調整値（番号の順）。
+        /// </summary>
+        public static OnlineSession Host(ushort port, IReadOnlyList<CharacterConfig> characters, RollbackSettings settings)
+        {
+            return HostWith(port, null, characters, settings);
+        }
+
+        /// <summary>address:port のホストに参加する（ステージを選ぶ流れ。ステージは開始のメッセージの番号で読み込む）。</summary>
+        public static OnlineSession Join(string address, ushort port, RollbackSettings settings)
+        {
+            var session = new OnlineSession(TransportLink.Connect(address, port), null, settings, null)
+            {
+                State = SessionState.Connecting,
+            };
+            session.Status = $"Connecting to {address}:{port}";
             return session;
         }
 
@@ -362,15 +473,95 @@ namespace Airerage.Net
         /// <summary>
         /// 試合を始める（ホストのみ、ロビーで）。今いる全員で始める。rules は試合のルール（null なら時間の制限なし。
         /// MatchRules.FreePlay()）で、調整値といっしょに全員へ送る。不正なら InvalidTuningException。
+        /// stage はステージの番号（StageCatalog の番号。ステージを選ぶ流れ。-1 なら作ったときのステージ）。今と違うステージなら、
+        /// 全員が読み込んで BeginPending を呼ぶまで Loading。
         /// </summary>
-        public void StartMatch(MatchRules rules = null)
+        public void StartMatch(MatchRules rules = null, int stage = -1)
         {
             if (!IsHost || State != SessionState.Lobby)
             {
                 throw new InvalidOperationException("試合を始められるのは、ロビーにいるホストだけです");
             }
             CloseUpPlayers();
-            SendStartAndBegin(LobbyPlayerCount, rules);
+            SendStartAndBegin(LobbyPlayerCount, rules, stage);
+        }
+
+        /// <summary>ホスト: ステージ選択からキャラクター選択へ戻す（全員の決定を外す）。</summary>
+        public void BackToCharacterSelect()
+        {
+            if (!IsHost || State != SessionState.Lobby)
+            {
+                throw new InvalidOperationException("ステージ選択から戻せるのは、ロビーにいるホストだけです");
+            }
+            SetPhase(LobbyPhase.CharacterSelect);
+            BroadcastLobby();
+        }
+
+        /// <summary>
+        /// ホスト: 試合の後に、全員でロビーの phase の段階（キャラクター選択など）へ戻る（試合の結果の「キャラクター選択へ」。T6-8）。
+        /// 試合のワールドを捨て、全員の準備完了を外す。
+        /// </summary>
+        public void ReturnToLobby(LobbyPhase phase)
+        {
+            if (!IsHost || (State != SessionState.Running && State != SessionState.Loading && State != SessionState.Lobby))
+            {
+                throw new InvalidOperationException("ロビーへ戻せるのは、試合中のホストだけです");
+            }
+            EnterLobby();
+            _startMessage = null;
+            SetPhase(phase);
+            BroadcastLobby();
+        }
+
+        // ロビーへ戻る（試合のワールドを捨てる）。
+        private void EnterLobby()
+        {
+            State = SessionState.Lobby;
+            _pending = null;
+            World = null;
+            Session = null;
+            Exchange = null;
+            PlayerCount = 0;
+            _previous = new CharacterState[0];
+            Status = IsHost ? $"Hosting on port {Port}: {LobbyPlayerCount} player(s)" : $"Joined as player {LocalPlayer + 1}";
+        }
+
+        // ホスト: ロビーの段階を変える（全員の準備完了を外す）。
+        private void SetPhase(LobbyPhase phase)
+        {
+            _phase = phase;
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                _lobbyReady[p] = false;
+            }
+        }
+
+        // ホスト: 2 人以上が全員準備完了なら次の段階へ（ステージ選択はホストが選ぶので進めない）。2 人を下回ったら待機所へ戻す。
+        private void CheckLobbyProgress()
+        {
+            if (!IsHost || State != SessionState.Lobby)
+            {
+                return;
+            }
+            int players = LobbyPlayerCount;
+            if (_phase != LobbyPhase.Waiting && players < 2)
+            {
+                SetPhase(LobbyPhase.Waiting);
+                return;
+            }
+            if (players < 2 || _phase == LobbyPhase.StageSelect)
+            {
+                return;
+            }
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                bool present = p == 0 || _playerPeer[p] >= 0;
+                if (present && !_lobbyReady[p])
+                {
+                    return;
+                }
+            }
+            SetPhase(_phase == LobbyPhase.Waiting ? LobbyPhase.CharacterSelect : LobbyPhase.StageSelect);
         }
 
         // ロビーで抜けた人の空いた番号を詰める（番号が 0 から人数 - 1 までになるように）。番号が変わる人には Welcome を送り直す。
@@ -388,9 +579,11 @@ namespace Airerage.Net
                     _playerPeer[next] = _playerPeer[p];
                     _lobbyNames[next] = _lobbyNames[p];
                     _lobbyCharacters[next] = _lobbyCharacters[p];
+                    _lobbyReady[next] = _lobbyReady[p];
                     _playerPeer[p] = -1;
                     _lobbyNames[p] = string.Empty;
                     _lobbyCharacters[p] = 0;
+                    _lobbyReady[p] = false;
                     _link.Send(_playerPeer[next], NetMessages.Welcome(next), reliable: true);
                 }
                 next++;
@@ -404,7 +597,7 @@ namespace Airerage.Net
             {
                 return;
             }
-            byte[] message = NetMessages.Lobby(Roster);
+            byte[] message = NetMessages.Lobby(Roster, _phase, _stageCursor);
             for (int p = 1; p < MaxPlayers; p++)
             {
                 if (_playerPeer[p] >= 0)
@@ -434,10 +627,10 @@ namespace Airerage.Net
             {
                 throw new InvalidOperationException("試合を始め直せるのは、試合中のホストだけです");
             }
-            SendStartAndBegin(PlayerCount, rules);
+            SendStartAndBegin(PlayerCount, rules, StageIndex);
         }
 
-        private void SendStartAndBegin(int count, MatchRules rules)
+        private void SendStartAndBegin(int count, MatchRules rules, int stage)
         {
             rules = rules ?? MatchRules.FreePlay();
             rules.Validate().ThrowIfInvalid();
@@ -470,7 +663,7 @@ namespace Airerage.Net
             }
             string json = JsonUtility.ToJson(new StartSettings
             {
-                Characters = configs, Picks = picks, CharacterIds = ids, Match = rules, Names = names,
+                Characters = configs, Picks = picks, CharacterIds = ids, Match = rules, Names = names, Stage = stage,
             });
             byte[] start = NetMessages.Start(count, match, json);
             for (int p = 1; p < MaxPlayers; p++)
@@ -483,7 +676,38 @@ namespace Airerage.Net
             }
             _startMessage = start;
             _startResendTimer = StartResendSeconds;
-            Begin(count, match, SettingsFromJson(json, count));
+            BeginOrWait(count, match, SettingsFromJson(json, count));
+        }
+
+        // 今のステージで始められるなら始め、違うステージなら読み込むまで待つ（Loading。BeginPending で始める）。
+        private void BeginOrWait(int count, int match, StartSettings settings)
+        {
+            if (_stage != null && (settings.Stage < 0 || settings.Stage == StageIndex))
+            {
+                _pending = null;
+                Begin(count, match, settings);
+                return;
+            }
+            _pending = new PendingStart { Count = count, Match = match, Settings = settings };
+            State = SessionState.Loading;
+            Status = $"Loading stage {settings.Stage}";
+        }
+
+        /// <summary>
+        /// 読み込んだステージ stage（番号 stageIndex）で、待っていた試合を始める（ステージを選ぶ流れ。試合の仕組みのシーンが読み込まれたら
+        /// 呼ぶ）。待っている試合がなければ InvalidOperationException。
+        /// </summary>
+        public void BeginPending(OnlineStage stage, int stageIndex)
+        {
+            if (_pending == null)
+            {
+                throw new InvalidOperationException("ステージを待っている試合がありません");
+            }
+            _stage = stage ?? throw new ArgumentNullException(nameof(stage));
+            StageIndex = stageIndex;
+            PendingStart pending = _pending;
+            _pending = null;
+            Begin(pending.Count, pending.Match, pending.Settings);
         }
 
         /// <summary>
@@ -765,7 +989,8 @@ namespace Airerage.Net
             {
                 case TransportLink.EventKind.Connected:
                     int player = FreePlayer();
-                    if (State != SessionState.Lobby || player < 0)
+                    // 参加できるのは、ロビーの待機所の段階だけ（キャラクター選択の途中からは入れない）。
+                    if (State != SessionState.Lobby || _phase != LobbyPhase.Waiting || player < 0)
                     {
                         _link.Send(e.Peer, NetMessages.Refused(), reliable: true);
                         _link.Disconnect(e.Peer);
@@ -774,6 +999,7 @@ namespace Airerage.Net
                     _playerPeer[player] = e.Peer;
                     _lobbyNames[player] = string.Empty;
                     _lobbyCharacters[player] = 0;
+                    _lobbyReady[player] = false;
                     _link.Send(e.Peer, NetMessages.Welcome(player), reliable: true);
                     Status = $"Hosting on port {Port}: {LobbyPlayerCount} player(s)";
                     BroadcastLobby();
@@ -787,8 +1013,10 @@ namespace Airerage.Net
                             _playerPeer[p] = -1;
                             _lobbyNames[p] = string.Empty;
                             _lobbyCharacters[p] = 0;
+                            _lobbyReady[p] = false;
+                            CheckLobbyProgress();
                             BroadcastLobby();
-                            if (State == SessionState.Running)
+                            if (State == SessionState.Running || State == SessionState.Loading)
                             {
                                 // 試合中に抜けた人がいたら、試合を終える（残りの人も止まったままにしないよう、接続を切る）。
                                 State = SessionState.Ended;
@@ -850,6 +1078,16 @@ namespace Airerage.Net
                     }
                     break;
 
+                case NetKind.Ready:
+                    int readier = PlayerOfPeer(e.Peer);
+                    if (readier > 0 && State == SessionState.Lobby)
+                    {
+                        _lobbyReady[readier] = NetMessages.ReadReady(e.Data);
+                        CheckLobbyProgress();
+                        BroadcastLobby();
+                    }
+                    break;
+
                 case NetKind.Checksum:
                     NetMessages.ReadChecksum(e.Data, out int checksumMatch, out int player, out int tick, out ulong checksum);
                     if (State == SessionState.Running && checksumMatch == MatchNumber && player > 0 && player < PlayerCount)
@@ -890,11 +1128,24 @@ namespace Airerage.Net
                             Status = $"Joined as player {LocalPlayer + 1}. Waiting for the host to start";
                             break;
                         case NetKind.Lobby:
-                            LobbySlot[] roster = NetMessages.ReadLobby(e.Data);
+                            LobbySlot[] roster = NetMessages.ReadLobby(e.Data, out LobbyPhase phase, out int stage);
                             _clientRoster = EmptyRoster();
                             for (int p = 0; p < MaxPlayers && p < roster.Length; p++)
                             {
-                                _clientRoster[p] = new LobbySlot(roster[p].Connected, SanitizeName(roster[p].Name), roster[p].Character);
+                                _clientRoster[p] = new LobbySlot(roster[p].Connected, SanitizeName(roster[p].Name), roster[p].Character,
+                                    roster[p].Ready);
+                            }
+                            _clientPhase = phase;
+                            _clientStage = stage;
+                            if (LocalPlayer >= 0 && LocalPlayer < MaxPlayers)
+                            {
+                                // 段階が変わるとホストが準備完了を外す（自分の値もそろえる）。
+                                _localReady = _clientRoster[LocalPlayer].Ready;
+                            }
+                            if (State == SessionState.Running || State == SessionState.Loading)
+                            {
+                                // ホストが試合の後にロビーへ戻した（ロビーのメッセージはロビーでしか送られない）。
+                                EnterLobby();
                             }
                             break;
                         case NetKind.Refused:
@@ -903,12 +1154,13 @@ namespace Airerage.Net
                             break;
                         case NetKind.Start:
                             NetMessages.ReadStart(e.Data, out int count, out int match, out string json);
-                            if (State == SessionState.Running && match == MatchNumber)
+                            if ((State == SessionState.Running && match == MatchNumber)
+                                || (State == SessionState.Loading && _pending != null && match == _pending.Match))
                             {
-                                // 送り直された、今の試合の開始のメッセージ（もう始めている）。
+                                // 送り直された、今の試合の開始のメッセージ（もう始めているか、ステージを読み込んでいる）。
                                 break;
                             }
-                            Begin(count, match, SettingsFromJson(json, count));
+                            BeginOrWait(count, match, SettingsFromJson(json, count));
                             break;
                         case NetKind.Input:
                             if (State == SessionState.Running && NetMessages.InputMatch(e.Data) == MatchNumber
@@ -982,6 +1234,17 @@ namespace Airerage.Net
 
             public MatchRules Match;
             public string[] Names;
+
+            /// <summary>ステージの番号（StageCatalog の番号。ステージを選ぶ流れでなければ -1）。</summary>
+            public int Stage = -1;
+        }
+
+        // ステージを読み込んでから始める試合。
+        private sealed class PendingStart
+        {
+            public int Count;
+            public int Match;
+            public StartSettings Settings;
         }
 
         // 接続の番号 → プレイヤーの番号（いなければ -1）。

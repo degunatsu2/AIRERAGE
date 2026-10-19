@@ -566,11 +566,119 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
+        public void Lobby_EveryoneReady_MovesToCharacterSelect_ThenStageSelect_AndTheMatchStartsOnTheChosenStage()
+        {
+            // ネットワーク対戦の流れ（docs/15 T6-7）: 待機所で全員が準備完了 → キャラクター選択 → 全員が決定 → ステージ選択（ホスト）→
+            // 開始のメッセージのステージを全員が読み込んで（BeginPending）始める。
+            var characters = new[] { new CharacterConfig(), CharacterPresets.RiskTaker() };
+            OnlineSession host = OnlineSession.Host(0, characters, new RollbackSettings());
+            _sessions.Add(host);
+            OnlineSession client = OnlineSession.Join("127.0.0.1", host.Port, new RollbackSettings());
+            _sessions.Add(client);
+            PumpUntil(() => client.LocalPlayer == 1 && client.Roster[1].Connected);
+            Assert.That(host.Phase, Is.EqualTo(LobbyPhase.Waiting));
+
+            host.LocalReady = true;
+            PumpUntil(() => client.Roster[0].Ready);
+            Assert.That(client.Phase, Is.EqualTo(LobbyPhase.Waiting), "1 人だけの準備完了で進んだ");
+            client.LocalReady = true;
+            PumpUntil(() => client.Phase == LobbyPhase.CharacterSelect);
+            Assert.That(host.Phase, Is.EqualTo(LobbyPhase.CharacterSelect));
+            Assert.That(host.LocalReady || client.LocalReady, Is.False, "段階が変わっても準備完了が残っている");
+
+            // キャラクター選択の途中からは参加できない。
+            OnlineSession late = OnlineSession.Join("127.0.0.1", host.Port, new RollbackSettings());
+            _sessions.Add(late);
+            PumpUntil(() => late.State == OnlineSession.SessionState.Ended);
+            Assert.That(host.LobbyPlayerCount, Is.EqualTo(2));
+            late.Dispose();
+            _sessions.Remove(late);
+
+            client.LocalCharacter = 1;
+            PumpUntil(() => host.Roster[1].Character == 1);
+            host.LocalReady = true;
+            client.LocalReady = true;
+            PumpUntil(() => client.Phase == LobbyPhase.StageSelect);
+            host.StageCursor = 3;
+            PumpUntil(() => client.StageCursor == 3);
+
+            // ステージ選択からキャラクター選択へ戻せる（決定は外れる）。
+            host.BackToCharacterSelect();
+            PumpUntil(() => client.Phase == LobbyPhase.CharacterSelect);
+            Assert.That(client.Roster[1].Ready, Is.False);
+            host.LocalReady = true;
+            client.LocalReady = true;
+            PumpUntil(() => client.Phase == LobbyPhase.StageSelect);
+
+            host.StartMatch(MatchRules.FreePlay(), 3);
+            PumpUntil(() => client.State == OnlineSession.SessionState.Loading);
+            Assert.That(host.State, Is.EqualTo(OnlineSession.SessionState.Loading), "ステージを読み込む前に始めた");
+            Assert.That(host.PendingStage, Is.EqualTo(3));
+            Assert.That(client.PendingStage, Is.EqualTo(3), "開始のメッセージにステージの番号がない");
+            PumpFrames(10);
+            Assert.That(client.State, Is.EqualTo(OnlineSession.SessionState.Loading), "送り直しの開始のメッセージで状態が変わった");
+
+            var stage = new OnlineStage(_terrain, new[] { SpawnBase });
+            host.BeginPending(stage, 3);
+            PumpFrames(5);
+            client.BeginPending(stage, 3);
+            PumpUntil(() => client.State == OnlineSession.SessionState.Running && host.State == OnlineSession.SessionState.Running);
+            Assert.That(client.StageIndex, Is.EqualTo(3));
+            Assert.That(client.PlayerCharacters, Is.EqualTo(new[] { 0, 1 }), "選んだキャラクターで始まらない");
+            RunTicksAndCompare(host, client, 120);
+
+            // 再戦は同じステージなので、すぐ始まる。
+            host.RestartMatch(MatchRules.FreePlay());
+            PumpUntil(() => client.State == OnlineSession.SessionState.Running && client.MatchNumber == host.MatchNumber);
+            Assert.That(host.State, Is.EqualTo(OnlineSession.SessionState.Running));
+
+            // 試合の後に、全員でキャラクター選択へ戻る（T6-8）。
+            host.ReturnToLobby(LobbyPhase.CharacterSelect);
+            PumpUntil(() => client.State == OnlineSession.SessionState.Lobby);
+            Assert.That(client.Phase, Is.EqualTo(LobbyPhase.CharacterSelect));
+            Assert.That(client.World, Is.Null, "前の試合のワールドが残っている");
+            Assert.That(host.Roster[1].Character, Is.EqualTo(1), "戻ったら選んだキャラクターが消えた");
+        }
+
+        [Test]
+        public void Lobby_FallingBelowTwoPlayers_GoesBackToTheWaitingRoom()
+        {
+            OnlineSession host = OnlineSession.Host(0, new[] { new CharacterConfig() }, new RollbackSettings());
+            _sessions.Add(host);
+            OnlineSession client = OnlineSession.Join("127.0.0.1", host.Port, new RollbackSettings());
+            _sessions.Add(client);
+            PumpUntil(() => client.LocalPlayer == 1 && host.LobbyPlayerCount == 2);
+            host.LocalReady = true;
+            client.LocalReady = true;
+            PumpUntil(() => host.Phase == LobbyPhase.CharacterSelect);
+            client.Dispose();
+            _sessions.Remove(client);
+            PumpUntil(() => host.LobbyPlayerCount == 1);
+            Assert.That(host.Phase, Is.EqualTo(LobbyPhase.Waiting), "1 人になってもキャラクター選択のまま");
+        }
+
+        // 全員を ticks まで進め、入力が確定するまで回して、状態とチェックサムがそろっていることを確かめる。
+        private void RunTicksAndCompare(OnlineSession host, OnlineSession client, int ticks)
+        {
+            host.TickLimit = ticks;
+            client.TickLimit = ticks;
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == ticks && s.Session.ConfirmedTick >= ticks - 1));
+            PumpFrames(2);
+            Assert.That(client.World.Checksum(), Is.EqualTo(host.World.Checksum()));
+            Assert.That(host.Desyncs, Is.Empty);
+            host.TickLimit = int.MaxValue;
+            client.TickLimit = int.MaxValue;
+        }
+
+        [Test]
         public void LobbyMessage_RoundTrips_AndRejectsBrokenData()
         {
-            var slots = new[] { new LobbySlot(true, "ボブ"), new LobbySlot(false, string.Empty) };
-            byte[] data = NetMessages.Lobby(slots);
-            Assert.That(NetMessages.ReadLobby(data), Is.EqualTo(slots));
+            var slots = new[] { new LobbySlot(true, "ボブ", 2, true), new LobbySlot(false, string.Empty) };
+            byte[] data = NetMessages.Lobby(slots, LobbyPhase.StageSelect, 4);
+            Assert.That(NetMessages.ReadLobby(data, out LobbyPhase phase, out int stage), Is.EqualTo(slots));
+            Assert.That(phase, Is.EqualTo(LobbyPhase.StageSelect));
+            Assert.That(stage, Is.EqualTo(4));
+            Assert.That(NetMessages.ReadReady(NetMessages.Ready(true)), Is.True);
             Assert.Throws<FormatException>(() => NetMessages.ReadLobby(new[] { (byte)NetKind.Lobby, (byte)2, (byte)1, (byte)9 }));
         }
 

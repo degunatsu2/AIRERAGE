@@ -27,6 +27,7 @@ namespace Airerage.Editor
     ///   Sandbox_Online と同じ配置（値は SandboxOnlineSceneBuilder の 1 か所）。
     /// - Match_Training: トレーニングの試合の仕組み（自分＋ダミー 3 体、表示、HUD、カメラ、一時停止）。ステージのシーンに重ねる。
     /// - Match_Local: ローカル対戦の試合の仕組み（4 人分の表示、全員が入るカメラ、人ごとの技の札、HUD、一時停止。T6-5）。ステージのシーンに重ねる。
+    /// - Match_Online: ネットワーク対戦の試合の仕組み（App の接続を使う OnlineRunner。T6-7）。ステージのシーンに重ねる。
     /// ステージの設定（StageDefinition）と一覧（StageCatalog）も作る。
     /// </summary>
     public static class FlowSceneBuilder
@@ -36,6 +37,7 @@ namespace Airerage.Editor
         public const string AthleticStagePath = "Assets/_Project/Scenes/Stages/Stage_Athletic.unity";
         public const string TrainingScenePath = "Assets/_Project/Scenes/Modes/Match_Training.unity";
         public const string LocalScenePath = "Assets/_Project/Scenes/Modes/Match_Local.unity";
+        public const string OnlineMatchScenePath = "Assets/_Project/Scenes/Modes/Match_Online.unity";
         public const string StageFolder = "Assets/_Project/Data/Stages";
         public const string AthleticStageAssetPath = StageFolder + "/Athletic.asset";
         public const string StageCatalogPath = StageFolder + "/StageCatalog.asset";
@@ -46,7 +48,7 @@ namespace Airerage.Editor
         // ビルドの設定のシーンの順（最初が起動するシーン）。ほかのシーンは後ろに並べる。テンプレートの SampleScene は外す。
         private static readonly string[] BuildOrder =
         {
-            AppScenePath, MenuScenePath, AthleticStagePath, TrainingScenePath, LocalScenePath,
+            AppScenePath, MenuScenePath, AthleticStagePath, TrainingScenePath, LocalScenePath, OnlineMatchScenePath,
         };
 
         private const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
@@ -72,10 +74,11 @@ namespace Airerage.Editor
             BuildAthleticStage();
             BuildTraining();
             BuildLocal();
+            BuildOnlineMatch();
             BuildMenu();
             BuildApp();
             ArrangeBuildSettings();
-            Debug.Log("FlowSceneBuilder: App、Menu、Stage_Athletic、Match_Training、Match_Local を作った");
+            Debug.Log("FlowSceneBuilder: App、Menu、ステージ、Match_Training、Match_Local、Match_Online を作った");
         }
 
         private static void BuildAthleticStage()
@@ -165,33 +168,8 @@ namespace Airerage.Editor
 
             CharacterRoster roster = SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(SandboxWireSceneBuilder.LoadOrCreateCharacterConfig());
             InputActionAsset inputActions = LoadInputActions();
-            Material wireMaterial = SandboxWireSceneBuilder.LoadOrCreateMaterial("Wire", new Color(0.6f, 0.2f, 0.85f), unlit: true);
-            Material attachedAnchorMaterial = SandboxWireSceneBuilder.LoadOrCreateMaterial("WireAnchor", new Color(1f, 0.5f, 0f), unlit: true);
-
             int count = LocalMatchRunner.MaxPlayers;
-            var characterViews = new Object[count];
-            var wireViews = new Object[count];
-            var aimIndicators = new Object[count];
-            var colors = new Color[count];
-            var playersRoot = new GameObject("Players").transform;
-            for (int p = 0; p < count; p++)
-            {
-                var (materialName, color) = SandboxOnlineSceneBuilder.PlayerColors[p];
-                colors[p] = color;
-                Material material = SandboxWireSceneBuilder.LoadOrCreateMaterial(materialName, color);
-                GameObject characterGo = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Cube, $"Player{p + 1}", material, Vector3.one);
-                characterGo.transform.SetParent(playersRoot, false);
-                var view = characterGo.AddComponent<CharacterView>();
-                SandboxWireSceneBuilder.AddFacingMarker(view);
-                SandboxWireSceneBuilder.SetReference(view, "_hitboxLine", SandboxWireSceneBuilder.CreateHitboxLine($"Player{p + 1}Hitbox"));
-                SandboxWireSceneBuilder.SetReference(view, "_chargeEffect", SandboxWireSceneBuilder.CreateChargeEffect($"Player{p + 1}Charge"));
-                SandboxWireSceneBuilder.AddCombatIndicators(view, $"Player{p + 1}", playersRoot, color);
-                characterViews[p] = view;
-                wireViews[p] = SandboxWireSceneBuilder.CreateWireView($"Player{p + 1}Wire", playersRoot, wireMaterial, attachedAnchorMaterial);
-                AimIndicatorView aim = SandboxWireSceneBuilder.CreateAimIndicator();
-                aim.name = $"Player{p + 1}Aim";
-                aimIndicators[p] = aim;
-            }
+            CreatePlayerViews(count, true, out Object[] characterViews, out Object[] wireViews, out Object[] aimIndicators, out Color[] colors);
 
             // 全員が入るカメラ: Cinemachine が追う点を SharedCamera が全員の中心へ動かし、距離を変える（ホイールのズームは使わない）。
             var cameraTarget = new GameObject("CameraTarget").transform;
@@ -227,6 +205,83 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
             MenuUiBuilder.CreatePauseMenu(runner, inputActions);
             Save(scene, LocalScenePath);
+        }
+
+        // プレイヤー count 人分の表示（オンラインと同じ色の箱、向きの印、判定の線、ためる光、戦闘の表示、ワイヤー）。withAim なら人ごとの照準も。
+        private static void CreatePlayerViews(int count, bool withAim, out Object[] characterViews, out Object[] wireViews,
+            out Object[] aimIndicators, out Color[] colors)
+        {
+            Material wireMaterial = SandboxWireSceneBuilder.LoadOrCreateMaterial("Wire", new Color(0.6f, 0.2f, 0.85f), unlit: true);
+            Material attachedAnchorMaterial = SandboxWireSceneBuilder.LoadOrCreateMaterial("WireAnchor", new Color(1f, 0.5f, 0f), unlit: true);
+            characterViews = new Object[count];
+            wireViews = new Object[count];
+            aimIndicators = new Object[withAim ? count : 0];
+            colors = new Color[count];
+            var playersRoot = new GameObject("Players").transform;
+            for (int p = 0; p < count; p++)
+            {
+                var (materialName, color) = SandboxOnlineSceneBuilder.PlayerColors[p];
+                colors[p] = color;
+                Material material = SandboxWireSceneBuilder.LoadOrCreateMaterial(materialName, color);
+                GameObject characterGo = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Cube, $"Player{p + 1}", material, Vector3.one);
+                characterGo.transform.SetParent(playersRoot, false);
+                var view = characterGo.AddComponent<CharacterView>();
+                SandboxWireSceneBuilder.AddFacingMarker(view);
+                SandboxWireSceneBuilder.SetReference(view, "_hitboxLine", SandboxWireSceneBuilder.CreateHitboxLine($"Player{p + 1}Hitbox"));
+                SandboxWireSceneBuilder.SetReference(view, "_chargeEffect", SandboxWireSceneBuilder.CreateChargeEffect($"Player{p + 1}Charge"));
+                SandboxWireSceneBuilder.AddCombatIndicators(view, $"Player{p + 1}", playersRoot, color);
+                characterViews[p] = view;
+                wireViews[p] = SandboxWireSceneBuilder.CreateWireView($"Player{p + 1}Wire", playersRoot, wireMaterial, attachedAnchorMaterial);
+                if (withAim)
+                {
+                    AimIndicatorView aim = SandboxWireSceneBuilder.CreateAimIndicator();
+                    aim.name = $"Player{p + 1}Aim";
+                    aimIndicators[p] = aim;
+                }
+            }
+        }
+
+        // ネットワーク対戦の試合の仕組み（docs/15 T6-7）: App の接続を使う OnlineRunner、4 人分の表示、自分を追うカメラ、HUD。
+        // ステージのシーンに重ねる（ロビーはメニューで済んでいる）。
+        private static void BuildOnlineMatch()
+        {
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+            Object.DestroyImmediate(Object.FindFirstObjectByType<Light>().gameObject);
+
+            CharacterConfigAsset character = SandboxWireSceneBuilder.LoadOrCreateCharacterConfig();
+            CharacterRoster roster = SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(character);
+            InputActionAsset inputActions = LoadInputActions();
+            CreatePlayerViews(Airerage.Net.OnlineSession.MaxPlayers, false, out Object[] characterViews, out Object[] wireViews, out _,
+                out Color[] colors);
+            CinemachineCamera follow = SandboxWireSceneBuilder.CreateFollowCamera(null, inputActions);
+            AimIndicatorView aimIndicator = SandboxWireSceneBuilder.CreateAimIndicator();
+            Camera camera = Object.FindFirstObjectByType<Camera>();
+
+            var runner = new GameObject("Online").AddComponent<Airerage.Net.OnlineRunner>();
+            SandboxWireSceneBuilder.SetReference(runner, "_character", character);
+            SandboxWireSceneBuilder.SetReference(runner, "_roster", roster);
+            SandboxWireSceneBuilder.SetReference(runner, "_inputActions", inputActions);
+            SandboxWireSceneBuilder.SetReference(runner, "_camera", camera);
+            SandboxWireSceneBuilder.SetReference(runner, "_followCamera", follow);
+            SandboxWireSceneBuilder.SetReference(runner, "_aimIndicator", aimIndicator);
+            SandboxWireSceneBuilder.SetReferenceArray(runner, "_characterViews", characterViews);
+            SandboxWireSceneBuilder.SetReferenceArray(runner, "_wireViews", wireViews);
+            SandboxOnlineSceneBuilder.SetColors(runner, "_playerColors", colors);
+            SandboxWireSceneBuilder.SetBool(runner, "_useConnection", true);
+
+            GameAudio audio = SandboxWireSceneBuilder.CreateAudio(runner);
+            SandboxWireSceneBuilder.SetReference(runner, "_audio", audio);
+            SandboxWireSceneBuilder.CreateComboHud(runner);
+            SandboxWireSceneBuilder.CreateSkillHud(runner, audio);
+            SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
+            SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
+            EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
+            SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
+            SandboxWireSceneBuilder.CreateBankView(runner, audio, guides);
+            SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
+            SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
+            SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
+            Save(scene, OnlineMatchScenePath);
         }
 
         private static void BuildMenu()
@@ -272,6 +327,8 @@ namespace Airerage.Editor
             var screens = canvas.gameObject.AddComponent<MenuScreens>();
             SandboxWireSceneBuilder.SetReference(screens, "_characterSelect", characterSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_stageSelect", stageSelect);
+            Airerage.Net.OnlineMenu online = OnlineMenuUiBuilder.Create(canvas.transform, screens, characterSelect, stageSelect, LoadOrCreateStages());
+            SandboxWireSceneBuilder.SetReference(screens, "_online", online);
             SandboxWireSceneBuilder.SetReference(screens, "_title", title.gameObject);
             SandboxWireSceneBuilder.SetReference(screens, "_pressAnyButton", press);
             SandboxWireSceneBuilder.SetReference(screens, "_main", main.gameObject);
@@ -307,6 +364,8 @@ namespace Airerage.Editor
                 new Vector2(0.5f, 0.65f), new Vector2(0f, 0f), new Vector2(900f, 100f), Color.white);
             UnityEngine.UI.Text description = MenuUiBuilder.CreateText(panel, "Description", string.Empty, 28, FontStyle.Bold, TextAnchor.UpperLeft,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), new Vector2(900f, 200f), new Color(1f, 1f, 1f, 0.85f));
+            UnityEngine.UI.Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -220f), new Vector2(900f, 50f), MenuUiBuilder.Accent);
             MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
                 TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
 
@@ -316,6 +375,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_name", name);
             SandboxWireSceneBuilder.SetReference(screen, "_description", description);
             SandboxWireSceneBuilder.SetReference(screen, "_band", band);
+            SandboxWireSceneBuilder.SetReference(screen, "_note", note);
             panel.gameObject.SetActive(false);
             return screen;
         }
@@ -331,6 +391,10 @@ namespace Airerage.Editor
             events.AddComponent<InputSystemUIInputModule>().AssignDefaultActions();
             // メニューの効果音（決定した直後に画面のシーンを外しても途切れないよう、いつも読み込むシーンに置く）。
             new GameObject("UiSounds").AddComponent<UiSounds>();
+            // ネットワーク対戦の接続（メニューと試合のシーンをまたいで保つ。T6-7）。
+            var connection = new GameObject("OnlineConnection").AddComponent<Airerage.Net.OnlineConnection>();
+            SandboxWireSceneBuilder.SetReference(connection, "_roster",
+                SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(SandboxWireSceneBuilder.LoadOrCreateCharacterConfig()));
             Save(scene, AppScenePath);
         }
 

@@ -31,6 +31,33 @@ namespace Airerage.Editor
         {
             CaptureCharacterSelect();
             CaptureLocalSelect();
+            CaptureOnline();
+        }
+
+        /// <summary>ネットワーク対戦の接続の画面と待機所（待機所の文字は、2 人がつながって 1 人が READY の例を直接入れる）。</summary>
+        public static void CaptureOnline()
+        {
+            MenuScreens screens = OpenMenu();
+            Transform connect = screens.transform.Find("OnlineConnect");
+            ShowOnly(screens, connect);
+            connect.Find("Name/Field").GetComponent<UnityEngine.UI.InputField>().text = "DEGU";
+            connect.Find("Address/Field").GetComponent<UnityEngine.UI.InputField>().text = "192.168.0.12";
+            connect.Find("Port/Field").GetComponent<UnityEngine.UI.InputField>().text = "7777";
+            CaptureAll(screens, "OnlineConnect");
+
+            Transform waiting = screens.transform.Find("OnlineWaiting");
+            ShowOnly(screens, waiting);
+            waiting.Find("Info").GetComponent<UnityEngine.UI.Text>().text = "HOSTING ON PORT 7777. FRIENDS JOIN WITH YOUR ADDRESS.";
+            waiting.Find("Message").GetComponent<UnityEngine.UI.Text>().text = "WHEN EVERYONE IS READY, CHARACTER SELECT STARTS";
+            string[] names = { "DEGU  (HOST)  (YOU)", "FRIEND", "WAITING...", "WAITING..." };
+            string[] states = { "READY!", "NOT READY", string.Empty, string.Empty };
+            for (int p = 0; p < names.Length; p++)
+            {
+                Transform slot = waiting.Find($"Slot{p + 1}P");
+                slot.Find("Name").GetComponent<UnityEngine.UI.Text>().text = names[p];
+                slot.Find("State").GetComponent<UnityEngine.UI.Text>().text = states[p];
+            }
+            CaptureAll(screens, "OnlineWaiting");
         }
 
         /// <summary>トレーニングのキャラクター選択（1P のカーソルをキャラクターごとに。最後のキャラクターでは技の説明も開く）。</summary>

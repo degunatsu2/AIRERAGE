@@ -11,7 +11,9 @@ namespace Airerage.Runtime.Flow
     /// - トレーニング: 選んだステージのシーン＋トレーニングの試合の仕組みのシーン（ステージを先に読み込む。実行がステージの物を探すため）。
     /// - ローカル対戦（T6-5）: 選んだステージのシーン＋ローカル対戦の試合の仕組みのシーン。参加した人（機器とキャラクター）と、時間の
     ///   制限を渡す（LocalPlayers、LocalTimed）。
-    /// - ネットワーク対戦: 今はオンラインの検証用のシーン（Sandbox_Online）をそのまま（T6-7 でステージと分ける）。
+    /// - ネットワーク対戦（T6-7）: 接続とロビー（待機所、キャラクター選択、ステージ選択）はメニューのシーンで行い、試合は選んだ
+    ///   ステージのシーン＋ネットワーク対戦の試合の仕組みのシーン（StartOnlineMatch）。接続は App のシーンの OnlineConnection が持つ。
+    ///   検証用のシーン（Sandbox_Online）は StartOnline で開ける（メニューからは使わない）。
     /// 光と空はステージのシーンのものを使う（ステージのシーンを有効にする）。読み込んでいる間の操作は受け付けない。
     /// ほかの部品は、シーンの中からこれを探して使う（静的な変数は使わない）。
     /// </summary>
@@ -24,6 +26,7 @@ namespace Airerage.Runtime.Flow
             Training,
             Local,
             Online,
+            OnlineMatch,
         }
 
         [SerializeField] private StageCatalog _stages;
@@ -31,6 +34,7 @@ namespace Airerage.Runtime.Flow
         [SerializeField] private string _trainingScene = "Match_Training";
         [SerializeField] private string _localScene = "Match_Local";
         [SerializeField] private string _onlineScene = "Sandbox_Online";
+        [SerializeField] private string _onlineMatchScene = "Match_Online";
 
         private readonly List<string> _loaded = new List<string>();
         private readonly List<LocalPlayerSetup> _localPlayers = new List<LocalPlayerSetup>();
@@ -102,6 +106,13 @@ namespace Airerage.Runtime.Flow
             LocalTimed = timed;
             stage = stage != null ? stage : _stages.Get(0);
             Go(FlowScreen.Local, stage, stage.SceneName, _localScene);
+        }
+
+        /// <summary>ネットワーク対戦の試合を始める（stage のシーンに、ネットワーク対戦の試合の仕組みを重ねる。T6-7）。</summary>
+        public void StartOnlineMatch(StageDefinition stage)
+        {
+            stage = stage != null ? stage : _stages.Get(0);
+            Go(FlowScreen.OnlineMatch, stage, stage.SceneName, _onlineMatchScene);
         }
 
         /// <summary>ネットワーク対戦を始める（今はオンラインの検証用のシーン。T6-7 でステージと分ける）。</summary>

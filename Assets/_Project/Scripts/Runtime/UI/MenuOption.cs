@@ -61,6 +61,15 @@ namespace Airerage.Runtime.UI
             _accent = accent;
         }
 
+        /// <summary>項目の文字を変える（READY ／ CANCEL READY など）。</summary>
+        public void SetLabel(string text)
+        {
+            if (_label != null && _label.text != text)
+            {
+                _label.text = text;
+            }
+        }
+
         /// <summary>選んでいるときに動かす量を変える（シーンのビルダー用）。</summary>
         public void SetSelectedShift(Vector2 shift)
         {

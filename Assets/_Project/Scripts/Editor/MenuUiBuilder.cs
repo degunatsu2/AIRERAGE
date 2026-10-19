@@ -92,6 +92,48 @@ namespace Airerage.Editor
         }
 
         /// <summary>
+        /// 文字の入力欄（左に見出し、右に入力する枠）。anchor（0〜1）を基準に、左上を position に置く。キーボードで入力し、
+        /// キーボード・ゲームパッドの上下で項目を移る。
+        /// </summary>
+        public static InputField CreateInputField(Transform parent, string name, string label, Vector2 anchor, Vector2 position, Vector2 size)
+        {
+            var row = new GameObject(name, typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            var rowRect = (RectTransform)row.transform;
+            rowRect.anchorMin = rowRect.anchorMax = anchor;
+            rowRect.pivot = new Vector2(0f, 1f);
+            rowRect.anchoredPosition = position;
+            rowRect.sizeDelta = size;
+            CreateText(row.transform, "Label", label, 26, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+                new Vector2(0f, 0.5f), Vector2.zero, new Vector2(170f, size.y), Color.white);
+
+            var box = new GameObject("Field", typeof(RectTransform));
+            box.transform.SetParent(row.transform, false);
+            var boxRect = (RectTransform)box.transform;
+            boxRect.anchorMin = new Vector2(0f, 0f);
+            boxRect.anchorMax = new Vector2(1f, 1f);
+            boxRect.offsetMin = new Vector2(180f, 0f);
+            boxRect.offsetMax = Vector2.zero;
+            var plate = box.AddComponent<SlantedPlate>();
+            plate.Configure(0.25f, 3f, PlateFill, PlateBorder);
+            Text text = CreateText(box.transform, "Text", string.Empty, 28, FontStyle.Bold, TextAnchor.MiddleLeft,
+                new Vector2(0f, 0.5f), new Vector2(size.y * 0.25f + 16f, 0f), new Vector2(size.x - 240f, size.y), Color.white, false);
+            text.supportRichText = false;
+            Text placeholder = CreateText(box.transform, "Placeholder", "...", 28, FontStyle.Italic, TextAnchor.MiddleLeft,
+                new Vector2(0f, 0.5f), new Vector2(size.y * 0.25f + 16f, 0f), new Vector2(size.x - 240f, size.y), new Color(1f, 1f, 1f, 0.35f), false);
+            var field = box.AddComponent<InputField>();
+            field.targetGraphic = plate;
+            field.textComponent = text;
+            field.placeholder = placeholder;
+            var colors = field.colors;
+            colors.highlightedColor = new Color(0.8f, 0.95f, 1f);
+            colors.selectedColor = Accent;
+            field.colors = colors;
+            field.navigation = new Navigation { mode = Navigation.Mode.Vertical };
+            return field;
+        }
+
+        /// <summary>
         /// メニューの項目 1 つ（斜めの札、左に名前、右に使えないときの理由）。anchor（0〜1）を基準に、札の左上を position に置く。
         /// </summary>
         public static MenuOption CreateMenuItem(Transform parent, string name, string label, Vector2 anchor, Vector2 position, Vector2 size)

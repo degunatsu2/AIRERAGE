@@ -33,6 +33,9 @@ namespace Airerage.Net
     /// 右上の全員の情報（ScoreboardHud）、コンボの表示、効果音などは ISimulationFeed で読ませる。
     /// ロビーでは、画面の中央に待機所（WaitingRoomPanel。だれがつながっていて、どの番号がまだ空いているか）を、ホストにも
     /// クライアントにも出す。ホストはその下の「START」で始める。
+    /// ネットワーク対戦の試合の仕組み（Match_Online。docs/15 T6-7）では _useConnection にする: App のシーンの OnlineConnection の接続を
+    /// 使い、ロビー（待機所・キャラクター選択・ステージ選択）はメニューで済んでいる。読み込んだステージ（出現位置はステージの
+    /// SpawnPointAuthoring）で、待っていた試合を始める（BeginPending）。接続の画面と待機所は出さない。Quit で接続を閉じてメニューへ。
     /// </summary>
     public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls
     {
@@ -69,6 +72,8 @@ namespace Airerage.Net
         [SerializeField] private CorrectionSmoothingSettings _smoothing = new CorrectionSmoothingSettings();
         [Tooltip("試合のルール（すべて【仮】。docs/12）。ホストのものを全員が使う。ロビーで「Timed match」を外すと時間の制限なし")]
         [SerializeField] private MatchRules _match = new MatchRules();
+        [Tooltip("App のシーンの OnlineConnection の接続を使う（ネットワーク対戦の試合の仕組み Match_Online。docs/15 T6-7）")]
+        [SerializeField] private bool _useConnection;
 
         // 遅延の模擬の選択肢（docs/10_online_plan.md T2-9 の評価の条件）。自分が送る側の遅延なので、往復はこの2倍。
         private static readonly (string Label, int DelayMs, int JitterMs)[] DelayPresets =
@@ -99,6 +104,7 @@ namespace Airerage.Net
         private WaitingRoomPanel _waitingRoom;
         private GameFlow _flow;
         private GUIStyle _footer;
+        private OnlineConnection _connection;
 
         /// <summary>今のセッション（始めていなければ null）。</summary>
         public OnlineSession Session => _session;
@@ -161,7 +167,14 @@ namespace Airerage.Net
             {
                 return;
             }
-            _session.RestartMatch(RulesForNextMatch());
+            if (_connection != null)
+            {
+                _connection.Restart();
+            }
+            else
+            {
+                _session.RestartMatch(RulesForNextMatch());
+            }
             _smoother = null;
             _notifiedTick = -1;
         }
@@ -204,10 +217,17 @@ namespace Airerage.Net
             return rules;
         }
 
-        /// <summary>セッションを閉じて、最初の画面に戻る。</summary>
+        /// <summary>セッションを閉じて、最初の画面に戻る（接続を使うときは、接続を閉じる）。</summary>
         public void Leave()
         {
-            _session?.Dispose();
+            if (_connection != null)
+            {
+                _connection.Leave();
+            }
+            else
+            {
+                _session?.Dispose();
+            }
             _session = null;
             _smoother = null;
             _delayPreset = 0;
@@ -219,11 +239,21 @@ namespace Airerage.Net
 
         private void Awake()
         {
-            if (_character == null || _inputActions == null || _spawnPoint == null || _camera == null)
+            if (_character == null || _inputActions == null || (_spawnPoint == null && !_useConnection) || _camera == null)
             {
                 Debug.LogError($"{name}: CharacterConfigAsset、InputActionAsset、出現位置、Camera のどれかが設定されていません", this);
                 enabled = false;
                 return;
+            }
+            if (_useConnection)
+            {
+                _connection = FindFirstObjectByType<OnlineConnection>();
+                if (_connection == null)
+                {
+                    Debug.LogError($"{name}: App のシーンの OnlineConnection がありません（App のシーンから始めてください）", this);
+                    enabled = false;
+                    return;
+                }
             }
             if (string.IsNullOrEmpty(_playerName))
             {
@@ -258,6 +288,15 @@ namespace Airerage.Net
             }
             _input = new InputSystemAdapter(_inputActions);
             _portText = _port.ToString();
+            if (_connection != null)
+            {
+                // ロビーで決めた試合を、読み込んだこのステージで始める（ほかの人も、それぞれ読み込んでから始める）。
+                _session = _connection.Session;
+                if (_session != null && _session.HasPendingStart)
+                {
+                    _session.BeginPending(_stage, _session.PendingStage);
+                }
+            }
             UpdateViews();
         }
 
@@ -273,7 +312,10 @@ namespace Airerage.Net
 
         private void OnDestroy()
         {
-            _session?.Dispose();
+            if (_connection == null)
+            {
+                _session?.Dispose();
+            }
             _session = null;
             _input?.Dispose();
             _waitingRoom?.Dispose();
@@ -281,6 +323,22 @@ namespace Airerage.Net
 
         private void Update()
         {
+            if (_connection != null)
+            {
+                _session = _connection.Session;
+                if (_session == null || _session.State == OnlineSession.SessionState.Ended)
+                {
+                    // 切れた（だれかが抜けた）。Esc・B・Start でもメニューへ戻れる。
+                    if (BackPressed())
+                    {
+                        Quit();
+                    }
+                    if (_session == null)
+                    {
+                        return;
+                    }
+                }
+            }
             if (_session == null)
             {
                 return;
@@ -290,7 +348,14 @@ namespace Airerage.Net
                 // 試合の前に押したボタンを、最初のティックに持ち込まない。
                 _input.Poll(_camera, _session.World.GetConfig(_session.LocalPlayer).Wire.AimDeadzone);
             }
-            _session.Update(Time.deltaTime, ConsumeLocalInput);
+            if (_connection != null)
+            {
+                _connection.Pump(Time.deltaTime, ConsumeLocalInput);
+            }
+            else
+            {
+                _session.Update(Time.deltaTime, ConsumeLocalInput);
+            }
             UpdateSmoothing(Time.deltaTime);
             UpdateViews();
             if (Running && _session.World.Tick != _notifiedTick)
@@ -300,10 +365,36 @@ namespace Airerage.Net
             }
         }
 
-        // 出現位置（_spawnPoints が人数分なければ、_spawnPoint を中心に横に並べる。OnlineStage.SpawnPosition）。
+        private static bool BackPressed()
+        {
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+            {
+                return true;
+            }
+            foreach (Gamepad gamepad in Gamepad.all)
+            {
+                if (gamepad.buttonEast.wasPressedThisFrame || gamepad.startButton.wasPressedThisFrame)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 出現位置（_spawnPoints が人数分なければ、_spawnPoint を中心に横に並べる。OnlineStage.SpawnPosition）。接続を使うときは、
+        // 読み込んだステージのシーンの出現位置（SpawnPointAuthoring）。
         private List<System.Numerics.Vector3> SpawnPositions()
         {
             var spawns = new List<System.Numerics.Vector3>();
+            if (_useConnection)
+            {
+                foreach (Vector3 spawn in SpawnPointAuthoring.Collect())
+                {
+                    spawns.Add(spawn.ToNumerics());
+                }
+                return spawns;
+            }
             foreach (Transform spawn in _spawnPoints)
             {
                 if (spawn != null)
@@ -446,6 +537,11 @@ namespace Airerage.Net
                 _style = new GUIStyle(GUI.skin.label) { fontSize = 14 };
                 _style.normal.textColor = Color.white;
             }
+            if (_connection != null)
+            {
+                DrawConnectionState();
+                return;
+            }
 
             // 試合中は小さくして、コンボの表示（左）と重ならないようにする（詳細は「Details」で開く）。
             bool compact = Running && !_showDetails;
@@ -464,6 +560,26 @@ namespace Airerage.Net
             {
                 DrawWaitingRoom();
             }
+        }
+
+        // 接続を使うとき: 試合中は何も出さない（HUD だけ）。切れたら、理由とメニューへ戻るボタン。
+        private void DrawConnectionState()
+        {
+            if (_session != null && _session.State != OnlineSession.SessionState.Ended)
+            {
+                return;
+            }
+            var box = new Rect((Screen.width - 420f) * 0.5f, (Screen.height - 130f) * 0.5f, 420f, 130f);
+            GUILayout.BeginArea(box, GUI.skin.box);
+            GUILayout.Label(_session != null ? _session.Status : "Disconnected", _style);
+            GUILayout.Label("The match ended because someone left.", _style);
+            if (GUILayout.Button("Back to menu (Esc / B)", GUILayout.Height(36f)))
+            {
+                UiSounds.Find().Play(SoundId.UiConfirm);
+                Quit();
+                ExitGui();
+            }
+            GUILayout.EndArea();
         }
 
         // 待機所: 画面の中央に、番号ごとの札。ホストは下に時間の制限の切り替えと「START」、クライアントは待っている案内。
@@ -537,7 +653,7 @@ namespace Airerage.Net
             }
         }
 
-        private const string PlayerNameKey = "Airerage.PlayerName";
+        private const string PlayerNameKey = OnlineConnection.PlayerNameKey;
         private const string CharacterKey = CharacterRoster.SelectedPreferenceKey;
         private const float CharacterRowHeight = 38f;
 
