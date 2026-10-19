@@ -12,7 +12,7 @@ namespace Airerage.Core.Simulation
     /// <summary>
     /// キャラクター1人分の1ティックの処理の順序を決める。
     /// 入力 → アクション（攻撃）→ ワイヤーのフェーズ → 速度（ワイヤーまたは通常移動）→ 移動と衝突 → ロープ長の補正 → 接地
-    /// → のけぞり中の跳ね返り → ステージのギミック（StageZones）。
+    /// → のけぞり中の跳ね返り → ステージのギミック（StageZones。氷だけは速度を決めた直後）。
     /// アクション中（攻撃中・のけぞり中）は、移動・ジャンプ・ワイヤーの入力を無視し、向きも変えない（ActionController.ControlInput）。
     /// キャンセル（攻撃→ジャンプ、攻撃→ワイヤー）で Free に戻ったティックは、入力をそのまま使い、このティックにジャンプ・射出する。
     /// ヒットストップの間は、何も進めずに止まる（ボタンの前の状態も変えないので、押し続けたボタンは止まりが解けてから効く。
@@ -37,7 +37,8 @@ namespace Airerage.Core.Simulation
             _zones = zones;
         }
 
-        public void Step(ref CharacterState state, PlayerInput input, CharacterConfig config)
+        /// <param name="tick">試合のティック数（周期のあるステージのギミック）。</param>
+        public void Step(ref CharacterState state, PlayerInput input, CharacterConfig config, int tick = 0)
         {
             if (state.Combat.IsWaitingToRespawn)
             {
@@ -90,9 +91,11 @@ namespace Airerage.Core.Simulation
             }
             else
             {
+                System.Numerics.Vector3 velocityBefore = state.Velocity;
                 Locomotion.UpdateVelocity(ref state, frame, movement);
                 ActionController.ApplyMotion(ref state, config);
                 LimitSlowFall(ref state, airJumpsBefore, config);
+                StageZones.ApplyFriction(ref state, velocityBefore, new System.Numerics.Vector2(halfExtents.X, halfExtents.Y), _zones);
             }
 
             System.Numerics.Vector3 beforeMove = state.Position;
@@ -113,7 +116,7 @@ namespace Airerage.Core.Simulation
             }
             ActionController.AfterMove(ref state, wasGrounded, velocityBeforeMove, config);
             Bounce(ref state, velocityBeforeMove, config.Combat);
-            StageZones.Apply(ref state, startPosition, new System.Numerics.Vector2(halfExtents.X, halfExtents.Y), _zones);
+            StageZones.Apply(ref state, startPosition, config, _zones, tick);
 
             // ゲームプレイは XY 平面（docs/01_game_design.md 4章）。
             state.Position.Z = 0f;

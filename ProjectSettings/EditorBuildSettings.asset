@@ -15,6 +15,21 @@ EditorBuildSettings:
     path: Assets/_Project/Scenes/Stages/Stage_Athletic.unity
     guid: 30ef3c9473958c008aefe776488eab73
   - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_CityDay.unity
+    guid: b39b642fdde21039c839494168375c03
+  - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_CityNight.unity
+    guid: 8c6f5ce36277e4a4cac16dbff38adcbc
+  - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_Volcano.unity
+    guid: 6cfab032c3a9300c5af638e102cca29b
+  - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_SnowSea.unity
+    guid: cf0100dd47d0e72e492dec494047e538
+  - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_SpaceStation.unity
+    guid: 59ab422a4b599b80b99ea56faef399af
+  - enabled: 1
     path: Assets/_Project/Scenes/Modes/Match_Training.unity
     guid: 6e06c256619b418bfb4d041913d107e9
   - enabled: 1

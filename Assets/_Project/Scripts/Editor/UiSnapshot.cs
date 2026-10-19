@@ -34,6 +34,71 @@ namespace Airerage.Editor
             CaptureOnline();
         }
 
+        /// <summary>
+        /// ステージの画像（docs/15 6.11）: ステージごとに、全体（遠くから）と、試合のカメラの距離（30m）で真ん中を撮る。ステージのシーンには
+        /// カメラがないので、撮る間だけ置く。ギミックの線（StageZoneView）は実行中に作るので写らない（台・柱・飾り・空・光を確かめる）。
+        /// </summary>
+        public static void CaptureStages()
+        {
+            Directory.CreateDirectory(OutputFolder);
+            var catalog = AssetDatabase.LoadAssetAtPath<Airerage.Runtime.Flow.StageCatalog>(FlowSceneBuilder.StageCatalogPath);
+            foreach (Airerage.Runtime.Flow.StageDefinition stage in catalog.Stages)
+            {
+                string[] found = AssetDatabase.FindAssets($"{stage.SceneName} t:Scene");
+                if (found.Length == 0)
+                {
+                    throw new InvalidOperationException($"ステージのシーンがない: {stage.SceneName}");
+                }
+                EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(found[0]), OpenSceneMode.Single);
+                var go = new GameObject("SnapshotCamera");
+                Camera camera = go.AddComponent<Camera>();
+                camera.clearFlags = CameraClearFlags.Skybox;
+                camera.farClipPlane = 1000f;
+                try
+                {
+                    camera.fieldOfView = 55f;
+                    go.transform.position = new Vector3(0f, 12f, -78f);
+                    RenderCamera(camera, new Vector2Int(1920, 1080), $"{OutputFolder}/Stage_{stage.SceneName}_Overview.png");
+                    camera.fieldOfView = 40f;
+                    go.transform.position = new Vector3(0f, 6f, -30f);
+                    RenderCamera(camera, new Vector2Int(1920, 1080), $"{OutputFolder}/Stage_{stage.SceneName}_Close.png");
+                }
+                finally
+                {
+                    Object.DestroyImmediate(go);
+                }
+            }
+            // ステージ選択の画面。
+            MenuScreens screens = OpenMenu();
+            Transform select = screens.transform.Find("StageSelect");
+            ShowOnly(screens, select);
+            select.GetComponent<StageSelectScreen>().ShowNetwork(true, 3);
+            CaptureAll(screens, "StageSelect");
+        }
+
+        private static void RenderCamera(Camera camera, Vector2Int size, string path)
+        {
+            var texture = new RenderTexture(size.x, size.y, 24);
+            try
+            {
+                camera.targetTexture = texture;
+                camera.Render();
+                RenderTexture.active = texture;
+                var image = new Texture2D(size.x, size.y, TextureFormat.RGB24, false);
+                image.ReadPixels(new Rect(0, 0, size.x, size.y), 0, 0);
+                image.Apply();
+                File.WriteAllBytes(path, image.EncodeToPNG());
+                Object.DestroyImmediate(image);
+                Debug.Log($"[UiSnapshot] {path}");
+            }
+            finally
+            {
+                RenderTexture.active = null;
+                camera.targetTexture = null;
+                Object.DestroyImmediate(texture);
+            }
+        }
+
         /// <summary>ネットワーク対戦の接続の画面と待機所（待機所の文字は、2 人がつながって 1 人が READY の例を直接入れる）。</summary>
         public static void CaptureOnline()
         {

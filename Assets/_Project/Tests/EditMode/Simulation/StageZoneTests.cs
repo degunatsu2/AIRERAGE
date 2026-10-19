@@ -10,7 +10,10 @@ using NUnit.Framework;
 
 namespace Airerage.Core.Tests.Simulation
 {
-    /// <summary>ステージのギミック（ジャンプ台、上昇気流、加速リング。StageZone / StageZones。ユーザーの要望、2026-10-13）。</summary>
+    /// <summary>
+    /// ステージのギミック（ジャンプ台、上昇気流、加速リング。StageZone / StageZones。ユーザーの要望、2026-10-13）。ステージ固有のギミック
+    /// （スピードレーン、発射台、バンパー、風、氷、低重力、ワープゲート。docs/15 6.11）。
+    /// </summary>
     public class StageZoneTests
     {
         private static readonly MovementTuning Movement = new MovementTuning();
@@ -301,6 +304,269 @@ namespace Airerage.Core.Tests.Simulation
         {
             var zone = new StageZone(StageZoneKind.JumpPad, 0f, 0f, 1f, 1f, new Vector2(0f, 3f), 10f);
             Assert.That(zone.Direction, Is.EqualTo(Vector2.UnitY));
+        }
+
+        [Test]
+        public void SpeedLane_CarriesAStandingCharacterAlong_AndTheSpeedLastsAfterJumpingOff()
+        {
+            SimWorld world = World(new StageZone(StageZoneKind.SpeedLane, -5f, 0f, 5f, 0.3f, Vector2.UnitX, 16f));
+            Step(world, 1);
+            Assert.That(world.GetState(0).Velocity.X, Is.EqualTo(16f).Within(1e-4f), "レーンの向きの速さにならない");
+
+            // 走ったまま跳ぶと、その速さで飛んでいく（同じ向きに入れている間）。
+            Step(world, 1, PlayerInput.FromAxes(1f, 0f, InputButtons.Jump));
+            for (int i = 0; i < 10; i++)
+            {
+                Step(world, 1, PlayerInput.FromAxes(1f, 0f, InputButtons.None));
+            }
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Grounded, Is.False, "前提: 跳んだ");
+            Assert.That(state.Velocity.X, Is.GreaterThan(14f), "跳んだ後に速さを保たない（跳んだティックに地面の加速の分だけ減る）");
+        }
+
+        [Test]
+        public void SpeedLane_DoesNothing_InTheAir()
+        {
+            SimWorld world = World(new StageZone(StageZoneKind.SpeedLane, -5f, 0f, 5f, 3f, Vector2.UnitX, 16f));
+            SetState(world, new Vector3(0f, 2f, 0f), Vector3.Zero);
+            Step(world, 1);
+
+            Assert.That(world.GetState(0).Velocity.X, Is.EqualTo(0f), "空中でもレーンが効いた");
+        }
+
+        [Test]
+        public void Launcher_SetsTheWholeVelocity_WhateverTheSpeedBefore()
+        {
+            var direction = Vector2.Normalize(new Vector2(1f, 1f));
+            SimWorld world = World(new StageZone(StageZoneKind.Launcher, -1f, 0f, 1f, 0.3f, direction, 20f));
+            SetState(world, new Vector3(0f, Movement.HalfHeight, 0f), new Vector3(-10f, 0f, 0f));
+            CharacterState state = world.GetState(0);
+            state.AirJumpsUsed = Movement.AirJumps;
+            world.SetState(0, state);
+            Step(world, 1);
+
+            state = world.GetState(0);
+            Assert.That(state.Velocity.X, Is.EqualTo(direction.X * 20f).Within(1e-4f), "横の速さを残した");
+            Assert.That(state.Velocity.Y, Is.EqualTo(direction.Y * 20f).Within(1e-4f));
+            Assert.That(state.Grounded, Is.False);
+            Assert.That(state.AirJumpsUsed, Is.EqualTo(0), "空中ジャンプが戻らない");
+            Assert.That(state.JumpPadCount, Is.EqualTo(1));
+            Step(world, 5);
+            Assert.That(world.GetState(0).JumpPadCount, Is.EqualTo(1), "飛び出した後に、もう一度打ち出した");
+        }
+
+        [Test]
+        public void Launcher_AlsoFires_ACharacterArrivingFastFromASpeedLane()
+        {
+            // スキージャンプ（雪原と海）: スピードレーンで走ってきた速さのまま、発射台の向きに打ち出す。
+            var direction = Vector2.Normalize(new Vector2(1f, 0.45f));
+            SimWorld world = World(
+                new StageZone(StageZoneKind.SpeedLane, -10f, 0f, -1f, 0.3f, Vector2.UnitX, 18f),
+                new StageZone(StageZoneKind.Launcher, -1f, 0f, 1f, 0.3f, direction, 22f));
+            SetState(world, new Vector3(-8f, Movement.HalfHeight, 0f), Vector3.Zero);
+            for (int i = 0; i < 60 && world.GetState(0).JumpPadCount == 0; i++)
+            {
+                Step(world, 1, PlayerInput.FromAxes(1f, 0f, InputButtons.None));
+            }
+
+            CharacterState state = world.GetState(0);
+            Assert.That(state.JumpPadCount, Is.EqualTo(1), "速く走ってきた人を打ち出さない");
+            Assert.That(state.Velocity.Y, Is.EqualTo(direction.Y * 22f).Within(1e-3f));
+        }
+
+        [Test]
+        public void Bumper_BouncesUp_WhenFallingOntoIt()
+        {
+            SimWorld world = World(new StageZone(StageZoneKind.Bumper, -2f, 4f, 2f, 5f, Vector2.Zero, 18f));
+            SetState(world, new Vector3(0f, 7f, 0f), new Vector3(0f, -10f, 0f));
+            for (int i = 0; i < 60 && world.GetState(0).JumpPadCount == 0; i++)
+            {
+                Step(world, 1);
+            }
+
+            CharacterState state = world.GetState(0);
+            Assert.That(state.JumpPadCount, Is.EqualTo(1), "前提: 当たった");
+            Assert.That(state.Velocity.Y, Is.GreaterThan(15f), "上へ弾かない");
+            Assert.That(state.Velocity.X, Is.EqualTo(0f).Within(1e-4f), "真上から落ちたのに横へ弾いた");
+        }
+
+        [Test]
+        public void Bumper_BouncesSideways_WhenHitFromTheSide()
+        {
+            SimWorld world = World(new StageZone(StageZoneKind.Bumper, -1f, 3f, 1f, 7f, Vector2.Zero, 18f));
+            SetState(world, new Vector3(-4f, 5f, 0f), new Vector3(15f, 0f, 0f));
+            for (int i = 0; i < 30 && world.GetState(0).JumpPadCount == 0; i++)
+            {
+                Step(world, 1);
+            }
+
+            CharacterState state = world.GetState(0);
+            Assert.That(state.JumpPadCount, Is.EqualTo(1), "前提: 当たった");
+            Assert.That(state.Velocity.X, Is.LessThan(-10f), "横から当たったのに、来た向きへ弾き返さない");
+        }
+
+        [Test]
+        public void Gust_BlowsOnlyWhileItIsActive()
+        {
+            var gust = new StageZone(StageZoneKind.Gust, -10f, 5f, 10f, 30f, Vector2.UnitX, 30f, 10f, 120, 60, 0, Vector2.Zero);
+            Assert.That(gust.IsActive(0) && gust.IsActive(59), Is.True);
+            Assert.That(gust.IsActive(60) || gust.IsActive(119), Is.False);
+            Assert.That(gust.IsActive(120), Is.True, "周期で繰り返さない");
+
+            SimWorld blowing = World(gust);
+            SetState(blowing, new Vector3(0f, 20f, 0f), Vector3.Zero);
+            Step(blowing, 30);
+            Assert.That(blowing.GetState(0).Velocity.X, Is.GreaterThan(5f), "吹いている間に流されない");
+
+            var shifted = new StageZone(StageZoneKind.Gust, -10f, 5f, 10f, 30f, Vector2.UnitX, 30f, 10f, 120, 60, 60, Vector2.Zero);
+            SimWorld calm = World(shifted);
+            SetState(calm, new Vector3(0f, 20f, 0f), Vector3.Zero);
+            Step(calm, 30);
+            Assert.That(calm.GetState(0).Velocity.X, Is.EqualTo(0f), "止んでいる間に流された");
+        }
+
+        [Test]
+        public void Gust_StopsAtTheLimit()
+        {
+            SimWorld world = World(new StageZone(StageZoneKind.Gust, -40f, 5f, 40f, 60f, Vector2.UnitX, 60f, 9f));
+            SetState(world, new Vector3(0f, 50f, 0f), Vector3.Zero);
+            Step(world, 30);
+
+            Assert.That(world.GetState(0).Velocity.X, Is.LessThanOrEqualTo(9f + 1e-4f), "上限より速くなった");
+            Assert.That(world.GetState(0).Velocity.X, Is.GreaterThan(8f));
+        }
+
+        [Test]
+        public void Ice_KeepsACharacterSliding()
+        {
+            var ice = new StageZone(StageZoneKind.Ice, -40f, 0f, 40f, 0.3f, Vector2.Zero, 0.1f);
+            SimWorld icy = World(ice);
+            SimWorld normal = World();
+            SetState(icy, new Vector3(0f, Movement.HalfHeight, 0f), new Vector3(8f, 0f, 0f));
+            SetState(normal, new Vector3(0f, Movement.HalfHeight, 0f), new Vector3(8f, 0f, 0f));
+            Step(icy, 1);
+            Step(normal, 1);
+            Assert.That(icy.GetState(0).Grounded && normal.GetState(0).Grounded, Is.True, "前提: 立っている");
+            Step(icy, 20);
+            Step(normal, 20);
+
+            Assert.That(normal.GetState(0).Velocity.X, Is.EqualTo(0f), "前提: ふつうの床では止まる");
+            Assert.That(icy.GetState(0).Velocity.X, Is.GreaterThan(4f), "氷の上で滑らない");
+        }
+
+        [Test]
+        public void LowGravity_LetsACharacterJumpHigher_AndFallSlowly()
+        {
+            var low = new StageZone(StageZoneKind.LowGravity, -40f, 0f, 40f, 60f, Vector2.Zero, 0.4f, 6f);
+            SimWorld world = World(low);
+            Step(world, 1);
+            Step(world, 1, PlayerInput.FromAxes(0f, 0f, InputButtons.Jump));
+            float highest = 0f;
+            float fastestFall = 0f;
+            for (int i = 0; i < 180; i++)
+            {
+                Step(world, 1);
+                highest = MathF.Max(highest, world.GetState(0).Position.Y - Movement.HalfHeight);
+                fastestFall = MathF.Min(fastestFall, world.GetState(0).Velocity.Y);
+            }
+
+            // ふつうのジャンプは 2.4m。重力 0.4 倍なら 6m ほど。
+            Assert.That(highest, Is.GreaterThan(5f), "高く跳べない");
+            Assert.That(fastestFall, Is.GreaterThanOrEqualTo(-6f - 1e-4f), "落ちる速さが上限を超えた");
+        }
+
+        [Test]
+        public void Warp_MovesToTheTarget_KeepingTheVelocity()
+        {
+            var gate = new StageZone(StageZoneKind.Warp, 3f, 0f, 4f, 3f, Vector2.Zero, 1f, 0f, 0, 0, 0, new Vector2(-20f, 5f));
+            SimWorld world = World(gate);
+            for (int i = 0; i < 120 && world.GetState(0).Combat.WarpCount == 0; i++)
+            {
+                Step(world, 1, PlayerInput.FromAxes(1f, 0f, InputButtons.None));
+            }
+
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Combat.WarpCount, Is.EqualTo(1), "ゲートで移らない");
+            Assert.That(state.Position.X, Is.EqualTo(-20f));
+            Assert.That(state.Position.Y, Is.EqualTo(5f));
+            Assert.That(state.Velocity.X, Is.GreaterThan(5f), "速度を保たない");
+            Assert.That(state.Grounded, Is.False);
+        }
+
+        [Test]
+        public void Warp_DoesNotMove_ACharacterAlreadyInsideTheGate_OrJustWarped()
+        {
+            var gate = new StageZone(StageZoneKind.Warp, -1f, 0f, 1f, 3f, Vector2.Zero, 1f, 0f, 0, 0, 0, new Vector2(-20f, 5f));
+            SimWorld inside = World(gate);
+            Step(inside, 10, PlayerInput.FromAxes(1f, 0f, InputButtons.None));
+            Assert.That(inside.GetState(0).Combat.WarpCount, Is.EqualTo(0), "中から出ただけで移った");
+
+            SimWorld cooling = World(new StageZone(StageZoneKind.Warp, 3f, 0f, 4f, 3f, Vector2.Zero, 1f, 0f, 0, 0, 0, new Vector2(-20f, 5f)));
+            CharacterState state = cooling.GetState(0);
+            state.Combat.WarpCooldownTicks = 200;
+            cooling.SetState(0, state);
+            Step(cooling, 60, PlayerInput.FromAxes(1f, 0f, InputButtons.None));
+            Assert.That(cooling.GetState(0).Combat.WarpCount, Is.EqualTo(0), "移った直後に、もう一度移った");
+        }
+
+        [Test]
+        public void StageGimmicks_RollBackToTheSameResult()
+        {
+            StageZone[] zones =
+            {
+                new StageZone(StageZoneKind.SpeedLane, -6f, 0f, -2f, 0.3f, Vector2.UnitX, 14f),
+                new StageZone(StageZoneKind.Launcher, 2f, 0f, 3f, 0.3f, new Vector2(-0.4f, 1f), 22f),
+                new StageZone(StageZoneKind.Bumper, -3f, 8f, -1f, 9f, Vector2.Zero, 16f),
+                new StageZone(StageZoneKind.Gust, -10f, 4f, 10f, 20f, new Vector2(-1f, 0.2f), 25f, 8f, 90, 40, 13, Vector2.Zero),
+                new StageZone(StageZoneKind.Ice, 4f, 0f, 12f, 0.3f, Vector2.Zero, 0.2f),
+                new StageZone(StageZoneKind.LowGravity, -12f, 10f, 12f, 30f, Vector2.Zero, 0.5f, 7f),
+                new StageZone(StageZoneKind.Warp, 13f, 0f, 14f, 4f, Vector2.Zero, 1f, 0f, 0, 0, 0, new Vector2(-8f, 6f)),
+            };
+            var reversed = (StageZone[])zones.Clone();
+            Array.Reverse(reversed);
+            SimWorld a = World(zones);
+            SimWorld b = World(reversed);
+            var snapshot = new WorldSnapshot();
+            var checksums = new List<ulong>();
+            for (int i = 0; i < 400; i++)
+            {
+                var input = PlayerInput.FromAxes(i % 150 < 100 ? 1f : -1f, 0f, i % 50 == 25 ? InputButtons.Jump : InputButtons.None);
+                if (i == 100)
+                {
+                    a.SaveTo(snapshot);
+                }
+                a.Step(new[] { input });
+                b.Step(new[] { input });
+                Assert.That(b.Checksum(), Is.EqualTo(a.Checksum()), $"並べた順でティック {a.Tick} の結果が違う");
+                if (i >= 100)
+                {
+                    checksums.Add(a.Checksum());
+                }
+            }
+
+            a.LoadFrom(snapshot);
+            for (int i = 100; i < 400; i++)
+            {
+                var input = PlayerInput.FromAxes(i % 150 < 100 ? 1f : -1f, 0f, i % 50 == 25 ? InputButtons.Jump : InputButtons.None);
+                a.Step(new[] { input });
+                Assert.That(a.Checksum(), Is.EqualTo(checksums[i - 100]), $"巻き戻した後のティック {a.Tick} の結果が違う");
+            }
+        }
+
+        [Test]
+        public void InvalidStageGimmicks_AreRejected()
+        {
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Ice, 0f, 0f, 1f, 1f, Vector2.Zero, 1.5f), "氷の強さが 1 より大きい");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.LowGravity, 0f, 0f, 1f, 1f, Vector2.Zero, 0.5f, 0f), "低重力の上限 0");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Gust, 0f, 0f, 1f, 1f, Vector2.UnitX, 10f, 5f, 60, 0, 0, Vector2.Zero),
+                "風が吹く長さ 0");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Gust, 0f, 0f, 1f, 1f, Vector2.UnitX, 10f, 5f, 60, 61, 0, Vector2.Zero),
+                "風が吹く長さが周期より長い");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Warp, 0f, 0f, 2f, 2f, Vector2.Zero, 1f, 0f, 0, 0, 0, new Vector2(1f, 1f)),
+                "出口がゲートの中");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.SpeedLane, 0f, 0f, 2f, 2f, Vector2.Zero, 10f), "レーンの向き 0");
+            var bumper = new StageZone(StageZoneKind.Bumper, 0f, 0f, 2f, 2f, Vector2.Zero, 10f);
+            Assert.That(bumper.Direction, Is.EqualTo(Vector2.UnitY), "向きを使わない種類の向きを揃えない");
         }
 
         [Test]

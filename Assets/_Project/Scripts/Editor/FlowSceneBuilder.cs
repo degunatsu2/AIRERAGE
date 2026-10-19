@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Airerage.Editor.Stages;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
@@ -25,6 +26,7 @@ namespace Airerage.Editor
     /// - Menu: タイトル、メインメニュー、キャラクター選択、ステージ選択（uGUI）。背景にステージを映すカメラ。
     /// - Stage_Athletic: アスレチックステージ（地形、ギミック、撃破の範囲、コインの出現地点、拠点の候補、出現位置、光）。
     ///   Sandbox_Online と同じ配置（値は SandboxOnlineSceneBuilder の 1 か所）。
+    /// - Stage_CityDay・Stage_CityNight・Stage_Volcano・Stage_SnowSea・Stage_SpaceStation: 追加のステージ（StageSceneBuilder。docs/15 6.11）。
     /// - Match_Training: トレーニングの試合の仕組み（自分＋ダミー 3 体、表示、HUD、カメラ、一時停止）。ステージのシーンに重ねる。
     /// - Match_Local: ローカル対戦の試合の仕組み（4 人分の表示、全員が入るカメラ、人ごとの技の札、HUD、一時停止。T6-5）。ステージのシーンに重ねる。
     /// - Match_Online: ネットワーク対戦の試合の仕組み（App の接続を使う OnlineRunner。T6-7）。ステージのシーンに重ねる。
@@ -46,17 +48,25 @@ namespace Airerage.Editor
         private const int TrainingDummies = 3;
 
         // ビルドの設定のシーンの順（最初が起動するシーン）。ほかのシーンは後ろに並べる。テンプレートの SampleScene は外す。
-        private static readonly string[] BuildOrder =
+        private static readonly string[] BuildOrder = CreateBuildOrder();
+
+        private static string[] CreateBuildOrder()
         {
-            AppScenePath, MenuScenePath, AthleticStagePath, TrainingScenePath, LocalScenePath, OnlineMatchScenePath,
-        };
+            var order = new List<string> { AppScenePath, MenuScenePath, AthleticStagePath };
+            foreach (StageLayout layout in StageSceneBuilder.Layouts)
+            {
+                order.Add(StageSceneBuilder.ScenePathOf(layout));
+            }
+            order.AddRange(new[] { TrainingScenePath, LocalScenePath, OnlineMatchScenePath });
+            return order.ToArray();
+        }
 
         private const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
 
         [MenuItem("Airerage/ゲームの流れのシーンを作り直す")]
         private static void BuildFromMenu()
         {
-            if (!EditorUtility.DisplayDialog("ゲームの流れ", "App・Menu・Stage_Athletic・Match_Training・Match_Local を作り直します。シーンを手で編集した内容は消えます。",
+            if (!EditorUtility.DisplayDialog("ゲームの流れ", "App・Menu・ステージ・Match_Training・Match_Local・Match_Online を作り直します。シーンを手で編集した内容は消えます。",
                     "作り直す", "やめる"))
             {
                 return;
@@ -68,10 +78,11 @@ namespace Airerage.Editor
             Build();
         }
 
-        /// <summary>4 つのシーンとステージの設定を作り直して保存し、ビルドの設定の順を整える。</summary>
+        /// <summary>シーンとステージの設定を作り直して保存し、ビルドの設定の順を整える。</summary>
         public static void Build()
         {
             BuildAthleticStage();
+            StageSceneBuilder.BuildAll();
             BuildTraining();
             BuildLocal();
             BuildOnlineMatch();
@@ -360,12 +371,14 @@ namespace Airerage.Editor
             }
             UnityEngine.UI.Image band = MenuUiBuilder.CreateFill(panel, "Band", new Color(0.35f, 0.85f, 1f, 0.35f),
                 new Vector2(0.45f, 0.55f), new Vector2(1f, 0.75f));
+            // 名前と説明は右の帯の側に、右の端から置く（左の札と重ならないように。説明は折り返す）。
             UnityEngine.UI.Text name = MenuUiBuilder.CreateText(panel, "Name", string.Empty, 72, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0.5f, 0.65f), new Vector2(0f, 0f), new Vector2(900f, 100f), Color.white);
+                new Vector2(1f, 0.65f), new Vector2(-80f, 0f), new Vector2(900f, 100f), Color.white);
             UnityEngine.UI.Text description = MenuUiBuilder.CreateText(panel, "Description", string.Empty, 28, FontStyle.Bold, TextAnchor.UpperLeft,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), new Vector2(900f, 200f), new Color(1f, 1f, 1f, 0.85f));
+                new Vector2(1f, 0.5f), new Vector2(-80f, 0f), new Vector2(900f, 200f), new Color(1f, 1f, 1f, 0.85f));
+            description.horizontalOverflow = HorizontalWrapMode.Wrap;
             UnityEngine.UI.Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -220f), new Vector2(900f, 50f), MenuUiBuilder.Accent);
+                new Vector2(1f, 0.5f), new Vector2(-80f, -220f), new Vector2(900f, 50f), MenuUiBuilder.Accent);
             MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
                 TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
 
@@ -398,19 +411,19 @@ namespace Airerage.Editor
             Save(scene, AppScenePath);
         }
 
-        /// <summary>ステージの設定と一覧（今はアスレチックステージだけ）。値はビルドのたびにここの値で作り直す。</summary>
+        /// <summary>ステージの設定と一覧（アスレチック、追加のステージの順）。値はビルドのたびにここの値で作り直す。</summary>
         internal static StageCatalog LoadOrCreateStages()
         {
             SandboxWireSceneBuilder.EnsureFolder(StageFolder);
-            var athletic = AssetDatabase.LoadAssetAtPath<StageDefinition>(AthleticStageAssetPath);
-            if (athletic == null)
+            var stages = new List<StageDefinition>
             {
-                athletic = ScriptableObject.CreateInstance<StageDefinition>();
-                AssetDatabase.CreateAsset(athletic, AthleticStageAssetPath);
+                LoadOrCreateStage(AthleticStageAssetPath, "ATHLETIC", Path.GetFileNameWithoutExtension(AthleticStagePath),
+                    "Jump pads, updrafts and boost rings.", new Color(0.35f, 0.85f, 1f)),
+            };
+            foreach (StageLayout layout in StageSceneBuilder.Layouts)
+            {
+                stages.Add(LoadOrCreateStage($"{StageFolder}/{layout.Id}.asset", layout.DisplayName, layout.SceneName, layout.Description, layout.Color));
             }
-            athletic.Configure("ATHLETIC", Path.GetFileNameWithoutExtension(AthleticStagePath),
-                "Jump pads, updrafts and boost rings.", new Color(0.35f, 0.85f, 1f));
-            EditorUtility.SetDirty(athletic);
 
             var catalog = AssetDatabase.LoadAssetAtPath<StageCatalog>(StageCatalogPath);
             if (catalog == null)
@@ -418,10 +431,23 @@ namespace Airerage.Editor
                 catalog = ScriptableObject.CreateInstance<StageCatalog>();
                 AssetDatabase.CreateAsset(catalog, StageCatalogPath);
             }
-            catalog.Configure(new[] { athletic });
+            catalog.Configure(stages.ToArray());
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
             return catalog;
+        }
+
+        private static StageDefinition LoadOrCreateStage(string path, string displayName, string sceneName, string description, Color color)
+        {
+            var stage = AssetDatabase.LoadAssetAtPath<StageDefinition>(path);
+            if (stage == null)
+            {
+                stage = ScriptableObject.CreateInstance<StageDefinition>();
+                AssetDatabase.CreateAsset(stage, path);
+            }
+            stage.Configure(displayName, sceneName, description, color);
+            EditorUtility.SetDirty(stage);
+            return stage;
         }
 
         // ビルドの設定のシーンの順を整える（App を最初に。テンプレートの SampleScene は外す。ファイルは消さない）。

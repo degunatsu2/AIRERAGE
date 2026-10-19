@@ -297,6 +297,11 @@ namespace Airerage.Net
                     _session.BeginPending(_stage, _session.PendingStage);
                 }
             }
+        }
+
+        private void Start()
+        {
+            // 表示は、同じシーンの表示（WireView など）の Awake が済んでから合わせる（読み込んだ順によらないように）。
             UpdateViews();
         }
 

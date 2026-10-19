@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using Airerage.Core.Common;
 using Airerage.Core.Simulation;
 using UnityEngine;
 
 namespace Airerage.Runtime.Simulation
 {
     /// <summary>
-    /// シーンに置くギミック（ジャンプ台、上昇気流、加速リング。Core の StageZone）。範囲は、この物体の位置を中心に、
+    /// シーンに置くギミック（ジャンプ台、上昇気流、加速リング、ステージ固有のギミック。Core の StageZone）。範囲は、この物体の位置を中心に、
     /// 大きさ _size の長方形（Z = 0 の面、ワールド座標。回転と拡大縮小は使わない）。見た目は StageZoneView が描く。
     /// 調整値は、シーンを作るコード（エディタのビルダー）で決める【仮】。
     /// </summary>
@@ -15,16 +16,25 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private StageZoneKind _kind = StageZoneKind.JumpPad;
         [Tooltip("範囲の大きさ（m）")]
         [SerializeField] private Vector2 _size = new Vector2(2f, 0.4f);
-        [Tooltip("向き（上昇気流では使わない）")]
+        [Tooltip("向き（上昇気流・バンパー・氷・低重力・ワープゲートでは使わない）")]
         [SerializeField] private Vector2 _direction = Vector2.up;
-        [Tooltip("ジャンプ台・加速リングでは速さ（m/s）、上昇気流では加速度（m/s²）")]
+        [Tooltip("ジャンプ台・加速リング・スピードレーン・発射台・バンパーでは速さ（m/s）、上昇気流・風では加速度（m/s²）、氷・低重力では倍率（0〜1）")]
         [SerializeField] private float _power = 24f;
-        [Tooltip("上昇気流の上向きの速さの上限（m/s）")]
+        [Tooltip("上昇気流・風の速さの上限、低重力の落ちる速さの上限（m/s）")]
         [SerializeField] private float _limit = 10f;
+        [Tooltip("風の周期（秒。0 ならいつも吹く）")]
+        [SerializeField] private float _periodSeconds;
+        [Tooltip("風が 1 周期のうち吹いている長さ（秒）")]
+        [SerializeField] private float _activeSeconds;
+        [Tooltip("風の周期のずれ（秒）")]
+        [SerializeField] private float _phaseSeconds;
+        [Tooltip("ワープゲートの出口（ワールドの位置）")]
+        [SerializeField] private Vector2 _target;
 
         public StageZoneKind Kind => _kind;
         public Vector2 Size => _size;
         public Vector2 Direction => _direction;
+        public Vector2 Target => _target;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(StageZoneKind kind, Vector2 size, Vector2 direction, float power, float limit = 0f)
@@ -36,13 +46,29 @@ namespace Airerage.Runtime.Simulation
             _limit = limit;
         }
 
+        /// <summary>周期のある風にする（シーンのビルダー用。秒）。</summary>
+        public void ConfigureTiming(float periodSeconds, float activeSeconds, float phaseSeconds)
+        {
+            _periodSeconds = periodSeconds;
+            _activeSeconds = activeSeconds;
+            _phaseSeconds = phaseSeconds;
+        }
+
+        /// <summary>ワープゲートの出口を決める（シーンのビルダー用）。</summary>
+        public void ConfigureTarget(Vector2 target)
+        {
+            _target = target;
+        }
+
         /// <summary>Core のギミックにする。値が不正なら ArgumentException。</summary>
         public StageZone ToZone()
         {
             Vector3 center = transform.position;
             Vector2 half = _size * 0.5f;
             var direction = new System.Numerics.Vector2(_direction.x, _direction.y);
-            return new StageZone(_kind, center.x - half.x, center.y - half.y, center.x + half.x, center.y + half.y, direction, _power, _limit);
+            return new StageZone(_kind, center.x - half.x, center.y - half.y, center.x + half.x, center.y + half.y, direction, _power, _limit,
+                SimTime.SecondsToTicks(_periodSeconds), SimTime.SecondsToTicks(_activeSeconds), SimTime.SecondsToTicks(_phaseSeconds),
+                new System.Numerics.Vector2(_target.x, _target.y));
         }
 
         /// <summary>
@@ -68,8 +94,24 @@ namespace Airerage.Runtime.Simulation
 
         private void OnDrawGizmos()
         {
-            Gizmos.color = _kind == StageZoneKind.JumpPad ? new Color(0.3f, 1f, 0.4f)
-                : _kind == StageZoneKind.Updraft ? new Color(0.5f, 0.85f, 1f) : new Color(1f, 0.6f, 0.2f);
+            switch (_kind)
+            {
+                case StageZoneKind.JumpPad:
+                case StageZoneKind.Launcher:
+                    Gizmos.color = new Color(0.3f, 1f, 0.4f);
+                    break;
+                case StageZoneKind.Updraft:
+                case StageZoneKind.Gust:
+                    Gizmos.color = new Color(0.5f, 0.85f, 1f);
+                    break;
+                case StageZoneKind.Warp:
+                    Gizmos.color = new Color(0.8f, 0.4f, 1f);
+                    Gizmos.DrawLine(transform.position, new Vector3(_target.x, _target.y, 0f));
+                    break;
+                default:
+                    Gizmos.color = new Color(1f, 0.6f, 0.2f);
+                    break;
+            }
             Gizmos.DrawWireCube(transform.position, new Vector3(_size.x, _size.y, 0f));
         }
     }

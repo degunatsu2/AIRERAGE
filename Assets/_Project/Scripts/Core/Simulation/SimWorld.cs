@@ -216,7 +216,7 @@ namespace Airerage.Core.Simulation
             {
                 CharacterState state = _states[i];
                 // 行動の速さの強化の間は、速さを上げた調整値で動かす（SpeedBoosts）。
-                _simulator.Step(ref state, phase == MatchPhase.Countdown ? default : inputs[i], SpeedBoosts.EffectiveConfig(state, _configs[i]));
+                _simulator.Step(ref state, phase == MatchPhase.Countdown ? default : inputs[i], SpeedBoosts.EffectiveConfig(state, _configs[i]), Tick);
                 _states[i] = state;
             }
             Tick++;

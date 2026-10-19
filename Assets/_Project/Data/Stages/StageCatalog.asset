@@ -14,3 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageCatalog
   _stages:
   - {fileID: 11400000, guid: 8c0251ecde741c92fbb17bade71e9ab8, type: 2}
+  - {fileID: 11400000, guid: f87f46d11fde49410addd79d02c4b4bf, type: 2}
+  - {fileID: 11400000, guid: fb8a820ecf8e8bed68e416a4af59aa1e, type: 2}
+  - {fileID: 11400000, guid: 4ad8e1279a86fbc5690242f6bd21f440, type: 2}
+  - {fileID: 11400000, guid: 72e208fd11ee2bb62a869b93aefba6d4, type: 2}
+  - {fileID: 11400000, guid: 260395f8fcc90acfba5d0d4c3830a70d, type: 2}
