@@ -162,6 +162,12 @@ namespace Airerage.Core.Combat
         public int HazardImmunityTicks;
         public int HazardHitCount;
 
+        /// <summary>
+        /// このティックに当たった危険の威力（コインを落とす量を決める。0 なら当たっていない）。SimWorld がコインを落としたら 0 に戻す
+        /// （ティックの終わりにはふつう 0）。
+        /// </summary>
+        public int HazardDropPower;
+
         /// <summary>凍っているか。</summary>
         public bool IsFrozen => FrozenTicksLeft > 0;
 
@@ -212,7 +218,8 @@ namespace Airerage.Core.Combat
                 && SlowFallSerial == other.SlowFallSerial && PortalCount == other.PortalCount && InPortalId == other.InPortalId
                 && WarpCooldownTicks == other.WarpCooldownTicks && WarpCount == other.WarpCount
                 && FrozenTicksLeft == other.FrozenTicksLeft && FreezeCount == other.FreezeCount
-                && HazardImmunityTicks == other.HazardImmunityTicks && HazardHitCount == other.HazardHitCount;
+                && HazardImmunityTicks == other.HazardImmunityTicks && HazardHitCount == other.HazardHitCount
+                && HazardDropPower == other.HazardDropPower;
         }
 
         public override bool Equals(object obj)
@@ -231,7 +238,7 @@ namespace Airerage.Core.Combat
                 HashCode.Combine(Holding, HoldSlot, HoldTicks, AttackSerial, CoinBoostTicksLeft, CoinBonusMilli, JackpotHitCount,
                     GaugeBonusRemainder),
                 HashCode.Combine(SpeedBoostTicksLeft, SkyBoostTicksLeft, Special1Spent, Special2Spent, SkillAim, SlowFallSerial, PortalCount,
-                    HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount, FrozenTicksLeft, FreezeCount, HazardImmunityTicks, HazardHitCount)));
+                    HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount, FrozenTicksLeft, FreezeCount, HazardImmunityTicks, HazardHitCount, HazardDropPower)));
         }
 
         public override string ToString()

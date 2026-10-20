@@ -216,17 +216,6 @@
                 },
                 {
                     "name": "",
-                    "id": "e32dc69e-80e4-43fa-9c1c-f7167127e453",
-                    "path": "<Keyboard>/j",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Wire",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "ec5a10bd-27de-4587-8c89-05bf03b121cd",
                     "path": "<Mouse>/leftButton",
                     "interactions": "",
@@ -240,17 +229,6 @@
                     "name": "",
                     "id": "1c419840-e2fe-4d37-a3e0-ddef58b4aed3",
                     "path": "<Gamepad>/buttonWest",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Attack",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "e8703f27-0457-4e62-8a1b-721275610365",
-                    "path": "<Keyboard>/k",
                     "interactions": "",
                     "processors": "",
                     "groups": "",

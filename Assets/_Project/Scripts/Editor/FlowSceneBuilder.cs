@@ -345,6 +345,8 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screens, "_optionsScreen", options);
             Airerage.Net.OnlineMenu online = OnlineMenuUiBuilder.Create(canvas.transform, screens, characterSelect, stageSelect, LoadOrCreateStages());
             SandboxWireSceneBuilder.SetReference(screens, "_online", online);
+            // 終了の確認（いちばん手前に出すため、ほかの画面の後に作る）。
+            SandboxWireSceneBuilder.SetReference(screens, "_quitDialog", MenuUiBuilder.CreateQuitDialog(canvas.transform));
             SandboxWireSceneBuilder.SetReference(screens, "_title", title.gameObject);
             SandboxWireSceneBuilder.SetReference(screens, "_pressAnyButton", press);
             SandboxWireSceneBuilder.SetReference(screens, "_main", main.gameObject);

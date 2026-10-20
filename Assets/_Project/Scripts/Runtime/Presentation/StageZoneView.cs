@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Airerage.Core.Common;
+using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Simulation;
@@ -15,11 +16,13 @@ namespace Airerage.Runtime.Presentation
     /// - 加速リング: 輪と、中心から両方向へ流れる「&lt; &gt;」の印（両方向に効く）。
     /// - スピードレーン: 縁の枠と、向きへ流れる「&gt;」の列。発射台: 明るい枠と、向きへ速く流れる「^」。
     /// - バンパー: 脈打つ二重の枠。氷: 表面の線と、横切るきらめき。低重力: 薄い枠と、ゆっくり昇る粒。
-    /// - 風: 向きへ流れる筋。周期のある風は、吹いている間だけ流れ、吹き始める 1 秒前（予告の長さがあればその長さ）から点滅して知らせる。
-    /// - 周期のある発射台（間欠泉）: 噴いている間だけ噴き出しの見た目を出し、噴く前は枠を点滅させる。噴いた瞬間に音。
+    /// - 風: 向きへ流れる筋。周期のある風は、吹いている間だけ流れ、吹き始める 1 秒前（予告の長さがあればその長さ）から予告する。
+    /// - 周期のある発射台（間欠泉）: 噴いている間だけ噴き出しの見た目を出し、噴く前は予告する。噴いた瞬間に音。
+    /// - 予告はどれも、当たる範囲に黄色の斜線と「三角形の中にエクスクラメーションマーク」の記号（WarningOverlay。ユーザーの要望、2026-10-20）。
     /// - ワープゲート: 回る輪と、中へ吸い込まれる輪。出口にも小さな輪。
-    /// - 危険（溶岩流・つらら）: 予告の間は当たる柱の全体を点滅させて警告音、噴いている間は柱の見た目と昇る（落ちる）筋。
-    /// - 吹雪: 予告の間は範囲の全体を点滅させ、画面の上に BLIZZARD の文字と警告音。吹いている間は白い幕と、向きへ流れる雪の筋。
+    /// - 危険（溶岩流・つらら）: 予告の間は当たる柱の全体を予告して警告音（つららは鳴らさない）、噴いている間は柱の見た目と昇る（落ちる）筋。
+    /// - 吹雪: 予告の間は凍る所（影にならない所）だけを予告し、画面の上に BLIZZARD の文字と警告音。吹いている間は白い幕と、向きへ流れる
+    ///   雪の筋。
     /// 動くギミックは、見た目の子（_moving）を試合のティック数で動かす（この物体は動かさない。ギミックの範囲はこの物体の位置から決まる）。
     /// 線は起動時にこの物体の子として作る。流れる印の動きは Time.time で決める（巻き戻しとは関係ない）。周期・動き・ランダムな位置は、
     /// シミュレーションと同じ試合のティック数と試合の種で決める（表示する試合がなければ、起動からの時間と種 0。メニューの背景など）。
@@ -41,8 +44,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _period = 0.9f;
         [Tooltip("効いている間だけ出す見た目（溶岩の柱、蒸気、吹雪の幕など。なくてもよい）")]
         [SerializeField] private GameObject _activeVisual;
-        [Tooltip("予告の間だけ点滅させる見た目（危険・吹雪。なくてもよい）")]
-        [SerializeField] private GameObject _warningVisual;
+        [Tooltip("予告の間に警告音を鳴らすか（危険と吹雪。つららは鳴らさない。ユーザーの要望、2026-10-20）")]
+        [SerializeField] private bool _warningSound = true;
         [Tooltip("動くギミックで、一緒に動かす見た目の親（なくてもよい）")]
         [SerializeField] private Transform _moving;
 
@@ -62,6 +65,11 @@ namespace Airerage.Runtime.Presentation
         private int _soundedCycle = int.MinValue;
         private int _blizzardCountdown;
         private GUIStyle _bannerStyle;
+        private WarningOverlay _overlay;
+        private readonly List<Rect> _warningAreas = new List<Rect>();
+        private readonly List<Vector2> _warningIcons = new List<Vector2>();
+        private List<Rect> _exposedAreas;
+        private List<Vector2> _exposedIcons;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(Material lineMaterial, Color color)
@@ -76,11 +84,17 @@ namespace Airerage.Runtime.Presentation
             _activeVisual = visual;
         }
 
-        /// <summary>予告の間だけ点滅させる見た目を決める（シーンのビルダー用）。</summary>
-        public void ConfigureWarningVisual(GameObject visual)
+        /// <summary>予告の間に警告音を鳴らすかを決める（シーンのビルダー用）。</summary>
+        public void ConfigureWarningSound(bool sound)
         {
-            _warningVisual = visual;
+            _warningSound = sound;
         }
+
+        /// <summary>予告の表示（周期のあるギミックだけ。テスト用）。</summary>
+        public WarningOverlay Warning => _overlay;
+
+        /// <summary>予告の間に警告音を鳴らすか（テスト用）。</summary>
+        public bool WarningSound => _warningSound;
 
         /// <summary>動くギミックで、一緒に動かす見た目の親を決める（シーンのビルダー用）。</summary>
         public void ConfigureMoving(Transform moving)
@@ -207,10 +221,40 @@ namespace Airerage.Runtime.Presentation
                 enabled = false;
                 return;
             }
-            if (_warningVisual != null)
+            if (_core.Period > 0 && _lineMaterial != null)
             {
-                _warningVisual.SetActive(false);
+                // 予告の表示（黄色の斜線と警告の記号。吹雪はキャラクターの前に、ほかはギミックの見た目の前に出す）。
+                var overlay = new GameObject("Warning");
+                overlay.transform.SetParent(transform, false);
+                _overlay = overlay.AddComponent<WarningOverlay>();
+                _overlay.Initialize(_lineMaterial, _zone.Kind == StageZoneKind.Blizzard ? -2.6f : -0.7f);
             }
+        }
+
+        // 予告の表示を出す（ShowsWarning も合わせる）。
+        private void ShowWarning(bool warning)
+        {
+            ShowsWarning = warning;
+            if (_overlay == null)
+            {
+                return;
+            }
+            if (!warning)
+            {
+                _overlay.Hide();
+                return;
+            }
+            float pulse = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.PI * 1.6f));
+            _overlay.Show(_warningAreas, _warningIcons, pulse);
+        }
+
+        // 範囲全体を予告する（記号は真ん中）。
+        private void WarnWholeZone(Vector3 center, Vector2 half)
+        {
+            _warningAreas.Clear();
+            _warningIcons.Clear();
+            _warningAreas.Add(new Rect(center.x - half.x, center.y - half.y, half.x * 2f, half.y * 2f));
+            _warningIcons.Add(new Vector2(center.x, center.y));
         }
 
         // 範囲の、向き direction に沿った長さ。
@@ -325,7 +369,12 @@ namespace Airerage.Runtime.Presentation
                 _soundedCycle = cycle;
                 PlayInMatch(SoundId.Geyser, 0.7f);
             }
-            float frameAlpha = _core.Period <= 0 ? 1f : warning ? strength : 0.25f + 0.75f * strength;
+            if (warning)
+            {
+                WarnWholeZone(center, half);
+            }
+            ShowWarning(warning);
+            float frameAlpha = _core.Period <= 0 ? 1f : 0.25f + 0.75f * strength;
             Box(_ring, center, half, 1f + 0.05f * Mathf.Sin(time * Mathf.PI * 4f), frameAlpha);
             Vector2 side = new Vector2(_direction.y, -_direction.x);
             float width = Mathf.Min(Mathf.Max(half.x, half.y) * 0.9f, 1.1f);
@@ -352,6 +401,11 @@ namespace Airerage.Runtime.Presentation
         {
             float strength = PeriodicStrength(tick, out bool warning, out _);
             SetActiveVisual(strength >= 1f);
+            if (warning)
+            {
+                WarnWholeZone(center, half);
+            }
+            ShowWarning(warning);
             Vector2 side = new Vector2(_direction.y, -_direction.x);
             float length = Extent(_direction);
             float across = Extent(side);
@@ -401,8 +455,9 @@ namespace Airerage.Runtime.Presentation
             int warningTicks = _core.Timing.WarningTicks > 0 ? _core.Timing.WarningTicks : SimTime.SecondsToTicks(GustWarningSeconds);
             if (untilActive <= warningTicks)
             {
+                // 予告の間は、流れる印を止めて、黄色の斜線と警告の記号を出す（ShowWarning）。
                 warning = true;
-                return Blink() ? 0.8f : 0.15f;
+                return 0f;
             }
             return 0f;
         }
@@ -422,29 +477,25 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        private void SetWarningVisual(bool visible)
-        {
-            if (_warningVisual != null && _warningVisual.activeSelf != visible)
-            {
-                _warningVisual.SetActive(visible);
-            }
-        }
 
-        // 予告の間は当たる柱の全体を点滅させ（予告の始まりに警告音）、噴いている間は柱の見た目と、向きへ流れる太い筋。
+        // 予告の間は当たる柱の全体に黄色の斜線と警告の記号（予告の始まりに警告音。つららは鳴らさない）、噴いている間は柱の見た目と、
+        // 向きへ流れる太い筋。
         private void RenderHazard(Vector3 center, Vector2 half, float time, int tick)
         {
             float strength = PeriodicStrength(tick, out bool warning, out int cycle);
-            ShowsWarning = warning;
             bool active = strength >= 1f;
             SetActiveVisual(active);
             if (warning && cycle != _warnedCycle)
             {
                 _warnedCycle = cycle;
-                PlayInMatch(SoundId.HazardWarning, 0.75f);
+                if (_warningSound)
+                {
+                    PlayInMatch(SoundId.HazardWarning, 0.75f);
+                }
             }
             if (!active && !warning)
             {
-                SetWarningVisual(false);
+                ShowWarning(false);
                 SetColor(_ring, 0f);
                 foreach (LineRenderer line in _marks)
                 {
@@ -458,9 +509,12 @@ namespace Airerage.Runtime.Presentation
             var columnHalf = new Vector2((maxX - minX) * 0.5f, half.y);
             var column = new Vector3(columnCenter, center.y, 0f);
             PlaceOnColumn(_activeVisual, columnCenter, maxX - minX);
-            PlaceOnColumn(_warningVisual, columnCenter, maxX - minX);
-            SetWarningVisual(warning && Blink());
-            Box(_ring, column, columnHalf, 1f, warning ? (Blink() ? 1f : 0.2f) : 0.9f);
+            if (warning)
+            {
+                WarnWholeZone(column, columnHalf);
+            }
+            ShowWarning(warning);
+            Box(_ring, column, columnHalf, 1f, warning ? 0f : 0.9f);
             // 上向きなら下から上へ（溶岩流）、下向きなら上から下へ（つらら）流れる。
             Vector2 flow = _direction;
             float height = half.y * 2f;
@@ -494,14 +548,13 @@ namespace Airerage.Runtime.Presentation
             t.localScale = scale;
         }
 
-        // 予告の間は範囲の全体を点滅させ、吹いている間は白い幕と、向きへ流れる雪の筋。
+        // 予告の間は、凍る所（影にならない所）だけに黄色の斜線と警告の記号（安全な所には出さない。ユーザーの要望、2026-10-20）。
+        // 吹いている間は白い幕と、向きへ流れる雪の筋。
         private void RenderBlizzard(Vector3 center, Vector2 half, float time, int tick)
         {
             float strength = PeriodicStrength(tick, out bool warning, out int cycle);
-            ShowsWarning = warning;
             bool active = strength >= 1f;
             SetActiveVisual(active);
-            SetWarningVisual(warning && Blink());
             _blizzardCountdown = 0;
             if (warning)
             {
@@ -510,10 +563,19 @@ namespace Airerage.Runtime.Presentation
                 if (cycle != _warnedCycle)
                 {
                     _warnedCycle = cycle;
-                    PlayInMatch(SoundId.BlizzardWarning, 0.8f);
+                    if (_warningSound)
+                    {
+                        PlayInMatch(SoundId.BlizzardWarning, 0.8f);
+                    }
                 }
+                ComputeExposedAreas();
+                _warningAreas.Clear();
+                _warningAreas.AddRange(_exposedAreas);
+                _warningIcons.Clear();
+                _warningIcons.AddRange(_exposedIcons);
             }
-            Box(_ring, center, half, 1f, warning ? (Blink() ? 0.9f : 0.15f) : active ? 0.5f : 0f);
+            ShowWarning(warning);
+            Box(_ring, center, half, 1f, active ? 0.5f : 0f);
             Vector2 side = new Vector2(_direction.y, -_direction.x);
             for (int i = 0; i < _marks.Count; i++)
             {
@@ -527,6 +589,71 @@ namespace Airerage.Runtime.Presentation
                 _marks[i].SetPosition(0, ToWorld(point));
                 _marks[i].SetPosition(1, ToWorld(point + _direction * 1.4f + Vector2.down * 0.2f));
                 SetColor(_marks[i], active ? Fade(phase) : 0f);
+            }
+        }
+
+        /// <summary>吹雪の範囲を区切る升目の大きさ（m）と、警告の記号を置く間隔（m）。</summary>
+        private const float ExposureCell = 1f;
+        private const float ExposureIconSpacing = 16f;
+
+        // 吹雪で凍る所（範囲の中で、地形の中でなく、風上に地形がない所。StageZones.Sheltered と同じ決め方）を、横に続く升目を
+        // まとめた長方形にする（1 回だけ。地形はシーンの箱から作る）。
+        private void ComputeExposedAreas()
+        {
+            if (_exposedAreas != null)
+            {
+                return;
+            }
+            _exposedAreas = new List<Rect>();
+            _exposedIcons = new List<Vector2>();
+            var errors = new List<string>();
+            BoxTerrain terrain = SceneTerrainBuilder.Build(1 << 0, errors);
+            var halfCell = new System.Numerics.Vector3(ExposureCell * 0.5f, ExposureCell * 0.5f, 0.5f);
+            float limit = _core.Limit > 0f ? _core.Limit : StageZones.BlizzardShelterDistance;
+            int columns = Mathf.Max(1, Mathf.FloorToInt((_core.MaxX - _core.MinX) / ExposureCell));
+            int rows = Mathf.Max(1, Mathf.FloorToInt((_core.MaxY - _core.MinY) / ExposureCell));
+            int iconStep = Mathf.Max(1, Mathf.RoundToInt(ExposureIconSpacing / ExposureCell));
+            for (int row = 0; row < rows; row++)
+            {
+                float y = _core.MinY + (row + 0.5f) * ExposureCell;
+                int runStart = -1;
+                for (int column = 0; column <= columns; column++)
+                {
+                    bool exposed = false;
+                    if (column < columns)
+                    {
+                        var point = new System.Numerics.Vector3(_core.MinX + (column + 0.5f) * ExposureCell, y, 0f);
+                        exposed = !terrain.IsOverlapping(point, halfCell) && !StageZones.Sheltered(point, _core.Direction, terrain, limit);
+                        if (exposed && row % iconStep == iconStep / 2 && column % iconStep == iconStep / 2)
+                        {
+                            _exposedIcons.Add(new Vector2(point.X, point.Y));
+                        }
+                    }
+                    if (exposed && runStart < 0)
+                    {
+                        runStart = column;
+                    }
+                    else if (!exposed && runStart >= 0)
+                    {
+                        _exposedAreas.Add(new Rect(_core.MinX + runStart * ExposureCell, y - ExposureCell * 0.5f,
+                            (column - runStart) * ExposureCell, ExposureCell));
+                        runStart = -1;
+                    }
+                }
+            }
+            foreach (string error in errors)
+            {
+                Debug.LogWarning($"{name}: 吹雪の予告の範囲を作るときに除いた地形: {error}", this);
+            }
+        }
+
+        /// <summary>吹雪で凍る所の長方形（テスト用。まだなければ作る）。</summary>
+        public IReadOnlyList<Rect> ExposedAreas
+        {
+            get
+            {
+                ComputeExposedAreas();
+                return _exposedAreas;
             }
         }
 
@@ -549,9 +676,19 @@ namespace Airerage.Runtime.Presentation
             string text = $"BLIZZARD IN {_blizzardCountdown} — TAKE COVER!";
             var rect = new Rect(0f, Screen.height * 0.2f, Screen.width, Screen.height * 0.08f);
             Color color = GUI.color;
-            GUI.color = new Color(0f, 0.05f, 0.15f, 0.8f);
-            GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width, rect.height), text, _bannerStyle);
-            GUI.color = Blink() ? new Color(0.75f, 0.95f, 1f) : new Color(0.4f, 0.75f, 1f);
+            // 帯と、文字の左右に警告の記号（予告の表示と同じ黄色。ユーザーの要望、2026-10-20）。
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            float iconSize = rect.height * 0.9f;
+            Vector2 textSize = _bannerStyle.CalcSize(new GUIContent(text));
+            if (_overlay != null && _overlay.IconTexture != null)
+            {
+                GUI.color = Color.white;
+                float y = rect.y + (rect.height - iconSize) * 0.5f;
+                GUI.DrawTexture(new Rect(rect.center.x - textSize.x * 0.5f - iconSize * 1.2f, y, iconSize, iconSize), _overlay.IconTexture);
+                GUI.DrawTexture(new Rect(rect.center.x + textSize.x * 0.5f + iconSize * 0.2f, y, iconSize, iconSize), _overlay.IconTexture);
+            }
+            GUI.color = Blink() ? new Color(1f, 0.88f, 0.1f) : new Color(1f, 0.7f, 0.05f);
             GUI.Label(rect, text, _bannerStyle);
             GUI.color = color;
         }

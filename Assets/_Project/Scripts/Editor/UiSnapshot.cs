@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using Airerage.Runtime.Data;
+using Airerage.Runtime.Presentation;
 using Airerage.Runtime.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -86,6 +90,148 @@ namespace Airerage.Editor
             CaptureAll(screens, "Options_General");
             options.Page.Button.onClick.Invoke();
             CaptureAll(screens, "Options_Controls");
+        }
+
+        /// <summary>
+        /// 見た目の確認（ユーザーの要望、2026-10-20）: キャラクターの仮の見た目（衣装 4 つ。正面と斜め）、ゲームを終了する前の確認、
+        /// ギミックの予告（火口の溶岩流と間欠泉、雪原の吹雪とつらら。黄色の斜線と警告の記号）。実行中に作る物は、起動の処理を呼んで作る。
+        /// </summary>
+        public static void CaptureLooks()
+        {
+            Directory.CreateDirectory(OutputFolder);
+            CaptureCostumes();
+            CaptureQuitDialog();
+            CaptureWarnings();
+        }
+
+        private static void CaptureCostumes()
+        {
+            EditorSceneManager.OpenScene(SandboxCombatSceneBuilder.ScenePath, OpenSceneMode.Single);
+            CostumeView costume = Object.FindObjectsByType<CostumeView>(FindObjectsSortMode.None).First(c => c.name == "Character");
+            CallAwake(costume);
+            // 箱は実行中に体の大きさ（MovementTuning の初期値）へ伸ばすので、撮る前に同じにする。
+            System.Numerics.Vector3 half = new Airerage.Core.Movement.MovementTuning().HalfExtents;
+            costume.transform.localScale = new Vector3(half.X * 2f, half.Y * 2f, half.Z * 2f);
+            costume.transform.position += Vector3.up * (half.Y * 2f - 1f) * 0.5f;
+            WithCamera(camera =>
+            {
+                Vector3 body = costume.transform.position + Vector3.up * 0.2f;
+                foreach (CharacterCostume look in Enum.GetValues(typeof(CharacterCostume)))
+                {
+                    costume.Show(look, force: true);
+                    camera.fieldOfView = 30f;
+                    camera.transform.position = body + new Vector3(0f, 0.4f, -6f);
+                    camera.transform.LookAt(body);
+                    RenderCamera(camera, new Vector2Int(800, 800), $"{OutputFolder}/Costume_{look}_Front.png");
+                    camera.transform.position = body + new Vector3(4f, 2f, -4.5f);
+                    camera.transform.LookAt(body);
+                    RenderCamera(camera, new Vector2Int(800, 800), $"{OutputFolder}/Costume_{look}_Angle.png");
+                }
+            });
+        }
+
+        private static void CaptureQuitDialog()
+        {
+            MenuScreens screens = OpenMenu();
+            ShowOnly(screens, screens.transform.Find("Title"));
+            screens.QuitDialog.gameObject.SetActive(true);
+            CallAwake(screens.QuitDialog);
+            CaptureAll(screens, "QuitDialog");
+        }
+
+        private static void CaptureWarnings()
+        {
+            OpenStage("Stage_Volcano");
+            StageZoneView lava = WarningView("LavaFlowWest");
+            lava.Warning.Show(new[] { new Rect(-26f, -20f, 6f, 33f) }, new[] { new Vector2(-23f, -3.5f) }, 1f);
+            foreach (string name in new[] { "GeyserHighWest", "GeyserLowWest" })
+            {
+                StageZoneView geyser = WarningView(name);
+                Vector3 center = geyser.transform.position;
+                geyser.Warning.Show(new[] { new Rect(center.x - 2.5f, center.y - 2.5f, 5f, 5f) }, new[] { new Vector2(center.x, center.y) }, 1f);
+            }
+            WithCamera(camera =>
+            {
+                camera.fieldOfView = 40f;
+                camera.transform.position = new Vector3(-26f, 2f, -42f);
+                RenderCamera(camera, new Vector2Int(1600, 900), $"{OutputFolder}/Warning_Volcano.png");
+            });
+
+            OpenStage("Stage_SnowSea");
+            StageZoneView blizzard = Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.None)
+                .First(v => v.GetComponent<Airerage.Runtime.Simulation.StageZoneAuthoring>().Kind == Airerage.Core.Simulation.StageZoneKind.Blizzard);
+            CallAwake(blizzard);
+            IReadOnlyList<Rect> areas = blizzard.ExposedAreas;
+            var icons = (List<Vector2>)typeof(StageZoneView).GetField("_exposedIcons", Private).GetValue(blizzard);
+            blizzard.Warning.Show(areas, icons, 1f);
+            WithCamera(camera =>
+            {
+                camera.fieldOfView = 50f;
+                camera.transform.position = new Vector3(0f, 14f, -78f);
+                RenderCamera(camera, new Vector2Int(1600, 900), $"{OutputFolder}/Warning_SnowSea_Blizzard.png");
+                camera.fieldOfView = 40f;
+                camera.transform.position = new Vector3(-30f, 2f, -32f);
+                RenderCamera(camera, new Vector2Int(1600, 900), $"{OutputFolder}/Warning_SnowSea_Cave.png");
+            });
+            blizzard.Warning.Hide();
+            StageZoneView icicles = WarningView("Icicles");
+            icicles.Warning.Show(new[] { new Rect(-37f, -3f, 1.6f, 5f) }, new[] { new Vector2(-36.2f, -0.5f) }, 1f);
+            WithCamera(camera =>
+            {
+                camera.fieldOfView = 40f;
+                camera.transform.position = new Vector3(-34f, 0f, -24f);
+                RenderCamera(camera, new Vector2Int(1600, 900), $"{OutputFolder}/Warning_SnowSea_Icicles.png");
+            });
+        }
+
+        private static void OpenStage(string scene)
+        {
+            string[] found = AssetDatabase.FindAssets($"{scene} t:Scene");
+            if (found.Length == 0)
+            {
+                throw new InvalidOperationException($"ステージのシーンがない: {scene}");
+            }
+            EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(found[0]), OpenSceneMode.Single);
+        }
+
+        // 名前が name のギミックの見た目を起動して返す（予告の表示を作る）。
+        private static StageZoneView WarningView(string name)
+        {
+            GameObject go = GameObject.Find(name);
+            if (go == null)
+            {
+                throw new InvalidOperationException($"ギミックがない: {name}");
+            }
+            var view = go.GetComponent<StageZoneView>();
+            CallAwake(view);
+            if (view.Warning == null)
+            {
+                throw new InvalidOperationException($"{name} に予告の表示がない");
+            }
+            return view;
+        }
+
+        // 実行中にだけ呼ばれる起動の処理を呼ぶ（エディタで撮るため）。
+        private static void CallAwake(MonoBehaviour behaviour)
+        {
+            behaviour.GetType().GetMethod("Awake", Private).Invoke(behaviour, null);
+        }
+
+        // 撮る間だけカメラを置く。
+        private static void WithCamera(Action<Camera> render)
+        {
+            var go = new GameObject("SnapshotCamera");
+            Camera camera = go.AddComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.Skybox;
+            camera.farClipPlane = 1000f;
+            try
+            {
+                render(camera);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
         }
 
         // ステージの見どころ（ステージのシーンの名前と、撮る所の中心）。

@@ -108,8 +108,8 @@ namespace Airerage.Core.Simulation
             bool attached = state.Wire.Phase == WirePhase.Attached;
             if (state.WallSide != 0 && !WallCling.Continues(state, frame, movement, _motor, halfExtents))
             {
+                // 張り付いていた長さは残す（着地か壁ジャンプで 0 に戻る。離れて張り付き直しても 4 秒を超えない）。
                 state.WallSide = 0;
-                state.WallClingTicks = 0;
             }
             if (attached)
             {

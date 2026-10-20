@@ -12,8 +12,10 @@ namespace Airerage.Runtime.UI
     /// <summary>
     /// オプションの画面（docs/15 T6-9。D-68）。いちばん上の PAGE の項目で、左右（か決定）でページを切り替える:
     /// - GENERAL: 全体・BGM・効果音の音量（0〜100%、10% ずつ）、表示（FULLSCREEN ／ WINDOWED）、解像度（この画面で使える大きさ）、
-    ///   垂直同期（ON ／ OFF）、RESET TO DEFAULT。項目を選んで左右で変える（決定でも次の値へ）。変えたらすぐに当てて保存する。
-    /// - CONTROLS: 変えられる操作（BindingSettings）ごとに、キーボードのキーとゲームパッドのボタン。項目を決定すると、次に押した
+    ///   垂直同期（ON ／ OFF）、RESET TO DEFAULT。項目を選んで左右で変える（値の左半分・右半分のクリックでも左右。OptionArrow。
+    ///   決定でも次の値へ）。変えたらすぐに当てて保存する。
+    /// 変えた結果の案内（左下）は 3 秒で消え、ページを切り替えても消える。
+    /// - CONTROLS: 変えられる操作（BindingSettings）ごとに、キーボードのキー（マウスの左・右・サイドのボタンも）とゲームパッドのボタン。項目を決定すると、次に押した
     ///   キー（ボタン）に変わる（キーボードは Esc、ゲームパッドは Start でやめる）。ほかの操作と同じキーなら入れ替える。RESET CONTROLS で
     ///   元に戻す。
     /// BACK か戻る操作（Esc・B）で閉じる（Closed）。設定は GameSettings で PlayerPrefs に保存し、キーの割り当ては試合の入力を
@@ -33,6 +35,9 @@ namespace Airerage.Runtime.UI
         }
 
         private const float NavigationRestoreDelay = 0.2f;
+
+        /// <summary>変えた結果の案内を出しておく長さ（秒。ユーザーの要望、2026-10-20）。</summary>
+        private const float PromptSeconds = 3f;
 
         [Tooltip("キーの割り当てを変える入力のアセット（試合で使うものと同じ）")]
         [SerializeField] private InputActionAsset _inputActions;
@@ -59,6 +64,7 @@ namespace Airerage.Runtime.UI
         private InputActionMap _map;
         private InputActionRebindingExtensions.RebindingOperation _rebind;
         private float _navigationRestoreAt = -1f;
+        private float _promptHideAt = -1f;
         private bool _wired;
 
         /// <summary>閉じた（設定は保存してある）。</summary>
@@ -230,6 +236,10 @@ namespace Airerage.Runtime.UI
             {
                 RestoreNavigation();
             }
+            if (_promptHideAt >= 0f && Time.unscaledTime >= _promptHideAt && _rebind == null)
+            {
+                SetPrompt(string.Empty);
+            }
         }
 
         // ページを切り替える（ページの項目を選んだまま）。
@@ -238,7 +248,8 @@ namespace Airerage.Runtime.UI
             _controls = controls;
             _generalPage.SetActive(!controls);
             _controlsPage.SetActive(controls);
-            _pageValue.text = controls ? "<  CONTROLS  >" : "<  GENERAL  >";
+            _pageValue.text = controls ? "CONTROLS" : "GENERAL";
+            SetPrompt(string.Empty);
             BuildNavigation();
             RefreshGeneral();
             RefreshBindings();
@@ -399,15 +410,15 @@ namespace Airerage.Runtime.UI
             _generalValues[(int)Row.Master].text = VolumeText(_settings.MasterVolume);
             _generalValues[(int)Row.Bgm].text = VolumeText(_settings.BgmVolume);
             _generalValues[(int)Row.Se].text = VolumeText(_settings.SeVolume);
-            _generalValues[(int)Row.Display].text = $"<  {(_settings.Fullscreen ? "FULLSCREEN" : "WINDOWED")}  >";
+            _generalValues[(int)Row.Display].text = _settings.Fullscreen ? "FULLSCREEN" : "WINDOWED";
             Vector2Int size = _resolutionIndex >= 0 && _resolutionIndex < _resolutions.Count ? _resolutions[_resolutionIndex] : Vector2Int.zero;
-            _generalValues[(int)Row.Resolution].text = $"<  {size.x} x {size.y}  >";
-            _generalValues[(int)Row.VSync].text = $"<  {(_settings.VSync ? "ON" : "OFF")}  >";
+            _generalValues[(int)Row.Resolution].text = $"{size.x} x {size.y}";
+            _generalValues[(int)Row.VSync].text = _settings.VSync ? "ON" : "OFF";
         }
 
         private static string VolumeText(int volume)
         {
-            return $"<  {volume * 100 / GameSettings.MaxVolume}%  >";
+            return $"{volume * 100 / GameSettings.MaxVolume}%";
         }
 
         private void RefreshBindings()
@@ -438,8 +449,8 @@ namespace Airerage.Runtime.UI
             MenuOption cell = column == BindingSettings.Column.Keyboard ? _keyCells[actionIndex] : _padCells[actionIndex];
             cell.SetLabel("...");
             SetPrompt(column == BindingSettings.Column.Keyboard
-                ? $"PRESS A KEY FOR {BindingSettings.Labels[actionIndex]}   (ESC: CANCEL)"
-                : $"PRESS A BUTTON FOR {BindingSettings.Labels[actionIndex]}   (START: CANCEL)");
+                ? $"PRESS A KEY OR MOUSE BUTTON FOR {BindingSettings.Labels[actionIndex]}   (ESC: CANCEL)"
+                : $"PRESS A BUTTON FOR {BindingSettings.Labels[actionIndex]}   (START: CANCEL)", false);
             // 変えている間は、メニューの移動・決定・戻るを止める（押したキーで項目が動かないように）。操作の組も止める。
             if (EventSystem.current != null)
             {
@@ -510,8 +521,10 @@ namespace Airerage.Runtime.UI
             _settings.Save();
         }
 
-        private void SetPrompt(string text)
+        // 案内を出す（timed なら PromptSeconds で消す。変えている間の案内は消さない）。
+        private void SetPrompt(string text, bool timed = true)
         {
+            _promptHideAt = timed && !string.IsNullOrEmpty(text) ? Time.unscaledTime + PromptSeconds : -1f;
             if (_prompt != null)
             {
                 _prompt.text = text;

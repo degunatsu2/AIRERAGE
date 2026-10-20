@@ -16,7 +16,7 @@ namespace Airerage.PlayMode.Tests
     /// 追加のステージ（docs/15 6.11）: どのステージもトレーニングで始まり（エラーなし、全員が出現位置に立つ）、ギミックの見た目が動く。
     /// 周期のあるギミック（風・間欠泉・危険・吹雪）の見た目（効いている間だけ出す柱など）が、試合のティック数と種で決まる効いているかと合う。
     /// 動くギミックの見た目が、試合のティック数で決まる位置にある。ワイヤーが刺さる足場が光る。
-    /// 宇宙ステーションの端のワープゲートで、反対の端へ移る。
+    /// 宇宙ステーションの端のワープゲートで、反対の端へ移る。予告は黄色の斜線と警告の記号で、吹雪は凍る所だけに出す（2026-10-20）。
     /// </summary>
     public sealed class StageGimmickTests
     {
@@ -71,6 +71,63 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(glow != null && glow.enabled && glow.BoxCount > 0, Is.True, $"{stage.DisplayName} のワイヤーが刺さる足場が光らない");
                 Assert.That(glow.Brightness, Is.GreaterThan(0.5f), $"{stage.DisplayName} の足場の光が動いていない");
             }
+        }
+
+        [UnityTest]
+        public IEnumerator Warnings_AreYellowStripesWithTheSign_AndTheBlizzardWarnsOnlyWhereItFreezes()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            StageDefinition snow = flow.Stages.Stages.First(s => s.SceneName == "Stage_SnowSea");
+            flow.StartTraining(snow);
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+
+            // 予告のある（周期のある）ギミックは、どれも同じ予告の表示（黄色の斜線と警告の記号）を持つ。つららは警告音を鳴らさない。
+            StageZoneView[] views = UnityEngine.Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.None);
+            foreach (StageZoneView view in views.Where(v => v.GetComponent<StageZoneAuthoring>().ToZone().Period > 0))
+            {
+                Assert.That(view.Warning, Is.Not.Null, $"{view.name} に予告の表示がない");
+                Assert.That(view.Warning.IconTexture, Is.Not.Null, $"{view.name} に警告の記号がない");
+            }
+            StageZoneView icicles = views.Single(v => v.name.Contains("Icicles"));
+            Assert.That(icicles.WarningSound, Is.False, "つららが警告音を鳴らす");
+            StageZoneView blizzardView = views.Single(v => v.GetComponent<StageZoneAuthoring>().Kind == StageZoneKind.Blizzard);
+            Assert.That(blizzardView.WarningSound, Is.True, "吹雪の警告音がない");
+
+            // 吹雪の予告は、凍る所（地形の中でなく、風上に地形がない所）だけを塗り、影（洞窟・船の中）には出さない。
+            StageZone blizzard = blizzardView.GetComponent<StageZoneAuthoring>().ToZone();
+            var errors = new System.Collections.Generic.List<string>();
+            Airerage.Core.Physics.BoxTerrain terrain = SceneTerrainBuilder.Build(1 << 0, errors);
+            var areas = blizzardView.ExposedAreas;
+            Assert.That(areas.Count, Is.GreaterThan(0), "吹雪の予告を塗る所がない");
+            bool Painted(float x, float y) => areas.Any(r => r.Contains(new Vector2(x, y)));
+            var halfCell = new System.Numerics.Vector3(0.5f, 0.5f, 0.5f);
+            int checkedCells = 0;
+            for (float y = blizzard.MinY + 0.5f; y < blizzard.MaxY; y += 3f)
+            {
+                for (float x = blizzard.MinX + 0.5f; x < blizzard.MaxX; x += 3f)
+                {
+                    var point = new System.Numerics.Vector3(x, y, 0f);
+                    bool freezes = !terrain.IsOverlapping(point, halfCell) && !StageZones.Sheltered(point, blizzard.Direction, terrain, blizzard.Limit);
+                    Assert.That(Painted(x, y), Is.EqualTo(freezes), $"({x}, {y}) の予告が、凍るかと合わない");
+                    checkedCells++;
+                }
+            }
+            Assert.That(checkedCells, Is.GreaterThan(100));
+            Assert.That(Painted(-35.5f, -2.5f), Is.False, "洞窟の中に吹雪の予告が出る");
+            Assert.That(Painted(45.5f, -0.5f), Is.False, "船の中に吹雪の予告が出る");
+            Assert.That(Painted(0.5f, 2.5f), Is.True, "真ん中の氷の上に吹雪の予告が出ない");
+
+            // 縞は、塗る所の世界の位置に描く（ギミックの物体の位置だけずれない）。
+            blizzardView.Warning.Show(areas, new[] { new Vector2(0.5f, 2.5f) }, 1f);
+            Bounds stripes = blizzardView.Warning.StripeBounds;
+            Assert.That(stripes.min.x, Is.EqualTo(areas.Min(r => r.xMin)).Within(0.01f), "縞の左の端がずれている");
+            Assert.That(stripes.min.y, Is.EqualTo(areas.Min(r => r.yMin)).Within(0.01f), "縞の下の端がずれている");
+            Assert.That(stripes.max.y, Is.EqualTo(areas.Max(r => r.yMax)).Within(0.01f), "縞の上の端がずれている");
+            Assert.That(blizzardView.Warning.IconCount, Is.EqualTo(1));
+            blizzardView.Warning.Hide();
         }
 
         [UnityTest]

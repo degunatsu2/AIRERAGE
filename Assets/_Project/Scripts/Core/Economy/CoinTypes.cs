@@ -132,6 +132,9 @@ namespace Airerage.Core.Economy
 
         /// <summary>コズミックレイでの確定（移動。所持 → 確定。ビームが拠点に触れていたとき。SPACE TRAVELER）。</summary>
         RayBank = 11,
+
+        /// <summary>ステージの危険（溶岩流・つらら）に当たったドロップ（移動。所持 → フィールド。威力に応じた量）。</summary>
+        HazardDrop = 12,
     }
 
     /// <summary>

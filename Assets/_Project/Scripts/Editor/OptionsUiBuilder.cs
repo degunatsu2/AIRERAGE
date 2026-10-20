@@ -26,8 +26,8 @@ namespace Airerage.Editor
             var anchor = new Vector2(0f, 1f);
 
             MenuOption page = MenuUiBuilder.CreateMenuItem(panel, "Page", "PAGE", anchor, new Vector2(Left, -150f), new Vector2(Width, RowHeight));
-            Text pageValue = Value(page, "<  GENERAL  >");
             page.gameObject.AddComponent<OptionStepper>();
+            Text pageValue = Value(page, "GENERAL");
 
             // GENERAL: 音量・画面の項目（左に名前、右に値）と、初めの値に戻す項目。
             RectTransform general = MenuUiBuilder.CreateFull(panel, "General");
@@ -97,11 +97,39 @@ namespace Airerage.Editor
             return screen;
         }
 
-        // 項目の右に寄せた値の文字。
+        // 項目の右に寄せた値（「<」、真ん中に値、「>」）。値の左半分・右半分をクリックすると左右を入れたことになる（OptionArrow。
+        // ユーザーの要望、2026-10-20）。項目に OptionStepper を付けてから呼ぶ。
         private static Text Value(MenuOption row, string text)
         {
-            return MenuUiBuilder.CreateText(row.transform, "Value", text, 30, FontStyle.BoldAndItalic, TextAnchor.MiddleRight,
-                new Vector2(1f, 0.5f), new Vector2(-48f, 0f), new Vector2(520f, RowHeight), MenuUiBuilder.Accent);
+            const float boxWidth = 400f;
+            var box = new GameObject("ValueBox", typeof(RectTransform));
+            box.transform.SetParent(row.transform, false);
+            var rect = (RectTransform)box.transform;
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1f, 0.5f);
+            rect.anchoredPosition = new Vector2(-40f, 0f);
+            rect.sizeDelta = new Vector2(boxWidth, RowHeight);
+            MenuUiBuilder.CreateText(box.transform, "Left", "<", 30, FontStyle.Bold, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f),
+                new Vector2(10f, 0f), new Vector2(40f, RowHeight), MenuUiBuilder.Accent);
+            MenuUiBuilder.CreateText(box.transform, "Right", ">", 30, FontStyle.Bold, TextAnchor.MiddleRight, new Vector2(1f, 0.5f),
+                new Vector2(-10f, 0f), new Vector2(40f, RowHeight), MenuUiBuilder.Accent);
+            Text value = MenuUiBuilder.CreateText(box.transform, "Value", text, 30, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(boxWidth - 100f, RowHeight), MenuUiBuilder.Accent);
+            var stepper = row.GetComponent<OptionStepper>();
+            for (int side = 0; side < 2; side++)
+            {
+                var zone = new GameObject(side == 0 ? "LeftArrow" : "RightArrow", typeof(RectTransform));
+                zone.transform.SetParent(box.transform, false);
+                var zoneRect = (RectTransform)zone.transform;
+                zoneRect.anchorMin = new Vector2(side * 0.5f, 0f);
+                zoneRect.anchorMax = new Vector2(side * 0.5f + 0.5f, 1f);
+                zoneRect.offsetMin = Vector2.zero;
+                zoneRect.offsetMax = Vector2.zero;
+                // 透明なクリックの的。
+                var image = zone.AddComponent<Image>();
+                image.color = new Color(1f, 1f, 1f, 0f);
+                zone.AddComponent<OptionArrow>().Configure(stepper, side == 0 ? -1 : 1);
+            }
+            return value;
         }
     }
 }

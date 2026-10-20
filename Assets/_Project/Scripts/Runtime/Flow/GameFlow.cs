@@ -223,9 +223,20 @@ namespace Airerage.Runtime.Flow
             Go(FlowScreen.Online, null, _onlineScene);
         }
 
+        /// <summary>終わる操作を受け付けたか（テスト用）。</summary>
+        public bool QuitRequested { get; private set; }
+
+        /// <summary>本当に終えるか（テストでは false にして、QuitRequested だけを確かめる）。</summary>
+        public bool AllowQuit { get; set; } = true;
+
         /// <summary>ゲームを終える（エディタでは再生を止める）。</summary>
         public void QuitGame()
         {
+            QuitRequested = true;
+            if (!AllowQuit)
+            {
+                return;
+            }
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #else

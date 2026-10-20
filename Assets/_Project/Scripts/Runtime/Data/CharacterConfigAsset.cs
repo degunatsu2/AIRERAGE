@@ -5,6 +5,22 @@ using UnityEngine;
 
 namespace Airerage.Runtime.Data
 {
+    /// <summary>キャラクターの仮の見た目（衣装。表示だけ。ユーザーの要望、2026-10-20）。</summary>
+    public enum CharacterCostume
+    {
+        /// <summary>箱のまま。</summary>
+        Standard = 0,
+
+        /// <summary>サングラス・アフロ・金色の服。</summary>
+        RiskTaker = 1,
+
+        /// <summary>ブレードシューズ・「風」のゼッケン。</summary>
+        StormRunner = 2,
+
+        /// <summary>宇宙服・宇宙帽。</summary>
+        SpaceTraveler = 3,
+    }
+
     /// <summary>
     /// キャラクター 1 体のアセット（docs/03_architecture.md 4.4、docs/13 T5-5）。シミュレーションの調整値（Core の CharacterConfig。
     /// 移動、ワイヤー、攻撃と技）と、表示だけに使う値（名前、ロゴ、技の絵、ハッシュタグと技の説明）を持つ。仮値は CharacterConfig の初期値にある。
@@ -31,8 +47,13 @@ namespace Airerage.Runtime.Data
         [SerializeField] private SkillText _special1Text = new SkillText();
         [SerializeField] private SkillText _special2Text = new SkillText();
         [SerializeField] private SkillText _superText = new SkillText();
+        [Tooltip("仮の見た目（衣装。CostumeView）")]
+        [SerializeField] private CharacterCostume _costume;
 
         public CharacterConfig Config => _config;
+
+        /// <summary>仮の見た目（衣装）。</summary>
+        public CharacterCostume Costume => _costume;
 
         public string DisplayName => string.IsNullOrEmpty(_displayName) ? name : _displayName;
 
@@ -80,6 +101,12 @@ namespace Airerage.Runtime.Data
         {
             _config = config ?? new CharacterConfig();
             _displayName = displayName ?? string.Empty;
+        }
+
+        /// <summary>シーンのビルダー用: 仮の見た目を設定する。</summary>
+        public void SetCostume(CharacterCostume costume)
+        {
+            _costume = costume;
         }
 
         /// <summary>シーンのビルダー用: ロゴを設定する。</summary>

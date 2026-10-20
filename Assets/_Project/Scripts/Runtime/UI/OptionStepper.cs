@@ -13,6 +13,12 @@ namespace Airerage.Runtime.UI
         /// <summary>左右を入れた（-1 が左、+1 が右）。</summary>
         public event Action<int> Stepped;
 
+        /// <summary>左（-1）か右（+1）を入れたことにする（値の左右の矢印のクリック。OptionArrow）。</summary>
+        public void Step(int direction)
+        {
+            Stepped?.Invoke(direction < 0 ? -1 : 1);
+        }
+
         public void OnMove(AxisEventData eventData)
         {
             if (eventData.moveDir == MoveDirection.Left)

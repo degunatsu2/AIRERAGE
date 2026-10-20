@@ -52,6 +52,9 @@ namespace Airerage.Runtime.UI
 
         public string Label => _label != null ? _label.text : string.Empty;
 
+        /// <summary>名前の文字（字体を変えるときに使う）。</summary>
+        public Text LabelText => _label;
+
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(SlantedPlate plate, Text label, Text note, Color accent)
         {

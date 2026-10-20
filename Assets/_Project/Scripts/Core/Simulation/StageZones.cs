@@ -258,6 +258,8 @@ namespace Airerage.Core.Simulation
             state.Combat.HitstopTicksLeft = Math.Max(state.Combat.HitstopTicksLeft, HazardHitstopTicks);
             state.Combat.HazardImmunityTicks = zone.ActiveTicks + 20;
             state.Combat.HazardHitCount++;
+            // 威力に応じてコインを落とす（SimWorld が CoinDropRules.DropOnHazards で落とす。ユーザーの要望、2026-10-20）。
+            state.Combat.HazardDropPower = Math.Max(1, (int)zone.Power);
             state.Grounded = false;
             state.WallSide = 0;
             state.JumpBufferTicksLeft = 0;

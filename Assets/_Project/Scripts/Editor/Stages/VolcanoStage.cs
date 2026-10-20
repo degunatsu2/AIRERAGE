@@ -6,9 +6,10 @@ namespace Airerage.Editor.Stages
 {
     /// <summary>
     /// 火山の火口（CRATER）。左右の火口の縁（段になった岩）と、溶岩の湖の真ん中の岩の柱、浮かぶ岩。溶岩に落ちると撃破。
-    /// 固有のギミック（ユーザーの要望、2026-10-19 に変えた）: 溶岩流（Hazard。溶岩の湖のランダムな場所から、浮かぶ岩の下の段の高さまで
-    /// 噴き出す。威力 60。噴く前に当たる柱の全体に警告と警告音）、壁の間欠泉（周期のある Launcher。縁の上の段と下の段の内側の壁から、
-    /// 火口の内側へ斜めに噴き出し、強い風よりも強く吹き飛ばす）、噴火口（Launcher。縁から火口の真ん中へ飛ばす）、噴石（Bumper）。
+    /// 固有のギミック（ユーザーの要望、2026-10-19 に変え、2026-10-20 に間隔と太さを変えた）: 溶岩流（Hazard。溶岩の湖のランダムな場所から、
+    /// 黒曜石の段の高さまで噴き出す。威力 60。噴く前に当たる柱の全体に警告と警告音）、壁の間欠泉（周期のある Launcher。縁の上の段と
+    /// 下の段の内側の壁から、火口の内側へ斜めに一斉に噴き出し、強い風よりも強く吹き飛ばす）、噴火口（Launcher。縁から火口の真ん中へ
+    /// 飛ばす）、噴石（Bumper）。
     /// </summary>
     internal static class VolcanoStage
     {
@@ -86,22 +87,24 @@ namespace Airerage.Editor.Stages
                     // 縁から火口の真ん中へ向かう加速リング。
                     new ZoneSpec("RimRingWest", StageZoneKind.BoostRing, new Vector2(-28f, 13f), new Vector2(2.4f, 3f), new Vector2(1f, 0.15f), 18f),
                     new ZoneSpec("RimRingEast", StageZoneKind.BoostRing, new Vector2(28f, 13f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.15f), 18f),
-                    // 溶岩流: 溶岩の湖（柱の左右）のランダムな場所から、幅 4m の柱が浮かぶ岩の下の段（y = 4）まで 1 秒噴き出す（5 秒ごと。
-                    // 左右が半分ずれる）。噴く 1.5 秒前から当たる柱の全体に警告。当たると上へ吹き飛ぶ（威力 60）。
-                    new ZoneSpec("LavaFlowWest", StageZoneKind.Hazard, new Vector2(-20f, -8f), new Vector2(28f, 24f), Vector2.up, 60f)
-                        .Every(5f, 1f, 0f, 0f, 1.5f).Column(4f),
-                    new ZoneSpec("LavaFlowEast", StageZoneKind.Hazard, new Vector2(20f, -8f), new Vector2(28f, 24f), Vector2.up, 60f)
-                        .Every(5f, 1f, 2.5f, 0f, 1.5f).Column(4f),
+                    // 溶岩流: 溶岩の湖（柱の左右）のランダムな場所から、幅 6m の柱が黒曜石の段（y = 13）まで 3 秒噴き出す（25 秒ごと。
+                    // 左右が半分ずれる。ユーザーの要望、2026-10-20: 頻度を 1/5、太さを 1.5 倍、長さを 3 倍、もう一段上まで）。噴く 2 秒前から
+                    // 当たる柱の全体に警告。当たると上へ吹き飛ぶ（威力 60）。
+                    new ZoneSpec("LavaFlowWest", StageZoneKind.Hazard, new Vector2(-20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 60f)
+                        .Every(25f, 3f, 0f, 0f, 2f).Column(6f),
+                    new ZoneSpec("LavaFlowEast", StageZoneKind.Hazard, new Vector2(20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 60f)
+                        .Every(25f, 3f, 12.5f, 0f, 2f).Column(6f),
                     // 壁の間欠泉: 縁の上の段（x = ±45）の上のほうと、下の段（x = ±34）の下のほうの内側の壁から、火口の内側へ斜めに噴く
-                    // （6 秒ごとに 1.2 秒。1.5 秒前から口の枠が点滅）。触れると速度をまるごと噴く向きにする（強い風より強い）。
+                    // （4 つが一斉に、20 秒ごとに 3.6 秒。ユーザーの要望、2026-10-20。2 秒前から口に警告）。触れると速度をまるごと噴く向きにする
+                    // （強い風より強い）。
                     new ZoneSpec("GeyserHighWest", StageZoneKind.Launcher, new Vector2(-42.5f, 14f), new Vector2(5f, 5f), new Vector2(1f, 0.35f), 34f)
-                        .Every(6f, 1.2f, 0f, 0f, 1.5f),
+                        .Every(20f, 3.6f, 0f, 0f, 2f),
                     new ZoneSpec("GeyserHighEast", StageZoneKind.Launcher, new Vector2(42.5f, 14f), new Vector2(5f, 5f), new Vector2(-1f, 0.35f), 34f)
-                        .Every(6f, 1.2f, 3f, 0f, 1.5f),
+                        .Every(20f, 3.6f, 0f, 0f, 2f),
                     new ZoneSpec("GeyserLowWest", StageZoneKind.Launcher, new Vector2(-31.5f, -6.5f), new Vector2(5f, 5f), new Vector2(1f, 0.8f), 32f)
-                        .Every(6f, 1.2f, 1.5f, 0f, 1.5f),
+                        .Every(20f, 3.6f, 0f, 0f, 2f),
                     new ZoneSpec("GeyserLowEast", StageZoneKind.Launcher, new Vector2(31.5f, -6.5f), new Vector2(5f, 5f), new Vector2(-1f, 0.8f), 32f)
-                        .Every(6f, 1.2f, 4.5f, 0f, 1.5f),
+                        .Every(20f, 3.6f, 0f, 0f, 2f),
                     // 噴火口: 縁の低い段から、火口の真ん中の柱へ飛ばす。
                     ZoneSpec.OnFloor("VentWest", StageZoneKind.Launcher, -37f, -35f, 2f, new Vector2(0.7f, 1f), 32f),
                     ZoneSpec.OnFloor("VentEast", StageZoneKind.Launcher, 35f, 37f, 2f, new Vector2(-0.7f, 1f), 32f),

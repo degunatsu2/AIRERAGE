@@ -177,7 +177,7 @@ namespace Airerage.Runtime.Presentation
                     shown = Take(LookOf(coin.Value));
                     shown.BornAt = time;
                     // 被弾ドロップは、落とした位置（当たった人の位置）から、それぞれの場所へ飛んでいくように見せる。
-                    shown.Flies = coin.Origin == CoinEventKind.HitDrop;
+                    shown.Flies = coin.Origin == CoinEventKind.HitDrop || coin.Origin == CoinEventKind.HazardDrop;
                     shown.FlyFrom = shown.Flies ? BatchCenter(field, coin) : Vector3.zero;
                     _shown.Add(coin.Id, shown);
                 }

@@ -166,6 +166,38 @@ namespace Airerage.Editor
         }
 
         /// <summary>
+        /// ゲームを終了する前の確認（QuitConfirmDialog。ユーザーの要望、2026-10-20）: 画面全体を暗くし（クリックを通さない）、真ん中の
+        /// 斜めの札に「ゲームを終了します。本当によろしいですか？」と、「はい」「いいえ」の 2 つの札。ほかの画面より手前に出すため、
+        /// Canvas の最後に作る。
+        /// </summary>
+        public static QuitConfirmDialog CreateQuitDialog(Transform canvas)
+        {
+            RectTransform root = CreateFull(canvas, "QuitConfirm");
+            Image dim = CreateFill(root, "Dim", new Color(0f, 0f, 0f, 0.72f), Vector2.zero, Vector2.one);
+            dim.raycastTarget = true;
+            var panel = new GameObject("Panel", typeof(RectTransform));
+            panel.transform.SetParent(root, false);
+            var panelRect = (RectTransform)panel.transform;
+            panelRect.anchorMin = panelRect.anchorMax = panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(1060f, 360f);
+            var plate = panel.AddComponent<SlantedPlate>();
+            // 中は不透明にする（線形の色空間では、半透明の暗い色を重ねても後ろの文字が透けて見える）。
+            plate.Configure(0.12f, 4f, new Color(0.03f, 0.05f, 0.09f, 1f), Accent);
+            Text message = CreateText(panel.transform, "Message", "ゲームを終了します。本当によろしいですか？", 40, FontStyle.Bold,
+                TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(980f, 90f), Color.white);
+            MenuOption yes = CreateMenuItem(panel.transform, "Yes", "はい", new Vector2(0.5f, 0f), new Vector2(-330f, 150f), new Vector2(300f, 76f));
+            MenuOption no = CreateMenuItem(panel.transform, "No", "いいえ", new Vector2(0.5f, 0f), new Vector2(50f, 150f), new Vector2(300f, 76f));
+            yes.SetSelectedShift(new Vector2(0f, 6f));
+            no.SetSelectedShift(new Vector2(0f, 6f));
+            var dialog = root.gameObject.AddComponent<QuitConfirmDialog>();
+            SandboxWireSceneBuilder.SetReference(dialog, "_message", message);
+            SandboxWireSceneBuilder.SetReference(dialog, "_yes", yes);
+            SandboxWireSceneBuilder.SetReference(dialog, "_no", no);
+            root.gameObject.SetActive(false);
+            return dialog;
+        }
+
+        /// <summary>
         /// キャラクター選択の札（縦長の斜めの札に、ロゴと名前。選んでいるときは上へ出る）。anchor を基準に、札の左上を position に置く。
         /// </summary>
         public static MenuOption CreateCharacterCard(Transform parent, string name, Texture2D logo, string displayName, Vector2 anchor,

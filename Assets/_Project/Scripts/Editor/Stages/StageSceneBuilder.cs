@@ -134,6 +134,7 @@ namespace Airerage.Editor.Stages
                 Color color = theme.ZoneColors.TryGetValue(zone.Kind, out Color themed) ? themed : DefaultColor(zone.Kind);
                 var view = go.AddComponent<StageZoneView>();
                 view.Configure(lineMaterial, color);
+                view.ConfigureWarningSound(zone.WarningSound);
                 Transform propParent = go.transform;
                 if (zone.TravelSeconds > 0f)
                 {
@@ -142,7 +143,7 @@ namespace Airerage.Editor.Stages
                     propParent.SetParent(go.transform, false);
                     view.ConfigureMoving(propParent);
                 }
-                GameObject active = CreateProp(propParent, go.transform, zone, color, decor, out GameObject warning);
+                GameObject active = CreateProp(propParent, go.transform, zone, color, decor);
                 bool periodic = zone.PeriodSeconds > 0f;
                 if (zone.Kind == StageZoneKind.Gust || zone.Kind == StageZoneKind.Hazard || zone.Kind == StageZoneKind.Blizzard
                     || (zone.Kind == StageZoneKind.Launcher && periodic))
@@ -151,21 +152,15 @@ namespace Airerage.Editor.Stages
                     view.ConfigureActiveVisual(active);
                     active.SetActive(!periodic);
                 }
-                if (warning != null)
-                {
-                    view.ConfigureWarningVisual(warning);
-                    warning.SetActive(false);
-                }
             }
         }
 
         // ギミックの台・柱などの見た目（当たりはない）。風の柱・間欠泉の噴き出し・危険の柱・吹雪の幕は、効いている間だけ出す（StageZoneView）。
-        // warning は予告の間だけ点滅させる見た目（危険・吹雪だけ）。parent は動くギミックの見た目の親、root はギミックの物体。
-        private static GameObject CreateProp(Transform parent, Transform root, ZoneSpec zone, Color color, StageDecor decor, out GameObject warning)
+        // 予告の表示（黄色の斜線と警告の記号）は StageZoneView が実行中に作る。parent は動くギミックの見た目の親、root はギミックの物体。
+        private static GameObject CreateProp(Transform parent, Transform root, ZoneSpec zone, Color color, StageDecor decor)
         {
             Vector2 size = zone.Size;
             string kind = zone.Kind.ToString();
-            warning = null;
             switch (zone.Kind)
             {
                 case StageZoneKind.JumpPad:
@@ -204,16 +199,12 @@ namespace Airerage.Editor.Stages
                     return gate;
                 case StageZoneKind.Hazard:
                 {
-                    // 幅 1 の柱の板（StageZoneView が周期ごとの柱の位置と幅に合わせる）。予告は赤い板を点滅させる。
-                    warning = decor.Quad("Warning", parent, new Vector3(0f, 0f, -0.6f), new Vector2(1f, size.y),
-                        decor.Transparent(kind + "Warning", new Color(1f, 0.1f, 0.05f, 0.32f)));
+                    // 幅 1 の柱の板（StageZoneView が周期ごとの柱の位置と幅に合わせる）。
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, -0.5f), new Vector2(1f, size.y), decor.Transparent(kind, WithAlpha(color, 0.78f)));
                 }
                 case StageZoneKind.Blizzard:
                 {
-                    // 範囲の全体の幕（手前。キャラクターの前にかかる）。予告は青い幕を点滅させる。
-                    warning = decor.Quad("Warning", parent, new Vector3(0f, 0f, -2.6f), size,
-                        decor.Transparent(kind + "Warning", new Color(0.35f, 0.7f, 1f, 0.16f)));
+                    // 範囲の全体の幕（手前。キャラクターの前にかかる）。
                     return decor.Quad("Storm", parent, new Vector3(0f, 0f, -2.5f), size, decor.Transparent(kind, WithAlpha(color, 0.22f)));
                 }
                 default:

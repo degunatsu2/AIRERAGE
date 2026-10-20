@@ -47,6 +47,39 @@ namespace Airerage.Core.Tests.Economy
             return -1;
         }
 
+        [Test]
+        public void HazardHit_DropsCoins_ByItsPower()
+        {
+            // 足元のコイン 50 枚を拾ってから、10 ティック目に噴き出す溶岩流（威力 60。柱は範囲いっぱい）に当たる。
+            var lava = new StageZone(StageZoneKind.Hazard, -2f, 0f, 2f, 4f, Vector2.UnitY, 60f, 0f, new StageZoneTiming(600, 10, 590),
+                Vector2.Zero, 4f);
+            var coin = new CoinSpawnPoint(new Vector2(0f, 1f), 50);
+            var world = new SimWorld(TestArenas.Ground(), Bounds, new[] { lava }, MatchRules.FreePlay(), new[] { coin });
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f), 1);
+            world.Step(new PlayerInput[1]);
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(50), "前提: 足元のコインを拾った");
+            for (int i = 0; i < 30 && world.GetState(0).Combat.HazardHitCount == 0; i++)
+            {
+                world.Step(new PlayerInput[1]);
+            }
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Combat.HazardHitCount, Is.EqualTo(1), "前提: 溶岩流に当たった");
+            // 50 枚 × 威力 60 × 20%/100 = 6 枚。
+            int expected = CoinDropRules.HazardDropAmount(world.Rules, 50, 60);
+            Assert.That(expected, Is.EqualTo(6));
+            Assert.That(state.Coins.Held, Is.EqualTo(50 - expected), "威力に応じた量を落とさない");
+            int dropped = 0;
+            foreach (FieldCoin drop in Drops(world))
+            {
+                dropped += drop.Value;
+                Assert.That(drop.Origin, Is.EqualTo(CoinEventKind.HazardDrop));
+            }
+            Assert.That(dropped, Is.EqualTo(expected), "落としたコインがフィールドにない");
+            Assert.That(state.Combat.HazardDropPower, Is.EqualTo(0), "落とした後に威力が残っている");
+            Assert.That(CoinDropRules.HazardDropAmount(world.Rules, 50, 30), Is.EqualTo(3), "威力が半分なら半分");
+            Assert.That(CoinDropRules.HazardDropAmount(world.Rules, 2, 30), Is.EqualTo(1), "少なくとも 1 枚");
+        }
+
         private static List<FieldCoin> Drops(SimWorld world)
         {
             var drops = new List<FieldCoin>();

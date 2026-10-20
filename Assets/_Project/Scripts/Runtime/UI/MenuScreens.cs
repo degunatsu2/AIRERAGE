@@ -6,6 +6,7 @@ using Airerage.Runtime.Flow;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.Utilities;
 using UnityEngine.UI;
 
@@ -13,7 +14,8 @@ namespace Airerage.Runtime.UI
 {
     /// <summary>
     /// メニューのシーンの画面（docs/15 T6-1。D-54、D-65、D-69）:
-    /// - タイトル: 「AIRERAGE」と「PRESS ANY BUTTON」（どれかのキー・ボタンでメインメニューへ。最初の 1 回だけ）。
+    /// - タイトル: 「AIRERAGE」と「PRESS ANY BUTTON」（どれかのキー・ボタンでメインメニューへ。最初の 1 回だけ）。Esc では終了の確認
+    ///   （QuitConfirmDialog。ユーザーの要望、2026-10-20）を出す。メインメニューの QUIT も、終了の確認で「はい」を選んだら終える。
     /// - メインメニュー: SINGLE（Phase 7 の CPU まで選べない）、LOCAL VS、NETWORK VS、TRAINING、OPTIONS、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
     /// - TRAINING → キャラクター選択（T6-3）→ ステージ選択（T6-4）→ トレーニング。戻る操作で 1 つ前の画面へ。選んだキャラクターは
     ///   覚えておき（PlayerPrefs。オンラインの待機所と同じ）、トレーニングの試合の仕組みがそのキャラクターで始める。
@@ -39,6 +41,7 @@ namespace Airerage.Runtime.UI
         [SerializeField] private CharacterSelectScreen _characterSelect;
         [SerializeField] private StageSelectScreen _stageSelect;
         [SerializeField] private OptionsScreen _optionsScreen;
+        [SerializeField] private QuitConfirmDialog _quitDialog;
         [Tooltip("ネットワーク対戦のメニュー（IOnlineMenu。なければ、NETWORK VS は今のオンラインの検証用のシーンを開く）")]
         [SerializeField] private MonoBehaviour _online;
 
@@ -67,6 +70,11 @@ namespace Airerage.Runtime.UI
 
         public OptionsScreen OptionsScreen => _optionsScreen;
 
+        /// <summary>終了の確認を出しているか（テスト用）。</summary>
+        public bool ShowingQuitDialog => _quitDialog != null && _quitDialog.IsShowing;
+
+        public QuitConfirmDialog QuitDialog => _quitDialog;
+
         public CharacterSelectScreen CharacterSelect => _characterSelect;
         public StageSelectScreen StageSelect => _stageSelect;
 
@@ -80,7 +88,8 @@ namespace Airerage.Runtime.UI
         private void Awake()
         {
             if (_title == null || _main == null || _single == null || _local == null || _network == null || _training == null
-                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null || _optionsScreen == null)
+                || _options == null || _quit == null || _characterSelect == null || _stageSelect == null || _optionsScreen == null
+                || _quitDialog == null)
             {
                 Debug.LogError($"{name}: 画面か項目が設定されていません", this);
                 enabled = false;
@@ -171,7 +180,8 @@ namespace Airerage.Runtime.UI
                     ShowCharacterSelect();
                 }
             };
-            _quit.Clicked.AddListener(() => Run(flow => flow.QuitGame()));
+            _quit.Clicked.AddListener(() => _quitDialog.Show(() => ShowMain(_quit)));
+            _quitDialog.Confirmed += () => Run(flow => flow.QuitGame());
             foreach (MenuOption item in new[] { _single, _local, _network, _training, _options, _quit })
             {
                 item.Cancelled += ShowTitle;
@@ -245,7 +255,20 @@ namespace Airerage.Runtime.UI
                 EventSystem.current.SetSelectedGameObject(null);
             }
             _anyButton?.Dispose();
-            _anyButton = InputSystem.onAnyButtonPress.CallOnce(_ => ContinueFromTitle());
+            _anyButton = InputSystem.onAnyButtonPress.CallOnce(OnTitleButton);
+        }
+
+        // タイトルで押したボタン: Esc なら終了の確認（いいえでタイトルへ戻る）、ほかはメインメニューへ。
+        private void OnTitleButton(InputControl control)
+        {
+            if (control is KeyControl key && key.keyCode == Key.Escape)
+            {
+                _anyButton?.Dispose();
+                _anyButton = null;
+                _quitDialog.Show(ShowTitle);
+                return;
+            }
+            ContinueFromTitle();
         }
 
         /// <summary>タイトルからメインメニューへ（テスト用にも公開）。</summary>
@@ -311,6 +334,7 @@ namespace Airerage.Runtime.UI
             _characterSelect.Hide();
             _stageSelect.Hide();
             _optionsScreen.Hide();
+            _quitDialog.Hide();
             _selectAtFrame = -1;
         }
 

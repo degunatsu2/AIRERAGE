@@ -377,7 +377,8 @@ namespace Airerage.Runtime.Simulation
                 CharacterState current = _world.GetState(p);
                 CharacterConfig config = _world.GetConfig(p);
                 _characterViews[p].Render(_previous[p], current, alpha, config.Movement.HalfExtents.ToUnity());
-                _characterViews[p].RenderAction(current, config.Combat, _world.Rules.RespawnDelayTicks);
+                _characterViews[p].RenderAction(current, config.Combat, _world.Rules.RespawnDelayTicks, config.Movement);
+                _characterViews[p].SetCostume(CharacterOf(p));
                 _wireViews[p].Render(_previous[p], current, alpha, config.Wire);
 
                 // 照準: 表示の位置（補間した位置）から、その人の今の入力で射出したときの結果を予測して示す（強化と置かれた物も含める）。

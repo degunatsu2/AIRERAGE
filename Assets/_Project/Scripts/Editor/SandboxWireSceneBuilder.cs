@@ -351,7 +351,7 @@ namespace Airerage.Editor
         }
 
         // 半透明の材質（Sprites/Default。色は作るたびに決める）。
-        private static Material LoadOrCreateTransparentMaterial(string name, Color color)
+        internal static Material LoadOrCreateTransparentMaterial(string name, Color color)
         {
             string path = $"{MaterialFolder}/{name}.mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -401,6 +401,8 @@ namespace Airerage.Editor
             nose.transform.SetParent(root, false);
             nose.transform.localPosition = new Vector3(0.64f, 0.28f, 0f);
             SetReference(view, "_facingMarker", root);
+            // キャラクターごとの仮の見た目（衣装。ユーザーの要望、2026-10-20）。
+            CostumeBuilder.Add(view, root);
         }
 
         // ガードのクールタイムのゲージの色（ワイヤーキャンセルの紫と区別する）。
@@ -450,6 +452,8 @@ namespace Airerage.Editor
             SetReference(view, "_jackpotBurst", jackpot);
             // コインの効率が上がっている残り（フィーバータイム。金色）。
             SetReference(view, "_feverGauge", CreateRingGauge(name + "FeverGauge", parent, "FEVER", 1.9f, new Color(1f, 0.8f, 0.2f, 0.75f)));
+            // 壁に張り付いていられる残り（紫。ユーザーの要望、2026-10-20）。
+            SetReference(view, "_wallClingGauge", CreateRingGauge(name + "WallClingGauge", parent, "WALL", 1.15f, new Color(0.72f, 0.4f, 1f, 0.8f)));
             // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。
             RingGaugeView respawn = CreateRingGauge(name + "RespawnGauge", parent, "RESPAWN", 2.6f,
                 new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f));

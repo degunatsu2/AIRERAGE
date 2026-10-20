@@ -64,6 +64,15 @@ namespace Airerage.PlayMode.Tests
                 Move(options.GeneralRow(OptionsScreen.Row.Bgm).gameObject, MoveDirection.Left);
             }
             Assert.That(options.GeneralValue(OptionsScreen.Row.Master), Does.Contain("70%"));
+            // 値の左半分のクリックで左、右半分のクリックで右（ユーザーの要望、2026-10-20）。
+            OptionArrow[] arrows = options.GeneralRow(OptionsScreen.Row.Master).GetComponentsInChildren<OptionArrow>();
+            Assert.That(arrows.Length, Is.EqualTo(2), "値の左右のクリックの的がない");
+            Click(Array.Find(arrows, a => a.Direction < 0).gameObject);
+            Assert.That(options.GeneralValue(OptionsScreen.Row.Master), Is.EqualTo("60%"), "左半分のクリックで下がらない");
+            Click(Array.Find(arrows, a => a.Direction > 0).gameObject);
+            Click(Array.Find(arrows, a => a.Direction > 0).gameObject);
+            Assert.That(options.GeneralValue(OptionsScreen.Row.Master), Is.EqualTo("80%"), "右半分のクリックで上がらない");
+            Click(Array.Find(arrows, a => a.Direction < 0).gameObject);
             Assert.That(AudioListener.volume, Is.EqualTo(0.7f).Within(1e-4f), "全体の音量がすぐに当たらない");
             Assert.That(GameSettings.Load().BgmVolume, Is.EqualTo(5), "変えた音量が保存されない");
             // 決定でも次の値へ（端から回る）。垂直同期は ON ↔ OFF。
@@ -94,6 +103,7 @@ namespace Airerage.PlayMode.Tests
         {
             var keyboard = InputSystem.AddDevice<Keyboard>();
             var gamepad = InputSystem.AddDevice<Gamepad>();
+            var mouse = InputSystem.AddDevice<Mouse>();
             InputActionAsset asset = null;
             try
             {
@@ -104,25 +114,35 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(options.ShowingControls, Is.True, "左右で CONTROLS のページにならない");
                 int jump = Array.IndexOf(BindingSettings.Actions, "Jump");
                 int attack = Array.IndexOf(BindingSettings.Actions, "Attack");
+                int wire = Array.IndexOf(BindingSettings.Actions, "Wire");
                 Assert.That(options.KeyCell(jump).Label, Is.EqualTo("SPACE"));
                 Assert.That(options.PadCell(jump).Label, Is.EqualTo("A"));
-                Assert.That(options.KeyCell(attack).Label, Is.EqualTo("K"));
+                // 攻撃とワイヤーのキーボードの列は、マウスのボタン（ユーザーの要望、2026-10-20）。
+                Assert.That(options.KeyCell(attack).Label, Is.EqualTo("RIGHT CLICK"));
+                Assert.That(options.KeyCell(wire).Label, Is.EqualTo("LEFT CLICK"));
 
                 // ジャンプのキーを L に。
                 options.KeyCell(jump).Button.onClick.Invoke();
                 Assert.That(options.IsRebinding, Is.True, "決定してもキーの変更が始まらない");
-                Assert.That(options.PromptText, Does.Contain("PRESS A KEY"));
+                Assert.That(options.PromptText, Does.Contain("PRESS A KEY OR MOUSE BUTTON"));
                 yield return Press(keyboard, Key.L);
                 yield return WaitFor(() => !options.IsRebinding, 2f, "キーを押しても変更が終わらない");
                 Assert.That(options.KeyCell(jump).Label, Is.EqualTo("L"));
 
-                // 攻撃のキーを L に: ジャンプと入れ替わる（ジャンプは攻撃の前のキー K）。
+                // 攻撃のキーを L に: ジャンプと入れ替わる（ジャンプは攻撃の前の右クリック）。
                 yield return WaitSeconds(0.3f);
                 options.KeyCell(attack).Button.onClick.Invoke();
                 yield return Press(keyboard, Key.L);
                 yield return WaitFor(() => !options.IsRebinding, 2f, "攻撃のキーの変更が終わらない");
                 Assert.That(options.KeyCell(attack).Label, Is.EqualTo("L"));
-                Assert.That(options.KeyCell(jump).Label, Is.EqualTo("K"), "同じキーの操作と入れ替わらない");
+                Assert.That(options.KeyCell(jump).Label, Is.EqualTo("RIGHT CLICK"), "同じキーの操作と入れ替わらない");
+
+                // ワイヤーをマウスのサイドのボタンに。
+                yield return WaitSeconds(0.3f);
+                options.KeyCell(wire).Button.onClick.Invoke();
+                yield return Press(mouse, MouseButton.Back);
+                yield return WaitFor(() => !options.IsRebinding, 2f, "マウスのボタンで変更が終わらない");
+                Assert.That(options.KeyCell(wire).Label, Is.EqualTo("MOUSE 4"), "マウスのサイドのボタンにできない");
 
                 // ゲームパッドのジャンプを Y に。Esc ／ Start でやめると変わらない。
                 yield return WaitSeconds(0.3f);
@@ -137,6 +157,9 @@ namespace Airerage.PlayMode.Tests
                 yield return WaitFor(() => !options.IsRebinding, 2f, "Start でやめられない");
                 Assert.That(options.PadCell(attack).Label, Is.EqualTo("X"), "やめたのに変わった");
                 Assert.That(options.PromptText, Does.Contain("CANCELLED"));
+                // 案内は 3 秒で消える。
+                yield return WaitSeconds(3.3f);
+                Assert.That(options.PromptText, Is.Empty, "変えた結果の案内が消えない");
 
                 // 試合の入力（アセットの複製から作る）に、保存した割り当てが当たる。
                 Assert.That(GameSettings.LoadBindingOverrides(), Is.Not.Empty, "割り当てが保存されない");
@@ -145,7 +168,9 @@ namespace Airerage.PlayMode.Tests
                 {
                     InputAction jumpAction = asset.FindAction("Player/Jump", throwIfNotFound: true);
                     InputAction attackAction = asset.FindAction("Player/Attack", throwIfNotFound: true);
-                    Assert.That(Effective(jumpAction, BindingSettings.Column.Keyboard), Is.EqualTo("<Keyboard>/k"));
+                    Assert.That(Effective(jumpAction, BindingSettings.Column.Keyboard), Is.EqualTo("<Mouse>/rightButton"));
+                    Assert.That(Effective(asset.FindAction("Player/Wire", throwIfNotFound: true), BindingSettings.Column.Keyboard),
+                        Is.EqualTo("<Mouse>/backButton"));
                     Assert.That(Effective(attackAction, BindingSettings.Column.Keyboard), Is.EqualTo("<Keyboard>/l"));
                     Assert.That(Effective(jumpAction, BindingSettings.Column.Gamepad), Is.EqualTo("<Gamepad>/buttonNorth"));
                 }
@@ -154,7 +179,8 @@ namespace Airerage.PlayMode.Tests
                 yield return WaitSeconds(0.3f);
                 options.ResetControls.Button.onClick.Invoke();
                 Assert.That(options.KeyCell(jump).Label, Is.EqualTo("SPACE"));
-                Assert.That(options.KeyCell(attack).Label, Is.EqualTo("K"));
+                Assert.That(options.KeyCell(attack).Label, Is.EqualTo("RIGHT CLICK"));
+                Assert.That(options.KeyCell(wire).Label, Is.EqualTo("LEFT CLICK"));
                 Assert.That(options.PadCell(jump).Label, Is.EqualTo("A"));
                 Assert.That(GameSettings.LoadBindingOverrides(), Is.EqualTo("{\"bindings\":[]}").Or.Empty, "元に戻しても保存が残る");
             }
@@ -171,6 +197,7 @@ namespace Airerage.PlayMode.Tests
                 }
                 InputSystem.RemoveDevice(keyboard);
                 InputSystem.RemoveDevice(gamepad);
+                InputSystem.RemoveDevice(mouse);
             }
         }
 
@@ -198,6 +225,13 @@ namespace Airerage.PlayMode.Tests
             found(menu);
         }
 
+        // マウスの左クリックを送る。
+        private static void Click(GameObject target)
+        {
+            var data = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
+            ExecuteEvents.Execute(target, data, ExecuteEvents.pointerClickHandler);
+        }
+
         // 選んでいる項目に、左右・上下の移動を送る（キーボード・ゲームパッドの移動と同じ）。
         private static void Move(GameObject target, MoveDirection direction)
         {
@@ -211,6 +245,15 @@ namespace Airerage.PlayMode.Tests
             yield return null;
             yield return null;
             InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            yield return null;
+        }
+
+        private static IEnumerator Press(Mouse mouse, MouseButton button)
+        {
+            InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(button));
+            yield return null;
+            yield return null;
+            InputSystem.QueueStateEvent(mouse, new MouseState());
             yield return null;
         }
 

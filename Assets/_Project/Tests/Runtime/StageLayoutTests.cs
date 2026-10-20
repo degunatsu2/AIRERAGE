@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Airerage.Core.Common;
 using Airerage.Core.Economy;
 using Airerage.Core.Input;
 using Airerage.Core.Physics;
@@ -194,7 +195,9 @@ namespace Airerage.Runtime.Tests
             foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.Launcher && z.Period == 0))
             {
                 // 飛ぶ向きへ入れ続ける（プレイヤーがふつうにすること）。床に降りるか、床の上のジャンプ台に乗ったら（続けて飛ぶ）降りたとみなす。
-                SimWorld world = World(new NVector3(zone.Center.X, zone.MinY + CharacterHalf.Y + 0.01f, 0f));
+                // 危険（溶岩流など）は時刻とランダムな場所で当たるかが変わるので除き、飛ぶ道だけを見る。
+                SimWorld world = World(_zones.Where(z => z.Kind != StageZoneKind.Hazard).ToList(),
+                    new NVector3(zone.Center.X, zone.MinY + CharacterHalf.Y + 0.01f, 0f));
                 PlayerInput input = PlayerInput.FromAxes(zone.Direction.X > 0f ? 1f : -1f, 0f, InputButtons.None);
                 Step(world, 1, input);
                 Assert.That(world.GetState(0).Grounded, Is.False, $"前提: {zone} で飛んだ");
@@ -268,6 +271,30 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
+        public void Volcano_LavaFlowsReachTheObsidianTier_AndGeysersEruptTogether()
+        {
+            Open("Stage_Volcano");
+            // 溶岩流は 25 秒ごとに 3 秒、幅 6m で黒曜石の段（y = 13）まで噴く（ユーザーの要望、2026-10-20）。
+            StageZone[] lava = _zones.Where(z => z.Kind == StageZoneKind.Hazard).ToArray();
+            Assert.That(lava.Length, Is.EqualTo(2), "溶岩流が左右にない");
+            foreach (StageZone zone in lava)
+            {
+                Assert.That(zone.MaxY, Is.GreaterThanOrEqualTo(13f), $"{zone} が黒曜石の段まで届かない");
+                Assert.That(zone.Width, Is.EqualTo(6f), $"{zone} の太さが違う");
+                Assert.That(zone.Period, Is.EqualTo(25 * SimTime.TicksPerSecond), $"{zone} の間隔が違う");
+                Assert.That(zone.Timing.ActiveTicks, Is.EqualTo(3 * SimTime.TicksPerSecond), $"{zone} の長さが違う");
+            }
+            // 壁の間欠泉は 4 つが一斉に、20 秒ごとに 3.6 秒噴く。
+            StageZone[] geysers = _zones.Where(z => z.Kind == StageZoneKind.Launcher && z.Period > 0).ToArray();
+            Assert.That(geysers.Length, Is.EqualTo(4), "壁の間欠泉が 4 つない");
+            Assert.That(geysers.All(g => g.Period == 20 * SimTime.TicksPerSecond && g.Timing.ActiveTicks == 216), Is.True, "間欠泉の間隔か長さが違う");
+            for (int tick = 0; tick < geysers[0].Period * 3; tick += 7)
+            {
+                Assert.That(geysers.Select(g => g.IsActive(tick, 1234)).Distinct().Count(), Is.EqualTo(1), $"ティック {tick} で一斉に噴いていない");
+            }
+        }
+
+        [Test]
         public void SnowSea_Blizzard_HasShelters_InTheCaveAndTheShip()
         {
             Open("Stage_SnowSea");
@@ -329,7 +356,12 @@ namespace Airerage.Runtime.Tests
 
         private SimWorld World(params NVector3[] positions)
         {
-            var world = new SimWorld(_terrain, _bounds, _zones);
+            return World(_zones, positions);
+        }
+
+        private SimWorld World(IReadOnlyList<StageZone> zones, params NVector3[] positions)
+        {
+            var world = new SimWorld(_terrain, _bounds, zones);
             foreach (NVector3 position in positions)
             {
                 world.AddCharacter(new CharacterConfig(), position, 1);

@@ -6,8 +6,9 @@ namespace Airerage.Runtime.Settings
 {
     /// <summary>
     /// キーの割り当ての変更（docs/15 T6-9。D-68）。変えられるのは "Player" の組のボタンの操作（ジャンプ・攻撃・ワイヤー・ガード・
-    /// 特殊攻撃 2 つ・必殺技）の、キーボードの 1 つ目のキーとゲームパッドのボタン【仮】。移動（WASD・左スティック）、照準（マウス・
-    /// 右スティック）、マウスのボタン、一時停止（Esc・Start）は変えない。
+    /// 特殊攻撃 2 つ・必殺技）の、キーボードとマウスの 1 つ（キーか、マウスの左・右・サイドのボタン。ユーザーの要望、2026-10-20）と
+    /// ゲームパッドのボタン【仮】。移動（WASD・左スティック）、照準（マウスの位置・右スティック）、マウスのホイールと真ん中のボタン
+    /// （ズーム）、一時停止（Esc・Start）は変えない。
     /// 変更は Input System の割り当ての上書き（元のアセットは変えない）で、JSON にして GameSettings に保存する。試合の入力
     /// （InputSystemAdapter）を作るときに ApplySaved で当てる。
     /// </summary>
@@ -24,6 +25,14 @@ namespace Airerage.Runtime.Settings
         /// <summary>変えられる操作（アクションの名前）と、オプションの画面に出す名前（同じ順）。</summary>
         public static readonly string[] Actions = { "Jump", "Attack", "Wire", "Guard", "Special1", "Special2", "Super" };
         public static readonly string[] Labels = { "JUMP", "ATTACK", "WIRE", "GUARD", "SKILL 1", "SKILL 2", "SUPER" };
+
+        // キーボードの列で使えるマウスのボタンと、画面に出す名前。
+        private static readonly string[] MouseButtons = { "<Mouse>/leftButton", "<Mouse>/rightButton", "<Mouse>/backButton", "<Mouse>/forwardButton" };
+        private static readonly Dictionary<string, string> MouseNames = new Dictionary<string, string>
+        {
+            { "leftButton", "LEFT CLICK" }, { "rightButton", "RIGHT CLICK" }, { "backButton", "MOUSE 4" }, { "forwardButton", "MOUSE 5" },
+            { "middleButton", "MIDDLE CLICK" },
+        };
 
         // ゲームパッドのボタンの、画面に出す名前（Xbox の配置の名前）。
         private static readonly Dictionary<string, string> GamepadNames = new Dictionary<string, string>
@@ -53,19 +62,30 @@ namespace Airerage.Runtime.Settings
             Apply(asset, GameSettings.LoadBindingOverrides());
         }
 
-        /// <summary>操作 action の、列 column の変えられる割り当ての番号（なければ -1）。</summary>
+        /// <summary>
+        /// 操作 action の、列 column の変えられる割り当ての番号（なければ -1）。キーボードの列は、キーかマウスのボタン
+        /// （左・右・サイド）の最初の割り当て。
+        /// </summary>
         public static int BindingIndex(InputAction action, Column column)
         {
-            string prefix = column == Column.Keyboard ? "<Keyboard>/" : "<Gamepad>/";
             for (int i = 0; i < action.bindings.Count; i++)
             {
                 InputBinding binding = action.bindings[i];
-                if (!binding.isComposite && !binding.isPartOfComposite && binding.path != null && binding.path.StartsWith(prefix, StringComparison.Ordinal))
+                if (!binding.isComposite && !binding.isPartOfComposite && binding.path != null && InColumn(binding.path, column))
                 {
                     return i;
                 }
             }
             return -1;
+        }
+
+        private static bool InColumn(string path, Column column)
+        {
+            if (column == Column.Gamepad)
+            {
+                return path.StartsWith("<Gamepad>/", StringComparison.Ordinal);
+            }
+            return path.StartsWith("<Keyboard>/", StringComparison.Ordinal) || Array.IndexOf(MouseButtons, path) >= 0;
         }
 
         /// <summary>今の割り当て（上書きがあればそれ）の、画面に出す名前。</summary>
@@ -85,6 +105,11 @@ namespace Airerage.Runtime.Settings
             {
                 return "-";
             }
+            const string mouse = "<Mouse>/";
+            if (path.StartsWith(mouse, StringComparison.Ordinal) && MouseNames.TryGetValue(path.Substring(mouse.Length), out string mouseName))
+            {
+                return mouseName;
+            }
             const string gamepad = "<Gamepad>/";
             if (path.StartsWith(gamepad, StringComparison.Ordinal))
             {
@@ -99,7 +124,8 @@ namespace Airerage.Runtime.Settings
         }
 
         /// <summary>
-        /// 操作 action の割り当て bindingIndex を、次に押したキー・ボタンに変える（列 column の機器だけ。キーボードは Esc、
+        /// 操作 action の割り当て bindingIndex を、次に押したキー・ボタンに変える（列 column の機器だけ。キーボードの列はキーと
+        /// マウスの左・右・サイドのボタン。キーボードは Esc、
         /// ゲームパッドは Start でやめる）。押したキーはほかへ伝えない（メニューの決定などにならない）。終わったら finished（変えたら true）。
         /// 操作の組は止めておく（変えている間は使えない）。
         /// </summary>
@@ -112,8 +138,12 @@ namespace Airerage.Runtime.Settings
                 .OnMatchWaitForAnother(0.05f);
             if (column == Column.Keyboard)
             {
-                operation.WithControlsHavingToMatchPath("<Keyboard>")
-                    .WithControlsExcluding("<Keyboard>/anyKey")
+                operation.WithControlsHavingToMatchPath("<Keyboard>");
+                foreach (string button in MouseButtons)
+                {
+                    operation.WithControlsHavingToMatchPath(button);
+                }
+                operation.WithControlsExcluding("<Keyboard>/anyKey")
                     .WithCancelingThrough("<Keyboard>/escape");
             }
             else

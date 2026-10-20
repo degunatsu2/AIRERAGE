@@ -100,6 +100,18 @@ namespace Airerage.Core.Economy
             return Math.Min(amount, held);
         }
 
+        /// <summary>危険のドロップで落とす枚数（所持 held 枚、威力 power のとき。少なくとも 1 枚、上限 HazardDropMax）。</summary>
+        public static int HazardDropAmount(MatchRules rules, int held, int power)
+        {
+            if (held <= 0 || power <= 0 || rules.HazardDropPercentPer100Power == 0 || rules.HazardDropMax == 0)
+            {
+                return 0;
+            }
+            long percentTimes100 = (long)power * rules.HazardDropPercentPer100Power;
+            int amount = (int)Math.Min(rules.HazardDropMax, Math.Max(1L, held * percentTimes100 / 10000));
+            return Math.Min(amount, held);
+        }
+
         /// <summary>撃破ドロップで落とす枚数（所持 held 枚のとき。端数は切り上げ）。</summary>
         public static int KoDropAmount(MatchRules rules, int held)
         {
@@ -159,6 +171,29 @@ namespace Airerage.Core.Economy
                 CharacterState victim = states[hit.Victim];
                 int amount = HitDropAmount(rules, victim.Coins.Held);
                 Drop(ledger, states, hit.Victim, CoinEventKind.HitDrop, amount, new Vector2(victim.Position.X, victim.Position.Y), HitOffsets, rules, tick);
+            }
+        }
+
+        /// <summary>
+        /// 危険のドロップ（ユーザーの要望、2026-10-20）: このティックにステージの危険（溶岩流・つらら）に当たった人
+        /// （CombatState.HazardDropPower）が、威力に応じた量を被弾ドロップと同じ並べ方で落とす。落としたら HazardDropPower を 0 に戻す。
+        /// 全員を進めた直後に呼ぶ。番号の順に落とす。
+        /// </summary>
+        public static void DropOnHazards(CoinLedger ledger, List<CharacterState> states, MatchRules rules, int tick)
+        {
+            for (int i = 0; i < states.Count; i++)
+            {
+                int power = states[i].Combat.HazardDropPower;
+                if (power <= 0)
+                {
+                    continue;
+                }
+                CharacterState victim = states[i];
+                int amount = HazardDropAmount(rules, victim.Coins.Held, power);
+                Drop(ledger, states, i, CoinEventKind.HazardDrop, amount, new Vector2(victim.Position.X, victim.Position.Y), HitOffsets, rules, tick);
+                CharacterState after = states[i];
+                after.Combat.HazardDropPower = 0;
+                states[i] = after;
             }
         }
 

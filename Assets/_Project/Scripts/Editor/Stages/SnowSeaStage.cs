@@ -111,11 +111,12 @@ namespace Airerage.Editor.Stages
                     Wave("WaveEast", 5f, 12f, 2.5f),
                     Wave("WaveFar", 20f, 26f, 3.75f),
                     Wave("WaveShip", 32f, 37f, 0.6f),
-                    // 洞窟のつらら: 天井のランダムな場所から、幅 1.6m のつららが 3.5 秒ごとに落ちる（1.2 秒前から当たる柱の全体に警告）。
+                    // 洞窟のつらら: 天井のランダムな場所から、幅 1.6m のつららが 3.5 秒ごとに落ちる（1.2 秒前から当たる柱の全体に警告。
+                    // 警告音は鳴らさない。ユーザーの要望、2026-10-20）。
                     new ZoneSpec("Icicles", StageZoneKind.Hazard, new Vector2(-35.5f, -0.5f), new Vector2(20f, 5f), Vector2.down, 30f)
-                        .Every(3.5f, 0.5f, 1f, 0f, 1.2f).Column(1.6f),
+                        .Every(3.5f, 0.5f, 1f, 0f, 1.2f).Column(1.6f).Silent(),
                     // 吹雪: 30〜40 秒ごとに 1.5 秒、左上から吹きつける。風上 14m の中に地形がない（何かの影に隠れていない）と 2 秒凍る。
-                    // 5 秒前から範囲の全体に警告と警告音。
+                    // 5 秒前から、当たる場所（影の外）にだけ警告（黄色の斜線と記号。ユーザーの要望、2026-10-20）と警告音。
                     new ZoneSpec("Blizzard", StageZoneKind.Blizzard, new Vector2(0f, 18f), new Vector2(120f, 56f), new Vector2(1f, -0.5f), 2f, 14f)
                         .Every(30f, 1.5f, 0f, 10f, 5f),
                 },

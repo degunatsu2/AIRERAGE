@@ -48,11 +48,14 @@ namespace Airerage.Core.Movement
         public float WallJumpSpeedX = 9f;
         public float WallJumpSpeedY = 13f;
 
-        /// <summary>壁に張り付いたまま止まっていられる長さ（ティック）。過ぎたら WallSlideSpeed でゆっくりずり落ちる【仮】。</summary>
-        public int WallClingHoldTicks = 90;
+        /// <summary>
+        /// 壁に張り付いていられる長さ（ティック。4 秒）。過ぎたら壁から離れ、着地するか壁ジャンプするまで張り付けない
+        /// （ユーザーの要望、2026-10-20）【仮】。
+        /// </summary>
+        public int WallClingMaxTicks = 240;
 
-        /// <summary>壁をずり落ちる速さ（m/s）【仮】。</summary>
-        public float WallSlideSpeed = 2.5f;
+        /// <summary>壁に張り付いている間、ずり落ちる速さ（m/s。張り付いた瞬間から少しずつ落ちる）【仮】。</summary>
+        public float WallSlideSpeed = 1f;
 
         /// <summary>この速さ（m/s）より速く上へ動いているときは、壁に当たっても張り付かない（ジャンプ台などで昇っている途中）【仮】。</summary>
         public float WallClingMaxRiseSpeed = 6f;
@@ -87,7 +90,7 @@ namespace Airerage.Core.Movement
             v.InRange(nameof(MoveDeadzone), MoveDeadzone, 0f, 0.95f);
             v.NonNegative(nameof(WallJumpSpeedX), WallJumpSpeedX);
             v.NonNegative(nameof(WallJumpSpeedY), WallJumpSpeedY);
-            v.NonNegative(nameof(WallClingHoldTicks), WallClingHoldTicks);
+            v.Positive(nameof(WallClingMaxTicks), WallClingMaxTicks);
             v.NonNegative(nameof(WallSlideSpeed), WallSlideSpeed);
             v.NonNegative(nameof(WallClingMaxRiseSpeed), WallClingMaxRiseSpeed);
             v.Positive(nameof(HalfWidth), HalfWidth);

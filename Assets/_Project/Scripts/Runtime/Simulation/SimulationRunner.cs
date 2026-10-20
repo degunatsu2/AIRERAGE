@@ -341,13 +341,15 @@ namespace Airerage.Runtime.Simulation
             if (_characterView != null)
             {
                 _characterView.Render(_previous, current, alpha, PlayerConfig.Movement.HalfExtents.ToUnity());
-                _characterView.RenderAction(current, PlayerConfig.Combat, _world.Rules.RespawnDelayTicks);
+                _characterView.RenderAction(current, PlayerConfig.Combat, _world.Rules.RespawnDelayTicks, PlayerConfig.Movement);
+                _characterView.SetCostume(_playerCharacter);
             }
             for (int i = 0; i < _previousDummies.Length; i++)
             {
                 CharacterState dummy = GetDummyState(i);
                 _dummyViews[i].Render(_previousDummies[i], dummy, alpha, _character.Config.Movement.HalfExtents.ToUnity());
-                _dummyViews[i].RenderAction(dummy, _character.Config.Combat, _world.Rules.RespawnDelayTicks);
+                _dummyViews[i].RenderAction(dummy, _character.Config.Combat, _world.Rules.RespawnDelayTicks, _character.Config.Movement);
+                _dummyViews[i].SetCostume(_character);
             }
             if (_wireView != null)
             {

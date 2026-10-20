@@ -1,5 +1,7 @@
 using Airerage.Core.Combat;
+using Airerage.Core.Movement;
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
 
@@ -85,6 +87,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private RingGaugeView _feverGauge;
         [Tooltip("撃破されて復帰を待つ間の、出現位置の周りの大きなゲージ（なくてもよい）")]
         [SerializeField] private RingGaugeView _respawnGauge;
+        [Tooltip("キャラクターの仮の見た目（衣装。なければ箱のまま）")]
+        [SerializeField] private CostumeView _costume;
+        [Tooltip("壁に張り付いていられる残り（紫の円形ゲージ。ユーザーの要望、2026-10-20）")]
+        [SerializeField] private RingGaugeView _wallClingGauge;
         [Tooltip("向きの印（目の帯と突き出た印をまとめた子。右向きで作り、左を向いたら左右を反転する。なければ出さない）")]
         [SerializeField] private Transform _facingMarker;
 
@@ -153,6 +159,17 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>復帰までの残りのゲージ（なければ null）。</summary>
         public RingGaugeView RespawnGauge => _respawnGauge;
+        public RingGaugeView WallClingGauge => _wallClingGauge;
+        public CostumeView Costume => _costume;
+
+        /// <summary>キャラクター character の衣装を出す（試合の仕組みが毎フレーム呼ぶ。変わったときだけ入れ替える）。</summary>
+        public void SetCostume(CharacterConfigAsset character)
+        {
+            if (_costume != null)
+            {
+                _costume.Show(character);
+            }
+        }
 
         /// <summary>撃破されて復帰を待っているので、見えなくしているか。</summary>
         public bool HiddenForRespawn { get; private set; }
@@ -175,9 +192,11 @@ namespace Airerage.Runtime.Presentation
         /// <summary>
         /// アクション状態（攻撃の段階、ヒットストップ、のけぞり）を色で示し、攻撃の判定を描く。
         /// respawnDelayTicks は復帰を待つ長さ（MatchRules.RespawnDelayTicks。復帰までのゲージの全体の長さに使う）。
+        /// movement があれば、壁に張り付いている間に残りの時間を紫の円形ゲージで示す。
         /// </summary>
-        public void RenderAction(in CharacterState current, CombatTuning combat, int respawnDelayTicks = 0)
+        public void RenderAction(in CharacterState current, CombatTuning combat, int respawnDelayTicks = 0, MovementTuning movement = null)
         {
+            RenderWallCling(current, movement);
             RenderHitbox(current, combat);
             RenderSpin(current, combat);
             RenderFacing(current);
@@ -208,6 +227,24 @@ namespace Airerage.Runtime.Presentation
             }
             _block.SetColor(BaseColorId, ColorOf(tint));
             _renderer.SetPropertyBlock(_block);
+        }
+
+        // 壁に張り付いていられる残り（WallCling.Remaining）。張り付いていなければ隠す。
+        private void RenderWallCling(in CharacterState state, MovementTuning movement)
+        {
+            if (_wallClingGauge == null)
+            {
+                return;
+            }
+            float remaining = movement != null ? WallCling.Remaining(state, movement) : 0f;
+            if (remaining > 0f)
+            {
+                _wallClingGauge.Show(transform.position, remaining);
+            }
+            else if (_wallClingGauge.IsShowing)
+            {
+                _wallClingGauge.Hide();
+            }
         }
 
         /// <summary>回る技で、今回している角度（度。回っていなければ 0）。</summary>

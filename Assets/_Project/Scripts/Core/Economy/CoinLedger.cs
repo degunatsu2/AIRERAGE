@@ -91,7 +91,7 @@ namespace Airerage.Core.Economy
         /// </summary>
         public int Drop(CoinEventId id, List<CharacterState> states, int character, int amount, Vector2 position, int pickableFromTick, int expireTick)
         {
-            if (id.Kind != CoinEventKind.HitDrop && id.Kind != CoinEventKind.KoDrop)
+            if (id.Kind != CoinEventKind.HitDrop && id.Kind != CoinEventKind.KoDrop && id.Kind != CoinEventKind.HazardDrop)
             {
                 Reject(id, "ドロップの種類ではない");
                 return -1;

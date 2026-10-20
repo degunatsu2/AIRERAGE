@@ -220,6 +220,8 @@ namespace Airerage.Core.Simulation
                 _states[i] = state;
             }
             Tick++;
+            // ステージの危険に当たった人が、威力に応じてコインを落とす。
+            CoinDropRules.DropOnHazards(Coins, _states, Rules, Tick);
             SkillRules.FireEffects(_objects, Coins, _states, _configs, Tick);
             _projectileHits.Clear();
             SkillRules.StepObjects(_objects, _collision, _states, _configs, Bounds, Tick, _projectileHits);

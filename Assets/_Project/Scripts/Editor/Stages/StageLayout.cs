@@ -59,6 +59,9 @@ namespace Airerage.Editor.Stages
         public Vector2 Travel;
         public float TravelSeconds;
 
+        /// <summary>予告の間に警告音を鳴らすか（危険・吹雪）。</summary>
+        public bool WarningSound = true;
+
         public ZoneSpec(string name, StageZoneKind kind, Vector2 center, Vector2 size, Vector2 direction, float power, float limit = 0f)
         {
             Name = name;
@@ -85,6 +88,13 @@ namespace Airerage.Editor.Stages
         public ZoneSpec Column(float width)
         {
             Width = width;
+            return this;
+        }
+
+        /// <summary>予告の警告音を鳴らさない（表示だけ）。</summary>
+        public ZoneSpec Silent()
+        {
+            WarningSound = false;
             return this;
         }
 

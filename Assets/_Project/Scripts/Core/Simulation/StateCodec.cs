@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 21;
+        public const int FormatVersion = 22;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -303,6 +303,7 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.FreezeCount);
             writer.Write(combat.HazardImmunityTicks);
             writer.Write(combat.HazardHitCount);
+            writer.Write(combat.HazardDropPower);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -421,6 +422,7 @@ namespace Airerage.Core.Simulation
                 FreezeCount = reader.ReadInt32(),
                 HazardImmunityTicks = reader.ReadInt32(),
                 HazardHitCount = reader.ReadInt32(),
+                HazardDropPower = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

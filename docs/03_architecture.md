@@ -86,7 +86,7 @@ Airerage.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを�
 | Runtime/Input | Input System から `PlayerInput` を作る | `InputSystemAdapter` | 1 |
 | Runtime/Settings | オプションの設定（音量・画面・キーの割り当て）の保存（PlayerPrefs）と適用。キーの割り当ての変更は Input System の上書きで、試合の入力を作るときに当てる（docs/15 T6-9） | `GameSettings`, `BindingSettings` | 6 |
 | Runtime/Data | ScriptableObject の定義と、Core の設定への変換 | `WireProfileAsset` など | 1 |
-| Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom`, `ChargeEffectView`, `RingGaugeView`, `GuardEffectView`, `BurstEffectView`, `ComboHud`, `StageZoneView`（ギミックの動く見た目、予告の表示と音）, `AttachableGlow`（ワイヤーが刺さる足場の光）, `MatchHud`（始まる前の演出、残り時間、結果とボタン）, `CoinView`（フィールドのコイン）, `CoinHud`（所持コインの数と「+n」） | 1 |
+| Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom`, `ChargeEffectView`, `RingGaugeView`, `GuardEffectView`, `BurstEffectView`, `ComboHud`, `StageZoneView`（ギミックの動く見た目、予告の表示と音）, `WarningOverlay`（予告の黄色の斜線と警告の記号）, `AttachableGlow`（ワイヤーが刺さる足場の光）, `CostumeView`（キャラクターの仮の見た目）, `MatchHud`（始まる前の演出、残り時間、結果とボタン）, `CoinView`（フィールドのコイン）, `CoinHud`（所持コインの数と「+n」） | 1 |
 | Runtime/Audio | 仮の BGM と効果音（音声ファイルを使わず、その場で合成する。状態の変化から鳴らす。差し替え可能） | `GameAudio`, `ProceduralAudio`, `CombatSoundEvents` | 3 |
 | Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム）、入力の記録と再生 | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels`, `ReplayControls` | 1 |
 | Net | 通信路（Unity Transport。検証用の遅延の模擬つき）、セッション（参加、開始、入力の中継、不一致の検出）、試合のステージ（地形・出現位置・撃破の範囲・ギミック）、巻き戻しの表示の補正、オンラインの画面（撃破の数の表示） | `TransportLink`, `NetMessages`, `OnlineSession`, `OnlineStage`, `CorrectionSmoother`, `OnlineRunner` | 2 |

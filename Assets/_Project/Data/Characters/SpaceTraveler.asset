@@ -27,8 +27,8 @@ MonoBehaviour:
       MoveDeadzone: 0.2
       WallJumpSpeedX: 9
       WallJumpSpeedY: 13
-      WallClingHoldTicks: 90
-      WallSlideSpeed: 2.5
+      WallClingMaxTicks: 240
+      WallSlideSpeed: 1
       WallClingMaxRiseSpeed: 6
       HalfWidth: 0.4
       HalfHeight: 0.9
@@ -460,3 +460,4 @@ MonoBehaviour:
     Name: "\u30B3\u30BA\u30DF\u30C3\u30AF\u30EC\u30A4"
     Description: "2\u3064\u306E\u30DD\u30FC\u30BF\u30EB\u306E\u9593\u3092\u3001\u58C1\u3092\u8CAB\u304F\u30D3\u30FC\u30E0\u3067\u653B\u6483\u3059\u308B\u3002\u30D3\u30FC\u30E0\u304C\u62E0\u70B9\u306B\u89E6\u308C\u308B\u3068\u624B\u6301\u3061\u306E\u30B3\u30A4\u30F3\u3092\u78BA\u5B9A\u3059\u308B\u3002"
     CooldownNote: 
+  _costume: 3

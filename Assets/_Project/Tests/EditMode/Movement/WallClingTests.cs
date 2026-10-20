@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using Airerage.Core.Combat;
 using Airerage.Core.Input;
+using Airerage.Core.Movement;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Core.Tests.Support;
@@ -44,7 +45,9 @@ namespace Airerage.Core.Tests.Movement
             float y = state.Position.Y;
             harness.Step(Inputs.None, 30);
             Assert.That(harness.State.WallSide, Is.EqualTo(1), "張り付いたままでいない");
-            Assert.That(harness.State.Position.Y, Is.EqualTo(y).Within(1e-4f), "止まっていない");
+            // 張り付いている間は少しずつずり落ちる（1 m/s。ユーザーの要望、2026-10-20）。
+            float slide = harness.Config.Movement.WallSlideSpeed * 30f / 60f;
+            Assert.That(harness.State.Position.Y, Is.EqualTo(y - slide).Within(0.05f), "少しずつずり落ちない");
         }
 
         [Test]
@@ -102,16 +105,54 @@ namespace Airerage.Core.Tests.Movement
         }
 
         [Test]
-        public void PushingAway_LetsGo_AndHoldingTooLong_SlidesDown()
+        public void PushingAway_LetsGo()
         {
             SimHarness harness = FlyingRight();
             harness.StepUntil(s => s.WallSide != 0, Inputs.None, 30);
-            float y = harness.State.Position.Y;
-            harness.Step(Inputs.None, harness.Config.Movement.WallClingHoldTicks + 30);
-            Assert.That(harness.State.Position.Y, Is.LessThan(y - 0.5f), "張り付いたままずり落ちない");
-
             harness.Step(Inputs.Left, 1);
             Assert.That(harness.State.WallSide, Is.EqualTo(0), "壁と反対へ入れても離れない");
+        }
+
+        [Test]
+        public void Cling_LastsFourSeconds_ThenLetsGo_UntilLandingOrAWallJump()
+        {
+            // 高い所（y = 25）で張り付く。
+            var harness = new SimHarness(Walls(), spawn: new Vector3(3f, 25f, 0f));
+            CharacterState state = harness.State;
+            state.Velocity = new Vector3(8f, 0f, 0f);
+            harness.State = state;
+            harness.StepUntil(s => s.WallSide != 0, Inputs.None, 30);
+            int max = harness.Config.Movement.WallClingMaxTicks;
+            Assert.That(max, Is.EqualTo(240), "張り付いていられる長さが 4 秒でない");
+
+            // 壁へ入れ続けても、4 秒で離れる。
+            harness.Step(Inputs.Right, max - 2);
+            Assert.That(harness.State.WallSide, Is.EqualTo(1), "4 秒より前に離れた");
+            Assert.That(WallCling.Remaining(harness.State, harness.Config.Movement), Is.GreaterThan(0f).And.LessThan(0.05f));
+            harness.Step(Inputs.Right, 3);
+            Assert.That(harness.State.WallSide, Is.EqualTo(0), "4 秒たっても離れない");
+
+            // 着地するまでは、壁へ入れても張り付かない。
+            bool clung = false;
+            for (int i = 0; i < 240 && !harness.State.Grounded; i++)
+            {
+                harness.Step(Inputs.Right);
+                clung |= harness.State.WallSide != 0;
+            }
+            Assert.That(clung, Is.False, "時間切れの後、着地する前にまた張り付いた");
+            Assert.That(harness.State.Grounded, Is.True);
+            Assert.That(harness.State.WallClingTicks, Is.EqualTo(0), "着地しても張り付いていた長さが戻らない");
+        }
+
+        [Test]
+        public void AWallJump_GivesAFreshFourSeconds()
+        {
+            SimHarness harness = FlyingRight();
+            harness.StepUntil(s => s.WallSide != 0, Inputs.None, 30);
+            harness.Step(Inputs.None, 100);
+            Assert.That(harness.State.WallClingTicks, Is.GreaterThan(90));
+            harness.Step(Inputs.Jump);
+            Assert.That(harness.State.WallClingTicks, Is.EqualTo(0), "壁ジャンプで張り付いていた長さが戻らない");
         }
 
         [Test]
