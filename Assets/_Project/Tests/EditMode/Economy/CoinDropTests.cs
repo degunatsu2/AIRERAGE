@@ -64,9 +64,9 @@ namespace Airerage.Core.Tests.Economy
             }
             CharacterState state = world.GetState(0);
             Assert.That(state.Combat.HazardHitCount, Is.EqualTo(1), "前提: 溶岩流に当たった");
-            // 50 枚 × 威力 60 × 20%/100 = 6 枚。
-            int expected = CoinDropRules.HazardDropAmount(world.Rules, 50, 60);
-            Assert.That(expected, Is.EqualTo(6));
+            // 威力 60 の枚数（所持 50 枚より多くは落とさないので 50 枚。ユーザーの要望、2026-10-21）。
+            int expected = CoinDropRules.HazardDropAmount(50, 60);
+            Assert.That(expected, Is.EqualTo(50));
             Assert.That(state.Coins.Held, Is.EqualTo(50 - expected), "威力に応じた量を落とさない");
             int dropped = 0;
             foreach (FieldCoin drop in Drops(world))
@@ -76,8 +76,37 @@ namespace Airerage.Core.Tests.Economy
             }
             Assert.That(dropped, Is.EqualTo(expected), "落としたコインがフィールドにない");
             Assert.That(state.Combat.HazardDropPower, Is.EqualTo(0), "落とした後に威力が残っている");
-            Assert.That(CoinDropRules.HazardDropAmount(world.Rules, 50, 30), Is.EqualTo(3), "威力が半分なら半分");
-            Assert.That(CoinDropRules.HazardDropAmount(world.Rules, 2, 30), Is.EqualTo(1), "少なくとも 1 枚");
+            Assert.That(CoinDropRules.HazardDropAmount(50, 30), Is.EqualTo(30), "威力の枚数を落とさない");
+            Assert.That(CoinDropRules.HazardDropAmount(2, 30), Is.EqualTo(2), "持っている分より多く落とす");
+            Assert.That(CoinDropRules.HazardDropAmount(0, 30), Is.EqualTo(0), "持っていないのに落とす");
+        }
+
+        [Test]
+        public void BlizzardFreeze_DropsCoins_ByItsPower()
+        {
+            // 足元のコイン 50 枚を拾ってから、10 ティック目に吹く吹雪（威力 20）で凍る（2026-10-21）。
+            var blizzard = new StageZone(StageZoneKind.Blizzard, -40f, -5f, 40f, 20f, Vector2.UnitX, 20f, 0f, new StageZoneTiming(600, 30, 590),
+                Vector2.Zero);
+            var coin = new CoinSpawnPoint(new Vector2(0f, 1f), 50);
+            var world = new SimWorld(TestArenas.Ground(), Bounds, new[] { blizzard }, MatchRules.FreePlay(), new[] { coin });
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f), 1);
+            world.Step(new PlayerInput[1]);
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(50), "前提: 足元のコインを拾った");
+            for (int i = 0; i < 30 && world.GetState(0).Combat.FreezeCount == 0; i++)
+            {
+                world.Step(new PlayerInput[1]);
+            }
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Combat.FreezeCount, Is.EqualTo(1), "前提: 吹雪で凍った");
+            Assert.That(state.Combat.FrozenTicksLeft, Is.GreaterThan(StageZones.BlizzardFreezeTicks - 5), "凍る長さが威力で変わった");
+            Assert.That(state.Coins.Held, Is.EqualTo(30), "威力の枚数を落とさない");
+            int dropped = 0;
+            foreach (FieldCoin drop in Drops(world))
+            {
+                dropped += drop.Value;
+                Assert.That(drop.Origin, Is.EqualTo(CoinEventKind.HazardDrop));
+            }
+            Assert.That(dropped, Is.EqualTo(20), "落としたコインがフィールドにない");
         }
 
         private static List<FieldCoin> Drops(SimWorld world)

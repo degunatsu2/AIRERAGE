@@ -680,6 +680,22 @@ namespace Airerage.Core.Tests.Simulation
         }
 
         [Test]
+        public void Hazard_KnockbackSpeed_CanBeSetApartFromItsPower()
+        {
+            // 威力 30（落とすコイン）で、吹き飛ばす速さは 40 m/s（Limit。2026-10-21）。
+            var lava = new StageZone(StageZoneKind.Hazard, -2f, -1f, 2f, 8f, Vector2.UnitY, 30f, 40f, new StageZoneTiming(120, 30, 0),
+                Vector2.Zero, 4f);
+            var world = new SimWorld(Floor(), null, new[] { lava });
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, Movement.HalfHeight, 0f), 1);
+            world.Step(new PlayerInput[1]);
+            CharacterState hit = world.GetState(0);
+            Assert.That(hit.Combat.HazardHitCount, Is.EqualTo(1), "前提: 当たった");
+            Assert.That(hit.Velocity.Y, Is.EqualTo(40f).Within(1e-3f), "決めた速さで吹き飛ばない");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Hazard, -2f, -1f, 2f, 8f, Vector2.UnitY, 30f, -1f,
+                new StageZoneTiming(120, 30, 0), Vector2.Zero, 4f));
+        }
+
+        [Test]
         public void Blizzard_FreezesExposedCharacters_ButNotThoseInShelter()
         {
             var timing = new StageZoneTiming(600, 30, 0);

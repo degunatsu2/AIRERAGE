@@ -69,15 +69,6 @@ namespace Airerage.Core.Match
         /// <summary>被弾ドロップの上限（枚）【仮】。</summary>
         public int HitDropMax = 10;
 
-        /// <summary>
-        /// ステージの危険（溶岩流・つらら）に当たったときに落とす、所持コインの割合（威力 100 あたりの %。威力 60 なら 12%）【仮】。
-        /// 少なくとも 1 枚（ユーザーの要望、2026-10-20）。
-        /// </summary>
-        public int HazardDropPercentPer100Power = 20;
-
-        /// <summary>危険のドロップの上限（枚）【仮】。</summary>
-        public int HazardDropMax = 20;
-
         /// <summary>撃破ドロップ: 撃破されたときに落とす、所持コインの割合（%。端数は切り上げ）【仮】。自滅も同じ（D-44）。</summary>
         public int KoDropPercent = 50;
 
@@ -181,8 +172,6 @@ namespace Airerage.Core.Match
             v.NonNegative(nameof(JackpotNoticeTicks), JackpotNoticeTicks);
             v.InRange(nameof(HitDropPercent), HitDropPercent, 0f, 100f);
             v.NonNegative(nameof(HitDropMax), HitDropMax);
-            v.InRange(nameof(HazardDropPercentPer100Power), HazardDropPercentPer100Power, 0f, 1000f);
-            v.NonNegative(nameof(HazardDropMax), HazardDropMax);
             v.InRange(nameof(KoDropPercent), KoDropPercent, 0f, 100f);
             v.NonNegative(nameof(DropPickableDelayTicks), DropPickableDelayTicks);
             v.Positive(nameof(DropLifetimeTicks), DropLifetimeTicks);

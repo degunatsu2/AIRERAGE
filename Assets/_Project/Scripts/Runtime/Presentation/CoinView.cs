@@ -70,6 +70,7 @@ namespace Airerage.Runtime.Presentation
             public CoinLook Look;
             public Transform[] Faces;
             public Renderer[] Renderers;
+            public Renderer[] Inners;
             public Color[] BaseColors;
             public LineRenderer RushHalo;
             public bool Glowing;
@@ -204,6 +205,10 @@ namespace Airerage.Runtime.Presentation
                 foreach (Renderer face in shown.Renderers)
                 {
                     face.enabled = visible;
+                }
+                foreach (Renderer inner in shown.Inners)
+                {
+                    inner.enabled = visible;
                 }
                 Glow(shown, coin, RushGlowing && visible && shown.Look != CoinLook.Rainbow, time, pop);
             }
@@ -387,6 +392,7 @@ namespace Airerage.Runtime.Presentation
                     Look = look,
                     Faces = faces,
                     Renderers = renderers,
+                    Inners = InnersOf(faces),
                     BaseColors = baseColors,
                     RushHalo = halo != null ? halo.GetComponent<LineRenderer>() : null,
                 };
@@ -400,6 +406,23 @@ namespace Airerage.Runtime.Presentation
         }
 
         // 見本の子のうち、メッシュを持つもの（コインの面）。
+        // 面の真ん中の暗い円（面の子。点滅のときに面と一緒に隠す）。
+        private static Renderer[] InnersOf(Transform[] faces)
+        {
+            var inners = new List<Renderer>();
+            foreach (Transform face in faces)
+            {
+                foreach (Transform child in face)
+                {
+                    if (child.TryGetComponent(out Renderer renderer))
+                    {
+                        inners.Add(renderer);
+                    }
+                }
+            }
+            return inners.ToArray();
+        }
+
         private static Transform[] FacesOf(Transform root)
         {
             var faces = new List<Transform>();

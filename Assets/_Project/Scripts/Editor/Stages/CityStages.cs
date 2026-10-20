@@ -140,6 +140,18 @@ namespace Airerage.Editor.Stages
                     // 20 枚: 広い谷のくりぬいた中の入り口（左は下向きの風の中）、狭い谷（助からない）、いちばん上、ステージの端。
                     (new Vector2(-11.5f, -6.5f), 20), (new Vector2(11.5f, -6.5f), 20), (new Vector2(-32f, -5f), 20), (new Vector2(32f, -5f), 20),
                     (new Vector2(0f, 37f), 20), (new Vector2(-46f, 27f), 20), (new Vector2(46f, 27f), 20),
+                    // 追加（総量を 2 倍に。ユーザーの要望、2026-10-21）。くりぬいた中（隠れ家にしやすい所。20 枚 2 つと 3 枚 2 つを固めて、取り合いを激しくする）。
+                    (new Vector2(-7.5f, -6f), 20), (new Vector2(7.5f, -6f), 20), (new Vector2(-3f, -5.5f), 3), (new Vector2(3f, -5.5f), 3),
+                    (new Vector2(-2.5f, -9f), 1), (new Vector2(2.5f, -9f), 1),
+                    // 広い谷の中（左は下向きの風、右は上昇気流）と底の近く。
+                    (new Vector2(-13.5f, -3f), 1), (new Vector2(13.5f, -3f), 1), (new Vector2(-15.5f, -15f), 20), (new Vector2(15.5f, -15f), 20),
+                    // オフィスの上、渡り廊下の上、広場の上、塔の間の上、ヘリポートの先、クレーンの横、塔の屋上の階段室の上。
+                    (new Vector2(-23.5f, 8f), 3), (new Vector2(23.5f, 8f), 3), (new Vector2(-25f, 10f), 1), (new Vector2(25f, 10f), 1),
+                    (new Vector2(-20f, 17f), 1), (new Vector2(20f, 17f), 1), (new Vector2(-5f, 18f), 1), (new Vector2(5f, 18f), 1),
+                    (new Vector2(-35f, 20f), 3), (new Vector2(35f, 20f), 3), (new Vector2(-17f, 26f), 1), (new Vector2(17f, 26f), 1),
+                    (new Vector2(-10f, 30f), 3), (new Vector2(10f, 30f), 3), (new Vector2(-44f, 19f), 1), (new Vector2(44f, 19f), 1),
+                    // 20 枚: 塔の外の上空、いちばん上。
+                    (new Vector2(-50f, 10f), 20), (new Vector2(50f, 10f), 20), (new Vector2(0f, 44f), 20),
                 },
                 Jackpots = new[]
                 {
@@ -245,6 +257,19 @@ namespace Airerage.Editor.Stages
                     (new Vector2(0f, 38f), 20), (new Vector2(-46f, 25f), 20), (new Vector2(46f, 25f), 20),
                     // くりぬいた中の床の上。
                     (new Vector2(-5f, -8f), 1), (new Vector2(5f, -8f), 1),
+                    // 追加（総量を 2 倍に。ユーザーの要望、2026-10-21）。くりぬいた中（隠れ家にしやすい所。20 枚 2 つと 3 枚 2 つを固めて、取り合いを激しくする）。
+                    (new Vector2(-7.5f, -6f), 20), (new Vector2(7.5f, -6f), 20), (new Vector2(-3f, -5.5f), 3), (new Vector2(3f, -5.5f), 3),
+                    (new Vector2(-2.5f, -9f), 1), (new Vector2(2.5f, -9f), 1),
+                    // 通風口の谷の中と、オフィスの上。
+                    (new Vector2(-16f, -8f), 20), (new Vector2(16f, -8f), 20), (new Vector2(-16f, 4f), 1), (new Vector2(16f, 4f), 1),
+                    (new Vector2(-24f, 6.5f), 3), (new Vector2(24f, 6.5f), 3),
+                    // 渡り廊下の上、トランポリンの上、塔の間の上、クレーンの横、塔の屋上の階段室の上。
+                    (new Vector2(-20f, 17f), 1), (new Vector2(20f, 17f), 1), (new Vector2(-5f, 22f), 1), (new Vector2(5f, 22f), 1),
+                    (new Vector2(0f, 24f), 1), (new Vector2(-35f, 20f), 3), (new Vector2(35f, 20f), 3), (new Vector2(-17f, 26f), 1),
+                    (new Vector2(17f, 26f), 1), (new Vector2(-10f, 30f), 3), (new Vector2(10f, 30f), 3), (new Vector2(-44f, 19f), 1),
+                    (new Vector2(44f, 19f), 1),
+                    // 20 枚: 塔の外の上空、いちばん上。
+                    (new Vector2(-50f, 10f), 20), (new Vector2(50f, 10f), 20), (new Vector2(0f, 45f), 20),
                 },
                 Jackpots = new[]
                 {

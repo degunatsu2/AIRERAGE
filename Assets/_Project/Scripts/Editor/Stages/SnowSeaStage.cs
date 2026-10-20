@@ -13,8 +13,9 @@ namespace Airerage.Editor.Stages
     /// </summary>
     internal static class SnowSeaStage
     {
-        // 氷の滑りやすさ（このティックの横の速さの変化の倍率）【仮】。
-        private const float IceGrip = 0.15f;
+        // 氷の滑りやすさ（このティックの横の速さの変化の倍率）【仮】。止まっていても動いていても、もっと滑るように 0.15 → 0.05
+        // （ユーザーの要望、2026-10-21。地上の加速 80 m/s² の 5% = 4 m/s²。走る速さ 8 m/s から止まるまで 2 秒）。
+        private const float IceGrip = 0.05f;
 
         public static StageLayout Create()
         {
@@ -66,6 +67,8 @@ namespace Airerage.Editor.Stages
                     // 船（甲板は接続できない。マストは接続できる）。船の中（y = -1.5〜2）は両端が開いていて、通り抜けられる。
                     new TerrainBox("ShipHull", 37f, 2f, 47f, 3f),
                     new TerrainBox("ShipKeel", 37f, -30f, 47f, -1.5f),
+                    // 船首（船の中の床の左の端。見た目だけで判定がなかった。ユーザーの指摘、2026-10-21）。
+                    new TerrainBox("ShipBow", 35f, -30f, 37f, -1.5f),
                     new TerrainBox("Mast", 41.7f, 3f, 42.3f, 16f, attachable: true),
                     new TerrainBox("CrowsNest", 40.5f, 16f, 43.5f, 16.4f),
                     // 宙に張り出した氷の棚とアーチ。
@@ -110,14 +113,16 @@ namespace Airerage.Editor.Stages
                     Wave("WaveMid", -11f, -5f, 1.25f),
                     Wave("WaveEast", 5f, 12f, 2.5f),
                     Wave("WaveFar", 20f, 26f, 3.75f),
-                    Wave("WaveShip", 32f, 37f, 0.6f),
+                    Wave("WaveShip", 32f, 35f, 0.6f), // 船首（x = 35〜37）の上には吹かない（2026-10-21）。
                     // 洞窟のつらら: 天井のランダムな場所から、幅 1.6m のつららが 3.5 秒ごとに落ちる（1.2 秒前から当たる柱の全体に警告。
                     // 警告音は鳴らさない。ユーザーの要望、2026-10-20）。
-                    new ZoneSpec("Icicles", StageZoneKind.Hazard, new Vector2(-35.5f, -0.5f), new Vector2(20f, 5f), Vector2.down, 30f)
+                    // 威力 15（その枚数のコインを落とす）。吹き飛ばす速さは今までどおり 15.5 m/s（2026-10-21）。
+                    new ZoneSpec("Icicles", StageZoneKind.Hazard, new Vector2(-35.5f, -0.5f), new Vector2(20f, 5f), Vector2.down, 15f, 15.5f)
                         .Every(3.5f, 0.5f, 1f, 0f, 1.2f).Column(1.6f).Silent(),
                     // 吹雪: 30〜40 秒ごとに 1.5 秒、左上から吹きつける。風上 14m の中に地形がない（何かの影に隠れていない）と 2 秒凍る。
                     // 5 秒前から、当たる場所（影の外）にだけ警告（黄色の斜線と記号。ユーザーの要望、2026-10-20）と警告音。
-                    new ZoneSpec("Blizzard", StageZoneKind.Blizzard, new Vector2(0f, 18f), new Vector2(120f, 56f), new Vector2(1f, -0.5f), 2f, 14f)
+                    // 凍ると威力 20 の枚数のコインを落とす（凍るのは 2 秒。StageZones.BlizzardFreezeTicks。2026-10-21）。
+                    new ZoneSpec("Blizzard", StageZoneKind.Blizzard, new Vector2(0f, 18f), new Vector2(120f, 56f), new Vector2(1f, -0.5f), 20f, 14f)
                         .Every(30f, 1.5f, 0f, 10f, 5f),
                 },
                 Coins = new (Vector2, int)[]
@@ -141,6 +146,21 @@ namespace Airerage.Editor.Stages
                     // 20 枚: 海の中（波で戻れる）、いちばん上、ステージの端。
                     (new Vector2(-21f, -8f), 20), (new Vector2(-8f, -8f), 20), (new Vector2(8.5f, -8f), 20), (new Vector2(23f, -8f), 20),
                     (new Vector2(0f, 36f), 20), (new Vector2(-47f, 24f), 20), (new Vector2(47f, 27f), 20),
+                    // 追加（総量を 2 倍に。ユーザーの要望、2026-10-21）。雪原の下の洞窟（隠れ家にしやすい所。つららの下に 20 枚 2 つと 3 枚 2 つを固めて、取り合いを激しくする）。
+                    (new Vector2(-43f, -1f), 20), (new Vector2(-28.5f, -1f), 20), (new Vector2(-39f, 0.5f), 3), (new Vector2(-33f, 0.5f), 3),
+                    (new Vector2(-45f, -2f), 1), (new Vector2(-26.5f, 0f), 1),
+                    // 船の中（もう 1 つの隠れ家）。
+                    (new Vector2(39.5f, 0.2f), 3), (new Vector2(44.5f, 0.2f), 20),
+                    // 雪原のジャンプ台の上、氷の上、氷山の脇、東の氷の上、船の上。
+                    (new Vector2(-35f, 10f), 1), (new Vector2(-35f, 17.5f), 1), (new Vector2(-11f, 5f), 1), (new Vector2(-5f, 7f), 1),
+                    (new Vector2(5f, 7f), 1), (new Vector2(10f, 6f), 1), (new Vector2(22f, 8f), 1), (new Vector2(27f, 5f), 1),
+                    (new Vector2(35f, 14f), 3), (new Vector2(38f, 17f), 1), (new Vector2(45f, 13f), 1),
+                    // 氷の棚とアーチの周り、高い所。
+                    (new Vector2(-20f, 18f), 3), (new Vector2(20f, 20f), 3), (new Vector2(-8f, 28f), 3), (new Vector2(8f, 28f), 3),
+                    (new Vector2(-12f, 22f), 1), (new Vector2(12f, 24f), 1), (new Vector2(-28f, 22f), 1), (new Vector2(25f, 21f), 1),
+                    (new Vector2(30f, 26f), 1), (new Vector2(0f, 32f), 1),
+                    // 20 枚: 上空、ステージの端。
+                    (new Vector2(-24f, 30f), 20), (new Vector2(24f, 30f), 20), (new Vector2(-52f, 10f), 20), (new Vector2(52f, 8f), 20),
                 },
                 Jackpots = new[]
                 {
@@ -201,14 +221,15 @@ namespace Airerage.Editor.Stages
                     new Vector3(size, size, size), pine);
                 tree.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
             }
-            // 船の飾り（木の船体と見張り台、帆、船首）。地形の箱を少し大きな木の箱で覆う。
+            // 船の飾り（木の船体と見張り台、帆、船首）。地形の箱を少し大きな木の箱で覆う（上の面も地形より少し上にする。同じ高さだと
+            // カメラが動くたびに地形の白とちらつく。ユーザーの指摘、2026-10-21）。
             decor.Box("ShipDeckSkin", new Vector3(42f, 2.5f, 0f), new Vector3(10.02f, 1.02f, 4.2f), wood);
-            decor.Box("ShipKeelSkin", new Vector3(42f, -6.25f, 0f), new Vector3(10.02f, 9.5f, 4.2f), wood);
+            decor.Box("ShipKeelSkin", new Vector3(42f, -6.24f, 0f), new Vector3(10.02f, 9.52f, 4.2f), wood);
             // 船の中（奥の板と、灯り）。
             decor.Box("ShipHold", new Vector3(42f, 0.25f, 1.8f), new Vector3(10f, 3.5f, 0.4f), decor.Lit("Hold", new Color(0.25f, 0.17f, 0.12f)));
             decor.Sphere("HoldLamp", new Vector3(42f, 1.6f, 0f), new Vector3(0.4f, 0.4f, 0.4f), decor.Unlit("Lamp", new Color(1f, 0.85f, 0.5f)));
-            decor.Box("CrowsNestSkin", new Vector3(42f, 16.2f, 0f), new Vector3(3.02f, 0.42f, 2f), wood);
-            decor.Box("ShipBow", new Vector3(36f, -3.75f, 0f), new Vector3(2f, 4.5f, 3.5f), wood);
+            decor.Box("CrowsNestSkin", new Vector3(42f, 16.2f, 0f), new Vector3(3.02f, 0.42f, 4.2f), wood);
+            decor.Box("ShipBow", new Vector3(36f, -3.74f, 0f), new Vector3(2.02f, 4.52f, 4.2f), wood);
             decor.Quad("Sail", new Vector3(42f, 10f, 0.4f), new Vector2(6f, 8f), sail);
             // 遠くの雪山と氷山。
             for (int i = 0; i < 6; i++)

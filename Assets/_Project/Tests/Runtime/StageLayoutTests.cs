@@ -31,6 +31,13 @@ namespace Airerage.Runtime.Tests
             "Stage_Athletic", "Stage_CityDay", "Stage_CityNight", "Stage_Volcano", "Stage_SnowSea", "Stage_SpaceStation",
         };
 
+        // コインの総量（出現地点の価値の合計）の下限。2026-10-21 に総量を 2 倍にした（ユーザーの要望。その前の総量の 2 倍）。
+        private static readonly Dictionary<string, int> MinimumCoinTotals = new Dictionary<string, int>
+        {
+            { "Stage_Athletic", 366 }, { "Stage_CityDay", 356 }, { "Stage_CityNight", 354 }, { "Stage_Volcano", 360 }, { "Stage_SnowSea", 362 },
+            { "Stage_SpaceStation", 278 },
+        };
+
         // ステージ固有のギミック（どのステージにもあるジャンプ台・上昇気流・加速リング以外）。
         private static readonly Dictionary<string, StageZoneKind[]> UniqueGimmicks = new Dictionary<string, StageZoneKind[]>
         {
@@ -292,6 +299,109 @@ namespace Airerage.Runtime.Tests
             {
                 Assert.That(geysers.Select(g => g.IsActive(tick, 1234)).Distinct().Count(), Is.EqualTo(1), $"ティック {tick} で一斉に噴いていない");
             }
+        }
+
+        [TestCaseSource(nameof(Stages))]
+        public void CoinTotals_AreDoubled_AndCoinsDoNotStack(string stage)
+        {
+            Open(stage);
+            CoinSpawnPoint[] regular = _coins.Where(c => c.Kind == CoinSpawnKind.Regular).ToArray();
+            Assert.That(regular.Sum(c => c.Value), Is.GreaterThanOrEqualTo(MinimumCoinTotals[stage]), "コインの総量が 2 倍になっていない");
+            for (int i = 0; i < regular.Length; i++)
+            {
+                for (int j = i + 1; j < regular.Length; j++)
+                {
+                    Assert.That(NVector2.Distance(regular[i].Position, regular[j].Position), Is.GreaterThanOrEqualTo(1.4f),
+                        $"コイン {regular[i].Position} と {regular[j].Position} が重なっている");
+                }
+            }
+        }
+
+        [Test]
+        public void Hideouts_HaveMoreCoins()
+        {
+            // 隠れ家にしやすい所（雪原の下の洞窟、ビル街の真ん中のビルの下）には、20 枚 2 つを含めて多めに置く（ユーザーの要望、2026-10-21）。
+            (string Stage, Rect Area)[] hideouts =
+            {
+                ("Stage_SnowSea", Rect.MinMaxRect(-46.5f, -3f, -24f, 2f)),
+                ("Stage_CityDay", Rect.MinMaxRect(-9f, -10f, 9f, -4f)),
+                ("Stage_CityNight", Rect.MinMaxRect(-9f, -10f, 9f, -4f)),
+            };
+            foreach (var hideout in hideouts)
+            {
+                Open(hideout.Stage);
+                CoinSpawnPoint[] inside = _coins.Where(c => c.Kind == CoinSpawnKind.Regular
+                    && hideout.Area.Contains(new Vector2(c.Position.X, c.Position.Y))).ToArray();
+                Assert.That(inside.Count(c => c.Value >= 20), Is.GreaterThanOrEqualTo(2), $"{hideout.Stage} の隠れ家の 20 枚が少ない");
+                Assert.That(inside.Sum(c => c.Value), Is.GreaterThanOrEqualTo(50), $"{hideout.Stage} の隠れ家のコインが少ない");
+                EditorSceneManager.CloseScene(_scene, true);
+                _scene = default;
+            }
+        }
+
+        [Test]
+        public void SnowSea_ShipBow_IsAFloor()
+        {
+            Open("Stage_SnowSea");
+            // 船の中の床の左の端（船首）にも立てる（見た目だけで判定がなかった。ユーザーの指摘、2026-10-21）。
+            Assert.That(_terrain.IsOverlapping(new NVector3(36f, -1.6f, 0f), new NVector3(0.4f, 0.05f, 0.4f)), Is.True, "船首に足場の判定がない");
+            SimWorld world = World(new NVector3(36f, -1.5f + CharacterHalf.Y + 0.01f, 0f));
+            Step(world, 60, default);
+            Assert.That(world.GetState(0).Grounded, Is.True, "船首に立てない");
+            Assert.That(world.GetState(0).Position.Y, Is.GreaterThan(-1.5f), "船首から落ちた");
+        }
+
+        [TestCaseSource(nameof(Stages))]
+        public void Decor_DoesNotShareAVisibleFaceWithTheTerrain(string stage)
+        {
+            Open(stage);
+            // 地形の箱と同じ向きの面が同じ位置にある飾りの箱は、カメラが動くとちらつく（z-fighting。雪原の船の白い部分。2026-10-21）。
+            Bounds[] terrain = Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None).Select(b => b.bounds).ToArray();
+            var problems = new List<string>();
+            foreach (MeshRenderer renderer in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            {
+                var filter = renderer.GetComponent<MeshFilter>();
+                if (renderer.GetComponent<Collider>() != null || filter == null || filter.sharedMesh == null || filter.sharedMesh.name != "Cube"
+                    || renderer.transform.rotation != Quaternion.identity || !renderer.enabled)
+                {
+                    continue;
+                }
+                Bounds decor = renderer.bounds;
+                foreach (Bounds box in terrain)
+                {
+                    if (SharesFace(decor, box))
+                    {
+                        problems.Add($"{renderer.name} {decor.center}");
+                        break;
+                    }
+                }
+            }
+            Assert.That(problems, Is.Empty, "地形と同じ位置に同じ向きの面がある飾り（ちらつく）");
+        }
+
+        // a と b に、同じ向きで同じ位置の面があり、その面が見える大きさで重なっているか（数 cm の細い重なりは見えないので数えない）。
+        // カメラは手前（-Z の側）にいるので、奥向き（+Z）の面は見えない。
+        private static bool SharesFace(Bounds a, Bounds b)
+        {
+            const float tolerance = 0.002f;
+            const float visibleOverlap = 0.05f;
+            for (int axis = 0; axis < 3; axis++)
+            {
+                int u = (axis + 1) % 3;
+                int v = (axis + 2) % 3;
+                float overlapU = Mathf.Min(a.max[u], b.max[u]) - Mathf.Max(a.min[u], b.min[u]);
+                float overlapV = Mathf.Min(a.max[v], b.max[v]) - Mathf.Max(a.min[v], b.min[v]);
+                if (overlapU <= visibleOverlap || overlapV <= visibleOverlap)
+                {
+                    continue;
+                }
+                bool sameMax = axis != 2 && Mathf.Abs(a.max[axis] - b.max[axis]) < tolerance;
+                if (sameMax || Mathf.Abs(a.min[axis] - b.min[axis]) < tolerance)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         [Test]

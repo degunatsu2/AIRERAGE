@@ -41,7 +41,10 @@ namespace Airerage.Core.Simulation
         /// <summary>吹雪で風上に地形があるかを調べる距離（m。ギミックの Limit が 0 のとき）【仮】。</summary>
         public const float BlizzardShelterDistance = 60f;
 
-        /// <summary>危険の威力から吹き飛びの速さ（m/s）を決める: 8 + 威力 × 0.25【仮】。</summary>
+        /// <summary>吹雪で凍っている長さ（ティック）【仮】。威力（Power）は落とすコインの枚数（2026-10-21）。</summary>
+        public const int BlizzardFreezeTicks = 120;
+
+        /// <summary>危険の吹き飛ばす速さ（m/s）を決めていない（Limit が 0）ときの、威力からの速さ: 8 + 威力 × 0.25【仮】。</summary>
         public static float HazardKnockbackSpeed(float power)
         {
             return 8f + power * 0.25f;
@@ -247,7 +250,7 @@ namespace Airerage.Core.Simulation
                 return;
             }
             WireController.Interrupt(ref state, wire);
-            float speed = HazardKnockbackSpeed(zone.Power);
+            float speed = zone.Limit > 0f ? zone.Limit : HazardKnockbackSpeed(zone.Power);
             // 柱の真ん中から外へ少し押し出す（同じ所に落ちてこないように）。
             float away = p.X >= (minX + maxX) * 0.5f ? 1f : -1f;
             state.Velocity = new Vector3(zone.Direction.X * speed + away * 3f, zone.Direction.Y * speed, 0f);
@@ -258,7 +261,7 @@ namespace Airerage.Core.Simulation
             state.Combat.HitstopTicksLeft = Math.Max(state.Combat.HitstopTicksLeft, HazardHitstopTicks);
             state.Combat.HazardImmunityTicks = zone.ActiveTicks + 20;
             state.Combat.HazardHitCount++;
-            // 威力に応じてコインを落とす（SimWorld が CoinDropRules.DropOnHazards で落とす。ユーザーの要望、2026-10-20）。
+            // 威力の枚数のコインを落とす（SimWorld が CoinDropRules.DropOnHazards で落とす。ユーザーの要望、2026-10-20・21）。
             state.Combat.HazardDropPower = Math.Max(1, (int)zone.Power);
             state.Grounded = false;
             state.WallSide = 0;
@@ -274,8 +277,10 @@ namespace Airerage.Core.Simulation
             }
             state.Combat.Holding = false;
             state.Combat.HoldTicks = 0;
-            state.Combat.FrozenTicksLeft = SimTime.SecondsToTicks(zone.Power);
+            state.Combat.FrozenTicksLeft = BlizzardFreezeTicks;
             state.Combat.FreezeCount++;
+            // 凍ったら威力の枚数のコインを落とす（ユーザーの要望、2026-10-21）。
+            state.Combat.HazardDropPower = Math.Max(1, (int)zone.Power);
             state.WallSide = 0;
             state.Velocity.X = 0f;
             state.JumpBufferTicksLeft = 0;

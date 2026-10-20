@@ -7,7 +7,7 @@ namespace Airerage.Editor.Stages
     /// <summary>
     /// 火山の火口（CRATER）。左右の火口の縁（段になった岩）と、溶岩の湖の真ん中の岩の柱、浮かぶ岩。溶岩に落ちると撃破。
     /// 固有のギミック（ユーザーの要望、2026-10-19 に変え、2026-10-20 に間隔と太さを変えた）: 溶岩流（Hazard。溶岩の湖のランダムな場所から、
-    /// 黒曜石の段の高さまで噴き出す。威力 60。噴く前に当たる柱の全体に警告と警告音）、壁の間欠泉（周期のある Launcher。縁の上の段と
+    /// 黒曜石の段の高さまで噴き出す。威力 30（その枚数のコインを落とす）で、高く吹き飛ばす。噴く前に当たる柱の全体に警告と警告音）、壁の間欠泉（周期のある Launcher。縁の上の段と
     /// 下の段の内側の壁から、火口の内側へ斜めに一斉に噴き出し、強い風よりも強く吹き飛ばす）、噴火口（Launcher。縁から火口の真ん中へ
     /// 飛ばす）、噴石（Bumper）。
     /// </summary>
@@ -89,10 +89,11 @@ namespace Airerage.Editor.Stages
                     new ZoneSpec("RimRingEast", StageZoneKind.BoostRing, new Vector2(28f, 13f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.15f), 18f),
                     // 溶岩流: 溶岩の湖（柱の左右）のランダムな場所から、幅 6m の柱が黒曜石の段（y = 13）まで 3 秒噴き出す（25 秒ごと。
                     // 左右が半分ずれる。ユーザーの要望、2026-10-20: 頻度を 1/5、太さを 1.5 倍、長さを 3 倍、もう一段上まで）。噴く 2 秒前から
-                    // 当たる柱の全体に警告。当たると上へ吹き飛ぶ（威力 60）。
-                    new ZoneSpec("LavaFlowWest", StageZoneKind.Hazard, new Vector2(-20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 60f)
+                    // 当たる柱の全体に警告。当たると威力 30 の枚数のコインを落とし、上へ 40 m/s で吹き飛ぶ（2026-10-21: 威力を 60 から 30 に、
+                    // 吹き飛ぶ高さを約 3 倍に。速さ 23 → 40 m/s）。
+                    new ZoneSpec("LavaFlowWest", StageZoneKind.Hazard, new Vector2(-20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 30f, 40f)
                         .Every(25f, 3f, 0f, 0f, 2f).Column(6f),
-                    new ZoneSpec("LavaFlowEast", StageZoneKind.Hazard, new Vector2(20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 60f)
+                    new ZoneSpec("LavaFlowEast", StageZoneKind.Hazard, new Vector2(20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 30f, 40f)
                         .Every(25f, 3f, 12.5f, 0f, 2f).Column(6f),
                     // 壁の間欠泉: 縁の上の段（x = ±45）の上のほうと、下の段（x = ±34）の下のほうの内側の壁から、火口の内側へ斜めに噴く
                     // （4 つが一斉に、20 秒ごとに 3.6 秒。ユーザーの要望、2026-10-20。2 秒前から口に警告）。触れると速度をまるごと噴く向きにする
@@ -133,6 +134,20 @@ namespace Airerage.Editor.Stages
                     // 20 枚: 溶岩の上（溶岩流が噴く所。壁の間欠泉か壁ジャンプで戻る）、いちばん上、ステージの端。
                     (new Vector2(-14f, -6f), 20), (new Vector2(14f, -6f), 20), (new Vector2(-28f, -5f), 20), (new Vector2(28f, -5f), 20),
                     (new Vector2(0f, 38f), 20), (new Vector2(-46f, 30f), 20), (new Vector2(46f, 30f), 20),
+                    // 追加（総量を 2 倍に。ユーザーの要望、2026-10-21）。浮かぶ岩の下の溶岩の上（溶岩流から隠れきれない隠れ家。20 枚と 3 枚 2 つを固める）。
+                    (new Vector2(-21.5f, 2f), 20), (new Vector2(21.5f, 2f), 20), (new Vector2(-18.5f, 2.5f), 3), (new Vector2(18.5f, 2.5f), 3),
+                    (new Vector2(-24.5f, 2.5f), 3), (new Vector2(24.5f, 2.5f), 3),
+                    // 柱の脇の溶岩の上、縁の低い段の壁の前、噴火口で飛ぶ道、黒曜石の上、縁の加速リングの上、間欠泉の先。
+                    (new Vector2(-8f, -3f), 1), (new Vector2(8f, -3f), 1), (new Vector2(-31f, -1f), 1), (new Vector2(31f, -1f), 1),
+                    (new Vector2(-37.5f, 6.5f), 3), (new Vector2(37.5f, 6.5f), 3), (new Vector2(-17f, 8f), 1), (new Vector2(17f, 8f), 1),
+                    (new Vector2(-10.5f, 15.5f), 3), (new Vector2(10.5f, 15.5f), 3), (new Vector2(-26f, 15f), 1), (new Vector2(26f, 15f), 1),
+                    (new Vector2(-33f, 11f), 1), (new Vector2(33f, 11f), 1),
+                    // 頂の岩の横、高い所、縁のいちばん上の先。
+                    (new Vector2(-12f, 24f), 1), (new Vector2(12f, 24f), 1), (new Vector2(-25f, 28f), 1), (new Vector2(25f, 28f), 1),
+                    (new Vector2(-42.5f, 20f), 1), (new Vector2(42.5f, 20f), 1),
+                    // 20 枚: 縁の上の上空、縁の外、真ん中の上空。
+                    (new Vector2(-40f, 24f), 20), (new Vector2(40f, 24f), 20), (new Vector2(-52f, 8f), 20), (new Vector2(52f, 8f), 20),
+                    (new Vector2(0f, 32f), 20),
                 },
                 Jackpots = new[]
                 {

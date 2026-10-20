@@ -120,6 +120,20 @@ namespace Airerage.Editor.Stages
                     (new Vector2(-13f, -8f), 3), (new Vector2(13f, -8f), 3),
                     // 20 枚: 外側のモジュールの外の下（落ちたら助からない）、いちばん上、ステージの端の高い所。
                     (new Vector2(-36f, -6f), 20), (new Vector2(36f, -6f), 20), (new Vector2(0f, 44f), 20), (new Vector2(-46f, 30f), 20), (new Vector2(46f, 30f), 20),
+                    // 追加（総量を 2 倍に。ユーザーの要望、2026-10-21）。宇宙船の中（無重力の隠れ家。20 枚と 3 枚を固める）。
+                    (new Vector2(-33f, 29.5f), 20), (new Vector2(33f, 29.5f), 20), (new Vector2(-25f, 25.5f), 3), (new Vector2(25f, 25.5f), 3),
+                    (new Vector2(-29f, 30.5f), 1), (new Vector2(29f, 30.5f), 1),
+                    // コアの下（20 枚と 3 枚。取ったら下の動くゲートでトラスの上へ戻る）、モジュールの下。
+                    (new Vector2(0f, -7f), 20), (new Vector2(-5f, -6.5f), 3), (new Vector2(5f, -6.5f), 3), (new Vector2(-3f, -9f), 1),
+                    (new Vector2(3f, -9f), 1), (new Vector2(-24f, -1f), 3), (new Vector2(24f, -1f), 3), (new Vector2(-20f, -3f), 1),
+                    (new Vector2(20f, -3f), 1),
+                    // ドッキングポートの下と外、トラスの上、コアのリングの上、軌道のリングの先、マスドライバーで飛ぶ道、高い所。
+                    (new Vector2(-36f, 8f), 1), (new Vector2(36f, 8f), 1), (new Vector2(-46f, 12f), 1), (new Vector2(46f, 12f), 1),
+                    (new Vector2(-3f, 25f), 1), (new Vector2(3f, 25f), 1), (new Vector2(-3f, 15f), 1), (new Vector2(3f, 15f), 1),
+                    (new Vector2(-30f, 19f), 1), (new Vector2(30f, 19f), 1), (new Vector2(-12f, 8f), 1), (new Vector2(12f, 8f), 1),
+                    (new Vector2(-16f, 34f), 1), (new Vector2(16f, 34f), 1), (new Vector2(-6f, 38f), 1), (new Vector2(6f, 38f), 1),
+                    // 20 枚: ステージの端の上空。
+                    (new Vector2(-50f, 20f), 20), (new Vector2(50f, 20f), 20),
                 },
                 Jackpots = new[]
                 {
@@ -187,7 +201,7 @@ namespace Airerage.Editor.Stages
             foreach (float side in new[] { -1f, 1f })
             {
                 float cx = 29f * side;
-                decor.Box("ShipInteriorWall", new Vector3(cx, 27.5f, 1.8f), new Vector3(15f, 7f, 0.4f), interior);
+                decor.Box("ShipInteriorWall", new Vector3(cx, 27.5f, 1.8f), new Vector3(15f, 6.98f, 0.4f), interior);
                 decor.Box("ShipBody", new Vector3(cx, 27.5f, 4f), new Vector3(16f, 9f, 4f), hull);
                 for (float x = -5f; x <= 5f; x += 2.5f)
                 {

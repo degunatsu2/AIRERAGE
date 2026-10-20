@@ -102,6 +102,32 @@ namespace Airerage.Editor
             CaptureCostumes();
             CaptureQuitDialog();
             CaptureWarnings();
+            CaptureCoins();
+        }
+
+        // コインの見本（1 枚・3 枚・赤・虹色）を、火口（赤い光）と雪原（明るい光）に並べて撮る（光で色が変わらないか。2026-10-21）。
+        private static void CaptureCoins()
+        {
+            foreach (string scene in new[] { "Stage_Volcano", "Stage_SnowSea" })
+            {
+                OpenStage(scene);
+                EditorSceneManager.OpenScene(FlowSceneBuilder.TrainingScenePath, OpenSceneMode.Additive);
+                var view = Object.FindFirstObjectByType<CoinView>(FindObjectsInactive.Include);
+                string[] templates = { "CoinSingle", "CoinTriple", "CoinRed", "CoinRainbow" };
+                for (int i = 0; i < templates.Length; i++)
+                {
+                    GameObject copy = Object.Instantiate(view.transform.Find(templates[i]).gameObject);
+                    copy.SetActive(true);
+                    copy.transform.position = new Vector3(-4.5f + i * 3f, 8f, 0f);
+                    copy.transform.localScale = Vector3.one * 1.6f;
+                }
+                WithCamera(camera =>
+                {
+                    camera.fieldOfView = 30f;
+                    camera.transform.position = new Vector3(0f, 8f, -16f);
+                    RenderCamera(camera, new Vector2Int(1200, 600), $"{OutputFolder}/Coins_{scene}.png");
+                });
+            }
         }
 
         private static void CaptureCostumes()

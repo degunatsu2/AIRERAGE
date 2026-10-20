@@ -128,12 +128,16 @@ namespace Airerage.Core.Simulation
         /// <summary>向き（長さ 1。上昇気流では使わない。加速リングでは、この向きとその逆の両方に効く）。</summary>
         public readonly Vector2 Direction;
 
-        /// <summary>ジャンプ台・加速リングでは速さ（m/s）、上昇気流では加速度（m/s²）、危険では威力、吹雪では凍る秒数。</summary>
+        /// <summary>
+        /// ジャンプ台・加速リングでは速さ（m/s）、上昇気流では加速度（m/s²）、危険・吹雪では威力（当たる・凍ると、この枚数のコインを
+        /// 落とす。ユーザーの要望、2026-10-21）。
+        /// </summary>
         public readonly float Power;
 
         /// <summary>
         /// 上昇気流・風では速さの上限（m/s）、低重力では落ちる速さの上限（m/s）、吹雪では影になる距離（m。風上のこの距離の中に地形があれば
-        /// 凍らない。0 なら StageZones.BlizzardShelterDistance）。ほかの種類では使わない。
+        /// 凍らない。0 なら StageZones.BlizzardShelterDistance）、危険では吹き飛ばす速さ（m/s。0 なら StageZones.HazardKnockbackSpeed で
+        /// 威力から決める）。ほかの種類では使わない。
         /// </summary>
         public readonly float Limit;
 
@@ -191,9 +195,9 @@ namespace Airerage.Core.Simulation
             {
                 throw new ArgumentException($"{kind} の速さの上限は正の有限な値にします（{limit}）");
             }
-            if (kind == StageZoneKind.Blizzard && (limit < 0f || float.IsNaN(limit) || float.IsInfinity(limit)))
+            if ((kind == StageZoneKind.Blizzard || kind == StageZoneKind.Hazard) && (limit < 0f || float.IsNaN(limit) || float.IsInfinity(limit)))
             {
-                throw new ArgumentException($"吹雪の影になる距離は 0 以上の有限な値にします（{limit}）");
+                throw new ArgumentException($"{kind} の {(kind == StageZoneKind.Blizzard ? "影になる距離" : "吹き飛ばす速さ")}は 0 以上の有限な値にします（{limit}）");
             }
             if ((kind == StageZoneKind.Ice || kind == StageZoneKind.LowGravity) && power > 1f)
             {

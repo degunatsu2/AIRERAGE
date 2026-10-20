@@ -151,6 +151,19 @@ namespace Airerage.Editor
             (new Vector2(38f, 14f), 20),
             (new Vector2(-14f, 28f), 20),
             (new Vector2(14f, 28f), 20),
+            // 追加（総量を 2 倍に。ユーザーの要望、2026-10-21）。中央の島の下（ワイヤーでぶら下がって取る隠れ場所。20 枚と 3 枚を固める）。
+            (new Vector2(0f, -4.5f), 20), (new Vector2(-5f, -3.5f), 3), (new Vector2(5f, -3.5f), 3), (new Vector2(-3f, -7f), 1),
+            (new Vector2(3f, -7f), 1), (new Vector2(-9.5f, -3f), 1), (new Vector2(9.5f, -3f), 1),
+            // 左右の島の下（20 枚と 3 枚）、上昇気流の中。
+            (new Vector2(-24f, -2f), 20), (new Vector2(24f, -2f), 20), (new Vector2(-27f, -3.5f), 3), (new Vector2(27f, -3.5f), 3),
+            (new Vector2(-13.5f, -2f), 1), (new Vector2(13.5f, -2f), 1), (new Vector2(-13.5f, -5f), 1), (new Vector2(13.5f, -5f), 1),
+            // 中段の足場の上、最上段の足場の横、飛び石の先の高い所、外側の高い所。
+            (new Vector2(-16f, 8.5f), 1), (new Vector2(16f, 8.5f), 1), (new Vector2(-9f, 22.5f), 1), (new Vector2(9f, 22.5f), 1),
+            (new Vector2(-17.75f, 24f), 3), (new Vector2(17.75f, 24f), 3), (new Vector2(-21f, 22f), 1), (new Vector2(21f, 22f), 1),
+            (new Vector2(-32f, 9f), 3), (new Vector2(32f, 9f), 3), (new Vector2(-33f, 17f), 1), (new Vector2(33f, 17f), 1),
+            (new Vector2(-7f, 31f), 1), (new Vector2(7f, 31f), 1), (new Vector2(-20f, 30f), 1), (new Vector2(20f, 30f), 1),
+            // 20 枚: 外側の上空とステージの端。
+            (new Vector2(-36f, 28f), 20), (new Vector2(36f, 28f), 20), (new Vector2(-47f, 20f), 20), (new Vector2(47f, 20f), 20),
         };
 
         // 100 枚のコインの候補の地点（残り 1 分に、試合ごとの種で選んだ1つに出る。どこも遠いか危ない）【仮】。

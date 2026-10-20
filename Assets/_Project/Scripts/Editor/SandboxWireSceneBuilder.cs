@@ -580,8 +580,8 @@ namespace Airerage.Editor
             LineRenderer ring = CreateIndicatorLine(safe.transform, "ChargeRing", lineMaterial, 0.12f);
             ring.startColor = ring.endColor = new Color(1f, 0.82f, 0.2f, 0.95f);
 
-            GameObject coin = CreateVisual(PrimitiveType.Cylinder, "ProjectileTemplate", LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f)),
-                new Vector3(0.55f, 0.06f, 0.55f));
+            GameObject coin = CreateVisual(PrimitiveType.Cylinder, "ProjectileTemplate",
+                LoadOrCreateMaterial("CoinGoldUnlit", new Color(1f, 0.8f, 0.18f), unlit: true), new Vector3(0.55f, 0.06f, 0.55f));
             coin.transform.SetParent(view.transform, false);
 
             // 突風（弧の形の風の線 3 本）と風の帯（枠と流れる線 6 本）。線だけで作る。
@@ -696,16 +696,19 @@ namespace Airerage.Editor
         /// <summary>コインの表示（CoinView、CoinHud。試合の仕組みのシーンに置く。出現地点は実行が読み込んだシーンから集める）。</summary>
         internal static void CreateCoinViews(MonoBehaviour source, EdgeGuideLayer guides)
         {
-            // 見た目の見本（CoinLook の順: 1 枚は金色、3 枚は金色のピラミッド、5 枚は赤、100 枚は虹色に光る）。
-            Material gold = LoadOrCreateMaterial("Coin", new Color(1f, 0.78f, 0.15f));
-            Material red = LoadOrCreateMaterial("CoinRed", new Color(0.9f, 0.12f, 0.1f));
+            // 見た目の見本（CoinLook の順: 1 枚は金色、3 枚は金色のピラミッド、5 枚は赤、100 枚は虹色に光る）。どれも光の影響を受けない
+            // 材質（火口の赤い光などで色が変わらないように。ユーザーの要望、2026-10-21）で、真ん中に少し暗い円（陰がなくても 1 枚ずつ見分ける）。
+            Material gold = LoadOrCreateMaterial("CoinGoldUnlit", new Color(1f, 0.8f, 0.18f), unlit: true);
+            Material goldInner = LoadOrCreateMaterial("CoinGoldInnerUnlit", new Color(0.86f, 0.6f, 0.08f), unlit: true);
+            Material red = LoadOrCreateMaterial("CoinRedUnlit", new Color(0.95f, 0.16f, 0.12f), unlit: true);
+            Material redInner = LoadOrCreateMaterial("CoinRedInnerUnlit", new Color(0.66f, 0.07f, 0.05f), unlit: true);
             Material rainbow = LoadOrCreateMaterial("CoinRainbow", Color.white, unlit: true);
             var view = new GameObject("Coins").AddComponent<CoinView>();
-            GameObject single = CreateCoinTemplate("CoinSingle", view.transform, gold, 0.7f, new[] { Vector2.zero });
-            GameObject triple = CreateCoinTemplate("CoinTriple", view.transform, gold, 0.6f,
+            GameObject single = CreateCoinTemplate("CoinSingle", view.transform, gold, goldInner, 0.7f, new[] { Vector2.zero });
+            GameObject triple = CreateCoinTemplate("CoinTriple", view.transform, gold, goldInner, 0.6f,
                 new[] { new Vector2(0f, 0.29f), new Vector2(-0.33f, -0.28f), new Vector2(0.33f, -0.28f) });
-            GameObject redCoin = CreateCoinTemplate("CoinRed", view.transform, red, 0.75f, new[] { Vector2.zero });
-            GameObject jackpot = CreateCoinTemplate("CoinRainbow", view.transform, rainbow, 1.1f, new[] { Vector2.zero });
+            GameObject redCoin = CreateCoinTemplate("CoinRed", view.transform, red, redInner, 0.75f, new[] { Vector2.zero });
+            GameObject jackpot = CreateCoinTemplate("CoinRainbow", view.transform, rainbow, null, 1.1f, new[] { Vector2.zero });
             var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             // COIN RUSH のときにコインの周りに出す金色の輪（CoinView が名前で探して使う。ふだんは出さない）。
             foreach (GameObject template in new[] { single, triple, redCoin })
@@ -799,7 +802,8 @@ namespace Airerage.Editor
         }
 
         // コインの見た目の見本: 空の親の下に、面をカメラに向けたコイン（円柱）を faces の位置に置く。
-        private static GameObject CreateCoinTemplate(string name, Transform parent, Material material, float diameter, Vector2[] faces)
+        // inner は、面の真ん中の少し暗い円の材質（なければ作らない）。面より少し厚くして、両側から見える。
+        private static GameObject CreateCoinTemplate(string name, Transform parent, Material material, Material inner, float diameter, Vector2[] faces)
         {
             var root = new GameObject(name);
             root.transform.SetParent(parent, false);
@@ -810,6 +814,12 @@ namespace Airerage.Editor
                 face.transform.localPosition = new Vector3(faces[i].x, faces[i].y, 0f);
                 face.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 face.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+                if (inner != null)
+                {
+                    GameObject center = CreateVisual(PrimitiveType.Cylinder, "Inner", inner, new Vector3(0.68f, 1.25f, 0.68f));
+                    center.transform.SetParent(face.transform, false);
+                    center.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+                }
             }
             return root;
         }

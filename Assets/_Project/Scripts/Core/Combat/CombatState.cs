@@ -163,7 +163,7 @@ namespace Airerage.Core.Combat
         public int HazardHitCount;
 
         /// <summary>
-        /// このティックに当たった危険の威力（コインを落とす量を決める。0 なら当たっていない）。SimWorld がコインを落としたら 0 に戻す
+        /// このティックに当たった危険・凍らせた吹雪の威力（落とすコインの枚数。0 なら当たっていない）。SimWorld がコインを落としたら 0 に戻す
         /// （ティックの終わりにはふつう 0）。
         /// </summary>
         public int HazardDropPower;
