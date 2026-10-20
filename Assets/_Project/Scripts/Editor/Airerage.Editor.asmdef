@@ -7,7 +7,9 @@
         "Airerage.Net",
         "Unity.Cinemachine",
         "Unity.InputSystem",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.Services.Core",
+        "Unity.Networking.Transport"
     ],
     "includePlatforms": [
         "Editor"

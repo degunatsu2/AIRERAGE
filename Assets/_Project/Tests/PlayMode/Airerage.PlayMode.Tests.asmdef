@@ -8,7 +8,9 @@
         "Unity.Cinemachine",
         "Unity.InputSystem",
         "UnityEngine.UI",
-        "UnityEngine.TestRunner"
+        "UnityEngine.TestRunner",
+        "Unity.Networking.Transport",
+        "Unity.Services.Core"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

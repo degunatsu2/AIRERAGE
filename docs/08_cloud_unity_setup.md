@@ -134,6 +134,7 @@ exit 0
 | ゲームの流れのシーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.FlowSceneBuilder.Build` | App・Menu・ステージ（Stage_Athletic と、追加の 5 つ。docs/15 6.12）・Match_Training・Match_Local・Match_Online（docs/15） |
 | メニューの画面の画像 | `xvfb-run -a -s "-screen 0 1920x1080x24" Unity -batchmode -quit -projectPath . -force-glcore -executeMethod Airerage.Editor.UiSnapshot.CaptureMenus -logFile Logs/snapshot.log` | キャラクター選択（キャラクターごと）とローカル対戦の参加の画面を、16:9・横に長い画面・16:10 で `Logs/Snapshots/` に PNG で保存する（配置の確認。`-nographics` は付けない）。日本語の字は、PC の日本語の字体（ここでは WenQuanYi Zen Hei）で描く |
 | ステージと結果の項目の画像 | 上と同じで `-executeMethod Airerage.Editor.UiSnapshot.CaptureStages`（ステージごとの全体と真ん中、ステージ選択）、`...UiSnapshot.CaptureResults`（結果の画面の項目） | ステージの空・光・台・飾りの確認（ギミックの線は実行中に作るので写らない）。docs/15 6.12、6.13 |
+| 参加コードのサービス（Relay）の確認 | `Unity -batchmode -nographics -projectPath . -executeMethod Airerage.Editor.OnlineServicesCheck.RunAndExit -logFile Logs/relaycheck.log`（`-quit` は付けない） | 匿名のサインイン・割り当て・参加コード（docs/15 6.18）。**クラウドのエディタはユーザーの Unity のアカウントでサインインしていないので、Unity Cloud のプロジェクトを読めず NG になる**（ユーザーの PC のエディタのメニューで使う）。Relay のゲームの通信（UDP）もこの環境からは外へ出せない |
 | キャラクターの見た目・終了の確認・予告の画像 | 上と同じで `-executeMethod Airerage.Editor.UiSnapshot.CaptureLooks` | 4 体の仮の衣装（正面と斜め）、ゲームを終了する前の確認、火口と雪原の予告（黄色の斜線と警告の記号。実行中に作る物は起動の処理を呼んで作る）。docs/15 6.16 |
 | 空中戦の検証用シーンの作り直し | `Unity -batchmode -nographics -quit -projectPath . -executeMethod Airerage.Editor.SandboxCombatSceneBuilder.Build` | `Assets/_Project/Scenes/Sandbox_Combat.unity` を作り直す（足場が少なく、外に出ると撃破。docs/11 T3-3） |
 

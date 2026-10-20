@@ -8,8 +8,9 @@ using Object = UnityEngine.Object;
 namespace Airerage.Editor
 {
     /// <summary>
-    /// ネットワーク対戦のメニュー（OnlineMenu。docs/15 T6-7）の画面を作る: 接続（名前・アドレス・ポート、HOST・JOIN・BACK）、待機所
-    /// （1P〜4P の札、READY・時間の制限・LEAVE）、読み込み中。キャラクター選択とステージ選択は、メニューの画面のものを使う。
+    /// ネットワーク対戦のメニュー（OnlineMenu。docs/15 T6-7）の画面を作る: 接続（名前・参加コード・アドレス・ポート、HOST ONLINE・
+    /// JOIN WITH CODE・HOST (LAN)・JOIN (LAN)・BACK。参加コードは docs/15 T6-10）、待機所（1P〜4P の札、READY・時間の制限・
+    /// 参加コードのコピー・LEAVE）、読み込み中。キャラクター選択とステージ選択は、メニューの画面のものを使う。
     /// 基準の画面の大きさは 1920×1080。
     /// </summary>
     internal static class OnlineMenuUiBuilder
@@ -22,21 +23,33 @@ namespace Airerage.Editor
 
             // 接続の画面。
             RectTransform connect = MenuUiBuilder.CreateFull(canvas, "OnlineConnect");
-            MenuUiBuilder.CreateFill(connect, "Side", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, new Vector2(0.5f, 1f));
+            MenuUiBuilder.CreateFill(connect, "Side", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, new Vector2(0.92f, 1f));
             MenuUiBuilder.CreateText(connect, "Title", "NETWORK VS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 top, new Vector2(90f, -60f), new Vector2(900f, 90f), Color.white);
+            // 左の列: 名前と、参加コード（インターネット越し。Relay）と BACK。右の列: IP アドレスとポート（同じ LAN）。
             var fieldSize = new Vector2(700f, 60f);
-            InputField name = MenuUiBuilder.CreateInputField(connect, "Name", "NAME", top, new Vector2(110f, -200f), fieldSize);
-            InputField address = MenuUiBuilder.CreateInputField(connect, "Address", "ADDRESS", top, new Vector2(110f, -276f), fieldSize);
-            InputField port = MenuUiBuilder.CreateInputField(connect, "Port", "PORT", top, new Vector2(110f, -352f), fieldSize);
-            MenuOption host = MenuUiBuilder.CreateMenuItem(connect, "Host", "HOST", top, new Vector2(110f, -460f), item);
-            MenuOption join = MenuUiBuilder.CreateMenuItem(connect, "Join", "JOIN", top, new Vector2(110f, -548f), item);
-            MenuOption back = MenuUiBuilder.CreateMenuItem(connect, "Back", "BACK", top, new Vector2(110f, -636f), item);
-            Text connectMessage = MenuUiBuilder.CreateText(connect, "Message", string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft,
-                top, new Vector2(110f, -740f), new Vector2(820f, 80f), new Color(1f, 0.85f, 0.3f));
+            var small = new Vector2(560f, 66f);
+            InputField name = MenuUiBuilder.CreateInputField(connect, "Name", "NAME", top, new Vector2(110f, -190f), fieldSize);
+            MenuUiBuilder.CreateText(connect, "OnlineTitle", "ONLINE (JOIN CODE)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                top, new Vector2(110f, -280f), new Vector2(700f, 44f), MenuUiBuilder.Accent);
+            InputField code = MenuUiBuilder.CreateInputField(connect, "Code", "JOIN CODE", top, new Vector2(110f, -330f), fieldSize);
+            code.characterLimit = JoinCodes.MaxLength;
+            code.contentType = InputField.ContentType.Alphanumeric;
+            MenuOption hostOnline = MenuUiBuilder.CreateMenuItem(connect, "HostOnline", "HOST ONLINE", top, new Vector2(110f, -410f), small);
+            MenuOption joinOnline = MenuUiBuilder.CreateMenuItem(connect, "JoinOnline", "JOIN WITH CODE", top, new Vector2(110f, -488f), small);
+            MenuOption back = MenuUiBuilder.CreateMenuItem(connect, "Back", "BACK", top, new Vector2(110f, -586f), small);
+            MenuUiBuilder.CreateText(connect, "LanTitle", "SAME NETWORK (LAN)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                top, new Vector2(960f, -280f), new Vector2(700f, 44f), MenuUiBuilder.Accent);
+            InputField address = MenuUiBuilder.CreateInputField(connect, "Address", "ADDRESS", top, new Vector2(960f, -330f), fieldSize);
+            InputField port = MenuUiBuilder.CreateInputField(connect, "Port", "PORT", top, new Vector2(960f, -400f), fieldSize);
+            MenuOption host = MenuUiBuilder.CreateMenuItem(connect, "Host", "HOST (LAN)", top, new Vector2(960f, -480f), small);
+            MenuOption join = MenuUiBuilder.CreateMenuItem(connect, "Join", "JOIN (LAN)", top, new Vector2(960f, -558f), small);
+            Text connectMessage = MenuUiBuilder.CreateText(connect, "Message", string.Empty, 26, FontStyle.Bold, TextAnchor.UpperLeft,
+                top, new Vector2(110f, -690f), new Vector2(1500f, 120f), new Color(1f, 0.85f, 0.3f));
             connectMessage.horizontalOverflow = HorizontalWrapMode.Wrap;
-            MenuUiBuilder.CreateText(connect, "Hint", "HOST: wait for friends on this PORT.   JOIN: enter the host's ADDRESS and PORT.", 22,
-                FontStyle.Bold, TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1400f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            MenuUiBuilder.CreateText(connect, "Hint",
+                "HOST ONLINE: get a JOIN CODE and tell it to your friends.   JOIN WITH CODE: enter the host's code.   LAN: the host's ADDRESS and PORT.",
+                22, FontStyle.Bold, TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1750f, 40f), new Color(1f, 1f, 1f, 0.7f));
             connect.gameObject.SetActive(false);
 
             // 待機所。
@@ -73,7 +86,8 @@ namespace Airerage.Editor
             }
             MenuOption ready = MenuUiBuilder.CreateMenuItem(waiting, "Ready", "READY", top, new Vector2(990f, -210f), item);
             MenuOption timeLimit = MenuUiBuilder.CreateMenuItem(waiting, "TimeLimit", "TIME LIMIT: ON", top, new Vector2(990f, -298f), item);
-            MenuOption leave = MenuUiBuilder.CreateMenuItem(waiting, "Leave", "LEAVE", top, new Vector2(990f, -386f), item);
+            MenuOption copyCode = MenuUiBuilder.CreateMenuItem(waiting, "CopyCode", "COPY JOIN CODE", top, new Vector2(990f, -386f), item);
+            MenuOption leave = MenuUiBuilder.CreateMenuItem(waiting, "Leave", "LEAVE", top, new Vector2(990f, -474f), item);
             Text waitingMessage = MenuUiBuilder.CreateText(waiting, "Message", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 top, new Vector2(110f, -610f), new Vector2(1400f, 44f), Color.white);
             MenuUiBuilder.CreateText(waiting, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: cancel ready, leave", 22, FontStyle.Bold,
@@ -94,8 +108,11 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(menu, "_stages", stages);
             SandboxWireSceneBuilder.SetReference(menu, "_connectPanel", connect.gameObject);
             SandboxWireSceneBuilder.SetReference(menu, "_name", name);
+            SandboxWireSceneBuilder.SetReference(menu, "_code", code);
             SandboxWireSceneBuilder.SetReference(menu, "_address", address);
             SandboxWireSceneBuilder.SetReference(menu, "_port", port);
+            SandboxWireSceneBuilder.SetReference(menu, "_hostOnline", hostOnline);
+            SandboxWireSceneBuilder.SetReference(menu, "_joinOnline", joinOnline);
             SandboxWireSceneBuilder.SetReference(menu, "_host", host);
             SandboxWireSceneBuilder.SetReference(menu, "_join", join);
             SandboxWireSceneBuilder.SetReference(menu, "_back", back);
@@ -107,6 +124,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotStates", states);
             SandboxWireSceneBuilder.SetReference(menu, "_ready", ready);
             SandboxWireSceneBuilder.SetReference(menu, "_timeLimit", timeLimit);
+            SandboxWireSceneBuilder.SetReference(menu, "_copyCode", copyCode);
             SandboxWireSceneBuilder.SetReference(menu, "_leave", leave);
             SandboxWireSceneBuilder.SetReference(menu, "_waitingMessage", waitingMessage);
             SandboxWireSceneBuilder.SetReference(menu, "_loadingPanel", loading.gameObject);

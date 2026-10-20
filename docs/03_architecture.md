@@ -89,7 +89,7 @@ Airerage.PlayMode.Tests（Runtime を参照。PlayMode テスト。シーンを�
 | Runtime/Presentation | 状態を読んで表示する。カメラのズーム（表示だけ） | `CharacterView`, `WireView`, `AimIndicatorView`, `CameraZoom`, `ChargeEffectView`, `RingGaugeView`, `GuardEffectView`, `BurstEffectView`, `ComboHud`, `StageZoneView`（ギミックの動く見た目、予告の表示と音）, `WarningOverlay`（予告の黄色の斜線と警告の記号）, `AttachableGlow`（ワイヤーが刺さる足場の光）, `CostumeView`（キャラクターの仮の見た目）, `MatchHud`（始まる前の演出、残り時間、結果とボタン）, `CoinView`（フィールドのコイン）, `CoinHud`（所持コインの数と「+n」） | 1 |
 | Runtime/Audio | 仮の BGM と効果音（音声ファイルを使わず、その場で合成する。状態の変化から鳴らす。差し替え可能） | `GameAudio`, `ProceduralAudio`, `CombatSoundEvents` | 3 |
 | Runtime/DebugTools | デバッグHUD、軌跡表示、スロー再生、タイプ切り替え、計測（速さ、コースのタイム）、入力の記録と再生 | `DebugHud`, `DebugControls`, `TrailView`, `MotionStats`, `CourseTimer`, `CourseTimerHud`, `CourseZone`, `WireTypeLabels`, `ReplayControls` | 1 |
-| Net | 通信路（Unity Transport。検証用の遅延の模擬つき）、セッション（参加、開始、入力の中継、不一致の検出）、試合のステージ（地形・出現位置・撃破の範囲・ギミック）、巻き戻しの表示の補正、オンラインの画面（撃破の数の表示） | `TransportLink`, `NetMessages`, `OnlineSession`, `OnlineStage`, `CorrectionSmoother`, `OnlineRunner` | 2 |
+| Net | 通信路（Unity Transport。検証用の遅延の模擬つき）、セッション（参加、開始、入力の中継、不一致の検出）、試合のステージ（地形・出現位置・撃破の範囲・ギミック）、巻き戻しの表示の補正、オンラインの画面（撃破の数の表示） | `TransportLink`（直接と Relay）, `RelayBackend`（参加コード。Unity の Relay。docs/15 T6-10）, `NetMessages`, `OnlineSession`, `OnlineStage`, `CorrectionSmoother`, `OnlineRunner`, `OnlineConnection`, `OnlineMenu` | 2 |
 
 ---
 

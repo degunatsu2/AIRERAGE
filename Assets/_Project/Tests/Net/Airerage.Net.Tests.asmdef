@@ -6,7 +6,8 @@
         "Airerage.Core.Tests",
         "Airerage.Net",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Unity.Networking.Transport"
     ],
     "includePlatforms": [
         "Editor"

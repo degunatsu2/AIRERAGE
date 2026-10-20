@@ -12,8 +12,10 @@ namespace Airerage.Net
     /// <summary>
     /// ネットワーク対戦のメニュー（docs/15 T6-7。ユーザーの要望、2026-10-19）。メニューのシーンに置き、メインメニューの NETWORK VS から開く
     /// （IOnlineMenu）。接続は App のシーンの OnlineConnection が持ち、ここは画面だけを受け持つ。接続の段階に合わせて画面を出す:
-    /// - 接続: 名前・アドレス・ポートの入力と HOST ／ JOIN ／ BACK。
-    /// - 待機所: 1P〜4P の札（名前と準備完了）、READY（もう一度で取り消し）、時間の制限（ホストだけ）、LEAVE。2 人以上が全員 READY で、
+    /// - 接続: 名前・参加コード・アドレス・ポートの入力と、HOST ONLINE ／ JOIN WITH CODE（Unity の Relay の参加コード。docs/15 T6-10）、
+    ///   HOST (LAN) ／ JOIN (LAN)（IP アドレスとポート）、BACK。参加コードのサービスに問い合わせている間はボタンを押せない。
+    /// - 待機所: 1P〜4P の札（名前と準備完了）、参加コード（コピーできる）、READY（もう一度で取り消し）、時間の制限（ホストだけ）、LEAVE。
+    ///   2 人以上が全員 READY で、
     ///   全員がキャラクター選択へ進む。
     /// - キャラクター選択: アイコンを選ぶ画面（CharacterSelectScreen のネットワーク対戦の使い方）。自分の枠をこの PC の機器で動かし、
     ///   ほかの人の枠は届いた値で出す。全員が決定でステージ選択へ。READY でないときの戻るで抜ける。
@@ -39,8 +41,11 @@ namespace Airerage.Net
         [Header("接続")]
         [SerializeField] private GameObject _connectPanel;
         [SerializeField] private InputField _name;
+        [SerializeField] private InputField _code;
         [SerializeField] private InputField _address;
         [SerializeField] private InputField _port;
+        [SerializeField] private MenuOption _hostOnline;
+        [SerializeField] private MenuOption _joinOnline;
         [SerializeField] private MenuOption _host;
         [SerializeField] private MenuOption _join;
         [SerializeField] private MenuOption _back;
@@ -53,6 +58,7 @@ namespace Airerage.Net
         [SerializeField] private Text[] _slotStates = new Text[0];
         [SerializeField] private MenuOption _ready;
         [SerializeField] private MenuOption _timeLimit;
+        [SerializeField] private MenuOption _copyCode;
         [SerializeField] private MenuOption _leave;
         [SerializeField] private Text _waitingMessage;
         [Tooltip("プレイヤーごとの色（1P〜4P）")]
@@ -69,6 +75,7 @@ namespace Airerage.Net
         private string _lastStatus = string.Empty;
         private int _selectAtFrame = -1;
         private MenuOption _focus;
+        private string _copiedCode = string.Empty;
 
         /// <summary>開いているか（テスト用）。</summary>
         public bool IsOpen => _open;
@@ -83,6 +90,16 @@ namespace Airerage.Net
 
         public MenuOption HostButton => _host;
         public MenuOption JoinButton => _join;
+        public MenuOption HostOnlineButton => _hostOnline;
+        public MenuOption JoinOnlineButton => _joinOnline;
+        public MenuOption CopyCodeButton => _copyCode;
+        public InputField CodeField => _code;
+
+        /// <summary>今の接続の画面の文（テスト用）。</summary>
+        public string ConnectMessage => _connectMessage != null ? _connectMessage.text : string.Empty;
+
+        /// <summary>待機所の上の文（参加コードなど。テスト用）。</summary>
+        public string WaitingInfo => _waitingInfo != null ? _waitingInfo.text : string.Empty;
         public MenuOption ReadyButton => _ready;
         public InputField NameField => _name;
         public InputField AddressField => _address;
@@ -93,8 +110,9 @@ namespace Airerage.Net
         private void Awake()
         {
             if (_menu == null || _characterSelect == null || _stageSelect == null || _stages == null || _connectPanel == null
-                || _name == null || _address == null || _port == null || _host == null || _join == null || _back == null
-                || _waitingPanel == null || _ready == null || _timeLimit == null || _leave == null
+                || _name == null || _code == null || _address == null || _port == null || _hostOnline == null || _joinOnline == null
+                || _host == null || _join == null || _back == null
+                || _waitingPanel == null || _ready == null || _timeLimit == null || _copyCode == null || _leave == null
                 || _slotPlates.Length != OnlineSession.MaxPlayers || _slotNames.Length != OnlineSession.MaxPlayers
                 || _slotStates.Length != OnlineSession.MaxPlayers)
             {
@@ -102,10 +120,14 @@ namespace Airerage.Net
                 enabled = false;
                 return;
             }
+            // 参加コードは英数字の大文字で入れる（小文字で打っても大文字にする）。
+            _code.onValidateInput = (text, index, c) => char.IsLetterOrDigit(c) && c < 128 ? char.ToUpperInvariant(c) : '\0';
+            _hostOnline.Clicked.AddListener(HostOnline);
+            _joinOnline.Clicked.AddListener(JoinOnline);
             _host.Clicked.AddListener(Host);
             _join.Clicked.AddListener(Join);
             _back.Clicked.AddListener(Close);
-            foreach (MenuOption option in new[] { _host, _join, _back })
+            foreach (MenuOption option in new[] { _hostOnline, _joinOnline, _host, _join, _back })
             {
                 option.Cancelled += Close;
             }
@@ -123,8 +145,16 @@ namespace Airerage.Net
                     Connection.Timed = !Connection.Timed;
                 }
             });
+            _copyCode.Clicked.AddListener(() =>
+            {
+                if (Session != null && Session.JoinCode.Length > 0)
+                {
+                    GUIUtility.systemCopyBuffer = Session.JoinCode;
+                    _copiedCode = Session.JoinCode;
+                }
+            });
             _leave.Clicked.AddListener(Leave);
-            foreach (MenuOption option in new[] { _ready, _timeLimit, _leave })
+            foreach (MenuOption option in new[] { _ready, _timeLimit, _copyCode, _leave })
             {
                 option.Cancelled += () =>
                 {
@@ -212,6 +242,45 @@ namespace Airerage.Net
             _menu.ShowMainFromOnline();
         }
 
+        /// <summary>参加コードでホストになる（Relay。docs/15 T6-10。テスト用にも公開）。</summary>
+        public async void HostOnline()
+        {
+            if (!CanConnect())
+            {
+                return;
+            }
+            SavePreferences();
+            if (!await Connection.HostOnline(_name.text, PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0)))
+            {
+                _lastStatus = Connection.Message;
+            }
+        }
+
+        /// <summary>入力欄の参加コードのホストに参加する（Relay。docs/15 T6-10。テスト用にも公開）。</summary>
+        public async void JoinOnline()
+        {
+            if (!CanConnect())
+            {
+                return;
+            }
+            SavePreferences();
+            if (!await Connection.JoinOnline(_code.text, _name.text, PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0)))
+            {
+                _lastStatus = Connection.Message;
+            }
+        }
+
+        // 接続を始められるか（App のシーンから始めていて、参加コードのサービスに問い合わせていない）。
+        private bool CanConnect()
+        {
+            if (Connection == null)
+            {
+                _connectMessage.text = "Start from the App scene to play online.";
+                return false;
+            }
+            return !Connection.Busy;
+        }
+
         /// <summary>ホストとして待ち受ける（ポートは入力欄。テスト用にも公開）。</summary>
         public void Host()
         {
@@ -249,9 +318,8 @@ namespace Airerage.Net
 
         private bool TryReadPort(out ushort port)
         {
-            if (Connection == null)
+            if (!CanConnect())
             {
-                _connectMessage.text = "Start from the App scene to play online.";
                 port = 0;
                 return false;
             }
@@ -308,7 +376,15 @@ namespace Airerage.Net
             switch (_shown)
             {
                 case Panel.Connect:
-                    _connectMessage.text = session != null ? session.Status : _lastStatus;
+                    bool busy = Connection != null && Connection.Busy;
+                    _connectMessage.text = busy ? Connection.Message : session != null ? session.Status : _lastStatus;
+                    foreach (MenuOption option in new[] { _hostOnline, _joinOnline, _host, _join })
+                    {
+                        if (option.Button.interactable == busy)
+                        {
+                            option.SetAvailable(!busy);
+                        }
+                    }
                     break;
                 case Panel.Waiting:
                     RefreshWaitingRoom(session);
@@ -354,11 +430,13 @@ namespace Airerage.Net
             {
                 case Panel.Connect:
                     _connectPanel.SetActive(true);
-                    Focus(session != null ? _back : _host);
+                    Focus(session != null ? _back : _hostOnline);
                     break;
                 case Panel.Waiting:
                     _waitingPanel.SetActive(true);
                     _timeLimit.gameObject.SetActive(session.IsHost);
+                    _copyCode.gameObject.SetActive(session.JoinCode.Length > 0);
+                    _copiedCode = string.Empty;
                     Focus(_ready);
                     break;
                 case Panel.CharacterSelect:
@@ -442,9 +520,19 @@ namespace Airerage.Net
             }
             _ready.SetLabel(session.LocalReady ? "CANCEL READY" : "READY");
             _timeLimit.SetLabel($"TIME LIMIT: {(Connection.Timed ? "ON" : "OFF")}");
-            _waitingInfo.text = session.IsHost
-                ? $"HOSTING ON PORT {session.Port}. FRIENDS JOIN WITH YOUR ADDRESS."
-                : $"CONNECTED AS {session.LocalPlayer + 1}P.";
+            if (session.JoinCode.Length > 0)
+            {
+                _waitingInfo.text = session.IsHost
+                    ? $"JOIN CODE: {session.JoinCode}   SHARE IT WITH YOUR FRIENDS (NETWORK VS > JOIN WITH CODE)."
+                    : $"CONNECTED AS {session.LocalPlayer + 1}P.   JOIN CODE: {session.JoinCode}";
+                _copyCode.SetLabel(_copiedCode == session.JoinCode ? "CODE COPIED!" : "COPY JOIN CODE");
+            }
+            else
+            {
+                _waitingInfo.text = session.IsHost
+                    ? $"HOSTING ON PORT {session.Port}. FRIENDS JOIN WITH YOUR ADDRESS."
+                    : $"CONNECTED AS {session.LocalPlayer + 1}P.";
+            }
             _waitingMessage.text = connected < 2
                 ? "WAITING FOR PLAYERS (2-4)"
                 : "WHEN EVERYONE IS READY, CHARACTER SELECT STARTS";

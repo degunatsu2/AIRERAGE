@@ -6,6 +6,7 @@ using Airerage.Core.Match;
 using Airerage.Core.Physics;
 using Airerage.Core.Rollback;
 using Airerage.Core.Simulation;
+using Unity.Networking.Transport.Relay;
 using UnityEngine;
 using NVector3 = System.Numerics.Vector3;
 
@@ -324,6 +325,15 @@ namespace Airerage.Net
         }
 
         public ushort Port => _link.LocalPort;
+
+        /// <summary>Relay を通してつないでいるときの参加コード（直接つないでいるときは空。docs/15 T6-10）。</summary>
+        public string JoinCode { get; private set; } = string.Empty;
+
+        /// <summary>Relay を通してつないでいるか。</summary>
+        public bool UsesRelay => _link.UsesRelay;
+
+        // ホストの状態の文の頭（参加コードか、待ち受けているポート）。
+        private string HostingLabel => JoinCode.Length > 0 ? $"Hosting online (code {JoinCode})" : $"Hosting on port {Port}";
         public SimWorld World { get; private set; }
         public RollbackSession Session { get; private set; }
         public InputExchange Exchange { get; private set; }
@@ -390,6 +400,38 @@ namespace Airerage.Net
 
         private static OnlineSession HostWith(ushort port, OnlineStage stage, IReadOnlyList<CharacterConfig> characters, RollbackSettings settings)
         {
+            OnlineSession session = HostOver(() => TransportLink.Host(port), stage, characters, settings);
+            session.Status = $"Hosting on port {session.Port}";
+            return session;
+        }
+
+        /// <summary>
+        /// ホストとして Relay の割り当て allocation で待ち受ける（参加コード。docs/15 T6-10）。ステージは試合を始めるときに選ぶ。
+        /// </summary>
+        public static OnlineSession HostRelay(RelayHostAllocation allocation, IReadOnlyList<CharacterConfig> characters, RollbackSettings settings)
+        {
+            OnlineSession session = HostOver(() => TransportLink.HostRelay(allocation.ServerData), null, characters, settings);
+            session.JoinCode = allocation.JoinCode;
+            session.Status = $"Hosting online. Join code: {allocation.JoinCode}";
+            return session;
+        }
+
+        /// <summary>参加コード joinCode から加わった Relay の割り当て relay で、ホストに参加する（docs/15 T6-10）。</summary>
+        public static OnlineSession JoinRelay(RelayServerData relay, string joinCode, RollbackSettings settings)
+        {
+            var session = new OnlineSession(TransportLink.ConnectRelay(relay), null, settings, null)
+            {
+                State = SessionState.Connecting,
+                JoinCode = joinCode,
+            };
+            session.Status = $"Connecting with code {joinCode}";
+            return session;
+        }
+
+        // 選べるキャラクターを確かめてから、link を開いてホストの接続を作る。
+        private static OnlineSession HostOver(Func<TransportLink> link, OnlineStage stage, IReadOnlyList<CharacterConfig> characters,
+            RollbackSettings settings)
+        {
             if (characters == null || characters.Count == 0)
             {
                 throw new ArgumentException("選べるキャラクターが 1 体もありません", nameof(characters));
@@ -402,13 +444,11 @@ namespace Airerage.Net
                 }
                 config.Validate();
             }
-            var session = new OnlineSession(TransportLink.Host(port), stage, settings, characters)
+            return new OnlineSession(link(), stage, settings, characters)
             {
                 LocalPlayer = 0,
                 State = SessionState.Lobby,
             };
-            session.Status = $"Hosting on port {session.Port}";
-            return session;
         }
 
         /// <summary>
@@ -523,7 +563,7 @@ namespace Airerage.Net
             Exchange = null;
             PlayerCount = 0;
             _previous = new CharacterState[0];
-            Status = IsHost ? $"Hosting on port {Port}: {LobbyPlayerCount} player(s)" : $"Joined as player {LocalPlayer + 1}";
+            Status = IsHost ? $"{HostingLabel}: {LobbyPlayerCount} player(s)" : $"Joined as player {LocalPlayer + 1}";
         }
 
         // ホスト: ロビーの段階を変える（全員の準備完了を外す）。
@@ -1001,7 +1041,7 @@ namespace Airerage.Net
                     _lobbyCharacters[player] = 0;
                     _lobbyReady[player] = false;
                     _link.Send(e.Peer, NetMessages.Welcome(player), reliable: true);
-                    Status = $"Hosting on port {Port}: {LobbyPlayerCount} player(s)";
+                    Status = $"{HostingLabel}: {LobbyPlayerCount} player(s)";
                     BroadcastLobby();
                     break;
 

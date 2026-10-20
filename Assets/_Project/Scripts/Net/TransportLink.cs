@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Unity.Collections;
 using Unity.Networking.Transport;
+using Unity.Networking.Transport.Relay;
 using Unity.Networking.Transport.Utilities;
 using Debug = UnityEngine.Debug;
 
@@ -13,6 +14,7 @@ namespace Airerage.Net
     /// ホストは待ち受け、クライアントはホストに接続する。接続ごとに番号（peer）を振る（クライアントから見たホストは 0）。
     /// 経路は2つ: 信頼性なし（入力。失われても次のメッセージで送り直す）と、信頼性あり・順序あり・分割あり（参加や開始などの制御）。
     /// 検証用に、自分が送るパケットに遅延・揺らぎ・欠落を加えられる（SetSimulatedConditions。Unity Transport のシミュレーター。T2-8、T2-9）。
+    /// 直接（IP アドレスとポート。LAN）か、Unity の Relay を通して（参加コード。docs/15 T6-10）つなぐ。Relay でも、上のやり取りは同じ。
     /// </summary>
     public sealed class TransportLink : IDisposable
     {
@@ -50,11 +52,17 @@ namespace Airerage.Net
         private readonly List<NetworkConnection> _connections = new List<NetworkConnection>();
         private bool _disposed;
 
-        private TransportLink(bool isHost)
+        private TransportLink(bool isHost, RelayServerData? relay = null)
         {
             IsHost = isHost;
+            UsesRelay = relay.HasValue;
             // 遅延の模擬（シミュレーター）は、どちらの経路にも入れておき、使わないときは止めておく。
             var settings = new NetworkSettings(Allocator.Temp);
+            if (relay.HasValue)
+            {
+                RelayServerData data = relay.Value;
+                settings.WithRelayParameters(ref data);
+            }
             settings.WithSimulatorStageParameters(
                 maxPacketCount: SimulatorMaxPackets, mode: ApplyMode.Off, randomSeed: (uint)Stopwatch.GetTimestamp());
             settings.WithFragmentationStageParameters(payloadCapacity: ReliablePayloadCapacity);
@@ -65,6 +73,9 @@ namespace Airerage.Net
         }
 
         public bool IsHost { get; }
+
+        /// <summary>Relay を通してつないでいるか。</summary>
+        public bool UsesRelay { get; }
 
         /// <summary>自分が送るパケットに加えている遅延（ミリ秒）。</summary>
         public int SimulatedDelayMs { get; private set; }
@@ -133,6 +144,34 @@ namespace Airerage.Net
                 link.Dispose();
                 throw new InvalidOperationException($"ポート {port} で待ち受けを始められません");
             }
+            return link;
+        }
+
+        /// <summary>
+        /// Relay の割り当て relay（ホストの割り当て）で待ち受ける（参加コード。docs/15 T6-10）。Relay では空いているポートで待ち受け、
+        /// Relay のサーバーとつながったら、参加する人の接続を受ける。失敗したら InvalidOperationException。
+        /// </summary>
+        public static TransportLink HostRelay(RelayServerData relay)
+        {
+            var link = new TransportLink(true, relay);
+            if (link._driver.Bind(NetworkEndpoint.AnyIpv4) != 0)
+            {
+                link.Dispose();
+                throw new InvalidOperationException("Relay を通して待ち受けられません");
+            }
+            if (link._driver.Listen() != 0)
+            {
+                link.Dispose();
+                throw new InvalidOperationException("Relay を通して待ち受けを始められません");
+            }
+            return link;
+        }
+
+        /// <summary>Relay の割り当て relay（参加コードから加わった割り当て）でホストに接続する。</summary>
+        public static TransportLink ConnectRelay(RelayServerData relay)
+        {
+            var link = new TransportLink(false, relay);
+            link._connections.Add(link._driver.Connect(relay.Endpoint));
             return link;
         }
 
