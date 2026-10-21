@@ -51,7 +51,7 @@ namespace Airerage.Editor
                 case CharacterPresets.PastryChefName:
                     character.SetProfile(new[] { "#設置", "#罠", "#お菓子" },
                         new SkillText("フラッフィベイス", "触れた人を弾き飛ばすわたがしの足場を置く。短く押すと足元に、長押しで照準の方向へ向けて置く。ワイヤーはつながらない。"),
-                        new SkillText("スイートトラップ", "照準の方向へクリームを飛ばし、当たった所に張り付かせる。長押し中にワイヤーでオレンジ（速くなり、ワイヤーがつながる）、攻撃で抹茶（遅くなり、壁と天井に張り付く）。"),
+                        new SkillText("スイートトラップ", "照準の方向へクリームを飛ばして張り付かせる。長押し中にワイヤーでオレンジ（速くなり、ワイヤーがつながる）、攻撃で抹茶（遅くなり、壁と天井に張り付く。ワイヤーはつながらない）。"),
                         new SkillText("ティーパーティ", "上へマカロンを次々と投げる。跳ね返りながら相手に当たる。色で威力が違い、虹色はとても強い。"));
                     character.SetCostume(CharacterCostume.PastryChef);
                     break;

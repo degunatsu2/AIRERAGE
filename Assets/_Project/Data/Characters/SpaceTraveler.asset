@@ -442,7 +442,7 @@ MonoBehaviour:
         MaxFallSpeed: 3
       CottonCandy:
         DurationTicks: 600
-        ShortPressTicks: 12
+        ShortPressTicks: 6
         PlaceDistance: 1.9
         FeetOffset: 0.2
         HalfLength: 1.8

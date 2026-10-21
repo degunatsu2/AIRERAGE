@@ -292,6 +292,7 @@ namespace Airerage.Editor
             GameAudio audio = SandboxWireSceneBuilder.CreateAudio(runner);
             SandboxWireSceneBuilder.SetReference(runner, "_audio", audio);
             SandboxWireSceneBuilder.CreateComboHud(runner);
+            SandboxWireSceneBuilder.CreateMissIndicator(runner, Object.FindFirstObjectByType<Camera>());
             SandboxWireSceneBuilder.CreateSkillHud(runner, audio);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
             SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);

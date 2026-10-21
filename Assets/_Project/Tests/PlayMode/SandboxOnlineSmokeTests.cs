@@ -65,6 +65,11 @@ namespace Airerage.PlayMode.Tests
             var followCamera = Object.FindFirstObjectByType<CinemachineCamera>();
             Assert.That(followCamera.Follow, Is.EqualTo(shown.transform), "カメラが自分のキャラクターを追従していない");
 
+            // ワイヤーの MISS・BLOCK! の表示も、ネットワーク対戦の自分のキャラクターで出す（ユーザーの要望、2026-10-21）。
+            var miss = Object.FindFirstObjectByType<MissIndicatorView>();
+            Assert.That(miss, Is.Not.Null, "ワイヤーの外れた表示がない");
+            Assert.That(miss.enabled, Is.True, "ワイヤーの外れた表示が OnlineRunner につながっていない");
+
             runner.Leave();
             Assert.That(runner.Session, Is.Null);
             Assert.That(shown.gameObject.activeSelf, Is.False, "抜けた後もキャラクターが表示されている");

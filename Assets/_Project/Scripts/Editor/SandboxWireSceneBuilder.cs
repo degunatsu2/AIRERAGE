@@ -1054,14 +1054,17 @@ namespace Airerage.Editor
             return view;
         }
 
-        /// <summary>ワイヤーが外れたときの表示（×印と MISS）。半透明にするため Sprites-Default を使う。</summary>
-        internal static void CreateMissIndicator(SimulationRunner runner, Camera camera)
+        /// <summary>
+        /// ワイヤーが外れたときの表示（×印と MISS、青い火花と BLOCK!）。source は自分のキャラクターを読む ISimulationFeed
+        /// （SimulationRunner か OnlineRunner）。半透明にするため Sprites-Default を使う。
+        /// </summary>
+        internal static void CreateMissIndicator(MonoBehaviour source, Camera camera)
         {
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             var root = new GameObject("MissIndicator");
             LineRenderer cross = CreateIndicatorLine(root.transform, "Cross", material, 0.1f);
             var view = cross.gameObject.AddComponent<MissIndicatorView>();
-            SetReference(view, "_runner", runner);
+            SetReference(view, "_source", source);
             SetReference(view, "_camera", camera);
         }
 

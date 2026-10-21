@@ -9,6 +9,9 @@ namespace Airerage.Runtime.Presentation
     /// ワイヤーが外れたことを分かりやすく示す（プレイテスト 2026-10-13 の #7）。外れた位置に×印と「MISS」を出し、
     /// 少しずつ消す（届かなかった）。ボタンを離して途中でやめたときは「CANCEL」を出す。接続できない物に当たったときは、
     /// 撃った側へ跳ね返る青い火花と「BLOCK!」を出す（文字は少し跳ねる。ユーザーの要望、2026-10-21）。
+    /// 自分のキャラクター（ISimulationFeed.LocalCharacter）だけを見る。トレーニング・検証用のシーン（SimulationRunner）と、ネットワーク対戦
+    /// （OnlineRunner。ユーザーの要望、2026-10-21）で使う。ローカル対戦では使わない。巻き戻しがあっても耐えるように、ティックではなく
+    /// 画面のフレームごとに、回収の段階に入った瞬間を前のフレームと比べて見つける。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     [RequireComponent(typeof(LineRenderer))]
@@ -22,7 +25,8 @@ namespace Airerage.Runtime.Presentation
         private const float SparkLength = 0.95f;
         private const float SparkSeconds = 0.18f;
 
-        [SerializeField] private SimulationRunner _runner;
+        [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
+        [SerializeField] private MonoBehaviour _source;
         [SerializeField] private Camera _camera;
         [SerializeField] private Color _missColor = new Color(1f, 0.25f, 0.25f, 0.95f);
         [SerializeField] private Color _cancelColor = new Color(0.35f, 0.35f, 0.4f, 0.9f);
@@ -35,6 +39,10 @@ namespace Airerage.Runtime.Presentation
 
         private LineRenderer _cross;
         private GUIStyle _style;
+        private ISimulationFeed _feed;
+        private SimulationRunner _runner;
+        private WirePhase _lastPhase = WirePhase.Ready;
+        private int _lastCharacter = -1;
         private float _shownAt = -1f;
         private Color _color;
         private bool _blocked;
@@ -55,9 +63,11 @@ namespace Airerage.Runtime.Presentation
             _cross.useWorldSpace = true;
             _cross.positionCount = CrossPoints;
             _cross.enabled = false;
-            if (_runner == null || _camera == null)
+            _feed = _source as ISimulationFeed;
+            _runner = _source as SimulationRunner;
+            if (_feed == null || _camera == null)
             {
-                Debug.LogError($"{name}: SimulationRunner か Camera が設定されていません", this);
+                Debug.LogError($"{name}: 状態を読む相手（ISimulationFeed）か Camera が設定されていません", this);
                 enabled = false;
             }
         }
@@ -66,7 +76,6 @@ namespace Airerage.Runtime.Presentation
         {
             if (_runner != null)
             {
-                _runner.PlayerTicked += OnPlayerTicked;
                 _runner.PlayerReset += Hide;
             }
         }
@@ -75,19 +84,31 @@ namespace Airerage.Runtime.Presentation
         {
             if (_runner != null)
             {
-                _runner.PlayerTicked -= OnPlayerTicked;
                 _runner.PlayerReset -= Hide;
             }
         }
 
-        private void OnPlayerTicked(CharacterState state)
+        // 自分のワイヤーが回収の段階に入った瞬間（外れた）を見つける。
+        private void Watch()
         {
-            // 外れたティックだけ、回収のフェーズが 0 ティック目になる。
-            WireState wire = state.Wire;
-            if (wire.Phase != WirePhase.Retracting || wire.PhaseTicks != 0)
+            int local = _feed.LocalCharacter;
+            if (local < 0 || local >= _feed.CharacterCount)
             {
+                _lastCharacter = -1;
                 return;
             }
+            WireState wire = _feed.GetState(local).Wire;
+            bool entered = wire.Phase == WirePhase.Retracting && _lastPhase != WirePhase.Retracting && _lastCharacter == local;
+            _lastPhase = wire.Phase;
+            _lastCharacter = local;
+            if (entered)
+            {
+                OnMissed(wire);
+            }
+        }
+
+        private void OnMissed(in WireState wire)
+        {
             bool canceled = wire.LastMissReason == WireMissReason.ButtonReleased || wire.LastMissReason == WireMissReason.ButtonToggled
                 || wire.LastMissReason == WireMissReason.Interrupted;
             if (wire.LastMissReason == WireMissReason.HitNonAttachable)
@@ -154,6 +175,7 @@ namespace Airerage.Runtime.Presentation
 
         private void Update()
         {
+            Watch();
             if (!IsShowing)
             {
                 _cross.enabled = false;

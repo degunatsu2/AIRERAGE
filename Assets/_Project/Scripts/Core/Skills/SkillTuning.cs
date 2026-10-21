@@ -379,8 +379,8 @@ namespace Airerage.Core.Skills
         /// <summary>消えるまで（ティック。10 秒）。</summary>
         public int DurationTicks = 600;
 
-        /// <summary>これより短い押し（ティック）は、足元に上向きで置く。</summary>
-        public int ShortPressTicks = 12;
+        /// <summary>これより短い押し（ティック）は、足元に上向きで置く（ユーザーの要望で 0.2 秒から短くした、2026-10-21）。</summary>
+        public int ShortPressTicks = 6;
 
         /// <summary>長押し: キャラクターの中心から足場の中心までの距離（m。目と鼻の先）。</summary>
         public float PlaceDistance = 1.9f;

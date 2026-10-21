@@ -399,6 +399,13 @@ namespace Airerage.Editor
             }
             OpenDetails(screen, 0);
             CaptureAll(screens, "CharacterSelect_Details");
+            // 技の説明が枠に収まっているか、キャラクターごとに見る。
+            for (int index = 1; index < screen.Count; index++)
+            {
+                screen.ShowSingle(index);
+                OpenDetails(screen, 0);
+                CaptureAll(screens, $"CharacterSelect_Details_{index}");
+            }
         }
 
         /// <summary>
