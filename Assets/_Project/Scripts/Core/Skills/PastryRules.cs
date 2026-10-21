@@ -44,13 +44,15 @@ namespace Airerage.Core.Skills
             center = position + normal * tuning.PlaceDistance;
         }
 
-        /// <summary>k 番目（0 から）のクリームを飛ばす位置と速度（照準 aim の方向を中心に扇形）。</summary>
+        /// <summary>k 番目（0 から）のクリームを飛ばす位置と速度（照準 aim の方向を中心に扇形。真ん中ほど密）。</summary>
         public static void CreamLaunch(in CharacterState state, CharacterConfig config, Vector2 aim, int k, out Vector2 origin,
             out Vector2 velocity)
         {
             CreamTuning tuning = config.Skills.Cream;
             Vector2 direction = SkillRules.AimDirection(aim, state.Facing, config.Wire.AimDeadzone);
-            float spread = tuning.ShotCount > 1 ? tuning.SpreadDeg * (k / (float)(tuning.ShotCount - 1) - 0.5f) : 0f;
+            // 扇の中の位置（-1〜1）を 2 乗で寄せて、狙った方向ほど密にする。
+            float x = tuning.ShotCount > 1 ? 2f * k / (tuning.ShotCount - 1) - 1f : 0f;
+            float spread = tuning.SpreadDeg * 0.5f * x * Math.Abs(x);
             float angle = MathF.Atan2(direction.Y, direction.X) + spread * MathF.PI / 180f;
             var shot = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
             origin = new Vector2(state.Position.X, state.Position.Y) + direction * tuning.LaunchOffset;
@@ -262,12 +264,8 @@ namespace Airerage.Core.Skills
                             }
                             continue;
                         }
-                        // 抹茶: 張り付いた所はだれも壁に張り付けない。遅くする・張り付かせるのは置いた本人以外【仮】。
+                        // 抹茶: 置いた本人も含めて全員に効く（ユーザーの要望、2026-10-21）。張り付いた所はだれも壁に張り付けない。
                         noCling |= wall;
-                        if (v == patch.Owner)
-                        {
-                            continue;
-                        }
                         matchaSpeed = tuning.MatchaSpeedPercent;
                         if ((wall || IsCeilingPatch(patch)) && tuning.MatchaStickTicks > 0)
                         {

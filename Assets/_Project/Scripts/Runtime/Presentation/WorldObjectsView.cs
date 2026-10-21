@@ -724,6 +724,8 @@ namespace Airerage.Runtime.Presentation
             bool blinking = PastryRules.IsBlinking(macaron, tuning, tick);
             SetVisible(shown, launched && (!blinking || Mathf.Repeat(Time.time * 10f, 1f) < 0.5f));
             shown.Visual.transform.rotation = Quaternion.Euler(0f, 0f, -macaron.Position.X / tuning.Radius * Mathf.Rad2Deg);
+            // 見本は半径 0.9m（当たりの半径に合わせる）。
+            shown.Visual.transform.localScale *= tuning.Radius / 0.9f;
             Tint(shown, MacaronColorOf(macaron.Variant, Time.time), "Shell");
         }
 

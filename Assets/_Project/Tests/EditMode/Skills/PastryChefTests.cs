@@ -185,7 +185,7 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
-        public void Cream_OnTheFloor_ChangesSpeed_OrangeForEveryone_MatchaNotForTheOwner()
+        public void Cream_OnTheFloor_ChangesSpeed_ForEveryoneIncludingTheOwner()
         {
             var world = new SimWorld(TestArenas.Ground());
             world.AddCharacter(CharacterPresets.PastryChef(), new Vector3(0f, GroundY, 0f));
@@ -201,12 +201,10 @@ namespace Airerage.Core.Tests.Skills
             CharacterConfig slow = SpeedBoosts.EffectiveConfig(world.GetState(1), new CharacterConfig());
             Assert.That(slow.Movement.RunSpeed, Is.EqualTo(new CharacterConfig().Movement.RunSpeed * 0.7f).Within(1e-3f));
 
-            // 置いた本人は自分の抹茶で遅くならない。
-            Edit(world, 0, s => { s.Position = new Vector3(-20f, GroundY, 0f); return s; });
-            Edit(world, 1, s => { s.Position = new Vector3(-20f, GroundY, 0f); return s; });
+            // 置いた本人も自分の抹茶で遅くなる（ユーザーの要望、2026-10-21）。
+            Edit(world, 0, s => { s.Position = new Vector3(20f, GroundY, 0f); return s; });
             Step(world, 1);
-            Assert.That(world.GetState(1).Combat.CreamSpeedPercent, Is.Zero, "自分の抹茶で遅くなった");
-            Assert.That(world.GetState(0).Combat.CreamSpeedPercent, Is.EqualTo(Chef.Skills.Cream.MatchaSpeedPercent));
+            Assert.That(world.GetState(0).Combat.CreamSpeedPercent, Is.EqualTo(Chef.Skills.Cream.MatchaSpeedPercent), "自分の抹茶で遅くならない");
 
             // 離れると戻る。
             Edit(world, 0, s => { s.Position = new Vector3(10f, GroundY, 0f); return s; });
@@ -253,6 +251,32 @@ namespace Airerage.Core.Tests.Skills
             CharacterState free = world.GetState(0);
             Assert.That(free.Combat.CreamStickTicksLeft, Is.Zero, "1 秒で離れない");
             Assert.That(free.WallSide, Is.Zero, "抹茶の壁に張り付けた");
+        }
+
+        [Test]
+        public void MatchaOnAWall_AlsoSticksTheOwner()
+        {
+            var world = new SimWorld(WallArena());
+            world.AddCharacter(CharacterPresets.PastryChef(), new Vector3(4.6f, 6f, 0f));
+            world.Objects.Add(Patch(0, CreamFlavor.Matcha, new Vector2(4.875f, 6f), new Vector2(0.125f, 2f), -Vector2.UnitX));
+            Step(world, 1);
+            Assert.That(world.GetState(0).Combat.CreamStickTicksLeft, Is.GreaterThan(0), "自分の抹茶に張り付かない");
+        }
+
+        [Test]
+        public void SweetTrap_IsDenserTowardTheAim()
+        {
+            CreamTuning tuning = Chef.Skills.Cream;
+            var state = new CharacterState { Facing = 1 };
+            var angles = new List<float>();
+            for (int k = 0; k < tuning.ShotCount; k++)
+            {
+                PastryRules.CreamLaunch(state, Chef, Vector2.UnitX, k, out _, out Vector2 velocity);
+                angles.Add(System.MathF.Atan2(velocity.Y, velocity.X) * 180f / System.MathF.PI);
+            }
+            Assert.That(angles.Max() - angles.Min(), Is.EqualTo(tuning.SpreadDeg).Within(0.01f), "扇の広がりが違う");
+            Assert.That(angles.Count(a => System.Math.Abs(a) <= tuning.SpreadDeg * 0.25f), Is.GreaterThan(tuning.ShotCount / 2),
+                "狙った方向に集まっていない");
         }
 
         [Test]

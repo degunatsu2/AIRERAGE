@@ -14,7 +14,7 @@ namespace Airerage.PlayMode.Tests
     public sealed class MissIndicatorTests
     {
         [UnityTest]
-        public IEnumerator FiringIntoTheGround_ShowsMissAtTheHitPoint()
+        public IEnumerator FiringIntoTheGround_ShowsBlockAtTheHitPoint()
         {
             SceneManager.LoadScene("Sandbox_Wire");
             yield return null;
@@ -37,7 +37,8 @@ namespace Airerage.PlayMode.Tests
             }
 
             Assert.That(miss.IsShowing, Is.True, "外れた表示が出ない");
-            Assert.That(miss.LastLabel, Is.EqualTo("MISS"));
+            // 接続できない物に当たったときは、青い BLOCK!（ユーザーの要望、2026-10-21）。
+            Assert.That(miss.LastLabel, Is.EqualTo("BLOCK!"));
             Assert.That(miss.LastPoint.y, Is.LessThan(0.5f), "外れた位置が地面にない");
             Assert.That(Mathf.Abs(miss.LastPoint.x - runner.PlayerState.Position.X), Is.LessThan(0.5f), "外れた位置が真下にない");
         }

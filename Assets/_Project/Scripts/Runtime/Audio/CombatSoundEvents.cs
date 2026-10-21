@@ -97,6 +97,12 @@ namespace Airerage.Runtime.Audio
             {
                 _audio.Play(SoundId.Guard, 1f, 0.04f);
             }
+            if (now.Wire.Phase == WirePhase.Retracting && before.Wire.Phase != WirePhase.Retracting
+                && now.Wire.LastMissReason == WireMissReason.HitNonAttachable)
+            {
+                // ワイヤーが接続できない物に弾かれた（BLOCK!）。
+                _audio.Play(SoundId.Guard, 0.6f, 0.08f);
+            }
             if (n.BounceCount > b.BounceCount)
             {
                 _audio.Play(SoundId.Bounce, 1f, 0.06f);

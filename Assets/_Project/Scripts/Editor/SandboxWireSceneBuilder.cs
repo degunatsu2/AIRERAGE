@@ -651,14 +651,15 @@ namespace Airerage.Editor
             var macaron = new GameObject("MacaronTemplate");
             macaron.transform.SetParent(view.transform, false);
             Material macaronShell = LoadOrCreateMaterial("MacaronShellUnlit", Color.white, unlit: true);
-            GameObject shellTop = CreateVisual(PrimitiveType.Cylinder, "ShellTop", macaronShell, new Vector3(0.6f, 0.07f, 0.6f));
+            // マカロンは半径 0.9m（TeaPartyTuning.Radius の初期値。ユーザーの要望で 3 倍にした、2026-10-21）。
+            GameObject shellTop = CreateVisual(PrimitiveType.Cylinder, "ShellTop", macaronShell, new Vector3(1.8f, 0.21f, 1.8f));
             shellTop.transform.SetParent(macaron.transform, false);
-            shellTop.transform.localPosition = new Vector3(0f, 0.1f, 0f);
-            GameObject shellBottom = CreateVisual(PrimitiveType.Cylinder, "ShellBottom", macaronShell, new Vector3(0.6f, 0.07f, 0.6f));
+            shellTop.transform.localPosition = new Vector3(0f, 0.3f, 0f);
+            GameObject shellBottom = CreateVisual(PrimitiveType.Cylinder, "ShellBottom", macaronShell, new Vector3(1.8f, 0.21f, 1.8f));
             shellBottom.transform.SetParent(macaron.transform, false);
-            shellBottom.transform.localPosition = new Vector3(0f, -0.1f, 0f);
+            shellBottom.transform.localPosition = new Vector3(0f, -0.3f, 0f);
             CreateVisual(PrimitiveType.Cylinder, "Filling", LoadOrCreateMaterial("MacaronFilling", new Color(1f, 0.96f, 0.88f), unlit: true),
-                new Vector3(0.5f, 0.04f, 0.5f)).transform.SetParent(macaron.transform, false);
+                new Vector3(1.5f, 0.12f, 1.5f)).transform.SetParent(macaron.transform, false);
 
             foreach (GameObject template in new[] { ball, safe, coin, gust, windZone, portal, missile, beam, candy, creamShot, creamPatch, macaron })
             {

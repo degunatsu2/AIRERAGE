@@ -410,18 +410,20 @@ namespace Airerage.Core.Skills
 
     /// <summary>
     /// クリーム（PASTRY CHEF の E。スイートトラップ。ユーザーの案、2026-10-21。値は【仮】）。照準の方向を中心に ShotCount 個を扇形に
-    /// 飛ばし（重力で落ちる）、地形に当たるとその場に PatchTicks の間張り付く。長押しの間は飛び方を表示する。
+    /// 飛ばし（重力で落ちる。狙った方向ほど密。ユーザーの要望で狭く・多くした、2026-10-21）、地形に当たるとその場に PatchTicks の間
+    /// 張り付く。長押しの間は飛び方を表示する。
     /// - オレンジ: 触れている間、あらゆる速さ +OrangeSpeedPercent %（SpeedBoosts）。壁なら壁ジャンプの速さが OrangeWallJumpPercent %。
     ///   張り付いた所は、ワイヤーがつながらない地形でもつながる。全員に効く（置いた本人も）。
     /// - 抹茶: 触れている間、あらゆる速さ MatchaSpeedPercent %。壁と天井では MatchaStickTicks の間張り付いて動けない（壁の張り付きと
-    ///   同じ速さでずり落ちる）。置いた本人には効かない【仮】。張り付いた所は、だれも壁に張り付けず、ワイヤーもつながらない。
+    ///   同じ速さでずり落ちる）。置いた本人にも効く（ユーザーの要望、2026-10-21）。張り付いた所は、だれも壁に張り付けず、ワイヤーも
+    ///   つながらない。
     /// </summary>
     [Serializable]
     public sealed class CreamTuning
     {
         /// <summary>1 回に飛ばす数と、扇の広がり（度。いちばん外の 2 つの間）。</summary>
-        public int ShotCount = 5;
-        public float SpreadDeg = 40f;
+        public int ShotCount = 7;
+        public float SpreadDeg = 22f;
 
         /// <summary>飛ばす速さ（m/s）と重力（m/s²）。</summary>
         public float Speed = 15f;
@@ -480,8 +482,8 @@ namespace Airerage.Core.Skills
         public int Count = 6;
         public int IntervalTicks = 8;
 
-        /// <summary>投げる位置（キャラクターの中心からの高さ。m）。</summary>
-        public float OffsetY = 1.1f;
+        /// <summary>投げる位置（キャラクターの中心からの高さ。m。大きくしたマカロンが頭に重ならないように）。</summary>
+        public float OffsetY = 1.9f;
 
         /// <summary>投げる速さ（m/s。この間でランダム）と、真上からの角度の最大（度。左右にランダム）。</summary>
         public float MinSpeed = 13f;
@@ -496,8 +498,8 @@ namespace Airerage.Core.Skills
         /// <summary>止まったとみなす速さ（m/s。床で跳ねたときにこれより遅ければ止まる）。</summary>
         public float StopSpeed = 1.5f;
 
-        /// <summary>当たりと地形にぶつかる大きさ（半径。m）。</summary>
-        public float Radius = 0.3f;
+        /// <summary>当たりと地形にぶつかる大きさ（半径。m。ユーザーの要望で 0.3 から 3 倍にした、2026-10-21。見た目も合わせる）。</summary>
+        public float Radius = 0.9f;
 
         /// <summary>消える前の点滅（ティック）と、止まらなくても消えるまで（ティック）。</summary>
         public int BlinkTicks = 30;

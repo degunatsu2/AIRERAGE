@@ -9,7 +9,8 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// PASTRY CHEF の技のキャラクターまわりの表示（docs/14 1.4）と、クリームに触れている人の印。
-    /// - フラッフィベイスを長押ししている間: 置く場所の枠（横長の長方形）と、表の向きの矢印（短く押したときと同じ計算。PastryRules）。
+    /// - フラッフィベイスを長押ししている間: 置く場所の枠（横長の長方形）と、表の向きの矢印（離したときと同じ計算。PastryRules）。
+    ///   短く押したとき（足元に置く）とみなす間は出さず、長押しになった瞬間から照準の方向に出す。
     /// - スイートトラップを長押ししている間: クリームの飛び方の線（重力で落ちる弧。選んでいる味の色）。
     /// - クリームの上: オレンジ（速くなる）は体の周りに上へ昇る明るい山形、抹茶（遅くなる）は下へ落ちる暗い山形と、体の周りの輪。
     /// 見た目の動きは表示の時間で決める。状態を読むだけで、書き換えない。
@@ -84,7 +85,8 @@ namespace Airerage.Runtime.Presentation
                 bool alive = !state.Combat.IsWaitingToRespawn;
                 SkillEffect holding = alive && state.Combat.Holding ? config.Combat.Get(state.Combat.HoldSlot).Effect : SkillEffect.None;
 
-                SetPlacing(effects, holding == SkillEffect.CottonCandy);
+                // 置く場所は、長押しになった（短く押したときの足元ではなくなった）瞬間から、照準の方向に出す（ユーザーの要望、2026-10-21）。
+                SetPlacing(effects, holding == SkillEffect.CottonCandy && state.Combat.HoldTicks >= config.Skills.CottonCandy.ShortPressTicks);
                 if (effects.Placing)
                 {
                     PastryRules.CandyPlacement(state, config, state.Combat.HoldTicks, state.Combat.SkillAim,
