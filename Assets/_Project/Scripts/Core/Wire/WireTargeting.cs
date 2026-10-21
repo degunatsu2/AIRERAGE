@@ -1,5 +1,6 @@
 using System.Numerics;
 using Airerage.Core.Common;
+using Airerage.Core.Objects;
 using Airerage.Core.Physics;
 
 namespace Airerage.Core.Wire
@@ -147,7 +148,7 @@ namespace Airerage.Core.Wire
                 reach = toTarget.Length();
             }
 
-            if (reach > 0f && collision.Raycast(origin, aim.Direction, reach, out CastHit hit))
+            if (reach > 0f && CastHook(collision, origin, aim.Direction, reach, out CastHit hit))
             {
                 return new WireShotPreview(aim, hit.Attachable || tuning.AttachAnySurface ? WireShotResult.Attach : WireShotResult.HitNonAttachable,
                     hit.Point);
@@ -159,6 +160,16 @@ namespace Airerage.Core.Wire
             // 空中につながる強化の間は、最大射程の点につながる（キャッスルインジエアー）。
             return new WireShotPreview(aim, tuning.AttachInAir ? WireShotResult.Attach : WireShotResult.OutOfRange,
                 origin + aim.Direction * tuning.MaxLength);
+        }
+
+        /// <summary>
+        /// ワイヤーのフックの当たり（置かれた物を含む地形なら WorldCollision.RaycastHook。わたがしの足場とクリーム）。
+        /// </summary>
+        public static bool CastHook(ICollisionQuery collision, Vector3 origin, Vector3 direction, float maxDistance, out CastHit hit)
+        {
+            return collision is WorldCollision world
+                ? world.RaycastHook(origin, direction, maxDistance, out hit)
+                : collision.Raycast(origin, direction, maxDistance, out hit);
         }
 
         /// <summary>

@@ -14,12 +14,17 @@ namespace Airerage.Core.Skills
     /// ヒットストップ、のけぞり、ガード、クールタイム、強化の残りは速くしない（ユーザーの回答、2026-10-16）。
     /// 割合は、効いている強化の割合を足す（ウインドクローク 20% とキャッスルインジエアー 50% なら 70%。D-64【提案】の「上乗せは足す」）。
     /// 攻撃のフレームを 1 ティックに 2 つまでしか進めないので、合計は MaxPercent まで。
+    /// 触れているクリーム（PASTRY CHEF の E。CombatState.CreamSpeedPercent）も足す。抹茶は負の割合で遅くする（時間が s 倍 (s &lt; 1) で
+    /// 進む。攻撃のフレームはときどき止まる。下限は −MaxSlowPercent）。
     /// キャッスルインジエアーの間は、ワイヤーが弾く物にもつながり、最大射程まで何もなければ空中につながる。
     /// </summary>
     public static class SpeedBoosts
     {
         /// <summary>速さの強化の割合の上限（%）。</summary>
         public const int MaxPercent = 100;
+
+        /// <summary>遅くする割合の上限（%。−この値まで）。</summary>
+        public const int MaxSlowPercent = 50;
 
         /// <summary>state に今効いている速さの強化の割合（%。0 なら強化なし）。</summary>
         public static int PercentOf(in CharacterState state, CharacterConfig config)
@@ -33,7 +38,8 @@ namespace Airerage.Core.Skills
             {
                 percent += config.Skills.SkyBoost.SpeedPercent;
             }
-            return Math.Min(percent, MaxPercent);
+            percent += state.Combat.CreamSpeedPercent;
+            return Math.Min(Math.Max(percent, -MaxSlowPercent), MaxPercent);
         }
 
         /// <summary>速さの倍率 s（1 + 割合 ÷ 100）。</summary>
@@ -59,10 +65,10 @@ namespace Airerage.Core.Skills
             return percent == 0 && !strongWire ? config : Apply(config, percent, strongWire);
         }
 
-        /// <summary>割合 percent（%）の速さと、strongWire ならワイヤーの強化を当てた調整値。</summary>
+        /// <summary>割合 percent（%。負なら遅く）の速さと、strongWire ならワイヤーの強化を当てた調整値。</summary>
         public static CharacterConfig Apply(CharacterConfig config, int percent, bool strongWire)
         {
-            float s = 1f + Math.Min(Math.Max(percent, 0), MaxPercent) / 100f;
+            float s = 1f + Math.Min(Math.Max(percent, -MaxSlowPercent), MaxPercent) / 100f;
             float s2 = s * s;
 
             MovementTuning movement = config.Movement.Clone();

@@ -229,7 +229,11 @@ namespace Airerage.Runtime.Presentation
             _renderer.SetPropertyBlock(_block);
         }
 
-        // 壁に張り付いていられる残り（WallCling.Remaining）。張り付いていなければ隠す。
+        // 抹茶のクリームに張り付いた長さ（ティック。円形のゲージの割合に使う）。
+        private int _creamStickTicks;
+
+        // 壁に張り付いていられる残り（WallCling.Remaining）。抹茶のクリーム（PASTRY CHEF の E）に張り付いている間は、離れるまでの残り。
+        // 張り付いていなければ隠す。
         private void RenderWallCling(in CharacterState state, MovementTuning movement)
         {
             if (_wallClingGauge == null)
@@ -237,6 +241,12 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             float remaining = movement != null ? WallCling.Remaining(state, movement) : 0f;
+            int stick = state.Combat.CreamStickTicksLeft;
+            _creamStickTicks = stick > 0 ? Mathf.Max(_creamStickTicks, stick) : 0;
+            if (stick > 0)
+            {
+                remaining = stick / (float)_creamStickTicks;
+            }
             if (remaining > 0f)
             {
                 _wallClingGauge.Show(transform.position, remaining);

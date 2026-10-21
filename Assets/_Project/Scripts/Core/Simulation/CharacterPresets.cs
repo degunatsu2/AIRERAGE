@@ -14,6 +14,7 @@ namespace Airerage.Core.Simulation
         public const string RiskTakerName = "RISK TAKER";
         public const string StormRunnerName = "STORM RUNNER";
         public const string SpaceTravelerName = "SPACE TRAVELER";
+        public const string PastryChefName = "PASTRY CHEF";
 
         /// <summary>STANDARD（基準のキャラクター。DASH・RISE・BURST）。</summary>
         public static CharacterConfig Standard()
@@ -403,6 +404,58 @@ namespace Airerage.Core.Simulation
                     // 撃つ間は止まる（C-9）。
                     new AttackMotion { StartTick = 0, Ticks = 72, VelocityX = 0f, VelocityY = 0f },
                 },
+            };
+            combat.SuperGaugeCost = 100 * CombatTuning.GaugePerPercent;
+            return config;
+        }
+        /// <summary>
+        /// PASTRY CHEF（仮の名前。docs/14 1.4。ユーザーの案、2026-10-21）。お菓子で足場と罠を作るキャラクター。通常の攻撃（地上技・空中技）は
+        /// STANDARD と同じ【仮】。
+        /// - Q フラッフィベイス: わたがしの足場（10 秒）。短く押すと足元に上向き、長押しすると照準の方向を向けて目の前に置く。触れた人を
+        ///   弾き飛ばす。ワイヤーはつながらない。クールタイム 8 秒。
+        /// - E スイートトラップ: クリームを照準の方向へ扇形に飛ばし、当たった地形に 10 秒張り付かせる。長押しの間にワイヤーでオレンジ、
+        ///   攻撃で抹茶（何も押さない・短く押すとオレンジ）。オレンジは速さ +30%・壁ジャンプ 1.5 倍・ワイヤーがつながる。抹茶は速さ −30%・
+        ///   壁と天井に 1 秒張り付く・壁に張り付けず、ワイヤーもつながらない。クールタイム 18 秒。
+        /// - R ティーパーティ: マカロン 6 個を次々と上へ投げる（緑 60% 威力 20、黄 35% 威力 40、虹 5% 威力 100）。必要なゲージ 100%。
+        /// </summary>
+        public static CharacterConfig PastryChef()
+        {
+            var config = new CharacterConfig();
+            CombatTuning combat = config.Combat;
+
+            combat.Special1 = new AttackData
+            {
+                Name = "FLUFFY BASE",
+                TotalTicks = 12,
+                WireCancelFromTick = 2,
+                Effect = SkillEffect.CottonCandy,
+                EffectTick = 0,
+                HoldMaxTicks = 600,
+                Hits = new AttackHit[0],
+            };
+            combat.Special1CooldownTicks = 480;
+
+            combat.Special2 = new AttackData
+            {
+                Name = "SWEET TRAP",
+                TotalTicks = 18,
+                WireCancelFromTick = 4,
+                Effect = SkillEffect.Cream,
+                EffectTick = 3,
+                HoldMaxTicks = 600,
+                Hits = new AttackHit[0],
+            };
+            combat.Special2CooldownTicks = 1080;
+
+            TeaPartyTuning party = config.Skills.TeaParty;
+            combat.Super = new AttackData
+            {
+                Name = "TEA PARTY",
+                TotalTicks = 4 + (party.Count - 1) * party.IntervalTicks + 12,
+                WireCancelFromTick = 4 + (party.Count - 1) * party.IntervalTicks,
+                Effect = SkillEffect.TeaParty,
+                EffectTick = 4,
+                Hits = new AttackHit[0],
             };
             combat.SuperGaugeCost = 100 * CombatTuning.GaugePerPercent;
             return config;

@@ -12,7 +12,7 @@ namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// キャラクターの仮の見た目（衣装。ユーザーの要望、2026-10-20）: F3 でキャラクターを切り替えると、そのキャラクターの衣装の部品だけが
-    /// 出る（STANDARD は箱のまま）。RISK TAKER・STORM RUNNER・SPACE TRAVELER はそれぞれ違う衣装。
+    /// 出る（STANDARD は箱のまま）。RISK TAKER・STORM RUNNER・SPACE TRAVELER・PASTRY CHEF はそれぞれ違う衣装。
     /// </summary>
     public sealed class CostumeTests
     {
@@ -26,7 +26,7 @@ namespace Airerage.PlayMode.Tests
             CostumeView costume = runner.PlayerView.Costume;
             Assert.That(costume, Is.Not.Null, "キャラクターの表示に衣装がない");
             var seen = new HashSet<CharacterCostume>();
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < runner.Roster.Count; i++)
             {
                 CharacterConfigAsset character = runner.CycleCharacter();
                 yield return null;
@@ -47,7 +47,8 @@ namespace Airerage.PlayMode.Tests
             Assert.That(seen, Is.EquivalentTo(new[]
             {
                 CharacterCostume.Standard, CharacterCostume.RiskTaker, CharacterCostume.StormRunner, CharacterCostume.SpaceTraveler,
-            }), "4 体の衣装がそろっていない");
+                CharacterCostume.PastryChef,
+            }), "5 体の衣装がそろっていない");
         }
     }
 }

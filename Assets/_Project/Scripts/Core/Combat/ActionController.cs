@@ -3,6 +3,7 @@ using System.Numerics;
 using Airerage.Core.Common;
 using Airerage.Core.Input;
 using Airerage.Core.Movement;
+using Airerage.Core.Objects;
 using Airerage.Core.Simulation;
 using Airerage.Core.Skills;
 using Airerage.Core.Wire;
@@ -168,6 +169,7 @@ namespace Airerage.Core.Combat
             state.Combat.Holding = true;
             state.Combat.HoldSlot = slot;
             state.Combat.HoldTicks = 0;
+            state.Combat.HoldVariant = 0;
             state.Combat.AttackBufferTicksLeft = 0;
             // 押したときに横を入れていれば、その向きを向く。ためている間は向きを変えられ、離したときの向きで出す。
             if (state.Combat.BufferedFacing != 0)
@@ -176,6 +178,30 @@ namespace Airerage.Core.Combat
                 state.Combat.BufferedFacing = 0;
             }
             return true;
+        }
+
+        /// <summary>
+        /// ためている技が、ためている間にワイヤー・攻撃のボタンで選ぶ技（PASTRY CHEF の E。SkillEffect.Cream）なら、押したボタンで
+        /// 選び（ワイヤーはオレンジ、攻撃は抹茶。CombatState.HoldVariant）、そのボタンを入力から取り除く（ワイヤーを撃たず、攻撃も
+        /// 出さない）。ActionController.Update の前に呼ぶ。
+        /// </summary>
+        public static void TakeHoldChoice(ref CharacterState state, ref InputFrame frame, ref PlayerInput input, CombatTuning combat)
+        {
+            if (!state.Combat.Holding || combat.Get(state.Combat.HoldSlot).Effect != SkillEffect.Cream)
+            {
+                return;
+            }
+            if (frame.WasPressed(InputButtons.Wire))
+            {
+                state.Combat.HoldVariant = (byte)CreamFlavor.Orange;
+            }
+            if (frame.WasPressed(InputButtons.Attack))
+            {
+                state.Combat.HoldVariant = (byte)CreamFlavor.Matcha;
+            }
+            const InputButtons taken = InputButtons.Wire | InputButtons.Attack;
+            input = new PlayerInput(input.MoveX, input.MoveY, input.Buttons & ~taken, input.AimX, input.AimY);
+            frame = new InputFrame(input, state.PreviousButtons & ~taken);
         }
 
         /// <summary>その場から動かずにためている（AttackData.HoldRooted）か。移動・ジャンプ・ワイヤーの入力を無視する。</summary>
@@ -424,18 +450,18 @@ namespace Airerage.Core.Combat
             }
         }
 
-        // 攻撃のフレームを進める（行動の速さの強化の間は速く。1 ティックに 2 つまで。SpeedBoosts）。
+        // 攻撃のフレームを進める（行動の速さの強化の間は速く。1 ティックに 2 つまで。遅くなっている間は、ときどき進めない。SpeedBoosts）。
         private static void AdvanceAttack(ref CharacterState state, CharacterConfig config)
         {
             int advance = 1;
             int percent = SpeedBoosts.PercentOf(state, config);
-            if (percent > 0)
+            if (percent != 0)
             {
-                state.Action.TickRemainder += percent;
+                state.Action.TickRemainder += Math.Abs(percent);
                 if (state.Action.TickRemainder >= 100)
                 {
                     state.Action.TickRemainder -= 100;
-                    advance = 2;
+                    advance = percent > 0 ? 2 : 0;
                 }
             }
             state.Action.Ticks += advance;

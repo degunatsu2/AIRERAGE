@@ -168,6 +168,24 @@ namespace Airerage.Core.Combat
         /// </summary>
         public int HazardDropPower;
 
+        /// <summary>長押しの技でためている間に選んだもの（PASTRY CHEF の E のクリームの味 CreamFlavor。0 は選んでいない）。</summary>
+        public byte HoldVariant;
+
+        /// <summary>
+        /// 触れているクリームの、速さの強化・弱体化の割合（%。オレンジは +、抹茶は −。PastryRules が毎ティックの物の更新で決め直す。SpeedBoosts）。
+        /// </summary>
+        public int CreamSpeedPercent;
+
+        /// <summary>触れているオレンジのクリームの、壁ジャンプの速さの割合（%。0 なら変えない）。</summary>
+        public int CreamWallJumpPercent;
+
+        /// <summary>抹茶のクリームが付いた壁に触れている（壁に張り付けない）。</summary>
+        public bool CreamNoCling;
+
+        /// <summary>抹茶のクリームに張り付いて動けない残り（ティック）。張り付いたら、クリームから離れるまでもう張り付かない（CreamStickSpent）。</summary>
+        public int CreamStickTicksLeft;
+        public bool CreamStickSpent;
+
         /// <summary>凍っているか。</summary>
         public bool IsFrozen => FrozenTicksLeft > 0;
 
@@ -219,7 +237,9 @@ namespace Airerage.Core.Combat
                 && WarpCooldownTicks == other.WarpCooldownTicks && WarpCount == other.WarpCount
                 && FrozenTicksLeft == other.FrozenTicksLeft && FreezeCount == other.FreezeCount
                 && HazardImmunityTicks == other.HazardImmunityTicks && HazardHitCount == other.HazardHitCount
-                && HazardDropPower == other.HazardDropPower;
+                && HazardDropPower == other.HazardDropPower && HoldVariant == other.HoldVariant
+                && CreamSpeedPercent == other.CreamSpeedPercent && CreamWallJumpPercent == other.CreamWallJumpPercent
+                && CreamNoCling == other.CreamNoCling && CreamStickTicksLeft == other.CreamStickTicksLeft && CreamStickSpent == other.CreamStickSpent;
         }
 
         public override bool Equals(object obj)
@@ -238,14 +258,16 @@ namespace Airerage.Core.Combat
                 HashCode.Combine(Holding, HoldSlot, HoldTicks, AttackSerial, CoinBoostTicksLeft, CoinBonusMilli, JackpotHitCount,
                     GaugeBonusRemainder),
                 HashCode.Combine(SpeedBoostTicksLeft, SkyBoostTicksLeft, Special1Spent, Special2Spent, SkillAim, SlowFallSerial, PortalCount,
-                    HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount, FrozenTicksLeft, FreezeCount, HazardImmunityTicks, HazardHitCount, HazardDropPower)));
+                    HashCode.Combine(
+                        HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount, FrozenTicksLeft, FreezeCount, HazardImmunityTicks, HazardHitCount, HazardDropPower),
+                        HashCode.Combine(HoldVariant, CreamSpeedPercent, CreamWallJumpPercent, CreamNoCling, CreamStickTicksLeft, CreamStickSpent))));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount})";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")}";
         }
     }
 }

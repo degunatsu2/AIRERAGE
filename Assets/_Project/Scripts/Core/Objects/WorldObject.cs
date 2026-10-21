@@ -36,6 +36,42 @@ namespace Airerage.Core.Objects
 
         /// <summary>コズミックレイのビーム（SPACE TRAVELER の R）。Position から End までの線分。壁を貫通する。</summary>
         Beam = 8,
+
+        /// <summary>
+        /// わたがしの足場（PASTRY CHEF の Q）。Position を中心に、向き Velocity（長さ 1。足場の表の向き）に垂直な横長の長方形
+        /// （End は半分の長さと半分の厚さ）。触れた人を弾き飛ばす。ワイヤーはつながらない（弾く）。
+        /// </summary>
+        CottonCandy = 9,
+
+        /// <summary>飛んでいるクリーム（PASTRY CHEF の E）。重力で落ち、地形に当たるとその場に張り付く（CreamPatch に変わる）。Variant は味。</summary>
+        CreamShot = 10,
+
+        /// <summary>
+        /// 地形に張り付いたクリーム（PASTRY CHEF の E）。Position を中心、End を半分の大きさにした軸平行の箱。Velocity は張り付いた面の
+        /// 法線。Variant は味（CreamFlavor）。
+        /// </summary>
+        CreamPatch = 11,
+
+        /// <summary>マカロン（PASTRY CHEF の R）。SpawnTick に投げ上げ、地形で跳ね返る。止まるかステージの外に出たら点滅して消える。Variant は色。</summary>
+        Macaron = 12,
+    }
+
+    /// <summary>クリームの味（PASTRY CHEF の E。WorldObject.Variant）。</summary>
+    public enum CreamFlavor : byte
+    {
+        /// <summary>オレンジ: 触れている間は速くなる。壁ジャンプが高くなり、張り付いた所にワイヤーがつながる。</summary>
+        Orange = 1,
+
+        /// <summary>抹茶: 触れている間は遅くなる。壁と天井では少しの間張り付く。張り付いた所は壁に張り付けず、ワイヤーもつながらない。</summary>
+        Matcha = 2,
+    }
+
+    /// <summary>マカロンの色（PASTRY CHEF の R。WorldObject.Variant。色で威力が違う）。</summary>
+    public enum MacaronColor : byte
+    {
+        Green = 0,
+        Yellow = 1,
+        Rainbow = 2,
     }
 
     /// <summary>
@@ -97,6 +133,9 @@ namespace Airerage.Core.Objects
         public int HitKey2;
         public int HitKey3;
 
+        /// <summary>種類の中の違い（クリームの味 CreamFlavor、マカロンの色 MacaronColor）。</summary>
+        public byte Variant;
+
         /// <summary>このティックで壊れた・寿命が来た（取り除く前の印）。</summary>
         public bool Ended;
 
@@ -108,7 +147,7 @@ namespace Airerage.Core.Objects
                 && ChargeMilli == other.ChargeMilli && Stored == other.Stored && HitMask == other.HitMask && BonusPercent == other.BonusPercent
                 && LastPushId == other.LastPushId && InPortalId == other.InPortalId && End.Equals(other.End)
                 && HitKey0 == other.HitKey0 && HitKey1 == other.HitKey1 && HitKey2 == other.HitKey2 && HitKey3 == other.HitKey3
-                && Ended == other.Ended;
+                && Variant == other.Variant && Ended == other.Ended;
         }
 
         public override bool Equals(object obj)

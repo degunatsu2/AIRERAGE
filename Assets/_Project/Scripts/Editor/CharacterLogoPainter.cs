@@ -13,6 +13,7 @@ namespace Airerage.Editor
     /// - SPACE TRAVELER: 紫の、土星のような惑星。真ん中に斜めの切れ込み。
     /// - STORM RUNNER: 黄緑の、風。
     /// - RISK TAKER: 黄色の、お金が降ってくる金庫。
+    /// - PASTRY CHEF: クリーム色の、コック帽（ふくらんだ 3 つの山と帯）。
     /// 形は距離の関数（負なら中）で書き、縁はなめらかにする。形ごとに暗い縁取りをつける（どの背景でも読めるように）。
     /// 座標は 0〜1（左上が 0、下が 1）。
     /// </summary>
@@ -30,6 +31,7 @@ namespace Airerage.Editor
         public static readonly Color SpaceTravelerColor = new Color(0.66f, 0.4f, 1f);
         public static readonly Color StormRunnerColor = new Color(0.68f, 1f, 0.2f);
         public static readonly Color RiskTakerColor = new Color(1f, 0.84f, 0.15f);
+        public static readonly Color PastryChefColor = new Color(1f, 0.93f, 0.74f);
 
         private delegate float Shape(Vector2 p);
 
@@ -84,6 +86,23 @@ namespace Airerage.Editor
             // 下: 右の先が下へ巻く。
             Fill(layers, p => Mathf.Min(Segment(p, new Vector2(0.22f, 0.72f), new Vector2(0.64f, 0.72f), width),
                 Arc(p, new Vector2(0.64f, 0.82f), 0.1f, -90f, 240f, width)), StormRunnerColor);
+            return Rasterize(layers);
+        }
+
+        /// <summary>PASTRY CHEF: ふくらんだ 3 つの山のコック帽と、下の帯（帯に横のみぞ。クリーム色）。</summary>
+        public static Color[] PastryChef()
+        {
+            var layers = new List<Layer>();
+            // ふくらんだ上（3 つの円と、つなぐ箱）。
+            Fill(layers, p => Mathf.Min(Mathf.Min(Circle(p, new Vector2(0.3f, 0.42f), 0.17f), Circle(p, new Vector2(0.7f, 0.42f), 0.17f)),
+                Mathf.Min(Circle(p, new Vector2(0.5f, 0.3f), 0.21f), RoundBox(p, new Vector2(0.5f, 0.52f), new Vector2(0.25f, 0.1f), 0.02f))),
+                PastryChefColor);
+            // 山の間のくぼみ。
+            Cut(layers, p => Mathf.Min(Segment(p, new Vector2(0.37f, 0.36f), new Vector2(0.39f, 0.55f), 0.012f),
+                Segment(p, new Vector2(0.63f, 0.36f), new Vector2(0.61f, 0.55f), 0.012f)));
+            // 帯。
+            Fill(layers, p => RoundBox(p, new Vector2(0.5f, 0.74f), new Vector2(0.24f, 0.1f), 0.03f), PastryChefColor);
+            Cut(layers, p => Segment(p, new Vector2(0.3f, 0.74f), new Vector2(0.7f, 0.74f), 0.012f));
             return Rasterize(layers);
         }
 

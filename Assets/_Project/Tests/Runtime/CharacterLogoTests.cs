@@ -8,7 +8,7 @@ namespace Airerage.Runtime.Tests
 {
     /// <summary>
     /// キャラクターのロゴ（仮の絵。docs/13 T5-8）: 選べるキャラクター全員にロゴがあり、絵が描かれていて、色がユーザーの案のとおり
-    /// （STANDARD 白、SPACE TRAVELER 紫、STORM RUNNER 黄緑、RISK TAKER 黄色）。シーンのビルダーが作る。
+    /// （STANDARD 白、SPACE TRAVELER 紫、STORM RUNNER 黄緑、RISK TAKER 黄色、PASTRY CHEF クリーム色）。シーンのビルダーが作る。
     /// </summary>
     public sealed class CharacterLogoTests
     {
@@ -19,7 +19,7 @@ namespace Airerage.Runtime.Tests
         {
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(RosterPath);
             Assert.That(roster, Is.Not.Null, "キャラクターの一覧がない");
-            Assert.That(roster.Count, Is.EqualTo(4));
+            Assert.That(roster.Count, Is.EqualTo(5));
             for (int i = 0; i < roster.Count; i++)
             {
                 CharacterConfigAsset character = roster.Get(i);
@@ -56,6 +56,11 @@ namespace Airerage.Runtime.Tests
                 else if (name == CharacterPresets.RiskTakerName)
                 {
                     Assert.That(hue * 360f, Is.InRange(40f, 60f), $"{name} のロゴが黄色でない（{mean}）");
+                }
+                else if (name == CharacterPresets.PastryChefName)
+                {
+                    Assert.That(hue * 360f, Is.InRange(30f, 55f), $"{name} のロゴがクリーム色でない（{mean}）");
+                    Assert.That(saturation, Is.InRange(0.12f, 0.4f), $"{name} のロゴがクリーム色でない（{mean}）");
                 }
                 else
                 {

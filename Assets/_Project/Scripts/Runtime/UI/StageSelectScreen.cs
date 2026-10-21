@@ -10,7 +10,9 @@ namespace Airerage.Runtime.UI
     /// 右に出す。決定で Confirmed（ステージ）、戻る操作で Cancelled。
     /// ネットワーク対戦（docs/15 T6-7）: ホストは同じように選び、カーソルを動かすたびに HighlightedIndexChanged（全員へ送る）。
     /// ほかの人は選べず（ReadOnly）、ホストのカーソル（ShowRemoteCursor）を見る。
-    /// 最後の札は RANDOM（決めたときに、ステージの一覧からランダムに選ぶ。ユーザーの要望、2026-10-19）。カーソルのあるステージは
+    /// 最後の札は RANDOM（決めたときに、ステージの一覧からランダムに選ぶ。ユーザーの要望、2026-10-19）。決めると、ルーレットのように
+    /// カーソルがステージの札を回りながら遅くなり、選んだステージで止まってから Confirmed（2026-10-21。回っている間は操作を受け付けない。
+    /// ネットワーク対戦では、ホストのカーソルが全員に送られるので、全員が同じルーレットを見る）。カーソルのあるステージは
     /// HighlightedStageChanged で知らせる（メニューの背景に映す。RANDOM では null）。
     /// </summary>
     public sealed class StageSelectScreen : MonoBehaviour
@@ -27,9 +29,23 @@ namespace Airerage.Runtime.UI
         [Tooltip("RANDOM の札（ステージの札の後ろ。なくてもよい）")]
         [SerializeField] private MenuOption _random;
 
+        // ルーレット: 回る回数、最初と最後の 1 つ進む間隔（秒）、止まってから決めるまで（秒）。
+        private const int RouletteLoops = 2;
+        private const float RouletteFirstStep = 0.05f;
+        private const float RouletteLastStep = 0.38f;
+        private const float RouletteHold = 0.7f;
+
         private int _selectAtFrame = -1;
         private int _selectIndex;
         private int _remoteIndex = -1;
+        private int _rouletteStep = -1;
+        private int _rouletteSteps;
+        private int _rouletteTarget;
+        private float _rouletteNextAt;
+        private bool _rouletteMoving;
+
+        /// <summary>RANDOM のルーレットが回っているか（止まって決めるまで）。</summary>
+        public bool Rolling => _rouletteStep >= 0;
 
         /// <summary>決定した（ステージ）。</summary>
         public event Action<StageDefinition> Confirmed;
@@ -83,7 +99,7 @@ namespace Airerage.Runtime.UI
                 int index = i;
                 _options[i].Selected += () =>
                 {
-                    if (ReadOnly)
+                    if (ReadOnly || (Rolling && !_rouletteMoving))
                     {
                         return;
                     }
@@ -95,14 +111,14 @@ namespace Airerage.Runtime.UI
                 };
                 _options[i].Clicked.AddListener(() =>
                 {
-                    if (!ReadOnly)
+                    if (!ReadOnly && !Rolling)
                     {
                         Confirmed?.Invoke(stage);
                     }
                 });
                 _options[i].Cancelled += () =>
                 {
-                    if (!ReadOnly)
+                    if (!ReadOnly && !Rolling)
                     {
                         Cancelled?.Invoke();
                     }
@@ -112,7 +128,7 @@ namespace Airerage.Runtime.UI
             {
                 _random.Selected += () =>
                 {
-                    if (ReadOnly)
+                    if (ReadOnly || Rolling)
                     {
                         return;
                     }
@@ -124,14 +140,14 @@ namespace Airerage.Runtime.UI
                 };
                 _random.Clicked.AddListener(() =>
                 {
-                    if (!ReadOnly)
+                    if (!ReadOnly && !Rolling)
                     {
-                        Confirmed?.Invoke(_stages[UnityEngine.Random.Range(0, _stages.Length)]);
+                        StartRoulette(UnityEngine.Random.Range(0, _stages.Length));
                     }
                 });
                 _random.Cancelled += () =>
                 {
-                    if (!ReadOnly)
+                    if (!ReadOnly && !Rolling)
                     {
                         Cancelled?.Invoke();
                     }
@@ -183,11 +199,55 @@ namespace Airerage.Runtime.UI
         public void Hide()
         {
             _selectAtFrame = -1;
+            _rouletteStep = -1;
             gameObject.SetActive(false);
+        }
+
+        // ルーレットを始める: 今のカーソル（RANDOM）から札を RouletteLoops 回りしてから target で止まる。
+        private void StartRoulette(int target)
+        {
+            _rouletteTarget = target;
+            _rouletteSteps = RouletteLoops * _options.Length + target + 1;
+            _rouletteStep = 0;
+            _rouletteNextAt = Time.unscaledTime;
+            _selectAtFrame = -1;
+        }
+
+        // ルーレットを進める（1 つ進むたびに札を選ぶ音を鳴らし、カーソルを送る）。止まったら少し見せてから決める。
+        private void UpdateRoulette()
+        {
+            if (Time.unscaledTime < _rouletteNextAt)
+            {
+                return;
+            }
+            if (_rouletteStep >= _rouletteSteps)
+            {
+                _rouletteStep = -1;
+                Confirmed?.Invoke(_stages[_rouletteTarget]);
+                return;
+            }
+            int index = _rouletteStep % _options.Length;
+            _rouletteStep++;
+            _rouletteMoving = true;
+            _options[index].Button.Select();
+            _rouletteMoving = false;
+            if (_rouletteStep >= _rouletteSteps)
+            {
+                _rouletteNextAt = Time.unscaledTime + RouletteHold;
+                return;
+            }
+            // だんだん遅くなる（終わりに近いほど間隔が長い）。
+            float progress = _rouletteStep / (float)_rouletteSteps;
+            _rouletteNextAt = Time.unscaledTime + Mathf.Lerp(RouletteFirstStep, RouletteLastStep, progress * progress * progress);
         }
 
         private void Update()
         {
+            if (Rolling)
+            {
+                UpdateRoulette();
+                return;
+            }
             if (_selectAtFrame >= 0 && Time.frameCount >= _selectAtFrame)
             {
                 _selectAtFrame = -1;

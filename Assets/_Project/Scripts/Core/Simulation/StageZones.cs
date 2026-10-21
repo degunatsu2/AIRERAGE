@@ -364,13 +364,23 @@ namespace Airerage.Core.Simulation
             float dy = (state.Position.Y - center.Y) / ((zone.MaxY - zone.MinY) * 0.5f + halfExtents.Y);
             float length = MathF.Sqrt(dx * dx + dy * dy);
             Vector2 normal = length > 1e-4f ? new Vector2(dx / length, dy / length) : Vector2.UnitY;
+            BumpAlong(ref state, normal, zone.Power);
+        }
+
+        /// <summary>
+        /// 弾き返す（バンパー、わたがしの足場）: 向き normal（長さ 1）の速さを power にする（直交する成分は残す。もうその向きに
+        /// power × PadRetriggerRatio 以上で離れていれば何もしない）。空中ジャンプが戻る。弾いたら true。
+        /// </summary>
+        public static bool BumpAlong(ref CharacterState state, Vector2 normal, float power)
+        {
             float along = Along(state.Velocity, normal);
-            if (along >= zone.Power * PadRetriggerRatio)
+            if (along >= power * PadRetriggerRatio)
             {
-                return;
+                return false;
             }
-            SetAlong(ref state.Velocity, normal, along, zone.Power);
+            SetAlong(ref state.Velocity, normal, along, power);
             TakeOff(ref state);
+            return true;
         }
 
         // 風: 向きに Power（m/s²）で加速する（その向きの速さは Limit まで）。

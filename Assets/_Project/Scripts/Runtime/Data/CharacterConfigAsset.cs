@@ -19,6 +19,9 @@ namespace Airerage.Runtime.Data
 
         /// <summary>宇宙服・宇宙帽。</summary>
         SpaceTraveler = 3,
+
+        /// <summary>クリーム色のコック帽・コックコート。</summary>
+        PastryChef = 4,
     }
 
     /// <summary>

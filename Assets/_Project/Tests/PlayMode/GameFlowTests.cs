@@ -73,7 +73,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.ShowingMain, Is.False);
                 CharacterSelectScreen characters = menu.CharacterSelect;
                 Assert.That(characters.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Single));
-                Assert.That(characters.Count, Is.EqualTo(4), "4 体のアイコンがない");
+                Assert.That(characters.Count, Is.EqualTo(5), "5 体のアイコンがない");
                 Assert.That(characters.CharacterOf(0), Is.EqualTo(1), "前に選んだキャラクターから始まらない");
                 Assert.That(characters.ShownName(0), Is.EqualTo(CharacterPresets.RiskTakerName), "1P の枠にカーソルのキャラクターを出さない");
                 Assert.That(characters.ShownTags(0), Is.EqualTo("#コイン重視  #大器晩成"), "1P の枠にハッシュタグを出さない");

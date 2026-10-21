@@ -17,13 +17,15 @@ namespace Airerage.Core.Movement
     ///   攻撃→攻撃のキャンセル（D-17）を戻す。
     /// - やめる: 着地、壁と反対へ入れる、攻撃・技・ガード、ワイヤーの接続、凍る、のけぞる、壁がなくなる。
     /// 状態は CharacterState.WallSide / WallClingTicks。表示と音のために WallJumpCount を数える。
+    /// PASTRY CHEF のクリーム（PastryRules）: 抹茶の付いた壁には張り付けない（CombatState.CreamNoCling）。オレンジの付いた壁からの
+    /// 壁ジャンプは速い（CombatState.CreamWallJumpPercent）。
     /// </summary>
     public static class WallCling
     {
         /// <summary>張り付きを続けるか（やめる条件に当たらないか）。</summary>
         public static bool Continues(in CharacterState state, in InputFrame frame, MovementTuning tuning, KinematicMotor motor, Vector3 halfExtents)
         {
-            if (state.WallSide == 0 || state.Grounded || !state.Action.IsFree || state.Combat.IsFrozen
+            if (state.WallSide == 0 || state.Grounded || !state.Action.IsFree || state.Combat.IsFrozen || state.Combat.CreamNoCling
                 || state.Wire.Phase == WirePhase.Attached || state.Wire.Phase == WirePhase.Firing)
             {
                 return false;
@@ -69,7 +71,8 @@ namespace Airerage.Core.Movement
         public static void Jump(ref CharacterState state, MovementTuning tuning)
         {
             int away = -state.WallSide;
-            state.Velocity = new Vector3(away * tuning.WallJumpSpeedX, tuning.WallJumpSpeedY, 0f);
+            float scale = state.Combat.CreamWallJumpPercent > 0 ? state.Combat.CreamWallJumpPercent / 100f : 1f;
+            state.Velocity = new Vector3(away * tuning.WallJumpSpeedX * scale, tuning.WallJumpSpeedY * scale, 0f);
             state.Facing = away;
             state.AirJumpsUsed = 0;
             state.Combat.AttackCancelUsed = false;
@@ -98,7 +101,8 @@ namespace Airerage.Core.Movement
         public static bool TryStart(ref CharacterState state, Vector3 velocityBeforeMove, MovementTuning tuning, KinematicMotor motor,
             Vector3 halfExtents)
         {
-            if (state.WallSide != 0 || state.Grounded || !state.Action.IsFree || state.Combat.IsFrozen
+            if (state.WallSide != 0 || state.Grounded || !state.Action.IsFree || state.Combat.IsFrozen || state.Combat.CreamNoCling
+                || state.Combat.CreamStickTicksLeft > 0
                 || state.Wire.Phase == WirePhase.Attached || velocityBeforeMove.Y > tuning.WallClingMaxRiseSpeed
                 || state.WallClingTicks >= tuning.WallClingMaxTicks)
             {

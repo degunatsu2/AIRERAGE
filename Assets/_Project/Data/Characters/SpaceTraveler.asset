@@ -440,6 +440,59 @@ MonoBehaviour:
           KnockbackY: 4
       SlowFall:
         MaxFallSpeed: 3
+      CottonCandy:
+        DurationTicks: 600
+        ShortPressTicks: 12
+        PlaceDistance: 1.9
+        FeetOffset: 0.2
+        HalfLength: 1.8
+        HalfThickness: 0.4
+        BouncePower: 20
+      Cream:
+        ShotCount: 5
+        SpreadDeg: 40
+        Speed: 15
+        Gravity: 25
+        LaunchOffset: 0.5
+        ShotLifetimeTicks: 150
+        PatchTicks: 600
+        PatchHalfLength: 0.7
+        PatchThickness: 0.25
+        OrangeSpeedPercent: 30
+        OrangeWallJumpPercent: 150
+        MatchaSpeedPercent: -30
+        MatchaStickTicks: 60
+      TeaParty:
+        Count: 6
+        IntervalTicks: 8
+        OffsetY: 1.1
+        MinSpeed: 13
+        MaxSpeed: 19
+        MaxAngleDeg: 55
+        Gravity: 25
+        Restitution: 0.7
+        Friction: 0.85
+        StopSpeed: 1.5
+        Radius: 0.3
+        BlinkTicks: 30
+        MaxLifetimeTicks: 600
+        GreenPercent: 60
+        YellowPercent: 35
+        YellowBonusPercent: 100
+        RainbowBonusPercent: 400
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 20
+          HitstopTicks: 14
+          HitstunTicks: 28
+          KnockbackX: 7
+          KnockbackY: 9
   _displayName: SPACE TRAVELER
   _logo: {fileID: 2800000, guid: 067af2315ce115f62a3467acef1bc8ae, type: 2}
   _special1Icon: {fileID: 0}

@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 22;
+        public const int FormatVersion = 23;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -160,6 +160,7 @@ namespace Airerage.Core.Simulation
                         writer.Write(item.HitKey1);
                         writer.Write(item.HitKey2);
                         writer.Write(item.HitKey3);
+                        writer.Write(item.Variant);
                         writer.Write(item.Ended);
                     }
                 }
@@ -304,6 +305,12 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.HazardImmunityTicks);
             writer.Write(combat.HazardHitCount);
             writer.Write(combat.HazardDropPower);
+            writer.Write(combat.HoldVariant);
+            writer.Write(combat.CreamSpeedPercent);
+            writer.Write(combat.CreamWallJumpPercent);
+            writer.Write(combat.CreamNoCling);
+            writer.Write(combat.CreamStickTicksLeft);
+            writer.Write(combat.CreamStickSpent);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -423,6 +430,12 @@ namespace Airerage.Core.Simulation
                 HazardImmunityTicks = reader.ReadInt32(),
                 HazardHitCount = reader.ReadInt32(),
                 HazardDropPower = reader.ReadInt32(),
+                HoldVariant = reader.ReadByte(),
+                CreamSpeedPercent = reader.ReadInt32(),
+                CreamWallJumpPercent = reader.ReadInt32(),
+                CreamNoCling = reader.ReadBoolean(),
+                CreamStickTicksLeft = reader.ReadInt32(),
+                CreamStickSpent = reader.ReadBoolean(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

@@ -13,6 +13,7 @@ namespace Airerage.Editor
     /// - RISK TAKER: アフロ、金色の服と襟、サングラス。
     /// - STORM RUNNER: ブレードシューズ（靴と 2 本の刃）、胸に「風」のゼッケン。
     /// - SPACE TRAVELER: 白い宇宙服と胸のパネル、首の輪、透明な宇宙帽、背中の生命維持装置。
+    /// - PASTRY CHEF: クリーム色のコック帽（ふくらんだ上と帯）とコックコート（2 列のボタン、首のスカーフ）。
     /// </summary>
     internal static class CostumeBuilder
     {
@@ -61,6 +62,22 @@ namespace Airerage.Editor
             Transform spaceFacing = Set(facing, "CostumeSpaceTravelerFacing");
             facingSets[(int)CharacterCostume.SpaceTraveler] = spaceFacing.gameObject;
             Part(spaceFacing, PrimitiveType.Cube, "Backpack", new Vector3(-0.52f, 0f, 0f), new Vector3(0.24f, 0.78f, 0.62f), Lit("CostumePack", new Color(0.75f, 0.77f, 0.82f)));
+
+            // PASTRY CHEF: クリーム色のコック帽とコックコート。
+            Transform chef = Set(view.transform, "CostumePastryChef");
+            bodySets[(int)CharacterCostume.PastryChef] = chef.gameObject;
+            Material cream = Lit("CostumeCream", new Color(1f, 0.95f, 0.8f));
+            Part(chef, PrimitiveType.Cube, "ChefCoat", new Vector3(0f, -0.18f, 0f), new Vector3(0.88f, 1.06f, 0.88f), cream);
+            Material button = Lit("CostumeChefButton", new Color(0.78f, 0.62f, 0.45f));
+            for (int row = 0; row < 3; row++)
+            {
+                float y = 0.12f - row * 0.2f;
+                Part(chef, PrimitiveType.Sphere, $"ButtonLeft{row}", new Vector3(-0.12f, y, -0.445f), new Vector3(0.07f, 0.07f, 0.03f), button);
+                Part(chef, PrimitiveType.Sphere, $"ButtonRight{row}", new Vector3(0.12f, y, -0.445f), new Vector3(0.07f, 0.07f, 0.03f), button);
+            }
+            Part(chef, PrimitiveType.Cube, "Scarf", new Vector3(0f, 0.32f, 0f), new Vector3(0.94f, 0.08f, 0.94f), Lit("CostumeChefScarf", new Color(1f, 0.6f, 0.68f)));
+            Part(chef, PrimitiveType.Cylinder, "HatBand", new Vector3(0f, 1.0f, 0f), new Vector3(0.74f, 0.11f, 0.74f), cream);
+            Part(chef, PrimitiveType.Sphere, "HatPuff", new Vector3(0f, 1.3f, 0f), new Vector3(1.0f, 0.62f, 1.0f), cream);
 
             var costume = view.gameObject.AddComponent<CostumeView>();
             costume.Configure(bodySets, facingSets, texts.ToArray(), view.GetComponent<Renderer>());

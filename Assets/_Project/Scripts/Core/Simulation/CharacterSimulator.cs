@@ -64,17 +64,31 @@ namespace Airerage.Core.Simulation
             var halfExtents = movement.HalfExtents;
             var halfExtents2 = new System.Numerics.Vector2(halfExtents.X, halfExtents.Y);
 
-            // 吹雪で凍っている間は、入力を受け付けない（攻撃を受けてのけぞったら解ける）。
+            // 吹雪で凍っている間と、抹茶のクリームに張り付いている間は、入力を受け付けない（攻撃を受けてのけぞったら解ける）。
             if (state.Action.Kind == ActionKind.Hitstun)
             {
                 state.Combat.FrozenTicksLeft = 0;
+                state.Combat.CreamStickTicksLeft = 0;
             }
             bool frozen = state.Combat.FrozenTicksLeft > 0;
+            bool stuck = state.Combat.CreamStickTicksLeft > 0;
             if (frozen)
             {
                 state.Combat.FrozenTicksLeft--;
+            }
+            if (stuck)
+            {
+                state.Combat.CreamStickTicksLeft--;
+            }
+            if (frozen || stuck)
+            {
                 effectiveInput = default;
                 frame = new InputFrame(default, state.PreviousButtons);
+            }
+            else
+            {
+                // PASTRY CHEF の E をためている間のワイヤー・攻撃のボタンは、クリームの味を選ぶのに使う（ワイヤーと攻撃は出ない）。
+                ActionController.TakeHoldChoice(ref state, ref frame, ref effectiveInput, config.Combat);
             }
 
             _motor.Depenetrate(ref state.Position, halfExtents);
@@ -132,6 +146,11 @@ namespace Airerage.Core.Simulation
             if (frozen)
             {
                 state.Velocity.X = 0f;
+            }
+            if (stuck)
+            {
+                // 抹茶のクリームに張り付いている: 壁の張り付きと同じ速さで、少しずつずり落ちる。
+                state.Velocity = new System.Numerics.Vector3(0f, -movement.WallSlideSpeed, 0f);
             }
 
             System.Numerics.Vector3 beforeMove = state.Position;

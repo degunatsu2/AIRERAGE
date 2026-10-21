@@ -221,7 +221,7 @@ namespace Airerage.Core.Wire
             }
 
             float castDistance = targetDistance < step ? targetDistance : step;
-            if (castDistance > 0f && _collision.Raycast(wire.HookPosition, wire.HookDirection, castDistance, out CastHit hit))
+            if (castDistance > 0f && WireTargeting.CastHook(_collision, wire.HookPosition, wire.HookDirection, castDistance, out CastHit hit))
             {
                 if (hit.Attachable || tuning.AttachAnySurface)
                 {

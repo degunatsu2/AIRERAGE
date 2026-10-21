@@ -1,6 +1,7 @@
 using System;
 using Airerage.Core.Combat;
 using Airerage.Core.Common;
+using Airerage.Core.Objects;
 
 namespace Airerage.Core.Skills
 {
@@ -49,6 +50,21 @@ namespace Airerage.Core.Skills
 
         /// <summary>ゆっくり落ちる（SPACE TRAVELER の地上技の後。別の移動をするまで）。</summary>
         SlowFall,
+
+        /// <summary>
+        /// わたがしの足場を置く（PASTRY CHEF の Q。フラッフィベイス）。短く押すと足元に上向きで、長押しすると照準の方向を向けて
+        /// 目の前に置く。
+        /// </summary>
+        CottonCandy,
+
+        /// <summary>
+        /// クリームを放射状に飛ばす（PASTRY CHEF の E。スイートトラップ）。長押しの間にワイヤーを押すとオレンジ、攻撃を押すと抹茶
+        /// （何も押さない・短く押すとオレンジ）。
+        /// </summary>
+        Cream,
+
+        /// <summary>マカロンを次々と投げ上げる（PASTRY CHEF の R。ティーパーティ）。</summary>
+        TeaParty,
     }
 
     /// <summary>
@@ -353,6 +369,185 @@ namespace Airerage.Core.Skills
     }
 
     /// <summary>
+    /// わたがしの足場（PASTRY CHEF の Q。フラッフィベイス。ユーザーの案、2026-10-21。値は【仮】）。短く押すと足元に上向きで、
+    /// 長押しすると照準の方向を向けて目の前に置く（長押しの間は、向きと置く場所を表示する）。横長で、触れた人をバンパー
+    /// （夜のビル街のネオン看板）のように弾き飛ばす。ワイヤーはつながらない（弾く）。地形ではない（立てない）。
+    /// </summary>
+    [Serializable]
+    public sealed class CottonCandyTuning
+    {
+        /// <summary>消えるまで（ティック。10 秒）。</summary>
+        public int DurationTicks = 600;
+
+        /// <summary>これより短い押し（ティック）は、足元に上向きで置く。</summary>
+        public int ShortPressTicks = 12;
+
+        /// <summary>長押し: キャラクターの中心から足場の中心までの距離（m。目と鼻の先）。</summary>
+        public float PlaceDistance = 1.9f;
+
+        /// <summary>足元: 足の下から足場の中心までの距離（m）。</summary>
+        public float FeetOffset = 0.2f;
+
+        /// <summary>足場の半分の長さと半分の厚さ（m。横長）。</summary>
+        public float HalfLength = 1.8f;
+        public float HalfThickness = 0.4f;
+
+        /// <summary>弾き飛ばす速さ（m/s。ネオン看板と同じ）。</summary>
+        public float BouncePower = 20f;
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(CottonCandyTuning));
+            v.Positive(nameof(DurationTicks), DurationTicks);
+            v.NonNegative(nameof(ShortPressTicks), ShortPressTicks);
+            v.NonNegative(nameof(PlaceDistance), PlaceDistance);
+            v.Positive(nameof(HalfLength), HalfLength);
+            v.Positive(nameof(HalfThickness), HalfThickness);
+            v.Positive(nameof(BouncePower), BouncePower);
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// クリーム（PASTRY CHEF の E。スイートトラップ。ユーザーの案、2026-10-21。値は【仮】）。照準の方向を中心に ShotCount 個を扇形に
+    /// 飛ばし（重力で落ちる）、地形に当たるとその場に PatchTicks の間張り付く。長押しの間は飛び方を表示する。
+    /// - オレンジ: 触れている間、あらゆる速さ +OrangeSpeedPercent %（SpeedBoosts）。壁なら壁ジャンプの速さが OrangeWallJumpPercent %。
+    ///   張り付いた所は、ワイヤーがつながらない地形でもつながる。全員に効く（置いた本人も）。
+    /// - 抹茶: 触れている間、あらゆる速さ MatchaSpeedPercent %。壁と天井では MatchaStickTicks の間張り付いて動けない（壁の張り付きと
+    ///   同じ速さでずり落ちる）。置いた本人には効かない【仮】。張り付いた所は、だれも壁に張り付けず、ワイヤーもつながらない。
+    /// </summary>
+    [Serializable]
+    public sealed class CreamTuning
+    {
+        /// <summary>1 回に飛ばす数と、扇の広がり（度。いちばん外の 2 つの間）。</summary>
+        public int ShotCount = 5;
+        public float SpreadDeg = 40f;
+
+        /// <summary>飛ばす速さ（m/s）と重力（m/s²）。</summary>
+        public float Speed = 15f;
+        public float Gravity = 25f;
+
+        /// <summary>出す位置（キャラクターの中心から照準の方向への距離。m）。</summary>
+        public float LaunchOffset = 0.5f;
+
+        /// <summary>飛んでいる間、何にも当たらずに消えるまで（ティック）。</summary>
+        public int ShotLifetimeTicks = 150;
+
+        /// <summary>張り付いている時間（ティック。10 秒）。</summary>
+        public int PatchTicks = 600;
+
+        /// <summary>張り付いたクリームの、面に沿った半分の長さと、面からの厚さ（m。触れたかの判定）。</summary>
+        public float PatchHalfLength = 0.7f;
+        public float PatchThickness = 0.25f;
+
+        /// <summary>オレンジ: 速さの割合（%）と、壁ジャンプの速さ（%）。</summary>
+        public int OrangeSpeedPercent = 30;
+        public int OrangeWallJumpPercent = 150;
+
+        /// <summary>抹茶: 速さの割合（%。負は遅くする）と、壁・天井に張り付く長さ（ティック。1 秒）。</summary>
+        public int MatchaSpeedPercent = -30;
+        public int MatchaStickTicks = 60;
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(CreamTuning));
+            v.Positive(nameof(ShotCount), ShotCount);
+            v.NonNegative(nameof(SpreadDeg), SpreadDeg);
+            v.Positive(nameof(Speed), Speed);
+            v.NonNegative(nameof(Gravity), Gravity);
+            v.Positive(nameof(ShotLifetimeTicks), ShotLifetimeTicks);
+            v.Positive(nameof(PatchTicks), PatchTicks);
+            v.Positive(nameof(PatchHalfLength), PatchHalfLength);
+            v.Positive(nameof(PatchThickness), PatchThickness);
+            v.InRange(nameof(OrangeSpeedPercent), OrangeSpeedPercent, 0, SpeedBoosts.MaxPercent);
+            v.InRange(nameof(MatchaSpeedPercent), MatchaSpeedPercent, -SpeedBoosts.MaxSlowPercent, 0);
+            v.Positive(nameof(OrangeWallJumpPercent), OrangeWallJumpPercent);
+            v.NonNegative(nameof(MatchaStickTicks), MatchaStickTicks);
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// マカロン（PASTRY CHEF の R。ティーパーティ。ユーザーの案、2026-10-21。値は【仮】）。上へランダムな角度で Count 個を
+    /// IntervalTicks ごとに投げ上げる。重力で落ち、地形で跳ね返る。止まるか、ステージの外に出たら点滅し、BlinkTicks（0.5 秒）で消える
+    /// （点滅の間は当たらない）。色は 緑 GreenPercent % / 黄 YellowPercent % / 虹（残り）で、威力は 20 / 40 / 100（吹き飛びも同じ割合で
+    /// 強くする。AttackPower の上乗せ）。持ち主以外に、相手ごとに 1 回だけ当たる（当たっても跳ね続ける）。
+    /// </summary>
+    [Serializable]
+    public sealed class TeaPartyTuning
+    {
+        /// <summary>投げる数と間隔（ティック）。</summary>
+        public int Count = 6;
+        public int IntervalTicks = 8;
+
+        /// <summary>投げる位置（キャラクターの中心からの高さ。m）。</summary>
+        public float OffsetY = 1.1f;
+
+        /// <summary>投げる速さ（m/s。この間でランダム）と、真上からの角度の最大（度。左右にランダム）。</summary>
+        public float MinSpeed = 13f;
+        public float MaxSpeed = 19f;
+        public float MaxAngleDeg = 55f;
+
+        /// <summary>重力（m/s²）、跳ね返りの係数（面に垂直な速さの残る割合）と、面に沿った速さの残る割合。</summary>
+        public float Gravity = 25f;
+        public float Restitution = 0.7f;
+        public float Friction = 0.85f;
+
+        /// <summary>止まったとみなす速さ（m/s。床で跳ねたときにこれより遅ければ止まる）。</summary>
+        public float StopSpeed = 1.5f;
+
+        /// <summary>当たりと地形にぶつかる大きさ（半径。m）。</summary>
+        public float Radius = 0.3f;
+
+        /// <summary>消える前の点滅（ティック）と、止まらなくても消えるまで（ティック）。</summary>
+        public int BlinkTicks = 30;
+        public int MaxLifetimeTicks = 600;
+
+        /// <summary>色の確率（%。虹は残り）。</summary>
+        public int GreenPercent = 60;
+        public int YellowPercent = 35;
+
+        /// <summary>黄と虹の威力と吹き飛びの上乗せ（%。緑の 20 に対して、黄 40、虹 100）。</summary>
+        public int YellowBonusPercent = 100;
+        public int RainbowBonusPercent = 400;
+
+        /// <summary>緑のマカロンが当たったときの判定のデータ（位置・大きさ・出る時間は使わない）。</summary>
+        public AttackHit Hit = new AttackHit
+        {
+            Damage = 20, HitstopTicks = 14, HitstunTicks = 28, KnockbackX = 7f, KnockbackY = 9f,
+        };
+
+        /// <summary>色 color の威力と吹き飛びの上乗せ（%）。</summary>
+        public int BonusPercentOf(MacaronColor color)
+        {
+            return color == MacaronColor.Rainbow ? RainbowBonusPercent : color == MacaronColor.Yellow ? YellowBonusPercent : 0;
+        }
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(TeaPartyTuning));
+            v.Positive(nameof(Count), Count);
+            v.NonNegative(nameof(IntervalTicks), IntervalTicks);
+            v.Positive(nameof(MinSpeed), MinSpeed);
+            v.InRange(nameof(MaxSpeed), MaxSpeed, MinSpeed, float.MaxValue);
+            v.InRange(nameof(MaxAngleDeg), MaxAngleDeg, 0f, 90f);
+            v.NonNegative(nameof(Gravity), Gravity);
+            v.InRange(nameof(Restitution), Restitution, 0f, 1f);
+            v.InRange(nameof(Friction), Friction, 0f, 1f);
+            v.NonNegative(nameof(StopSpeed), StopSpeed);
+            v.Positive(nameof(Radius), Radius);
+            v.Positive(nameof(BlinkTicks), BlinkTicks);
+            v.Positive(nameof(MaxLifetimeTicks), MaxLifetimeTicks);
+            v.InRange(nameof(GreenPercent), GreenPercent, 0, 100);
+            v.InRange(nameof(YellowPercent), YellowPercent, 0, 100 - GreenPercent);
+            v.NonNegative(nameof(YellowBonusPercent), YellowBonusPercent);
+            v.NonNegative(nameof(RainbowBonusPercent), RainbowBonusPercent);
+            v.NotNull(nameof(Hit), Hit);
+            return v;
+        }
+    }
+
+    /// <summary>
     /// ワープポータル（SPACE TRAVELER の Q。docs/14 1.1、C-5〜C-7。値は【仮】）。自分のいる位置に置く。壊せない。自分のものは
     /// MaxPerOwner まで（増えたらいちばん古いものが消える）。同じ持ち主のポータル 2 つがつながり、片方に入るともう片方へ移る（速度は
     /// そのまま）。全員と投射物が使える。入るのは外から入ったときだけ（置いたとき・出たときにいたポータルは、いったん出てから入り直す）。
@@ -500,6 +695,9 @@ namespace Airerage.Core.Skills
         public MissileTuning Missile = new MissileTuning();
         public BeamTuning Beam = new BeamTuning();
         public SlowFallTuning SlowFall = new SlowFallTuning();
+        public CottonCandyTuning CottonCandy = new CottonCandyTuning();
+        public CreamTuning Cream = new CreamTuning();
+        public TeaPartyTuning TeaParty = new TeaPartyTuning();
 
         public TuningValidator Validate()
         {
@@ -563,6 +761,21 @@ namespace Airerage.Core.Skills
             if (Projectile != null)
             {
                 v.Merge(Projectile.Validate());
+            }
+            v.NotNull(nameof(CottonCandy), CottonCandy);
+            v.NotNull(nameof(Cream), Cream);
+            v.NotNull(nameof(TeaParty), TeaParty);
+            if (CottonCandy != null)
+            {
+                v.Merge(CottonCandy.Validate());
+            }
+            if (Cream != null)
+            {
+                v.Merge(Cream.Validate());
+            }
+            if (TeaParty != null)
+            {
+                v.Merge(TeaParty.Validate());
             }
             return v;
         }

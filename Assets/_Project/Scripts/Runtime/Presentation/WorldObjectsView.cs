@@ -23,6 +23,9 @@ namespace Airerage.Runtime.Presentation
     /// - ミサイル: 飛ぶ向きを向いた弾と軌跡。消えたら爆発の光と音。
     /// - コズミックレイ: ポータルの間の太い紫の光と白い芯（当たる瞬間に明るくなる）。撃ち終わって手持ちが確定されたら、
     ///   いちばん古いポータルから拠点へ金色のコインが飛ぶ。
+    /// - わたがしの足場（PASTRY CHEF の Q）: 表の向きを向いた、横長のピンクの雲。消える前の 1 秒は点滅する。
+    /// - クリーム（E）: 飛んでいる間は小さな玉、張り付いたら面に沿った板（オレンジ・抹茶の色）。消える前の 1 秒は点滅する。
+    /// - マカロン（R）: 色の殻とクリームの間の円盤（虹は色が回る）。投げる前は隠し、投げた瞬間に音を鳴らす。消える前に点滅する。
     /// 物が出たとき・セーフティボックスが消えたとき（ばらまき）に音を鳴らす（_audio があれば）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class WorldObjectsView : MonoBehaviour
@@ -41,7 +44,7 @@ namespace Airerage.Runtime.Presentation
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
-        [Tooltip("見た目の見本（ミラーボール、セーフティボックス、投射物、突風、風の帯、ワープポータル、ミサイル、ビームの順）。シーンでは隠しておく")]
+        [Tooltip("見た目の見本（ミラーボール、セーフティボックス、投射物、突風、風の帯、ワープポータル、ミサイル、ビーム、わたがし、飛ぶクリーム、張り付いたクリーム、マカロンの順）。シーンでは隠しておく")]
         [SerializeField] private GameObject[] _templates = new GameObject[0];
         [Tooltip("セーフティボックスの枚数を画面に写すカメラ")]
         [SerializeField] private Camera _camera;
@@ -117,6 +120,24 @@ namespace Airerage.Runtime.Presentation
             public LineRenderer BeamGlow;
             public Vector3 BeamStart;
             public int BankedAtSpawn;
+            public bool Launched;
+        }
+
+        /// <summary>クリームの色（オレンジ・抹茶）。</summary>
+        public static Color CreamColor(byte flavor)
+        {
+            return flavor == (byte)CreamFlavor.Matcha ? new Color(0.5f, 0.75f, 0.32f) : new Color(1f, 0.62f, 0.15f);
+        }
+
+        /// <summary>マカロンの色（緑・黄・虹。虹は時間で色が回る）。</summary>
+        public static Color MacaronColorOf(byte color, float time)
+        {
+            switch ((MacaronColor)color)
+            {
+                case MacaronColor.Yellow: return new Color(1f, 0.88f, 0.3f);
+                case MacaronColor.Rainbow: return Color.HSVToRGB(Mathf.Repeat(time * 1.2f, 1f), 0.65f, 1f);
+                default: return new Color(0.55f, 0.9f, 0.5f);
+            }
         }
 
         /// <summary>セーフティボックスのチャージの演出の種類（表示用）。</summary>
@@ -223,6 +244,12 @@ namespace Airerage.Runtime.Presentation
                 foreach (WorldObject item in objects.Items)
                 {
                     _present.Add(item.Id);
+                    if (_shown.TryGetValue(item.Id, out Shown changed) && changed.Kind != item.Kind)
+                    {
+                        // 種類が変わった（飛んでいたクリームが張り付いた）: 見た目を作り直す。
+                        Destroy(changed.Visual);
+                        _shown.Remove(item.Id);
+                    }
                     if (!_shown.TryGetValue(item.Id, out Shown shown))
                     {
                         shown = Create(item);
@@ -365,6 +392,12 @@ namespace Airerage.Runtime.Presentation
                     break;
                 case WorldObjectKind.Beam:
                     _audio.Play(SoundId.CosmicRay);
+                    break;
+                case WorldObjectKind.CottonCandy:
+                    _audio.Play(SoundId.JumpPad, 0.8f, 0.1f);
+                    break;
+                case WorldObjectKind.CreamShot:
+                    _audio.Play(SoundId.Swing, 0.35f, 0.15f);
                     break;
             }
         }
@@ -530,6 +563,27 @@ namespace Airerage.Runtime.Presentation
                 case WorldObjectKind.Beam:
                     UpdateBeam(shown, item);
                     break;
+                case WorldObjectKind.CottonCandy:
+                {
+                    var normal = new Vector3(item.Velocity.X, item.Velocity.Y, 0f);
+                    t.rotation = Quaternion.FromToRotation(Vector3.up, normal);
+                    // 見本は半分の長さ 1.8m、半分の厚さ 0.4m。
+                    t.localScale = Vector3.Scale(t.localScale, new Vector3(item.End.X / 1.8f, item.End.Y / 0.4f, 1f))
+                        * (1f + 0.04f * Mathf.Sin(Time.time * 5f));
+                    SetVisible(shown, ExpireBlink(item));
+                    break;
+                }
+                case WorldObjectKind.CreamShot:
+                    Tint(shown, CreamColor(item.Variant), null);
+                    break;
+                case WorldObjectKind.CreamPatch:
+                    t.localScale = new Vector3(item.End.X * 2f, item.End.Y * 2f, 0.9f) * Mathf.Lerp(0.6f, 1f, pop);
+                    Tint(shown, CreamColor(item.Variant), null);
+                    SetVisible(shown, ExpireBlink(item));
+                    break;
+                case WorldObjectKind.Macaron:
+                    UpdateMacaron(shown, item);
+                    break;
             }
             foreach (WindShadow wind in shown.Winds)
             {
@@ -626,6 +680,51 @@ namespace Airerage.Runtime.Presentation
         private static Vector3 ToWorld(Vector2 v)
         {
             return new Vector3(v.x, v.y, -0.5f);
+        }
+
+        // 消える前の 1 秒は点滅する（見えるなら true）。
+        private bool ExpireBlink(in WorldObject item)
+        {
+            float secondsLeft = (item.ExpireTick - _feed.CurrentTick) / (float)SimTime.TicksPerSecond;
+            return secondsLeft > BlinkSeconds || Mathf.Repeat(Time.time * 8f, 1f) < 0.6f;
+        }
+
+        private static void SetVisible(Shown shown, bool visible)
+        {
+            foreach (Renderer renderer in shown.Renderers)
+            {
+                renderer.enabled = visible;
+            }
+        }
+
+        // 色を変える（only の名前で始まる部品だけ。null ならすべて）。
+        private void Tint(Shown shown, Color color, string only)
+        {
+            _block.SetColor(BaseColorId, color);
+            foreach (Renderer renderer in shown.Renderers)
+            {
+                if (only == null || renderer.name.StartsWith(only, System.StringComparison.Ordinal))
+                {
+                    renderer.SetPropertyBlock(_block);
+                }
+            }
+        }
+
+        // マカロン: 投げるまでは隠す。投げたら転がるように回し、色を塗る。点滅の間は点滅する。
+        private void UpdateMacaron(Shown shown, in WorldObject macaron)
+        {
+            int tick = _feed.CurrentTick;
+            bool launched = PastryRules.IsLaunched(macaron, tick);
+            if (launched && !shown.Launched && _primed && _audio != null)
+            {
+                _audio.Play(SoundId.CoinToss, macaron.Variant == (byte)MacaronColor.Rainbow ? 1f : 0.7f, 0.12f);
+            }
+            shown.Launched = launched;
+            TeaPartyTuning tuning = _feed.GetConfig(macaron.Owner).Skills.TeaParty;
+            bool blinking = PastryRules.IsBlinking(macaron, tuning, tick);
+            SetVisible(shown, launched && (!blinking || Mathf.Repeat(Time.time * 10f, 1f) < 0.5f));
+            shown.Visual.transform.rotation = Quaternion.Euler(0f, 0f, -macaron.Position.X / tuning.Radius * Mathf.Rad2Deg);
+            Tint(shown, MacaronColorOf(macaron.Variant, Time.time), "Shell");
         }
 
         private void UpdateMirrorBall(Shown shown, in WorldObject ball)

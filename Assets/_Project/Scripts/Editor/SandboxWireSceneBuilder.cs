@@ -33,6 +33,7 @@ namespace Airerage.Editor
         public const string RiskTakerPath = "Assets/_Project/Data/Characters/RiskTaker.asset";
         public const string StormRunnerPath = "Assets/_Project/Data/Characters/StormRunner.asset";
         public const string SpaceTravelerPath = "Assets/_Project/Data/Characters/SpaceTraveler.asset";
+        public const string PastryChefPath = "Assets/_Project/Data/Characters/PastryChef.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
@@ -507,6 +508,11 @@ namespace Airerage.Editor
             SetReference(space, "_source", source);
             SetReference(space, "_lineTemplate", spaceLine);
             SetReference(space, "_burstTemplate", warp);
+            var pastry = new GameObject("PastryEffects").AddComponent<PastryEffectsView>();
+            LineRenderer pastryLine = CreateIndicatorLine(pastry.transform, "PastryLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
+            pastryLine.gameObject.SetActive(false);
+            SetReference(pastry, "_source", source);
+            SetReference(pastry, "_lineTemplate", pastryLine);
             var boost = new GameObject("BoostAura").AddComponent<BoostAuraView>();
             LineRenderer boostLine = CreateIndicatorLine(boost.transform, "BoostLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
             boostLine.gameObject.SetActive(false);
@@ -617,7 +623,44 @@ namespace Airerage.Editor
             CreateIndicatorLine(beam.transform, "Glow", lineMaterial, 1.5f);
             CreateIndicatorLine(beam.transform, "Core", lineMaterial, 0.4f);
 
-            foreach (GameObject template in new[] { ball, safe, coin, gust, windZone, portal, missile, beam })
+            // PASTRY CHEF: わたがしの足場（横長に並んだ雲の玉）、飛ぶクリーム（玉）、張り付いたクリーム（大きさ 1 の板）、マカロン。
+            var candy = new GameObject("CottonCandyTemplate");
+            candy.transform.SetParent(view.transform, false);
+            Material candyPink = LoadOrCreateMaterial("CottonCandyPink", new Color(1f, 0.72f, 0.88f));
+            Material candyWhite = LoadOrCreateMaterial("CottonCandyWhite", new Color(1f, 0.9f, 0.96f));
+            for (int i = 0; i < 5; i++)
+            {
+                GameObject puff = CreateVisual(PrimitiveType.Sphere, "Puff" + i, i % 2 == 0 ? candyPink : candyWhite,
+                    new Vector3(1.2f, 0.85f - 0.1f * Mathf.Abs(i - 2), 0.9f));
+                puff.transform.SetParent(candy.transform, false);
+                puff.transform.localPosition = new Vector3(-1.4f + 0.7f * i, 0f, 0f);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                GameObject top = CreateVisual(PrimitiveType.Sphere, "TopPuff" + i, candyWhite, new Vector3(1f, 0.6f, 0.8f));
+                top.transform.SetParent(candy.transform, false);
+                top.transform.localPosition = new Vector3(-0.6f + 1.2f * i, 0.22f, 0f);
+            }
+            var creamShot = new GameObject("CreamShotTemplate");
+            creamShot.transform.SetParent(view.transform, false);
+            Material cream = LoadOrCreateMaterial("CreamUnlit", Color.white, unlit: true);
+            CreateVisual(PrimitiveType.Sphere, "Drop", cream, new Vector3(0.32f, 0.32f, 0.32f)).transform.SetParent(creamShot.transform, false);
+            var creamPatch = new GameObject("CreamPatchTemplate");
+            creamPatch.transform.SetParent(view.transform, false);
+            CreateVisual(PrimitiveType.Cube, "Patch", cream, Vector3.one).transform.SetParent(creamPatch.transform, false);
+            var macaron = new GameObject("MacaronTemplate");
+            macaron.transform.SetParent(view.transform, false);
+            Material macaronShell = LoadOrCreateMaterial("MacaronShellUnlit", Color.white, unlit: true);
+            GameObject shellTop = CreateVisual(PrimitiveType.Cylinder, "ShellTop", macaronShell, new Vector3(0.6f, 0.07f, 0.6f));
+            shellTop.transform.SetParent(macaron.transform, false);
+            shellTop.transform.localPosition = new Vector3(0f, 0.1f, 0f);
+            GameObject shellBottom = CreateVisual(PrimitiveType.Cylinder, "ShellBottom", macaronShell, new Vector3(0.6f, 0.07f, 0.6f));
+            shellBottom.transform.SetParent(macaron.transform, false);
+            shellBottom.transform.localPosition = new Vector3(0f, -0.1f, 0f);
+            CreateVisual(PrimitiveType.Cylinder, "Filling", LoadOrCreateMaterial("MacaronFilling", new Color(1f, 0.96f, 0.88f), unlit: true),
+                new Vector3(0.5f, 0.04f, 0.5f)).transform.SetParent(macaron.transform, false);
+
+            foreach (GameObject template in new[] { ball, safe, coin, gust, windZone, portal, missile, beam, candy, creamShot, creamPatch, macaron })
             {
                 foreach (Collider collider in template.GetComponentsInChildren<Collider>())
                 {
@@ -626,7 +669,7 @@ namespace Airerage.Editor
                 template.SetActive(false);
             }
             SetReference(view, "_source", source);
-            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin, gust, windZone, portal, missile, beam });
+            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin, gust, windZone, portal, missile, beam, candy, creamShot, creamPatch, macaron });
             BurstEffectView explosion = CreateBurst("ExplosionTemplate", view.transform);
             explosion.Configure(new Color(0.85f, 0.6f, 1f), false, 0.45f, 0.3f, 2.6f, 12, 2.4f, 0.22f, string.Empty, 0, 0.12f);
             explosion.gameObject.SetActive(false);
@@ -1086,7 +1129,7 @@ namespace Airerage.Editor
 
         /// <summary>
         /// 選べるキャラクターの一覧（docs/13 T5-5、T5-6）を作り直す: character（STANDARD）と、CharacterPresets から作るキャラクター
-        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
+        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER、PASTRY CHEF）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
         /// （値はコードの 1 か所で決める）。仮のロゴ（CharacterLogoPainter）も描き直して設定する（docs/13 T5-8）。
         /// </summary>
         internal static CharacterRoster LoadOrCreateCharacterRoster(CharacterConfigAsset character)
@@ -1098,6 +1141,8 @@ namespace Airerage.Editor
             AssignLogo(riskTaker, "RiskTaker", CharacterLogoPainter.RiskTaker());
             AssignLogo(stormRunner, "StormRunner", CharacterLogoPainter.StormRunner());
             AssignLogo(spaceTraveler, "SpaceTraveler", CharacterLogoPainter.SpaceTraveler());
+            CharacterConfigAsset pastryChef = WritePresetCharacter(PastryChefPath, CharacterPresets.PastryChef(), CharacterPresets.PastryChefName);
+            AssignLogo(pastryChef, "PastryChef", CharacterLogoPainter.PastryChef());
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
             if (roster == null)
             {
@@ -1105,7 +1150,7 @@ namespace Airerage.Editor
                 roster = ScriptableObject.CreateInstance<CharacterRoster>();
                 AssetDatabase.CreateAsset(roster, CharacterRosterPath);
             }
-            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler });
+            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler, pastryChef });
             EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return roster;

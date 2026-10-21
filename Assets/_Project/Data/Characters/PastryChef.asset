@@ -1,0 +1,497 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17401b775c1c455396f260bce2a3c785, type: 3}
+  m_Name: PastryChef
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Data.CharacterConfigAsset
+  _config:
+    Movement:
+      RunSpeed: 8
+      GroundAcceleration: 80
+      AirAcceleration: 30
+      AirDrag: 2
+      Gravity: 30
+      MaxFallSpeed: 20
+      JumpSpeed: 12
+      AirJumps: 1
+      CoyoteTicks: 6
+      JumpBufferTicks: 6
+      MoveDeadzone: 0.2
+      WallJumpSpeedX: 9
+      WallJumpSpeedY: 13
+      WallClingMaxTicks: 240
+      WallSlideSpeed: 1
+      WallClingMaxRiseSpeed: 6
+      HalfWidth: 0.4
+      HalfHeight: 0.9
+    Wire:
+      ModelType: 0
+      ButtonMode: 0
+      MaxLength: 12
+      FireSpeed: 60
+      MissRetractTicks: 10
+      CooldownTicks: 20
+      ReleaseCooldownTicks: 0
+      RestoreAirJumpsOnRelease: 1
+      AttachedInputInfluence: 0.25
+      AimAssistAngleDeg: 6
+      AimAssistRadius: 0.8
+      NeutralAimAngleDeg: 45
+      AimDeadzone: 0.3
+      MinRopeLength: 1
+      ReleaseWhenLineBlocked: 0
+      RopeWrapping: 1
+      MaxAttachTicks: 180
+      MaxAttachedSpeed: 22
+      ExitSpeedCap: 18
+      AttachTurnSpeed: 1
+      AttachTurnBehind: 0.5
+      AttachAnySurface: 0
+      AttachInAir: 0
+      Inertial:
+        NeutralMode: 1
+        UpMode: 0
+        DownMode: 2
+        ReelSpeed: 8
+        ReelOutSpeed: 6
+        UpInputThreshold: 0.9
+        DownInputThreshold: 0.5
+        HoldSwingAcceleration: 16
+        SwingAcceleration: 10
+        Damping: 0
+        StartPullSpeed: 16
+        StartPullTicks: 20
+        StartPullFadeTicks: 20
+      Responsive:
+        PullSpeed: 16
+        PullAcceleration: 120
+        SteerSpeed: 6
+        GravityScale: 0.2
+        ArrivalRadius: 1
+    Combat:
+      Ground:
+        Name: 
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 28
+        WireCancelFromTick: 5
+        Hits:
+        - StartTick: 5
+          ActiveTicks: 8
+          UntilEnd: 0
+          OffsetX: 1.6
+          OffsetY: 0
+          HalfWidth: 1.75
+          HalfHeight: 1.75
+          Damage: 4
+          HitstopTicks: 10
+          HitstunTicks: 20
+          KnockbackX: 13
+          KnockbackY: 5
+        - StartTick: 13
+          ActiveTicks: 5
+          UntilEnd: 0
+          OffsetX: 1.6
+          OffsetY: 1.5
+          HalfWidth: 2
+          HalfHeight: 2
+          Damage: 4
+          HitstopTicks: 12
+          HitstunTicks: 24
+          KnockbackX: 10.5
+          KnockbackY: 13.5
+        Motions:
+        - StartTick: 5
+          Ticks: 8
+          VelocityX: 18
+          VelocityY: 0
+          RequiresHit: 0
+        - StartTick: 13
+          Ticks: 1
+          VelocityX: 10.5
+          VelocityY: 12.5
+          RequiresHit: 0
+      AirNeutral:
+        Name: 
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 19
+        WireCancelFromTick: 5
+        Hits:
+        - StartTick: 5
+          ActiveTicks: 4
+          UntilEnd: 0
+          OffsetX: 0
+          OffsetY: 0
+          HalfWidth: 2.75
+          HalfHeight: 2.75
+          Damage: 4
+          HitstopTicks: 10
+          HitstunTicks: 20
+          KnockbackX: 5
+          KnockbackY: 7
+        Motions: []
+      AirSide:
+        Name: 
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 25
+        WireCancelFromTick: 7
+        Hits:
+        - StartTick: 7
+          ActiveTicks: 4
+          UntilEnd: 0
+          OffsetX: 2
+          OffsetY: 0.1
+          HalfWidth: 2
+          HalfHeight: 1.25
+          Damage: 6
+          HitstopTicks: 14
+          HitstunTicks: 24
+          KnockbackX: 14
+          KnockbackY: 4
+        Motions: []
+      AirUp:
+        Name: 
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 24
+        WireCancelFromTick: 6
+        Hits:
+        - StartTick: 6
+          ActiveTicks: 4
+          UntilEnd: 0
+          OffsetX: 0.2
+          OffsetY: 1.75
+          HalfWidth: 1.75
+          HalfHeight: 1.75
+          Damage: 5
+          HitstopTicks: 12
+          HitstunTicks: 22
+          KnockbackX: 2
+          KnockbackY: 14
+        Motions: []
+      AirDown:
+        Name: 
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 40
+        WireCancelFromTick: 16
+        Hits:
+        - StartTick: 16
+          ActiveTicks: 12
+          UntilEnd: 0
+          OffsetX: 1
+          OffsetY: -2
+          HalfWidth: 1.75
+          HalfHeight: 2
+          Damage: 8
+          HitstopTicks: 20
+          HitstunTicks: 28
+          KnockbackX: 6
+          KnockbackY: -12
+        Motions:
+        - StartTick: 16
+          Ticks: 12
+          VelocityX: 9
+          VelocityY: -15
+          RequiresHit: 0
+      Special1:
+        Name: FLUFFY BASE
+        Effect: 12
+        EffectTick: 0
+        HoldMaxTicks: 600
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 12
+        WireCancelFromTick: 2
+        Hits: []
+        Motions: []
+      Special1CooldownTicks: 480
+      Special1MaxCharges: 1
+      Special2MaxCharges: 1
+      Special2:
+        Name: SWEET TRAP
+        Effect: 13
+        EffectTick: 3
+        HoldMaxTicks: 600
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 18
+        WireCancelFromTick: 4
+        Hits: []
+        Motions: []
+      Special2CooldownTicks: 1080
+      Super:
+        Name: TEA PARTY
+        Effect: 14
+        EffectTick: 4
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        ChargeLevels: []
+        Roulette: 0
+        TotalTicks: 56
+        WireCancelFromTick: 44
+        Hits: []
+        Motions: []
+      SuperGaugeCost: 1000
+      KoAttack: 4
+      KoKnockbackBase: 0.5
+      KoKnockbackPerSpeed: 0.3
+      FatalStrikeSpeed: 14
+      FatalHitstopMultiplier: 2
+      BounceMinSpeed: 10
+      BounceRestitution: 0.6
+      WireCancelCooldownTicks: 180
+      AttackBufferTicks: 10
+      GuardTicks: 30
+      JustGuardTicks: 6
+      GuardCooldownTicks: 120
+      GuardStunTicks: 12
+      GuardKnockbackScale: 0.4
+      ParriedStunTicks: 30
+      ParriedPushbackX: 4
+      ParriedPushbackY: 6
+      GaugeOnHit: 80
+      GaugeOnGuarded: 30
+      GaugeOnDamaged: 40
+      GaugeOnGuard: 20
+      GaugeOnJustGuard: 200
+      GaugePerCoin: 2
+    Skills:
+      MirrorBall:
+        DurationTicks: 300
+        OffsetY: 2.2
+        GaugeIntervalTicks: 12
+        GaugePerInterval: 10
+      Safe:
+        DurationTicks: 10800
+        ChargeIntervalTicks: 300
+        ChargeCoins: 2
+        ChargeRatePercent: 110
+        MaxCoins: 300
+        GoldCoins: 150
+        Durability: 30
+        DepositPerSecond: 30
+        HalfWidth: 0.7
+        HalfHeight: 0.7
+      CoinBoost:
+        DurationTicks: 300
+        BonusPercent: 20
+        GaugeBonusPercent: 20
+      Projectile:
+        OffsetX: 0.3
+        OffsetY: 1
+        VelocityX: 2
+        VelocityY: 16
+        Gravity: 30
+        LifetimeTicks: 40
+        Radius: 0.5
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          HitstopTicks: 10
+          HitstunTicks: 22
+          KnockbackX: 2
+          KnockbackY: 13
+        HeldCoinsPerBonusPercent: 0
+        MaxHeldCoinBonusPercent: 0
+      Run:
+        InitialSpeed: 12.5
+        Acceleration: 6
+        MaxSpeed: 28
+        JumpAngleDeg: 20
+        TurnTicks: 8
+        RehitTicks: 30
+      SpeedBoost:
+        DurationTicks: 300
+        SpeedPercent: 20
+        GustSpeed: 30
+        GustRange: 15
+        GustHalfWidth: 1
+        GustPush: 12
+        GustWindupTicks: 10
+        GustRecoveryTicks: 14
+        GustRecoilSpeed: 9
+        GustWindupBrake: 0.8
+      WindZone:
+        DurationTicks: 600
+        Length: 10
+        HalfWidth: 1.5
+        Acceleration: 70
+        SpeedLimit: 20
+      SkyBoost:
+        DurationTicks: 600
+        SpeedPercent: 50
+      Portal:
+        DurationTicks: 1800
+        Radius: 1.2
+        MaxPerOwner: 2
+        WarpCooldownTicks: 30
+        EnterHoldTicks: 12
+      Missile:
+        Speed: 18
+        Radius: 0.4
+        ExplosionRadius: 1.6
+        OffsetY: 0.2
+        BonusPercentPerSecond: 200
+        LifetimeTicks: 1200
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          HitstopTicks: 10
+          HitstunTicks: 24
+          KnockbackX: 9
+          KnockbackY: 7
+      Beam:
+        HalfWidth: 0.75
+        IntervalTicks: 10
+        Hits: 6
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 15
+          HitstopTicks: 6
+          HitstunTicks: 20
+          KnockbackX: 3
+          KnockbackY: 4
+      SlowFall:
+        MaxFallSpeed: 3
+      CottonCandy:
+        DurationTicks: 600
+        ShortPressTicks: 12
+        PlaceDistance: 1.9
+        FeetOffset: 0.2
+        HalfLength: 1.8
+        HalfThickness: 0.4
+        BouncePower: 20
+      Cream:
+        ShotCount: 5
+        SpreadDeg: 40
+        Speed: 15
+        Gravity: 25
+        LaunchOffset: 0.5
+        ShotLifetimeTicks: 150
+        PatchTicks: 600
+        PatchHalfLength: 0.7
+        PatchThickness: 0.25
+        OrangeSpeedPercent: 30
+        OrangeWallJumpPercent: 150
+        MatchaSpeedPercent: -30
+        MatchaStickTicks: 60
+      TeaParty:
+        Count: 6
+        IntervalTicks: 8
+        OffsetY: 1.1
+        MinSpeed: 13
+        MaxSpeed: 19
+        MaxAngleDeg: 55
+        Gravity: 25
+        Restitution: 0.7
+        Friction: 0.85
+        StopSpeed: 1.5
+        Radius: 0.3
+        BlinkTicks: 30
+        MaxLifetimeTicks: 600
+        GreenPercent: 60
+        YellowPercent: 35
+        YellowBonusPercent: 100
+        RainbowBonusPercent: 400
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 20
+          HitstopTicks: 14
+          HitstunTicks: 28
+          KnockbackX: 7
+          KnockbackY: 9
+  _displayName: PASTRY CHEF
+  _logo: {fileID: 2800000, guid: 523089f68ab3afce4b4cb6a7d027b383, type: 2}
+  _special1Icon: {fileID: 0}
+  _special2Icon: {fileID: 0}
+  _superIcon: {fileID: 0}
+  _tags:
+  - "#\u8A2D\u7F6E"
+  - "#\u7F60"
+  - "#\u304A\u83D3\u5B50"
+  _special1Text:
+    Name: "\u30D5\u30E9\u30C3\u30D5\u30A3\u30D9\u30A4\u30B9"
+    Description: "\u89E6\u308C\u305F\u4EBA\u3092\u5F3E\u304D\u98DB\u3070\u3059\u308F\u305F\u304C\u3057\u306E\u8DB3\u5834\u3092\u7F6E\u304F\u3002\u77ED\u304F\u62BC\u3059\u3068\u8DB3\u5143\u306B\u3001\u9577\u62BC\u3057\u3067\u7167\u6E96\u306E\u65B9\u5411\u3078\u5411\u3051\u3066\u7F6E\u304F\u3002\u30EF\u30A4\u30E4\u30FC\u306F\u3064\u306A\u304C\u3089\u306A\u3044\u3002"
+    CooldownNote: 
+  _special2Text:
+    Name: "\u30B9\u30A4\u30FC\u30C8\u30C8\u30E9\u30C3\u30D7"
+    Description: "\u7167\u6E96\u306E\u65B9\u5411\u3078\u30AF\u30EA\u30FC\u30E0\u3092\u98DB\u3070\u3057\u3001\u5F53\u305F\u3063\u305F\u6240\u306B\u5F35\u308A\u4ED8\u304B\u305B\u308B\u3002\u9577\u62BC\u3057\u4E2D\u306B\u30EF\u30A4\u30E4\u30FC\u3067\u30AA\u30EC\u30F3\u30B8\uFF08\u901F\u304F\u306A\u308A\u3001\u30EF\u30A4\u30E4\u30FC\u304C\u3064\u306A\u304C\u308B\uFF09\u3001\u653B\u6483\u3067\u62B9\u8336\uFF08\u9045\u304F\u306A\u308A\u3001\u58C1\u3068\u5929\u4E95\u306B\u5F35\u308A\u4ED8\u304F\uFF09\u3002"
+    CooldownNote: 
+  _superText:
+    Name: "\u30C6\u30A3\u30FC\u30D1\u30FC\u30C6\u30A3"
+    Description: "\u4E0A\u3078\u30DE\u30AB\u30ED\u30F3\u3092\u6B21\u3005\u3068\u6295\u3052\u308B\u3002\u8DF3\u306D\u8FD4\u308A\u306A\u304C\u3089\u76F8\u624B\u306B\u5F53\u305F\u308B\u3002\u8272\u3067\u5A01\u529B\u304C\u9055\u3044\u3001\u8679\u8272\u306F\u3068\u3066\u3082\u5F37\u3044\u3002"
+    CooldownNote: 
+  _costume: 4

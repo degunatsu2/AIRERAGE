@@ -19,7 +19,7 @@ namespace Airerage.Core.Skills
     /// 2. StepObjects: 物を進める（寿命、ミラーボールのゲージ、セーフティボックスのチャージ、投射物の移動と命中）。投射物の命中は
     ///    hits に集めて、HitResolver がキャラクターの攻撃と一緒に当てる。
     /// 3. EndObjects（命中の後）: 寿命が来た・壊れた物を取り除く（ばらまき、ワイヤーの解除、クールタイムの開始）。
-    /// 物は番号の順、キャラクターは番号の順に調べる（結果が順番で変わらない）。
+    /// 物は番号の順、キャラクターは番号の順に調べる（結果が順番で変わらない）。PASTRY CHEF の技は PastryRules。
     /// </summary>
     public static class SkillRules
     {
@@ -55,6 +55,8 @@ namespace Airerage.Core.Skills
         public static void StepObjects(WorldObjects objects, ICollisionQuery terrain, List<CharacterState> states,
             IReadOnlyList<CharacterConfig> configs, StageBounds? bounds, int tick, List<HitRecord> hits)
         {
+            // クリームとマカロンは、動かない地形だけに当たる（わたがしの足場には張り付かない・跳ねない）。
+            ICollisionQuery ground = terrain is WorldCollision world ? world.Terrain : terrain;
             for (int o = 0; o < objects.Count; o++)
             {
                 WorldObject item = objects[o];
@@ -92,10 +94,20 @@ namespace Airerage.Core.Skills
                     case WorldObjectKind.Beam:
                         SpaceRules.StepBeam(item, objects, states, configs, owner.Skills.Beam, hits, tick);
                         break;
+                    case WorldObjectKind.CottonCandy:
+                        PastryRules.StepCottonCandy(item, states, configs, owner.Skills.CottonCandy);
+                        break;
+                    case WorldObjectKind.CreamShot:
+                        PastryRules.StepCreamShot(ref item, ground, bounds, owner.Skills.Cream, tick);
+                        break;
+                    case WorldObjectKind.Macaron:
+                        PastryRules.StepMacaron(ref item, ground, states, configs, bounds, owner.Skills.TeaParty, hits, tick);
+                        break;
                 }
                 objects[o] = item;
             }
             SpaceRules.WarpThroughPortals(objects, states, configs);
+            PastryRules.TouchCream(objects, states, configs);
         }
 
         /// <summary>
@@ -264,6 +276,15 @@ namespace Airerage.Core.Skills
                     // ゆっくり落ちる（別の移動をするまで。CharacterSimulator が終わりを決める）。
                     state.Combat.SlowFallSerial = state.Combat.AttackSerial + 1;
                     states[index] = state;
+                    break;
+                case SkillEffect.CottonCandy:
+                    PastryRules.FireCottonCandy(objects, state, index, config, tick);
+                    break;
+                case SkillEffect.Cream:
+                    PastryRules.FireCream(objects, state, index, config, tick);
+                    break;
+                case SkillEffect.TeaParty:
+                    PastryRules.FireTeaParty(objects, state, index, config, tick);
                     break;
                 case SkillEffect.Projectile:
                 {
