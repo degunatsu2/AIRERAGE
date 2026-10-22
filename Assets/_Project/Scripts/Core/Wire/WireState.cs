@@ -113,6 +113,12 @@ namespace Airerage.Core.Wire
         public WireMissReason LastMissReason;
 
         /// <summary>
+        /// 鞭（SOLDERER のインバータの間に外れたワイヤー。ボタンを押している間は回収せず、照準の方向へ伸ばして振り回す。WireController）。
+        /// 回収の段階（Retracting）の間だけ使う。
+        /// </summary>
+        public bool Whip;
+
+        /// <summary>
         /// ワイヤーで引っ張られている状態か（D-18: 接続中フェーズと同じ）。
         /// ワイヤー→攻撃のキャンセル判定は、運動モデルに関係なくこの値だけを見る。
         /// </summary>
@@ -136,7 +142,7 @@ namespace Airerage.Core.Wire
                 && AttachSpeed.Equals(other.AttachSpeed)
                 && CooldownTicksLeft == other.CooldownTicksLeft
                 && LastReleaseReason == other.LastReleaseReason
-                && LastMissReason == other.LastMissReason;
+                && LastMissReason == other.LastMissReason && Whip == other.Whip;
         }
 
         public override bool Equals(object obj)
@@ -161,6 +167,7 @@ namespace Airerage.Core.Wire
             hash.Add(CooldownTicksLeft);
             hash.Add(LastReleaseReason);
             hash.Add(LastMissReason);
+            hash.Add(Whip);
             return hash.ToHashCode();
         }
     }

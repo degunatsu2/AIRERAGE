@@ -14,6 +14,7 @@ namespace Airerage.Editor
     /// - STORM RUNNER: 黄緑の、風。
     /// - RISK TAKER: 黄色の、お金が降ってくる金庫。
     /// - PASTRY CHEF: クリーム色の、コック帽（ふくらんだ 3 つの山と帯）。
+    /// - SOLDERER: 電気の水色の、稲妻（RISK TAKER の黄色・STORM RUNNER の黄緑と見分けられる色）。
     /// 形は距離の関数（負なら中）で書き、縁はなめらかにする。形ごとに暗い縁取りをつける（どの背景でも読めるように）。
     /// 座標は 0〜1（左上が 0、下が 1）。
     /// </summary>
@@ -32,6 +33,7 @@ namespace Airerage.Editor
         public static readonly Color StormRunnerColor = new Color(0.68f, 1f, 0.2f);
         public static readonly Color RiskTakerColor = new Color(1f, 0.84f, 0.15f);
         public static readonly Color PastryChefColor = new Color(1f, 0.93f, 0.74f);
+        public static readonly Color SoldererColor = new Color(0.36f, 0.88f, 1f);
 
         private delegate float Shape(Vector2 p);
 
@@ -103,6 +105,25 @@ namespace Airerage.Editor
             // 帯。
             Fill(layers, p => RoundBox(p, new Vector2(0.5f, 0.74f), new Vector2(0.24f, 0.1f), 0.03f), PastryChefColor);
             Cut(layers, p => Segment(p, new Vector2(0.3f, 0.74f), new Vector2(0.7f, 0.74f), 0.012f));
+            return Rasterize(layers);
+        }
+
+        /// <summary>SOLDERER: 斜めに走る稲妻と、その両側に小さな火花（電気の水色）。</summary>
+        public static Color[] Solderer()
+        {
+            var layers = new List<Layer>();
+            // 稲妻（上は平らで、真ん中で段違いに折れ、下は尖る）。
+            Vector2[] bolt =
+            {
+                new Vector2(0.56f, 0.04f), new Vector2(0.74f, 0.04f), new Vector2(0.6f, 0.38f), new Vector2(0.8f, 0.38f),
+                new Vector2(0.36f, 0.96f), new Vector2(0.46f, 0.54f), new Vector2(0.24f, 0.54f),
+            };
+            Fill(layers, p => Polygon(p, bolt), SoldererColor);
+            // 火花（短い線の組）。
+            Fill(layers, p => Mathf.Min(Segment(p, new Vector2(0.14f, 0.28f), new Vector2(0.24f, 0.34f), 0.022f),
+                Segment(p, new Vector2(0.12f, 0.42f), new Vector2(0.22f, 0.42f), 0.022f)), SoldererColor);
+            Fill(layers, p => Mathf.Min(Segment(p, new Vector2(0.86f, 0.62f), new Vector2(0.76f, 0.66f), 0.022f),
+                Segment(p, new Vector2(0.88f, 0.76f), new Vector2(0.78f, 0.74f), 0.022f)), SoldererColor);
             return Rasterize(layers);
         }
 
@@ -253,6 +274,28 @@ namespace Airerage.Editor
             Vector2 start = center + Direction(from) * radius;
             Vector2 end = center + Direction(from + sweep) * radius;
             return Mathf.Min((p - start).magnitude, (p - end).magnitude) - width;
+        }
+
+        // 多角形（頂点を順に並べる。凹んでいてもよい）までの距離（中は負）。
+        private static float Polygon(Vector2 p, Vector2[] points)
+        {
+            float distance = (p - points[0]).sqrMagnitude;
+            float sign = 1f;
+            for (int i = 0, j = points.Length - 1; i < points.Length; j = i, i++)
+            {
+                Vector2 e = points[j] - points[i];
+                Vector2 w = p - points[i];
+                Vector2 b = w - e * Mathf.Clamp01(Vector2.Dot(w, e) / e.sqrMagnitude);
+                distance = Mathf.Min(distance, b.sqrMagnitude);
+                bool c0 = p.y >= points[i].y;
+                bool c1 = p.y < points[j].y;
+                bool c2 = e.x * w.y > e.y * w.x;
+                if ((c0 && c1 && c2) || (!c0 && !c1 && !c2))
+                {
+                    sign = -sign;
+                }
+            }
+            return sign * Mathf.Sqrt(distance);
         }
 
         // 楕円（半径 radii）までのおおよその距離。

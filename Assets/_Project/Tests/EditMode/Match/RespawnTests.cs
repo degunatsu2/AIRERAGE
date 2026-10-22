@@ -137,19 +137,26 @@ namespace Airerage.Core.Tests.Match
         }
 
         [Test]
-        public void AttackingEndsTheInvincibility()
+        public void AfterRespawn_AttackingKeepsTheIntangibility_AndTheAttackDoesNotHit()
         {
+            // 復帰した後の無干渉は、攻撃しても終わらず、その間の攻撃は相手に当たらない（ユーザーの要望、2026-10-21）。
             var world = new SimWorld(TestArenas.Ground());
             world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
-            world.Step(new PlayerInput[1]);
+            world.AddCharacter(new CharacterConfig(), new Vector3(1.6f, GroundY, 0f));
+            world.Step(new PlayerInput[2]);
             CharacterState state = world.GetState(0);
             state.Combat.InvincibleTicksLeft = Rules.InvincibleTicks;
+            state.Facing = 1;
             world.SetState(0, state);
 
-            world.Step(new[] { Attack });
-
+            world.Step(new[] { Attack, default });
             Assert.That(world.GetState(0).Action.Kind, Is.EqualTo(ActionKind.Attack), "前提: 攻撃した");
-            Assert.That(world.GetState(0).Combat.InvincibleTicksLeft, Is.EqualTo(0), "攻撃しても無敵が終わらない");
+            Assert.That(world.GetState(0).Combat.InvincibleTicksLeft, Is.EqualTo(Rules.InvincibleTicks - 1), "攻撃で無干渉が終わった");
+            for (int i = 0; i < 30; i++)
+            {
+                world.Step(new PlayerInput[2]);
+            }
+            Assert.That(world.GetState(1).Combat.ComboCount, Is.Zero, "無干渉の間の攻撃が当たった");
         }
 
         [Test]

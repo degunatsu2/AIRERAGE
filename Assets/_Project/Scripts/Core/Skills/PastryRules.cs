@@ -15,6 +15,8 @@ namespace Airerage.Core.Skills
     /// - Q フラッフィベイス（CottonCandyTuning）: わたがしの足場。触れた人を弾き飛ばす。
     /// - E スイートトラップ（CreamTuning）: クリームを扇形に飛ばし、地形に張り付かせる。触れた人の速さを変える（TouchCream）。
     /// - R ティーパーティ（TeaPartyTuning）: マカロンを次々と投げ上げる。跳ね返り、相手に当たる。
+    /// - 空中下（撃破技）デジタルスケール（ScaleTuning）: 真下へ自由落下し、落ちていた時間で強くなる（2026-10-21）。
+    /// - 空中上 ボウル（AttackData.BlocksProjectilesAbove）: 上から来た投射物を防ぐ（TryBlockFromAbove。2026-10-21）。
     /// 置く位置・飛ばす向きは、表示（長押しの間の予告）でも同じ計算を使う（CandyPlacement、CreamLaunch）。
     /// </summary>
     public static class PastryRules
@@ -145,7 +147,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (target.Combat.IsWaitingToRespawn || target.Combat.HitstopTicksLeft > 0)
+                if (target.Combat.IsUntouchable || target.Combat.HitstopTicksLeft > 0)
                 {
                     continue;
                 }
@@ -243,7 +245,7 @@ namespace Airerage.Core.Skills
                 int wallJump = 0;
                 bool noCling = false;
                 bool stickTouch = false;
-                if (!state.Combat.IsWaitingToRespawn)
+                if (!state.Combat.IsUntouchable)
                 {
                     Vector3 half = configs[v].Movement.HalfExtents;
                     for (int o = 0; o < objects.Count; o++)
@@ -355,8 +357,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == macaron.Owner || (macaron.HitMask & (1u << v)) != 0 || target.Combat.InvincibleTicksLeft > 0
-                    || target.Combat.IsWaitingToRespawn)
+                if (v == macaron.Owner || (macaron.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -379,6 +380,119 @@ namespace Airerage.Core.Skills
         {
             macaron.Velocity = Vector2.Zero;
             macaron.ExpireTick = Math.Min(macaron.ExpireTick, tick + tuning.BlinkTicks);
+        }
+        /// <summary>空中下: デジタルスケールを足もとから落とす。</summary>
+        public static void FireScale(WorldObjects objects, in CharacterState state, int index, CharacterConfig config, int tick)
+        {
+            ScaleTuning tuning = config.Skills.Scale;
+            objects.Add(new WorldObject
+            {
+                Kind = WorldObjectKind.Scale, Owner = index, Slot = state.Action.Attack,
+                Position = new Vector2(state.Position.X, state.Position.Y + tuning.OffsetY), SpawnTick = tick, ExpireTick = int.MaxValue,
+            });
+        }
+
+        /// <summary>デジタルスケールのグラム数（表示にも使う）。</summary>
+        public static int ScaleGrams(in WorldObject scale, ScaleTuning tuning, int tick)
+        {
+            return tuning.GramsAt(tick - scale.SpawnTick);
+        }
+
+        /// <summary>
+        /// デジタルスケール: 真下へ自由落下する。持ち主以外の相手に触れたら当てて（落ちていた時間で威力と吹き飛びが増え、FatalGrams 以上なら
+        /// FATAL）消える。地形に当たるか、ステージの外に出ても消える。
+        /// </summary>
+        public static void StepScale(ref WorldObject scale, ICollisionQuery terrain, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+            StageBounds? bounds, ScaleTuning tuning, List<HitRecord> hits, int tick)
+        {
+            scale.Velocity.X = 0f;
+            scale.Velocity.Y = MathF.Max(scale.Velocity.Y - tuning.Gravity * SimTime.DeltaTime, -tuning.MaxFallSpeed);
+            Vector2 delta = scale.Velocity * SimTime.DeltaTime;
+            var half = new Vector3(tuning.HalfWidth, tuning.HalfHeight, tuning.HalfWidth);
+            var center = new Vector3(scale.Position.X, scale.Position.Y, 0f);
+            if (terrain.SweepBox(center, half, new Vector3(delta.X, delta.Y, 0f), out CastHit ground))
+            {
+                float length = delta.Length();
+                if (length > SimMath.Epsilon)
+                {
+                    scale.Position += delta / length * MathF.Max(0f, ground.Distance - 0.01f);
+                }
+                scale.Ended = true;
+                return;
+            }
+            scale.Position += delta;
+            if (bounds.HasValue && !bounds.Value.Contains(new Vector3(scale.Position.X, scale.Position.Y, 0f)))
+            {
+                scale.Ended = true;
+                return;
+            }
+            for (int v = 0; v < states.Count; v++)
+            {
+                CharacterState target = states[v];
+                if (v == scale.Owner || target.Combat.IsUntouchable)
+                {
+                    continue;
+                }
+                Vector3 size = configs[v].Movement.HalfExtents;
+                if (MathF.Abs(target.Position.X - scale.Position.X) < size.X + tuning.HalfWidth
+                    && MathF.Abs(target.Position.Y - scale.Position.Y) < size.Y + tuning.HalfHeight)
+                {
+                    int grams = ScaleGrams(scale, tuning, tick);
+                    int bonus = tuning.BonusPercentAt(grams);
+                    var power = new AttackPower(1f, bonus, bonus, fatal: grams >= tuning.FatalGrams, sources: PowerSource.FallTime);
+                    int facing = target.Position.X >= scale.Position.X ? 1 : -1;
+                    hits.Add(new HitRecord(scale.Owner, v, scale.Slot, 0, tuning.Hit, facing, power, fromObject: true));
+                    scale.Ended = true;
+                    return;
+                }
+            }
+        }
+
+        /// <summary>防げる投射物か（上から来たものを、PASTRY CHEF のボウルが防ぐ）。</summary>
+        public static bool IsBlockable(WorldObjectKind kind)
+        {
+            return kind == WorldObjectKind.Projectile || kind == WorldObjectKind.Missile || kind == WorldObjectKind.Macaron
+                || kind == WorldObjectKind.CreamShot || kind == WorldObjectKind.Scale || kind == WorldObjectKind.BallLightning;
+        }
+
+        /// <summary>
+        /// 上から来た投射物 item（下へ動いている）を、ボウルの攻撃（AttackData.BlocksProjectilesAbove）の判定の箱で防ぐ人がいれば、防いで
+        /// （その人の ShieldBlockCount を増やす）true。持ち主の投射物は防がない。
+        /// </summary>
+        public static bool TryBlockFromAbove(in WorldObject item, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, float radius)
+        {
+            if (item.Velocity.Y >= 0f)
+            {
+                return false;
+            }
+            for (int v = 0; v < states.Count; v++)
+            {
+                CharacterState state = states[v];
+                if (v == item.Owner || state.Action.Kind != ActionKind.Attack || state.Combat.IsWaitingToRespawn)
+                {
+                    continue;
+                }
+                AttackData attack = configs[v].Combat.Get(state.Action.Attack);
+                if (!attack.BlocksProjectilesAbove || item.Position.Y < state.Position.Y)
+                {
+                    continue;
+                }
+                foreach (AttackHit hit in attack.Hits)
+                {
+                    if (!hit.IsActiveAt(state.Action.Ticks))
+                    {
+                        continue;
+                    }
+                    HitResolver.Hitbox(state, hit, out Vector2 center, out Vector2 half);
+                    if (MathF.Abs(item.Position.X - center.X) < half.X + radius && MathF.Abs(item.Position.Y - center.Y) < half.Y + radius)
+                    {
+                        state.Combat.ShieldBlockCount++;
+                        states[v] = state;
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
     }
 }

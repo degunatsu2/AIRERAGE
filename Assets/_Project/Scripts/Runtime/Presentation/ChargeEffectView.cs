@@ -41,6 +41,8 @@ namespace Airerage.Runtime.Presentation
         /// <summary>チャージの進み具合（0〜1）。</summary>
         public float Progress { get; private set; }
 
+        private float _shownAt = -10f;
+
         private void Awake()
         {
             Hide();
@@ -49,6 +51,10 @@ namespace Airerage.Runtime.Presentation
         /// <summary>center（キャラクターの中心）の周りに、進み具合 progress（0〜1）のチャージを描く。</summary>
         public void Show(Vector3 center, float progress)
         {
+            if (!IsShowing)
+            {
+                _shownAt = Time.time;
+            }
             IsShowing = true;
             Progress = Mathf.Clamp01(progress);
             _center = center;
@@ -137,19 +143,16 @@ namespace Airerage.Runtime.Presentation
             }
             if (_style == null)
             {
-                _style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+                _style = TextFlash.Style(_fontSize, FontStyle.Bold, TextAnchor.MiddleCenter);
             }
             // 進むほど大きく、脈打つ。
             float pulse = 1f + 0.08f * Mathf.Sin(Time.time * 30f);
             _style.fontSize = Mathf.RoundToInt(_fontSize * Mathf.Lerp(0.8f, 1.15f, Progress) * pulse);
             var rect = new Rect(screen.x - 150f, Screen.height - screen.y - 30f, 300f, 60f);
 
-            Color previous = GUI.color;
-            GUI.color = new Color(0.25f, 0.15f, 0f, 0.9f);
-            GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width, rect.height), Label, _style);
-            GUI.color = Color.Lerp(_color, _highlight, 0.5f + 0.5f * Mathf.Sin(Time.time * 30f));
-            GUI.Label(rect, Label, _style);
-            GUI.color = previous;
+            // 出た瞬間は白く光り、すぐに本来の色（脈打つ）へ（TextFlash）。
+            Color color = Color.Lerp(_color, _highlight, 0.5f + 0.5f * Mathf.Sin(Time.time * 30f));
+            TextFlash.Draw(rect, Label, _style, TextFlash.Apply(color, Time.time - _shownAt), 0.9f);
         }
     }
 }

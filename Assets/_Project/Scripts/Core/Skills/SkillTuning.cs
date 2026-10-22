@@ -65,6 +65,15 @@ namespace Airerage.Core.Skills
 
         /// <summary>マカロンを次々と投げ上げる（PASTRY CHEF の R。ティーパーティ）。</summary>
         TeaParty,
+
+        /// <summary>デジタルスケールを真下へ落とす（PASTRY CHEF の空中下の撃破技）。</summary>
+        DropScale,
+
+        /// <summary>インバータの ON・OFF を切り替える（SOLDERER の E）。</summary>
+        Inverter,
+
+        /// <summary>ボールライトニングを次々と放つ（SOLDERER の R）。</summary>
+        BallLightning,
     }
 
     /// <summary>
@@ -425,8 +434,8 @@ namespace Airerage.Core.Skills
         public int ShotCount = 7;
         public float SpreadDeg = 22f;
 
-        /// <summary>飛ばす速さ（m/s）と重力（m/s²）。</summary>
-        public float Speed = 15f;
+        /// <summary>飛ばす速さ（m/s。ユーザーの要望で 15 から上げた、2026-10-21）と重力（m/s²）。</summary>
+        public float Speed = 21f;
         public float Gravity = 25f;
 
         /// <summary>出す位置（キャラクターの中心から照準の方向への距離。m）。</summary>
@@ -545,6 +554,147 @@ namespace Airerage.Core.Skills
             v.NonNegative(nameof(YellowBonusPercent), YellowBonusPercent);
             v.NonNegative(nameof(RainbowBonusPercent), RainbowBonusPercent);
             v.NotNull(nameof(Hit), Hit);
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// デジタルスケール（PASTRY CHEF の空中下の撃破技。ユーザーの案、2026-10-21。値は【仮】）。足もとから真下へ自由落下させる。地形・
+    /// 相手に当たるか、ステージの外に出たら消える。落ちていた時間でグラム数（表示）と、威力・吹き飛びの上乗せが増え、FatalGrams 以上で
+    /// 当てると FATAL。
+    /// </summary>
+    [Serializable]
+    public sealed class ScaleTuning
+    {
+        /// <summary>出す位置（キャラクターの中心からの高さ。m）と、重力（m/s²）・落ちる速さの上限（m/s）。</summary>
+        public float OffsetY = -1.2f;
+        public float Gravity = 32f;
+        public float MaxFallSpeed = 34f;
+
+        /// <summary>当たりの大きさ（半分。m）。</summary>
+        public float HalfWidth = 0.6f;
+        public float HalfHeight = 0.35f;
+
+        /// <summary>グラム数: 落とした瞬間 BaseGrams、1 秒ごとに GramsPerSecond 増える。FatalGrams 以上で当てると FATAL。</summary>
+        public int BaseGrams = 100;
+        public int GramsPerSecond = 700;
+        public int FatalGrams = 1000;
+
+        /// <summary>100 グラムごとの威力と吹き飛びの上乗せ（%）と、上乗せの上限（%）。</summary>
+        public int BonusPercentPer100Grams = 15;
+        public int MaxBonusPercent = 300;
+
+        /// <summary>落ちて当たったときの判定のデータ（位置・大きさ・出る時間は使わない）。吹き飛びは下向き。</summary>
+        public AttackHit Hit = new AttackHit
+        {
+            Damage = 8, HitstopTicks = 16, HitstunTicks = 30, KnockbackX = 3f, KnockbackY = -13f,
+        };
+
+        /// <summary>落としてから ticks ティックたったときのグラム数。</summary>
+        public int GramsAt(int ticks)
+        {
+            return BaseGrams + (int)((long)Math.Max(0, ticks) * GramsPerSecond / SimTime.TicksPerSecond);
+        }
+
+        /// <summary>グラム数 grams の威力と吹き飛びの上乗せ（%）。</summary>
+        public int BonusPercentAt(int grams)
+        {
+            return Math.Min(MaxBonusPercent, grams / 100 * BonusPercentPer100Grams);
+        }
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(ScaleTuning));
+            v.NonNegative(nameof(Gravity), Gravity);
+            v.Positive(nameof(MaxFallSpeed), MaxFallSpeed);
+            v.Positive(nameof(HalfWidth), HalfWidth);
+            v.Positive(nameof(HalfHeight), HalfHeight);
+            v.NonNegative(nameof(BaseGrams), BaseGrams);
+            v.NonNegative(nameof(GramsPerSecond), GramsPerSecond);
+            v.Positive(nameof(FatalGrams), FatalGrams);
+            v.NonNegative(nameof(BonusPercentPer100Grams), BonusPercentPer100Grams);
+            v.NonNegative(nameof(MaxBonusPercent), MaxBonusPercent);
+            v.NotNull(nameof(Hit), Hit);
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// インバータ（SOLDERER の E。ユーザーの案、2026-10-21。値は【仮】）。押すたびに ON・OFF。ON の間は、ワイヤーの射程が RangeScale 倍に
+    /// なり、雷を帯びる。
+    /// - 鞭: 何もない所・つながらない物へ撃って外れたとき、ボタンを押している間は、照準の方向へ射程の長さだけ伸ばして振り回せる（何にも
+    ///   つながらない）。触れた相手（持ち主以外）に WhipHit を当てる（吹き飛ばさず、行動と慣性を止める）。同じ相手には WhipRehitTicks ごと。
+    /// - 雷の波動: つながる地形にワイヤーをつなぐと、つないだ点から、その地形の箱の縁を左右の両回りに WaveSpeed で進み、反対側で
+    ///   出会って消える。触れた相手（持ち主以外）を StunTicks の間感電させる（その場にとどまり、動けない）。
+    /// </summary>
+    [Serializable]
+    public sealed class InverterTuning
+    {
+        /// <summary>ON の間のワイヤーの射程の倍率。</summary>
+        public float RangeScale = 1f / 3f;
+
+        /// <summary>鞭の太さ（半分。m）と、同じ相手にもう一度当たるまで（ティック）。</summary>
+        public float WhipHalfThickness = 0.25f;
+        public int WhipRehitTicks = 24;
+
+        /// <summary>鞭が当たったときの判定のデータ（吹き飛ばさない。ヒットストップはほぼない）。</summary>
+        public AttackHit WhipHit = new AttackHit
+        {
+            Damage = 5, HitstopTicks = 2, HitstunTicks = 14, KnockbackX = 0f, KnockbackY = 0f,
+        };
+
+        /// <summary>雷の波動の進む速さ（m/s）と、触れたとみなす距離（m）。</summary>
+        public float WaveSpeed = 36f;
+        public float WaveRadius = 0.5f;
+
+        /// <summary>感電の長さ（ティック。1 秒）と、感電が解けてから、もう感電しない長さ（ティック）。</summary>
+        public int StunTicks = 60;
+        public int StunGuardTicks = 30;
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(InverterTuning));
+            v.InRange(nameof(RangeScale), RangeScale, 0.05f, 1f);
+            v.Positive(nameof(WhipHalfThickness), WhipHalfThickness);
+            v.NonNegative(nameof(WhipRehitTicks), WhipRehitTicks);
+            v.NotNull(nameof(WhipHit), WhipHit);
+            v.Positive(nameof(WaveSpeed), WaveSpeed);
+            v.Positive(nameof(WaveRadius), WaveRadius);
+            v.NonNegative(nameof(StunTicks), StunTicks);
+            v.NonNegative(nameof(StunGuardTicks), StunGuardTicks);
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// ボールライトニング（SOLDERER の R。ユーザーの案、2026-10-21。値は【仮】）。Count 個を IntervalTicks ごとに、放つときの照準の方向へ
+    /// 放つ（R を押したまま照準を動かすと、1 つずつ向きを変えられる）。ゆっくり進み、壁で跳ね返る。TravelDistance 進むと止まり、TrapTicks の
+    /// 間残る。触れた相手（持ち主以外）を感電させる（インバータの雷の波動と同じ。InverterTuning.StunTicks）。同じ球は同じ相手に 1 回だけ。
+    /// </summary>
+    [Serializable]
+    public sealed class BallLightningTuning
+    {
+        public int Count = 3;
+        public int IntervalTicks = 18;
+
+        /// <summary>放つ位置（キャラクターの中心から照準の方向への距離。m）と、進む速さ（m/s）と、止まるまでに進む距離（m）。</summary>
+        public float LaunchOffset = 0.8f;
+        public float Speed = 7f;
+        public float TravelDistance = 14f;
+
+        /// <summary>止まってから消えるまで（ティック。5 秒）と、触れたとみなす半径（m）。</summary>
+        public int TrapTicks = 300;
+        public float Radius = 0.55f;
+
+        public TuningValidator Validate()
+        {
+            var v = new TuningValidator(nameof(BallLightningTuning));
+            v.Positive(nameof(Count), Count);
+            v.NonNegative(nameof(IntervalTicks), IntervalTicks);
+            v.Positive(nameof(Speed), Speed);
+            v.Positive(nameof(TravelDistance), TravelDistance);
+            v.Positive(nameof(TrapTicks), TrapTicks);
+            v.Positive(nameof(Radius), Radius);
             return v;
         }
     }
@@ -700,6 +850,9 @@ namespace Airerage.Core.Skills
         public CottonCandyTuning CottonCandy = new CottonCandyTuning();
         public CreamTuning Cream = new CreamTuning();
         public TeaPartyTuning TeaParty = new TeaPartyTuning();
+        public ScaleTuning Scale = new ScaleTuning();
+        public InverterTuning Inverter = new InverterTuning();
+        public BallLightningTuning BallLightning = new BallLightningTuning();
 
         public TuningValidator Validate()
         {
@@ -778,6 +931,21 @@ namespace Airerage.Core.Skills
             if (TeaParty != null)
             {
                 v.Merge(TeaParty.Validate());
+            }
+            v.NotNull(nameof(Scale), Scale);
+            v.NotNull(nameof(Inverter), Inverter);
+            v.NotNull(nameof(BallLightning), BallLightning);
+            if (Scale != null)
+            {
+                v.Merge(Scale.Validate());
+            }
+            if (Inverter != null)
+            {
+                v.Merge(Inverter.Validate());
+            }
+            if (BallLightning != null)
+            {
+                v.Merge(BallLightning.Validate());
             }
             return v;
         }

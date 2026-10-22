@@ -381,5 +381,126 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(yellow, Is.GreaterThan(green + 1f), "黄が緑より遠くへ飛ばない");
             Assert.That(rainbow, Is.GreaterThan(yellow + 2f), "虹が黄より遠くへ飛ばない");
         }
+        // 空中で止まっている（落ちていく）キャラクター 1 体と、その相手（ダミー）。
+        private static SimWorld AirWorld(CharacterConfig config, Vector3 at, Vector3 dummy)
+        {
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(config, at);
+            world.AddCharacter(new CharacterConfig(), dummy);
+            return world;
+        }
+
+        [Test]
+        public void SpatulaSpin_HitsFrontThenBack_ThenFliesForwardUpWithInertia()
+        {
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(CharacterPresets.PastryChef(), new Vector3(0f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(1.6f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(-1.6f, GroundY, 0f));
+            Step(world, 2);
+            Step(world, 1, Press(InputButtons.Attack));
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.Ground));
+            float top = 0f;
+            float farthest = 0f;
+            for (int t = 0; t < 90; t++)
+            {
+                Step(world, 1);
+                top = System.Math.Max(top, world.GetState(0).Position.Y);
+                farthest = System.Math.Max(farthest, world.GetState(0).Position.X);
+            }
+            Assert.That(world.GetState(1).Combat.LastAttacker, Is.EqualTo(0), "前の相手に当たらない");
+            Assert.That(world.GetState(2).Combat.LastAttacker, Is.EqualTo(0), "後ろの相手に当たらない");
+            Assert.That(world.GetState(2).Combat.HasLastAttacker, Is.True);
+            Assert.That(top, Is.GreaterThan(3f), "最後に飛び上がらない");
+            Assert.That(farthest, Is.GreaterThan(4f), "前の斜め上へ飛ばない（慣性で進まない）");
+        }
+
+        [Test]
+        public void PaletteKnives_HaveDiagonalHitboxes()
+        {
+            var center = Vector2.Zero;
+            var half = new Vector2(2.6f, 0.35f);
+            float angle = 35f * System.MathF.PI / 180f;
+            var body = new Vector2(0.4f, 0.9f);
+            Assert.That(HitShapes.Overlaps(center, half, angle, new Vector2(2.3f, 1.6f), body), Is.True, "斜め上の相手に当たらない");
+            Assert.That(HitShapes.Overlaps(center, half, angle, new Vector2(2.3f, -1.6f), body), Is.False, "反対の斜めに当たった");
+            Assert.That(HitShapes.Overlaps(center, half, -angle, new Vector2(2.3f, -1.6f), body), Is.True, "向きを変えた判定が当たらない");
+
+            // 空中で出すと、斜め上の相手に当たる。
+            SimWorld world = AirWorld(CharacterPresets.PastryChef(), new Vector3(0f, 8f, 0f), new Vector3(2.2f, 9.5f, 0f));
+            Step(world, 1, Press(InputButtons.Attack));
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirNeutral));
+            Step(world, 14);
+            Assert.That(world.GetState(1).Combat.HasLastAttacker, Is.True, "斜めの判定が当たらない");
+            Assert.That(world.GetState(1).Combat.ComboCount, Is.EqualTo(1), "1 回だけ当たる（ExclusiveHits）");
+        }
+
+        [Test]
+        public void HandMixer_HitsFourTimes()
+        {
+            SimWorld world = AirWorld(CharacterPresets.PastryChef(), new Vector3(0f, 8f, 0f), new Vector3(1.9f, 8f, 0f));
+            Step(world, 1, Press(InputButtons.Attack, 1f));
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirSide));
+            Step(world, 60);
+            Assert.That(world.GetState(1).Combat.ComboCount, Is.EqualTo(4), "多段ヒットしない");
+        }
+
+        [TestCase(8f, false, TestName = "低い所から落とすと FATAL ではない")]
+        [TestCase(34f, true, TestName = "高い所から落とすと FATAL")]
+        public void DigitalScale_GetsHeavierTheLongerItFalls(float height, bool fatal)
+        {
+            SimWorld world = AirWorld(CharacterPresets.PastryChef(), new Vector3(0f, height, 0f), new Vector3(0f, GroundY, 0f));
+            Step(world, 1, Press(InputButtons.Attack, 0f, -1f));
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirDown));
+            Step(world, 8);
+            WorldObject scale = OfKind(world, WorldObjectKind.Scale).Single();
+            int grams = PastryRules.ScaleGrams(scale, Chef.Skills.Scale, world.Tick);
+            Assert.That(grams, Is.GreaterThan(Chef.Skills.Scale.BaseGrams), "グラム数が増えない");
+            Step(world, 150);
+            Assert.That(world.GetState(1).Combat.HasLastAttacker, Is.True, "落ちたスケールが当たらない");
+            Assert.That(world.GetState(1).Combat.FatalHitCount, Is.EqualTo(fatal ? 1 : 0));
+            Assert.That(OfKind(world, WorldObjectKind.Scale), Is.Empty, "当たっても消えない");
+        }
+
+        [Test]
+        public void BowlGuard_BlocksProjectilesComingFromAbove()
+        {
+            SimWorld world = AirWorld(CharacterPresets.PastryChef(), new Vector3(0f, 8f, 0f), new Vector3(30f, GroundY, 0f));
+            world.Objects.Add(new WorldObject
+            {
+                Kind = WorldObjectKind.Macaron, Owner = 1, Slot = AttackSlot.Super, Position = new Vector2(0f, 12f),
+                Velocity = new Vector2(0f, -12f), ExpireTick = int.MaxValue, BonusPercent = 0,
+            });
+            Step(world, 1, Press(InputButtons.Attack, 0f, 1f));
+            Assert.That(world.GetState(0).Action.Attack, Is.EqualTo(AttackSlot.AirUp));
+            Step(world, 20);
+            Assert.That(world.GetState(0).Combat.ShieldBlockCount, Is.EqualTo(1), "上から来たマカロンを防がない");
+            Assert.That(world.GetState(0).Combat.HasLastAttacker, Is.False, "防いだのに当たった");
+            Assert.That(OfKind(world, WorldObjectKind.Macaron), Is.Empty);
+        }
+
+        [Test]
+        public void Respawned_Character_IsNotWarpedOrBouncedByPlacedObjects()
+        {
+            // 復帰した後の無干渉の間は、置かれた物（わたがし）にも弾かれない（ユーザーの要望、2026-10-21）。
+            var world = new SimWorld(TestArenas.Ground());
+            world.AddCharacter(CharacterPresets.PastryChef(), new Vector3(-20f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, GroundY, 0f));
+            world.Objects.Add(new WorldObject
+            {
+                Kind = WorldObjectKind.CottonCandy, Owner = 0, Position = new Vector2(0f, 0.2f), Velocity = Vector2.UnitY,
+                End = new Vector2(1.8f, 0.4f), ExpireTick = int.MaxValue,
+            });
+            Edit(world, 1, s => { s.Combat.InvincibleTicksLeft = 60; return s; });
+            Step(world, 2);
+            Assert.That(world.GetState(1).Velocity.Y, Is.LessThan(1f), "無干渉の間に、わたがしに弾かれた");
+            float top = 0f;
+            for (int t = 0; t < 90; t++)
+            {
+                Step(world, 1);
+                top = System.Math.Max(top, world.GetState(1).Position.Y);
+            }
+            Assert.That(top, Is.GreaterThan(GroundY + 3f), "無干渉が終わっても弾かれない");
+        }
     }
 }

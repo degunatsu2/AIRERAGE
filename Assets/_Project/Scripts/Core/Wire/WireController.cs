@@ -40,6 +40,7 @@ namespace Airerage.Core.Wire
                     {
                         Fire(ref state, input, tuning);
                         AdvanceHook(ref state, tuning);
+                        TryStartWhip(ref state, input, tuning);
                     }
                     break;
 
@@ -56,6 +57,7 @@ namespace Airerage.Core.Wire
                     else
                     {
                         AdvanceHook(ref state, tuning);
+                        TryStartWhip(ref state, input, tuning);
                     }
                     break;
 
@@ -65,6 +67,11 @@ namespace Airerage.Core.Wire
                     break;
 
                 case WirePhase.Retracting:
+                    if (state.Wire.Whip)
+                    {
+                        UpdateWhip(ref state, input, tuning);
+                        break;
+                    }
                     state.Wire.PhaseTicks++;
                     if (state.Wire.PhaseTicks >= tuning.MissRetractTicks)
                     {
@@ -299,6 +306,38 @@ namespace Airerage.Core.Wire
             state.Velocity = swing * (speed * tuning.AttachTurnSpeed);
         }
 
+        // インバータ（SOLDERER の E）の間に、何もない所・つながらない物へ撃って外れ、ボタンを押したままなら、鞭にする（ユーザーの案、
+        // 2026-10-21）。鞭の間は回収せず、何にもつながらない。
+        private static void TryStartWhip(ref CharacterState state, in InputFrame input, WireTuning tuning)
+        {
+            WireState wire = state.Wire;
+            if (wire.Phase == WirePhase.Retracting && wire.PhaseTicks == 0 && state.Combat.InverterOn
+                && tuning.ButtonMode == WireButtonMode.Hold && input.IsHeld(InputButtons.Wire)
+                && (wire.LastMissReason == WireMissReason.OutOfRange || wire.LastMissReason == WireMissReason.HitNonAttachable))
+            {
+                state.Wire.Whip = true;
+                UpdateWhip(ref state, input, tuning);
+            }
+        }
+
+        // 鞭: ボタンを押している間は、照準の方向へ射程の長さだけ伸ばす（ElectricRules が当たりを調べる）。離したら回収する。
+        private static void UpdateWhip(ref CharacterState state, in InputFrame input, WireTuning tuning)
+        {
+            if (!state.Combat.InverterOn || !input.IsHeld(InputButtons.Wire))
+            {
+                state.Wire.Whip = false;
+                state.Wire.PhaseTicks = 0;
+                return;
+            }
+            float length = input.Aim.Length();
+            if (length > 0.2f)
+            {
+                state.Wire.HookDirection = new Vector3(input.Aim.X / length, input.Aim.Y / length, 0f);
+            }
+            state.Wire.HookPosition = state.Position + state.Wire.HookDirection * tuning.MaxLength;
+            state.Wire.PhaseTicks = 0;
+        }
+
         private static void Miss(ref CharacterState state, WireMissReason reason)
         {
             SetPhase(ref state.Wire, WirePhase.Retracting);
@@ -323,6 +362,7 @@ namespace Airerage.Core.Wire
         {
             wire.Phase = phase;
             wire.PhaseTicks = 0;
+            wire.Whip = false;
         }
     }
 }

@@ -26,6 +26,9 @@ namespace Airerage.Runtime.Presentation
     /// - わたがしの足場（PASTRY CHEF の Q）: 表の向きを向いた、横長のピンクの雲。消える前の 1 秒は点滅する。
     /// - クリーム（E）: 飛んでいる間は小さな玉、張り付いたら面に沿った板（オレンジ・抹茶の色）。消える前の 1 秒は点滅する。
     /// - マカロン（R）: 色の殻とクリームの間の円盤（虹は色が回る）。投げる前は隠し、投げた瞬間に音を鳴らす。消える前に点滅する。
+    /// - デジタルスケール（PASTRY CHEF の空中下）: 灰色の量りとボウル。上にグラム数（FATAL の重さを超えたら赤く光る）。
+    /// - 雷の波動（SOLDERER のインバータ）: 地形の箱の縁を両回りに進むジグザグの光。
+    /// - ボールライトニング（SOLDERER の R）: 脈打つ光の球と、周りのジグザグ。放つ前は隠し、止まった後は消える前に点滅する。
     /// 物が出たとき・セーフティボックスが消えたとき（ばらまき）に音を鳴らす（_audio があれば）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class WorldObjectsView : MonoBehaviour
@@ -44,7 +47,7 @@ namespace Airerage.Runtime.Presentation
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
-        [Tooltip("見た目の見本（ミラーボール、セーフティボックス、投射物、突風、風の帯、ワープポータル、ミサイル、ビーム、わたがし、飛ぶクリーム、張り付いたクリーム、マカロンの順）。シーンでは隠しておく")]
+        [Tooltip("見た目の見本（ミラーボール、セーフティボックス、投射物、突風、風の帯、ワープポータル、ミサイル、ビーム、わたがし、飛ぶクリーム、張り付いたクリーム、マカロン、デジタルスケール、雷の波動、ボールライトニングの順）。シーンでは隠しておく")]
         [SerializeField] private GameObject[] _templates = new GameObject[0];
         [Tooltip("セーフティボックスの枚数を画面に写すカメラ")]
         [SerializeField] private Camera _camera;
@@ -121,7 +124,14 @@ namespace Airerage.Runtime.Presentation
             public Vector3 BeamStart;
             public int BankedAtSpawn;
             public bool Launched;
+            public string Grams = string.Empty;
+            public bool Heavy;
+            public LineRenderer Spark;
         }
+
+        // 雷のジグザグの色。
+        private static readonly Color Electric = new Color(1f, 0.95f, 0.4f);
+        private static readonly Color ElectricBlue = new Color(0.45f, 0.85f, 1f);
 
         /// <summary>クリームの色（オレンジ・抹茶）。</summary>
         public static Color CreamColor(byte flavor)
@@ -315,6 +325,7 @@ namespace Airerage.Runtime.Presentation
             shown.Swirl = FindLine(visual, "Swirl");
             shown.Link = FindLine(visual, "Link");
             shown.Trail = FindLine(visual, "Trail");
+            shown.Spark = FindLine(visual, "Spark");
             shown.BeamCore = FindLine(visual, "Core");
             shown.BeamGlow = FindLine(visual, "Glow");
             shown.PortalRing = item.Kind == WorldObjectKind.Portal ? FindLine(visual, "Ring") : null;
@@ -398,6 +409,10 @@ namespace Airerage.Runtime.Presentation
                     break;
                 case WorldObjectKind.CreamShot:
                     _audio.Play(SoundId.Swing, 0.35f, 0.15f);
+                    break;
+                case WorldObjectKind.ShockWave:
+                    // インバータで足場につないで、雷が地面を伝い始めた（SOLDERER）。
+                    _audio.Play(SoundId.Thunder, 0.8f, 0.04f);
                     break;
             }
         }
@@ -584,6 +599,21 @@ namespace Airerage.Runtime.Presentation
                 case WorldObjectKind.Macaron:
                     UpdateMacaron(shown, item);
                     break;
+                case WorldObjectKind.Scale:
+                {
+                    ScaleTuning scale = _feed.GetConfig(item.Owner).Skills.Scale;
+                    int grams = PastryRules.ScaleGrams(item, scale, _feed.CurrentTick);
+                    shown.Grams = $"{grams}g";
+                    shown.Heavy = grams >= scale.FatalGrams;
+                    t.localScale = Vector3.one;
+                    break;
+                }
+                case WorldObjectKind.ShockWave:
+                    UpdateShockWave(shown, item);
+                    break;
+                case WorldObjectKind.BallLightning:
+                    UpdateBall(shown, item);
+                    break;
             }
             foreach (WindShadow wind in shown.Winds)
             {
@@ -708,6 +738,68 @@ namespace Airerage.Runtime.Presentation
                     renderer.SetPropertyBlock(_block);
                 }
             }
+        }
+
+        // 雷の波動: 始まりの点から両回りに、進んだ所までジグザグの光（先ほど明るい）。
+        private void UpdateShockWave(Shown shown, in WorldObject wave)
+        {
+            shown.Visual.transform.position = Vector3.zero;
+            shown.Visual.transform.localScale = Vector3.one;
+            if (shown.Spark == null)
+            {
+                return;
+            }
+            InverterTuning tuning = _feed.GetConfig(wave.Owner).Skills.Inverter;
+            float travel = ElectricRules.WaveTravel(wave, tuning, _feed.CurrentTick);
+            const int points = 32;
+            LineRenderer line = shown.Spark;
+            line.positionCount = points;
+            int frame = Mathf.FloorToInt(Time.time * 30f);
+            for (int i = 0; i < points; i++)
+            {
+                // -travel から +travel まで（真ん中が始まりの点）。
+                float d = Mathf.Lerp(-travel, travel, i / (float)(points - 1));
+                System.Numerics.Vector2 p = ElectricRules.PointAlong(wave, d);
+                float jitter = (Mathf.PerlinNoise(i * 0.9f, frame * 0.41f) - 0.5f) * 0.35f;
+                line.SetPosition(i, new Vector3(p.X, p.Y + jitter, -0.7f));
+            }
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Electric, 0.5f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.35f, 0.5f), new GradientAlphaKey(1f, 1f) });
+            line.colorGradient = gradient;
+        }
+
+        // ボールライトニング: 放つまでは隠す。脈打つ光と、周りのジグザグ。止まった後は消える前の 1 秒に点滅する。
+        private void UpdateBall(Shown shown, in WorldObject ball)
+        {
+            bool launched = ball.Stored != 0;
+            bool visible = launched && (!ElectricRules.IsResting(ball) || ExpireBlink(ball));
+            if (launched && !shown.Launched && _primed && _audio != null)
+            {
+                _audio.Play(SoundId.MissileFire, 0.6f, 0.1f);
+            }
+            shown.Launched = launched;
+            SetVisible(shown, visible);
+            float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 18f + ball.Id);
+            shown.Visual.transform.localScale = Vector3.one * (0.9f + 0.2f * pulse);
+            Tint(shown, Color.Lerp(Electric, Color.white, pulse * 0.6f), null);
+            if (shown.Spark == null)
+            {
+                return;
+            }
+            shown.Spark.enabled = visible;
+            const int points = 9;
+            shown.Spark.loop = true;
+            shown.Spark.positionCount = points;
+            int frame = Mathf.FloorToInt(Time.time * 24f);
+            for (int i = 0; i < points; i++)
+            {
+                float angle = Mathf.PI * 2f * i / points;
+                float radius = 0.75f + (Mathf.PerlinNoise(i * 1.3f, frame * 0.5f + ball.Id) - 0.5f) * 0.6f;
+                shown.Spark.SetPosition(i, shown.Anchor + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, -0.7f));
+            }
+            shown.Spark.startColor = shown.Spark.endColor = new Color(ElectricBlue.r, ElectricBlue.g, ElectricBlue.b, 0.85f);
         }
 
         // マカロン: 投げるまでは隠す。投げたら転がるように回し、色を塗る。点滅の間は点滅する。
@@ -898,11 +990,22 @@ namespace Airerage.Runtime.Presentation
             }
             if (_label == null)
             {
-                _label = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-                _label.normal.textColor = Color.white;
+                _label = TextFlash.Style(16, FontStyle.Bold, TextAnchor.MiddleCenter);
             }
             foreach (Shown shown in _shown.Values)
             {
+                if (shown.Kind == WorldObjectKind.Scale)
+                {
+                    // デジタルスケールのグラム数（FATAL の重さを超えたら赤く光る）。
+                    Vector3 s = _camera.WorldToScreenPoint(shown.Anchor + new Vector3(0f, 1.1f, 0f));
+                    if (s.z > 0f)
+                    {
+                        Color gramsColor = shown.Heavy ? Color.Lerp(new Color(1f, 0.25f, 0.2f), Color.white, 0.3f + 0.3f * Mathf.Sin(Time.time * 20f))
+                            : new Color(0.55f, 1f, 0.6f);
+                        GuidePlate.DrawText(new Rect(s.x - 60f, Screen.height - s.y - 14f, 120f, 28f), shown.Grams, _label, gramsColor);
+                    }
+                    continue;
+                }
                 if (shown.Kind != WorldObjectKind.Safe)
                 {
                     continue;

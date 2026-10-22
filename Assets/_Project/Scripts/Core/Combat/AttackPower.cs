@@ -31,6 +31,12 @@ namespace Airerage.Core.Combat
 
         /// <summary>上乗せ（威力）: ミサイルが飛んでいた時間（SPACE TRAVELER のスペースミサイル）。</summary>
         FlightTime = 1 << 5,
+
+        /// <summary>倍率: クリティカル判定（SOLDERER の指先。AttackHit.Critical）。</summary>
+        Critical = 1 << 6,
+
+        /// <summary>上乗せ（威力と吹き飛び）: 落ちていた時間（PASTRY CHEF のデジタルスケール）。</summary>
+        FallTime = 1 << 7,
     }
 
     /// <summary>
@@ -71,6 +77,12 @@ namespace Airerage.Core.Combat
             Fatal = fatal;
             Jackpot = jackpot;
             Sources = sources;
+        }
+
+        /// <summary>クリティカル判定が当たった強さ（倍率に scale を掛け、FATAL にする）。</summary>
+        public AttackPower WithCritical(float scale)
+        {
+            return new AttackPower(Multiplier * scale, BonusPercent, KnockbackBonusPercent, true, Jackpot, Sources | PowerSource.Critical);
         }
 
         /// <summary>何もかからない強さ（倍率 1、上乗せ 0）。</summary>
@@ -125,7 +137,7 @@ namespace Airerage.Core.Combat
             else if (attacker.Action.Attack == combat.KoAttack)
             {
                 multiplier *= combat.KoKnockbackScale(attacker.Action.StrikeSpeed);
-                fatal = attacker.Action.StrikeSpeed >= combat.FatalStrikeSpeed;
+                fatal = !attack.FatalOnlyByCritical && attacker.Action.StrikeSpeed >= combat.FatalStrikeSpeed;
                 sources |= PowerSource.KoSpeed;
             }
 

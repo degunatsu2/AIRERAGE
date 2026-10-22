@@ -232,7 +232,8 @@ namespace Airerage.Runtime.Presentation
         // 抹茶のクリームに張り付いた長さ（ティック。円形のゲージの割合に使う）。
         private int _creamStickTicks;
 
-        // 壁に張り付いていられる残り（WallCling.Remaining）。抹茶のクリーム（PASTRY CHEF の E）に張り付いている間は、離れるまでの残り。
+        // 壁に張り付いていられる残り（WallCling.Remaining）。抹茶のクリーム（PASTRY CHEF の E）に張り付いている間と、感電している間は、
+        // 解けるまでの残り。
         // 張り付いていなければ隠す。
         private void RenderWallCling(in CharacterState state, MovementTuning movement)
         {
@@ -241,7 +242,8 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             float remaining = movement != null ? WallCling.Remaining(state, movement) : 0f;
-            int stick = state.Combat.CreamStickTicksLeft;
+            // 感電（SOLDERER の雷の波動・ボールライトニング）も、解けるまでの残りを同じゲージで出す。
+            int stick = Mathf.Max(state.Combat.CreamStickTicksLeft, state.Combat.StunTicksLeft);
             _creamStickTicks = stick > 0 ? Mathf.Max(_creamStickTicks, stick) : 0;
             if (stick > 0)
             {
@@ -528,9 +530,11 @@ namespace Airerage.Runtime.Presentation
             AttackHit hit = null;
             if (state.Action.Kind == ActionKind.Attack)
             {
-                foreach (AttackHit candidate in combat.Get(state.Action.Attack).Hits)
+                AttackData attack = combat.Get(state.Action.Attack);
+                foreach (AttackHit candidate in attack.Hits)
                 {
-                    hit = hit ?? (candidate.IsActiveAt(state.Action.Ticks) ? candidate : null);
+                    bool active = candidate.IsActiveAt(state.Action.Ticks) && attack.Uses(candidate.Charge, state.Action.Charge);
+                    hit = hit ?? (active ? candidate : null);
                 }
             }
             _hitboxLine.enabled = hit != null;
@@ -542,10 +546,13 @@ namespace Airerage.Runtime.Presentation
             const float z = -0.6f; // キャラクターの手前に描く
             _hitboxLine.loop = true;
             _hitboxLine.positionCount = 4;
-            _hitboxLine.SetPosition(0, new Vector3(center.X - half.X, center.Y - half.Y, z));
-            _hitboxLine.SetPosition(1, new Vector3(center.X + half.X, center.Y - half.Y, z));
-            _hitboxLine.SetPosition(2, new Vector3(center.X + half.X, center.Y + half.Y, z));
-            _hitboxLine.SetPosition(3, new Vector3(center.X - half.X, center.Y + half.Y, z));
+            // 傾いた判定（AttackHit.AngleDeg）は、傾けて描く。
+            float angle = HitResolver.HitAngle(state, hit);
+            for (int i = 0; i < 4; i++)
+            {
+                System.Numerics.Vector2 corner = HitShapes.Corner(center, half, angle, i);
+                _hitboxLine.SetPosition(i, new Vector3(corner.X, corner.Y, z));
+            }
         }
     }
 }

@@ -14,6 +14,7 @@ namespace Airerage.Editor
     /// - STORM RUNNER: ブレードシューズ（靴と 2 本の刃）、胸に「風」のゼッケン。
     /// - SPACE TRAVELER: 白い宇宙服と胸のパネル、首の輪、透明な宇宙帽、背中の生命維持装置。
     /// - PASTRY CHEF: クリーム色のコック帽（ふくらんだ上と帯）とコックコート（2 列のボタン、首のスカーフ）。
+    /// - SOLDERER: 濃い紺の作業着と胸の稲妻の線（光る水色）、額のゴーグル、背中のバッテリーと端子。
     /// </summary>
     internal static class CostumeBuilder
     {
@@ -79,6 +80,27 @@ namespace Airerage.Editor
             Part(chef, PrimitiveType.Cylinder, "HatBand", new Vector3(0f, 1.0f, 0f), new Vector3(0.74f, 0.11f, 0.74f), cream);
             Part(chef, PrimitiveType.Sphere, "HatPuff", new Vector3(0f, 1.3f, 0f), new Vector3(1.0f, 0.62f, 1.0f), cream);
 
+            // SOLDERER: 作業着、稲妻の線、ゴーグル、バッテリー。
+            Transform solderer = Set(view.transform, "CostumeSolderer");
+            bodySets[(int)CharacterCostume.Solderer] = solderer.gameObject;
+            Part(solderer, PrimitiveType.Cube, "WorkSuit", new Vector3(0f, -0.2f, 0f), new Vector3(0.87f, 1.04f, 0.87f), Lit("CostumeWorkSuit", new Color(0.1f, 0.13f, 0.22f)));
+            Material spark = SandboxWireSceneBuilder.LoadOrCreateMaterial("CostumeSpark", new Color(0.36f, 0.88f, 1f), unlit: true);
+            // 胸の稲妻（斜めの 3 本の帯で Z の形）。
+            PartRotated(solderer, PrimitiveType.Cube, "BoltTop", new Vector3(0.06f, 0.14f, -0.442f), new Vector3(0.07f, 0.26f, 0.02f), new Vector3(0f, 0f, -28f), spark);
+            PartRotated(solderer, PrimitiveType.Cube, "BoltMiddle", new Vector3(0f, 0.01f, -0.442f), new Vector3(0.24f, 0.06f, 0.02f), new Vector3(0f, 0f, 18f), spark);
+            PartRotated(solderer, PrimitiveType.Cube, "BoltBottom", new Vector3(-0.06f, -0.14f, -0.442f), new Vector3(0.07f, 0.26f, 0.02f), new Vector3(0f, 0f, -28f), spark);
+            Part(solderer, PrimitiveType.Cube, "Belt", new Vector3(0f, -0.42f, 0f), new Vector3(0.9f, 0.08f, 0.9f), Lit("CostumeBelt", new Color(0.3f, 0.24f, 0.16f)));
+            Material goggleFrame = Lit("CostumeGoggleFrame", new Color(0.2f, 0.2f, 0.22f));
+            Part(solderer, PrimitiveType.Cube, "GoggleBand", new Vector3(0f, 0.72f, 0f), new Vector3(0.84f, 0.08f, 0.84f), goggleFrame);
+            Material lens = SandboxWireSceneBuilder.LoadOrCreateMaterial("CostumeGoggleLens", new Color(1f, 0.7f, 0.15f), unlit: true);
+            PartRotated(solderer, PrimitiveType.Cylinder, "GoggleLeft", new Vector3(-0.17f, 0.74f, -0.43f), new Vector3(0.2f, 0.03f, 0.2f), new Vector3(90f, 0f, 0f), lens);
+            PartRotated(solderer, PrimitiveType.Cylinder, "GoggleRight", new Vector3(0.17f, 0.74f, -0.43f), new Vector3(0.2f, 0.03f, 0.2f), new Vector3(90f, 0f, 0f), lens);
+            Transform soldererFacing = Set(facing, "CostumeSoldererFacing");
+            facingSets[(int)CharacterCostume.Solderer] = soldererFacing.gameObject;
+            Part(soldererFacing, PrimitiveType.Cube, "Battery", new Vector3(-0.5f, -0.05f, 0f), new Vector3(0.2f, 0.62f, 0.5f), Lit("CostumeBattery", new Color(0.85f, 0.65f, 0.1f)));
+            Part(soldererFacing, PrimitiveType.Cube, "TerminalTop", new Vector3(-0.5f, 0.3f, -0.12f), new Vector3(0.1f, 0.1f, 0.1f), spark);
+            Part(soldererFacing, PrimitiveType.Cube, "TerminalBottom", new Vector3(-0.5f, 0.3f, 0.12f), new Vector3(0.1f, 0.1f, 0.1f), black);
+
             var costume = view.gameObject.AddComponent<CostumeView>();
             costume.Configure(bodySets, facingSets, texts.ToArray(), view.GetComponent<Renderer>());
             SandboxWireSceneBuilder.SetReference(view, "_costume", costume);
@@ -104,6 +126,20 @@ namespace Airerage.Editor
             GameObject go = SandboxWireSceneBuilder.CreateVisual(type, name, material, Divide(size));
             go.transform.SetParent(parent, false);
             go.transform.localPosition = Divide(center);
+            go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        // 回した部品 1 つ（rotation 度）。箱の大きさで歪まないように、入れ物で箱の大きさを打ち消してから回す。
+        private static void PartRotated(Transform parent, PrimitiveType type, string name, Vector3 center, Vector3 size, Vector3 rotation,
+            Material material)
+        {
+            var holder = new GameObject(name);
+            holder.transform.SetParent(parent, false);
+            holder.transform.localPosition = Divide(center);
+            holder.transform.localScale = Divide(Vector3.one);
+            holder.transform.localEulerAngles = rotation;
+            GameObject go = SandboxWireSceneBuilder.CreateVisual(type, name + "Part", material, size);
+            go.transform.SetParent(holder.transform, false);
             go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 

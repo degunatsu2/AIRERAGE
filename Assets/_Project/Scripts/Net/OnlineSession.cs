@@ -805,7 +805,9 @@ namespace Airerage.Net
                 {
                     _previous[p] = World.GetState(p);
                 }
-                Exchange.AdvanceFrame(localInput(Session.LocalInputTick));
+                // インバータ（SOLDERER）の間は、ワイヤーを押している間の照準も送る（鞭の向き）。
+                bool keepWireAim = LocalPlayer >= 0 && LocalPlayer < PlayerCount && World.GetState(LocalPlayer).Combat.InverterOn;
+                Exchange.AdvanceFrame(localInput(Session.LocalInputTick), keepWireAim);
                 _waitFrames += Exchange.RecommendWaitFrames();
             }
             if (ticks == MaxTicksPerFrame && _accumulator >= SimTime.DeltaTime)

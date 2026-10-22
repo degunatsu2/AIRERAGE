@@ -242,7 +242,27 @@ namespace Airerage.Core.Combat
             }
             StartAttack(ref state, slot, combat, input);
             state.Action.Charge = charge;
+            AttackData started = combat.Get(slot);
+            if (started.AimFromMove)
+            {
+                state.Action.Aim = MoveDirection(input, state.Facing, config.Movement.MoveDeadzone);
+                if (MathF.Abs(state.Action.Aim.X) > 0.1f)
+                {
+                    state.Facing = state.Action.Aim.X > 0f ? 1 : -1;
+                }
+            }
+            if (slot == AttackSlot.Special1 && started.ChainMax > 1)
+            {
+                AfterChainStep(ref state, combat);
+            }
             return true;
+        }
+
+        // 移動の入力の方向（長さ 1。入れていなければ向いている方向の水平）。
+        private static Vector2 MoveDirection(in InputFrame input, int facing, float deadzone)
+        {
+            float length = input.Move.Length();
+            return length >= deadzone && length > 1e-4f ? input.Move / length : new Vector2(facing >= 0 ? 1f : -1f, 0f);
         }
 
         /// <summary>
@@ -255,7 +275,7 @@ namespace Airerage.Core.Combat
             {
                 case AttackSlot.Special1:
                     return combat.Special1MaxCharges > 1 ? state.Combat.Special1Spent < combat.Special1MaxCharges
-                        : state.Combat.Special1CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
+                        : state.Combat.Special1CooldownTicksLeft == 0 || CanRecast(state, slot, combat) || CanChain(state, combat);
                 case AttackSlot.Special2:
                     return combat.Special2MaxCharges > 1 ? state.Combat.Special2Spent < combat.Special2MaxCharges
                         : state.Combat.Special2CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
@@ -277,7 +297,37 @@ namespace Airerage.Core.Combat
                 SpeedBoostTuning boost = config.Skills.SpeedBoost;
                 return boost.GustWindupTicks + boost.GustRecoveryTicks;
             }
-            return config.Combat.Get(state.Action.Attack).TotalTicks;
+            return config.Combat.Get(state.Action.Attack).TotalTicksFor(state.Action.Charge);
+        }
+
+        /// <summary>連続技（AttackData.ChainMax。特殊攻撃 1）の次を、今出せるか（続けて出せる時間の中で、回数が残っている）。</summary>
+        public static bool CanChain(in CharacterState state, CombatTuning combat)
+        {
+            return combat.Special1.ChainMax > 1 && state.Combat.Special1CooldownTicksLeft == CombatState.CooldownWhileActive
+                && state.Combat.ChainTicksLeft > 0 && state.Combat.ChainCount < combat.Special1.ChainMax;
+        }
+
+        // 連続技を 1 回出した後（ためた長さが決まってから）: 続けられるなら次を待ち（クールタイムを止める）、回数を使い切ったか長押しで
+        // 出したなら終わり、出した回数 × クールタイムを数える。
+        private static void AfterChainStep(ref CharacterState state, CombatTuning combat)
+        {
+            AttackData attack = combat.Special1;
+            state.Combat.ChainCount++;
+            if (attack.IsCharged(state.Action.Charge) || state.Combat.ChainCount >= attack.ChainMax)
+            {
+                EndChain(ref state.Combat, combat);
+                return;
+            }
+            state.Combat.Special1CooldownTicksLeft = CombatState.CooldownWhileActive;
+            state.Combat.ChainTicksLeft = attack.ChainWindowTicks;
+        }
+
+        // 連続技を終える（出した回数 × クールタイム）。
+        private static void EndChain(ref CombatState combat, CombatTuning tuning)
+        {
+            combat.Special1CooldownTicksLeft = Math.Max(1, combat.ChainCount) * tuning.Special1CooldownTicks;
+            combat.ChainCount = 0;
+            combat.ChainTicksLeft = 0;
         }
 
         /// <summary>
@@ -363,11 +413,23 @@ namespace Airerage.Core.Combat
             {
                 foreach (AttackMotion motion in attack.Motions)
                 {
-                    if (motion.IsActiveAt(t) && (!motion.RequiresHit || state.Action.Connected))
+                    if (!motion.IsActiveAt(t) || (motion.RequiresHit && !state.Action.Connected) || !attack.Uses(motion.Charge, state.Action.Charge))
                     {
-                        state.Velocity.X = motion.VelocityX * state.Facing * scale;
-                        state.Velocity.Y = motion.VelocityY * scale;
+                        continue;
                     }
+                    if (motion.AlongAim)
+                    {
+                        // 技の向きへ（イナズマステップ）。
+                        state.Velocity.X = state.Action.Aim.X * motion.VelocityX * scale;
+                        state.Velocity.Y = state.Action.Aim.Y * motion.VelocityX * scale;
+                        if (state.Velocity.Y > 0f)
+                        {
+                            state.Grounded = false;
+                        }
+                        continue;
+                    }
+                    state.Velocity.X = motion.VelocityX * state.Facing * scale;
+                    state.Velocity.Y = motion.VelocityY * scale;
                 }
             }
         }
@@ -432,6 +494,15 @@ namespace Airerage.Core.Combat
             CountDown(ref state.Combat.SpeedBoostTicksLeft);
             CountDown(ref state.Combat.SkyBoostTicksLeft);
             CountDown(ref state.Combat.WarpCooldownTicks);
+            if (state.Combat.ChainTicksLeft > 0)
+            {
+                state.Combat.ChainTicksLeft--;
+                if (state.Combat.ChainTicksLeft == 0 && state.Combat.ChainCount > 0)
+                {
+                    // 続けて出せる時間が切れた。
+                    EndChain(ref state.Combat, combat);
+                }
+            }
             Recharge(ref state.Combat.Special1Spent, ref state.Combat.Special1CooldownTicksLeft, combat.Special1MaxCharges, combat.Special1CooldownTicks);
             Recharge(ref state.Combat.Special2Spent, ref state.Combat.Special2CooldownTicksLeft, combat.Special2MaxCharges, combat.Special2CooldownTicks);
             // 行動の速さの強化が終わったら（時間切れ・撃破）、止めていたクールタイムを数え始める。

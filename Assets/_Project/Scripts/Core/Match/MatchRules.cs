@@ -45,8 +45,12 @@ namespace Airerage.Core.Match
         /// <summary>撃破されてから復帰するまで（ティック）。この間は出現位置で待ち、動かず、攻撃も受けない。</summary>
         public int RespawnDelayTicks = 180;
 
-        /// <summary>復帰した後の無敵（ティック）。攻撃を受けない。自分が攻撃を出すと、そこで無敵が終わる【仮】。</summary>
-        public int InvincibleTicks = 90;
+        /// <summary>
+        /// 復帰した後の無干渉（ティック。点滅する）。攻撃・投射物・置かれた物（ワープポータル、風、わたがし、クリームなど）・ステージの危険の
+        /// 影響を受けず、自分の攻撃も相手に当たらない。動いたり技を出したりはできる（置かれた物でハメられないように。ユーザーの要望、
+        /// 2026-10-21。前は 1.5 秒の無敵で、攻撃を出すと終わっていた）。CombatState.IsUntouchable。
+        /// </summary>
+        public int InvincibleTicks = 60;
 
         /// <summary>
         /// コインが拾われてから、同じ出現地点にまた出るまで（ティック。docs/12 T4-4）。試合が始まったときは全部の地点に出す。

@@ -98,7 +98,7 @@ namespace Airerage.Runtime.Audio
                 _audio.Play(SoundId.Guard, 1f, 0.04f);
             }
             if (now.Wire.Phase == WirePhase.Retracting && before.Wire.Phase != WirePhase.Retracting
-                && now.Wire.LastMissReason == WireMissReason.HitNonAttachable)
+                && now.Wire.LastMissReason == WireMissReason.HitNonAttachable && !now.Wire.Whip)
             {
                 // ワイヤーが接続できない物に弾かれた（BLOCK!）。
                 _audio.Play(SoundId.Guard, 0.6f, 0.08f);
@@ -120,6 +120,16 @@ namespace Airerage.Runtime.Audio
             if (n.FreezeCount > b.FreezeCount)
             {
                 _audio.Play(SoundId.Freeze, 0.9f, 0.04f);
+            }
+            if (n.StunCount > b.StunCount)
+            {
+                // 雷で感電した（SOLDERER）。
+                _audio.Play(SoundId.Zap, 0.9f, 0.05f);
+            }
+            if (n.ShieldBlockCount > b.ShieldBlockCount)
+            {
+                // ボウルで上からの投射物を防いだ（PASTRY CHEF）。
+                _audio.Play(SoundId.ShieldBlock, 0.9f, 0.04f);
             }
             if (n.FatalHitCount > b.FatalHitCount)
             {

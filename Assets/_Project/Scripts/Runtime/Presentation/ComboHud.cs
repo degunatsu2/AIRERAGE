@@ -49,6 +49,9 @@ namespace Airerage.Runtime.Presentation
             public float HitstunLeft;
             public float EndedAt = -1f;
 
+            /// <summary>数が最後に増えた時刻（文字を白く光らせる。TextFlash）。</summary>
+            public float CountAt = -10f;
+
             public bool Active => EndedAt < 0f;
         }
 
@@ -86,6 +89,10 @@ namespace Airerage.Runtime.Presentation
                         string label = _everyone ? $"{_feed.LabelOf(c.LastAttacker)} > {_feed.LabelOf(i)}" : _feed.LabelOf(i);
                         entry = new Entry { Target = i, Label = label };
                         _entries.Insert(0, entry);
+                    }
+                    if (c.ComboCount != entry.Count)
+                    {
+                        entry.CountAt = Time.time;
                     }
                     entry.Count = c.ComboCount;
                     entry.Coins = CombatRewardRules.DamageRewardAmount(_feed.Rules, c.ComboDamage);
@@ -139,8 +146,8 @@ namespace Airerage.Runtime.Presentation
             }
             if (_big == null)
             {
-                _big = new GUIStyle(GUI.skin.label) { fontSize = 56, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-                _small = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+                _big = TextFlash.Style(56, FontStyle.Bold, TextAnchor.MiddleLeft);
+                _small = TextFlash.Style(22, FontStyle.Bold, TextAnchor.MiddleLeft);
             }
             Color previous = GUI.color;
             float y = 140f;
@@ -155,11 +162,13 @@ namespace Airerage.Runtime.Presentation
 
         private void DrawEntry(Entry entry, float x, float y, float alpha)
         {
-            Shadowed(new Rect(x, y, 130f, 64f), entry.Count.ToString(), _big, _countColor, alpha);
+            // 数が増えた瞬間は白く光り、すぐに本来の色へ（TextFlash）。
+            float age = Time.time - entry.CountAt;
+            Shadowed(new Rect(x, y, 130f, 64f), entry.Count.ToString(), _big, TextFlash.Apply(_countColor, age), alpha);
             Shadowed(new Rect(x + 128f, y + 8f, 160f, 30f), "COMBO", _small, Color.white, alpha);
             Shadowed(new Rect(x + 128f, y + 34f, 200f, 26f), $"vs {entry.Label}", _small, new Color(0.8f, 0.8f, 0.85f), alpha * 0.8f);
             // コイン（今は威力の合計【仮】）。大きめの数字で。
-            Shadowed(new Rect(x, y + 58f, 300f, 50f), $"+{entry.Coins} COIN", _big, _coinColor, alpha, 0.7f);
+            Shadowed(new Rect(x, y + 58f, 300f, 50f), $"+{entry.Coins} COIN", _big, TextFlash.Apply(_coinColor, age), alpha, 0.7f);
 
             // のけぞりの残り。
             var back = new Rect(x, y + 112f, 240f, 12f);

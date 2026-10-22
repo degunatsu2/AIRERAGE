@@ -245,7 +245,9 @@ namespace Airerage.Runtime.Presentation
             bool jackpot = IsJackpot(wheel.Roll);
             Color color = jackpot ? Color.HSVToRGB(Mathf.Repeat(Time.time * 1.2f, 1f), 0.6f, 1f) : new Color(1f, 0.92f, 0.45f);
             var result = new Rect(center.x - 120f, rect.yMax + 2f, 240f, 40f);
-            GuidePlate.DrawText(result, jackpot ? LabelOf(wheel.Roll) + " JACKPOT!" : LabelOf(wheel.Roll), _resultStyle, color);
+            // 出た瞬間は白く光り、すぐに本来の色へ（TextFlash）。
+            GuidePlate.DrawText(result, jackpot ? LabelOf(wheel.Roll) + " JACKPOT!" : LabelOf(wheel.Roll), _resultStyle,
+                TextFlash.Apply(color, Time.time - wheel.StoppedAt - StopSeconds));
         }
 
         private void EnsureStyles()
@@ -255,7 +257,7 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             _numberStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            _resultStyle = new GUIStyle(GUI.skin.label) { fontSize = 28, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _resultStyle = TextFlash.Style(28, FontStyle.Bold, TextAnchor.MiddleCenter);
             _pointerStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, wordWrap = false };
             _pointerStyle.normal.textColor = new Color(1f, 0.85f, 0.2f);
         }

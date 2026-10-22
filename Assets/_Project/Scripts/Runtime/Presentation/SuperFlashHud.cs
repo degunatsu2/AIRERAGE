@@ -124,7 +124,9 @@ namespace Airerage.Runtime.Presentation
             {
                 Color gold = Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f, 1f), 0.45f, 1f);
                 gold.a = Mathf.Clamp01(alpha / _darkness);
-                GuidePlate.DrawText(new Rect(center.x - 200f, bottom - 24f, 400f, 44f), $"{_feed.LabelOf(_target)}  {moveName}", _name, gold);
+                // 出た瞬間は白く光り、すぐに本来の色へ（TextFlash）。
+                GuidePlate.DrawText(new Rect(center.x - 200f, bottom - 24f, 400f, 44f), $"{_feed.LabelOf(_target)}  {moveName}", _name,
+                    TextFlash.Apply(gold, Time.time - _startedAt));
             }
             GUI.color = previous;
         }
@@ -143,8 +145,7 @@ namespace Airerage.Runtime.Presentation
                 float d = Mathf.Sqrt(dx * dx + dy * dy);
                 return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.55f, 1f, d));
             });
-            _name = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            _name.normal.textColor = Color.white;
+            _name = TextFlash.Style(30, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter);
         }
     }
 }

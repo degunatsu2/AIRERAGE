@@ -291,6 +291,52 @@
 - R: マカロンの半径を 0.3m から 0.9m（3 倍）にした（当たり・地形とのぶつかり・見た目）。頭に重ならないよう、投げる高さを 1.9m にした。
 - E の説明（キャラクター選択の F1）に、抹茶にはワイヤーがつながらないことを書いた（`CharacterProfiles`。2026-10-21）。
 
+### 3.17 文字の演出、リスポーンの無干渉、PASTRY CHEF の通常攻撃（ユーザーの要望、2026-10-21。値はすべて【仮】）
+
+- **文字の色**: ときどき文字が本来の色でなく白く出ることがある、という指摘。再現はできず原因は特定しきれなかったが、考えられる原因
+  （IMGUI のスキンの状態ごとの文字の色に左右される、`GUI.color` の戻し忘れ）を取り除いた: 文字の演出は共通の `TextFlash` を使い、
+  書体はどの状態でも文字を白・背景なしにして、色は `GUI.color` だけで決め、描いた後に必ず戻す。
+- **文字の演出の統一**: ユーザーの好みで、文字の演出はすべて「出た瞬間は白く光り、すぐに本来の色に変わる」にした（`TextFlash.Apply`:
+  白のまま 0.06 秒、0.14 秒かけて本来の色へ）。MISS・CANCEL・BLOCK!、FATAL!・SUPER!・JACKPOT!（`BurstEffectView`）、GUARD・PARRY
+  （`GuardEffectView`）、CHARGE!（`ChargeEffectView`）、COMBO の数と +COIN（`ComboHud`。数が変わるたびに光る）、必殺技の名前
+  （`SuperFlashHud`）、ルーレットの目（`RouletteView`）、置かれた物の文字（`WorldObjectsView`）。
+- **リスポーンの無干渉**: 復帰した後の 1 秒（`MatchRules.InvincibleTicks` = 60）は点滅し、動けるが、攻撃・投射物・置かれた物・ステージの
+  危険のどれにも触れず、自分の攻撃も当たらない（`CombatState.IsUntouchable`。`HitResolver`・`SkillRules`・`PastryRules`・
+  `SpaceRules`・`ElectricRules`・ギミックが調べる）。攻撃を出しても終わらない（D-44 を変更。[12](12_match_plan.md) 3.2）。
+- **PASTRY CHEF の通常攻撃**（[14](14_characters.md) 1.4）: SPATULA SPIN（地上技。前 → 後ろ → 前上へ飛び上がる。体が回る）、PALETTE KNIVES
+  （空中 N。±35° に傾いた細長い判定 2 本）、HAND MIXER（空中横。細い判定の 4 段）、DIGITAL SCALE（空中下・撃破技。落とすスケール
+  `WorldObjectKind.Scale`、`PastryRules.StepScale`。落ちた秒数でグラム数と威力・吹き飛びの上乗せ `PowerSource.FallTime`、1000 g で
+  FATAL。上にグラム数を表示）、BOWL GUARD（空中上。判定が出ている間、上から来たほかの人の投射物を防ぐ `AttackData.BlocksProjectilesAbove`・
+  `PastryRules.TryBlockFromAbove`。防いだら弾く水色の光と「GUARD」（`PastryEffectsView`）と音 `ShieldBlock`）。E のクリームの初速を
+  15 → 21 m/s にした。
+- **仕組みの追加**: 傾いた判定（`AttackHit.AngleDeg`。当たりは分離軸で調べる `HitShapes`）、1 人には判定の 1 つだけ（`ExclusiveHits`）、
+  クリティカル判定（`AttackHit.Critical`。相手の中心から 0.3m 以内）。状態の形式は版 24。
+
+### 3.18 SOLDERER（2026-10-21。ユーザーの案。[14](14_characters.md) 1.5。値はすべて【仮】）
+
+- **Core**（`Skills/ElectricRules.cs`。調整値は `InverterTuning`・`BallLightningTuning`）:
+  - 通常の攻撃: THUNDER KICK（地上技。前後の衝撃波と真上への跳躍）、DISCHARGE（空中 N。体の周りの 4m 四方を 20 ティック）、FINGER SPARK
+    （空中横・撃破技。指先のクリティカル判定は出た瞬間の 1 ティックだけで、FATAL・威力と吹き飛び 2.5 倍。速さでは FATAL にならない
+    `FatalOnlyByCritical`。腕の判定は 14 ティック）、STOMP（空中下。当たると反動で真上へ `RequiresHit`）、THUNDER FLIP（空中上。3 つの判定で弧）。
+  - Q イナズマステップ: 長押しの技で、ためた長さ 10 ティックで短押し・長押しを分ける（判定と動きの `ChargeFilter`、全体の長さ
+    `ChargedTotalTicks`）。向きは出したときの移動の入力（`AimFromMove`。動きは `AttackMotion.AlongAim`）。続けて 3 回まで（`ChainMax`。
+    次を出せる時間 `ChainWindowTicks` = 3 秒は出すたびに戻る）。回数を使い切るか、長押しで出すか、時間が切れたら終わり、使った回数 × 6 秒の
+    クールタイム（`ActionController.AfterChainStep`・`EndChain`）。
+  - E インバータ: 切り替え（`CombatState.InverterOn`）。オンの間はワイヤーの射程が 1/3（`SpeedBoosts.EffectiveConfig`）。外れたワイヤーの
+    ボタンを押したままなら鞭（`WireState.Whip`。照準の方向へ射程の長さ。当たりは `ElectricRules.StepWhips`、のけぞりは 14 ティック・吹き飛びなし）。
+    オンのまま地形の足場につなぐと、雷の波動（`WorldObjectKind.ShockWave`）が箱の縁を両方向へ一周し、触れた人を 1 秒感電させる
+    （`ElectricRules.Stun`: `CombatState.StunTicksLeft`。入力を受け付けず、速さ 0 でその場にとどまる。のけぞると解ける。終わって 0.5 秒は
+    もう感電しない `StunGuardTicks`）。オンラインでは、インバータの間はワイヤーのボタンを押している間の照準も送る（`InputNormalizer` の
+    `keepWireAim`。鞭を振り回すため）。
+  - R ボールライトニング: 0.3 秒ごとに 3 つ、そのときの照準の方向へ 7 m/s で撃つ（`WorldObjectKind.BallLightning`）。地形で跳ね返り、14m
+    進むと止まって 5 秒の罠。触れた持ち主以外を感電させて消える。ゲージ 90%。
+- **表示**: 電気のキャラクターまわり（`ElectricEffectsView`: 感電の稲妻（だれでも）、インバータの火花、攻撃の判定の縁を走る稲妻、
+  イナズマステップの跡（長押しは太い黄色）と長押しのオーラ（長押しの突撃では回る））、感電の残りは円形のゲージ（`CharacterView`）、
+  インバータの間のワイヤーはぎざぎざの水色（`WireView`。鞭も）、雷の波動と電気の球（`WorldObjectsView`）、札の CHAIN と残りの回数
+  （`SkillHud`）、音（感電 `Zap`、雷の波動 `Thunder`）。鞭の間は MISS・BLOCK! を出さない。衣装（`CostumeBuilder`: 紺の作業着と胸の稲妻、
+  ゴーグル、背中のバッテリー）、ロゴ（`CharacterLogoPainter.Solderer`: 電気の水色の稲妻）、キャラクター選択の文（`CharacterProfiles`）。
+  一覧の最後（6 体目）。
+
 ## 4. 確認したいこと
 
 - D-55〜D-58 は決定した（2026-10-15、ユーザー。[02](02_open_decisions.md)）。
@@ -413,3 +459,26 @@ SPACE TRAVELER:
 1. Q を長押し: 予告が最初から足元ではなく、0.1 秒たった瞬間にマウスの方向へ出て、そのまま追いかけるか。短く押したときは足元に置くか。
 2. E: クリームが狭い範囲に濃く飛ぶか。自分の抹茶でも遅くなり、壁・天井で張り付くか。
 3. R: マカロンが大きくなったか（当たりも大きい）。
+
+## 15. 操作での確認（ユーザー。3.17）
+
+1. 文字の演出: MISS・BLOCK!・FATAL!・GUARD・CHARGE!・COMBO・必殺技の名前・ルーレットの目が、出た瞬間に白く光ってすぐ本来の色になるか。
+   白いままの文字が出ることがあれば、どの文字か・何をしたときかを教えてほしい。
+2. リスポーン: 復帰した後 1 秒点滅し、その間はポータル・わたがし・クリーム・攻撃などに触れず、動けるか。自分の攻撃も当たらないか。
+3. PASTRY CHEF の通常攻撃: 地上技（前・後ろ・前上へ飛び上がる。その後の慣性）、空中 N（斜めの 2 本）、空中横（多段）、空中下（スケールが
+   落ちてグラム数が増え、重いと赤く脈打つ。1000 g 以上で当てると FATAL）、空中上（上から来た相手の投射物を防ぎ、GUARD が出るか）。
+4. E のクリームが前より遠くへ飛ぶか。
+
+## 16. 操作での確認（ユーザー。SOLDERER）
+
+`Sandbox_Wire`（F3 で 6 体目）か、メニューの TRAINING のキャラクター選択から SOLDERER を選ぶ。
+
+1. 見た目: 紺の作業着と胸の稲妻、ゴーグル、背中のバッテリー、ロゴ（水色の稲妻）、キャラクター選択の文。
+2. 通常の攻撃: 地上技で真上へ高く跳び、前後に判定が出るか。空中 N の持続、空中横の指先（中心に重ねると FATAL）、空中下で当たると跳ねるか、
+   空中上のサマーソルト。
+3. Q: 短押しで移動の方向へ突撃し、3 秒以内なら続けて合わせて 3 回出せるか（札に CHAIN と残り）。長押しでオーラが出て、離すと長く強く突撃し、
+   そこで終わるか。クールタイムが使った回数で 6・12・18 秒になるか。
+4. E: 押すたびにオン・オフ（火花とワイヤーの見た目）。オンの間は射程が短いか。何もない所へ撃ってボタンを押し続けると鞭になり、マウスで
+   振り回せて当たるか（相手が一瞬止まる）。オンのまま足場につなぐと、雷が足場の縁を一周し、触れたダミーが 1 秒感電するか（円形のゲージ）。
+5. R: 電気の球を 3 つ、それぞれマウスの方向へ撃てるか。壁で跳ね返り、止まって 5 秒残り、触れると感電するか。
+6. 数値（射程 1/3、感電 1 秒、鞭の威力 5、球の速さと距離、ゲージ 90%）の感じ。変えたい値があれば教えてほしい。

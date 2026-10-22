@@ -64,14 +64,28 @@ namespace Airerage.Core.Simulation
             var halfExtents = movement.HalfExtents;
             var halfExtents2 = new System.Numerics.Vector2(halfExtents.X, halfExtents.Y);
 
-            // 吹雪で凍っている間と、抹茶のクリームに張り付いている間は、入力を受け付けない（攻撃を受けてのけぞったら解ける）。
+            // 吹雪で凍っている間と、抹茶のクリームに張り付いている間と、感電している間は、入力を受け付けない（攻撃を受けてのけぞったら解ける）。
             if (state.Action.Kind == ActionKind.Hitstun)
             {
                 state.Combat.FrozenTicksLeft = 0;
                 state.Combat.CreamStickTicksLeft = 0;
+                state.Combat.StunTicksLeft = 0;
+            }
+            if (state.Combat.StunGuardTicks > 0)
+            {
+                state.Combat.StunGuardTicks--;
+            }
+            if (state.Combat.WhipGuardTicks > 0)
+            {
+                state.Combat.WhipGuardTicks--;
             }
             bool frozen = state.Combat.FrozenTicksLeft > 0;
             bool stuck = state.Combat.CreamStickTicksLeft > 0;
+            bool stunned = state.Combat.StunTicksLeft > 0;
+            if (stunned)
+            {
+                state.Combat.StunTicksLeft--;
+            }
             if (frozen)
             {
                 state.Combat.FrozenTicksLeft--;
@@ -80,7 +94,7 @@ namespace Airerage.Core.Simulation
             {
                 state.Combat.CreamStickTicksLeft--;
             }
-            if (frozen || stuck)
+            if (frozen || stuck || stunned)
             {
                 effectiveInput = default;
                 frame = new InputFrame(default, state.PreviousButtons);
@@ -104,11 +118,6 @@ namespace Airerage.Core.Simulation
                 state.Combat.HazardImmunityTicks--;
             }
             ActionController.Update(ref state, frame, config);
-            if (state.Action.Kind == ActionKind.Attack)
-            {
-                // 復帰した後の無敵は、自分が攻撃を出すと終わる【仮】（無敵のまま一方的に攻撃できないように）。
-                state.Combat.InvincibleTicksLeft = 0;
-            }
             if (!state.Action.IsFree || ActionController.IsRootedHold(state, config.Combat))
             {
                 frame = new InputFrame(ActionController.ControlInput(state, effectiveInput, config.Combat), state.PreviousButtons);
@@ -147,7 +156,12 @@ namespace Airerage.Core.Simulation
             {
                 state.Velocity.X = 0f;
             }
-            if (stuck)
+            if (stunned)
+            {
+                // 感電: 重力も受けず、その場にとどまる。
+                state.Velocity = System.Numerics.Vector3.Zero;
+            }
+            else if (stuck)
             {
                 // 抹茶のクリームに張り付いている: 壁の張り付きと同じ速さで、少しずつずり落ちる。
                 state.Velocity = new System.Numerics.Vector3(0f, -movement.WallSlideSpeed, 0f);

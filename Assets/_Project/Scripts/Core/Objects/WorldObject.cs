@@ -54,6 +54,24 @@ namespace Airerage.Core.Objects
 
         /// <summary>マカロン（PASTRY CHEF の R）。SpawnTick に投げ上げ、地形で跳ね返る。止まるかステージの外に出たら点滅して消える。Variant は色。</summary>
         Macaron = 12,
+
+        /// <summary>
+        /// デジタルスケール（PASTRY CHEF の空中下の撃破技）。真下へ自由落下し、落ちていた時間でグラム数・威力・吹き飛びが増える。地形・相手に
+        /// 当たるか、ステージの外に出たら消える。
+        /// </summary>
+        Scale = 13,
+
+        /// <summary>
+        /// 雷の波動（SOLDERER のインバータでワイヤーをつないだとき）。つないだ地形の箱の縁を、Position から左右の両回りに進み、反対側で
+        /// 出会って消える。Velocity は箱の左下、End は右上。触れた人を感電させる。
+        /// </summary>
+        ShockWave = 14,
+
+        /// <summary>
+        /// ボールライトニング（SOLDERER の R）。SpawnTick に照準の方向へ放ち、ゆっくり進んで壁で跳ね返る。決まった距離を進むと止まり、
+        /// しばらく残る罠になる。触れた人を感電させる。Stored は 0: 放つ前、1: 進んでいる、2: 止まった。ChargeMilli は進んだ距離（mm）。
+        /// </summary>
+        BallLightning = 15,
     }
 
     /// <summary>クリームの味（PASTRY CHEF の E。WorldObject.Variant）。</summary>

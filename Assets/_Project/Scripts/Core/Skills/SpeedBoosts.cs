@@ -62,11 +62,15 @@ namespace Airerage.Core.Skills
         {
             int percent = PercentOf(state, config);
             bool strongWire = HasStrongWire(state);
-            return percent == 0 && !strongWire ? config : Apply(config, percent, strongWire);
+            // インバータ（SOLDERER の E）の間は、ワイヤーの射程が短くなる。
+            float range = state.Combat.InverterOn ? config.Skills.Inverter.RangeScale : 1f;
+            return percent == 0 && !strongWire && range == 1f ? config : Apply(config, percent, strongWire, range);
         }
 
-        /// <summary>割合 percent（%。負なら遅く）の速さと、strongWire ならワイヤーの強化を当てた調整値。</summary>
-        public static CharacterConfig Apply(CharacterConfig config, int percent, bool strongWire)
+        /// <summary>
+        /// 割合 percent（%。負なら遅く）の速さと、strongWire ならワイヤーの強化と、ワイヤーの射程の倍率 range を当てた調整値。
+        /// </summary>
+        public static CharacterConfig Apply(CharacterConfig config, int percent, bool strongWire, float range = 1f)
         {
             float s = 1f + Math.Min(Math.Max(percent, -MaxSlowPercent), MaxPercent) / 100f;
             float s2 = s * s;
@@ -98,6 +102,7 @@ namespace Airerage.Core.Skills
                 wire.AttachAnySurface = true;
                 wire.AttachInAir = true;
             }
+            wire.MaxLength *= range;
 
             return new CharacterConfig
             {

@@ -243,7 +243,8 @@ namespace Airerage.Core.Skills
                     continue;
                 }
                 state.Combat.InPortalId = portal.Id;
-                if (state.Combat.WarpCooldownTicks <= 0 && FindPartner(objects, portal.Owner, portal.Id, out WorldObject partner))
+                // 復帰した後の無干渉の間は移らない（入っているポータルは覚え、出てから入り直すまで移らない。ハメを防ぐ）。
+                if (!state.Combat.IsUntouchable && state.Combat.WarpCooldownTicks <= 0 && FindPartner(objects, portal.Owner, portal.Id, out WorldObject partner))
                 {
                     Warp(ref state, partner, configs[portal.Owner].Skills.Portal, configs[v].Wire);
                 }
@@ -360,7 +361,7 @@ namespace Airerage.Core.Skills
 
         private static bool CanBeHit(in CharacterState state)
         {
-            return state.Combat.InvincibleTicksLeft <= 0 && !state.Combat.IsWaitingToRespawn;
+            return !state.Combat.IsUntouchable;
         }
 
         private static bool Overlaps(in WorldObject safe, IReadOnlyList<CharacterConfig> configs, Vector2 point, float radius)

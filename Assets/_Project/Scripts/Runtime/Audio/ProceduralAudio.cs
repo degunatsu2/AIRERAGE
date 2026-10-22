@@ -165,6 +165,15 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>間欠泉が噴き出した（強く噴き上がる蒸気の音）。</summary>
         Geyser,
+
+        /// <summary>感電した（細かく弾けるノイズと、震える低いうなり。SOLDERER。ユーザーの案、2026-10-21）。</summary>
+        Zap,
+
+        /// <summary>雷が地面を伝い始めた（鋭い放電と、低く響く雷鳴。SOLDERER のインバータ）。</summary>
+        Thunder,
+
+        /// <summary>ボウルで上からの投射物を防いだ（高い金属の「カン」と弾く音。PASTRY CHEF の空中上）。</summary>
+        ShieldBlock,
     }
 
     /// <summary>
@@ -687,6 +696,31 @@ namespace Airerage.Runtime.Audio
                     b = new float[Samples(0.9f, r)];
                     AddNoise(b, r, rng, 0f, 0.85f, 0.85f, 0.01f, 0.45f, 2500f, 6000f, 350f);
                     AddTone(b, r, 0f, 0.4f, 120f, 60f, Wave.Sine, 0.4f, 0.005f, 0.2f);
+                    break;
+                case SoundId.Zap:
+                    // 震える矩形波（50 Hz の揺れ）と、弾けるノイズ。
+                    b = new float[Samples(0.55f, r)];
+                    AddTone(b, r, 0f, 0.5f, 95f, 80f, Wave.Square, 0.2f, 0.005f, 0.3f);
+                    AddNoise(b, r, rng, 0f, 0.5f, 0.6f, 0.002f, 0.3f, 7000f, 4000f, 1500f);
+                    for (int i = 0; i < 5; i++)
+                    {
+                        AddNoise(b, r, rng, 0.03f + i * 0.09f, 0.03f, 0.5f, 0.001f, 0.02f, 9000f, 9000f, 2500f);
+                    }
+                    ApplyTremolo(b, r, 50f, 0.6f);
+                    break;
+                case SoundId.Thunder:
+                    b = new float[Samples(1f, r)];
+                    AddNoise(b, r, rng, 0f, 0.12f, 0.9f, 0.001f, 0.05f, 9000f, 5000f, 1200f);
+                    AddTone(b, r, 0f, 0.15f, 1800f, 300f, Wave.Saw, 0.18f, 0.001f, 0.08f);
+                    AddNoise(b, r, rng, 0.05f, 0.9f, 0.7f, 0.02f, 0.6f, 700f, 150f, 30f);
+                    AddTone(b, r, 0.03f, 0.6f, 90f, 40f, Wave.Sine, 0.5f, 0.01f, 0.35f);
+                    break;
+                case SoundId.ShieldBlock:
+                    b = new float[Samples(0.5f, r)];
+                    AddTone(b, r, 0f, 0.45f, 1650f, 1600f, Wave.Sine, 0.3f, 0.001f, 0.2f);
+                    AddTone(b, r, 0f, 0.4f, 2470f, 2450f, Wave.Sine, 0.16f, 0.001f, 0.15f);
+                    AddNoise(b, r, rng, 0f, 0.05f, 0.6f, 0.001f, 0.02f, 8000f, 6000f, 2000f);
+                    AddTone(b, r, 0f, 0.12f, 500f, 900f, Wave.Triangle, 0.2f, 0.002f, 0.05f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

@@ -105,6 +105,14 @@ MonoBehaviour:
           BonusPercent: 500
           KnockbackPercent: 500
         Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        AimFromMove: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        FatalOnlyByCritical: 0
+        BlocksProjectilesAbove: 0
         TotalTicks: 42
         WireCancelFromTick: 8
         Hits:
@@ -120,17 +128,25 @@ MonoBehaviour:
           HitstunTicks: 26
           KnockbackX: 14
           KnockbackY: 9
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
         Motions:
         - StartTick: 8
           Ticks: 8
           VelocityX: 20
           VelocityY: 0
           RequiresHit: 0
+          AlongAim: 0
+          Charge: 0
         - StartTick: 16
           Ticks: 1
           VelocityX: 9
           VelocityY: 14
           RequiresHit: 1
+          AlongAim: 0
+          Charge: 0
       AirNeutral:
         Name: 
         Effect: 0
@@ -141,6 +157,14 @@ MonoBehaviour:
         SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        AimFromMove: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        FatalOnlyByCritical: 0
+        BlocksProjectilesAbove: 0
         TotalTicks: 19
         WireCancelFromTick: 5
         Hits:
@@ -156,6 +180,10 @@ MonoBehaviour:
           HitstunTicks: 20
           KnockbackX: 5
           KnockbackY: 7
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
         Motions: []
       AirSide:
         Name: 
@@ -167,6 +195,14 @@ MonoBehaviour:
         SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        AimFromMove: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        FatalOnlyByCritical: 0
+        BlocksProjectilesAbove: 0
         TotalTicks: 25
         WireCancelFromTick: 7
         Hits:
@@ -182,6 +218,10 @@ MonoBehaviour:
           HitstunTicks: 24
           KnockbackX: 14
           KnockbackY: 4
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
         Motions: []
       AirUp:
         Name: COIN TOSS
@@ -193,6 +233,14 @@ MonoBehaviour:
         SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        AimFromMove: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        FatalOnlyByCritical: 0
+        BlocksProjectilesAbove: 0
         TotalTicks: 22
         WireCancelFromTick: 6
         Hits: []
@@ -207,6 +255,14 @@ MonoBehaviour:
         SpinPerHit: 0
         ChargeLevels: []
         Roulette: 1
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        AimFromMove: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        FatalOnlyByCritical: 0
+        BlocksProjectilesAbove: 0
         TotalTicks: 40
         WireCancelFromTick: 16
         Hits:
@@ -222,12 +278,18 @@ MonoBehaviour:
           HitstunTicks: 28
           KnockbackX: 6
           KnockbackY: -12
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
         Motions:
         - StartTick: 16
           Ticks: 12
           VelocityX: 9
           VelocityY: -15
           RequiresHit: 0
+          AlongAim: 0
+          Charge: 0
       Special1:
         Name: LIGHT
         Effect: 1
@@ -238,6 +300,14 @@ MonoBehaviour:
         SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        AimFromMove: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        FatalOnlyByCritical: 0
+        BlocksProjectilesAbove: 0
         TotalTicks: 16
         WireCancelFromTick: 4
         Hits: []
@@ -255,6 +325,14 @@ MonoBehaviour:
         SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        AimFromMove: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        FatalOnlyByCritical: 0
+        BlocksProjectilesAbove: 0
         TotalTicks: 14
         WireCancelFromTick: 4
         Hits: []
@@ -270,6 +348,14 @@ MonoBehaviour:
         SpinPerHit: 0
         ChargeLevels: []
         Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        AimFromMove: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        FatalOnlyByCritical: 0
+        BlocksProjectilesAbove: 0
         TotalTicks: 24
         WireCancelFromTick: 12
         Hits: []
@@ -279,6 +365,7 @@ MonoBehaviour:
       KoKnockbackBase: 0.5
       KoKnockbackPerSpeed: 0.3
       FatalStrikeSpeed: 14
+      CriticalCenterRadius: 0.3
       FatalHitstopMultiplier: 2
       BounceMinSpeed: 10
       BounceRestitution: 0.6
@@ -340,6 +427,10 @@ MonoBehaviour:
           HitstunTicks: 22
           KnockbackX: 2
           KnockbackY: 13
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
         HeldCoinsPerBonusPercent: 3
         MaxHeldCoinBonusPercent: 100
       Run:
@@ -395,6 +486,10 @@ MonoBehaviour:
           HitstunTicks: 24
           KnockbackX: 9
           KnockbackY: 7
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
       Beam:
         HalfWidth: 0.75
         IntervalTicks: 10
@@ -412,6 +507,10 @@ MonoBehaviour:
           HitstunTicks: 20
           KnockbackX: 3
           KnockbackY: 4
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
       SlowFall:
         MaxFallSpeed: 3
       CottonCandy:
@@ -425,7 +524,7 @@ MonoBehaviour:
       Cream:
         ShotCount: 7
         SpreadDeg: 22
-        Speed: 15
+        Speed: 21
         Gravity: 25
         LaunchOffset: 0.5
         ShotLifetimeTicks: 150
@@ -467,6 +566,71 @@ MonoBehaviour:
           HitstunTicks: 28
           KnockbackX: 7
           KnockbackY: 9
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+      Scale:
+        OffsetY: -1.2
+        Gravity: 32
+        MaxFallSpeed: 34
+        HalfWidth: 0.6
+        HalfHeight: 0.35
+        BaseGrams: 100
+        GramsPerSecond: 700
+        FatalGrams: 1000
+        BonusPercentPer100Grams: 15
+        MaxBonusPercent: 300
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 8
+          HitstopTicks: 16
+          HitstunTicks: 30
+          KnockbackX: 3
+          KnockbackY: -13
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+      Inverter:
+        RangeScale: 0.33333334
+        WhipHalfThickness: 0.25
+        WhipRehitTicks: 24
+        WhipHit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          HitstopTicks: 2
+          HitstunTicks: 14
+          KnockbackX: 0
+          KnockbackY: 0
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+        WaveSpeed: 36
+        WaveRadius: 0.5
+        StunTicks: 60
+        StunGuardTicks: 30
+      BallLightning:
+        Count: 3
+        IntervalTicks: 18
+        LaunchOffset: 0.8
+        Speed: 7
+        TravelDistance: 14
+        TrapTicks: 300
+        Radius: 0.55
   _displayName: RISK TAKER
   _logo: {fileID: 2800000, guid: 1a21ce27e35e469a0a863c15f13e2e64, type: 2}
   _special1Icon: {fileID: 0}

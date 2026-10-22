@@ -109,6 +109,11 @@ namespace Airerage.Runtime.Presentation
 
         private void OnMissed(in WireState wire)
         {
+            if (wire.Whip)
+            {
+                // インバータの鞭（SOLDERER の E）は外れではない。
+                return;
+            }
             bool canceled = wire.LastMissReason == WireMissReason.ButtonReleased || wire.LastMissReason == WireMissReason.ButtonToggled
                 || wire.LastMissReason == WireMissReason.Interrupted;
             if (wire.LastMissReason == WireMissReason.HitNonAttachable)
@@ -198,7 +203,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (_style == null)
             {
-                _style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = _fontSize, fontStyle = FontStyle.Bold };
+                _style = TextFlash.Style(_fontSize, FontStyle.Bold, TextAnchor.MiddleCenter);
             }
             // BLOCK! は跳ね返る向きへ少し飛び出し、最初に大きく出てから元の大きさに戻る。
             float age = Time.time - _shownAt;
@@ -213,9 +218,9 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             _style.fontSize = _blocked ? Mathf.RoundToInt(_fontSize * (1f + 0.5f * Mathf.Clamp01(1f - age / 0.2f))) : _fontSize;
-            _style.normal.textColor = FadedColor();
             var rect = new Rect(screen.x - 100f, Screen.height - screen.y - 20f, 200f, 40f);
-            GUI.Label(rect, LastLabel, _style);
+            // 出た瞬間は白く光り、すぐに本来の色へ（TextFlash）。
+            TextFlash.Draw(rect, LastLabel, _style, TextFlash.Apply(FadedColor(), age));
         }
 
         // 後半で消えていく。

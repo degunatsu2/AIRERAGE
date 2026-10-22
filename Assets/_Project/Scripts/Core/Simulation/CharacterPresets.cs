@@ -15,6 +15,7 @@ namespace Airerage.Core.Simulation
         public const string StormRunnerName = "STORM RUNNER";
         public const string SpaceTravelerName = "SPACE TRAVELER";
         public const string PastryChefName = "PASTRY CHEF";
+        public const string SoldererName = "SOLDERER";
 
         /// <summary>STANDARD（基準のキャラクター。DASH・RISE・BURST）。</summary>
         public static CharacterConfig Standard()
@@ -409,8 +410,14 @@ namespace Airerage.Core.Simulation
             return config;
         }
         /// <summary>
-        /// PASTRY CHEF（仮の名前。docs/14 1.4。ユーザーの案、2026-10-21）。お菓子で足場と罠を作るキャラクター。通常の攻撃（地上技・空中技）は
-        /// STANDARD と同じ【仮】。
+        /// PASTRY CHEF（仮の名前。docs/14 1.4。ユーザーの案、2026-10-21）。お菓子で足場と罠を作るキャラクター。
+        /// - 地上技 SPATULA SPIN: ゴムベラを持って回り、前 → 後ろの順に攻撃し、最後に回転の勢いで前の斜め上 60° へ飛び上がって攻撃する
+        ///   （技の後もかなりの慣性で飛ぶ）。
+        /// - 空中 N PALETTE KNIVES: 両手のパレットナイフを横に広げて斜めに一回転。斜めに伸びた判定（AttackHit.AngleDeg）。
+        /// - 空中横 HAND MIXER: ハンドミキサーを回して攻撃。細い判定の多段ヒット。
+        /// - 空中下（撃破技）DIGITAL SCALE: ボウルを乗せたデジタルスケールを落とす。落ちていた時間でグラム数・威力・吹き飛びが増え、
+        ///   1000g 以上で当てると FATAL（PastryRules.StepScale）。
+        /// - 空中上 BOWL GUARD: ボウルを持って手を上に伸ばす。判定は少し弱いが、判定が出ている間、上から来た投射物を防ぐ（GUARD）。
         /// - Q フラッフィベイス: わたがしの足場（10 秒）。短く押すと足元に上向き、長押しすると照準の方向を向けて目の前に置く。触れた人を
         ///   弾き飛ばす。ワイヤーはつながらない。クールタイム 8 秒。
         /// - E スイートトラップ: クリームを照準の方向へ扇形に飛ばし、当たった地形に 10 秒張り付かせる。長押しの間にワイヤーでオレンジ、
@@ -422,6 +429,129 @@ namespace Airerage.Core.Simulation
         {
             var config = new CharacterConfig();
             CombatTuning combat = config.Combat;
+
+            combat.Ground = new AttackData
+            {
+                Name = "SPATULA SPIN",
+                TotalTicks = 42,
+                WireCancelFromTick = 20,
+                SpinPerHit = true,
+                Hits = new[]
+                {
+                    // 前、後ろ、飛び上がりながら前の斜め上。
+                    new AttackHit
+                    {
+                        StartTick = 5, ActiveTicks = 4, OffsetX = 1.6f, HalfWidth = 1.6f, HalfHeight = 1.5f,
+                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 5f, KnockbackY = 9f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 12, ActiveTicks = 4, OffsetX = -1.6f, HalfWidth = 1.6f, HalfHeight = 1.5f,
+                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = -6f, KnockbackY = 9f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 19, ActiveTicks = 6, OffsetX = 1f, OffsetY = 1f, HalfWidth = 1.8f, HalfHeight = 1.8f,
+                        Damage = 6, HitstopTicks = 12, HitstunTicks = 26, KnockbackX = 10f, KnockbackY = 13f,
+                    },
+                },
+                Motions = new[]
+                {
+                    new AttackMotion { StartTick = 0, Ticks = 19, VelocityX = 3f, VelocityY = 0f },
+                    // 前の斜め上 60° へ 20 m/s（その後は慣性のまま飛ぶ）。
+                    new AttackMotion { StartTick = 19, Ticks = 1, VelocityX = 10f, VelocityY = 17.3f },
+                },
+            };
+
+            combat.AirNeutral = new AttackData
+            {
+                Name = "PALETTE KNIVES",
+                TotalTicks = 28,
+                WireCancelFromTick = 6,
+                ExclusiveHits = true,
+                Hits = new[]
+                {
+                    // 横に広げたナイフが、斜めに一回転する（斜めの細長い判定が、向きを変える）。
+                    new AttackHit
+                    {
+                        StartTick = 6, ActiveTicks = 5, OffsetX = 0f, OffsetY = 0.2f, HalfWidth = 2.6f, HalfHeight = 0.35f, AngleDeg = 35f,
+                        Damage = 5, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 7f, KnockbackY = 8f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 11, ActiveTicks = 5, OffsetX = 0f, OffsetY = 0.2f, HalfWidth = 2.6f, HalfHeight = 0.35f, AngleDeg = -35f,
+                        Damage = 5, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 8f, KnockbackY = 6f,
+                    },
+                },
+            };
+
+            combat.AirSide = new AttackData
+            {
+                Name = "HAND MIXER",
+                TotalTicks = 28,
+                WireCancelFromTick = 6,
+                Hits = new[]
+                {
+                    // 細い判定の多段ヒット。最後だけ吹き飛ばす。
+                    new AttackHit
+                    {
+                        StartTick = 5, ActiveTicks = 2, OffsetX = 1.9f, HalfWidth = 1.5f, HalfHeight = 0.35f,
+                        Damage = 2, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 9, ActiveTicks = 2, OffsetX = 1.9f, HalfWidth = 1.5f, HalfHeight = 0.35f,
+                        Damage = 2, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 13, ActiveTicks = 2, OffsetX = 1.9f, HalfWidth = 1.5f, HalfHeight = 0.35f,
+                        Damage = 2, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 17, ActiveTicks = 3, OffsetX = 1.9f, HalfWidth = 1.5f, HalfHeight = 0.4f,
+                        Damage = 3, HitstopTicks = 8, HitstunTicks = 22, KnockbackX = 10f, KnockbackY = 5f,
+                    },
+                },
+                Motions = new[]
+                {
+                    // 回している間は、その場に少しとどまる（多段ヒットが離れないように）。
+                    new AttackMotion { StartTick = 3, Ticks = 17, VelocityX = 1f, VelocityY = 0f },
+                },
+            };
+
+            combat.AirDown = new AttackData
+            {
+                Name = "DIGITAL SCALE",
+                TotalTicks = 26,
+                WireCancelFromTick = 10,
+                Effect = SkillEffect.DropScale,
+                EffectTick = 6,
+                Hits = new AttackHit[0],
+                Motions = new[]
+                {
+                    // 落とす間、少しとどまる。
+                    new AttackMotion { StartTick = 0, Ticks = 7, VelocityX = 0f, VelocityY = 1.5f },
+                },
+            };
+            combat.KoAttack = AttackSlot.AirDown;
+
+            combat.AirUp = new AttackData
+            {
+                Name = "BOWL GUARD",
+                TotalTicks = 26,
+                WireCancelFromTick = 6,
+                BlocksProjectilesAbove = true,
+                Hits = new[]
+                {
+                    new AttackHit
+                    {
+                        StartTick = 4, ActiveTicks = 16, OffsetX = 0.2f, OffsetY = 1.7f, HalfWidth = 1.5f, HalfHeight = 0.9f,
+                        Damage = 3, HitstopTicks = 7, HitstunTicks = 18, KnockbackX = 2f, KnockbackY = 10f,
+                    },
+                },
+            };
 
             combat.Special1 = new AttackData
             {
@@ -458,6 +588,203 @@ namespace Airerage.Core.Simulation
                 Hits = new AttackHit[0],
             };
             combat.SuperGaugeCost = 100 * CombatTuning.GaugePerPercent;
+            return config;
+        }
+        /// <summary>
+        /// SOLDERER（docs/14 1.5。ユーザーの案、2026-10-21）。電気がコンセプトで、素早く動いて軽い一撃を当て続けるヒット＆アウェイ。
+        /// - 地上技 THUNDER KICK: 地面を蹴って真上に高く跳ぶ。蹴るときに雷の衝撃波で前後を攻撃する。
+        /// - 空中 N DISCHARGE: 大の字で全身から放電。持続は長いが弱い。
+        /// - 空中横（撃破技）FINGER SPARK: 指先を斜め下に伸ばして攻撃。指先のクリティカル判定（出た瞬間だけ）が相手の体の中心に重なった
+        ///   ときだけ FATAL（威力と吹き飛びが大きく増える）。速さでは FATAL にならない。持続は長い。
+        /// - 空中下 STOMP: 踏みつけ。当たると反動で真上に跳ぶ。
+        /// - 空中上 THUNDER FLIP: 雷をまとった両足でサマーソルト（前の下 → 上 → 後ろ）。
+        /// - Q INAZUMA STEP: 短く押すと移動の入力の方向へ短く突撃（威力 10）。3 秒以内なら続けて出せ、合わせて 3 回まで（突撃するたびに 3 秒に
+        ///   戻る）。長押しすると回りながら長く突撃（威力 20）し、回数に関係なく終わる。クールタイムは突撃した回数 × 6 秒（6/12/18 秒）。
+        /// - E INVERTER: ON・OFF（クールタイム 0.5 秒）。ON の間はワイヤーの射程が 1/3 になり、雷を帯びる（外したワイヤーを押したままで
+        ///   鞭、つなぐと雷の波動。ElectricRules）。
+        /// - R BALL LIGHTNING: 照準の方向へ遅い電気の球を 3 つ放つ（壁で跳ね返り、止まると 5 秒残る罠）。触れると感電。必要なゲージ 90%。
+        /// </summary>
+        public static CharacterConfig Solderer()
+        {
+            var config = new CharacterConfig();
+            config.Movement.RunSpeed = 9.5f;
+            config.Movement.AirAcceleration = 36f;
+            CombatTuning combat = config.Combat;
+
+            combat.Ground = new AttackData
+            {
+                Name = "THUNDER KICK",
+                TotalTicks = 30,
+                WireCancelFromTick = 6,
+                Hits = new[]
+                {
+                    // 蹴る瞬間の、前と後ろの雷の衝撃波。
+                    new AttackHit
+                    {
+                        StartTick = 4, ActiveTicks = 4, OffsetX = 1.6f, HalfWidth = 1.5f, HalfHeight = 1.4f,
+                        Damage = 4, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = 6f, KnockbackY = 10f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 4, ActiveTicks = 4, OffsetX = -1.6f, HalfWidth = 1.5f, HalfHeight = 1.4f,
+                        Damage = 4, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = -6f, KnockbackY = 10f,
+                    },
+                },
+                Motions = new[]
+                {
+                    new AttackMotion { StartTick = 0, Ticks = 4, VelocityX = 0f, VelocityY = 0f },
+                    new AttackMotion { StartTick = 4, Ticks = 1, VelocityX = 0f, VelocityY = 21f },
+                },
+            };
+
+            combat.AirNeutral = new AttackData
+            {
+                Name = "DISCHARGE",
+                TotalTicks = 32,
+                WireCancelFromTick = 6,
+                Hits = new[]
+                {
+                    new AttackHit
+                    {
+                        StartTick = 4, ActiveTicks = 20, OffsetX = 0f, HalfWidth = 2f, HalfHeight = 2f,
+                        Damage = 3, HitstopTicks = 5, HitstunTicks = 16, KnockbackX = 3f, KnockbackY = 5f,
+                    },
+                },
+            };
+
+            combat.AirSide = new AttackData
+            {
+                Name = "FINGER SPARK",
+                TotalTicks = 34,
+                WireCancelFromTick = 7,
+                ExclusiveHits = true,
+                FatalOnlyByCritical = true,
+                Hits = new[]
+                {
+                    // 指先のクリティカル判定（出た瞬間だけ。相手の体の中心に重なったときだけ当たる）。
+                    new AttackHit
+                    {
+                        StartTick = 6, ActiveTicks = 1, OffsetX = 2.3f, OffsetY = -1.1f, HalfWidth = 0.35f, HalfHeight = 0.35f,
+                        Critical = true, CriticalScale = 2.5f,
+                        Damage = 10, HitstopTicks = 20, HitstunTicks = 32, KnockbackX = 12f, KnockbackY = -4f,
+                    },
+                    // 斜め下に伸ばした腕の通常の判定（持続は長い）。
+                    new AttackHit
+                    {
+                        StartTick = 6, ActiveTicks = 14, OffsetX = 1.5f, OffsetY = -0.7f, HalfWidth = 1.2f, HalfHeight = 0.45f, AngleDeg = -35f,
+                        Damage = 5, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 9f, KnockbackY = -2f,
+                    },
+                },
+            };
+            combat.KoAttack = AttackSlot.AirSide;
+
+            combat.AirDown = new AttackData
+            {
+                Name = "STOMP",
+                TotalTicks = 32,
+                WireCancelFromTick = 8,
+                Hits = new[]
+                {
+                    new AttackHit
+                    {
+                        StartTick = 6, ActiveTicks = 10, OffsetX = 0f, OffsetY = -1.4f, HalfWidth = 1.2f, HalfHeight = 0.9f,
+                        Damage = 6, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = -12f,
+                    },
+                },
+                Motions = new[]
+                {
+                    new AttackMotion { StartTick = 4, Ticks = 12, VelocityX = 0f, VelocityY = -18f },
+                    // 当たったら、反動で真上に跳ぶ。
+                    new AttackMotion { StartTick = 6, Ticks = 8, VelocityX = 0f, VelocityY = 16f, RequiresHit = true },
+                },
+            };
+
+            combat.AirUp = new AttackData
+            {
+                Name = "THUNDER FLIP",
+                TotalTicks = 26,
+                WireCancelFromTick = 6,
+                ExclusiveHits = true,
+                Hits = new[]
+                {
+                    // サマーソルト: 前の下 → 頭の上 → 後ろ。
+                    new AttackHit
+                    {
+                        StartTick = 4, ActiveTicks = 3, OffsetX = 1.4f, OffsetY = -0.4f, HalfWidth = 1.2f, HalfHeight = 1f,
+                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 3f, KnockbackY = 13f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 7, ActiveTicks = 3, OffsetX = 0.3f, OffsetY = 1.6f, HalfWidth = 1.3f, HalfHeight = 1f,
+                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 1f, KnockbackY = 14f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 10, ActiveTicks = 3, OffsetX = -1.2f, OffsetY = 0.6f, HalfWidth = 1.2f, HalfHeight = 1f,
+                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = -2f, KnockbackY = 13f,
+                    },
+                },
+                Motions = new[]
+                {
+                    new AttackMotion { StartTick = 2, Ticks = 1, VelocityX = 1f, VelocityY = 7f },
+                },
+            };
+
+            combat.Special1 = new AttackData
+            {
+                Name = "INAZUMA STEP",
+                TotalTicks = 14,
+                ChargedTotalTicks = 26,
+                WireCancelFromTick = 4,
+                HoldMaxTicks = 600,
+                ChargedFromTicks = 10,
+                AimFromMove = true,
+                ChainMax = 3,
+                ChainWindowTicks = 180,
+                Hits = new[]
+                {
+                    new AttackHit
+                    {
+                        StartTick = 1, ActiveTicks = 9, OffsetX = 0f, HalfWidth = 1f, HalfHeight = 1.2f, Charge = ChargeFilter.Tapped,
+                        Damage = 10, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = 8f, KnockbackY = 6f,
+                    },
+                    new AttackHit
+                    {
+                        StartTick = 2, ActiveTicks = 16, OffsetX = 0f, HalfWidth = 1.4f, HalfHeight = 1.5f, Charge = ChargeFilter.Charged,
+                        Damage = 20, HitstopTicks = 14, HitstunTicks = 28, KnockbackX = 13f, KnockbackY = 9f,
+                    },
+                },
+                Motions = new[]
+                {
+                    // 移動の入力の方向へ: 短く（3.6m）、長押しなら長く（8m）。
+                    new AttackMotion { StartTick = 0, Ticks = 9, VelocityX = 24f, AlongAim = true, Charge = ChargeFilter.Tapped },
+                    new AttackMotion { StartTick = 0, Ticks = 16, VelocityX = 30f, AlongAim = true, Charge = ChargeFilter.Charged },
+                },
+            };
+            combat.Special1CooldownTicks = 360;
+
+            combat.Special2 = new AttackData
+            {
+                Name = "INVERTER",
+                TotalTicks = 6,
+                WireCancelFromTick = 1,
+                Effect = SkillEffect.Inverter,
+                EffectTick = 0,
+                Hits = new AttackHit[0],
+            };
+            combat.Special2CooldownTicks = 30;
+
+            BallLightningTuning balls = config.Skills.BallLightning;
+            combat.Super = new AttackData
+            {
+                Name = "BALL LIGHTNING",
+                TotalTicks = 2 + (balls.Count - 1) * balls.IntervalTicks + 8,
+                WireCancelFromTick = 2 + (balls.Count - 1) * balls.IntervalTicks,
+                Effect = SkillEffect.BallLightning,
+                EffectTick = 2,
+                Hits = new AttackHit[0],
+            };
+            combat.SuperGaugeCost = 90 * CombatTuning.GaugePerPercent;
             return config;
         }
     }

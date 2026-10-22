@@ -34,6 +34,7 @@ namespace Airerage.Editor
         public const string StormRunnerPath = "Assets/_Project/Data/Characters/StormRunner.asset";
         public const string SpaceTravelerPath = "Assets/_Project/Data/Characters/SpaceTraveler.asset";
         public const string PastryChefPath = "Assets/_Project/Data/Characters/PastryChef.asset";
+        public const string SoldererPath = "Assets/_Project/Data/Characters/Solderer.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
@@ -511,8 +512,18 @@ namespace Airerage.Editor
             var pastry = new GameObject("PastryEffects").AddComponent<PastryEffectsView>();
             LineRenderer pastryLine = CreateIndicatorLine(pastry.transform, "PastryLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
             pastryLine.gameObject.SetActive(false);
+            // ボウルで上からの投射物を防いだ（弾く水色の光と「GUARD」。ユーザーの要望、2026-10-21）。
+            BurstEffectView shieldGuard = CreateBurst("ShieldGuardTemplate", pastry.transform);
+            shieldGuard.Configure(new Color(0.6f, 0.88f, 1f), false, 0.55f, 0.3f, 2f, 10, 1.3f, 0.14f, "GUARD", 40, 0f);
+            shieldGuard.gameObject.SetActive(false);
             SetReference(pastry, "_source", source);
             SetReference(pastry, "_lineTemplate", pastryLine);
+            SetReference(pastry, "_guardTemplate", shieldGuard);
+            var electric = new GameObject("ElectricEffects").AddComponent<ElectricEffectsView>();
+            LineRenderer electricLine = CreateIndicatorLine(electric.transform, "ElectricLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
+            electricLine.gameObject.SetActive(false);
+            SetReference(electric, "_source", source);
+            SetReference(electric, "_lineTemplate", electricLine);
             var boost = new GameObject("BoostAura").AddComponent<BoostAuraView>();
             LineRenderer boostLine = CreateIndicatorLine(boost.transform, "BoostLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
             boostLine.gameObject.SetActive(false);
@@ -661,7 +672,28 @@ namespace Airerage.Editor
             CreateVisual(PrimitiveType.Cylinder, "Filling", LoadOrCreateMaterial("MacaronFilling", new Color(1f, 0.96f, 0.88f), unlit: true),
                 new Vector3(1.5f, 0.12f, 1.5f)).transform.SetParent(macaron.transform, false);
 
-            foreach (GameObject template in new[] { ball, safe, coin, gust, windZone, portal, missile, beam, candy, creamShot, creamPatch, macaron })
+            // デジタルスケール（量りとボウル）、雷の波動（線だけ）、ボールライトニング（光る球と周りのジグザグ）。
+            var scale = new GameObject("ScaleTemplate");
+            scale.transform.SetParent(view.transform, false);
+            CreateVisual(PrimitiveType.Cube, "ScaleBody", LoadOrCreateMaterial("ScaleBody", new Color(0.72f, 0.74f, 0.78f)), new Vector3(1.2f, 0.25f, 1f))
+                .transform.SetParent(scale.transform, false);
+            GameObject display = CreateVisual(PrimitiveType.Cube, "ScaleDisplay", LoadOrCreateMaterial("ScaleDisplay", new Color(0.2f, 0.9f, 0.4f), unlit: true),
+                new Vector3(0.5f, 0.12f, 0.05f));
+            display.transform.SetParent(scale.transform, false);
+            display.transform.localPosition = new Vector3(0f, 0f, -0.5f);
+            GameObject bowl = CreateVisual(PrimitiveType.Sphere, "ScaleBowl", LoadOrCreateMaterial("ScaleBowl", new Color(0.92f, 0.94f, 0.97f)), new Vector3(1.1f, 0.55f, 1.1f));
+            bowl.transform.SetParent(scale.transform, false);
+            bowl.transform.localPosition = new Vector3(0f, 0.3f, 0f);
+            var shockWave = new GameObject("ShockWaveTemplate");
+            shockWave.transform.SetParent(view.transform, false);
+            CreateIndicatorLine(shockWave.transform, "Spark", lineMaterial, 0.16f);
+            var ballLightning = new GameObject("BallLightningTemplate");
+            ballLightning.transform.SetParent(view.transform, false);
+            CreateVisual(PrimitiveType.Sphere, "Core", LoadOrCreateMaterial("BallLightningUnlit", Color.white, unlit: true), new Vector3(1f, 1f, 1f))
+                .transform.SetParent(ballLightning.transform, false);
+            CreateIndicatorLine(ballLightning.transform, "Spark", lineMaterial, 0.07f);
+
+            foreach (GameObject template in new[] { ball, safe, coin, gust, windZone, portal, missile, beam, candy, creamShot, creamPatch, macaron, scale, shockWave, ballLightning })
             {
                 foreach (Collider collider in template.GetComponentsInChildren<Collider>())
                 {
@@ -670,7 +702,7 @@ namespace Airerage.Editor
                 template.SetActive(false);
             }
             SetReference(view, "_source", source);
-            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin, gust, windZone, portal, missile, beam, candy, creamShot, creamPatch, macaron });
+            SetReferenceArray(view, "_templates", new Object[] { ball, safe, coin, gust, windZone, portal, missile, beam, candy, creamShot, creamPatch, macaron, scale, shockWave, ballLightning });
             BurstEffectView explosion = CreateBurst("ExplosionTemplate", view.transform);
             explosion.Configure(new Color(0.85f, 0.6f, 1f), false, 0.45f, 0.3f, 2.6f, 12, 2.4f, 0.22f, string.Empty, 0, 0.12f);
             explosion.gameObject.SetActive(false);
@@ -1133,7 +1165,7 @@ namespace Airerage.Editor
 
         /// <summary>
         /// 選べるキャラクターの一覧（docs/13 T5-5、T5-6）を作り直す: character（STANDARD）と、CharacterPresets から作るキャラクター
-        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER、PASTRY CHEF）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
+        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER、PASTRY CHEF、SOLDERER）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
         /// （値はコードの 1 か所で決める）。仮のロゴ（CharacterLogoPainter）も描き直して設定する（docs/13 T5-8）。
         /// </summary>
         internal static CharacterRoster LoadOrCreateCharacterRoster(CharacterConfigAsset character)
@@ -1147,6 +1179,8 @@ namespace Airerage.Editor
             AssignLogo(spaceTraveler, "SpaceTraveler", CharacterLogoPainter.SpaceTraveler());
             CharacterConfigAsset pastryChef = WritePresetCharacter(PastryChefPath, CharacterPresets.PastryChef(), CharacterPresets.PastryChefName);
             AssignLogo(pastryChef, "PastryChef", CharacterLogoPainter.PastryChef());
+            CharacterConfigAsset solderer = WritePresetCharacter(SoldererPath, CharacterPresets.Solderer(), CharacterPresets.SoldererName);
+            AssignLogo(solderer, "Solderer", CharacterLogoPainter.Solderer());
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
             if (roster == null)
             {
@@ -1154,7 +1188,7 @@ namespace Airerage.Editor
                 roster = ScriptableObject.CreateInstance<CharacterRoster>();
                 AssetDatabase.CreateAsset(roster, CharacterRosterPath);
             }
-            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler, pastryChef });
+            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler, pastryChef, solderer });
             EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return roster;

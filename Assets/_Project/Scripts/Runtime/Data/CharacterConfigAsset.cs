@@ -22,6 +22,9 @@ namespace Airerage.Runtime.Data
 
         /// <summary>クリーム色のコック帽・コックコート。</summary>
         PastryChef = 4,
+
+        /// <summary>黒い作業着と黄色の稲妻の線、ゴーグル、背中のバッテリー。</summary>
+        Solderer = 5,
     }
 
     /// <summary>

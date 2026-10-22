@@ -39,6 +39,7 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _style;
         private Vector3 _center;
         private float _parryAt = -10f;
+        private float _guardShownAt = -10f;
         private float _blockAt = -10f;
 
         /// <summary>ガードの輪と「GUARD!」を出しているか。</summary>
@@ -76,6 +77,10 @@ namespace Airerage.Runtime.Presentation
         public void Render(Vector3 center, bool guarding)
         {
             _center = center;
+            if (guarding && !ShowingGuard)
+            {
+                _guardShownAt = Time.time;
+            }
             ShowingGuard = guarding;
             float time = Time.time;
 
@@ -168,7 +173,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (_style == null)
             {
-                _style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+                _style = TextFlash.Style(_fontSize, FontStyle.Bold, TextAnchor.MiddleCenter);
             }
             string label = parry ? ParryLabel : GuardLabel;
             float scale = parry ? 1.4f - 0.3f * Mathf.Clamp01((Time.time - _parryAt) / _parryDuration) : 1f;
@@ -176,12 +181,9 @@ namespace Airerage.Runtime.Presentation
             Color color = parry ? _parryColor : Color.Lerp(_playerColor, Color.white, 0.3f);
             var rect = new Rect(screen.x - 150f, Screen.height - screen.y - 30f, 300f, 60f);
 
-            Color previous = GUI.color;
-            GUI.color = new Color(0.1f, 0.05f, 0f, 0.85f);
-            GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width, rect.height), label, _style);
-            GUI.color = color;
-            GUI.Label(rect, label, _style);
-            GUI.color = previous;
+            // 出た瞬間は白く光り、すぐに本来の色へ（TextFlash）。
+            float age = Time.time - (parry ? _parryAt : _guardShownAt);
+            TextFlash.Draw(rect, label, _style, TextFlash.Apply(color, age));
         }
     }
 }

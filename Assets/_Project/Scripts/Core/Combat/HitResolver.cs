@@ -84,22 +84,26 @@ namespace Airerage.Core.Combat
             for (int a = 0; a < states.Count; a++)
             {
                 CharacterState attacker = states[a];
-                if (attacker.Action.Kind != ActionKind.Attack || attacker.Combat.HitstopTicksLeft > 0)
+                // 復帰した後の無干渉の間は、自分の攻撃も相手に当たらない（MatchRules.InvincibleTicks）。
+                if (attacker.Action.Kind != ActionKind.Attack || attacker.Combat.HitstopTicksLeft > 0 || attacker.Combat.IsUntouchable)
                 {
                     continue;
                 }
                 CombatTuning combat = configs[a].Combat;
                 AttackData attack = combat.Get(attacker.Action.Attack);
                 AttackPower power = AttackPower.Of(attacker, a, configs[a], seed);
+                // このティックに、判定のどれか 1 つが当たった相手（AttackData.ExclusiveHits）。
+                uint exclusive = 0;
                 for (int h = 0; h < attack.Hits.Length; h++)
                 {
                     AttackHit hitData = attack.Hits[h];
-                    if (!hitData.IsActiveAt(attacker.Action.Ticks))
+                    if (!hitData.IsActiveAt(attacker.Action.Ticks) || !attack.Uses(hitData.Charge, attacker.Action.Charge))
                     {
                         continue;
                     }
                     Hitbox(attacker, hitData, out Vector2 center, out Vector2 half);
-                    if (objects != null && DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, half,
+                    float angle = HitAngle(attacker, hitData);
+                    if (objects != null && DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, HitShapes.Bounds(half, angle),
                             AttackPower.Damage(hitData.Damage, power.Multiplier, power.BonusPercent)))
                     {
                         // 壊せる物に当てたら、キャラクターに当てたときと同じように止まる（ユーザーの要望、2026-10-16）。
@@ -109,17 +113,26 @@ namespace Airerage.Core.Combat
                     }
                     for (int v = 0; v < states.Count; v++)
                     {
-                        // 無敵（復帰を待つ間と、復帰した後。docs/12 T4-2）の相手には当たらない。
-                        if (v == a || (attacker.Action.HitMask & HitBit(h, v)) != 0 || states[v].Combat.InvincibleTicksLeft > 0)
+                        // 干渉されない相手（復帰を待つ間と、復帰した後の無干渉。docs/12 T4-2）には当たらない。
+                        if (v == a || (attacker.Action.HitMask & HitBit(h, v)) != 0 || states[v].Combat.IsUntouchable)
+                        {
+                            continue;
+                        }
+                        if (attack.ExclusiveHits && ((exclusive & (1u << v)) != 0 || HitAny(attacker.Action.HitMask, attack.Hits.Length, v)))
                         {
                             continue;
                         }
                         Vector3 target = states[v].Position;
+                        var targetCenter = new Vector2(target.X, target.Y);
                         Vector3 targetHalf = configs[v].Movement.HalfExtents;
-                        if (MathF.Abs(target.X - center.X) < half.X + targetHalf.X
-                            && MathF.Abs(target.Y - center.Y) < half.Y + targetHalf.Y)
+                        bool touches = hitData.Critical
+                            ? HitShapes.ContainsPoint(center, half, angle, targetCenter, combat.CriticalCenterRadius)
+                            : HitShapes.Overlaps(center, half, angle, targetCenter, new Vector2(targetHalf.X, targetHalf.Y));
+                        if (touches)
                         {
-                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, power));
+                            AttackPower hitPower = hitData.Critical ? power.WithCritical(hitData.CriticalScale) : power;
+                            _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, hitPower));
+                            exclusive |= 1u << v;
                         }
                     }
                 }
@@ -130,7 +143,7 @@ namespace Airerage.Core.Combat
                 foreach (HitRecord extra in extraHits)
                 {
                     // 無敵の相手には当たらない（集めた後に復帰や無敵が変わることはないが、念のため当てる直前にも調べる）。
-                    if (states[extra.Victim].Combat.InvincibleTicksLeft <= 0)
+                    if (!states[extra.Victim].Combat.IsUntouchable)
                     {
                         _hits.Add(extra);
                     }
@@ -190,6 +203,25 @@ namespace Airerage.Core.Combat
                 attacker.Position.X + hit.OffsetX * attacker.Facing,
                 attacker.Position.Y + hit.OffsetY);
             half = new Vector2(hit.HalfWidth, hit.HalfHeight);
+        }
+
+        /// <summary>判定 hit の傾き（ラジアン。左を向いていれば左右を反転する）。</summary>
+        public static float HitAngle(in CharacterState attacker, AttackHit hit)
+        {
+            return hit.AngleDeg * MathF.PI / 180f * (attacker.Facing < 0 ? -1f : 1f);
+        }
+
+        // 判定のどれか（count 個）が、キャラクター victim にもう当たったか。
+        private static bool HitAny(uint mask, int count, int victim)
+        {
+            for (int h = 0; h < count; h++)
+            {
+                if ((mask & HitBit(h, victim)) != 0)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>判定 hitIndex がキャラクター victim に当たったことを示す、ActionState.HitMask のビット。</summary>

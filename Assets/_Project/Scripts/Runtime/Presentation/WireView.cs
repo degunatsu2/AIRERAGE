@@ -21,6 +21,17 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private RingGaugeView _attachGauge;
 
         private LineRenderer _line;
+        private Color _startColor;
+        private Color _endColor;
+
+        // 雷を帯びたワイヤー（SOLDERER のインバータ）の、ジグザグの点の数と揺れ幅（m）。
+        private const int ElectricPoints = 14;
+        private const float ElectricJitter = 0.18f;
+        private static readonly Color ElectricColor = new Color(1f, 0.95f, 0.35f);
+        private static readonly Color ElectricEndColor = new Color(0.45f, 0.85f, 1f);
+
+        /// <summary>雷を帯びた見た目で描いているか（テスト用）。</summary>
+        public bool ShowsElectric { get; private set; }
 
         /// <summary>接続を保てる残り時間のゲージ（なければ null）。</summary>
         public RingGaugeView AttachGauge => _attachGauge;
@@ -30,6 +41,8 @@ namespace Airerage.Runtime.Presentation
             _line = GetComponent<LineRenderer>();
             _line.useWorldSpace = true;
             _line.positionCount = 2;
+            _startColor = _line.startColor;
+            _endColor = _line.endColor;
             Hide();
         }
 
@@ -47,6 +60,12 @@ namespace Airerage.Runtime.Presentation
             if (wire.Phase == WirePhase.Attached)
             {
                 to = wire.Anchor.ToUnity();
+            }
+            else if (wire.Phase == WirePhase.Retracting && wire.Whip)
+            {
+                // 鞭（インバータの間に外れて、押したまま）: 伸ばしたまま振り回す。
+                to = Vector3.Lerp(previous.Wire.Whip ? previous.Wire.HookPosition.ToUnity() : wire.HookPosition.ToUnity(),
+                    wire.HookPosition.ToUnity(), alpha);
             }
             else if (wire.Phase == WirePhase.Retracting)
             {
@@ -75,12 +94,30 @@ namespace Airerage.Runtime.Presentation
                 }
                 _line.SetPosition(count + 1, to);
             }
+            else if (current.Combat.InverterOn)
+            {
+                // 雷を帯びたワイヤー: 両端を固定して、間をジグザグに揺らす。
+                _line.positionCount = ElectricPoints;
+                Vector3 along = to - from;
+                Vector3 side = new Vector3(-along.y, along.x, 0f).normalized;
+                int frame = Mathf.FloorToInt(Time.time * 30f);
+                for (int i = 0; i < ElectricPoints; i++)
+                {
+                    float t = i / (float)(ElectricPoints - 1);
+                    float jitter = i == 0 || i == ElectricPoints - 1 ? 0f
+                        : (Mathf.PerlinNoise(i * 0.73f, frame * 0.37f) - 0.5f) * 2f * ElectricJitter * (wire.Whip ? 1.6f : 1f);
+                    _line.SetPosition(i, from + along * t + side * jitter);
+                }
+            }
             else
             {
                 _line.positionCount = 2;
                 _line.SetPosition(0, from);
                 _line.SetPosition(1, to);
             }
+            ShowsElectric = current.Combat.InverterOn;
+            _line.startColor = ShowsElectric ? ElectricColor : _startColor;
+            _line.endColor = ShowsElectric ? ElectricEndColor : _endColor;
             if (_anchorMarker != null)
             {
                 _anchorMarker.gameObject.SetActive(wire.Phase == WirePhase.Attached);

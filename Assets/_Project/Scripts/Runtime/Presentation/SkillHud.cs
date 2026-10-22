@@ -185,7 +185,9 @@ namespace Airerage.Runtime.Presentation
                 AttackSlot move = Slots[i];
                 // 効果中にもう一度出せる技（ウインドクローク）は、効果中は「使える」として知らせない（札に GUST と出す）。
                 bool recast = move != AttackSlot.Super && ActionController.CanRecast(state, move, combat);
-                bool ready = ActionController.CanUse(state, move, combat) && !recast;
+                // 連続技（イナズマステップ）の続きを出せる間は、「使える」として知らせない（札に残りの回数を出す）。
+                bool chaining = move == AttackSlot.Special1 && state.Combat.ChainTicksLeft > 0;
+                bool ready = ActionController.CanUse(state, move, combat) && !recast && !chaining;
                 string moveName = combat.Get(move).Name;
                 slot.Name = string.IsNullOrEmpty(moveName) ? (move == AttackSlot.Super ? "SUPER" : $"SPECIAL {i + 1}") : moveName;
                 slot.Icon = character != null ? character.IconOf(move) : null;
@@ -228,6 +230,14 @@ namespace Airerage.Runtime.Presentation
                         bool aiming = combat.Get(move).Effect == Airerage.Core.Skills.SkillEffect.Missile;
                         slot.Text = deposit >= 0 ? $"-{deposit}" : aiming ? "AIM" : "HOLD";
                         slot.Label = "HOLD";
+                    }
+                    else if (chaining)
+                    {
+                        // 連続技の続きを出せる残りの時間と回数（SOLDERER のイナズマステップ）。
+                        AttackData chain = combat.Get(move);
+                        slot.Fill = Mathf.Clamp01(state.Combat.ChainTicksLeft / (float)Mathf.Max(1, chain.ChainWindowTicks));
+                        slot.Text = $"x{Mathf.Max(0, chain.ChainMax - state.Combat.ChainCount)}";
+                        slot.Label = "CHAIN";
                     }
                     else if (left == CombatState.CooldownWhileActive)
                     {

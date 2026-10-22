@@ -71,6 +71,14 @@ namespace Airerage.Core.Skills
                     continue;
                 }
                 CharacterConfig owner = configs[item.Owner];
+                if (PastryRules.IsBlockable(item.Kind) && IsFlying(item, tick)
+                    && PastryRules.TryBlockFromAbove(item, states, configs, 0.4f))
+                {
+                    // 上から来た投射物を、ボウルで防いだ（PASTRY CHEF の空中上）。
+                    item.Ended = true;
+                    objects[o] = item;
+                    continue;
+                }
                 switch (item.Kind)
                 {
                     case WorldObjectKind.MirrorBall:
@@ -103,11 +111,22 @@ namespace Airerage.Core.Skills
                     case WorldObjectKind.Macaron:
                         PastryRules.StepMacaron(ref item, ground, states, configs, bounds, owner.Skills.TeaParty, hits, tick);
                         break;
+                    case WorldObjectKind.Scale:
+                        PastryRules.StepScale(ref item, ground, states, configs, bounds, owner.Skills.Scale, hits, tick);
+                        break;
+                    case WorldObjectKind.ShockWave:
+                        ElectricRules.StepShockWave(ref item, states, configs, tick);
+                        break;
+                    case WorldObjectKind.BallLightning:
+                        ElectricRules.StepBall(ref item, ground, states, configs, bounds, tick);
+                        break;
                 }
                 objects[o] = item;
             }
             SpaceRules.WarpThroughPortals(objects, states, configs);
             PastryRules.TouchCream(objects, states, configs);
+            ElectricRules.StepWhips(states, configs, hits);
+            ElectricRules.SpawnWaves(objects, ground, states, tick);
         }
 
         /// <summary>
@@ -286,6 +305,15 @@ namespace Airerage.Core.Skills
                 case SkillEffect.TeaParty:
                     PastryRules.FireTeaParty(objects, state, index, config, tick);
                     break;
+                case SkillEffect.DropScale:
+                    PastryRules.FireScale(objects, state, index, config, tick);
+                    break;
+                case SkillEffect.Inverter:
+                    ElectricRules.ToggleInverter(states, index);
+                    break;
+                case SkillEffect.BallLightning:
+                    ElectricRules.FireBallLightning(objects, state, index, config, tick);
+                    break;
                 case SkillEffect.Projectile:
                 {
                     // 威力の上乗せは、撃ったときの手持ちのコインで決める（コイントス。AttackPower の上乗せ）。
@@ -365,7 +393,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == shot.Owner || (shot.HitMask & (1u << v)) != 0 || target.Combat.InvincibleTicksLeft > 0 || target.Combat.IsWaitingToRespawn)
+                if (v == shot.Owner || (shot.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -401,6 +429,20 @@ namespace Airerage.Core.Skills
             }
         }
 
+        // 飛んでいる投射物か（放つ前・止まった後のものは防がない）。
+        private static bool IsFlying(in WorldObject item, int tick)
+        {
+            switch (item.Kind)
+            {
+                case WorldObjectKind.Macaron:
+                    return PastryRules.IsLaunched(item, tick);
+                case WorldObjectKind.BallLightning:
+                    return item.Stored == 1;
+                default:
+                    return true;
+            }
+        }
+
         /// <summary>照準の方向 aim（長さが deadzone より小さければ、向いている方向 facing の水平）を長さ 1 にしたもの。</summary>
         public static Vector2 AimDirection(Vector2 aim, int facing, float deadzone)
         {
@@ -432,7 +474,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == gust.Owner || (gust.HitMask & (1u << v)) != 0 || target.Combat.IsWaitingToRespawn)
+                if (v == gust.Owner || (gust.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -483,7 +525,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (target.Combat.IsWaitingToRespawn || target.Combat.HitstopTicksLeft > 0)
+                if (target.Combat.IsUntouchable || target.Combat.HitstopTicksLeft > 0)
                 {
                     continue;
                 }

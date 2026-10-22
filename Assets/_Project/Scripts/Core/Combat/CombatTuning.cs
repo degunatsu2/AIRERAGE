@@ -4,9 +4,22 @@ using Airerage.Core.Skills;
 
 namespace Airerage.Core.Combat
 {
+    /// <summary>長押しの技で、判定や動きを出す押し方（AttackData.ChargedFromTicks）。</summary>
+    public enum ChargeFilter : byte
+    {
+        /// <summary>どちらでも出す。</summary>
+        Any,
+
+        /// <summary>短く押したときだけ。</summary>
+        Tapped,
+
+        /// <summary>長押ししたときだけ。</summary>
+        Charged,
+    }
+
     /// <summary>
     /// 攻撃の判定1つ（docs/01_game_design.md 6.4）。攻撃を始めてから StartTick ティック目から ActiveTicks ティックの間だけ出る、
-    /// 軸平行の箱（D-37）。1つの攻撃に複数持てる（二段技）。同じ判定は同じ相手に1回だけ当たる。
+    /// 軸平行の箱（D-37。AngleDeg で傾けられる）。1つの攻撃に複数持てる（二段技）。同じ判定は同じ相手に1回だけ当たる。
     /// 位置と吹き飛びの X は、攻撃した側の向いている方向を正とする。
     /// </summary>
     [Serializable]
@@ -42,6 +55,22 @@ namespace Airerage.Core.Combat
         public float KnockbackX = 8f;
         public float KnockbackY = 6f;
 
+        /// <summary>
+        /// 箱の傾き（度。向いている方向から見て左回りが正。左を向けば左右を反転する）。0 なら軸平行。斜めに伸びた判定に使う
+        /// （PASTRY CHEF のパレットナイフ。2026-10-21）。
+        /// </summary>
+        public float AngleDeg;
+
+        /// <summary>
+        /// クリティカル判定（SOLDERER の指先。2026-10-21）。相手の体の中心（CombatTuning.CriticalCenterRadius の余裕）が箱に入ったときだけ
+        /// 当たり、当たれば FATAL で、吹き飛びと威力に CriticalScale を掛ける。
+        /// </summary>
+        public bool Critical;
+        public float CriticalScale = 1f;
+
+        /// <summary>長押しの技で、この判定を出す押し方（AttackData.ChargedFromTicks。SOLDERER の Q）。</summary>
+        public ChargeFilter Charge;
+
         public bool IsActiveAt(int ticks)
         {
             return ticks >= StartTick && (UntilEnd || ticks < StartTick + ActiveTicks);
@@ -61,6 +90,7 @@ namespace Airerage.Core.Combat
             v.NonNegative(nameof(Damage), Damage);
             v.NonNegative(nameof(HitstopTicks), HitstopTicks);
             v.NonNegative(nameof(HitstunTicks), HitstunTicks);
+            v.Positive(nameof(CriticalScale), CriticalScale);
             return v;
         }
     }
@@ -79,6 +109,15 @@ namespace Airerage.Core.Combat
 
         /// <summary>この攻撃が相手に当たっているときだけ動く（当たったら飛び出す、など。RISK TAKER のオールイン）。</summary>
         public bool RequiresHit;
+
+        /// <summary>
+        /// 技の向き（ActionState.Aim。AttackData.AimFromMove なら移動の入力の方向）へ VelocityX の速さで動く（VelocityY は使わない。
+        /// SOLDERER のイナズマステップ）。
+        /// </summary>
+        public bool AlongAim;
+
+        /// <summary>長押しの技で、この動きをする押し方（AttackData.ChargedFromTicks）。</summary>
+        public ChargeFilter Charge;
 
         public bool IsActiveAt(int ticks)
         {
@@ -187,6 +226,54 @@ namespace Airerage.Core.Combat
         /// </summary>
         public bool Roulette;
 
+        /// <summary>
+        /// 長押しとみなす、ためた長さ（ティック。0 なら分けない）。短く押したときと長押ししたときで、判定と動き（ChargeFilter）と
+        /// 全体の長さ（ChargedTotalTicks）を変える（SOLDERER のイナズマステップ。2026-10-21）。
+        /// </summary>
+        public int ChargedFromTicks;
+
+        /// <summary>長押しで出したときの全体の長さ（ティック。0 なら TotalTicks）。</summary>
+        public int ChargedTotalTicks;
+
+        /// <summary>技の向き（ActionState.Aim）を、照準ではなく、出したときの移動の入力の方向にする（入れていなければ向いている方向）。</summary>
+        public bool AimFromMove;
+
+        /// <summary>
+        /// 続けて出せる回数（2 以上なら連続技。特殊攻撃 1 だけ）。出すたびに ChainWindowTicks の間、次を出せる。回数を使い切るか、
+        /// 長押しで出すか、時間が切れたら終わり、出した回数 × クールタイムを数える（SOLDERER のイナズマステップ。2026-10-21）。
+        /// </summary>
+        public int ChainMax;
+        public int ChainWindowTicks;
+
+        /// <summary>1 人には、判定のどれか 1 つだけが当たる（先に当たった判定だけ。クリティカル判定と通常の判定など）。</summary>
+        public bool ExclusiveHits;
+
+        /// <summary>撃破技でも、打つ直前の速さでは FATAL にならない（FATAL はクリティカル判定だけ。SOLDERER）。</summary>
+        public bool FatalOnlyByCritical;
+
+        /// <summary>
+        /// 判定が出ている間、その判定の箱で、上から飛んできたほかの人の投射物を防ぐ（PASTRY CHEF のボウル。防いだら GUARD。2026-10-21）。
+        /// </summary>
+        public bool BlocksProjectilesAbove;
+
+        /// <summary>ためた長さ charge が長押しか。</summary>
+        public bool IsCharged(int charge)
+        {
+            return ChargedFromTicks > 0 && charge >= ChargedFromTicks;
+        }
+
+        /// <summary>押し方の決まり filter の判定・動きを、ためた長さ charge で出すか。</summary>
+        public bool Uses(ChargeFilter filter, int charge)
+        {
+            return filter == ChargeFilter.Any || (filter == ChargeFilter.Charged) == IsCharged(charge);
+        }
+
+        /// <summary>ためた長さ charge で出したときの全体の長さ（ティック）。</summary>
+        public int TotalTicksFor(int charge)
+        {
+            return IsCharged(charge) && ChargedTotalTicks > 0 ? ChargedTotalTicks : TotalTicks;
+        }
+
         /// <summary>攻撃の全体の長さ（ティック）。終わったティックから次の行動ができる。</summary>
         public int TotalTicks = 18;
 
@@ -238,6 +325,10 @@ namespace Airerage.Core.Combat
             v.NotNull(nameof(Motions), Motions);
             v.InRange(nameof(EffectTick), EffectTick, 0f, TotalTicks - 1);
             v.NonNegative(nameof(HoldMaxTicks), HoldMaxTicks);
+            v.NonNegative(nameof(ChargedFromTicks), ChargedFromTicks);
+            v.NonNegative(nameof(ChargedTotalTicks), ChargedTotalTicks);
+            v.NonNegative(nameof(ChainMax), ChainMax);
+            v.NonNegative(nameof(ChainWindowTicks), ChainWindowTicks);
             v.NotNull(nameof(ChargeLevels), ChargeLevels);
             if (ChargeLevels != null)
             {
@@ -267,7 +358,7 @@ namespace Airerage.Core.Combat
                     v.NotNull($"Hits[{i}]", Hits[i]);
                     if (Hits[i] != null)
                     {
-                        v.Merge(Hits[i].Validate($"{name}.Hits[{i}]", TotalTicks));
+                        v.Merge(Hits[i].Validate($"{name}.Hits[{i}]", Math.Max(TotalTicks, ChargedTotalTicks)));
                     }
                 }
             }
@@ -278,7 +369,7 @@ namespace Airerage.Core.Combat
                     v.NotNull($"Motions[{i}]", Motions[i]);
                     if (Motions[i] != null)
                     {
-                        v.Merge(Motions[i].Validate($"{name}.Motions[{i}]", TotalTicks));
+                        v.Merge(Motions[i].Validate($"{name}.Motions[{i}]", Math.Max(TotalTicks, ChargedTotalTicks)));
                     }
                 }
             }
@@ -497,6 +588,12 @@ namespace Airerage.Core.Combat
         /// （ユーザーの要望、2026-10-13。倍率は 3 倍で長すぎたので 2 倍にした。撃破技のヒットストップ 20 ティックの 2 倍で 40 ティック）。【仮】
         /// </summary>
         public float FatalStrikeSpeed = 14f;
+
+        /// <summary>
+        /// クリティカル判定（AttackHit.Critical）で、相手の体の中心とみなす範囲の半径（m）。体の中心からこの距離までが箱に入れば当たる
+        /// 【仮】（SOLDERER の指先。2026-10-21）。
+        /// </summary>
+        public float CriticalCenterRadius = 0.3f;
         public int FatalHitstopMultiplier = 2;
 
         /// <summary>

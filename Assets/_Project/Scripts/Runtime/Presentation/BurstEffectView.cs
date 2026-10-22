@@ -188,7 +188,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (_style == null)
             {
-                _style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+                _style = TextFlash.Style(_fontSize, FontStyle.Bold, TextAnchor.MiddleCenter);
             }
             // 最初に大きく出て、少し縮みながら消える。
             float pop = progress < 0.15f ? Mathf.Lerp(1.8f, 1.2f, progress / 0.15f) : Mathf.Lerp(1.2f, 1f, (progress - 0.15f) / 0.85f);
@@ -196,14 +196,10 @@ namespace Airerage.Runtime.Presentation
             var rect = new Rect(screen.x - 250f, Screen.height - screen.y - 50f, 500f, 100f);
             float alpha = progress < 0.7f ? 1f : 1f - (progress - 0.7f) / 0.3f;
 
-            Color previous = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.85f * alpha);
-            GUI.Label(new Rect(rect.x + 3f, rect.y + 3f, rect.width, rect.height), _label, _style);
             Color text = _rainbow ? Color.HSVToRGB(Mathf.Repeat(Time.time * 2f, 1f), 0.8f, 1f) : _color;
             text.a = alpha;
-            GUI.color = text;
-            GUI.Label(rect, _label, _style);
-            GUI.color = previous;
+            // 出た瞬間は白く光り、すぐに本来の色へ（TextFlash）。
+            TextFlash.Draw(rect, _label, _style, TextFlash.Apply(text, Time.time - _startedAt), 0.85f, 3f);
         }
     }
 }

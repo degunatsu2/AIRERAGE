@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 23;
+        public const int FormatVersion = 24;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -233,6 +233,7 @@ namespace Airerage.Core.Simulation
             writer.Write(wire.CooldownTicksLeft);
             writer.Write((byte)wire.LastReleaseReason);
             writer.Write((byte)wire.LastMissReason);
+            writer.Write(wire.Whip);
 
             ActionState action = state.Action;
             writer.Write((byte)action.Kind);
@@ -311,6 +312,14 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.CreamNoCling);
             writer.Write(combat.CreamStickTicksLeft);
             writer.Write(combat.CreamStickSpent);
+            writer.Write(combat.ChainCount);
+            writer.Write(combat.ChainTicksLeft);
+            writer.Write(combat.InverterOn);
+            writer.Write(combat.StunTicksLeft);
+            writer.Write(combat.StunGuardTicks);
+            writer.Write(combat.StunCount);
+            writer.Write(combat.WhipGuardTicks);
+            writer.Write(combat.ShieldBlockCount);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -358,6 +367,7 @@ namespace Airerage.Core.Simulation
                 CooldownTicksLeft = reader.ReadInt32(),
                 LastReleaseReason = (WireReleaseReason)reader.ReadByte(),
                 LastMissReason = (WireMissReason)reader.ReadByte(),
+                Whip = reader.ReadBoolean(),
             };
             state.Action = new ActionState
             {
@@ -436,6 +446,14 @@ namespace Airerage.Core.Simulation
                 CreamNoCling = reader.ReadBoolean(),
                 CreamStickTicksLeft = reader.ReadInt32(),
                 CreamStickSpent = reader.ReadBoolean(),
+                ChainCount = reader.ReadInt32(),
+                ChainTicksLeft = reader.ReadInt32(),
+                InverterOn = reader.ReadBoolean(),
+                StunTicksLeft = reader.ReadInt32(),
+                StunGuardTicks = reader.ReadInt32(),
+                StunCount = reader.ReadInt32(),
+                WhipGuardTicks = reader.ReadInt32(),
+                ShieldBlockCount = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();
