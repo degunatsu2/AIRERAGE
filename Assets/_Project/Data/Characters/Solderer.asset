@@ -89,11 +89,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 30
@@ -106,7 +108,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.5
           HalfHeight: 1.4
-          Damage: 4
+          Damage: 1
+          Gauge: 70
           HitstopTicks: 8
           HitstunTicks: 20
           KnockbackX: 6
@@ -122,7 +125,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.5
           HalfHeight: 1.4
-          Damage: 4
+          Damage: 1
+          Gauge: 70
           HitstopTicks: 8
           HitstunTicks: 20
           KnockbackX: -6
@@ -158,11 +162,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 32
@@ -175,7 +181,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 2
           HalfHeight: 2
-          Damage: 3
+          Damage: 1
+          Gauge: 55
           HitstopTicks: 5
           HitstunTicks: 16
           KnockbackX: 3
@@ -197,11 +204,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 1
-        NoSpeedBonus: 1
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 34
@@ -214,7 +223,8 @@ MonoBehaviour:
           OffsetY: -1.1
           HalfWidth: 0.35
           HalfHeight: 0.35
-          Damage: 10
+          Damage: 3
+          Gauge: 85
           HitstopTicks: 20
           HitstunTicks: 32
           KnockbackX: 12
@@ -230,7 +240,8 @@ MonoBehaviour:
           OffsetY: -0.7
           HalfWidth: 1.2
           HalfHeight: 0.45
-          Damage: 5
+          Damage: 2
+          Gauge: 65
           HitstopTicks: 10
           HitstunTicks: 22
           KnockbackX: 9
@@ -252,11 +263,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 1
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 38
@@ -269,7 +282,8 @@ MonoBehaviour:
           OffsetY: -0.4
           HalfWidth: 1.2
           HalfHeight: 1
-          Damage: 4
+          Damage: 1
+          Gauge: 70
           HitstopTicks: 9
           HitstunTicks: 22
           KnockbackX: 3
@@ -285,7 +299,8 @@ MonoBehaviour:
           OffsetY: 1.6
           HalfWidth: 1.3
           HalfHeight: 1
-          Damage: 4
+          Damage: 1
+          Gauge: 75
           HitstopTicks: 9
           HitstunTicks: 22
           KnockbackX: 1
@@ -301,7 +316,8 @@ MonoBehaviour:
           OffsetY: 0.6
           HalfWidth: 1.2
           HalfHeight: 1
-          Damage: 4
+          Damage: 1
+          Gauge: 70
           HitstopTicks: 9
           HitstunTicks: 22
           KnockbackX: -2
@@ -330,11 +346,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 1
         BlocksProjectilesAbove: 0
         TotalTicks: 32
@@ -347,7 +365,8 @@ MonoBehaviour:
           OffsetY: -1.4
           HalfWidth: 1.2
           HalfHeight: 0.9
-          Damage: 6
+          Damage: 2
+          Gauge: 75
           HitstopTicks: 10
           HitstunTicks: 22
           KnockbackX: 2
@@ -382,25 +401,28 @@ MonoBehaviour:
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 10
-        ChargedTotalTicks: 26
+        ChargedTotalTicks: 21
+        FiresWhenCharged: 1
+        TracksAim: 0
         AimTurnsFacing: 1
         ChainMax: 3
         ChainWindowTicks: 180
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
-        TotalTicks: 14
+        TotalTicks: 11
         WireCancelFromTick: 4
         Hits:
         - StartTick: 1
-          ActiveTicks: 9
+          ActiveTicks: 6
           UntilEnd: 0
           OffsetX: 0
           OffsetY: 0
           HalfWidth: 1
           HalfHeight: 1.2
-          Damage: 10
+          Damage: 3
+          Gauge: 80
           HitstopTicks: 8
           HitstunTicks: 20
           KnockbackX: 8
@@ -410,13 +432,14 @@ MonoBehaviour:
           CriticalScale: 1
           Charge: 1
         - StartTick: 2
-          ActiveTicks: 16
+          ActiveTicks: 11
           UntilEnd: 0
           OffsetX: 0
           OffsetY: 0
           HalfWidth: 1.4
           HalfHeight: 1.5
-          Damage: 20
+          Damage: 6
+          Gauge: 115
           HitstopTicks: 14
           HitstunTicks: 28
           KnockbackX: 13
@@ -427,14 +450,14 @@ MonoBehaviour:
           Charge: 2
         Motions:
         - StartTick: 0
-          Ticks: 9
+          Ticks: 6
           VelocityX: 24
           VelocityY: 0
           RequiresHit: 0
           AlongAim: 1
           Charge: 1
         - StartTick: 0
-          Ticks: 16
+          Ticks: 11
           VelocityX: 30
           VelocityY: 0
           RequiresHit: 0
@@ -455,11 +478,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 6
@@ -479,11 +504,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 1
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 46
@@ -509,8 +536,7 @@ MonoBehaviour:
       ParriedStunTicks: 30
       ParriedPushbackX: 4
       ParriedPushbackY: 6
-      GaugeOnHit: 80
-      GaugeOnGuarded: 30
+      GaugeGuardedPercent: 40
       GaugeOnDamaged: 40
       GaugeOnGuard: 20
       GaugeOnJustGuard: 200
@@ -528,7 +554,7 @@ MonoBehaviour:
         ChargeRatePercent: 110
         MaxCoins: 300
         GoldCoins: 150
-        Durability: 30
+        Durability: 9
         DepositPerSecond: 30
         HalfWidth: 0.7
         HalfHeight: 0.7
@@ -552,7 +578,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 75
           HitstopTicks: 10
           HitstunTicks: 22
           KnockbackX: 2
@@ -611,7 +638,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 70
           HitstopTicks: 10
           HitstunTicks: 24
           KnockbackX: 9
@@ -632,7 +660,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 15
+          Damage: 5
+          Gauge: 0
           HitstopTicks: 6
           HitstunTicks: 20
           KnockbackX: 3
@@ -691,7 +720,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 20
+          Damage: 6
+          Gauge: 0
           HitstopTicks: 14
           HitstunTicks: 28
           KnockbackX: 7
@@ -719,7 +749,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 8
+          Damage: 2
+          Gauge: 80
           HitstopTicks: 16
           HitstunTicks: 30
           KnockbackX: 3
@@ -740,7 +771,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 50
           HitstopTicks: 2
           HitstunTicks: 14
           KnockbackX: 0
@@ -753,14 +785,15 @@ MonoBehaviour:
         WaveRadius: 0.5
         StunTicks: 60
         StunGuardTicks: 30
+        WaveCooldownTicks: 180
       BallLightning:
         Count: 3
         IntervalTicks: 18
-        LaunchOffset: 0.8
+        LaunchOffset: 1.2
         Speed: 7
         TravelDistance: 14
         TrapTicks: 300
-        Radius: 0.55
+        Radius: 1.1
   _displayName: SOLDERER
   _logo: {fileID: 2800000, guid: 4f7d62fe05f522009a613ea4947a7a38, type: 2}
   _special1Icon: {fileID: 0}
@@ -772,14 +805,14 @@ MonoBehaviour:
   - "#\u96FB\u6C17"
   _special1Text:
     Name: "\u30A4\u30CA\u30BA\u30DE\u30B9\u30C6\u30C3\u30D7"
-    Description: "\u7167\u6E96\u306E\u65B9\u5411\u3078\u77ED\u304F\u7A81\u6483\u3059\u308B\u3002\u7D9A\u3051\u30662\u56DE\u307E\u3067\u51FA\u305B\u308B\u3002\u9577\u62BC\u3057\u3067\u5F37\u3044\u96F7\u3092\u307E\u3068\u3063\u3066\u9577\u304F\u7A81\u6483\u3059\u308B\u3002\u4F7F\u3063\u305F\u56DE\u6570\u3067\u30AF\u30FC\u30EB\u30BF\u30A4\u30E0\u304C\u5EF6\u3073\u308B\u3002"
+    Description: "\u7167\u6E96\u306E\u65B9\u5411\u3078\u77ED\u304F\u7A81\u6483\u3059\u308B\u3002\u7D9A\u3051\u30662\u56DE\u307E\u3067\u51FA\u305B\u308B\u3002\u9577\u62BC\u3057\u3059\u308B\u3068\u3001\u305D\u306E\u77AC\u9593\u306B\u5F37\u3044\u96F7\u3092\u307E\u3068\u3063\u3066\u9577\u304F\u7A81\u6483\u3059\u308B\u3002\u4F7F\u3063\u305F\u56DE\u6570\u3067\u30AF\u30FC\u30EB\u30BF\u30A4\u30E0\u304C\u5EF6\u3073\u308B\u3002"
     CooldownNote: 
   _special2Text:
     Name: "\u30A4\u30F3\u30D0\u30FC\u30BF"
-    Description: "\u62BC\u3059\u305F\u3073\u306B\u5207\u308A\u66FF\u3048\u308B\u3002\u30AA\u30F3\u306E\u9593\u306F\u30EF\u30A4\u30E4\u30FC\u304C\u77ED\u304F\u96FB\u6C17\u3092\u5E2F\u3073\u3001\u8DB3\u5834\u306B\u3064\u306A\u3050\u3068\u96F7\u304C\u5730\u9762\u3092\u4F1D\u3063\u3066\u89E6\u308C\u305F\u4EBA\u3092\u611F\u96FB\u3055\u305B\u308B\u3002\u4F55\u3082\u306A\u3044\u6240\u3078\u98DB\u3070\u3057\u3066\u62BC\u3057\u7D9A\u3051\u308B\u3068\u97AD\u306B\u306A\u308B\u3002"
+    Description: "\u62BC\u3059\u305F\u3073\u306B\u5207\u308A\u66FF\u3048\u308B\u3002\u30AA\u30F3\u306E\u9593\u306F\u30EF\u30A4\u30E4\u30FC\u304C\u77ED\u304F\u96FB\u6C17\u3092\u5E2F\u3073\u3001\u8DB3\u5834\u306B\u3064\u306A\u3050\u3068\u96F7\u304C\u5730\u9762\u3092\u4F1D\u3063\u3066\u89E6\u308C\u305F\u4EBA\u3092\u611F\u96FB\u3055\u305B\u308B\uFF083\u79D2\u306B1\u56DE\uFF09\u3002\u4F55\u3082\u306A\u3044\u6240\u3078\u98DB\u3070\u3057\u3066\u62BC\u3057\u7D9A\u3051\u308B\u3068\u97AD\u306B\u306A\u308A\u3001\u653B\u6483\u3057\u3066\u3082\u6D88\u3048\u306A\u3044\u3002"
     CooldownNote: 
   _superText:
     Name: "\u30DC\u30FC\u30EB\u30E9\u30A4\u30C8\u30CB\u30F3\u30B0"
-    Description: "\u7167\u6E96\u306E\u65B9\u5411\u3078\u3086\u3063\u304F\u308A\u9032\u3080\u96FB\u6C17\u306E\u7403\u30923\u3064\u6483\u3064\u3002\u58C1\u3067\u8DF3\u306D\u8FD4\u308A\u3001\u6B62\u307E\u3063\u305F\u5F8C\u3082\u3057\u3070\u3089\u304F\u6B8B\u3063\u3066\u89E6\u308C\u305F\u4EBA\u3092\u611F\u96FB\u3055\u305B\u308B\u3002"
+    Description: "\u5927\u304D\u306A\u96FB\u6C17\u306E\u7403\u30923\u3064\u3001\u305D\u308C\u305E\u308C\u653E\u3064\u77AC\u9593\u306E\u7167\u6E96\u306E\u65B9\u5411\u3078\u6483\u3064\u3002\u3086\u3063\u304F\u308A\u9032\u3093\u3067\u58C1\u3067\u8DF3\u306D\u8FD4\u308A\u3001\u6B62\u307E\u3063\u305F\u5F8C\u3082\u3057\u3070\u3089\u304F\u6B8B\u3063\u3066\u89E6\u308C\u305F\u4EBA\u3092\u611F\u96FB\u3055\u305B\u308B\u3002"
     CooldownNote: 
   _costume: 5

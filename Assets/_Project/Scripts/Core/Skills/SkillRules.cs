@@ -126,7 +126,7 @@ namespace Airerage.Core.Skills
             SpaceRules.WarpThroughPortals(objects, states, configs);
             PastryRules.TouchCream(objects, states, configs);
             ElectricRules.StepWhips(states, configs, hits);
-            ElectricRules.SpawnWaves(objects, ground, states, tick);
+            ElectricRules.SpawnWaves(objects, ground, states, configs, tick);
         }
 
         /// <summary>

@@ -170,18 +170,22 @@ namespace Airerage.Core.Skills
 
         /// <summary>
         /// インバータの間にワイヤーをつないだ人がいれば（つないだティックだけ）、つないだ地形の箱の縁を走る雷の波動を出す（地形が箱で
-        /// なければ出さない）。
+        /// なければ出さない）。出したら InverterTuning.WaveCooldownTicks の間は出ない（CombatState.WaveCooldownTicks。毎ティック減らす）。
         /// </summary>
-        public static void SpawnWaves(WorldObjects objects, ICollisionQuery terrain, List<CharacterState> states, int tick)
+        public static void SpawnWaves(WorldObjects objects, ICollisionQuery terrain, List<CharacterState> states,
+            IReadOnlyList<CharacterConfig> configs, int tick)
         {
-            if (!(terrain is BoxTerrain boxes))
-            {
-                return;
-            }
             for (int i = 0; i < states.Count; i++)
             {
                 CharacterState state = states[i];
-                if (!state.Combat.InverterOn || state.Wire.Phase != WirePhase.Attached || state.Wire.PhaseTicks != 0)
+                if (state.Combat.WaveCooldownTicks > 0)
+                {
+                    state.Combat.WaveCooldownTicks--;
+                    states[i] = state;
+                    continue;
+                }
+                if (!state.Combat.InverterOn || state.Wire.Phase != WirePhase.Attached || state.Wire.PhaseTicks != 0
+                    || !(terrain is BoxTerrain boxes))
                 {
                     continue;
                 }
@@ -195,6 +199,8 @@ namespace Airerage.Core.Skills
                     Kind = WorldObjectKind.ShockWave, Owner = i, Slot = AttackSlot.Special2, Position = ClosestOnEdge(point, min, max),
                     Velocity = min, End = max, SpawnTick = tick, ExpireTick = int.MaxValue,
                 });
+                state.Combat.WaveCooldownTicks = configs[i].Skills.Inverter.WaveCooldownTicks;
+                states[i] = state;
             }
         }
 

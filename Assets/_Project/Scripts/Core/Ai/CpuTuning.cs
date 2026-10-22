@@ -3,17 +3,21 @@ using Airerage.Core.Common;
 
 namespace Airerage.Core.Ai
 {
-    /// <summary>CPU の強さの段階（D-71【仮】。docs/16 2 章）。</summary>
+    /// <summary>
+    /// CPU の強さの段階（D-71。ユーザーの決定、2026-10-22: 4 段階。10 点満点の手ごわさで EASY 1・NORMAL 3・HARD 6・HELL 10 くらい）。
+    /// </summary>
     public enum CpuLevel : byte
     {
         Easy = 0,
         Normal = 1,
         Hard = 2,
+        Hell = 3,
     }
 
     /// <summary>
     /// CPU の強さの調整値（docs/16 3 章。値はすべて【仮】）。反応の遅れ・狙いのずれ・攻撃と守りと技の頻度で強さを変える。
-    /// 段階ごとの値は For で作る（値はここの 1 か所で決める）。
+    /// HELL だけは、当たったら次の攻撃でキャンセルしてつなぎ（CancelOnHit）、相手の攻撃が出る直前にガードしてジャストガードを狙う
+    /// （TimedGuard）。段階ごとの値は For で作る（値はここの 1 か所で決める）。
     /// </summary>
     [Serializable]
     public sealed class CpuTuning
@@ -42,25 +46,45 @@ namespace Airerage.Core.Ai
         /// <summary>この枚数以上のコインを持っていたら、拠点へ確定しに行く。</summary>
         public int BankAtHeldCoins = 20;
 
+        /// <summary>攻撃が当たったら、終わるのを待たずに次の攻撃でキャンセルしてつなぐ（D-17 の 1 回。攻撃の間 AttackIntervalTicks も待たない）。</summary>
+        public bool CancelOnHit;
+
+        /// <summary>ガードを、相手の攻撃の判定が出る直前まで待ってから押す（ジャストガードを狙う）。false なら相手が攻撃を出したらすぐ押す。</summary>
+        public bool TimedGuard;
+
         /// <summary>段階 level の値。</summary>
         public static CpuTuning For(CpuLevel level)
         {
             switch (level)
             {
                 case CpuLevel.Easy:
+                    // 1 点: 初めての人でも勝てる。のんびり判断し、攻撃はまばらで、ガードしない。
                     return new CpuTuning
                     {
-                        DecideEveryTicks = 24, ReactionTicks = 22, AttackIntervalTicks = 40, AimErrorDegrees = 20f, GuardChance = 0.05f,
-                        SkillChance = 0.1f, Aggression = 0.6f, BankAtHeldCoins = 30,
+                        DecideEveryTicks = 36, ReactionTicks = 30, AttackIntervalTicks = 60, AimErrorDegrees = 25f, GuardChance = 0f,
+                        SkillChance = 0.05f, Aggression = 0.4f, BankAtHeldCoins = 40,
                     };
                 case CpuLevel.Hard:
+                    // 6 点: 慣れた人と互角くらい。
                     return new CpuTuning
                     {
-                        DecideEveryTicks = 6, ReactionTicks = 4, AttackIntervalTicks = 6, AimErrorDegrees = 3f, GuardChance = 0.6f,
-                        SkillChance = 0.45f, Aggression = 1.4f, BankAtHeldCoins = 15,
+                        DecideEveryTicks = 8, ReactionTicks = 6, AttackIntervalTicks = 12, AimErrorDegrees = 5f, GuardChance = 0.4f,
+                        SkillChance = 0.35f, Aggression = 1.2f, BankAtHeldCoins = 18,
+                    };
+                case CpuLevel.Hell:
+                    // 10 点: ほとんど待たずに判断・反応し、当たればつなぎ、ジャストガードを狙う。
+                    return new CpuTuning
+                    {
+                        DecideEveryTicks = 3, ReactionTicks = 1, AttackIntervalTicks = 0, AimErrorDegrees = 1f, GuardChance = 0.85f,
+                        SkillChance = 0.6f, Aggression = 1.6f, BankAtHeldCoins = 12, CancelOnHit = true, TimedGuard = true,
                     };
                 default:
-                    return new CpuTuning();
+                    // 3 点: 少し慣れれば勝てる。
+                    return new CpuTuning
+                    {
+                        DecideEveryTicks = 18, ReactionTicks = 16, AttackIntervalTicks = 30, AimErrorDegrees = 13f, GuardChance = 0.15f,
+                        SkillChance = 0.18f, Aggression = 0.8f, BankAtHeldCoins = 25,
+                    };
             }
         }
 

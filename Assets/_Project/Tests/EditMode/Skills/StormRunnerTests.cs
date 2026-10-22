@@ -185,7 +185,8 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(bonus, Is.GreaterThan(0), "前提: 初速より速い");
             Assert.That(hit.Value.BonusPercent, Is.EqualTo(bonus), "速さで強くならない");
             Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(Storm.Combat.Ground.Hits[0].Damage, 1f, bonus)));
-            Assert.That(hit.Value.Damage, Is.EqualTo((int)System.MathF.Round(runner.Action.RunSpeed * 0.4f)).Within(1), "ダメージが速さ × 0.4 でない");
+            float perSpeed = Storm.Combat.Ground.Hits[0].Damage / run.InitialSpeed;
+            Assert.That(hit.Value.Damage, Is.EqualTo((int)System.MathF.Round(runner.Action.RunSpeed * perSpeed)).Within(1), "ダメージが速さに比例しない");
             Assert.That(runner.Action.Attack, Is.EqualTo(AttackSlot.Ground), "当てたら走るのが終わった");
 
             // 同じ相手には 0.5 秒（30 ティック）に 1 回まで。

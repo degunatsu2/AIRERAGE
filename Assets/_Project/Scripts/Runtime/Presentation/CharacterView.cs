@@ -18,7 +18,7 @@ namespace Airerage.Runtime.Presentation
     /// キャンセルした瞬間は紫の光（_wireCancelBurst）を出す（T3-7。あれば）。ジャンプ台・加速リングが効いた瞬間は _gimmickBurst。
     /// 特殊攻撃を出した瞬間は _specialBurst、必殺技を出した瞬間は虹色の光と「SUPER!」（_superBurst）を出す（docs/13 T5-4。あれば）。
     /// ルーレットの最大（JACKPOT）を受けた瞬間は _jackpotBurst、コインの効率が上がっている間（フィーバータイム）は周りに金色のゲージ
-    /// （_feverGauge）を出す（RISK TAKER。docs/14。あれば）。
+    /// （_feverGauge）を出す（RISK TAKER。docs/14。あれば）。雷の波動のクールタイムの間は、水色のゲージ（_waveGauge。SOLDERER。あれば）。
     /// 撃破されて復帰を待っている間は見えなくし、復帰した後の無敵の間は点滅させる（docs/12 T4-2）。
     /// 回る技（AttackData.SpinPerHit）の間は、判定 1 つにつき 1 回転させる。
     /// 向いている方向は、箱の前の面の目の帯と、横へ突き出た印（_facingMarker。あれば）で示す（向きで左右を反転する。ユーザーの要望、2026-10-16）。
@@ -87,6 +87,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private RingGaugeView _feverGauge;
         [Tooltip("撃破されて復帰を待つ間の、出現位置の周りの大きなゲージ（なくてもよい）")]
         [SerializeField] private RingGaugeView _respawnGauge;
+        [Tooltip("雷の波動（インバータ）を次に出せるまでのゲージ（SOLDERER。なくてもよい）")]
+        [SerializeField] private RingGaugeView _waveGauge;
         [Tooltip("キャラクターの仮の見た目（衣装。なければ箱のまま）")]
         [SerializeField] private CostumeView _costume;
         [Tooltip("壁に張り付いていられる残り（紫の円形ゲージ。ユーザーの要望、2026-10-20）")]
@@ -110,6 +112,7 @@ namespace Airerage.Runtime.Presentation
         private int _shownGauge;
         private int _shownJackpots;
         private int _feverTicks;
+        private int _waveTicks;
         private Renderer[] _facingRenderers;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
@@ -160,6 +163,7 @@ namespace Airerage.Runtime.Presentation
         /// <summary>復帰までの残りのゲージ（なければ null）。</summary>
         public RingGaugeView RespawnGauge => _respawnGauge;
         public RingGaugeView WallClingGauge => _wallClingGauge;
+        public RingGaugeView WaveGauge => _waveGauge;
         public CostumeView Costume => _costume;
 
         /// <summary>キャラクター character の衣装を出す（試合の仕組みが毎フレーム呼ぶ。変わったときだけ入れ替える）。</summary>
@@ -396,6 +400,12 @@ namespace Airerage.Runtime.Presentation
                         _feverGauge.Hide();
                     }
                 }
+            }
+            if (_waveGauge != null)
+            {
+                // 全体の長さは、波動を出したときの残り（いちばん大きかった値）。
+                _waveTicks = c.WaveCooldownTicks > 0 ? Mathf.Max(_waveTicks, c.WaveCooldownTicks) : 0;
+                ShowOrHide(_waveGauge, _waveTicks > 0 ? c.WaveCooldownTicks / (float)_waveTicks : 0f);
             }
             _shownSpecial1Cooldown = c.Special1CooldownTicksLeft;
             _shownSpecial2Cooldown = c.Special2CooldownTicksLeft;

@@ -79,8 +79,8 @@ namespace Airerage.Core.Skills
     /// <summary>
     /// 走り続ける地上技（AttackData.Run。STORM RUNNER。docs/14 1.2、C-10、C-11。値は【仮】）。向いている方向へ走り、だんだん加速する。
     /// 足場が途切れたら・壁にぶつかったら浅い角度で跳ぶ（壁なら反対側へ）。着地したらそのまま走る。逆向きに入力すると、反転の後に
-    /// 速さを初めに戻して逆向きに走る。体の判定のダメージは速さに比例する（初速で判定のダメージ。速さ × 0.4 になるように、
-    /// 判定のダメージは初速 × 0.4 にする）。
+    /// 速さを初めに戻して逆向きに走る。体の判定のダメージは速さに比例する（初速で判定のダメージ。前は速さ × 0.4。
+    /// 威力を 30% にしたので、初速で 2）。
     /// </summary>
     [Serializable]
     public sealed class RunTuning
@@ -263,8 +263,8 @@ namespace Airerage.Core.Skills
         /// <summary>この枚数で金色に光る（表示用。ユーザーの決定）。</summary>
         public int GoldCoins = 150;
 
-        /// <summary>壊れるまでのダメージ（C-2）。</summary>
-        public int Durability = 30;
+        /// <summary>壊れるまでのダメージ（C-2 の 30 を、攻撃の威力を 30% にしたのに合わせて 9 にした。2026-10-22）。</summary>
+        public int Durability = 9;
 
         /// <summary>長押しで預ける速さ（枚/秒）。</summary>
         public int DepositPerSecond = 30;
@@ -342,7 +342,7 @@ namespace Airerage.Core.Skills
         /// <summary>当たったときの判定のデータ（位置・大きさ・出る時間は使わない）。</summary>
         public AttackHit Hit = new AttackHit
         {
-            Damage = 5, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 13f,
+            Damage = 2, Gauge = 75, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 13f,
         };
 
         /// <summary>
@@ -481,7 +481,7 @@ namespace Airerage.Core.Skills
     /// <summary>
     /// マカロン（PASTRY CHEF の R。ティーパーティ。ユーザーの案、2026-10-21。値は【仮】）。上へランダムな角度で Count 個を
     /// IntervalTicks ごとに投げ上げる。重力で落ち、地形で跳ね返る。止まるか、ステージの外に出たら点滅し、BlinkTicks（0.5 秒）で消える
-    /// （点滅の間は当たらない）。色は 緑 GreenPercent % / 黄 YellowPercent % / 虹（残り）で、威力は 20 / 40 / 100（吹き飛びも同じ割合で
+    /// （点滅の間は当たらない）。色は 緑 GreenPercent % / 黄 YellowPercent % / 虹（残り）で、威力は判定の威力の 1 / 2 / 5 倍（吹き飛びも同じ割合で
     /// 強くする。AttackPower の上乗せ）。持ち主以外に、相手ごとに 1 回だけ当たる（当たっても跳ね続ける）。
     /// </summary>
     [Serializable]
@@ -525,7 +525,7 @@ namespace Airerage.Core.Skills
         /// <summary>緑のマカロンが当たったときの判定のデータ（位置・大きさ・出る時間は使わない）。</summary>
         public AttackHit Hit = new AttackHit
         {
-            Damage = 20, HitstopTicks = 14, HitstunTicks = 28, KnockbackX = 7f, KnockbackY = 9f,
+            Damage = 6, Gauge = 0, HitstopTicks = 14, HitstunTicks = 28, KnockbackX = 7f, KnockbackY = 9f,
         };
 
         /// <summary>色 color の威力と吹き飛びの上乗せ（%）。</summary>
@@ -590,7 +590,7 @@ namespace Airerage.Core.Skills
         /// <summary>落ちて当たったときの判定のデータ（位置・大きさ・出る時間は使わない）。吹き飛びは下向き。</summary>
         public AttackHit Hit = new AttackHit
         {
-            Damage = 8, HitstopTicks = 16, HitstunTicks = 30, KnockbackX = 3f, KnockbackY = -13f,
+            Damage = 2, Gauge = 80, HitstopTicks = 16, HitstunTicks = 30, KnockbackX = 3f, KnockbackY = -13f,
         };
 
         /// <summary>落としてから ticks ティックたったときのグラム数。</summary>
@@ -643,7 +643,7 @@ namespace Airerage.Core.Skills
         /// <summary>鞭が当たったときの判定のデータ（吹き飛ばさない。ヒットストップはほぼない）。</summary>
         public AttackHit WhipHit = new AttackHit
         {
-            Damage = 5, HitstopTicks = 2, HitstunTicks = 14, KnockbackX = 0f, KnockbackY = 0f,
+            Damage = 2, Gauge = 50, HitstopTicks = 2, HitstunTicks = 14, KnockbackX = 0f, KnockbackY = 0f,
         };
 
         /// <summary>雷の波動の進む速さ（m/s）と、触れたとみなす距離（m）。</summary>
@@ -653,6 +653,9 @@ namespace Airerage.Core.Skills
         /// <summary>感電の長さ（ティック。1 秒）と、感電が解けてから、もう感電しない長さ（ティック）。</summary>
         public int StunTicks = 60;
         public int StunGuardTicks = 30;
+
+        /// <summary>雷の波動を出してから、次に出せるまで（ティック。3 秒。その間につないでも出ない。ユーザーの要望、2026-10-22）。</summary>
+        public int WaveCooldownTicks = 180;
 
         public TuningValidator Validate()
         {
@@ -665,13 +668,14 @@ namespace Airerage.Core.Skills
             v.Positive(nameof(WaveRadius), WaveRadius);
             v.NonNegative(nameof(StunTicks), StunTicks);
             v.NonNegative(nameof(StunGuardTicks), StunGuardTicks);
+            v.NonNegative(nameof(WaveCooldownTicks), WaveCooldownTicks);
             return v;
         }
     }
 
     /// <summary>
     /// ボールライトニング（SOLDERER の R。ユーザーの案、2026-10-21。値は【仮】）。Count 個を IntervalTicks ごとに、放つときの照準の方向へ
-    /// 放つ（R を押したまま照準を動かすと、1 つずつ向きを変えられる）。ゆっくり進み、壁で跳ね返る。TravelDistance 進むと止まり、TrapTicks の
+    /// 放つ（R を離していても、1 つずつ放つ瞬間の照準の方向へ。AttackData.TracksAim。2026-10-22）。ゆっくり進み、壁で跳ね返る。TravelDistance 進むと止まり、TrapTicks の
     /// 間残る。触れた相手（持ち主以外）を感電させる（インバータの雷の波動と同じ。InverterTuning.StunTicks）。同じ球は同じ相手に 1 回だけ。
     /// </summary>
     [Serializable]
@@ -681,13 +685,13 @@ namespace Airerage.Core.Skills
         public int IntervalTicks = 18;
 
         /// <summary>放つ位置（キャラクターの中心から照準の方向への距離。m）と、進む速さ（m/s）と、止まるまでに進む距離（m）。</summary>
-        public float LaunchOffset = 0.8f;
+        public float LaunchOffset = 1.2f;
         public float Speed = 7f;
         public float TravelDistance = 14f;
 
-        /// <summary>止まってから消えるまで（ティック。5 秒）と、触れたとみなす半径（m）。</summary>
+        /// <summary>止まってから消えるまで（ティック。5 秒）と、触れたとみなす半径（m。ユーザーの要望で 2 倍にした、2026-10-22）。</summary>
         public int TrapTicks = 300;
-        public float Radius = 0.55f;
+        public float Radius = 1.1f;
 
         public TuningValidator Validate()
         {
@@ -756,7 +760,7 @@ namespace Airerage.Core.Skills
         /// <summary>出す位置の高さ（キャラクターの中心から。m）。</summary>
         public float OffsetY = 0.2f;
 
-        /// <summary>1 秒ごとの威力の上乗せ（%。判定のダメージ 5 に 200% で、1 秒ごとに +10）。</summary>
+        /// <summary>1 秒ごとの威力の上乗せ（%。200% なら、1 秒ごとに判定の威力の 2 倍ずつ増える）。</summary>
         public int BonusPercentPerSecond = 200;
 
         /// <summary>消えるまでの上限（ティック。ステージの範囲がないときのため）。</summary>
@@ -765,7 +769,7 @@ namespace Airerage.Core.Skills
         /// <summary>当たったときの判定のデータ（位置・大きさ・出る時間は使わない）。</summary>
         public AttackHit Hit = new AttackHit
         {
-            Damage = 5, HitstopTicks = 10, HitstunTicks = 24, KnockbackX = 9f, KnockbackY = 7f,
+            Damage = 2, Gauge = 70, HitstopTicks = 10, HitstunTicks = 24, KnockbackX = 9f, KnockbackY = 7f,
         };
 
         /// <summary>飛んでいた ticks ティックの威力の上乗せ（%）。</summary>
@@ -802,7 +806,7 @@ namespace Airerage.Core.Skills
         /// <summary>1 回の判定のデータ（吹き飛びの X はビームから離れる向き、Y は上）。</summary>
         public AttackHit Hit = new AttackHit
         {
-            Damage = 15, HitstopTicks = 6, HitstunTicks = 20, KnockbackX = 3f, KnockbackY = 4f,
+            Damage = 5, Gauge = 0, HitstopTicks = 6, HitstunTicks = 20, KnockbackX = 3f, KnockbackY = 4f,
         };
 
         /// <summary>ビームが残る長さ（ティック。最後の判定まで）。</summary>

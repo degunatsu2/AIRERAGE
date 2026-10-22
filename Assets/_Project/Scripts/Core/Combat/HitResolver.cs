@@ -29,9 +29,9 @@ namespace Airerage.Core.Combat
     ///   どちらも、攻撃した側の「当たった」（ActionState.Connected）にはならない（攻撃→攻撃などのキャンセルはできない）。
     ///   ガードの値は、当たった側の調整値を使う。
     /// - 両者にヒットストップを与える。
-    /// - ゲージ（T3-6）: 当たれば当てた側が GaugeOnHit・受けた側が GaugeOnDamaged、ふつうのガードなら攻撃した側が GaugeOnGuarded・
-    ///   守った側が GaugeOnGuard、ジャストガードなら守った側が GaugeOnJustGuard を得る（それぞれ自分の調整値。上限 MaxGauge）。
-    ///   必殺技では、攻撃した側はゲージを得ない（続けて必殺技を出せないように。docs/13 T5-3）【仮】。受けた側・守った側は得る。
+    /// - ゲージ（T3-6）: 当たれば当てた側が判定のゲージ（AttackHit.Gauge。技ごと。2026-10-22）・受けた側が GaugeOnDamaged、ふつうの
+    ///   ガードなら攻撃した側が判定のゲージの GaugeGuardedPercent %・守った側が GaugeOnGuard、ジャストガードなら守った側が
+    ///   GaugeOnJustGuard を得る（上限 MaxGauge）。必殺技の判定はゲージが 0（続けて必殺技を出せないように。docs/13 T5-3）【仮】。
     /// - 投射物の命中（docs/13 T5-6）: SkillRules が集めた命中（HitRecord.FromObject）も、キャラクターの攻撃の後に同じ規則で当てる。
     ///   ただし、撃った人は止まらず（ヒットストップなし）、今の攻撃の「当たった」にもならず、ジャストガードされても隙にならない。
     /// - 壊せる物（セーフティボックス）: 攻撃の判定が重なったら、物にダメージを与える（同じ攻撃の同じ判定は 1 回だけ）。攻撃した側は
@@ -258,12 +258,10 @@ namespace Airerage.Core.Combat
                 }
                 attacker.Combat.HitstopTicksLeft = Math.Max(attacker.Combat.HitstopTicksLeft, hitstop);
             }
-            if (hit.Attack != AttackSlot.Super)
-            {
-                CombatTuning.AddGauge(ref attacker.Combat,
-                    result == HitResult.Hit ? attackerCombat.GaugeOnHit : result == HitResult.Guarded ? attackerCombat.GaugeOnGuarded : 0,
-                    configs[hit.Attacker].Skills.CoinBoost);
-            }
+            // 当てた側のゲージは判定ごと（必殺技の判定は 0）。ガードされたら割合だけ、ジャストガードされたら得ない。
+            CombatTuning.AddGauge(ref attacker.Combat,
+                result == HitResult.Hit ? data.Gauge : result == HitResult.Guarded ? data.Gauge * attackerCombat.GaugeGuardedPercent / 100 : 0,
+                configs[hit.Attacker].Skills.CoinBoost);
             states[hit.Attacker] = attacker;
 
             victim = states[hit.Victim];

@@ -42,8 +42,17 @@ namespace Airerage.Core.Combat
         public float HalfWidth = 0.6f;
         public float HalfHeight = 0.6f;
 
-        /// <summary>ダメージ。HP はなく（D-23）、コインへの変換（Phase 4）とコンボの表示に使う。</summary>
-        public int Damage = 5;
+        /// <summary>
+        /// 威力（ダメージ）。HP はなく（D-23）、コンボが終わるとそのまま同じ枚数のコインになる（MatchRules.DamageRewardPercent。
+        /// 威力とコインは等価。ユーザーの要望、2026-10-22）。コンボの表示にも使う。
+        /// </summary>
+        public int Damage = 2;
+
+        /// <summary>
+        /// 当てたときに、当てた側が得るゲージ（0.1% 単位。技（判定）ごとに決める。ユーザーの要望、2026-10-22）。ふつうのガードを
+        /// されたら CombatTuning.GaugeGuardedPercent の割合だけ得る。必殺技の判定は 0（必殺技ではたまらない）。
+        /// </summary>
+        public int Gauge = 80;
 
         /// <summary>ヒットストップ（ティック）。当てた側と当たった側の両方が止まる。</summary>
         public int HitstopTicks = 6;
@@ -51,7 +60,7 @@ namespace Airerage.Core.Combat
         /// <summary>のけぞり（ティック）。当たった側が入力を受け付けない。ヒットストップの後から数える。</summary>
         public int HitstunTicks = 20;
 
-        /// <summary>当たった側の吹き飛びの速度（m/s）。撃破技なら、打つ直前の速さで倍率がかかる（D-38）。</summary>
+        /// <summary>当たった側の吹き飛びの速度（m/s）。AttackData.SpeedScaled の技なら、打つ直前の速さで倍率がかかる（D-38）。</summary>
         public float KnockbackX = 8f;
         public float KnockbackY = 6f;
 
@@ -88,6 +97,7 @@ namespace Airerage.Core.Combat
             v.Positive(nameof(HalfWidth), HalfWidth);
             v.Positive(nameof(HalfHeight), HalfHeight);
             v.NonNegative(nameof(Damage), Damage);
+            v.InRange(nameof(Gauge), Gauge, 0f, CombatTuning.MaxGauge);
             v.NonNegative(nameof(HitstopTicks), HitstopTicks);
             v.NonNegative(nameof(HitstunTicks), HitstunTicks);
             v.Positive(nameof(CriticalScale), CriticalScale);
@@ -236,6 +246,18 @@ namespace Airerage.Core.Combat
         public int ChargedTotalTicks;
 
         /// <summary>
+        /// 長押しになった瞬間（ためた長さが ChargedFromTicks になったとき）に、離さなくても長押しの形で出す（SOLDERER のイナズマステップ。
+        /// ユーザーの要望、2026-10-22）。
+        /// </summary>
+        public bool FiresWhenCharged;
+
+        /// <summary>
+        /// 出している間ずっと、照準（マウスポインター）を技の照準（CombatState.SkillAim）として覚える（ボタンを離していても。SOLDERER の
+        /// ボールライトニングは、1 つずつ放つ瞬間の照準の方向へ。ユーザーの要望、2026-10-22）。
+        /// </summary>
+        public bool TracksAim;
+
+        /// <summary>
         /// 技の向き（ActionState.Aim）を、出したときの照準（マウスポインター。ゲームパッドは右スティックか移動のスティック）の方向の長さ 1 に
         /// し、向きもそちらへ変える（照準がなければ向いている方向。SOLDERER のイナズマステップ。ユーザーの要望で移動の入力から変えた、2026-10-22）。
         /// </summary>
@@ -252,10 +274,10 @@ namespace Airerage.Core.Combat
         public bool ExclusiveHits;
 
         /// <summary>
-        /// 撃破技でも、打つ直前の速さで強くならない（威力・吹き飛びの倍率も、速さの FATAL もない。強さはクリティカル判定など技そのもので
-        /// 決まる。撃破技の速さの係数はキャラクター固有。SOLDERER。ユーザーの指摘、2026-10-22）。
+        /// 打つ直前の速さで強くなる（威力と吹き飛びに CombatTuning.KoKnockbackScale の倍率、FatalStrikeSpeed 以上で FATAL。D-38）。
+        /// STANDARD の撃破技だけ（ほかのキャラクターは技そのもので差をつけるので使わない。ユーザーの指示、2026-10-22）。
         /// </summary>
-        public bool NoSpeedBonus;
+        public bool SpeedScaled;
 
         /// <summary>当たったら、当たったときの動き（AttackMotion.RequiresHit。反動）を 1 回つけて、攻撃を終える（SOLDERER のストンピング）。</summary>
         public bool EndsOnHit;
@@ -411,12 +433,12 @@ namespace Airerage.Core.Combat
                 new AttackHit
                 {
                     StartTick = 5, ActiveTicks = 8, OffsetX = 1.6f, HalfWidth = 1.75f, HalfHeight = 1.75f,
-                    Damage = 4, HitstopTicks = 10, HitstunTicks = 20, KnockbackX = 13f, KnockbackY = 5f,
+                    Damage = 1, Gauge = 75, HitstopTicks = 10, HitstunTicks = 20, KnockbackX = 13f, KnockbackY = 5f,
                 },
                 new AttackHit
                 {
                     StartTick = 13, ActiveTicks = 5, OffsetX = 1.6f, OffsetY = 1.5f, HalfWidth = 2f, HalfHeight = 2f,
-                    Damage = 4, HitstopTicks = 12, HitstunTicks = 24, KnockbackX = 10.5f, KnockbackY = 13.5f,
+                    Damage = 1, Gauge = 80, HitstopTicks = 12, HitstunTicks = 24, KnockbackX = 10.5f, KnockbackY = 13.5f,
                 },
             },
             Motions = new[]
@@ -436,7 +458,7 @@ namespace Airerage.Core.Combat
                 new AttackHit
                 {
                     StartTick = 5, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 2.75f, HalfHeight = 2.75f,
-                    Damage = 4, HitstopTicks = 10, HitstunTicks = 20, KnockbackX = 5f, KnockbackY = 7f,
+                    Damage = 1, Gauge = 60, HitstopTicks = 10, HitstunTicks = 20, KnockbackX = 5f, KnockbackY = 7f,
                 },
             },
         };
@@ -451,7 +473,7 @@ namespace Airerage.Core.Combat
                 new AttackHit
                 {
                     StartTick = 7, ActiveTicks = 4, OffsetX = 2f, OffsetY = 0.1f, HalfWidth = 2f, HalfHeight = 1.25f,
-                    Damage = 6, HitstopTicks = 14, HitstunTicks = 24, KnockbackX = 14f, KnockbackY = 4f,
+                    Damage = 2, Gauge = 80, HitstopTicks = 14, HitstunTicks = 24, KnockbackX = 14f, KnockbackY = 4f,
                 },
             },
         };
@@ -466,25 +488,26 @@ namespace Airerage.Core.Combat
                 new AttackHit
                 {
                     StartTick = 6, ActiveTicks = 4, OffsetX = 0.2f, OffsetY = 1.75f, HalfWidth = 1.75f, HalfHeight = 1.75f,
-                    Damage = 5, HitstopTicks = 12, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 14f,
+                    Damage = 2, Gauge = 75, HitstopTicks = 12, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = 14f,
                 },
             },
         };
 
         /// <summary>
         /// 空中・下（デフォルトのキャラクターの撃破技。D-38）: 発生（チャージ）が遅く、その間は慣性のまま。チャージの後、
-        /// 斜め下へ飛び込みながら攻撃し、相手を斜め下へたたき落とす。
+        /// 斜め下へ飛び込みながら攻撃し、相手を斜め下へたたき落とす。打つ直前の速さで強くなる（SpeedScaled。STANDARD だけ）。
         /// </summary>
         public AttackData AirDown = new AttackData
         {
             TotalTicks = 40,
             WireCancelFromTick = 16,
+            SpeedScaled = true,
             Hits = new[]
             {
                 new AttackHit
                 {
                     StartTick = 16, ActiveTicks = 12, OffsetX = 1f, OffsetY = -2f, HalfWidth = 1.75f, HalfHeight = 2f,
-                    Damage = 8, HitstopTicks = 20, HitstunTicks = 28, KnockbackX = 6f, KnockbackY = -12f,
+                    Damage = 2, Gauge = 80, HitstopTicks = 20, HitstunTicks = 28, KnockbackX = 6f, KnockbackY = -12f,
                 },
             },
             Motions = new[]
@@ -507,7 +530,7 @@ namespace Airerage.Core.Combat
                 new AttackHit
                 {
                     StartTick = 6, ActiveTicks = 12, OffsetX = 1f, HalfWidth = 1.5f, HalfHeight = 1.5f,
-                    Damage = 6, HitstopTicks = 12, HitstunTicks = 24, KnockbackX = 12f, KnockbackY = 8f,
+                    Damage = 2, Gauge = 80, HitstopTicks = 12, HitstunTicks = 24, KnockbackX = 12f, KnockbackY = 8f,
                 },
             },
             Motions = new[]
@@ -541,7 +564,7 @@ namespace Airerage.Core.Combat
                 new AttackHit
                 {
                     StartTick = 4, ActiveTicks = 8, OffsetX = 0.4f, OffsetY = 1.2f, HalfWidth = 1.5f, HalfHeight = 2f,
-                    Damage = 5, HitstopTicks = 12, HitstunTicks = 26, KnockbackX = 3f, KnockbackY = 15f,
+                    Damage = 2, Gauge = 80, HitstopTicks = 12, HitstunTicks = 26, KnockbackX = 3f, KnockbackY = 15f,
                 },
             },
             Motions = new[]
@@ -567,7 +590,7 @@ namespace Airerage.Core.Combat
                 new AttackHit
                 {
                     StartTick = 18, ActiveTicks = 8, OffsetX = 0f, HalfWidth = 4.5f, HalfHeight = 4.5f,
-                    Damage = 60, HitstopTicks = 24, HitstunTicks = 40, KnockbackX = 16f, KnockbackY = 12f,
+                    Damage = 18, Gauge = 0, HitstopTicks = 24, HitstunTicks = 40, KnockbackX = 16f, KnockbackY = 12f,
                 },
             },
             Motions = new[]
@@ -659,11 +682,11 @@ namespace Airerage.Core.Combat
         /// </summary>
         public const int MaxGauge = 100 * GaugePerPercent;
 
-        /// <summary>攻撃が当たったときに、当てた側が得るゲージ（大。8%）。必殺技が当たったときは得ない【仮】。【仮】</summary>
-        public int GaugeOnHit = 80;
-
-        /// <summary>攻撃がふつうのガードをされたときに、攻撃した側が得るゲージ（3%）。【仮】</summary>
-        public int GaugeOnGuarded = 30;
+        /// <summary>
+        /// 攻撃がふつうのガードをされたときに、攻撃した側が得るゲージの割合（%。判定のゲージ AttackHit.Gauge にかける。前の
+        /// 当てたとき 8%・ガードされたとき 3% の比に近い値）。【仮】
+        /// </summary>
+        public int GaugeGuardedPercent = 40;
 
         /// <summary>攻撃を受けた（のけぞった）ときに得るゲージ（小。4%）。【仮】</summary>
         public int GaugeOnDamaged = 40;
@@ -778,8 +801,7 @@ namespace Airerage.Core.Combat
             v.InRange(nameof(GuardKnockbackScale), GuardKnockbackScale, 0f, 1f);
             v.NonNegative(nameof(ParriedStunTicks), ParriedStunTicks);
             v.NonNegative(nameof(ParriedPushbackX), ParriedPushbackX);
-            v.NonNegative(nameof(GaugeOnHit), GaugeOnHit);
-            v.NonNegative(nameof(GaugeOnGuarded), GaugeOnGuarded);
+            v.InRange(nameof(GaugeGuardedPercent), GaugeGuardedPercent, 0f, 100f);
             v.NonNegative(nameof(GaugeOnDamaged), GaugeOnDamaged);
             v.NonNegative(nameof(GaugeOnGuard), GaugeOnGuard);
             v.NonNegative(nameof(GaugeOnJustGuard), GaugeOnJustGuard);

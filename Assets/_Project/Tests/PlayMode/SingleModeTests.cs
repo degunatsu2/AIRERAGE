@@ -17,7 +17,7 @@ using UnityEngine.TestTools;
 namespace Airerage.PlayMode.Tests
 {
     /// <summary>
-    /// シングルモード（docs/16 T7-2）: SINGLE → キャラクター選択 → CPU の強さ → ステージ選択 → 自分＋CPU 3 体の試合。CPU が動いて攻撃し、
+    /// シングルモード（docs/16 T7-2）: SINGLE → キャラクター選択 → CPU の強さ（4 段階）→ ステージ選択 → 自分＋CPU 3 体の試合。CPU が動いて攻撃し、
     /// CPU の技の札は出さない。結果の「キャラクター選択へ」でシングルモードのキャラクター選択へ戻る。
     /// </summary>
     public sealed class SingleModeTests
@@ -58,17 +58,17 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.CpuLevel.Option(CpuLevel.Normal).gameObject),
                     "前に選んだ強さ（NORMAL）を選んでいない");
 
-                // 戻るとキャラクター選択、もう一度決めて HARD。
+                // 戻るとキャラクター選択、もう一度決めて HELL（4 段階。D-71）。
                 menu.CpuLevel.Option(CpuLevel.Normal).OnCancel(null);
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "CPU の強さから戻れない");
                 yield return Tap(keyboard, Key.Enter);
                 yield return null;
-                menu.CpuLevel.Option(CpuLevel.Hard).Button.onClick.Invoke();
+                menu.CpuLevel.Option(CpuLevel.Hell).Button.onClick.Invoke();
                 yield return null;
                 Assert.That(menu.ShowingStageSelect, Is.True, "強さを決めてもステージ選択を出さない");
-                Assert.That(PlayerPrefs.GetInt(CpuLevelScreen.PreferenceKey), Is.EqualTo((int)CpuLevel.Hard), "選んだ強さを覚えない");
+                Assert.That(PlayerPrefs.GetInt(CpuLevelScreen.PreferenceKey), Is.EqualTo((int)CpuLevel.Hell), "選んだ強さを覚えない");
 
                 menu.StageSelect.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Local && !flow.IsLoading, 10f, "試合にならない");
@@ -80,7 +80,7 @@ namespace Airerage.PlayMode.Tests
                 for (int p = 1; p < 4; p++)
                 {
                     Assert.That(runner.IsCpu(p), Is.True, $"P{p + 1} が CPU でない");
-                    Assert.That(runner.Players[p].CpuLevel, Is.EqualTo(CpuLevel.Hard));
+                    Assert.That(runner.Players[p].CpuLevel, Is.EqualTo(CpuLevel.Hell));
                     Assert.That(runner.Players[p].Character, Is.Not.EqualTo(2), "CPU が自分と同じキャラクター（ほかがあるのに）");
                     Assert.That(runner.LabelOf(p), Is.EqualTo($"CPU{p + 1}"));
                 }

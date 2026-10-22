@@ -89,11 +89,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 12
@@ -106,7 +108,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.1
           HalfHeight: 1.2
-          Damage: 5
+          Damage: 2
+          Gauge: 75
           HitstopTicks: 6
           HitstunTicks: 16
           KnockbackX: 11
@@ -128,11 +131,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 26
@@ -145,7 +150,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 2.4
           HalfHeight: 2.4
-          Damage: 2
+          Damage: 1
+          Gauge: 50
           HitstopTicks: 6
           HitstunTicks: 16
           KnockbackX: 2
@@ -161,7 +167,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 2.4
           HalfHeight: 2.4
-          Damage: 2
+          Damage: 1
+          Gauge: 50
           HitstopTicks: 6
           HitstunTicks: 16
           KnockbackX: 2
@@ -177,7 +184,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 2.6
           HalfHeight: 2.6
-          Damage: 3
+          Damage: 1
+          Gauge: 65
           HitstopTicks: 10
           HitstunTicks: 22
           KnockbackX: 7
@@ -199,11 +207,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 22
@@ -216,7 +226,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 2.2
           HalfHeight: 1.2
-          Damage: 6
+          Damage: 2
+          Gauge: 80
           HitstopTicks: 12
           HitstunTicks: 22
           KnockbackX: 13
@@ -238,11 +249,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 24
@@ -255,7 +268,8 @@ MonoBehaviour:
           OffsetY: 1.75
           HalfWidth: 1.75
           HalfHeight: 1.75
-          Damage: 5
+          Damage: 2
+          Gauge: 75
           HitstopTicks: 12
           HitstunTicks: 22
           KnockbackX: 2
@@ -277,11 +291,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 36
@@ -294,7 +310,8 @@ MonoBehaviour:
           OffsetY: -1.5
           HalfWidth: 1.8
           HalfHeight: 1.8
-          Damage: 8
+          Damage: 2
+          Gauge: 85
           HitstopTicks: 20
           HitstunTicks: 28
           KnockbackX: 8
@@ -323,11 +340,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 10
@@ -349,11 +368,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 14
@@ -373,11 +394,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 20
@@ -403,8 +426,7 @@ MonoBehaviour:
       ParriedStunTicks: 30
       ParriedPushbackX: 4
       ParriedPushbackY: 6
-      GaugeOnHit: 80
-      GaugeOnGuarded: 30
+      GaugeGuardedPercent: 40
       GaugeOnDamaged: 40
       GaugeOnGuard: 20
       GaugeOnJustGuard: 200
@@ -422,7 +444,7 @@ MonoBehaviour:
         ChargeRatePercent: 110
         MaxCoins: 300
         GoldCoins: 150
-        Durability: 30
+        Durability: 9
         DepositPerSecond: 30
         HalfWidth: 0.7
         HalfHeight: 0.7
@@ -446,7 +468,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 75
           HitstopTicks: 10
           HitstunTicks: 22
           KnockbackX: 2
@@ -505,7 +528,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 70
           HitstopTicks: 10
           HitstunTicks: 24
           KnockbackX: 9
@@ -526,7 +550,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 15
+          Damage: 5
+          Gauge: 0
           HitstopTicks: 6
           HitstunTicks: 20
           KnockbackX: 3
@@ -585,7 +610,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 20
+          Damage: 6
+          Gauge: 0
           HitstopTicks: 14
           HitstunTicks: 28
           KnockbackX: 7
@@ -613,7 +639,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 8
+          Damage: 2
+          Gauge: 80
           HitstopTicks: 16
           HitstunTicks: 30
           KnockbackX: 3
@@ -634,7 +661,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 50
           HitstopTicks: 2
           HitstunTicks: 14
           KnockbackX: 0
@@ -647,14 +675,15 @@ MonoBehaviour:
         WaveRadius: 0.5
         StunTicks: 60
         StunGuardTicks: 30
+        WaveCooldownTicks: 180
       BallLightning:
         Count: 3
         IntervalTicks: 18
-        LaunchOffset: 0.8
+        LaunchOffset: 1.2
         Speed: 7
         TravelDistance: 14
         TrapTicks: 300
-        Radius: 0.55
+        Radius: 1.1
   _displayName: STORM RUNNER
   _logo: {fileID: 2800000, guid: efe492c73f2279bb083673da4d79f498, type: 2}
   _special1Icon: {fileID: 0}

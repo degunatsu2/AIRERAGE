@@ -134,7 +134,7 @@ namespace Airerage.Core.Combat
                 jackpot = roll == AttackData.RouletteScales.Length - 1;
                 sources |= PowerSource.Roulette;
             }
-            else if (attacker.Action.Attack == combat.KoAttack && !attack.NoSpeedBonus)
+            else if (attack.SpeedScaled)
             {
                 multiplier *= combat.KoKnockbackScale(attacker.Action.StrikeSpeed);
                 fatal = attacker.Action.StrikeSpeed >= combat.FatalStrikeSpeed;

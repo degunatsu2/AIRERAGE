@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Airerage.Runtime.UI
 {
     /// <summary>
-    /// シングルモードの CPU の強さを選ぶ画面（docs/16 T7-2。D-71【仮】）: EASY・NORMAL・HARD の札。前に選んだ強さから始める
+    /// シングルモードの CPU の強さを選ぶ画面（docs/16 T7-2。D-71）: EASY・NORMAL・HARD・HELL の札。前に選んだ強さから始める
     /// （PlayerPrefs）。決定で Confirmed、戻る操作で Cancelled。
     /// </summary>
     public sealed class CpuLevelScreen : MonoBehaviour
@@ -13,7 +13,7 @@ namespace Airerage.Runtime.UI
         /// <summary>前に選んだ強さを覚えておく PlayerPrefs のキー。</summary>
         public const string PreferenceKey = "Airerage.CpuLevel";
 
-        [Tooltip("強さの札（EASY・NORMAL・HARD の順）")]
+        [Tooltip("強さの札（EASY・NORMAL・HARD・HELL の順。CpuLevel の数と同じ）")]
         [SerializeField] private MenuOption[] _options = new MenuOption[0];
 
         /// <summary>強さを決めた。</summary>
@@ -29,9 +29,10 @@ namespace Airerage.Runtime.UI
 
         private void Awake()
         {
-            if (_options.Length != 3)
+            int levels = Enum.GetValues(typeof(CpuLevel)).Length;
+            if (_options.Length != levels)
             {
-                Debug.LogError($"{name}: 強さの札が 3 つ（EASY・NORMAL・HARD）ではありません（{_options.Length}）", this);
+                Debug.LogError($"{name}: 強さの札が {levels} つ（EASY・NORMAL・HARD・HELL）ではありません（{_options.Length}）", this);
                 enabled = false;
                 return;
             }

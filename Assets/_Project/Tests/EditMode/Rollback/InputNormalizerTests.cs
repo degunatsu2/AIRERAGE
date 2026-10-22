@@ -27,6 +27,16 @@ namespace Airerage.Core.Tests.Rollback
             Assert.That(notPressed.HasAim, Is.False);
         }
 
+        [Test]
+        public void KeepAim_KeepsTheAimWithoutButtons()
+        {
+            // 出している間ずっと照準を追う技（ボールライトニング）の間は、ボタンを押していなくても照準を送る（呼ぶ側が決める。2026-10-22）。
+            PlayerInput aimed = PlayerInput.FromAxes(0f, 0f, InputButtons.None).WithAim(new Vector2(0f, 1f));
+
+            Assert.That(InputNormalizer.Normalize(aimed, default, 2).HasAim, Is.False, "ふつうは消す");
+            Assert.That(InputNormalizer.Normalize(aimed, default, 2, keepAim: true).HasAim, Is.True, "keepAim なら残す");
+        }
+
         [TestCase(40, 41, 40, TestName = "小さな揺れは前の値のまま")]
         [TestCase(40, 43, 43, TestName = "大きな変化は新しい値")]
         [TestCase(1, 0, 0, TestName = "離したらすぐ 0")]

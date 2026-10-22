@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -100,7 +101,7 @@ namespace Airerage.Core.Tests.Skills
         [Test]
         public void FingerSpark_HasNoSpeedBonus()
         {
-            // 撃破技の速さの係数はキャラクター固有。SOLDERER の撃破技は速さで強くならない（ユーザーの指摘、2026-10-22）。
+            // 撃破技の速さの係数は STANDARD だけ。SOLDERER の撃破技は速さで強くならない（ユーザーの指示、2026-10-22）。
             var state = new CharacterState { Action = new ActionState { Kind = ActionKind.Attack, Attack = AttackSlot.AirSide, StrikeSpeed = 40f } };
             Assert.That(AttackPower.Of(state, 0, Sol, 0).Fatal, Is.False, "速さで FATAL になった");
             Assert.That(AttackPower.Of(state, 0, Sol, 0).Multiplier, Is.EqualTo(1f), "速さで強くなっている");
@@ -206,6 +207,53 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
+        public void InazumaStep_FiresTheStrongDash_AsSoonAsItIsCharged()
+        {
+            // 長押しの判定になった瞬間に、離さなくても強突撃を出す（ユーザーの要望、2026-10-22）。
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f));
+            Step(world, 2);
+            Step(world, Sol.Combat.Special1.ChargedFromTicks + 2, Press(InputButtons.Special1, 1f, 0f).WithAim(Vector2.UnitX));
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Action.Kind, Is.EqualTo(ActionKind.Attack), "押したままでは出ない");
+            Assert.That(state.Action.Attack, Is.EqualTo(AttackSlot.Special1));
+            Assert.That(Sol.Combat.Special1.IsCharged(state.Action.Charge), Is.True, "強突撃でない");
+            Assert.That(state.Combat.Holding, Is.False);
+        }
+
+        [Test]
+        public void InazumaStep_Dashes_ALittleFartherThanBlinkKick()
+        {
+            // 短押しの突撃は SPACE TRAVELER の空中横（BLINK KICK）より少しだけ長い。長押しも前（8m）より短い（ユーザーの要望、2026-10-22）。
+            float blink = MotionDistance(CharacterPresets.SpaceTraveler().Combat.AirSide, 0);
+            float tapped = MotionDistance(Sol.Combat.Special1, 0);
+            float charged = MotionDistance(Sol.Combat.Special1, Sol.Combat.Special1.ChargedFromTicks);
+            Assert.That(tapped, Is.GreaterThan(blink).And.LessThan(blink + 1f), $"短押し {tapped}m、BLINK KICK {blink}m");
+            Assert.That(charged, Is.InRange(tapped + 1f, 7f), "長押し");
+
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f));
+            Step(world, 2);
+            Step(world, 1, Press(InputButtons.Special1).WithAim(Vector2.UnitX));
+            Step(world, 1, Press(InputButtons.None).WithAim(Vector2.UnitX));
+            Step(world, 6);
+            Assert.That(world.GetState(0).Position.X, Is.EqualTo(tapped).Within(0.5f), "突撃の距離");
+            Assert.That(world.GetState(0).Velocity.X, Is.GreaterThan(10f), "突撃の後の慣性が残らない");
+        }
+
+        // 攻撃の動き（当たったときだけの動きを除く）で進む距離（m。向いている方向・照準の方向へ）。
+        private static float MotionDistance(AttackData attack, int charge)
+        {
+            float distance = 0f;
+            foreach (AttackMotion motion in attack.Motions)
+            {
+                if (!motion.RequiresHit && attack.Uses(motion.Charge, charge))
+                {
+                    distance += motion.VelocityX * motion.Ticks / 60f;
+                }
+            }
+            return distance;
+        }
+
+        [Test]
         public void InazumaStep_GoesTowardThePointer_NotTheMoveInput()
         {
             // マウスポインターの方向へ（移動のキーとは逆でも。ユーザーの要望、2026-10-22）。
@@ -283,6 +331,63 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
+        public void Whip_StaysOut_WhileAttacking_AsLongAsTheButtonIsHeld()
+        {
+            // 鞭（つながっていない電気のワイヤー）は、押している間は攻撃しても回収しない（ユーザーの要望、2026-10-22）。
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, 3f, 0f));
+            Edit(world, 0, s => { s.Combat.InverterOn = true; return s; });
+            Step(world, 2);
+            for (int t = 0; t < 12; t++)
+            {
+                Step(world, 1, Press(InputButtons.Wire).WithAim(Vector2.UnitY));
+            }
+            Assert.That(world.GetState(0).Wire.Whip, Is.True, "前提: 鞭になった");
+            Step(world, 1, Press(InputButtons.Wire | InputButtons.Attack).WithAim(Vector2.UnitY));
+            for (int t = 0; t < 10; t++)
+            {
+                Step(world, 1, Press(InputButtons.Wire).WithAim(Vector2.UnitX));
+                Assert.That(world.GetState(0).Action.Kind, Is.EqualTo(ActionKind.Attack), "前提: 攻撃している");
+                Assert.That(world.GetState(0).Wire.Whip, Is.True, "攻撃したら鞭が消えた");
+            }
+            Assert.That(world.GetState(0).Wire.HookDirection.X, Is.GreaterThan(0.9f), "攻撃の間は鞭を振れない");
+            Step(world, 1, Press(InputButtons.None));
+            Assert.That(world.GetState(0).Wire.Whip, Is.False, "離しても鞭のまま");
+        }
+
+        [Test]
+        public void ShockWave_HasAThreeSecondCooldown()
+        {
+            var terrain = new BoxTerrain().AddBox(-30f, -1f, 30f, 0f).AddBox(2f, 3f, 12f, 4f, attachable: true);
+            SimWorld world = World(terrain, new Vector3(0f, GroundY, 0f));
+            Edit(world, 0, s => { s.Combat.InverterOn = true; return s; });
+            Step(world, 2);
+            int Attach()
+            {
+                // つないで、離す（離した後のワイヤーのクールタイムも待つ）。波動の数を返す。
+                for (int t = 0; t < 8; t++)
+                {
+                    Step(world, 1, Press(InputButtons.Wire).WithAim(new Vector2(1f, 1.2f)));
+                }
+                Assert.That(world.GetState(0).Wire.Phase, Is.EqualTo(WirePhase.Attached), "前提: 足場につないだ");
+                int waves = world.Objects.Items.Count(o => o.Kind == WorldObjectKind.ShockWave);
+                Step(world, 1, Press(InputButtons.None));
+                Step(world, Sol.Wire.CooldownTicks + 2);
+                Edit(world, 0, s => { s.Position = new Vector3(0f, GroundY, 0f); s.Velocity = Vector3.Zero; return s; });
+                Step(world, 2);
+                return waves;
+            }
+            Assert.That(Attach(), Is.EqualTo(1), "雷の波動が出ない");
+            Assert.That(world.GetState(0).Combat.WaveCooldownTicks, Is.GreaterThan(0), "クールタイムが始まらない");
+            int spawned = world.Objects.Items.Count(o => o.Kind == WorldObjectKind.ShockWave);
+            Attach();
+            Assert.That(world.Objects.Items.Count(o => o.Kind == WorldObjectKind.ShockWave), Is.LessThanOrEqualTo(spawned),
+                "3 秒たたずに、また波動が出た");
+            Step(world, Sol.Skills.Inverter.WaveCooldownTicks);
+            Assert.That(world.GetState(0).Combat.WaveCooldownTicks, Is.Zero);
+            Assert.That(Attach(), Is.GreaterThanOrEqualTo(1), "3 秒たっても波動が出ない");
+        }
+
+        [Test]
         public void ShockWave_RunsAroundTheBox_AndStunsWhoItTouches()
         {
             var terrain = new BoxTerrain().AddBox(-30f, -1f, 30f, 0f).AddBox(2f, 3f, 12f, 4f, attachable: true);
@@ -329,6 +434,30 @@ namespace Airerage.Core.Tests.Skills
                 "進んだ後に止まらない");
             Step(world, Sol.Skills.BallLightning.TrapTicks + 10);
             Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.BallLightning), Is.False, "止まってから消えない");
+        }
+
+        [Test]
+        public void BallLightning_EachBall_GoesWhereThePointerIsWhenItLaunches()
+        {
+            // R を短く押すだけで、球ごとに放つ瞬間のポインターの向きへ（ユーザーの要望、2026-10-22）。
+            SimWorld world = World(new BoxTerrain(), new Vector3(0f, 20f, 0f));
+            Edit(world, 0, s => { s.Combat.Gauge = CombatTuning.MaxGauge; return s; });
+            BallLightningTuning tuning = Sol.Skills.BallLightning;
+            Vector2[] aims = { Vector2.UnitX, Vector2.UnitY, -Vector2.UnitX };
+            Step(world, 1, Press(InputButtons.Super).WithAim(aims[0]));
+            for (int t = 1; t < 2 + (tuning.Count - 1) * tuning.IntervalTicks + 4; t++)
+            {
+                // 2 つ目・3 つ目を放つ少し前に、ボタンを押さずにポインターだけ動かす。
+                int index = Math.Min(tuning.Count - 1, Math.Max(0, (t - 2 + tuning.IntervalTicks / 2) / tuning.IntervalTicks));
+                Step(world, 1, Press(InputButtons.None).WithAim(aims[index]));
+                Edit(world, 0, s => { s.Velocity = Vector3.Zero; return s; });
+            }
+            List<WorldObject> balls = world.Objects.Items.Where(o => o.Kind == WorldObjectKind.BallLightning).OrderBy(o => o.SpawnTick).ToList();
+            Assert.That(balls.Count, Is.EqualTo(3));
+            Assert.That(balls[0].Velocity.X, Is.GreaterThan(5f), "1 つ目が右へ進まない");
+            Assert.That(balls[1].Velocity.Y, Is.GreaterThan(5f), "2 つ目が上へ進まない（ボタンを離すとポインターを見ない）");
+            Assert.That(balls[2].Velocity.X, Is.LessThan(-5f), "3 つ目が左へ進まない");
+            Assert.That(tuning.Radius, Is.EqualTo(1.1f).Within(1e-4f), "球の大きさ（前の 2 倍）");
         }
     }
 }

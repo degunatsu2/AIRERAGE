@@ -253,7 +253,7 @@ namespace Airerage.Core.Tests.Skills
             WorldObject missile = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Missile);
             Assert.That(missile.Velocity.Y, Is.EqualTo(Space.Skills.Missile.Speed).Within(1e-3f), "照準の方向へ撃たない");
 
-            // 30m 上の相手に当たる。1 秒半ほど飛ぶので、威力は 5 より大きい。
+            // 30m 上の相手に当たる。1 秒半ほど飛ぶので、威力は元の 3 倍以上（1 秒で +200%）。
             HitRecord? hit = null;
             for (int t = 0; t < 200 && hit == null; t++)
             {
@@ -265,7 +265,7 @@ namespace Airerage.Core.Tests.Skills
                 }
             }
             Assert.That(hit.HasValue, Is.True, "ミサイルが当たらない");
-            Assert.That(hit.Value.Damage, Is.GreaterThanOrEqualTo(15), "飛んだ時間で強くならない（1 秒で +10）");
+            Assert.That(hit.Value.Damage, Is.GreaterThanOrEqualTo(Space.Skills.Missile.Hit.Damage * 3), "飛んだ時間で強くならない（1 秒で +200%）");
             Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Missile), Is.False, "当たっても消えない");
         }
 

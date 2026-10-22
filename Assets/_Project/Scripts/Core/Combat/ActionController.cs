@@ -60,7 +60,7 @@ namespace Airerage.Core.Combat
         public static void Update(ref CharacterState state, in InputFrame input, CharacterConfig config)
         {
             CombatTuning combat = config.Combat;
-            RememberSkillAim(ref state, input);
+            RememberSkillAim(ref state, input, combat);
             UpdateTimers(ref state, input, combat, config.Movement.MoveDeadzone);
             if (state.Wire.Phase == WirePhase.Attached)
             {
@@ -226,13 +226,18 @@ namespace Airerage.Core.Combat
                 state.Combat.HoldTicks = 0;
                 return false;
             }
+            AttackData holding = combat.Get(slot);
             if (input.IsHeld(ButtonOf(slot)))
             {
-                if (state.Combat.HoldTicks < combat.Get(slot).HoldMaxTicks)
+                if (state.Combat.HoldTicks < holding.HoldMaxTicks)
                 {
                     state.Combat.HoldTicks++;
                 }
-                return false;
+                // 長押しになった瞬間に出す技（離さなくても出る。SOLDERER のイナズマステップ。ユーザーの要望、2026-10-22）。
+                if (!holding.FiresWhenCharged || !holding.IsCharged(state.Combat.HoldTicks))
+                {
+                    return false;
+                }
             }
             int charge = state.Combat.HoldTicks;
             state.Combat.Holding = false;
@@ -374,6 +379,12 @@ namespace Airerage.Core.Combat
             {
                 return input;
             }
+            if (state.Wire.Whip && state.Action.Kind != ActionKind.Hitstun)
+            {
+                // インバータの鞭（つながっていない電気のワイヤー）は、押している間は攻撃・技・ガードをしても続く（ワイヤーのボタンと照準を
+                // 残す。ユーザーの要望、2026-10-22）。のけぞったら回収する。
+                return new PlayerInput(0, 0, input.Buttons & ~InputButtons.Jump, input.AimX, input.AimY);
+            }
             return new PlayerInput(0, 0, input.Buttons & ~(InputButtons.Jump | InputButtons.Wire));
         }
 
@@ -384,7 +395,7 @@ namespace Airerage.Core.Combat
         public static void RecordHitstopPresses(ref CharacterState state, PlayerInput input, CharacterConfig config)
         {
             var frame = new InputFrame(input, state.PreviousButtons);
-            RememberSkillAim(ref state, frame);
+            RememberSkillAim(ref state, frame, config.Combat);
             BufferPresses(ref state, frame, config.Combat, config.Movement.MoveDeadzone);
             state.Combat.HitstopPresses |= frame.Pressed & InputButtons.Jump;
         }
@@ -428,7 +439,7 @@ namespace Airerage.Core.Combat
             // 行動の速さの強化でフレームを飛ばしたティックは、飛ばしたフレームの分も順に調べる（1 ティックだけの動きを落とさない）。
             int ticks = state.Action.Ticks;
             int from = ticks - Math.Max(1, state.Action.Advance) + 1;
-            if (state.Action.Attack == combat.KoAttack && from <= attack.FirstHitTick && attack.FirstHitTick <= ticks)
+            if (attack.SpeedScaled && from <= attack.FirstHitTick && attack.FirstHitTick <= ticks)
             {
                 state.Action.StrikeSpeed = state.Velocity.Length();
             }
@@ -731,12 +742,23 @@ namespace Airerage.Core.Combat
         // 技の照準（CombatState.SkillAim）: 技のボタンを押している間の、毎ティックの照準を覚える。技はこの照準で出す（押している間に
         // 出る技は今の照準、離してから出る技（ため技、先行入力）は最後に押していたティックの照準）。オンラインでは照準をこの間だけ送る
         // （InputNormalizer）。今のティックのボタンだけで決めるので、正規化の前と後で結果が変わらない。
-        private static void RememberSkillAim(ref CharacterState state, in InputFrame input)
+        // 出している間ずっと照準を追う技（AttackData.TracksAim。ボールライトニング）は、ボタンを離していても照準があれば覚える
+        // （オンラインでは、その間は照準を送る。TracksAimNow）。
+        private static void RememberSkillAim(ref CharacterState state, in InputFrame input, CombatTuning combat)
         {
-            if ((input.Held & SkillButtons) != 0)
+            if ((input.Held & SkillButtons) != 0 || (TracksAimNow(state, combat) && input.Aim != System.Numerics.Vector2.Zero))
             {
                 state.Combat.SkillAim = input.Aim;
             }
+        }
+
+        /// <summary>
+        /// 今の攻撃が、出している間ずっと照準を追う技か（AttackData.TracksAim。SOLDERER のボールライトニングは、1 つずつ放つときの
+        /// 照準の方向へ）。オンラインでは、この間は照準を送る（InputNormalizer）。
+        /// </summary>
+        public static bool TracksAimNow(in CharacterState state, CombatTuning combat)
+        {
+            return state.Action.Kind == ActionKind.Attack && combat.Get(state.Action.Attack).TracksAim;
         }
 
         private static void BufferAttack(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone, AttackSlot slot)

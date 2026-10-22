@@ -89,11 +89,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 42
@@ -106,7 +108,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.6
           HalfHeight: 1.5
-          Damage: 4
+          Damage: 1
+          Gauge: 65
           HitstopTicks: 9
           HitstunTicks: 22
           KnockbackX: 5
@@ -122,7 +125,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.6
           HalfHeight: 1.5
-          Damage: 4
+          Damage: 1
+          Gauge: 65
           HitstopTicks: 9
           HitstunTicks: 22
           KnockbackX: -6
@@ -138,7 +142,8 @@ MonoBehaviour:
           OffsetY: 1
           HalfWidth: 1.8
           HalfHeight: 1.8
-          Damage: 6
+          Damage: 2
+          Gauge: 85
           HitstopTicks: 12
           HitstunTicks: 26
           KnockbackX: 10
@@ -174,11 +179,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 1
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 28
@@ -191,7 +198,8 @@ MonoBehaviour:
           OffsetY: 0.2
           HalfWidth: 2.6
           HalfHeight: 0.35
-          Damage: 5
+          Damage: 2
+          Gauge: 70
           HitstopTicks: 10
           HitstunTicks: 22
           KnockbackX: 7
@@ -207,7 +215,8 @@ MonoBehaviour:
           OffsetY: 0.2
           HalfWidth: 2.6
           HalfHeight: 0.35
-          Damage: 5
+          Damage: 2
+          Gauge: 70
           HitstopTicks: 10
           HitstunTicks: 22
           KnockbackX: 8
@@ -229,11 +238,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 28
@@ -246,7 +257,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.5
           HalfHeight: 0.35
-          Damage: 2
+          Damage: 1
+          Gauge: 40
           HitstopTicks: 4
           HitstunTicks: 14
           KnockbackX: 1
@@ -262,7 +274,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.5
           HalfHeight: 0.35
-          Damage: 2
+          Damage: 1
+          Gauge: 40
           HitstopTicks: 4
           HitstunTicks: 14
           KnockbackX: 1
@@ -278,7 +291,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.5
           HalfHeight: 0.35
-          Damage: 2
+          Damage: 1
+          Gauge: 40
           HitstopTicks: 4
           HitstunTicks: 14
           KnockbackX: 1
@@ -294,7 +308,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 1.5
           HalfHeight: 0.4
-          Damage: 3
+          Damage: 1
+          Gauge: 65
           HitstopTicks: 8
           HitstunTicks: 22
           KnockbackX: 10
@@ -323,11 +338,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 1
         TotalTicks: 26
@@ -340,7 +357,8 @@ MonoBehaviour:
           OffsetY: 1.7
           HalfWidth: 1.5
           HalfHeight: 0.9
-          Damage: 3
+          Damage: 1
+          Gauge: 65
           HitstopTicks: 7
           HitstunTicks: 18
           KnockbackX: 2
@@ -362,11 +380,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 26
@@ -392,11 +412,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 12
@@ -418,11 +440,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 18
@@ -442,11 +466,13 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
         AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        NoSpeedBonus: 0
+        SpeedScaled: 0
         EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 56
@@ -472,8 +498,7 @@ MonoBehaviour:
       ParriedStunTicks: 30
       ParriedPushbackX: 4
       ParriedPushbackY: 6
-      GaugeOnHit: 80
-      GaugeOnGuarded: 30
+      GaugeGuardedPercent: 40
       GaugeOnDamaged: 40
       GaugeOnGuard: 20
       GaugeOnJustGuard: 200
@@ -491,7 +516,7 @@ MonoBehaviour:
         ChargeRatePercent: 110
         MaxCoins: 300
         GoldCoins: 150
-        Durability: 30
+        Durability: 9
         DepositPerSecond: 30
         HalfWidth: 0.7
         HalfHeight: 0.7
@@ -515,7 +540,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 75
           HitstopTicks: 10
           HitstunTicks: 22
           KnockbackX: 2
@@ -574,7 +600,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 70
           HitstopTicks: 10
           HitstunTicks: 24
           KnockbackX: 9
@@ -595,7 +622,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 15
+          Damage: 5
+          Gauge: 0
           HitstopTicks: 6
           HitstunTicks: 20
           KnockbackX: 3
@@ -654,7 +682,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 20
+          Damage: 6
+          Gauge: 0
           HitstopTicks: 14
           HitstunTicks: 28
           KnockbackX: 7
@@ -682,7 +711,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 8
+          Damage: 2
+          Gauge: 80
           HitstopTicks: 16
           HitstunTicks: 30
           KnockbackX: 3
@@ -703,7 +733,8 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 5
+          Damage: 2
+          Gauge: 50
           HitstopTicks: 2
           HitstunTicks: 14
           KnockbackX: 0
@@ -716,14 +747,15 @@ MonoBehaviour:
         WaveRadius: 0.5
         StunTicks: 60
         StunGuardTicks: 30
+        WaveCooldownTicks: 180
       BallLightning:
         Count: 3
         IntervalTicks: 18
-        LaunchOffset: 0.8
+        LaunchOffset: 1.2
         Speed: 7
         TravelDistance: 14
         TrapTicks: 300
-        Radius: 0.55
+        Radius: 1.1
   _displayName: PASTRY CHEF
   _logo: {fileID: 2800000, guid: 523089f68ab3afce4b4cb6a7d027b383, type: 2}
   _special1Icon: {fileID: 0}

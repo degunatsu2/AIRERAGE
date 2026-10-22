@@ -72,13 +72,16 @@ namespace Airerage.Core.Tests.Economy
         }
 
         [Test]
-        public void DamageReward_IsThirtyPercent_AtLeastOne()
+        public void DamageReward_EqualsTheDamage()
         {
+            // 威力とコインは等価（2026-10-22。前は 30%）。割合を変えれば端数は切り捨て、少なくとも 1 枚。
             var rules = new MatchRules();
-            Assert.That(CombatRewardRules.DamageRewardAmount(rules, 10), Is.EqualTo(3));
-            Assert.That(CombatRewardRules.DamageRewardAmount(rules, 8), Is.EqualTo(2), "端数は切り捨て");
-            Assert.That(CombatRewardRules.DamageRewardAmount(rules, 1), Is.EqualTo(1), "少なくとも 1 枚");
+            Assert.That(CombatRewardRules.DamageRewardAmount(rules, 10), Is.EqualTo(10));
+            Assert.That(CombatRewardRules.DamageRewardAmount(rules, 1), Is.EqualTo(1));
             Assert.That(CombatRewardRules.DamageRewardAmount(rules, 0), Is.EqualTo(0));
+            var thirty = new MatchRules { DamageRewardPercent = 30 };
+            Assert.That(CombatRewardRules.DamageRewardAmount(thirty, 8), Is.EqualTo(2), "端数は切り捨て");
+            Assert.That(CombatRewardRules.DamageRewardAmount(thirty, 1), Is.EqualTo(1), "少なくとも 1 枚");
             Assert.That(CombatRewardRules.DamageRewardAmount(new MatchRules { DamageRewardPercent = 0 }, 10), Is.EqualTo(0), "0% なら払わない");
         }
 

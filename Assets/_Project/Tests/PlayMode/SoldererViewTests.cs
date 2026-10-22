@@ -56,7 +56,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(dashed, Is.True, "イナズマステップの跡を出さない");
             Assert.That(chained, Is.True, "続きを出せる間、札に CHAIN と出さない");
 
-            // Q を長押し: 長押しになったらオーラ。
+            // Q を長押し: 長押しになった瞬間に強突撃が出て、オーラが回る（離さなくてよい。2026-10-22）。
             runner.InputOverride = new Script(Enumerable.Repeat(new SimInput(0, 0, InputButtons.Special1), 30).Append(default).ToList());
             bool charged = false;
             start = Time.time;

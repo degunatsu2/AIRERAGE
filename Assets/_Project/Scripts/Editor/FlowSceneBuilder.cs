@@ -363,14 +363,14 @@ namespace Airerage.Editor
             Save(scene, MenuScenePath);
         }
 
-        // シングルモードの CPU の強さ（docs/16 T7-2）: 左に EASY・NORMAL・HARD の札、右に説明。
+        // シングルモードの CPU の強さ（docs/16 T7-2）: 左に EASY・NORMAL・HARD・HELL の札（CpuLevel の順）、右に説明。
         private static CpuLevelScreen CreateCpuLevel(Transform canvas)
         {
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CpuLevel");
             MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.42f, 1f));
             MenuUiBuilder.CreateText(panel, "Title", "CPU LEVEL", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
-            string[] labels = { "EASY", "NORMAL", "HARD" };
+            string[] labels = System.Array.ConvertAll(System.Enum.GetNames(typeof(Airerage.Core.Ai.CpuLevel)), n => n.ToUpperInvariant());
             var options = new Object[labels.Length];
             for (int i = 0; i < labels.Length; i++)
             {

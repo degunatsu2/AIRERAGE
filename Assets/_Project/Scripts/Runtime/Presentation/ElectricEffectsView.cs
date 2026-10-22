@@ -131,9 +131,10 @@ namespace Airerage.Runtime.Presentation
 
                 bool charging = alive && step.ChainMax > 1 && state.Combat.Holding && state.Combat.HoldSlot == AttackSlot.Special1
                     && step.IsCharged(state.Combat.HoldTicks);
-                effects.Charging = charging;
-                // 長押しで出した突撃の間は、同じオーラが体のまわりを回る。
+                // 長押しで出した突撃の間は、同じオーラが体のまわりを回る（長押しになった瞬間に出る技では、ためている間のオーラは
+                // 出る間がなく、このオーラだけになる。2026-10-22）。
                 bool spinning = dashing && step.IsCharged(state.Action.Charge);
+                effects.Charging = charging || spinning;
                 SetLine(effects.Aura, charging || spinning);
                 if (charging || spinning)
                 {

@@ -39,7 +39,8 @@ namespace Airerage.Core.Ai
     /// - 動き（毎ティック）: 目標へ走る・跳ぶ・空中ジャンプ・ワイヤー（つながる所を WireTargeting.PredictShot で確かめて撃ち、目標の方へ
     ///   振れたら離す）。
     /// - 攻撃: 相手が判定の届く所にいれば（今の位置で判定の箱と相手の箱が重なるか）、反応の遅れの後に出す。撃破の範囲の端の近くでは撃破技。
-    /// - 守り: 近くの相手が攻撃を出したら、確率でガード。
+    /// - 守り: 近くの相手が攻撃を出したら、確率でガード（CpuTuning.TimedGuard なら判定が出る直前に押してジャストガードを狙う）。
+    ///   CpuTuning.CancelOnHit なら、当たった攻撃を次の攻撃でキャンセルしてつなぐ。
     /// - 技（Q・E・R）: 使えて、技のデータから見て今が使い時なら（CpuSkills.Plan）、確率で使う。押す長さ・照準・長押しの間に押す
     ///   ボタンも CpuSkills が決める。落ちそうなときの技（足場・ワープなど）は確率を上げる。
     /// 乱数はティックと番号と試合の種から作るので、同じ入力の並びなら何度でも同じ動きになる。覚えていること（目標など）はこの中に持つ。
@@ -83,6 +84,7 @@ namespace Airerage.Core.Ai
         private InputButtons _lastButtons;
         private int _attackReadyTick;
         private int _inRangeSinceTick = -1;
+        private int _guardStartTick = -1;
         private int _guardUntilTick = -1;
         private int _guardDecidedSerial = -1;
         private int _guardDecidedFor = -1;
@@ -174,14 +176,15 @@ namespace Airerage.Core.Ai
             float moveY = 0f;
             var buttons = InputButtons.None;
             Vector2 aim = Vector2.Zero;
-            if (tick < _guardUntilTick)
+            bool guardPending = tick < _guardStartTick;
+            if (tick >= _guardStartTick && tick < _guardUntilTick)
             {
                 buttons |= InputButtons.Guard;
             }
             else
             {
                 Steer(world, self, config, tick, ref moveX, ref moveY, ref buttons, ref aim);
-                if (_skillStartTick < 0)
+                if (_skillStartTick < 0 && !guardPending)
                 {
                     Attack(world, self, config, tick, ref moveX, ref moveY, ref buttons);
                     ConsiderGuard(world, self, tick, ref buttons);
@@ -519,11 +522,13 @@ namespace Airerage.Core.Ai
         private void Attack(SimWorld world, in CharacterState self, CharacterConfig config, int tick, ref float moveX, ref float moveY,
             ref InputButtons buttons)
         {
-            if (tick < _attackReadyTick || (buttons & InputButtons.Jump) != 0)
+            // HELL: 当たったら、終わるのを待たずに次の攻撃でキャンセルしてつなぐ（D-17 の 1 回）。
+            bool comboCancel = _tuning.CancelOnHit && self.Action.Kind == ActionKind.Attack && self.Action.Connected && !self.Combat.AttackCancelUsed;
+            if ((tick < _attackReadyTick && !comboCancel) || (buttons & InputButtons.Jump) != 0)
             {
                 return;
             }
-            bool canAct = self.Action.IsFree || self.Wire.Phase == WirePhase.Attached;
+            bool canAct = comboCancel || self.Action.IsFree || self.Wire.Phase == WirePhase.Attached;
             if (!canAct || (_lastButtons & InputButtons.Attack) != 0)
             {
                 return;
@@ -639,8 +644,19 @@ namespace Airerage.Core.Ai
                 _guardDecidedSerial = opponent.Combat.AttackSerial;
                 if (Chance(tick, 600 + other, _tuning.GuardChance))
                 {
-                    _guardUntilTick = tick + 18;
-                    buttons = InputButtons.Guard;
+                    // TimedGuard（HELL）: 相手の判定が出る 1 ティック前にガードが始まるように待つ（ジャストガードを狙う）。
+                    int delay = 0;
+                    if (_tuning.TimedGuard)
+                    {
+                        AttackData attack = world.GetConfig(other).Combat.Get(opponent.Action.Attack);
+                        delay = Math.Max(0, attack.FirstHitTick - opponent.Action.Ticks - 2);
+                    }
+                    _guardStartTick = tick + delay;
+                    _guardUntilTick = _guardStartTick + 18;
+                    if (delay == 0)
+                    {
+                        buttons = InputButtons.Guard;
+                    }
                     return;
                 }
             }

@@ -55,7 +55,7 @@ namespace Airerage.Core.Tests.Ai
         public void InazumaStep_TapsWhenClose_HoldsWhenALittleFar_SkipsWhenFar()
         {
             CharacterConfig solderer = CharacterPresets.Solderer();
-            float[] distances = { 2.5f, 6.5f, 15f };
+            float[] distances = { 2.5f, 5f, 15f };
             var holds = new List<int>();
             foreach (float distance in distances)
             {

@@ -375,9 +375,12 @@ namespace Airerage.Core.Tests.Skills
             float green = Hit(MacaronColor.Green, out int greenDamage);
             float yellow = Hit(MacaronColor.Yellow, out int yellowDamage);
             float rainbow = Hit(MacaronColor.Rainbow, out int rainbowDamage);
-            Assert.That(greenDamage, Is.EqualTo(20));
-            Assert.That(yellowDamage, Is.EqualTo(40));
-            Assert.That(rainbowDamage, Is.EqualTo(100));
+            int base_ = Chef.Skills.TeaParty.Hit.Damage;
+            Assert.That(greenDamage, Is.EqualTo(base_));
+            Assert.That(yellowDamage, Is.EqualTo(AttackPower.Damage(base_, 1f, Chef.Skills.TeaParty.BonusPercentOf(MacaronColor.Yellow))));
+            Assert.That(rainbowDamage, Is.EqualTo(AttackPower.Damage(base_, 1f, Chef.Skills.TeaParty.BonusPercentOf(MacaronColor.Rainbow))));
+            Assert.That(rainbowDamage, Is.GreaterThan(yellowDamage));
+            Assert.That(yellowDamage, Is.GreaterThan(greenDamage));
             Assert.That(yellow, Is.GreaterThan(green + 1f), "黄が緑より遠くへ飛ばない");
             Assert.That(rainbow, Is.GreaterThan(yellow + 2f), "虹が黄より遠くへ飛ばない");
         }

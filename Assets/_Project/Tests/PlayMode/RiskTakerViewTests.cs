@@ -88,7 +88,8 @@ namespace Airerage.PlayMode.Tests
 
             // 150 枚で金色、300 枚で虹色（表示を確かめるため、チャージを書き換える）。チャージした瞬間の演出と音。
             safe.ChargeMilli = 150_000;
-            safe.Damage = 15;
+            int durability = CharacterPresets.RiskTaker().Skills.Safe.Durability;
+            safe.Damage = durability / 2;
             objects[safeIndex] = safe;
             yield return null;
             yield return null;
@@ -96,7 +97,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(glow, Is.EqualTo(WorldObjectsView.SafeGlow.Gold), "150 枚で金色に光らない");
             objectsView.TryGetSafeState(safe.Id, out safeEvent, out health, out ring);
             Assert.That(safeEvent, Is.EqualTo(WorldObjectsView.SafeEvent.Gold), "150 枚の演出がない");
-            Assert.That(health, Is.EqualTo(0.5f).Within(1e-4f), "HP バーが減らない");
+            Assert.That(health, Is.EqualTo(1f - (float)(durability / 2) / durability).Within(1e-4f), "HP バーが減らない");
             Assert.That(audio.History.Contains(SoundId.SafeGold), Is.True, "150 枚の音が鳴らない");
             safe.ChargeMilli = 300_000;
             objects[safeIndex] = safe;

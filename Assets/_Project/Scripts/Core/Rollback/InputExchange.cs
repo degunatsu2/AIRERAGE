@@ -69,12 +69,12 @@ namespace Airerage.Core.Rollback
 
         /// <summary>
         /// 自分の入力を正規化して、セッションを1ティック進める（RollbackSession.AdvanceFrame）。使った入力を返す。
-        /// keepWireAim なら、ワイヤーのボタンを押している間の照準も残す（InputNormalizer）。
+        /// keepWireAim なら、ワイヤーのボタンを押している間の照準も残す。keepAim なら、いつも照準を残す（InputNormalizer）。
         /// </summary>
-        public PlayerInput AdvanceFrame(PlayerInput localInput, bool keepWireAim = false)
+        public PlayerInput AdvanceFrame(PlayerInput localInput, bool keepWireAim = false, bool keepAim = false)
         {
             int tick = _session.LocalInputTick;
-            PlayerInput normalized = InputNormalizer.Normalize(localInput, _lastLocalInput, _settings.MoveHysteresis, keepWireAim);
+            PlayerInput normalized = InputNormalizer.Normalize(localInput, _lastLocalInput, _settings.MoveHysteresis, keepWireAim, keepAim);
             _session.AdvanceFrame(normalized);
             _lastLocalInput = normalized;
             if (HasRemote())

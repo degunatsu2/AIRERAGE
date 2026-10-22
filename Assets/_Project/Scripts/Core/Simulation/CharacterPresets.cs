@@ -36,7 +36,7 @@ namespace Airerage.Core.Simulation
         /// - Q LIGHT（ターンオンザライト）: 5 秒のミラーボールを自分の少し上に置く。アンカーとしてつなげて、つないだ人は 1 秒に 5%
         ///   のゲージがたまる。クールタイム 15 秒（ユーザーの要望、2026-10-16。20 秒から）。
         /// - E SAFE（セーフティボックス）: 長押しで手持ちのコインを預けて（1 秒に 30 枚）金庫を置く。5 秒ごとに 2 枚足して 1.1 倍
-        ///   （上限 300 枚）。壊す（30 ダメージ）か 3 分でばらまく。クールタイム 30 秒（壊れてから）。
+        ///   （上限 300 枚）。壊す（耐久 9）か 3 分でばらまく。クールタイム 30 秒（壊れてから）。
         /// - R FEVER（フィーバータイム）: 5 秒間、拾ったコインと戦闘の報酬、得るゲージが 1.2 倍（ゲージはユーザーの要望、2026-10-16）。
         ///   必要なゲージ 50%。
         /// </summary>
@@ -66,7 +66,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 8, ActiveTicks = 8, OffsetX = 1.8f, HalfWidth = 2f, HalfHeight = 1.6f,
-                        Damage = 9, HitstopTicks = 14, HitstunTicks = 26, KnockbackX = 14f, KnockbackY = 9f,
+                        Damage = 3, Gauge = 90, HitstopTicks = 14, HitstunTicks = 26, KnockbackX = 14f, KnockbackY = 9f,
                     },
                 },
                 Motions = new[]
@@ -90,6 +90,7 @@ namespace Airerage.Core.Simulation
 
             combat.AirDown.Name = "ROULETTE SMASH";
             combat.AirDown.Roulette = true;
+            combat.AirDown.SpeedScaled = false;
             combat.KoAttack = AttackSlot.AirDown;
 
             combat.Special1 = new AttackData
@@ -133,7 +134,7 @@ namespace Airerage.Core.Simulation
         /// - 地上技 STORM DASH: 向いている方向へ走り続ける（SkillTuning.Run。初速 12.5 m/s、毎秒 +6、最大 28。2026-10-16 に速くした）。
         ///   別の行動をするまで終わらない。
         ///   足場が途切れたら・壁にぶつかったら浅い角度（20°）で跳ぶ。逆向きに入力すると、反転の後に初速で逆向きに走る。体の判定の
-        ///   ダメージは速さ × 0.4（初速で 5）。同じ相手には 0.5 秒に 1 回。
+        ///   ダメージは速さに比例（初速で 2）。同じ相手には 0.5 秒に 1 回。
         /// - 空中・横 GALE SLASH: 速さを落とさずに横へ切り抜ける（動きを決めない）。
         /// - 空中・下（撃破技）DOWNBURST: 斜め下へ急降下して蹴る（打つ直前の速さで強くなる）。
         /// - 空中・ニュートラル WHIRLWIND（つむじ風）: 竜巻をまとって回る 3 段（1 段で 1 回転。表示）。
@@ -159,7 +160,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 1, UntilEnd = true, OffsetX = 0.4f, HalfWidth = 1.1f, HalfHeight = 1.2f,
-                        Damage = 5, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 11f, KnockbackY = 9f,
+                        Damage = 2, Gauge = 75, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 11f, KnockbackY = 9f,
                     },
                 },
             };
@@ -174,7 +175,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 5, ActiveTicks = 6, OffsetX = 1.8f, HalfWidth = 2.2f, HalfHeight = 1.2f,
-                        Damage = 6, HitstopTicks = 12, HitstunTicks = 22, KnockbackX = 13f, KnockbackY = 5f,
+                        Damage = 2, Gauge = 80, HitstopTicks = 12, HitstunTicks = 22, KnockbackX = 13f, KnockbackY = 5f,
                     },
                 },
             };
@@ -189,7 +190,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 12, ActiveTicks = 10, OffsetX = 1.2f, OffsetY = -1.5f, HalfWidth = 1.8f, HalfHeight = 1.8f,
-                        Damage = 8, HitstopTicks = 20, HitstunTicks = 28, KnockbackX = 8f, KnockbackY = -12f,
+                        Damage = 2, Gauge = 85, HitstopTicks = 20, HitstunTicks = 28, KnockbackX = 8f, KnockbackY = -12f,
                     },
                 },
                 Motions = new[]
@@ -210,17 +211,17 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 3, OffsetX = 0f, HalfWidth = 2.4f, HalfHeight = 2.4f,
-                        Damage = 2, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 2f, KnockbackY = 4f,
+                        Damage = 1, Gauge = 50, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 2f, KnockbackY = 4f,
                     },
                     new AttackHit
                     {
                         StartTick = 10, ActiveTicks = 3, OffsetX = 0f, HalfWidth = 2.4f, HalfHeight = 2.4f,
-                        Damage = 2, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 2f, KnockbackY = 4f,
+                        Damage = 1, Gauge = 50, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 2f, KnockbackY = 4f,
                     },
                     new AttackHit
                     {
                         StartTick = 16, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 2.6f, HalfHeight = 2.6f,
-                        Damage = 3, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 7f, KnockbackY = 8f,
+                        Damage = 1, Gauge = 65, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 7f, KnockbackY = 8f,
                     },
                 },
             };
@@ -272,9 +273,9 @@ namespace Airerage.Core.Simulation
         ///   置いた直後は自分が入らず、長押ししてから離すと、置いたポータルにそのまま入る（ユーザーの要望、2026-10-16）。2 回まで続けて
         ///   使え、減っている間は 10 秒ごとに 1 つ戻る（C-6）。
         /// - E MISSILE（スペースミサイル）: 長押しで狙い（狙いの表示）、離すと照準の方向へまっすぐ飛ぶミサイル（18 m/s）。触れたものか
-        ///   ステージの外で爆発する（D-63）。威力は最低 5、1 秒ごとに +10。壊せる物は壊す。クールタイム 6 秒。
+        ///   ステージの外で爆発する（D-63）。威力は最低 2、飛んだ 1 秒ごとに +200%。壊せる物は壊す。クールタイム 6 秒。
         /// - R COSMIC RAY（コズミックレイ）: 自分のポータル 2 つの間に、壁を貫通するビーム（太さ 1.5m）を撃つ（撃つ間は止まる）。
-        ///   10 ティックごとに 15 ダメージを 6 回。撃ち終わったときにビームの線が拠点に触れていれば、手持ちのコインを全部確定する（C-9）。
+        ///   10 ティックごとに 5 ダメージを 6 回。撃ち終わったときにビームの線が拠点に触れていれば、手持ちのコインを全部確定する（C-9）。
         ///   ポータルが 2 つないと出せない。必要なゲージ 100%（D-62）。
         /// </summary>
         public static CharacterConfig SpaceTraveler()
@@ -295,7 +296,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 9, ActiveTicks = 4, OffsetX = 1.6f, OffsetY = 0.3f, HalfWidth = 1.6f, HalfHeight = 1.75f,
-                        Damage = 5, HitstopTicks = 10, HitstunTicks = 26, KnockbackX = 3f, KnockbackY = 17f,
+                        Damage = 2, Gauge = 80, HitstopTicks = 10, HitstunTicks = 26, KnockbackX = 3f, KnockbackY = 17f,
                     },
                 },
                 Motions = new[]
@@ -315,7 +316,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 6, ActiveTicks = 5, OffsetX = 1.4f, HalfWidth = 1.6f, HalfHeight = 1.3f,
-                        Damage = 6, HitstopTicks = 12, HitstunTicks = 22, KnockbackX = 12f, KnockbackY = 6f,
+                        Damage = 2, Gauge = 75, HitstopTicks = 12, HitstunTicks = 22, KnockbackX = 12f, KnockbackY = 6f,
                     },
                 },
                 Motions = new[]
@@ -336,7 +337,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 16, ActiveTicks = 14, OffsetX = 0f, OffsetY = -1.2f, HalfWidth = 1.4f, HalfHeight = 1.8f,
-                        Damage = 9, HitstopTicks = 20, HitstunTicks = 28, KnockbackX = 3f, KnockbackY = -14f,
+                        Damage = 3, Gauge = 85, HitstopTicks = 20, HitstunTicks = 28, KnockbackX = 3f, KnockbackY = -14f,
                     },
                 },
                 Motions = new[]
@@ -357,12 +358,12 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 2.4f, HalfHeight = 2.4f,
-                        Damage = 3, HitstopTicks = 8, HitstunTicks = 18, KnockbackX = -3f, KnockbackY = 3f,
+                        Damage = 1, Gauge = 50, HitstopTicks = 8, HitstunTicks = 18, KnockbackX = -3f, KnockbackY = 3f,
                     },
                     new AttackHit
                     {
                         StartTick = 12, ActiveTicks = 4, OffsetX = 0f, HalfWidth = 2.6f, HalfHeight = 2.6f,
-                        Damage = 4, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 6f, KnockbackY = 7f,
+                        Damage = 1, Gauge = 65, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 6f, KnockbackY = 7f,
                     },
                 },
             };
@@ -423,7 +424,7 @@ namespace Airerage.Core.Simulation
         /// - E スイートトラップ: クリームを照準の方向へ扇形に飛ばし、当たった地形に 10 秒張り付かせる。長押しの間にワイヤーでオレンジ、
         ///   攻撃で抹茶（何も押さない・短く押すとオレンジ）。オレンジは速さ +30%・壁ジャンプ 1.5 倍・ワイヤーがつながる。抹茶は速さ −30%・
         ///   壁と天井に 1 秒張り付く・壁に張り付けず、ワイヤーもつながらない。クールタイム 18 秒。
-        /// - R ティーパーティ: マカロン 6 個を次々と上へ投げる（緑 60% 威力 20、黄 35% 威力 40、虹 5% 威力 100）。必要なゲージ 100%。
+        /// - R ティーパーティ: マカロン 6 個を次々と上へ投げる（緑 60% 威力 6、黄 35% 威力 12、虹 5% 威力 30）。必要なゲージ 100%。
         /// </summary>
         public static CharacterConfig PastryChef()
         {
@@ -442,17 +443,17 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 5, ActiveTicks = 4, OffsetX = 1.6f, HalfWidth = 1.6f, HalfHeight = 1.5f,
-                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 5f, KnockbackY = 9f,
+                        Damage = 1, Gauge = 65, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 5f, KnockbackY = 9f,
                     },
                     new AttackHit
                     {
                         StartTick = 12, ActiveTicks = 4, OffsetX = -1.6f, HalfWidth = 1.6f, HalfHeight = 1.5f,
-                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = -6f, KnockbackY = 9f,
+                        Damage = 1, Gauge = 65, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = -6f, KnockbackY = 9f,
                     },
                     new AttackHit
                     {
                         StartTick = 19, ActiveTicks = 6, OffsetX = 1f, OffsetY = 1f, HalfWidth = 1.8f, HalfHeight = 1.8f,
-                        Damage = 6, HitstopTicks = 12, HitstunTicks = 26, KnockbackX = 10f, KnockbackY = 13f,
+                        Damage = 2, Gauge = 85, HitstopTicks = 12, HitstunTicks = 26, KnockbackX = 10f, KnockbackY = 13f,
                     },
                 },
                 Motions = new[]
@@ -475,12 +476,12 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 6, ActiveTicks = 5, OffsetX = 0f, OffsetY = 0.2f, HalfWidth = 2.6f, HalfHeight = 0.35f, AngleDeg = 35f,
-                        Damage = 5, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 7f, KnockbackY = 8f,
+                        Damage = 2, Gauge = 70, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 7f, KnockbackY = 8f,
                     },
                     new AttackHit
                     {
                         StartTick = 11, ActiveTicks = 5, OffsetX = 0f, OffsetY = 0.2f, HalfWidth = 2.6f, HalfHeight = 0.35f, AngleDeg = -35f,
-                        Damage = 5, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 8f, KnockbackY = 6f,
+                        Damage = 2, Gauge = 70, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 8f, KnockbackY = 6f,
                     },
                 },
             };
@@ -496,22 +497,22 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 5, ActiveTicks = 2, OffsetX = 1.9f, HalfWidth = 1.5f, HalfHeight = 0.35f,
-                        Damage = 2, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
+                        Damage = 1, Gauge = 40, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
                     },
                     new AttackHit
                     {
                         StartTick = 9, ActiveTicks = 2, OffsetX = 1.9f, HalfWidth = 1.5f, HalfHeight = 0.35f,
-                        Damage = 2, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
+                        Damage = 1, Gauge = 40, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
                     },
                     new AttackHit
                     {
                         StartTick = 13, ActiveTicks = 2, OffsetX = 1.9f, HalfWidth = 1.5f, HalfHeight = 0.35f,
-                        Damage = 2, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
+                        Damage = 1, Gauge = 40, HitstopTicks = 4, HitstunTicks = 14, KnockbackX = 1f, KnockbackY = 0.5f,
                     },
                     new AttackHit
                     {
                         StartTick = 17, ActiveTicks = 3, OffsetX = 1.9f, HalfWidth = 1.5f, HalfHeight = 0.4f,
-                        Damage = 3, HitstopTicks = 8, HitstunTicks = 22, KnockbackX = 10f, KnockbackY = 5f,
+                        Damage = 1, Gauge = 65, HitstopTicks = 8, HitstunTicks = 22, KnockbackX = 10f, KnockbackY = 5f,
                     },
                 },
                 Motions = new[]
@@ -548,7 +549,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 16, OffsetX = 0.2f, OffsetY = 1.7f, HalfWidth = 1.5f, HalfHeight = 0.9f,
-                        Damage = 3, HitstopTicks = 7, HitstunTicks = 18, KnockbackX = 2f, KnockbackY = 10f,
+                        Damage = 1, Gauge = 65, HitstopTicks = 7, HitstunTicks = 18, KnockbackX = 2f, KnockbackY = 10f,
                     },
                 },
             };
@@ -598,11 +599,11 @@ namespace Airerage.Core.Simulation
         ///   ときだけ FATAL（威力と吹き飛びが大きく増える）。速さでは FATAL にならない。持続は長い。
         /// - 空中下 STOMP: 踏みつけ。当たると反動で真上に跳ぶ。
         /// - 空中上 THUNDER FLIP: 雷をまとった両足でサマーソルト（前の下 → 上 → 後ろ）。
-        /// - Q INAZUMA STEP: 短く押すと移動の入力の方向へ短く突撃（威力 10）。3 秒以内なら続けて出せ、合わせて 3 回まで（突撃するたびに 3 秒に
-        ///   戻る）。長押しすると回りながら長く突撃（威力 20）し、回数に関係なく終わる。クールタイムは突撃した回数 × 6 秒（6/12/18 秒）。
+        /// - Q INAZUMA STEP: 短く押すと照準の方向へ短く突撃（威力 3）。3 秒以内なら続けて出せ、合わせて 3 回まで（突撃するたびに 3 秒に
+        ///   戻る）。長押しすると、長押しになった瞬間に回りながら長く突撃（威力 6）し、回数に関係なく終わる。クールタイムは突撃した回数 × 6 秒（6/12/18 秒）。
         /// - E INVERTER: ON・OFF（クールタイム 0.5 秒）。ON の間はワイヤーの射程が 1/3 になり、雷を帯びる（外したワイヤーを押したままで
-        ///   鞭、つなぐと雷の波動。ElectricRules）。
-        /// - R BALL LIGHTNING: 照準の方向へ遅い電気の球を 3 つ放つ（壁で跳ね返り、止まると 5 秒残る罠）。触れると感電。必要なゲージ 90%。
+        ///   鞭（押している間は攻撃しても続く）、つなぐと雷の波動（3 秒に 1 回）。ElectricRules）。
+        /// - R BALL LIGHTNING: 遅い電気の球を 3 つ、それぞれ放つ瞬間の照準の方向へ放つ（壁で跳ね返り、止まると 5 秒残る罠）。触れると感電。必要なゲージ 90%。
         /// </summary>
         public static CharacterConfig Solderer()
         {
@@ -622,12 +623,12 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 4, OffsetX = 1.6f, HalfWidth = 1.5f, HalfHeight = 1.4f,
-                        Damage = 4, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = 6f, KnockbackY = 10f,
+                        Damage = 1, Gauge = 70, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = 6f, KnockbackY = 10f,
                     },
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 4, OffsetX = -1.6f, HalfWidth = 1.5f, HalfHeight = 1.4f,
-                        Damage = 4, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = -6f, KnockbackY = 10f,
+                        Damage = 1, Gauge = 70, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = -6f, KnockbackY = 10f,
                     },
                 },
                 Motions = new[]
@@ -647,7 +648,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 20, OffsetX = 0f, HalfWidth = 2f, HalfHeight = 2f,
-                        Damage = 3, HitstopTicks = 5, HitstunTicks = 16, KnockbackX = 3f, KnockbackY = 5f,
+                        Damage = 1, Gauge = 55, HitstopTicks = 5, HitstunTicks = 16, KnockbackX = 3f, KnockbackY = 5f,
                     },
                 },
             };
@@ -658,7 +659,6 @@ namespace Airerage.Core.Simulation
                 TotalTicks = 34,
                 WireCancelFromTick = 7,
                 ExclusiveHits = true,
-                NoSpeedBonus = true,
                 Hits = new[]
                 {
                     // 指先のクリティカル判定（出た瞬間だけ。相手の体の中心に重なったときだけ当たる）。
@@ -666,13 +666,13 @@ namespace Airerage.Core.Simulation
                     {
                         StartTick = 6, ActiveTicks = 1, OffsetX = 2.3f, OffsetY = -1.1f, HalfWidth = 0.35f, HalfHeight = 0.35f,
                         Critical = true, CriticalScale = 2.5f,
-                        Damage = 10, HitstopTicks = 20, HitstunTicks = 32, KnockbackX = 12f, KnockbackY = -4f,
+                        Damage = 3, Gauge = 85, HitstopTicks = 20, HitstunTicks = 32, KnockbackX = 12f, KnockbackY = -4f,
                     },
                     // 斜め下に伸ばした腕の通常の判定（持続は長い）。
                     new AttackHit
                     {
                         StartTick = 6, ActiveTicks = 14, OffsetX = 1.5f, OffsetY = -0.7f, HalfWidth = 1.2f, HalfHeight = 0.45f, AngleDeg = -35f,
-                        Damage = 5, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 9f, KnockbackY = -2f,
+                        Damage = 2, Gauge = 65, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 9f, KnockbackY = -2f,
                     },
                 },
             };
@@ -690,7 +690,7 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 6, ActiveTicks = 10, OffsetX = 0f, OffsetY = -1.4f, HalfWidth = 1.2f, HalfHeight = 0.9f,
-                        Damage = 6, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = -12f,
+                        Damage = 2, Gauge = 75, HitstopTicks = 10, HitstunTicks = 22, KnockbackX = 2f, KnockbackY = -12f,
                     },
                 },
                 Motions = new[]
@@ -714,17 +714,17 @@ namespace Airerage.Core.Simulation
                     new AttackHit
                     {
                         StartTick = 4, ActiveTicks = 3, OffsetX = 1.4f, OffsetY = -0.4f, HalfWidth = 1.2f, HalfHeight = 1f,
-                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 3f, KnockbackY = 13f,
+                        Damage = 1, Gauge = 70, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 3f, KnockbackY = 13f,
                     },
                     new AttackHit
                     {
                         StartTick = 7, ActiveTicks = 3, OffsetX = 0.3f, OffsetY = 1.6f, HalfWidth = 1.3f, HalfHeight = 1f,
-                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 1f, KnockbackY = 14f,
+                        Damage = 1, Gauge = 75, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = 1f, KnockbackY = 14f,
                     },
                     new AttackHit
                     {
                         StartTick = 10, ActiveTicks = 3, OffsetX = -1.2f, OffsetY = 0.6f, HalfWidth = 1.2f, HalfHeight = 1f,
-                        Damage = 4, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = -2f, KnockbackY = 13f,
+                        Damage = 1, Gauge = 70, HitstopTicks = 9, HitstunTicks = 22, KnockbackX = -2f, KnockbackY = 13f,
                     },
                 },
                 Motions = new[]
@@ -736,11 +736,12 @@ namespace Airerage.Core.Simulation
             combat.Special1 = new AttackData
             {
                 Name = "INAZUMA STEP",
-                TotalTicks = 14,
-                ChargedTotalTicks = 26,
+                TotalTicks = 11,
+                ChargedTotalTicks = 21,
                 WireCancelFromTick = 4,
                 HoldMaxTicks = 600,
                 ChargedFromTicks = 10,
+                FiresWhenCharged = true,
                 AimTurnsFacing = true,
                 ChainMax = 3,
                 ChainWindowTicks = 180,
@@ -748,20 +749,21 @@ namespace Airerage.Core.Simulation
                 {
                     new AttackHit
                     {
-                        StartTick = 1, ActiveTicks = 9, OffsetX = 0f, HalfWidth = 1f, HalfHeight = 1.2f, Charge = ChargeFilter.Tapped,
-                        Damage = 10, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = 8f, KnockbackY = 6f,
+                        StartTick = 1, ActiveTicks = 6, OffsetX = 0f, HalfWidth = 1f, HalfHeight = 1.2f, Charge = ChargeFilter.Tapped,
+                        Damage = 3, Gauge = 80, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = 8f, KnockbackY = 6f,
                     },
                     new AttackHit
                     {
-                        StartTick = 2, ActiveTicks = 16, OffsetX = 0f, HalfWidth = 1.4f, HalfHeight = 1.5f, Charge = ChargeFilter.Charged,
-                        Damage = 20, HitstopTicks = 14, HitstunTicks = 28, KnockbackX = 13f, KnockbackY = 9f,
+                        StartTick = 2, ActiveTicks = 11, OffsetX = 0f, HalfWidth = 1.4f, HalfHeight = 1.5f, Charge = ChargeFilter.Charged,
+                        Damage = 6, Gauge = 115, HitstopTicks = 14, HitstunTicks = 28, KnockbackX = 13f, KnockbackY = 9f,
                     },
                 },
                 Motions = new[]
                 {
-                    // 照準の方向へ: 短く（3.6m）、長押しなら長く（8m）。
-                    new AttackMotion { StartTick = 0, Ticks = 9, VelocityX = 24f, AlongAim = true, Charge = ChargeFilter.Tapped },
-                    new AttackMotion { StartTick = 0, Ticks = 16, VelocityX = 30f, AlongAim = true, Charge = ChargeFilter.Charged },
+                    // 照準の方向へ: 短く（2.4m。SPACE TRAVELER の空中横の約 2m より少し長く）、長押しなら長く（5.5m）。突撃の後の慣性は
+                    // そのまま残る（ユーザーの要望で縮めた、2026-10-22。前は 3.6m・8m）。
+                    new AttackMotion { StartTick = 0, Ticks = 6, VelocityX = 24f, AlongAim = true, Charge = ChargeFilter.Tapped },
+                    new AttackMotion { StartTick = 0, Ticks = 11, VelocityX = 30f, AlongAim = true, Charge = ChargeFilter.Charged },
                 },
             };
             combat.Special1CooldownTicks = 360;
@@ -785,6 +787,7 @@ namespace Airerage.Core.Simulation
                 WireCancelFromTick = 2 + (balls.Count - 1) * balls.IntervalTicks,
                 Effect = SkillEffect.BallLightning,
                 EffectTick = 2,
+                TracksAim = true,
                 Hits = new AttackHit[0],
             };
             combat.SuperGaugeCost = 90 * CombatTuning.GaugePerPercent;

@@ -7,11 +7,13 @@ on:
     paths:
       - "Assets/**"
       - "tools/**"
+      - "docs/17_move_data.md"
       - ".github/workflows/core-tests.yml"
   pull_request:
     paths:
       - "Assets/**"
       - "tools/**"
+      - "docs/17_move_data.md"
       - ".github/workflows/core-tests.yml"
 
 jobs:
@@ -28,5 +30,6 @@ jobs:
       - name: Unity の .meta ファイルを検査
         run: python3 tools/unity_meta.py --check
 
+      # 技の性能表 docs/17_move_data.md がコードの値と合っているかも、ここで調べる（MoveTableTests）。
       - name: Core のテストを実行
         run: dotnet test tools/CoreTests/Airerage.Core.Tests --nologo

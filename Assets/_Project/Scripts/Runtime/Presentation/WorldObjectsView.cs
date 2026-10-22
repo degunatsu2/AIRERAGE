@@ -828,7 +828,9 @@ namespace Airerage.Runtime.Presentation
             shown.Launched = launched;
             SetVisible(shown, visible);
             float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 18f + ball.Id);
-            shown.Visual.transform.localScale = Vector3.one * (0.9f + 0.2f * pulse);
+            // 見本は直径 1m の球。当たりの半径に合わせる（ユーザーの要望で 2 倍にした、2026-10-22）。
+            float radiusOfBall = _feed.GetConfig(ball.Owner).Skills.BallLightning.Radius;
+            shown.Visual.transform.localScale = Vector3.one * (radiusOfBall * 2f * (0.9f + 0.2f * pulse));
             Tint(shown, Color.Lerp(Electric, Color.white, pulse * 0.6f), null);
             if (shown.Spark == null)
             {
@@ -842,7 +844,7 @@ namespace Airerage.Runtime.Presentation
             for (int i = 0; i < points; i++)
             {
                 float angle = Mathf.PI * 2f * i / points;
-                float radius = 0.75f + (Mathf.PerlinNoise(i * 1.3f, frame * 0.5f + ball.Id) - 0.5f) * 0.6f;
+                float radius = radiusOfBall * (1.35f + (Mathf.PerlinNoise(i * 1.3f, frame * 0.5f + ball.Id) - 0.5f) * 1.1f);
                 shown.Spark.SetPosition(i, shown.Anchor + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, -0.7f));
             }
             shown.Spark.startColor = shown.Spark.endColor = new Color(ElectricBlue.r, ElectricBlue.g, ElectricBlue.b, 0.85f);

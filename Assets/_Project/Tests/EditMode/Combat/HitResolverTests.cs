@@ -458,5 +458,24 @@ namespace Airerage.Core.Tests.Combat
             Assert.That(network.Worlds[1].Checksum(), Is.EqualTo(reference.Checksum()));
             Assert.That(network.Sessions[0].RollbackCount, Is.GreaterThan(0), "前提: 巻き戻している");
         }
+
+        [Test]
+        public void OnlyStandardsKoAttack_IsScaledBySpeed()
+        {
+            // 打つ直前の速さで強くなるのは STANDARD の撃破技だけ（ほかのキャラクターは技そのもので差をつける。ユーザーの指示、2026-10-22）。
+            var configs = new[]
+            {
+                CharacterPresets.Standard(), CharacterPresets.RiskTaker(), CharacterPresets.StormRunner(), CharacterPresets.SpaceTraveler(),
+                CharacterPresets.PastryChef(), CharacterPresets.Solderer(),
+            };
+            for (int c = 0; c < configs.Length; c++)
+            {
+                foreach (AttackSlot slot in (AttackSlot[])System.Enum.GetValues(typeof(AttackSlot)))
+                {
+                    bool expected = c == 0 && slot == configs[c].Combat.KoAttack;
+                    Assert.That(configs[c].Combat.Get(slot).SpeedScaled, Is.EqualTo(expected), $"キャラクター {c} の {slot}");
+                }
+            }
+        }
     }
 }

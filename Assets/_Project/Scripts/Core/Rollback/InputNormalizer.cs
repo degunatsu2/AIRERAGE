@@ -17,17 +17,20 @@ namespace Airerage.Core.Rollback
         /// - 照準の方向は、ワイヤーのボタンを押したティック（WireController の射出）と、技のボタン（Q・E・R）を押している間
         ///   （ActionController が技の照準 CombatState.SkillAim を覚える）にしか使わないので、それ以外では消す。keepWireAim なら、
         ///   ワイヤーのボタンを押している間も残す（SOLDERER のインバータの間の鞭の向き。2026-10-21。呼ぶ側が自分の状態から決める。
-        ///   決めた入力を全員が使うので、結果はずれない）。
+        ///   決めた入力を全員が使うので、結果はずれない）。keepAim なら、ボタンに関係なく残す（出している間ずっと照準を追う技
+        ///   ActionController.TracksAimNow。SOLDERER のボールライトニング。2026-10-22。これも呼ぶ側が自分の状態から決める）。
         ///   シミュレーションの結果は変わらない。マウスの照準は毎ティック変わるため、特に効く。
         /// - 移動のスティックは、前のティックからの変化が moveHysteresis 以下なら前の値のままにする（スティックの揺れを無視する）。
         ///   ただし 0（離した）と端（いっぱいに倒した）にはすぐ合わせる。
         /// </summary>
-        public static PlayerInput Normalize(PlayerInput input, PlayerInput previous, int moveHysteresis, bool keepWireAim = false)
+        public static PlayerInput Normalize(PlayerInput input, PlayerInput previous, int moveHysteresis, bool keepWireAim = false,
+            bool keepAim = false)
         {
             bool wirePressed = input.IsHeld(InputButtons.Wire) && !previous.IsHeld(InputButtons.Wire);
-            bool keepAim = wirePressed || (keepWireAim && input.IsHeld(InputButtons.Wire)) || (input.Buttons & ActionController.SkillButtons) != 0;
-            sbyte aimX = keepAim ? input.AimX : (sbyte)0;
-            sbyte aimY = keepAim ? input.AimY : (sbyte)0;
+            bool aimUsed = keepAim || wirePressed || (keepWireAim && input.IsHeld(InputButtons.Wire))
+                || (input.Buttons & ActionController.SkillButtons) != 0;
+            sbyte aimX = aimUsed ? input.AimX : (sbyte)0;
+            sbyte aimY = aimUsed ? input.AimY : (sbyte)0;
             sbyte moveX = Settle(input.MoveX, previous.MoveX, moveHysteresis);
             sbyte moveY = Settle(input.MoveY, previous.MoveY, moveHysteresis);
             // 抜けた印（InputButtons.Leave）は自分の入力には入れない（ホストが決めて全員へ送るもの）。

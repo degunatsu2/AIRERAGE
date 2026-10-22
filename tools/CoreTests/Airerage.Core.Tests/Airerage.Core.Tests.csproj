@@ -16,6 +16,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../../Assets/_Project/Tests/EditMode/**/*.cs" />
+    <!-- dotnet test だけで動かすもの（技の性能表 docs/17 の生成と検査。Unity のテストには入れない）。 -->
+    <Compile Include="Docs/**/*.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Airerage.Core/Airerage.Core.csproj" />

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Airerage.Core.Combat;
 using Airerage.Core.Common;
 using Airerage.Core.Input;
 using Airerage.Core.Match;
@@ -835,9 +836,12 @@ namespace Airerage.Net
                 {
                     _previous[p] = World.GetState(p);
                 }
-                // インバータ（SOLDERER）の間は、ワイヤーを押している間の照準も送る（鞭の向き）。
-                bool keepWireAim = LocalPlayer >= 0 && LocalPlayer < PlayerCount && World.GetState(LocalPlayer).Combat.InverterOn;
-                Exchange.AdvanceFrame(localInput(Session.LocalInputTick), keepWireAim);
+                // インバータ（SOLDERER）の間は、ワイヤーを押している間の照準も送る（鞭の向き）。出している間ずっと照準を追う技
+                // （ボールライトニング）の間は、いつも照準を送る。
+                bool local = LocalPlayer >= 0 && LocalPlayer < PlayerCount;
+                bool keepWireAim = local && World.GetState(LocalPlayer).Combat.InverterOn;
+                bool keepAim = local && ActionController.TracksAimNow(World.GetState(LocalPlayer), World.GetConfig(LocalPlayer).Combat);
+                Exchange.AdvanceFrame(localInput(Session.LocalInputTick), keepWireAim, keepAim);
                 _waitFrames += Exchange.RecommendWaitFrames();
             }
             if (ticks == MaxTicksPerFrame && _accumulator >= SimTime.DeltaTime)

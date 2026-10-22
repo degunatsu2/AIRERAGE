@@ -47,7 +47,7 @@ namespace Airerage.Core.Tests.Combat
             SimWorld world = FirstHit(null);
 
             Assert.That(world.LastHits[0].Result, Is.EqualTo(HitResult.Hit));
-            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(Combat.GaugeOnHit), "当てた側");
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(Combat.Ground.Hits[0].Gauge), "当てた側（判定のゲージ）");
             Assert.That(world.GetState(1).Combat.Gauge, Is.EqualTo(Combat.GaugeOnDamaged), "受けた側");
         }
 
@@ -57,7 +57,8 @@ namespace Airerage.Core.Tests.Combat
             SimWorld world = FirstHit(-4);
 
             Assert.That(world.LastHits[0].Result, Is.EqualTo(HitResult.Guarded));
-            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(Combat.GaugeOnGuarded), "攻撃した側");
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(Combat.Ground.Hits[0].Gauge * Combat.GaugeGuardedPercent / 100),
+                "攻撃した側（判定のゲージの割合）");
             Assert.That(world.GetState(1).Combat.Gauge, Is.EqualTo(Combat.GaugeOnGuard), "守った側");
         }
 
@@ -69,6 +70,46 @@ namespace Airerage.Core.Tests.Combat
             Assert.That(world.LastHits[0].Result, Is.EqualTo(HitResult.JustGuarded));
             Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(0), "ジャストガードされた側");
             Assert.That(world.GetState(1).Combat.Gauge, Is.EqualTo(Combat.GaugeOnJustGuard), "守った側");
+        }
+
+        [Test]
+        public void HitGauge_IsSetPerAttack()
+        {
+            // 技ごとのゲージ（2026-10-22）: 判定のゲージを変えると、当てた側が得る量が変わる。
+            var world = new SimWorld(TestArenas.Ground());
+            var config = new CharacterConfig();
+            config.Combat.Ground.Hits = new[] { config.Combat.Ground.Hits[0] };
+            config.Combat.Ground.Hits[0].Gauge = 123;
+            world.AddCharacter(config, new Vector3(0f, GroundY, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(1.6f, GroundY, 0f), -1);
+            world.Step(new PlayerInput[2]);
+            world.Step(new[] { Attack, default });
+            for (int t = 0; t < 30 && world.LastHits.Count == 0; t++)
+            {
+                world.Step(new PlayerInput[2]);
+            }
+
+            Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(123));
+        }
+
+        [Test]
+        public void SuperHits_GiveNoGauge()
+        {
+            // 必殺技の判定はゲージが 0（どのキャラクターも。続けて必殺技を出せないように）。
+            foreach (CharacterConfig config in new[]
+            {
+                CharacterPresets.Standard(), CharacterPresets.RiskTaker(), CharacterPresets.StormRunner(), CharacterPresets.SpaceTraveler(),
+                CharacterPresets.PastryChef(), CharacterPresets.Solderer(),
+            })
+            {
+                foreach (AttackHit hit in config.Combat.Super.Hits)
+                {
+                    Assert.That(hit.Gauge, Is.Zero, config.Combat.Super.Name);
+                }
+            }
+            var skills = new Airerage.Core.Skills.SkillTuning();
+            Assert.That(skills.Beam.Hit.Gauge, Is.Zero, "コズミックレイ");
+            Assert.That(skills.TeaParty.Hit.Gauge, Is.Zero, "ティーパーティ");
         }
 
         [Test]

@@ -207,6 +207,9 @@ namespace Airerage.Core.Combat
         /// <summary>鞭（インバータのワイヤー）にもう当たらない残り（ティック。同じ鞭に続けて当たらないように）。</summary>
         public int WhipGuardTicks;
 
+        /// <summary>雷の波動（インバータの間に足場につなぐ）を次に出せるまでの残り（ティック。InverterTuning.WaveCooldownTicks）。</summary>
+        public int WaveCooldownTicks;
+
         /// <summary>上から来た投射物を防いだ数（PASTRY CHEF のボウル。AttackData.BlocksProjectilesAbove。表示と効果音）。</summary>
         public int ShieldBlockCount;
 
@@ -281,7 +284,8 @@ namespace Airerage.Core.Combat
                 && CreamNoCling == other.CreamNoCling && CreamStickTicksLeft == other.CreamStickTicksLeft && CreamStickSpent == other.CreamStickSpent
                 && ChainCount == other.ChainCount && ChainTicksLeft == other.ChainTicksLeft && InverterOn == other.InverterOn
                 && StunTicksLeft == other.StunTicksLeft && StunGuardTicks == other.StunGuardTicks && StunCount == other.StunCount
-                && WhipGuardTicks == other.WhipGuardTicks && ShieldBlockCount == other.ShieldBlockCount && HasLeft == other.HasLeft;
+                && WhipGuardTicks == other.WhipGuardTicks && ShieldBlockCount == other.ShieldBlockCount && HasLeft == other.HasLeft
+                && WaveCooldownTicks == other.WaveCooldownTicks;
         }
 
         public override bool Equals(object obj)
@@ -304,14 +308,14 @@ namespace Airerage.Core.Combat
                         HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount, FrozenTicksLeft, FreezeCount, HazardImmunityTicks, HazardHitCount, HazardDropPower),
                         HashCode.Combine(HoldVariant, CreamSpeedPercent, CreamWallJumpPercent, CreamNoCling, CreamStickTicksLeft, CreamStickSpent),
                         HashCode.Combine(ChainCount, ChainTicksLeft, InverterOn, StunTicksLeft, StunGuardTicks, StunCount, WhipGuardTicks,
-                            HashCode.Combine(ShieldBlockCount, HasLeft)))));
+                            HashCode.Combine(ShieldBlockCount, HasLeft, WaveCooldownTicks)))));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} shield={ShieldBlockCount}{(HasLeft ? " left" : "")}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} shield={ShieldBlockCount}{(HasLeft ? " left" : "")}";
         }
     }
 }
