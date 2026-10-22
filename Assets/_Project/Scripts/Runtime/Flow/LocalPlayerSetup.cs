@@ -1,3 +1,4 @@
+using Airerage.Core.Ai;
 using UnityEngine.InputSystem;
 
 namespace Airerage.Runtime.Flow
@@ -23,5 +24,17 @@ namespace Airerage.Runtime.Flow
 
         /// <summary>キャラクター（CharacterRoster の番号）。</summary>
         public int Character { get; set; }
+
+        /// <summary>CPU が操作するか（シングルモード。docs/16 T7-2）。</summary>
+        public bool IsCpu { get; private set; }
+
+        /// <summary>CPU の強さ（IsCpu のときだけ）。</summary>
+        public CpuLevel CpuLevel { get; private set; }
+
+        /// <summary>CPU が操作する人（機器なし）。</summary>
+        public static LocalPlayerSetup Cpu(int character, CpuLevel level)
+        {
+            return new LocalPlayerSetup(new InputDevice[0], "CPU", character) { IsCpu = true, CpuLevel = level };
+        }
     }
 }

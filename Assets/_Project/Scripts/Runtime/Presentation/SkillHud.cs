@@ -126,6 +126,9 @@ namespace Airerage.Runtime.Presentation
             public float At;
         }
 
+        /// <summary>出す人の番号（ローカル対戦。-1 なら自分のキャラクター）。</summary>
+        public int Player => _player;
+
         /// <summary>左から 特殊攻撃 1・特殊攻撃 2・必殺技 の札の表示（テスト用）。</summary>
         public Slot SlotOf(int index) => _slots[index];
 
@@ -170,7 +173,8 @@ namespace Airerage.Runtime.Presentation
         private void Update()
         {
             int local = Shown;
-            bool shown = local >= 0 && local < _feed.CharacterCount;
+            // CPU（シングルモード）の技の札は出さない。
+            bool shown = local >= 0 && local < _feed.CharacterCount && !(_feed is ICpuRoster cpus && cpus.IsCpu(local));
             for (int i = 0; i < SlotCount; i++)
             {
                 Slot slot = _slots[i];

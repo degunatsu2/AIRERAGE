@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Airerage.Core.Ai;
 using Airerage.Core.Common;
 using Airerage.Core.Economy;
 using Airerage.Core.Input;
@@ -27,9 +28,10 @@ namespace Airerage.Runtime.Simulation
     /// - カメラは全員が入る 1 つのカメラ（SharedCamera）。技の札は人ごと（SkillHud の _player）、コンボはだれのものでも出す（ComboHud）。
     /// - 結果の REMATCH で同じ人で始め直し、CHARACTER SELECT で同じ人のままキャラクター選択へ、MAIN MENU でメニューへ（IMatchControls。
     ///   結果の画面は ResultsMenu。docs/15 T6-8）。Esc・Start で一時停止（IPauseTarget）。
+    /// - シングルモード（docs/16 T7-2）: CPU の人（LocalPlayerSetup.IsCpu）は、CpuPlayer が入力を作る（機器は読まない。照準の表示と技の札は出さない）。
     /// ステージの地形・範囲・ギミック・コインの出現地点・拠点・出現位置は、読み込んだステージのシーンから探す（D-66）。
     /// </summary>
-    public sealed class LocalMatchRunner : MonoBehaviour, ISimulationFeed, IMatchControls, IPauseTarget
+    public sealed class LocalMatchRunner : MonoBehaviour, ISimulationFeed, IMatchControls, IPauseTarget, ICpuRoster
     {
         public const int MaxPlayers = 4;
 
@@ -63,6 +65,7 @@ namespace Airerage.Runtime.Simulation
         private List<Vector3> _spawns;
         private SimWorld _world;
         private SimInput[] _tickInputs = new SimInput[0];
+        private CpuPlayer[] _cpus = new CpuPlayer[0];
         private CharacterState[] _previous = new CharacterState[0];
         private GameFlow _flow;
         private bool _timed = true;
@@ -113,7 +116,13 @@ namespace Airerage.Runtime.Simulation
         public CharacterState GetState(int index) => _world.GetState(index);
         CharacterConfig ISimulationFeed.GetConfig(int index) => _world.GetConfig(index);
         public CharacterConfigAsset CharacterOf(int index) => index >= 0 && index < _players.Count ? _roster.Get(_players[index].Character) : null;
-        public string LabelOf(int index) => $"P{index + 1}";
+        public string LabelOf(int index) => IsCpu(index) ? $"CPU{index + 1}" : $"P{index + 1}";
+
+        /// <summary>キャラクター index を CPU が操作しているか（ICpuRoster）。</summary>
+        public bool IsCpu(int index) => index >= 0 && index < _players.Count && _players[index].IsCpu;
+
+        /// <summary>キャラクター index の CPU（人なら null。テスト用）。</summary>
+        public CpuPlayer CpuOf(int index) => index >= 0 && index < _cpus.Length ? _cpus[index] : null;
         public Color ColorOf(int index) => index >= 0 && index < _playerColors.Length ? _playerColors[index] : Color.white;
         public int CurrentTick => _world == null ? 0 : _world.Tick;
         MatchRules ISimulationFeed.Rules => _world?.Rules;
@@ -301,6 +310,14 @@ namespace Airerage.Runtime.Simulation
             }
             _tickInputs = new SimInput[count];
             _previous = new CharacterState[count];
+            _cpus = new CpuPlayer[count];
+            for (int p = 0; p < count; p++)
+            {
+                if (_players[p].IsCpu)
+                {
+                    _cpus[p] = new CpuPlayer(p, CpuTuning.For(_players[p].CpuLevel), rules.Seed + p);
+                }
+            }
             for (int p = 0; p < count; p++)
             {
                 _previous[p] = _world.GetState(p);
@@ -311,7 +328,7 @@ namespace Airerage.Runtime.Simulation
                 bool shown = p < count;
                 _characterViews[p].gameObject.SetActive(shown);
                 _wireViews[p].gameObject.SetActive(shown);
-                _aimIndicators[p].gameObject.SetActive(shown);
+                _aimIndicators[p].gameObject.SetActive(shown && !IsCpu(p));
             }
             Ticked?.Invoke();
         }
@@ -365,6 +382,10 @@ namespace Airerage.Runtime.Simulation
             {
                 _previous[p] = _world.GetState(p);
                 _tickInputs[p] = _inputs[p].ConsumeTick(_previous[p].Position);
+                if (_cpus[p] != null)
+                {
+                    _tickInputs[p] = _cpus[p].Think(_world);
+                }
             }
             _world.Step(_tickInputs);
             Ticked?.Invoke();
@@ -381,6 +402,10 @@ namespace Airerage.Runtime.Simulation
                 _characterViews[p].SetCostume(CharacterOf(p));
                 _wireViews[p].Render(_previous[p], current, alpha, config.Wire);
 
+                if (_cpus[p] != null)
+                {
+                    continue;
+                }
                 // 照準: 表示の位置（補間した位置）から、その人の今の入力で射出したときの結果を予測して示す（強化と置かれた物も含める）。
                 Vector3 origin = Vector3.Lerp(_previous[p].Position.ToUnity(), current.Position.ToUnity(), alpha);
                 System.Numerics.Vector3 simOrigin = origin.ToNumerics();

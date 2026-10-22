@@ -53,13 +53,13 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingMain, Is.True, "タイトルの後にメインメニューを出さない");
-                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Local.gameObject), "使える最初の項目（LOCAL VS）を選んでいない");
+                Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Single.gameObject), "使える最初の項目（SINGLE）を選んでいない");
                 Assert.That(sounds.History, Is.EqualTo(new[] { SoundId.UiConfirm }), "タイトルを抜けたときに決定の音だけを鳴らさない（最初の項目は音なしで選ぶ）");
 
                 // カーソルを動かすと移動の音、決定すると決定の音（ユーザーの要望、2026-10-16）。
                 EventSystem.current.SetSelectedGameObject(menu.Training.gameObject);
                 Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiMove), "カーソルを動かしても音が鳴らない");
-                Assert.That(menu.Single.Button.interactable, Is.False, "SINGLE は Phase 7 まで選べない");
+                Assert.That(menu.Single.Button.interactable, Is.True, "SINGLE を選べない（docs/16 T7-2）");
                 Assert.That(menu.Local.Button.interactable, Is.True, "LOCAL VS を選べない（T6-5）");
                 Assert.That(menu.Options.Button.interactable, Is.True, "OPTIONS を選べない（T6-9）");
                 Assert.That(menu.Training.Button.interactable && menu.Quit.Button.interactable, Is.True);

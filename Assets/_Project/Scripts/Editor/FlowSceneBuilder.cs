@@ -340,7 +340,10 @@ namespace Airerage.Editor
             StageSelectScreen stageSelect = CreateStageSelect(canvas.transform);
             OptionsScreen options = OptionsUiBuilder.Create(canvas.transform, LoadInputActions());
 
+            CpuLevelScreen cpuLevel = CreateCpuLevel(canvas.transform);
+
             var screens = canvas.gameObject.AddComponent<MenuScreens>();
+            SandboxWireSceneBuilder.SetReference(screens, "_cpuLevel", cpuLevel);
             SandboxWireSceneBuilder.SetReference(screens, "_characterSelect", characterSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_stageSelect", stageSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_optionsScreen", options);
@@ -358,6 +361,30 @@ namespace Airerage.Editor
             }
             SandboxWireSceneBuilder.CreateVersionLabel();
             Save(scene, MenuScenePath);
+        }
+
+        // シングルモードの CPU の強さ（docs/16 T7-2）: 左に EASY・NORMAL・HARD の札、右に説明。
+        private static CpuLevelScreen CreateCpuLevel(Transform canvas)
+        {
+            RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CpuLevel");
+            MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.42f, 1f));
+            MenuUiBuilder.CreateText(panel, "Title", "CPU LEVEL", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
+            string[] labels = { "EASY", "NORMAL", "HARD" };
+            var options = new Object[labels.Length];
+            for (int i = 0; i < labels.Length; i++)
+            {
+                options[i] = MenuUiBuilder.CreateMenuItem(panel, $"Level{labels[i]}", labels[i], new Vector2(0f, 1f),
+                    new Vector2(110f, -230f - i * 88f), new Vector2(560f, 72f));
+            }
+            MenuUiBuilder.CreateText(panel, "Description", "YOU + 3 CPUs.  The CPUs pick random characters.", 30, FontStyle.Bold,
+                TextAnchor.MiddleLeft, new Vector2(1f, 0.6f), new Vector2(-80f, 0f), new Vector2(900f, 60f), new Color(1f, 1f, 1f, 0.85f));
+            MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            var screen = panel.gameObject.AddComponent<CpuLevelScreen>();
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
+            panel.gameObject.SetActive(false);
+            return screen;
         }
 
         // ステージ選択（docs/15 T6-4）: 左にステージの札を縦に並べ、右にカーソルのあるステージの名前と説明（ステージの色の帯）。

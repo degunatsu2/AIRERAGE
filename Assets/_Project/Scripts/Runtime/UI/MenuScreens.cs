@@ -16,7 +16,7 @@ namespace Airerage.Runtime.UI
     /// メニューのシーンの画面（docs/15 T6-1。D-54、D-65、D-69）:
     /// - タイトル: 「AIRERAGE」と「PRESS ANY BUTTON」（どれかのキー・ボタンでメインメニューへ。最初の 1 回だけ）。Esc では終了の確認
     ///   （QuitConfirmDialog。ユーザーの要望、2026-10-20）を出す。メインメニューの QUIT も、終了の確認で「はい」を選んだら終える。
-    /// - メインメニュー: SINGLE（Phase 7 の CPU まで選べない）、LOCAL VS、NETWORK VS、TRAINING、OPTIONS、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
+    /// - メインメニュー: SINGLE、LOCAL VS、NETWORK VS、TRAINING、OPTIONS、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
     /// - TRAINING → キャラクター選択（T6-3）→ ステージ選択（T6-4）→ トレーニング。戻る操作で 1 つ前の画面へ。選んだキャラクターは
     ///   覚えておき（PlayerPrefs。オンラインの待機所と同じ）、トレーニングの試合の仕組みがそのキャラクターで始める。
     /// - キャラクター選択はアイコンを選ぶ形（CharacterSelectScreen。トレーニングは 1P だけ、ローカル対戦は機器ごとに参加。docs/15 6.9）。
@@ -25,6 +25,9 @@ namespace Airerage.Runtime.UI
     /// - LOCAL VS → 参加とキャラクター選択（T6-5）→ ステージ選択 → ローカル対戦。ステージ選択から戻ると、参加した人は
     ///   そのまま（READY だけ外す）。
     /// - OPTIONS → オプションの画面（OptionsScreen。音量・画面・キーの割り当て。docs/15 T6-9）。閉じるとメインメニューの OPTIONS へ。
+    /// - SINGLE（docs/16 T7-2。D-72【仮】）→ キャラクター選択（トレーニングと同じ 1 人の画面）→ CPU の強さ（CpuLevelScreen）→ ステージ選択 →
+    ///   自分＋CPU 3 体のローカル対戦（CPU のキャラクターはランダム。なるべく自分と違うキャラクター）。自分はキーボード＋マウスとどの
+    ///   ゲームパッドでも操作できる。
     /// 画面の移り変わりは App のシーンの GameFlow に頼む（App のシーンから始めないと、試合へは移らない）。
     /// </summary>
     public sealed class MenuScreens : MonoBehaviour
@@ -42,6 +45,7 @@ namespace Airerage.Runtime.UI
         [SerializeField] private StageSelectScreen _stageSelect;
         [SerializeField] private OptionsScreen _optionsScreen;
         [SerializeField] private QuitConfirmDialog _quitDialog;
+        [SerializeField] private CpuLevelScreen _cpuLevel;
         [Tooltip("ネットワーク対戦のメニュー（IOnlineMenu。なければ、NETWORK VS は今のオンラインの検証用のシーンを開く）")]
         [SerializeField] private MonoBehaviour _online;
 
@@ -50,10 +54,18 @@ namespace Airerage.Runtime.UI
         private float _shownAt;
         private int _selectAtFrame = -1;
         private MenuOption _focus;
-        // ステージ選択の後に始めるもの（トレーニングかローカル対戦）と、ローカル対戦に参加した人。
-        private bool _localMode;
+        // ステージ選択の後に始めるもの（トレーニング・ローカル対戦・シングルモード）と、ローカル対戦に参加した人、シングルモードの CPU の強さ。
+        private enum PlayMode
+        {
+            Training,
+            Local,
+            Single,
+        }
+
+        private PlayMode _mode;
         private IReadOnlyList<LocalPlayerSetup> _localPlayers;
         private bool _localTimed = true;
+        private Airerage.Core.Ai.CpuLevel _level = Airerage.Core.Ai.CpuLevel.Normal;
 
         /// <summary>タイトルを出しているか（テスト用）。</summary>
         public bool ShowingTitle => _title != null && _title.activeSelf;
@@ -64,6 +76,11 @@ namespace Airerage.Runtime.UI
         /// <summary>キャラクター選択・ステージ選択を出しているか（テスト用）。</summary>
         public bool ShowingCharacterSelect => _characterSelect != null && _characterSelect.gameObject.activeSelf;
         public bool ShowingStageSelect => _stageSelect != null && _stageSelect.gameObject.activeSelf;
+
+        /// <summary>CPU の強さの画面を出しているか（テスト用）。</summary>
+        public bool ShowingCpuLevel => _cpuLevel != null && _cpuLevel.IsShowing;
+
+        public CpuLevelScreen CpuLevel => _cpuLevel;
 
         /// <summary>オプションの画面を出しているか（テスト用）。</summary>
         public bool ShowingOptions => _optionsScreen != null && _optionsScreen.IsShowing;
@@ -89,13 +106,23 @@ namespace Airerage.Runtime.UI
         {
             if (_title == null || _main == null || _single == null || _local == null || _network == null || _training == null
                 || _options == null || _quit == null || _characterSelect == null || _stageSelect == null || _optionsScreen == null
-                || _quitDialog == null)
+                || _quitDialog == null || _cpuLevel == null)
             {
                 Debug.LogError($"{name}: 画面か項目が設定されていません", this);
                 enabled = false;
                 return;
             }
-            _single.SetAvailable(false, "COMING SOON (CPU)");
+            _single.Clicked.AddListener(() =>
+            {
+                _mode = PlayMode.Single;
+                ShowCharacterSelect();
+            });
+            _cpuLevel.Confirmed += level =>
+            {
+                _level = level;
+                ShowStageSelect();
+            };
+            _cpuLevel.Cancelled += ShowCharacterSelect;
             _options.Clicked.AddListener(() =>
             {
                 HideAll();
@@ -116,12 +143,12 @@ namespace Airerage.Runtime.UI
             });
             _training.Clicked.AddListener(() =>
             {
-                _localMode = false;
+                _mode = PlayMode.Training;
                 ShowCharacterSelect();
             });
             _local.Clicked.AddListener(() =>
             {
-                _localMode = true;
+                _mode = PlayMode.Local;
                 ShowLocalJoin(true);
             });
             _characterSelect.LocalConfirmed += (players, timed) =>
@@ -133,14 +160,21 @@ namespace Airerage.Runtime.UI
             _characterSelect.Confirmed += index =>
             {
                 PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, index);
-                ShowStageSelect();
+                if (_mode == PlayMode.Single)
+                {
+                    ShowCpuLevel();
+                }
+                else
+                {
+                    ShowStageSelect();
+                }
             };
             _characterSelect.Cancelled += () =>
             {
                 // ネットワーク対戦のキャラクター選択の「戻る」は、ネットワーク対戦のメニューが受け持つ。
                 if (_characterSelect.Mode == CharacterSelectScreen.SelectMode.Single)
                 {
-                    ShowMain(_training);
+                    ShowMain(_mode == PlayMode.Single ? _single : _training);
                 }
                 else if (_characterSelect.Mode == CharacterSelectScreen.SelectMode.Local)
                 {
@@ -156,13 +190,17 @@ namespace Airerage.Runtime.UI
                 {
                     return;
                 }
-                if (_localMode)
+                switch (_mode)
                 {
-                    flow.StartLocal(stage, _localPlayers, _localTimed);
-                }
-                else
-                {
-                    flow.StartTraining(stage);
+                    case PlayMode.Local:
+                        flow.StartLocal(stage, _localPlayers, _localTimed);
+                        break;
+                    case PlayMode.Single:
+                        flow.StartLocal(stage, SinglePlayers(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0)), true, single: true);
+                        break;
+                    default:
+                        flow.StartTraining(stage);
+                        break;
                 }
             });
             _stageSelect.Cancelled += () =>
@@ -171,13 +209,17 @@ namespace Airerage.Runtime.UI
                 {
                     return;
                 }
-                if (_localMode)
+                switch (_mode)
                 {
-                    ShowLocalJoin(false);
-                }
-                else
-                {
-                    ShowCharacterSelect();
+                    case PlayMode.Local:
+                        ShowLocalJoin(false);
+                        break;
+                    case PlayMode.Single:
+                        ShowCpuLevel();
+                        break;
+                    default:
+                        ShowCharacterSelect();
+                        break;
                 }
             };
             _quit.Clicked.AddListener(() => _quitDialog.Show(() => ShowMain(_quit)));
@@ -195,6 +237,7 @@ namespace Airerage.Runtime.UI
             {
                 Debug.LogWarning($"{name}: GameFlow がありません（App のシーンから始めてください）。項目を選んでも画面は移りません", this);
             }
+            bool selectReturn = _flow != null && _flow.ConsumeLocalSelectReturn();
             if (Online != null && Online.IsConnected)
             {
                 // つながったまま試合から戻った（ネットワーク対戦のメニューが、今の段階の画面を出す）。
@@ -202,11 +245,18 @@ namespace Airerage.Runtime.UI
                 _flow?.MarkTitlePassed();
                 Online.Open();
             }
-            else if (_flow != null && _flow.ConsumeLocalSelectReturn())
+            else if (selectReturn && _flow.LocalSingle)
+            {
+                // シングルモードの結果の「キャラクター選択へ」（docs/16 T7-2）。
+                _flow.MarkTitlePassed();
+                _mode = PlayMode.Single;
+                ShowCharacterSelect();
+            }
+            else if (selectReturn)
             {
                 // ローカル対戦の結果の「キャラクター選択へ」（同じ人とキャラクターで。docs/15 T6-8）。
                 _flow.MarkTitlePassed();
-                _localMode = true;
+                _mode = PlayMode.Local;
                 HideAll();
                 if (EventSystem.current != null)
                 {
@@ -321,6 +371,51 @@ namespace Airerage.Runtime.UI
             _characterSelect.ShowLocal(reset);
         }
 
+        private void ShowCpuLevel()
+        {
+            HideAll();
+            _cpuLevel.Show();
+        }
+
+        /// <summary>
+        /// シングルモードの参加者（docs/16 T7-2）: 自分（キーボード＋マウスとすべてのゲームパッド。キャラクター character）と CPU 3 体
+        /// （今の強さ。キャラクターはランダムで、なるべく自分とも互いとも違うもの）。
+        /// </summary>
+        public List<LocalPlayerSetup> SinglePlayers(int character)
+        {
+            var devices = new List<InputDevice>();
+            if (Keyboard.current != null)
+            {
+                devices.Add(Keyboard.current);
+            }
+            if (Mouse.current != null)
+            {
+                devices.Add(Mouse.current);
+            }
+            devices.AddRange(Gamepad.all);
+            var players = new List<LocalPlayerSetup> { new LocalPlayerSetup(devices.ToArray(), "KEYBOARD / GAMEPAD", character) };
+            int count = Math.Max(1, _characterSelect.Count);
+            var pool = new List<int>();
+            for (int i = 0; i < count; i++)
+            {
+                if (i != character)
+                {
+                    pool.Add(i);
+                }
+            }
+            for (int k = 0; k < 3; k++)
+            {
+                if (pool.Count == 0)
+                {
+                    pool.Add(UnityEngine.Random.Range(0, count));
+                }
+                int pick = UnityEngine.Random.Range(0, pool.Count);
+                players.Add(LocalPlayerSetup.Cpu(pool[pick], _level));
+                pool.RemoveAt(pick);
+            }
+            return players;
+        }
+
         private void ShowStageSelect()
         {
             HideAll();
@@ -333,6 +428,7 @@ namespace Airerage.Runtime.UI
             _main.SetActive(false);
             _characterSelect.Hide();
             _stageSelect.Hide();
+            _cpuLevel.Hide();
             _optionsScreen.Hide();
             _quitDialog.Hide();
             _selectAtFrame = -1;

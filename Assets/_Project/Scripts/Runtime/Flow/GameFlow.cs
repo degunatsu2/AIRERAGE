@@ -11,7 +11,7 @@ namespace Airerage.Runtime.Flow
     /// - メニュー: メニューのシーン（タイトル、メインメニュー）＋背景のステージ（ステージの一覧の最初）。
     /// - トレーニング: 選んだステージのシーン＋トレーニングの試合の仕組みのシーン（ステージを先に読み込む。実行がステージの物を探すため）。
     /// - ローカル対戦（T6-5）: 選んだステージのシーン＋ローカル対戦の試合の仕組みのシーン。参加した人（機器とキャラクター）と、時間の
-    ///   制限を渡す（LocalPlayers、LocalTimed）。
+    ///   制限を渡す（LocalPlayers、LocalTimed）。シングルモード（自分＋CPU。docs/16 T7-2）も同じ試合の仕組みで、CPU の人を入れる（LocalSingle）。
     /// - ネットワーク対戦（T6-7）: 接続とロビー（待機所、キャラクター選択、ステージ選択）はメニューのシーンで行い、試合は選んだ
     ///   ステージのシーン＋ネットワーク対戦の試合の仕組みのシーン（StartOnlineMatch）。接続は App のシーンの OnlineConnection が持つ。
     ///   検証用のシーン（Sandbox_Online）は StartOnline で開ける（メニューからは使わない）。
@@ -68,6 +68,11 @@ namespace Airerage.Runtime.Flow
 
         /// <summary>ローカル対戦を時間の制限ありで始めるか。</summary>
         public bool LocalTimed { get; private set; } = true;
+
+        /// <summary>
+        /// 今のローカル対戦がシングルモード（自分＋CPU。docs/16 T7-2）か。結果の「キャラクター選択へ」で、シングルモードのキャラクター選択へ戻る。
+        /// </summary>
+        public bool LocalSingle { get; private set; }
 
         /// <summary>今読み込んでいる、画面のシーンの名前（テスト用）。</summary>
         public IReadOnlyList<string> LoadedScenes => _loaded;
@@ -195,8 +200,11 @@ namespace Airerage.Runtime.Flow
             Go(FlowScreen.Training, stage, stage.SceneName, _trainingScene);
         }
 
-        /// <summary>ローカル対戦を始める（stage のシーンに、ローカル対戦の試合の仕組みを重ねる。参加した人と時間の制限を渡す）。</summary>
-        public void StartLocal(StageDefinition stage, IReadOnlyList<LocalPlayerSetup> players, bool timed)
+        /// <summary>
+        /// ローカル対戦を始める（stage のシーンに、ローカル対戦の試合の仕組みを重ねる。参加した人と時間の制限を渡す）。single ならシングルモード
+        /// （CPU の人は LocalPlayerSetup.Cpu）。
+        /// </summary>
+        public void StartLocal(StageDefinition stage, IReadOnlyList<LocalPlayerSetup> players, bool timed, bool single = false)
         {
             if (IsLoading)
             {
@@ -206,6 +214,7 @@ namespace Airerage.Runtime.Flow
             _localPlayers.Clear();
             _localPlayers.AddRange(players);
             LocalTimed = timed;
+            LocalSingle = single;
             stage = stage != null ? stage : _stages.Get(0);
             Go(FlowScreen.Local, stage, stage.SceneName, _localScene);
         }
