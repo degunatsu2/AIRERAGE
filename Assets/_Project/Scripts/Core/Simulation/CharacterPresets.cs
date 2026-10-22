@@ -658,7 +658,7 @@ namespace Airerage.Core.Simulation
                 TotalTicks = 34,
                 WireCancelFromTick = 7,
                 ExclusiveHits = true,
-                FatalOnlyByCritical = true,
+                NoSpeedBonus = true,
                 Hits = new[]
                 {
                     // 指先のクリティカル判定（出た瞬間だけ。相手の体の中心に重なったときだけ当たる）。
@@ -683,6 +683,8 @@ namespace Airerage.Core.Simulation
                 Name = "STOMP",
                 TotalTicks = 32,
                 WireCancelFromTick = 8,
+                // 当たったら反動で跳び、そこで攻撃を終える（跳んだ後に降下の動きが残らないように。ユーザーの指摘、2026-10-22）。
+                EndsOnHit = true,
                 Hits = new[]
                 {
                     new AttackHit
@@ -694,15 +696,16 @@ namespace Airerage.Core.Simulation
                 Motions = new[]
                 {
                     new AttackMotion { StartTick = 4, Ticks = 12, VelocityX = 0f, VelocityY = -18f },
-                    // 当たったら、反動で真上に跳ぶ。
-                    new AttackMotion { StartTick = 6, Ticks = 8, VelocityX = 0f, VelocityY = 16f, RequiresHit = true },
+                    // 当たったら、反動で真上に跳ぶ（EndsOnHit で 1 回だけつける）。
+                    new AttackMotion { StartTick = 6, Ticks = 1, VelocityX = 0f, VelocityY = 16f, RequiresHit = true },
                 },
             };
 
             combat.AirUp = new AttackData
             {
                 Name = "THUNDER FLIP",
-                TotalTicks = 26,
+                // 後隙を長く（続けて出しても少しずつ上がり続けないように。ユーザーの指摘、2026-10-22）。
+                TotalTicks = 38,
                 WireCancelFromTick = 6,
                 ExclusiveHits = true,
                 Hits = new[]
@@ -738,7 +741,7 @@ namespace Airerage.Core.Simulation
                 WireCancelFromTick = 4,
                 HoldMaxTicks = 600,
                 ChargedFromTicks = 10,
-                AimFromMove = true,
+                AimTurnsFacing = true,
                 ChainMax = 3,
                 ChainWindowTicks = 180,
                 Hits = new[]
@@ -756,7 +759,7 @@ namespace Airerage.Core.Simulation
                 },
                 Motions = new[]
                 {
-                    // 移動の入力の方向へ: 短く（3.6m）、長押しなら長く（8m）。
+                    // 照準の方向へ: 短く（3.6m）、長押しなら長く（8m）。
                     new AttackMotion { StartTick = 0, Ticks = 9, VelocityX = 24f, AlongAim = true, Charge = ChargeFilter.Tapped },
                     new AttackMotion { StartTick = 0, Ticks = 16, VelocityX = 30f, AlongAim = true, Charge = ChargeFilter.Charged },
                 },

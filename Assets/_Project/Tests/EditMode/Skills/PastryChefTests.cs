@@ -447,6 +447,7 @@ namespace Airerage.Core.Tests.Skills
 
         [TestCase(8f, false, TestName = "低い所から落とすと FATAL ではない")]
         [TestCase(34f, true, TestName = "高い所から落とすと FATAL")]
+        [TestCase(14f, true, TestName = "10m ほど落とせば FATAL（前は約 26m 要った。2026-10-22）")]
         public void DigitalScale_GetsHeavierTheLongerItFalls(float height, bool fatal)
         {
             SimWorld world = AirWorld(CharacterPresets.PastryChef(), new Vector3(0f, height, 0f), new Vector3(0f, GroundY, 0f));

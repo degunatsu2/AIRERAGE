@@ -22,8 +22,9 @@ namespace Airerage.Core.Combat
         /// spawns はキャラクターごとの出現したときの状態（同じ番号・同じ数）。knockouts を渡すと、このティックの撃破を番号の順に加える
         /// （撃破ドロップに使う。docs/12 T4-6）。
         /// </summary>
+        /// configs を渡すと、続けて出している途中の連続技（イナズマステップ）を撃破で終え、出した回数のクールタイムを数え始める。
         public static void Resolve(List<CharacterState> states, IReadOnlyList<CharacterState> spawns, StageBounds bounds, MatchRules rules,
-            List<KnockoutRecord> knockouts = null)
+            List<KnockoutRecord> knockouts = null, IReadOnlyList<CharacterConfig> configs = null)
         {
             for (int i = 0; i < states.Count; i++)
             {
@@ -40,7 +41,7 @@ namespace Airerage.Core.Combat
                 }
                 knockouts?.Add(new KnockoutRecord(i, state.Combat.HasLastAttacker ? state.Combat.LastAttacker : -1,
                     new Vector2(state.Position.X, state.Position.Y)));
-                states[i] = Respawn(states[i], spawns[i], rules);
+                states[i] = Respawn(states[i], spawns[i], rules, configs != null ? configs[i].Combat : null);
             }
         }
 
@@ -68,7 +69,7 @@ namespace Airerage.Core.Combat
         /// コイン、まだ払っていないダメージ報酬の元を引き継ぐ。
         /// 無敵は、待つ間と復帰した後の両方の長さにする。
         /// </summary>
-        private static CharacterState Respawn(in CharacterState state, in CharacterState spawn, MatchRules rules)
+        private static CharacterState Respawn(in CharacterState state, in CharacterState spawn, MatchRules rules, CombatTuning combat)
         {
             CharacterState respawned = spawn;
             respawned.Combat.Knockouts = state.Combat.Knockouts;
@@ -88,7 +89,14 @@ namespace Airerage.Core.Combat
             // 攻撃の番号は増え続ける（壊せる物に、前の攻撃と同じ番号で当たらないように）。効果が続いている技（セーフティボックスなど）の
             // 止めているクールタイムは残す（撃破されても、2 つ目を置けないように）。
             respawned.Combat.AttackSerial = state.Combat.AttackSerial;
-            if (state.Combat.Special1CooldownTicksLeft == CombatState.CooldownWhileActive)
+            if (state.Combat.ChainCount > 0 && combat != null)
+            {
+                // 連続技の途中で撃破された: そこで終え、出した回数のクールタイムを数え始める（止めたままにすると、ずっと ACTIVE で使えなくなる。
+                // ユーザーの指摘、2026-10-22）。
+                respawned.Combat.ChainCount = state.Combat.ChainCount;
+                ActionController.EndChain(ref respawned.Combat, combat);
+            }
+            else if (state.Combat.Special1CooldownTicksLeft == CombatState.CooldownWhileActive)
             {
                 respawned.Combat.Special1CooldownTicksLeft = CombatState.CooldownWhileActive;
             }

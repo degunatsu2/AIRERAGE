@@ -134,10 +134,10 @@ namespace Airerage.Core.Combat
                 jackpot = roll == AttackData.RouletteScales.Length - 1;
                 sources |= PowerSource.Roulette;
             }
-            else if (attacker.Action.Attack == combat.KoAttack)
+            else if (attacker.Action.Attack == combat.KoAttack && !attack.NoSpeedBonus)
             {
                 multiplier *= combat.KoKnockbackScale(attacker.Action.StrikeSpeed);
-                fatal = !attack.FatalOnlyByCritical && attacker.Action.StrikeSpeed >= combat.FatalStrikeSpeed;
+                fatal = attacker.Action.StrikeSpeed >= combat.FatalStrikeSpeed;
                 sources |= PowerSource.KoSpeed;
             }
 

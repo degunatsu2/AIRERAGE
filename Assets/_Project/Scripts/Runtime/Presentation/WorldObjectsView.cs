@@ -126,12 +126,21 @@ namespace Airerage.Runtime.Presentation
             public bool Launched;
             public string Grams = string.Empty;
             public bool Heavy;
+            public LineRenderer[] WaveLines;
             public LineRenderer Spark;
         }
 
         // 雷のジグザグの色。
         private static readonly Color Electric = new Color(1f, 0.95f, 0.4f);
         private static readonly Color ElectricBlue = new Color(0.45f, 0.85f, 1f);
+
+        // 雷の波動の色（青に黄色の縁）と、跳ね方（1 回の跳ねの長さと高さ）、後ろの軌跡の長さ（m）と点の数。
+        private static readonly Color WaveBlue = new Color(0.2f, 0.5f, 1f);
+        private static readonly Color WaveYellow = new Color(1f, 0.86f, 0.15f);
+        private const float WaveHopLength = 2.4f;
+        private const float WaveHopHeight = 0.9f;
+        private const float WaveTrailLength = 3.4f;
+        private const int WavePoints = 20;
 
         /// <summary>クリームの色（オレンジ・抹茶）。</summary>
         public static Color CreamColor(byte flavor)
@@ -605,7 +614,8 @@ namespace Airerage.Runtime.Presentation
                     int grams = PastryRules.ScaleGrams(item, scale, _feed.CurrentTick);
                     shown.Grams = $"{grams}g";
                     shown.Heavy = grams >= scale.FatalGrams;
-                    t.localScale = Vector3.one;
+                    // 見本は当たりの半分の幅 0.6m で作ってある。当たりの大きさに合わせる。
+                    t.localScale = Vector3.one * (scale.HalfWidth / 0.6f);
                     break;
                 }
                 case WorldObjectKind.ShockWave:
@@ -741,6 +751,8 @@ namespace Airerage.Runtime.Presentation
         }
 
         // 雷の波動: 始まりの点から両回りに、進んだ所までジグザグの光（先ほど明るい）。
+        // 雷の波動（ユーザーの要望、2026-10-22: 目立つように、青に黄色の縁で、地面を跳ねるように進む）: 始まりの点から両回りに進む 2 つの
+        // 波の先と、その後ろの跳ねた軌跡（縁から外向きに、WaveHopLength ごとに跳ねる弧）。黄色の太い線の上に、青い細い線を重ねる。
         private void UpdateShockWave(Shown shown, in WorldObject wave)
         {
             shown.Visual.transform.position = Vector3.zero;
@@ -749,25 +761,59 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
+            if (shown.WaveLines == null)
+            {
+                // 線は 4 本（前の縁・前の芯・後ろの縁・後ろの芯）。見本の線（Spark）を複製して使う。
+                shown.WaveLines = new LineRenderer[4];
+                shown.WaveLines[0] = shown.Spark;
+                for (int k = 1; k < shown.WaveLines.Length; k++)
+                {
+                    shown.WaveLines[k] = Instantiate(shown.Spark, shown.Spark.transform.parent);
+                    shown.WaveLines[k].name = "Spark" + k;
+                }
+            }
             InverterTuning tuning = _feed.GetConfig(wave.Owner).Skills.Inverter;
             float travel = ElectricRules.WaveTravel(wave, tuning, _feed.CurrentTick);
-            const int points = 32;
-            LineRenderer line = shown.Spark;
-            line.positionCount = points;
-            int frame = Mathf.FloorToInt(Time.time * 30f);
-            for (int i = 0; i < points; i++)
+            DrawWave(shown.WaveLines[0], shown.WaveLines[1], wave, travel, 1f);
+            DrawWave(shown.WaveLines[2], shown.WaveLines[3], wave, travel, -1f);
+        }
+
+        // 波 1 つ（direction の回り）。縁（edge）は黄色で太く、芯（core）は青く細い。先ほど明るく、後ろへ薄くなる。
+        private static void DrawWave(LineRenderer edge, LineRenderer core, in WorldObject wave, float travel, float direction)
+        {
+            var center = new Vector2((wave.Velocity.X + wave.End.X) * 0.5f, (wave.Velocity.Y + wave.End.Y) * 0.5f);
+            float length = Mathf.Min(WaveTrailLength, travel);
+            edge.positionCount = WavePoints;
+            core.positionCount = WavePoints;
+            for (int i = 0; i < WavePoints; i++)
             {
-                // -travel から +travel まで（真ん中が始まりの点）。
-                float d = Mathf.Lerp(-travel, travel, i / (float)(points - 1));
-                System.Numerics.Vector2 p = ElectricRules.PointAlong(wave, d);
-                float jitter = (Mathf.PerlinNoise(i * 0.9f, frame * 0.41f) - 0.5f) * 0.35f;
-                line.SetPosition(i, new Vector3(p.X, p.Y + jitter, -0.7f));
+                float d = travel - length * i / (WavePoints - 1);
+                System.Numerics.Vector2 p = ElectricRules.PointAlong(wave, direction * d);
+                System.Numerics.Vector2 ahead = ElectricRules.PointAlong(wave, direction * (d + 0.05f));
+                var tangent = new Vector2(ahead.X - p.X, ahead.Y - p.Y);
+                var normal = new Vector2(-tangent.y, tangent.x).normalized;
+                if (Vector2.Dot(normal, new Vector2(p.X, p.Y) - center) < 0f)
+                {
+                    normal = -normal;
+                }
+                float hop = Mathf.Abs(Mathf.Sin(Mathf.PI * d / WaveHopLength)) * WaveHopHeight + 0.12f;
+                var point = new Vector2(p.X, p.Y) + normal * hop;
+                edge.SetPosition(i, new Vector3(point.x, point.y, -0.68f));
+                core.SetPosition(i, new Vector3(point.x, point.y, -0.72f));
             }
+            edge.widthMultiplier = 0.34f;
+            core.widthMultiplier = 0.15f;
+            edge.colorGradient = Fade(WaveYellow);
+            core.colorGradient = Fade(WaveBlue);
+        }
+
+        private static Gradient Fade(Color color)
+        {
             var gradient = new Gradient();
             gradient.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Electric, 0.5f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.35f, 0.5f), new GradientAlphaKey(1f, 1f) });
-            line.colorGradient = gradient;
+                new[] { new GradientColorKey(Color.Lerp(color, Color.white, 0.3f), 0f), new GradientColorKey(color, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.5f), new GradientAlphaKey(0f, 1f) });
+            return gradient;
         }
 
         // ボールライトニング: 放つまでは隠す。脈打つ光と、周りのジグザグ。止まった後は消える前の 1 秒に点滅する。

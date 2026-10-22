@@ -85,6 +85,11 @@ namespace Airerage.Core.Combat
 
                 case ActionKind.Attack:
                     AdvanceAttack(ref state, config);
+                    if (EndOnHit(ref state, config))
+                    {
+                        // 当たって攻撃を終えた。このティックから次の行動ができる。
+                        break;
+                    }
                     if (combat.Get(state.Action.Attack).Run)
                     {
                         if (UpdateRun(ref state, input, config))
@@ -243,9 +248,10 @@ namespace Airerage.Core.Combat
             StartAttack(ref state, slot, combat, input);
             state.Action.Charge = charge;
             AttackData started = combat.Get(slot);
-            if (started.AimFromMove)
+            if (started.AimTurnsFacing)
             {
-                state.Action.Aim = MoveDirection(input, state.Facing, config.Movement.MoveDeadzone);
+                // 照準（マウスポインター。ゲームパッドは右スティックか移動のスティック）の方向へ。向きもそちらへ変える。
+                state.Action.Aim = SkillRules.AimDirection(state.Combat.SkillAim, state.Facing, config.Wire.AimDeadzone);
                 if (MathF.Abs(state.Action.Aim.X) > 0.1f)
                 {
                     state.Facing = state.Action.Aim.X > 0f ? 1 : -1;
@@ -256,13 +262,6 @@ namespace Airerage.Core.Combat
                 AfterChainStep(ref state, combat);
             }
             return true;
-        }
-
-        // 移動の入力の方向（長さ 1。入れていなければ向いている方向の水平）。
-        private static Vector2 MoveDirection(in InputFrame input, int facing, float deadzone)
-        {
-            float length = input.Move.Length();
-            return length >= deadzone && length > 1e-4f ? input.Move / length : new Vector2(facing >= 0 ? 1f : -1f, 0f);
         }
 
         /// <summary>
@@ -300,6 +299,30 @@ namespace Airerage.Core.Combat
             return config.Combat.Get(state.Action.Attack).TotalTicksFor(state.Action.Charge);
         }
 
+        // 当たったら終える攻撃（AttackData.EndsOnHit。SOLDERER のストンピング）: 当たったときの動き（反動）を 1 回つけて、攻撃を終える。
+        private static bool EndOnHit(ref CharacterState state, CharacterConfig config)
+        {
+            AttackData attack = config.Combat.Get(state.Action.Attack);
+            if (!attack.EndsOnHit || !state.Action.Connected)
+            {
+                return false;
+            }
+            float scale = SpeedBoosts.ScaleOf(state, config);
+            foreach (AttackMotion motion in attack.Motions)
+            {
+                if (motion.RequiresHit)
+                {
+                    state.Velocity.X = motion.VelocityX * state.Facing * scale;
+                    state.Velocity.Y = motion.VelocityY * scale;
+                    state.Grounded = state.Grounded && motion.VelocityY <= 0f;
+                    break;
+                }
+            }
+            state.Action = default;
+            state.Combat.AttackCancelUsed = false;
+            return true;
+        }
+
         /// <summary>連続技（AttackData.ChainMax。特殊攻撃 1）の次を、今出せるか（続けて出せる時間の中で、回数が残っている）。</summary>
         public static bool CanChain(in CharacterState state, CombatTuning combat)
         {
@@ -322,8 +345,8 @@ namespace Airerage.Core.Combat
             state.Combat.ChainTicksLeft = attack.ChainWindowTicks;
         }
 
-        // 連続技を終える（出した回数 × クールタイム）。
-        private static void EndChain(ref CombatState combat, CombatTuning tuning)
+        /// <summary>連続技を終える（出した回数 × クールタイム。撃破で終えるときにも使う）。</summary>
+        public static void EndChain(ref CombatState combat, CombatTuning tuning)
         {
             combat.Special1CooldownTicksLeft = Math.Max(1, combat.ChainCount) * tuning.Special1CooldownTicks;
             combat.ChainCount = 0;

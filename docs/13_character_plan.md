@@ -317,9 +317,9 @@
 - **Core**（`Skills/ElectricRules.cs`。調整値は `InverterTuning`・`BallLightningTuning`）:
   - 通常の攻撃: THUNDER KICK（地上技。前後の衝撃波と真上への跳躍）、DISCHARGE（空中 N。体の周りの 4m 四方を 20 ティック）、FINGER SPARK
     （空中横・撃破技。指先のクリティカル判定は出た瞬間の 1 ティックだけで、FATAL・威力と吹き飛び 2.5 倍。速さでは FATAL にならない
-    `FatalOnlyByCritical`。腕の判定は 14 ティック）、STOMP（空中下。当たると反動で真上へ `RequiresHit`）、THUNDER FLIP（空中上。3 つの判定で弧）。
+    3.19 で速さの倍率もなくした `NoSpeedBonus`。腕の判定は 14 ティック）、STOMP（空中下。当たると反動で真上へ `RequiresHit`）、THUNDER FLIP（空中上。3 つの判定で弧）。
   - Q イナズマステップ: 長押しの技で、ためた長さ 10 ティックで短押し・長押しを分ける（判定と動きの `ChargeFilter`、全体の長さ
-    `ChargedTotalTicks`）。向きは出したときの移動の入力（`AimFromMove`。動きは `AttackMotion.AlongAim`）。続けて 3 回まで（`ChainMax`。
+    `ChargedTotalTicks`）。向きは出したときの照準（3.19 で移動の入力から変えた。`AimTurnsFacing`。動きは `AttackMotion.AlongAim`）。続けて 3 回まで（`ChainMax`。
     次を出せる時間 `ChainWindowTicks` = 3 秒は出すたびに戻る）。回数を使い切るか、長押しで出すか、時間が切れたら終わり、使った回数 × 6 秒の
     クールタイム（`ActionController.AfterChainStep`・`EndChain`）。
   - E インバータ: 切り替え（`CombatState.InverterOn`）。オンの間はワイヤーの射程が 1/3（`SpeedBoosts.EffectiveConfig`）。外れたワイヤーの
@@ -336,6 +336,31 @@
   （`SkillHud`）、音（感電 `Zap`、雷の波動 `Thunder`）。鞭の間は MISS・BLOCK! を出さない。衣装（`CostumeBuilder`: 紺の作業着と胸の稲妻、
   ゴーグル、背中のバッテリー）、ロゴ（`CharacterLogoPainter.Solderer`: 電気の水色の稲妻）、キャラクター選択の文（`CharacterProfiles`）。
   一覧の最後（6 体目）。
+
+### 3.19 PASTRY CHEF と SOLDERER の修正（ユーザーの要望、2026-10-22。値はすべて【仮】）
+
+- **PASTRY CHEF**:
+  - 地上技（SPATULA SPIN）: 体が回る技でも、緑の風（竜巻）のエフェクトは出さない。竜巻は Q が速さの強化（STORM RUNNER）のキャラクターだけ
+    （`BoostAuraView`）。
+  - 空中下（DIGITAL SCALE）: 落ちる秒数 × 1200 g ずつ増え（前は 700 g）、100 g ごとに威力と吹き飛びが +25%（前は +15%。上限 +400%）。
+    1000 g の FATAL まで約 0.75 秒・約 9m の落下（前は約 1.3 秒・約 26m）。スケールを大きくした（幅 1.7m・高さ 1m。前は 1.2m・0.7m。
+    当たり・地形とのぶつかり・見た目）。`SkillTuning.ScaleTuning`。
+- **SOLDERER**:
+  - 空中上（THUNDER FLIP）: 全体を 26 → 38 ティックに伸ばした。出し続けると、1 回ごとに上がる速さより、後隙の間に重力で落ちる分が大きくなり、
+    少しずつ下がる（前は 1 回ごとに少し上がり、無限に上昇できた）。
+  - 空中横（FINGER SPARK）: 撃破技でも、打つ直前の速さで威力・吹き飛びが上がらないようにし、速さでの FATAL もない（`AttackData.NoSpeedBonus`。
+    前の `FatalOnlyByCritical` は FATAL だけを止めていて、倍率は残っていた）。FATAL と大きな威力は指先のクリティカルだけ。撃破技に速さの
+    係数がかかるかどうかは技（キャラクター）ごとに決める（ユーザーの指摘。[02](02_open_decisions.md) D-38 の追記）。
+  - 空中下（STOMP）: 当たったら攻撃をその場で終わらせ、反動で真上へ跳ぶ（`AttackData.EndsOnHit`。`ActionController.EndOnHit`）。前は跳ねた後も
+    攻撃の動きが残り、すぐ下向きに動いていた。終わった後は落ちる・ジャンプ・攻撃・ワイヤーが自由。
+  - Q（イナズマステップ）:
+    - 不具合: 続きを使い切る前に撃破されると、札が「ACTIVE」のままで試合の終わりまで使えなかった。原因は、リスポーンで続きの回数
+      （`ChainCount`）が消えるのに「使っている間」のクールタイムの印が残っていたこと。撃破されたら、その時点で続きを終わらせ、使った回数の
+      クールタイムを始める（`KnockoutResolver.Respawn` が `ActionController.EndChain` を呼ぶ）。
+    - 向き: 移動の入力の方向ではなく、照準（マウスポインター・右スティック）の方向へ突撃する（`AttackData.AimTurnsFacing`。照準の左右に
+      向きも変える）。キャラクター選択の説明も「照準の方向へ」にした。
+  - E（インバータ）の雷の波動: 青い芯と黄色の縁の線にし、地面の上を跳ねるように（2.4m ごとに高さ 0.9m の弧）進む（`WorldObjectsView`。
+    判定は今までどおり箱の縁）。尾を引く 3.4m の線が両方向へ進む。
 
 ## 4. 確認したいこと
 
@@ -482,3 +507,14 @@ SPACE TRAVELER:
    振り回せて当たるか（相手が一瞬止まる）。オンのまま足場につなぐと、雷が足場の縁を一周し、触れたダミーが 1 秒感電するか（円形のゲージ）。
 5. R: 電気の球を 3 つ、それぞれマウスの方向へ撃てるか。壁で跳ね返り、止まって 5 秒残り、触れると感電するか。
 6. 数値（射程 1/3、感電 1 秒、鞭の威力 5、球の速さと距離、ゲージ 90%）の感じ。変えたい値があれば教えてほしい。
+
+## 17. 操作での確認（ユーザー。3.19 の修正）
+
+1. PASTRY CHEF の地上技: 回っても緑の風が出ないか。
+2. PASTRY CHEF の空中下: スケールが大きくなり、前より短い落下（約 9m）で赤く脈打って FATAL になるか。威力の伸びの感じ。
+3. SOLDERER の空中上: 出し続けても上がり続けず、少しずつ下がるか。後隙が長すぎないか。
+4. SOLDERER の空中横: 速く飛びながら当てても威力・吹き飛びが変わらないか（指先のクリティカルだけ FATAL）。
+5. SOLDERER の空中下: 当たって跳ねた後、すぐ下がらずに上へ跳ぶか。そのまま次の行動ができるか。
+6. SOLDERER の Q: 続きを残したまま撃破されても、リスポーン後に札がクールタイムを数え、使えるようになるか。マウスの方向へ突撃するか
+   （移動のキーを押していなくても）。
+7. SOLDERER の E: 足場につないだときの雷の波動が、青に黄色の縁で、地面を跳ねながら進んで見えるか。

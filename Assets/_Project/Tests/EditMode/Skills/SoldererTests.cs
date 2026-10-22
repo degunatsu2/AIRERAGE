@@ -98,11 +98,26 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
-        public void FingerSpark_IsNotFatalBySpeed()
+        public void FingerSpark_HasNoSpeedBonus()
         {
+            // 撃破技の速さの係数はキャラクター固有。SOLDERER の撃破技は速さで強くならない（ユーザーの指摘、2026-10-22）。
             var state = new CharacterState { Action = new ActionState { Kind = ActionKind.Attack, Attack = AttackSlot.AirSide, StrikeSpeed = 40f } };
             Assert.That(AttackPower.Of(state, 0, Sol, 0).Fatal, Is.False, "速さで FATAL になった");
-            Assert.That(AttackPower.Of(state, 0, Sol, 0).Multiplier, Is.GreaterThan(1f), "撃破技の速さの倍率がない");
+            Assert.That(AttackPower.Of(state, 0, Sol, 0).Multiplier, Is.EqualTo(1f), "速さで強くなっている");
+        }
+
+        [Test]
+        public void ThunderFlip_Repeated_DoesNotClimbForever()
+        {
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, 20f, 0f));
+            float start = world.GetState(0).Position.Y;
+            int length = Sol.Combat.AirUp.TotalTicks;
+            for (int k = 0; k < 8; k++)
+            {
+                Step(world, 1, Press(InputButtons.Attack, 0f, 1f));
+                Step(world, length);
+            }
+            Assert.That(world.GetState(0).Position.Y, Is.LessThan(start - 2f), "続けて出すと上がり続ける");
         }
 
         [Test]
@@ -119,6 +134,49 @@ namespace Airerage.Core.Tests.Skills
             }
             Assert.That(world.GetState(1).Combat.HasLastAttacker, Is.True, "踏みつけが当たらない");
             Assert.That(rise, Is.GreaterThan(10f), "反動で跳ばない");
+        }
+
+        [Test]
+        public void Stomp_EndsTheAttackOnHit_SoTheBounceIsNotCutShort()
+        {
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, 4.5f, 0f), new Vector3(0f, GroundY, 0f));
+            Step(world, 1, Press(InputButtons.Attack, 0f, -1f));
+            int t = 0;
+            while (!world.GetState(1).Combat.HasLastAttacker && t++ < 40)
+            {
+                Step(world, 1);
+            }
+            Assert.That(world.GetState(1).Combat.HasLastAttacker, Is.True, "前提: 踏みつけが当たる");
+            // ヒットストップが終わったら、攻撃は終わって上へ跳んでいる（降下の動きが残っていない）。
+            Step(world, Sol.Combat.AirDown.Hits[0].HitstopTicks + 2);
+            CharacterState after = world.GetState(0);
+            Assert.That(after.Action.Kind, Is.EqualTo(ActionKind.Free), "当たっても攻撃が終わらない");
+            Assert.That(after.Velocity.Y, Is.GreaterThan(8f), "反動で跳んでいない");
+            float top = after.Position.Y;
+            for (int k = 0; k < 20; k++)
+            {
+                Step(world, 1);
+                top = System.Math.Max(top, world.GetState(0).Position.Y);
+            }
+            Assert.That(top, Is.GreaterThan(after.Position.Y + 1.5f), "跳んだ後すぐに降下する");
+        }
+
+        [Test]
+        public void KnockedOutDuringTheChain_StartsTheCooldown_InsteadOfStayingActive()
+        {
+            var world = new SimWorld(TestArenas.Ground(), new StageBounds(-50f, -20f, 50f, 40f));
+            world.AddCharacter(CharacterPresets.Solderer(), new Vector3(0f, GroundY, 0f));
+            Step(world, 2);
+            TapStep(world, 1f, 0f);
+            Assert.That(world.GetState(0).Combat.Special1CooldownTicksLeft, Is.EqualTo(CombatState.CooldownWhileActive), "前提: 続きを出せる");
+            Edit(world, 0, s => { s.Position = new Vector3(0f, -30f, 0f); return s; });
+            Step(world, 1);
+            CharacterState knocked = world.GetState(0);
+            Assert.That(knocked.Combat.Falls, Is.EqualTo(1), "前提: 撃破された");
+            Assert.That(knocked.Combat.ChainCount, Is.Zero);
+            Assert.That(knocked.Combat.Special1CooldownTicksLeft, Is.EqualTo(360), "撃破されたら、出した回数（1 回）のクールタイムにならない");
+            Step(world, world.Rules.RespawnDelayTicks + 360 + 5);
+            Assert.That(ActionController.CanUse(world.GetState(0), AttackSlot.Special1, Sol.Combat), Is.True, "クールタイムの後も使えない");
         }
 
         // Q を短く押す（移動の入力 x、y と一緒に）。
@@ -145,6 +203,19 @@ namespace Airerage.Core.Tests.Skills
             CharacterState third = world.GetState(0);
             Assert.That(third.Combat.ChainCount, Is.Zero, "3 回で終わらない");
             Assert.That(third.Combat.Special1CooldownTicksLeft, Is.InRange(3 * 360 - 20, 3 * 360), "3 回分（18 秒）のクールタイムでない");
+        }
+
+        [Test]
+        public void InazumaStep_GoesTowardThePointer_NotTheMoveInput()
+        {
+            // マウスポインターの方向へ（移動のキーとは逆でも。ユーザーの要望、2026-10-22）。
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f));
+            Step(world, 2);
+            Step(world, 1, Press(InputButtons.Special1, 1f, 0f).WithAim(new Vector2(-1f, 0f)));
+            Step(world, 1, Press(InputButtons.None, 1f, 0f).WithAim(new Vector2(-1f, 0f)));
+            Step(world, 14);
+            Assert.That(world.GetState(0).Position.X, Is.LessThan(-2.5f), "ポインターの方向へ突撃しない");
+            Assert.That(world.GetState(0).Facing, Is.EqualTo(-1), "ポインターの方を向かない");
         }
 
         [Test]

@@ -572,17 +572,20 @@ namespace Airerage.Core.Skills
         public float MaxFallSpeed = 34f;
 
         /// <summary>当たりの大きさ（半分。m）。</summary>
-        public float HalfWidth = 0.6f;
-        public float HalfHeight = 0.35f;
+        public float HalfWidth = 0.85f;
+        public float HalfHeight = 0.5f;
 
-        /// <summary>グラム数: 落とした瞬間 BaseGrams、1 秒ごとに GramsPerSecond 増える。FatalGrams 以上で当てると FATAL。</summary>
+        /// <summary>
+        /// グラム数: 落とした瞬間 BaseGrams、1 秒ごとに GramsPerSecond 増える。FatalGrams 以上で当てると FATAL（約 0.75 秒・9m の落下で FATAL。
+        /// ユーザーの要望で短くした、2026-10-22。前は約 1.3 秒・26m）。
+        /// </summary>
         public int BaseGrams = 100;
-        public int GramsPerSecond = 700;
+        public int GramsPerSecond = 1200;
         public int FatalGrams = 1000;
 
-        /// <summary>100 グラムごとの威力と吹き飛びの上乗せ（%）と、上乗せの上限（%）。</summary>
-        public int BonusPercentPer100Grams = 15;
-        public int MaxBonusPercent = 300;
+        /// <summary>100 グラムごとの威力と吹き飛びの上乗せ（%）と、上乗せの上限（%）。ユーザーの要望で増え方を上げた（15 → 25%、2026-10-22）。</summary>
+        public int BonusPercentPer100Grams = 25;
+        public int MaxBonusPercent = 400;
 
         /// <summary>落ちて当たったときの判定のデータ（位置・大きさ・出る時間は使わない）。吹き飛びは下向き。</summary>
         public AttackHit Hit = new AttackHit

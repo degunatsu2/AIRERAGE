@@ -89,11 +89,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 42
         WireCancelFromTick: 20
@@ -173,11 +174,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 1
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 28
         WireCancelFromTick: 6
@@ -227,11 +229,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 28
         WireCancelFromTick: 6
@@ -320,11 +323,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 1
         TotalTicks: 26
         WireCancelFromTick: 6
@@ -358,11 +362,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 26
         WireCancelFromTick: 10
@@ -387,11 +392,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 12
         WireCancelFromTick: 2
@@ -412,11 +418,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 18
         WireCancelFromTick: 4
@@ -435,11 +442,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 56
         WireCancelFromTick: 44
@@ -659,13 +667,13 @@ MonoBehaviour:
         OffsetY: -1.2
         Gravity: 32
         MaxFallSpeed: 34
-        HalfWidth: 0.6
-        HalfHeight: 0.35
+        HalfWidth: 0.85
+        HalfHeight: 0.5
         BaseGrams: 100
-        GramsPerSecond: 700
+        GramsPerSecond: 1200
         FatalGrams: 1000
-        BonusPercentPer100Grams: 15
-        MaxBonusPercent: 300
+        BonusPercentPer100Grams: 25
+        MaxBonusPercent: 400
         Hit:
           StartTick: 5
           ActiveTicks: 3

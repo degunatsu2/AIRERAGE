@@ -111,7 +111,7 @@ namespace Airerage.Core.Combat
         public bool RequiresHit;
 
         /// <summary>
-        /// 技の向き（ActionState.Aim。AttackData.AimFromMove なら移動の入力の方向）へ VelocityX の速さで動く（VelocityY は使わない。
+        /// 技の向き（ActionState.Aim。AttackData.AimTurnsFacing なら照準の方向）へ VelocityX の速さで動く（VelocityY は使わない。
         /// SOLDERER のイナズマステップ）。
         /// </summary>
         public bool AlongAim;
@@ -235,8 +235,11 @@ namespace Airerage.Core.Combat
         /// <summary>長押しで出したときの全体の長さ（ティック。0 なら TotalTicks）。</summary>
         public int ChargedTotalTicks;
 
-        /// <summary>技の向き（ActionState.Aim）を、照準ではなく、出したときの移動の入力の方向にする（入れていなければ向いている方向）。</summary>
-        public bool AimFromMove;
+        /// <summary>
+        /// 技の向き（ActionState.Aim）を、出したときの照準（マウスポインター。ゲームパッドは右スティックか移動のスティック）の方向の長さ 1 に
+        /// し、向きもそちらへ変える（照準がなければ向いている方向。SOLDERER のイナズマステップ。ユーザーの要望で移動の入力から変えた、2026-10-22）。
+        /// </summary>
+        public bool AimTurnsFacing;
 
         /// <summary>
         /// 続けて出せる回数（2 以上なら連続技。特殊攻撃 1 だけ）。出すたびに ChainWindowTicks の間、次を出せる。回数を使い切るか、
@@ -248,8 +251,14 @@ namespace Airerage.Core.Combat
         /// <summary>1 人には、判定のどれか 1 つだけが当たる（先に当たった判定だけ。クリティカル判定と通常の判定など）。</summary>
         public bool ExclusiveHits;
 
-        /// <summary>撃破技でも、打つ直前の速さでは FATAL にならない（FATAL はクリティカル判定だけ。SOLDERER）。</summary>
-        public bool FatalOnlyByCritical;
+        /// <summary>
+        /// 撃破技でも、打つ直前の速さで強くならない（威力・吹き飛びの倍率も、速さの FATAL もない。強さはクリティカル判定など技そのもので
+        /// 決まる。撃破技の速さの係数はキャラクター固有。SOLDERER。ユーザーの指摘、2026-10-22）。
+        /// </summary>
+        public bool NoSpeedBonus;
+
+        /// <summary>当たったら、当たったときの動き（AttackMotion.RequiresHit。反動）を 1 回つけて、攻撃を終える（SOLDERER のストンピング）。</summary>
+        public bool EndsOnHit;
 
         /// <summary>
         /// 判定が出ている間、その判定の箱で、上から飛んできたほかの人の投射物を防ぐ（PASTRY CHEF のボウル。防いだら GUARD。2026-10-21）。

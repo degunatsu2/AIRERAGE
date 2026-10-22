@@ -12,7 +12,7 @@ namespace Airerage.Runtime.Presentation
     /// - ウインドクローク（CombatState.SpeedBoostTicksLeft）: 体の周りを回る黄緑の風と、残りの時間の円形のゲージ（縁つき）。
     /// - キャッスルインジエアー（SkyBoostTicksLeft）: 体の周りを大きく回る空色の風と、残りの時間の円形のゲージ（縁つき。外側）。
     /// - 走り続ける地上技（AttackData.Run）: 黄緑のオーラと、後ろへ流れる黄緑の風の線（速いほど長い）。
-    /// - 回る技（AttackData.SpinPerHit。つむじ風）: 体を包む竜巻（キャラクターの回転は CharacterView）。
+    /// - 風のキャラクター（STORM RUNNER）の回る技（AttackData.SpinPerHit。つむじ風）: 体を包む竜巻（キャラクターの回転は CharacterView）。
     /// - 突風の溜め（ActionState.Recast）: 体に集まってくる風の輪。
     /// 見た目の動きは表示の時間で決める。状態を読むだけで、書き換えない。
     /// </summary>
@@ -130,7 +130,10 @@ namespace Airerage.Runtime.Presentation
                 bool cloak = alive && state.Combat.SpeedBoostTicksLeft > 0;
                 bool castle = alive && state.Combat.SkyBoostTicksLeft > 0;
                 bool run = attacking && attack.Run;
-                bool tornado = attacking && attack.SpinPerHit && attack.Hits.Length > 0 && state.Action.Ticks < SpinEndTick(attack) + 4;
+                // 竜巻は風のキャラクター（Q が行動の速さの強化＝ウインドクローク。STORM RUNNER）の回る技だけ（PASTRY CHEF のゴムベラ回転には
+                // 出さない。ユーザーの指摘、2026-10-22）。
+                bool windy = config.Combat.Special1.Effect == SkillEffect.SpeedBoost;
+                bool tornado = attacking && windy && attack.SpinPerHit && attack.Hits.Length > 0 && state.Action.Ticks < SpinEndTick(attack) + 4;
                 SpeedBoostTuning boost = config.Skills.SpeedBoost;
                 bool gather = attacking && state.Action.Recast && state.Action.Ticks < boost.GustWindupTicks;
                 Show(lines, cloak, castle, run, tornado, gather);

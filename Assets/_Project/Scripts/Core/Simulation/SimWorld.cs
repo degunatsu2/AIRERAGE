@@ -236,7 +236,7 @@ namespace Airerage.Core.Simulation
             CoinDropRules.DropOnHits(Coins, _states, _hits.LastHits, Rules, Tick);
             if (Bounds.HasValue)
             {
-                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts);
+                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts, _configs);
                 CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, CoinSpawns, Rules, Tick);
             }
             CombatRewardRules.Step(Coins, _states, _hits.LastEndedCombos, _knockouts, Rules, Tick, _configs);

@@ -57,7 +57,7 @@ namespace Airerage.Editor
                     break;
                 case CharacterPresets.SoldererName:
                     character.SetProfile(new[] { "#高速", "#ヒット＆アウェイ", "#電気" },
-                        new SkillText("イナズマステップ", "移動の方向へ短く突撃する。続けて2回まで出せる。長押しで強い雷をまとって長く突撃する。使った回数でクールタイムが延びる。"),
+                        new SkillText("イナズマステップ", "照準の方向へ短く突撃する。続けて2回まで出せる。長押しで強い雷をまとって長く突撃する。使った回数でクールタイムが延びる。"),
                         new SkillText("インバータ", "押すたびに切り替える。オンの間はワイヤーが短く電気を帯び、足場につなぐと雷が地面を伝って触れた人を感電させる。何もない所へ飛ばして押し続けると鞭になる。"),
                         new SkillText("ボールライトニング", "照準の方向へゆっくり進む電気の球を3つ撃つ。壁で跳ね返り、止まった後もしばらく残って触れた人を感電させる。"));
                     character.SetCostume(CharacterCostume.Solderer);

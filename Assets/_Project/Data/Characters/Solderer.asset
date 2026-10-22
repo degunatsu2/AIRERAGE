@@ -89,11 +89,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 30
         WireCancelFromTick: 6
@@ -157,11 +158,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 32
         WireCancelFromTick: 6
@@ -195,11 +197,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 1
-        FatalOnlyByCritical: 1
+        NoSpeedBonus: 1
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 34
         WireCancelFromTick: 7
@@ -249,13 +252,14 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 1
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
-        TotalTicks: 26
+        TotalTicks: 38
         WireCancelFromTick: 6
         Hits:
         - StartTick: 4
@@ -326,11 +330,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 1
         BlocksProjectilesAbove: 0
         TotalTicks: 32
         WireCancelFromTick: 8
@@ -360,7 +365,7 @@ MonoBehaviour:
           AlongAim: 0
           Charge: 0
         - StartTick: 6
-          Ticks: 8
+          Ticks: 1
           VelocityX: 0
           VelocityY: 16
           RequiresHit: 1
@@ -378,11 +383,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 10
         ChargedTotalTicks: 26
-        AimFromMove: 1
+        AimTurnsFacing: 1
         ChainMax: 3
         ChainWindowTicks: 180
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 14
         WireCancelFromTick: 4
@@ -449,11 +455,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 6
         WireCancelFromTick: 1
@@ -472,11 +479,12 @@ MonoBehaviour:
         Roulette: 0
         ChargedFromTicks: 0
         ChargedTotalTicks: 0
-        AimFromMove: 0
+        AimTurnsFacing: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
-        FatalOnlyByCritical: 0
+        NoSpeedBonus: 0
+        EndsOnHit: 0
         BlocksProjectilesAbove: 0
         TotalTicks: 46
         WireCancelFromTick: 38
@@ -696,13 +704,13 @@ MonoBehaviour:
         OffsetY: -1.2
         Gravity: 32
         MaxFallSpeed: 34
-        HalfWidth: 0.6
-        HalfHeight: 0.35
+        HalfWidth: 0.85
+        HalfHeight: 0.5
         BaseGrams: 100
-        GramsPerSecond: 700
+        GramsPerSecond: 1200
         FatalGrams: 1000
-        BonusPercentPer100Grams: 15
-        MaxBonusPercent: 300
+        BonusPercentPer100Grams: 25
+        MaxBonusPercent: 400
         Hit:
           StartTick: 5
           ActiveTicks: 3
@@ -764,7 +772,7 @@ MonoBehaviour:
   - "#\u96FB\u6C17"
   _special1Text:
     Name: "\u30A4\u30CA\u30BA\u30DE\u30B9\u30C6\u30C3\u30D7"
-    Description: "\u79FB\u52D5\u306E\u65B9\u5411\u3078\u77ED\u304F\u7A81\u6483\u3059\u308B\u3002\u7D9A\u3051\u30662\u56DE\u307E\u3067\u51FA\u305B\u308B\u3002\u9577\u62BC\u3057\u3067\u5F37\u3044\u96F7\u3092\u307E\u3068\u3063\u3066\u9577\u304F\u7A81\u6483\u3059\u308B\u3002\u4F7F\u3063\u305F\u56DE\u6570\u3067\u30AF\u30FC\u30EB\u30BF\u30A4\u30E0\u304C\u5EF6\u3073\u308B\u3002"
+    Description: "\u7167\u6E96\u306E\u65B9\u5411\u3078\u77ED\u304F\u7A81\u6483\u3059\u308B\u3002\u7D9A\u3051\u30662\u56DE\u307E\u3067\u51FA\u305B\u308B\u3002\u9577\u62BC\u3057\u3067\u5F37\u3044\u96F7\u3092\u307E\u3068\u3063\u3066\u9577\u304F\u7A81\u6483\u3059\u308B\u3002\u4F7F\u3063\u305F\u56DE\u6570\u3067\u30AF\u30FC\u30EB\u30BF\u30A4\u30E0\u304C\u5EF6\u3073\u308B\u3002"
     CooldownNote: 
   _special2Text:
     Name: "\u30A4\u30F3\u30D0\u30FC\u30BF"
