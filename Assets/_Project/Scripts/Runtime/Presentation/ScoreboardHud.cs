@@ -221,7 +221,13 @@ namespace Airerage.Runtime.Presentation
         private PlayerStatusPlate.Look CurrentLook(int index)
         {
             var look = new PlayerStatusPlate.Look();
-            if (_waiting[index])
+            if (_feed.GetState(index).Combat.HasLeft)
+            {
+                // 試合から抜けた人（ネットワーク対戦。docs/15 T6-10）: 灰色のまま「LEFT」。
+                look.Gray = 1f;
+                look.Overlay = "LEFT";
+            }
+            else if (_waiting[index])
             {
                 float t = Time.time - _fellAt[index];
                 if (float.IsInfinity(t))

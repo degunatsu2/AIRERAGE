@@ -37,6 +37,11 @@ namespace Airerage.Net
     /// - ステージを選ぶ流れ（GameFlow から）では、セッションを作るときにステージがない。開始のメッセージにステージの番号を入れ、
     ///   全員がそのステージのシーンを読み込んでから BeginPending で始める（それまでは Loading）。今と同じステージなら（再戦）すぐ始める。
     /// - 試合の後にホストが ReturnToLobby を呼ぶと、全員がロビー（キャラクター選択など）へ戻る。
+    /// - 試合中にクライアントが抜けたら（docs/15 T6-10）: 残りが 2 人以上なら、ホストがその人の入力で自分が見た（中継した）最後の次の
+    ///   ティックを抜けたティックに決め、まだだれかに届いていないかもしれない入力といっしょに、抜けた知らせ（Left）を確実な経路で全員へ
+    ///   送る。全員がそのティックからその人の入力を「抜けた」（PlayerInput.Departed）で確定するので、結果はそろう。抜けた人のキャラクターは
+    ///   見えず何にも触れない（CombatState.HasLeft）。1 人だけになったら試合を終える。ホストが抜けたら試合は終わる。
+    ///   再戦では番号を詰めて、今いる人で始め直す。
     /// </summary>
     public sealed class OnlineSession : IDisposable
     {
@@ -109,6 +114,22 @@ namespace Airerage.Net
         // ホスト: ティック → プレイヤーごとのチェックサム（全員の分を比べたら消す）。
         private readonly Dictionary<int, ChecksumRow> _checksums = new Dictionary<int, ChecksumRow>();
 
+        // ホスト: 試合中にクライアントから届いた入力（自分宛ても、中継したものも。プレイヤーごとにティック → 入力）と、途切れずにそろった
+        // 最後のティックと、まだ残している最も古いティック。抜けた人の入力を、だれかに届いたかもしれない分まで知るため（docs/15 T6-10）。
+        // ホストはすべての入力を中継するので、ここにない入力はだれにも届いていない。
+        private readonly Dictionary<int, PlayerInput>[] _seenInputs = new Dictionary<int, PlayerInput>[MaxPlayers];
+        private readonly int[] _seenContiguous = new int[MaxPlayers];
+        private readonly int[] _seenOldest = new int[MaxPlayers];
+
+        // ホスト: [宛先, 送り手] → 送り手が宛先の入力をどこまで受け取ったか（中継したメッセージの確認応答）。
+        private readonly int[,] _seenAck = new int[MaxPlayers, MaxPlayers];
+
+        // 試合から抜けた人（番号ごと。試合の始めに戻す）。
+        private readonly bool[] _departed = new bool[MaxPlayers];
+
+        // クライアント: ステージを読み込んでいる間に届いた、抜けた知らせ（始めてから当てる）。
+        private readonly List<byte[]> _pendingLeaves = new List<byte[]>();
+
         private CharacterState[] _previous = new CharacterState[0];
         private NVector3[] _corrections = new NVector3[0];
         private NVector3[] _beforeReconcile = new NVector3[0];
@@ -125,6 +146,7 @@ namespace Airerage.Net
             for (int p = 0; p < MaxPlayers; p++)
             {
                 _playerPeer[p] = -1;
+                _seenInputs[p] = new Dictionary<int, PlayerInput>();
             }
         }
 
@@ -287,6 +309,12 @@ namespace Airerage.Net
         public int MatchNumber { get; private set; }
 
         /// <summary>ロビーにいるプレイヤーの数（ホストのみ。自分を含む）。</summary>
+        /// <summary>プレイヤー player が試合から抜けたか（docs/15 T6-10。抜けた人のキャラクターは外れ、試合は続く）。</summary>
+        public bool HasDeparted(int player)
+        {
+            return player >= 0 && player < MaxPlayers && _departed[player];
+        }
+
         public int LobbyPlayerCount
         {
             get
@@ -667,7 +695,9 @@ namespace Airerage.Net
             {
                 throw new InvalidOperationException("試合を始め直せるのは、試合中のホストだけです");
             }
-            SendStartAndBegin(PlayerCount, rules, StageIndex);
+            // 試合中に抜けた人がいれば、番号を詰めて、今いる人で始め直す。
+            CloseUpPlayers();
+            SendStartAndBegin(LobbyPlayerCount, rules, StageIndex);
         }
 
         private void SendStartAndBegin(int count, MatchRules rules, int stage)
@@ -848,7 +878,7 @@ namespace Airerage.Net
         {
             for (int p = 0; p < PlayerCount; p++)
             {
-                if (p == LocalPlayer)
+                if (p == LocalPlayer || _departed[p])
                 {
                     continue;
                 }
@@ -950,7 +980,12 @@ namespace Airerage.Net
                 }
                 row.Values[p] = null;
             }
-            if (row.Compared >= PlayerCount - 1)
+            int remotes = 0;
+            for (int p = 1; p < PlayerCount; p++)
+            {
+                remotes += _departed[p] ? 0 : 1;
+            }
+            if (row.Compared >= remotes)
             {
                 _checksums.Remove(tick);
             }
@@ -979,6 +1014,17 @@ namespace Airerage.Net
             }
             Session = new RollbackSession(World, LocalPlayer, _settings);
             Exchange = new InputExchange(Session, _settings);
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                _departed[p] = false;
+                _seenInputs[p].Clear();
+                _seenContiguous[p] = Session.FirstInputTick - 1;
+                _seenOldest[p] = Session.FirstInputTick;
+                for (int q = 0; q < MaxPlayers; q++)
+                {
+                    _seenAck[p, q] = Session.FirstInputTick - 1;
+                }
+            }
             _previous = new CharacterState[playerCount];
             _corrections = new NVector3[playerCount];
             _beforeReconcile = new NVector3[playerCount];
@@ -988,6 +1034,16 @@ namespace Airerage.Net
             }
             State = SessionState.Running;
             Status = $"Running: player {LocalPlayer + 1} of {playerCount}";
+            // ステージを読み込んでいる間に届いた、この試合の抜けた知らせ。
+            foreach (byte[] leave in _pendingLeaves)
+            {
+                NetMessages.ReadLeft(leave, out int leftMatch, out int player, out int fromTick, out int startTick, out PlayerInput[] inputs);
+                if (leftMatch == match)
+                {
+                    ApplyDeparture(player, fromTick, startTick, inputs);
+                }
+            }
+            _pendingLeaves.Clear();
         }
 
         private void PumpEvents()
@@ -1058,9 +1114,11 @@ namespace Airerage.Net
                             _lobbyReady[p] = false;
                             CheckLobbyProgress();
                             BroadcastLobby();
-                            if (State == SessionState.Running || State == SessionState.Loading)
+                            // 試合中に抜けた人は外して、残りの 2 人以上で続ける（docs/15 T6-10）。
+                            bool goesOn = State == SessionState.Running && p < PlayerCount && LobbyPlayerCount >= 2 && RemoveDeparted(p);
+                            if (!goesOn && (State == SessionState.Running || State == SessionState.Loading))
                             {
-                                // 試合中に抜けた人がいたら、試合を終える（残りの人も止まったままにしないよう、接続を切る）。
+                                // 1 人だけになったか、外せなかったら、試合を終える（残りの人も止まったままにしないよう、接続を切る）。
                                 State = SessionState.Ended;
                                 Status = $"Player {p + 1} disconnected";
                                 DisconnectAll();
@@ -1092,11 +1150,17 @@ namespace Airerage.Net
                         return;
                     }
                     int target = NetMessages.InputTarget(e.Data);
+                    if (inputSender <= 0 || inputSender >= PlayerCount || _departed[inputSender] || target < 0 || target >= PlayerCount)
+                    {
+                        return;
+                    }
+                    Airerage.Core.Rollback.InputMessage message = Airerage.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data));
+                    RecordSeen(inputSender, target, message);
                     if (target == LocalPlayer)
                     {
-                        Exchange.Receive(Airerage.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data)));
+                        Exchange.Receive(message);
                     }
-                    else if (target > 0 && target < PlayerCount && _playerPeer[target] >= 0)
+                    else if (target > 0 && _playerPeer[target] >= 0)
                     {
                         _link.Send(_playerPeer[target], e.Data, reliable: false);
                     }
@@ -1211,9 +1275,107 @@ namespace Airerage.Net
                                 Exchange.Receive(Airerage.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data)));
                             }
                             break;
+                        case NetKind.Left:
+                            NetMessages.ReadLeft(e.Data, out int leftMatch, out int leaver, out int fromTick, out int startTick,
+                                out PlayerInput[] leftInputs);
+                            if (State == SessionState.Running && leftMatch == MatchNumber)
+                            {
+                                ApplyDeparture(leaver, fromTick, startTick, leftInputs);
+                            }
+                            else if (State == SessionState.Loading && _pending != null && leftMatch == _pending.Match)
+                            {
+                                _pendingLeaves.Add(e.Data);
+                            }
+                            break;
                     }
                     break;
             }
+        }
+
+        // ホスト: クライアント sender から宛先 target へのメッセージの入力と確認応答を記録する（抜けた人の入力を知るため）。
+        // 全員に届いたことが確認された古い入力は捨てる。
+        private void RecordSeen(int sender, int target, Airerage.Core.Rollback.InputMessage message)
+        {
+            Dictionary<int, PlayerInput> seen = _seenInputs[sender];
+            for (int i = 0; i < message.Inputs.Count; i++)
+            {
+                int tick = message.StartTick + i;
+                if (tick > _seenContiguous[sender] && !seen.ContainsKey(tick))
+                {
+                    seen[tick] = message.Inputs[i];
+                }
+            }
+            while (seen.ContainsKey(_seenContiguous[sender] + 1))
+            {
+                _seenContiguous[sender]++;
+            }
+            _seenAck[target, sender] = Math.Max(_seenAck[target, sender], message.Ack);
+            int keepFrom = OldestNeeded(sender);
+            while (_seenOldest[sender] < keepFrom)
+            {
+                seen.Remove(_seenOldest[sender]);
+                _seenOldest[sender]++;
+            }
+        }
+
+        // ホスト: プレイヤー player の入力のうち、まだだれかに届いていないかもしれない最も古いティック（自分と、今いるほかの人の確認応答の最小の次）。
+        private int OldestNeeded(int player)
+        {
+            int oldest = Session.ContiguousTick(player) + 1;
+            for (int r = 1; r < PlayerCount; r++)
+            {
+                if (r != player && !_departed[r] && _playerPeer[r] >= 0)
+                {
+                    oldest = Math.Min(oldest, _seenAck[player, r] + 1);
+                }
+            }
+            return Math.Max(oldest, Session.FirstInputTick);
+        }
+
+        // ホスト: 試合中に抜けたプレイヤー player を外す。抜けたティックは、その人の入力でホストが見た（中継した）最後の次。そこまでの入力の
+        // うち、まだだれかに届いていないかもしれない分を、抜けた知らせに入れて全員へ確実に送る。外せなければ false（試合を終える）。
+        private bool RemoveDeparted(int player)
+        {
+            int fromTick = Math.Max(_seenContiguous[player] + 1, Session.FirstInputTick);
+            int start = OldestNeeded(player);
+            var inputs = new List<PlayerInput>();
+            for (int tick = start; tick < fromTick; tick++)
+            {
+                if (!_seenInputs[player].TryGetValue(tick, out PlayerInput input))
+                {
+                    Debug.LogError($"OnlineSession: 抜けたプレイヤー {player + 1} のティック {tick} の入力が残っていないので、試合を終えます");
+                    return false;
+                }
+                inputs.Add(input);
+            }
+            if (inputs.Count > NetMessages.MaxLeftInputs)
+            {
+                Debug.LogError($"OnlineSession: 抜けたプレイヤー {player + 1} の送る入力が多すぎる（{inputs.Count} 個）ので、試合を終えます");
+                return false;
+            }
+            byte[] message = NetMessages.Left(MatchNumber, player, fromTick, start, inputs);
+            ApplyDeparture(player, fromTick, start, inputs);
+            for (int r = 1; r < MaxPlayers; r++)
+            {
+                if (_playerPeer[r] >= 0)
+                {
+                    _link.Send(_playerPeer[r], message, reliable: true);
+                }
+            }
+            return true;
+        }
+
+        // 抜けた人を外す（ホストもクライアントも同じ。InputExchange.RemovePlayer）。
+        private void ApplyDeparture(int player, int fromTick, int startTick, IReadOnlyList<PlayerInput> inputs)
+        {
+            if (player <= 0 || player >= PlayerCount || player == LocalPlayer || _departed[player])
+            {
+                Debug.LogWarning($"OnlineSession: 抜けた知らせのプレイヤーの番号がおかしいので無視しました（{player}）");
+                return;
+            }
+            Exchange.RemovePlayer(player, fromTick, startTick, inputs);
+            _departed[player] = true;
+            Status = $"Player {player + 1} left. The match goes on";
         }
 
         private void DisconnectAll()

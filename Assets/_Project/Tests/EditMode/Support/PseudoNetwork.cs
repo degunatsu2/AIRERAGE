@@ -35,6 +35,12 @@ namespace Airerage.Core.Tests.Support
         private long _spreadSum;
         private int _spreadSamples;
 
+        // 試合から抜けた人（docs/15 T6-10）: 抜けたティック（抜けていなければ int.MaxValue）と、欠落しなかったメッセージで送った入力の
+        // 最後のティック（ホストが中継した入力のうち、最も先のもの。抜けたティックを決めるのに使う）と、まだ届いていない抜けた知らせ。
+        private readonly int[] _leftFrom;
+        private readonly int[] _lastSentTick;
+        private readonly List<LeaveNotice> _notices = new List<LeaveNotice>();
+
         public PseudoNetwork(int players, RollbackSettings settings, int latencyFrames, int jitterFrames, double lossRate, int seed)
             : this(MakeScripts(players, seed), settings, latencyFrames, jitterFrames, lossRate, seed)
         {
@@ -60,6 +66,8 @@ namespace Airerage.Core.Tests.Support
             _stalledByPeer = new int[players];
             _freezeRun = new int[players];
             _beforeReconcile = new Vector3[players];
+            _leftFrom = new int[players];
+            _lastSentTick = new int[players];
             Worlds = new SimWorld[players];
             for (int p = 0; p < players; p++)
             {
@@ -67,7 +75,40 @@ namespace Airerage.Core.Tests.Support
                 Sessions[p] = new RollbackSession(Worlds[p], p, settings);
                 Exchanges[p] = new InputExchange(Sessions[p], settings);
                 Normalized[p] = Normalize(Scripts[p], settings);
+                _leftFrom[p] = int.MaxValue;
+                _lastSentTick[p] = settings.InputDelayTicks - 1;
             }
+        }
+
+        /// <summary>
+        /// プレイヤー leaver が試合から抜ける（切れた。docs/15 T6-10）。ホストの手順をまねる: 抜けた人が送った入力（欠落しなかった
+        /// メッセージの分。ホストはすべてを中継するので全部見ている）の次のティックを抜けたティックにし、そこまでの入力と合わせて、
+        /// 残りの人へ noticeLatencyFrames 後に知らせる（届いた人から RemovePlayer）。抜けた人はもう進まず、送らず、受け取らない。
+        /// </summary>
+        public int RemovePlayer(int leaver, int noticeLatencyFrames)
+        {
+            int fromTick = _lastSentTick[leaver] + 1;
+            _leftFrom[leaver] = fromTick;
+            int start = Settings.InputDelayTicks;
+            var inputs = new List<PlayerInput>();
+            for (int t = start; t < fromTick; t++)
+            {
+                inputs.Add(Normalized[leaver][t]);
+            }
+            for (int p = 0; p < Sessions.Length; p++)
+            {
+                if (_leftFrom[p] == int.MaxValue)
+                {
+                    _notices.Add(new LeaveNotice(p, Frame + noticeLatencyFrames, leaver, fromTick, start, inputs));
+                }
+            }
+            return fromTick;
+        }
+
+        /// <summary>プレイヤー p が試合から抜けたか。</summary>
+        public bool HasLeft(int p)
+        {
+            return _leftFrom[p] != int.MaxValue;
         }
 
         public RollbackSettings Settings { get; }
@@ -137,6 +178,10 @@ namespace Airerage.Core.Tests.Support
         /// <summary>プレイヤー p がティック t に使う本当の入力（正規化した入力。入力遅延の分の最初のティックは空の入力）。</summary>
         public PlayerInput TrueInput(int p, int t)
         {
+            if (t >= _leftFrom[p])
+            {
+                return PlayerInput.Departed;
+            }
             return t < Settings.InputDelayTicks ? default : Normalized[p][t];
         }
 
@@ -160,9 +205,12 @@ namespace Airerage.Core.Tests.Support
             {
                 if (AllDone(targetTick))
                 {
-                    foreach (RollbackSession session in Sessions)
+                    for (int p = 0; p < Sessions.Length; p++)
                     {
-                        session.Reconcile();
+                        if (!HasLeft(p))
+                        {
+                            Sessions[p].Reconcile();
+                        }
                     }
                     CompareConfirmedChecksums();
                     return;
@@ -193,6 +241,10 @@ namespace Airerage.Core.Tests.Support
             Deliver();
             for (int p = 0; p < Sessions.Length; p++)
             {
+                if (HasLeft(p))
+                {
+                    continue;
+                }
                 RollbackSession session = Sessions[p];
                 ReconcileAndMeasure(p);
                 int tickBefore = session.CurrentTick;
@@ -273,8 +325,13 @@ namespace Airerage.Core.Tests.Support
         {
             int min = int.MaxValue;
             int max = int.MinValue;
-            foreach (RollbackSession session in Sessions)
+            for (int p = 0; p < Sessions.Length; p++)
             {
+                RollbackSession session = Sessions[p];
+                if (HasLeft(p))
+                {
+                    continue;
+                }
                 if (session.CurrentTick >= targetTick)
                 {
                     return;
@@ -292,17 +349,19 @@ namespace Airerage.Core.Tests.Support
             {
                 for (int to = 0; to < Sessions.Length; to++)
                 {
-                    if (to == from)
+                    if (to == from || HasLeft(from) || Exchanges[from].HasLeft(to))
                     {
                         continue;
                     }
-                    byte[] bytes = Exchanges[from].BuildMessage(to).ToBytes();
+                    InputMessage message = Exchanges[from].BuildMessage(to);
+                    byte[] bytes = message.ToBytes();
                     SentMessages++;
                     SentBytes += bytes.Length;
                     int deliverFrame = Frame + _latency + (_jitter > 0 ? _random.Next(_jitter + 1) : 0);
                     if (_random.NextDouble() >= _loss)
                     {
                         _inFlight.Add(new Packet(to, deliverFrame, bytes));
+                        _lastSentTick[from] = Math.Max(_lastSentTick[from], message.StartTick + message.Inputs.Count - 1);
                     }
                 }
             }
@@ -319,14 +378,33 @@ namespace Airerage.Core.Tests.Support
                 }
                 _inFlight.RemoveAt(i);
                 i--;
-                Exchanges[packet.To].Receive(InputMessage.FromBytes(packet.Bytes));
+                if (!HasLeft(packet.To))
+                {
+                    Exchanges[packet.To].Receive(InputMessage.FromBytes(packet.Bytes));
+                }
+            }
+            for (int i = 0; i < _notices.Count; i++)
+            {
+                LeaveNotice notice = _notices[i];
+                if (notice.DeliverFrame > Frame)
+                {
+                    continue;
+                }
+                _notices.RemoveAt(i);
+                i--;
+                Exchanges[notice.To].RemovePlayer(notice.Leaver, notice.FromTick, notice.StartTick, notice.Inputs);
             }
         }
 
         private void CompareConfirmedChecksums()
         {
-            foreach (RollbackSession session in Sessions)
+            for (int p = 0; p < Sessions.Length; p++)
             {
+                RollbackSession session = Sessions[p];
+                if (HasLeft(p))
+                {
+                    continue;
+                }
                 int last = Math.Min(session.ConfirmedTick + 1, session.CurrentTick);
                 for (int tick = Math.Max(0, last - Settings.MaxPredictionTicks - 1); tick <= last; tick++)
                 {
@@ -351,8 +429,13 @@ namespace Airerage.Core.Tests.Support
 
         private bool AllDone(int targetTick)
         {
-            foreach (RollbackSession session in Sessions)
+            for (int p = 0; p < Sessions.Length; p++)
             {
+                RollbackSession session = Sessions[p];
+                if (HasLeft(p))
+                {
+                    continue;
+                }
                 if (session.CurrentTick < targetTick || session.ConfirmedTick < targetTick - 1)
                 {
                     return false;
@@ -419,6 +502,26 @@ namespace Airerage.Core.Tests.Support
                         .WithAim(new Vector2((float)random.NextDouble() * 2f - 1f, (float)random.NextDouble()));
                 default:
                     return default;
+            }
+        }
+
+        private readonly struct LeaveNotice
+        {
+            public readonly int To;
+            public readonly int DeliverFrame;
+            public readonly int Leaver;
+            public readonly int FromTick;
+            public readonly int StartTick;
+            public readonly List<PlayerInput> Inputs;
+
+            public LeaveNotice(int to, int deliverFrame, int leaver, int fromTick, int startTick, List<PlayerInput> inputs)
+            {
+                To = to;
+                DeliverFrame = deliverFrame;
+                Leaver = leaver;
+                FromTick = fromTick;
+                StartTick = startTick;
+                Inputs = inputs;
             }
         }
 

@@ -22,6 +22,12 @@ namespace Airerage.Core.Input
 
         /// <summary>必殺技（R ／ ゲームパッドの右スティックの押し込み【仮】）。</summary>
         Super = 1 << 6,
+
+        /// <summary>
+        /// 試合から抜けた（ネットワーク対戦で切れた人。人が押すボタンではない）。ホストが決めたティックから、全員がその人の入力を
+        /// PlayerInput.Departed として同じように使う（docs/15 T6-10）。
+        /// </summary>
+        Leave = 1 << 15,
     }
 
     /// <summary>
@@ -31,6 +37,9 @@ namespace Airerage.Core.Input
     public readonly struct PlayerInput : IEquatable<PlayerInput>
     {
         public const int AxisMax = 127;
+
+        /// <summary>試合から抜けた人の入力（InputButtons.Leave だけ）。</summary>
+        public static readonly PlayerInput Departed = new PlayerInput(0, 0, InputButtons.Leave);
 
         public readonly sbyte MoveX;
         public readonly sbyte MoveY;

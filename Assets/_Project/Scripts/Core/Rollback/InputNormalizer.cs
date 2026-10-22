@@ -30,7 +30,8 @@ namespace Airerage.Core.Rollback
             sbyte aimY = keepAim ? input.AimY : (sbyte)0;
             sbyte moveX = Settle(input.MoveX, previous.MoveX, moveHysteresis);
             sbyte moveY = Settle(input.MoveY, previous.MoveY, moveHysteresis);
-            return new PlayerInput(moveX, moveY, input.Buttons, aimX, aimY);
+            // 抜けた印（InputButtons.Leave）は自分の入力には入れない（ホストが決めて全員へ送るもの）。
+            return new PlayerInput(moveX, moveY, input.Buttons & ~InputButtons.Leave, aimX, aimY);
         }
 
         private static sbyte Settle(sbyte value, sbyte previous, int hysteresis)

@@ -45,6 +45,25 @@ namespace Airerage.Core.Combat
         }
 
         /// <summary>
+        /// 試合から抜けた人の状態（docs/15 T6-10）: 出現したときの状態に戻して（技・ワイヤー・動きをやめる）、抜けた印をつける。撃破の数、
+        /// ゲージ、コイン（所持も確定も）、前のティックのボタン、ギミックの数を引き継ぐ。復帰は待たない（抜けた印でずっと同じ扱い）。
+        /// </summary>
+        public static CharacterState Departed(in CharacterState state, in CharacterState spawn)
+        {
+            CharacterState departed = spawn;
+            departed.Combat.HasLeft = true;
+            departed.Combat.Knockouts = state.Combat.Knockouts;
+            departed.Combat.Falls = state.Combat.Falls;
+            departed.Combat.Gauge = state.Combat.Gauge;
+            departed.Combat.AttackSerial = state.Combat.AttackSerial;
+            departed.PreviousButtons = state.PreviousButtons;
+            departed.JumpPadCount = state.JumpPadCount;
+            departed.BoostRingCount = state.BoostRingCount;
+            departed.Coins = state.Coins;
+            return departed;
+        }
+
+        /// <summary>
         /// 出現したときの状態に戻し、復帰を待たせる。撃破の数（撃破された数は +1）、ゲージ、前のティックのボタン、ギミックの数、
         /// コイン、まだ払っていないダメージ報酬の元を引き継ぐ。
         /// 無敵は、待つ間と復帰した後の両方の長さにする。

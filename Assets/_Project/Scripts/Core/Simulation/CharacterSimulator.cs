@@ -44,6 +44,12 @@ namespace Airerage.Core.Simulation
         /// <param name="seed">試合の種（ステージのギミックのランダムな周期と位置）。</param>
         public void Step(ref CharacterState state, PlayerInput input, CharacterConfig config, int tick = 0, int seed = 0)
         {
+            if (state.Combat.HasLeft)
+            {
+                // 試合から抜けた人は、ずっと動かない（docs/15 T6-10）。
+                state.PreviousButtons = input.Buttons;
+                return;
+            }
             if (state.Combat.IsWaitingToRespawn)
             {
                 // 撃破されて復帰を待っている間は動かない（ボタンの前の状態だけ更新し、待ち終わった直後に押したとみなさない）。

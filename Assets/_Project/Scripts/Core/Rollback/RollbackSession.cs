@@ -34,6 +34,12 @@ namespace Airerage.Core.Rollback
         private readonly PlayerInput[] _stepInputs;
         private int _pendingRollbackTick = int.MaxValue;
 
+        // プレイヤーごとの、試合から抜けたティック（その後の入力は PlayerInput.Departed で確定。抜けていなければ int.MaxValue）。
+        private readonly int[] _leftFrom;
+
+        // 抜けた人の、確定とみなすティック（ConfirmedTick などの最小を求める計算で、その人が足を引っ張らないように）。
+        private const int LeftContiguous = int.MaxValue - 1;
+
         /// <param name="world">キャラクターをプレイヤーの数だけ追加したワールド。今のティックから始める。</param>
         public RollbackSession(SimWorld world, int localPlayer, RollbackSettings settings)
         {
@@ -63,6 +69,7 @@ namespace Airerage.Core.Rollback
             _contiguous = new int[players];
             _oldestKept = new int[players];
             _stepInputs = new PlayerInput[players];
+            _leftFrom = new int[players];
 
             // 入力遅延の分の最初のティックは、誰も入力していない（全員の空の入力が確定している）。
             int start = world.Tick;
@@ -76,6 +83,7 @@ namespace Airerage.Core.Rollback
                 }
                 _contiguous[p] = _firstInputTick - 1;
                 _oldestKept[p] = start;
+                _leftFrom[p] = int.MaxValue;
             }
 
             _frames = new Frame[settings.MaxPredictionTicks + 2];
@@ -94,6 +102,9 @@ namespace Airerage.Core.Rollback
 
         /// <summary>次の自分の入力を使うティック（今のティック＋入力遅延）。</summary>
         public int LocalInputTick => CurrentTick + _settings.InputDelayTicks;
+
+        /// <summary>最初に入力を使うティック（それより前は全員の空の入力で確定している）。</summary>
+        public int FirstInputTick => _firstInputTick;
 
         /// <summary>全員の入力が、そのティックまですべて届いている最大のティック（確定ティック）。</summary>
         public int ConfirmedTick
@@ -130,6 +141,63 @@ namespace Airerage.Core.Rollback
                     confirmed = Math.Min(confirmed, tick);
                 }
                 return CurrentTick - confirmed <= _settings.MaxPredictionTicks;
+            }
+        }
+
+        /// <summary>プレイヤー player が試合から抜けたか（RemovePlayer）。</summary>
+        public bool HasLeft(int player)
+        {
+            return _leftFrom[player] != int.MaxValue;
+        }
+
+        /// <summary>
+        /// プレイヤー player が試合から抜けた（ネットワーク対戦で切れた。docs/15 T6-10）。fromTick からのその人の入力は、すべて
+        /// PlayerInput.Departed で確定とする（全員が同じ fromTick を使えば、結果はそろう）。fromTick より前のその人の入力は、すべて
+        /// 届いている必要がある（先に AddRemoteInput で渡す。足りなければ InvalidOperationException）。fromTick 以降を予測で計算して
+        /// いれば、次の AdvanceFrame か Reconcile で巻き戻す。
+        /// </summary>
+        public void RemovePlayer(int player, int fromTick)
+        {
+            if (player == _localPlayer || player < 0 || player >= PlayerCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(player), player, $"抜けた人の番号は 0〜{PlayerCount - 1}（自分の {_localPlayer} を除く）");
+            }
+            if (HasLeft(player))
+            {
+                if (_leftFrom[player] != fromTick)
+                {
+                    throw new InvalidOperationException(
+                        $"プレイヤー {player} はティック {_leftFrom[player]} で抜けています（今回の {fromTick} と違う）");
+                }
+                return;
+            }
+            if (fromTick < _firstInputTick)
+            {
+                throw new ArgumentOutOfRangeException(nameof(fromTick), fromTick, $"抜けるティックは {_firstInputTick} から");
+            }
+            if (_contiguous[player] < fromTick - 1)
+            {
+                throw new InvalidOperationException(
+                    $"プレイヤー {player} のティック {_contiguous[player] + 1}〜{fromTick - 1} の入力が届いていないので、ティック {fromTick} で抜けたことにできません");
+            }
+            // 抜けた後のティックに届いていた入力は使わない（ホストが見た入力より後のものは、だれにも届いていないはず）。
+            var later = new List<int>();
+            foreach (int tick in _inputs[player].Keys)
+            {
+                if (tick >= fromTick)
+                {
+                    later.Add(tick);
+                }
+            }
+            foreach (int tick in later)
+            {
+                _inputs[player].Remove(tick);
+            }
+            _leftFrom[player] = fromTick;
+            _contiguous[player] = LeftContiguous;
+            if (fromTick < CurrentTick)
+            {
+                _pendingRollbackTick = Math.Min(_pendingRollbackTick, fromTick);
             }
         }
 
@@ -180,7 +248,7 @@ namespace Airerage.Core.Rollback
             }
             if (tick <= _contiguous[player] && !_inputs[player].ContainsKey(tick))
             {
-                // すでに確定し、古くなって捨てた入力の再送。
+                // すでに確定し、古くなって捨てた入力の再送（抜けた人の、遅れて届いた入力も）。
                 return;
             }
             if (!StoreInput(player, tick, input))
@@ -272,6 +340,10 @@ namespace Airerage.Core.Rollback
         // まだ何も届いていなければ空の入力）。
         private PlayerInput InputFor(int player, int tick)
         {
+            if (tick >= _leftFrom[player])
+            {
+                return PlayerInput.Departed;
+            }
             Dictionary<int, PlayerInput> inputs = _inputs[player];
             if (inputs.TryGetValue(tick, out PlayerInput input))
             {

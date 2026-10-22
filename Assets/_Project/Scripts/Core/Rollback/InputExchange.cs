@@ -32,11 +32,15 @@ namespace Airerage.Core.Rollback
         // 相手ごとの、自分の入力をどこまで受け取ったと確認されたか。
         private readonly int[] _ackedBy;
 
+        // 試合から抜けた相手（もう送らず、届いても使わない。RemovePlayer）。
+        private readonly bool[] _left;
+
         public InputExchange(RollbackSession session, RollbackSettings settings)
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _ackedBy = new int[session.PlayerCount];
+            _left = new bool[session.PlayerCount];
             int lastDefault = session.LocalInputTick - 1; // 入力遅延の分の最初のティックは、全員が空の入力で確定している
             for (int p = 0; p < _ackedBy.Length; p++)
             {
@@ -73,7 +77,7 @@ namespace Airerage.Core.Rollback
             PlayerInput normalized = InputNormalizer.Normalize(localInput, _lastLocalInput, _settings.MoveHysteresis, keepWireAim);
             _session.AdvanceFrame(normalized);
             _lastLocalInput = normalized;
-            if (_session.PlayerCount > 1)
+            if (HasRemote())
             {
                 _unacked[tick] = normalized;
             }
@@ -87,6 +91,10 @@ namespace Airerage.Core.Rollback
         public InputMessage BuildMessage(int remotePlayer)
         {
             CheckRemote(remotePlayer);
+            if (_left[remotePlayer])
+            {
+                throw new InvalidOperationException($"プレイヤー {remotePlayer} は試合から抜けたので、メッセージを作りません");
+            }
             int start = _ackedBy[remotePlayer] + 1;
             int last = Math.Min(_session.LocalInputTick - 1, start + MaxInputsPerMessage - 1);
             var inputs = new List<PlayerInput>(Math.Max(0, last - start + 1));
@@ -99,6 +107,41 @@ namespace Airerage.Core.Rollback
                 _session.LocalPlayer, now, _timeSync.AdvantageOver(remotePlayer, now), _session.ContiguousTick(remotePlayer), start, inputs);
         }
 
+        /// <summary>相手 player が試合から抜けたか（RemovePlayer）。</summary>
+        public bool HasLeft(int player)
+        {
+            return player >= 0 && player < _left.Length && _left[player];
+        }
+
+        /// <summary>
+        /// 相手 player が試合から抜けた（docs/15 T6-10）。inputs はその人のティック startTick からの入力（抜ける fromTick より前の分。
+        /// 自分にまだ届いていない分を含むこと）で、セッションに渡してから、fromTick 以降を抜けた人の入力で確定する
+        /// （RollbackSession.RemovePlayer）。その人へはもう送らず、その人から届いたメッセージは使わない。
+        /// </summary>
+        public void RemovePlayer(int player, int fromTick, int startTick, IReadOnlyList<PlayerInput> inputs)
+        {
+            CheckRemote(player);
+            if (inputs == null)
+            {
+                throw new ArgumentNullException(nameof(inputs));
+            }
+            if (!_left[player])
+            {
+                for (int i = 0; i < inputs.Count; i++)
+                {
+                    int tick = startTick + i;
+                    if (tick >= _session.FirstInputTick && tick < fromTick)
+                    {
+                        _session.AddRemoteInput(player, tick, inputs[i]);
+                    }
+                }
+            }
+            _session.RemovePlayer(player, fromTick);
+            _left[player] = true;
+            _timeSync.Remove(player);
+            DiscardAcked();
+        }
+
         /// <summary>届いたメッセージを処理する。同じメッセージが何度届いても、順番が前後してもよい。</summary>
         public void Receive(InputMessage message)
         {
@@ -107,6 +150,11 @@ namespace Airerage.Core.Rollback
                 throw new ArgumentNullException(nameof(message));
             }
             CheckRemote(message.Sender);
+            if (_left[message.Sender])
+            {
+                // 抜けた人から遅れて届いたメッセージ（必要な入力は RemovePlayer で受け取っている）。
+                return;
+            }
             _timeSync.OnMessage(message.Sender, _session.CurrentTick, message.SenderTick, message.Advantage);
             // 同じ入力の再送や、確定して古くなった入力は、セッションが無視する。
             for (int i = 0; i < message.Inputs.Count; i++)
@@ -126,16 +174,31 @@ namespace Airerage.Core.Rollback
             int ackedByAll = int.MaxValue;
             for (int p = 0; p < _ackedBy.Length; p++)
             {
-                if (p != _session.LocalPlayer)
+                if (p != _session.LocalPlayer && !_left[p])
                 {
                     ackedByAll = Math.Min(ackedByAll, _ackedBy[p]);
                 }
             }
+            // 相手が全員抜けたら、自分の入力はもう送らない（今までの分を捨てる）。
+            ackedByAll = Math.Min(ackedByAll, _session.LocalInputTick - 1);
             while (_oldestUnacked <= ackedByAll)
             {
                 _unacked.Remove(_oldestUnacked);
                 _oldestUnacked++;
             }
+        }
+
+        // 送る相手（抜けていない相手）がいるか。
+        private bool HasRemote()
+        {
+            for (int p = 0; p < _left.Length; p++)
+            {
+                if (p != _session.LocalPlayer && !_left[p])
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void CheckRemote(int player)

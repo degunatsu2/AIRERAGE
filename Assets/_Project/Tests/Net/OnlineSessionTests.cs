@@ -483,20 +483,101 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
-        public void PlayerLeavingDuringMatch_EndsTheMatchForEveryone()
+        public void PlayerLeavingDuringMatch_IsRemoved_AndTheOthersGoOnInSync()
         {
+            // 試合中に抜けた人を外して、残りの人で続ける（docs/15 T6-10）。
             OnlineSession host = Host();
             OnlineSession stays = Join(host);
             OnlineSession leaves = Join(host);
             PumpUntil(() => stays.LocalPlayer >= 0 && leaves.LocalPlayer >= 0);
+            int leaver = leaves.LocalPlayer;
             host.StartMatch();
             PumpUntil(() => _sessions.TrueForAll(s => s.State == OnlineSession.SessionState.Running && s.Session.CurrentTick > 30));
 
             leaves.Dispose();
             _sessions.Remove(leaves);
-            PumpUntil(() => host.State == OnlineSession.SessionState.Ended && stays.State == OnlineSession.SessionState.Ended);
+            PumpUntil(() => host.HasDeparted(leaver) && stays.HasDeparted(leaver));
+            int ticks = Math.Max(host.Session.CurrentTick, stays.Session.CurrentTick) + 180;
+            host.TickLimit = ticks;
+            stays.TickLimit = ticks;
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == ticks && s.Session.ConfirmedTick >= ticks - 1));
+            PumpFrames(2);
+
+            Assert.That(host.State, Is.EqualTo(OnlineSession.SessionState.Running), "残りの人の試合が終わった");
+            Assert.That(stays.State, Is.EqualTo(OnlineSession.SessionState.Running));
+            Assert.That(stays.World.Checksum(), Is.EqualTo(host.World.Checksum()), "残りの人の状態がそろわない");
+            Assert.That(host.Desyncs, Is.Empty);
+            Assert.That(host.World.GetState(leaver).Combat.HasLeft, Is.True, "抜けた人のキャラクターが外れていない");
+            Assert.That(host.Status, Does.Contain("left"));
+            Assert.That(stays.Status, Does.Contain("left"));
+        }
+
+        [Test]
+        public void PlayerLeaving_WithDelayAndLoss_StillLeavesTheOthersInSync()
+        {
+            // 片道 40ms・欠落 5% で、入力や確認応答が遅れて届いたり、届かなかったりしても、残りの人はそろう（抜ける人の送信は欠落させない。
+            // 切断の知らせが欠落すると、気づくのが接続の時間切れまで遅れるため）。
+            OnlineSession host = Host();
+            OnlineSession stays = Join(host);
+            OnlineSession leaves = Join(host);
+            PumpUntil(() => stays.LocalPlayer >= 0 && leaves.LocalPlayer >= 0);
+            host.Link.SetSimulatedConditions(40, 5, 5);
+            stays.Link.SetSimulatedConditions(40, 5, 5);
+            leaves.Link.SetSimulatedConditions(40, 5, 0);
+            int leaver = leaves.LocalPlayer;
+            host.StartMatch();
+            PumpUntil(() => _sessions.TrueForAll(s => s.State == OnlineSession.SessionState.Running && s.Session.CurrentTick > 60));
+
+            leaves.Dispose();
+            _sessions.Remove(leaves);
+            PumpUntil(() => host.HasDeparted(leaver) && stays.HasDeparted(leaver));
+            int ticks = Math.Max(host.Session.CurrentTick, stays.Session.CurrentTick) + 180;
+            host.TickLimit = ticks;
+            stays.TickLimit = ticks;
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == ticks && s.Session.ConfirmedTick >= ticks - 1));
+            PumpFrames(2);
+
+            Assert.That(stays.World.Checksum(), Is.EqualTo(host.World.Checksum()), "残りの人の状態がそろわない");
+            Assert.That(host.Desyncs, Is.Empty);
+        }
+
+        [Test]
+        public void LastClientLeavingDuringMatch_EndsTheMatch()
+        {
+            OnlineSession host = Host();
+            OnlineSession leaves = Join(host);
+            PumpUntil(() => leaves.LocalPlayer >= 0);
+            host.StartMatch();
+            PumpUntil(() => _sessions.TrueForAll(s => s.State == OnlineSession.SessionState.Running && s.Session.CurrentTick > 30));
+
+            leaves.Dispose();
+            _sessions.Remove(leaves);
+            PumpUntil(() => host.State == OnlineSession.SessionState.Ended);
             Assert.That(host.Status, Does.Contain("disconnected"));
-            Assert.That(stays.Status, Does.Contain("Disconnected"));
+        }
+
+        [Test]
+        public void Rematch_AfterSomeoneLeft_StartsWithThePeopleWhoStayed()
+        {
+            OnlineSession host = Host();
+            OnlineSession leaves = Join(host);
+            PumpUntil(() => leaves.LocalPlayer == 1);
+            OnlineSession stays = Join(host);
+            PumpUntil(() => stays.LocalPlayer == 2);
+            host.StartMatch();
+            PumpUntil(() => _sessions.TrueForAll(s => s.State == OnlineSession.SessionState.Running && s.Session.CurrentTick > 30));
+            leaves.Dispose();
+            _sessions.Remove(leaves);
+            PumpUntil(() => host.HasDeparted(1) && stays.HasDeparted(1));
+
+            host.RestartMatch();
+            PumpUntil(() => stays.State == OnlineSession.SessionState.Running && stays.MatchNumber == host.MatchNumber && stays.Session.CurrentTick > 30
+                && host.Session.CurrentTick > 30);
+
+            Assert.That(host.PlayerCount, Is.EqualTo(2), "抜けた人を入れて始め直した");
+            Assert.That(stays.PlayerCount, Is.EqualTo(2));
+            Assert.That(stays.LocalPlayer, Is.EqualTo(1), "番号を詰めていない");
+            Assert.That(stays.HasDeparted(1), Is.False);
         }
 
         [Test]

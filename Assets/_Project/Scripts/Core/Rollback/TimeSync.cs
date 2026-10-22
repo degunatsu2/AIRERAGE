@@ -19,6 +19,7 @@ namespace Airerage.Core.Rollback
         private readonly int[][] _localSamples;
         private readonly int[][] _remoteSamples;
         private readonly int[] _sampleCount;
+        private readonly bool[] _removed;
         private int _nextRecommendationTick;
 
         public TimeSync(int playerCount, int localPlayer, int startTick, RollbackSettings settings)
@@ -29,6 +30,7 @@ namespace Airerage.Core.Rollback
             _localSamples = new int[playerCount][];
             _remoteSamples = new int[playerCount][];
             _sampleCount = new int[playerCount];
+            _removed = new bool[playerCount];
             for (int p = 0; p < playerCount; p++)
             {
                 _latestRemoteTick[p] = startTick;
@@ -46,9 +48,20 @@ namespace Airerage.Core.Rollback
             return localTick - _latestRemoteTick[remote];
         }
 
+        /// <summary>相手 remote が試合から抜けた（その人との差はもう考えない）。</summary>
+        public void Remove(int remote)
+        {
+            _removed[remote] = true;
+            _sampleCount[remote] = 0;
+        }
+
         /// <summary>相手 remote からメッセージが届いたときに呼ぶ。</summary>
         public void OnMessage(int remote, int localTick, int senderTick, int senderAdvantage)
         {
+            if (_removed[remote])
+            {
+                return;
+            }
             _latestRemoteTick[remote] = Math.Max(_latestRemoteTick[remote], senderTick);
             int index = _sampleCount[remote] % Window;
             _localSamples[remote][index] = localTick - senderTick;

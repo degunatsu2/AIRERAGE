@@ -215,6 +215,11 @@ namespace Airerage.Core.Simulation
             for (int i = 0; i < _states.Count; i++)
             {
                 CharacterState state = _states[i];
+                if (inputs[i].IsHeld(InputButtons.Leave) && !state.Combat.HasLeft)
+                {
+                    // 試合から抜けた（ネットワーク対戦。全員が同じティックからこの入力を使う。docs/15 T6-10）。
+                    state = KnockoutResolver.Departed(state, _spawns[i]);
+                }
                 // 行動の速さの強化の間は、速さを上げた調整値で動かす（SpeedBoosts）。
                 _simulator.Step(ref state, phase == MatchPhase.Countdown ? default : inputs[i], SpeedBoosts.EffectiveConfig(state, _configs[i]), Tick, Rules.Seed);
                 _states[i] = state;

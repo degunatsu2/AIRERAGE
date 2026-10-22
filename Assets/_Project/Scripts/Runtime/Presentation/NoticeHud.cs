@@ -17,6 +17,7 @@ namespace Airerage.Runtime.Presentation
     ///   伸びるように出て、終わると縮んで消える。重なれば縦に積む。画面が狭くて右の表と重なるときは、タイマーの下に出す。
     /// - 画面を横切る帯（BannerStrip）: 100 枚のコインの予告の始まり「JACKPOT INCOMING」（虹色）と、COIN RUSH の始まり
     ///   （金色。短いファンファーレ）。
+    /// - 試合から抜けた人（ネットワーク対戦。docs/15 T6-10）: 「P3 LEFT」の札（灰色。LeftChipSeconds 秒）。
     /// 出来事の時刻は、ティック数とルールだけから決まる（BankRules、FieldCoinRules、MatchRules）。巻き戻しでもずれない。
     /// 拠点の予告の呼び鈴は BankView、100 枚のコインの警報は MatchAtmosphere が鳴らす。状態を読むだけで、書き換えない。
     /// </summary>
@@ -24,6 +25,9 @@ namespace Airerage.Runtime.Presentation
     {
         /// <summary>100 枚のコインが出た後に「JACKPOT 100」の札を残すティック（2 秒）。</summary>
         public const int JackpotChipTicks = 120;
+
+        /// <summary>抜けた人の札を出しておく秒数。</summary>
+        public const float LeftChipSeconds = 4f;
 
         private const int ChipWidth = 260;
         private const int ChipHeight = 36;
@@ -57,6 +61,10 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _seconds;
         private readonly BannerStrip _strip = new BannerStrip();
         private Band _band;
+
+        // キャラクターごとの、試合から抜けたか（前のフレーム）と、抜けた時刻（表示の時間）。
+        private bool[] _left = new bool[0];
+        private float[] _leftAt = new float[0];
 
         private sealed class Chip
         {
@@ -148,6 +156,7 @@ namespace Airerage.Runtime.Presentation
                     UpdateBankChip(rules, tick);
                     UpdateJackpotChip(rules, tick);
                 }
+                UpdateLeftChips();
                 _lastTick = tick;
             }
             // 出来事が終わった札は、つぶれるように消す。
@@ -224,6 +233,41 @@ namespace Airerage.Runtime.Presentation
                 chip.Seconds = -1;
             }
         }
+
+        // 試合から抜けた人の札（抜けた瞬間から LeftChipSeconds 秒）。人数が変わったら、今の様子から数え直す（前から抜けていた人は出さない）。
+        private void UpdateLeftChips()
+        {
+            int count = _feed.CharacterCount;
+            if (_left.Length != count)
+            {
+                _left = new bool[count];
+                _leftAt = new float[count];
+                for (int i = 0; i < count; i++)
+                {
+                    _left[i] = _feed.GetState(i).Combat.HasLeft;
+                    _leftAt[i] = float.NegativeInfinity;
+                }
+                return;
+            }
+            for (int i = 0; i < count; i++)
+            {
+                bool left = _feed.GetState(i).Combat.HasLeft;
+                if (left && !_left[i])
+                {
+                    _leftAt[i] = Time.time;
+                    LeftChipsShown++;
+                }
+                _left[i] = left;
+                if (left && Time.time - _leftAt[i] < LeftChipSeconds)
+                {
+                    Chip chip = Show("left" + i, $"P{i + 1} LEFT", false, new Color(0.7f, 0.72f, 0.78f));
+                    chip.Seconds = -1;
+                }
+            }
+        }
+
+        /// <summary>抜けた人の札を出した回数（テスト用）。</summary>
+        public int LeftChipsShown { get; private set; }
 
         // 札を出す（もう出ていれば、見出しだけを変える）。
         private Chip Show(string key, string title, bool jackpot, Color color)

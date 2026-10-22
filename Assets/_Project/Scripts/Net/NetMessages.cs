@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using Airerage.Core.Input;
 
 namespace Airerage.Net
 {
@@ -35,6 +36,11 @@ namespace Airerage.Net
 
         /// <summary>クライアント → ホスト: 準備完了か（待機所の READY、キャラクター選択の決定。docs/15 T6-7）。</summary>
         Ready = 9,
+
+        /// <summary>
+        /// ホスト → クライアント: 試合中にプレイヤーが抜けた（試合の番号、抜けた人、抜けたティック、その前までのその人の入力。docs/15 T6-10）。
+        /// </summary>
+        Left = 10,
     }
 
     /// <summary>
@@ -324,6 +330,71 @@ namespace Airerage.Net
                 player = reader.ReadByte();
                 tick = reader.ReadInt32();
                 checksum = reader.ReadUInt64();
+            }
+        }
+
+        /// <summary>1 つの抜けた知らせに入れられる入力の最大の数（確実に届ける経路の大きさ 16 KB に収める）。</summary>
+        public const int MaxLeftInputs = 2400;
+
+        /// <summary>
+        /// プレイヤー player が抜けた（試合の番号 match）。fromTick からその人の入力は抜けた人の入力。inputs はティック startTick からの、
+        /// fromTick より前のその人の入力（受け手にまだ届いていないかもしれない分）。
+        /// </summary>
+        public static byte[] Left(int match, int player, int fromTick, int startTick, IReadOnlyList<PlayerInput> inputs)
+        {
+            if (inputs.Count > MaxLeftInputs)
+            {
+                throw new ArgumentException($"入力は {MaxLeftInputs} 個まで（{inputs.Count} 個）", nameof(inputs));
+            }
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write((byte)NetKind.Left);
+                writer.Write((byte)match);
+                writer.Write((byte)player);
+                writer.Write(fromTick);
+                writer.Write(startTick);
+                writer.Write((ushort)inputs.Count);
+                foreach (PlayerInput input in inputs)
+                {
+                    writer.Write(input.MoveX);
+                    writer.Write(input.MoveY);
+                    writer.Write(input.AimX);
+                    writer.Write(input.AimY);
+                    writer.Write((ushort)input.Buttons);
+                }
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        public static void ReadLeft(byte[] data, out int match, out int player, out int fromTick, out int startTick,
+            out PlayerInput[] inputs)
+        {
+            const int header = 1 + 1 + 1 + 4 + 4 + 2;
+            Expect(data, NetKind.Left, header);
+            using (var reader = new BinaryReader(new MemoryStream(data)))
+            {
+                reader.ReadByte();
+                match = reader.ReadByte();
+                player = reader.ReadByte();
+                fromTick = reader.ReadInt32();
+                startTick = reader.ReadInt32();
+                int count = reader.ReadUInt16();
+                if (data.Length != header + count * 6)
+                {
+                    throw new FormatException($"抜けた知らせの長さが合いません（入力 {count} 個、{data.Length} バイト）");
+                }
+                inputs = new PlayerInput[count];
+                for (int i = 0; i < count; i++)
+                {
+                    sbyte moveX = reader.ReadSByte();
+                    sbyte moveY = reader.ReadSByte();
+                    sbyte aimX = reader.ReadSByte();
+                    sbyte aimY = reader.ReadSByte();
+                    var buttons = (InputButtons)reader.ReadUInt16();
+                    inputs[i] = new PlayerInput(moveX, moveY, buttons, aimX, aimY);
+                }
             }
         }
 
