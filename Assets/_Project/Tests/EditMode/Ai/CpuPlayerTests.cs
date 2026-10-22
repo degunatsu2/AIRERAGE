@@ -153,7 +153,7 @@ namespace Airerage.Core.Tests.Ai
         }
 
         // CPU に操作させて、done になるか maxTicks まで進める（CPU のいない番号は何もしない）。
-        private static bool Run(SimWorld world, IReadOnlyList<CpuPlayer> cpus, int maxTicks, System.Func<bool> done)
+        internal static bool Run(SimWorld world, IReadOnlyList<CpuPlayer> cpus, int maxTicks, System.Func<bool> done)
         {
             var inputs = new PlayerInput[world.CharacterCount];
             for (int t = 0; t < maxTicks; t++)

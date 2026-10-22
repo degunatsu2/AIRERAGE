@@ -39,7 +39,9 @@ namespace Airerage.Core.Ai
     /// - 動き（毎ティック）: 目標へ走る・跳ぶ・空中ジャンプ・ワイヤー（つながる所を WireTargeting.PredictShot で確かめて撃ち、目標の方へ
     ///   振れたら離す）。
     /// - 攻撃: 相手が判定の届く所にいれば（今の位置で判定の箱と相手の箱が重なるか）、反応の遅れの後に出す。撃破の範囲の端の近くでは撃破技。
-    /// - 守り・技: 近くの相手が攻撃を出したら、確率でガード。技（Q・E・R）は、使えて相手が近ければ確率で使う（短く押す）。
+    /// - 守り: 近くの相手が攻撃を出したら、確率でガード。
+    /// - 技（Q・E・R）: 使えて、技のデータから見て今が使い時なら（CpuSkills.Plan）、確率で使う。押す長さ・照準・長押しの間に押す
+    ///   ボタンも CpuSkills が決める。落ちそうなときの技（足場・ワープなど）は確率を上げる。
     /// 乱数はティックと番号と試合の種から作るので、同じ入力の並びなら何度でも同じ動きになる。覚えていること（目標など）はこの中に持つ。
     /// </summary>
     public sealed class CpuPlayer
@@ -60,8 +62,7 @@ namespace Airerage.Core.Ai
         // ワイヤーを離してから、次に撃つまでの間（ティック。戻るときは待たない。撃ちすぎてせわしなく見えないように）。
         private const int WireGapTicks = 15;
 
-        // 技を使う相手の近さ（m）と、ガードを考える相手の近さ（m）。
-        private const float SkillRange = 7f;
+        // ガードを考える相手の近さ（m）。
         private const float GuardRange = 3.5f;
 
         // 撃破技を優先する、相手と撃破の範囲の端との距離（m）。
@@ -90,8 +91,9 @@ namespace Airerage.Core.Ai
         private Vector3 _stuckFrom;
         private int _stuckSinceTick;
         private int _wanderUntilTick = -1;
-        private InputButtons _skillPress;
-        private Vector2 _skillAim;
+        private CpuSkillUse _skill;
+        private bool _skillPlanned;
+        private int _skillStartTick = -1;
 
         /// <param name="index">操作するキャラクターの番号。</param>
         /// <param name="salt">乱数を CPU ごとに変える値（同じ番号でも、試合ごとに変えたいときに）。</param>
@@ -124,6 +126,9 @@ namespace Airerage.Core.Ai
         /// <summary>撃ったワイヤーの数。</summary>
         public int WiresFired { get; private set; }
 
+        /// <summary>技（Q・E・R）を押し始めた数。</summary>
+        public int SkillsStarted { get; private set; }
+
         /// <summary>
         /// 次のティックの入力を作る（world は今のティックの状態。world.Step に渡す前に呼ぶ）。
         /// </summary>
@@ -144,6 +149,8 @@ namespace Airerage.Core.Ai
                 _wireAttachedTick = -1;
                 _stuckSinceTick = tick;
                 _stuckFrom = self.Position;
+                _skillPlanned = false;
+                _skillStartTick = -1;
                 return default;
             }
 
@@ -174,15 +181,12 @@ namespace Airerage.Core.Ai
             else
             {
                 Steer(world, self, config, tick, ref moveX, ref moveY, ref buttons, ref aim);
-                Attack(world, self, config, tick, ref moveX, ref moveY, ref buttons);
-                ConsiderGuard(world, self, tick, ref buttons);
-                if (_skillPress != InputButtons.None && (buttons & (InputButtons.Attack | InputButtons.Guard)) == 0)
+                if (_skillStartTick < 0)
                 {
-                    // 技は 1 ティックだけ押す（長押しの技は、短く押したときの形で出る）。
-                    buttons |= _skillPress;
-                    aim = _skillAim;
-                    _skillPress = InputButtons.None;
+                    Attack(world, self, config, tick, ref moveX, ref moveY, ref buttons);
+                    ConsiderGuard(world, self, tick, ref buttons);
                 }
+                PressSkill(world, self, tick, ref buttons, ref aim);
             }
 
             PlayerInput input = PlayerInput.FromAxes(Clamp(moveX), Clamp(moveY), buttons);
@@ -194,8 +198,14 @@ namespace Airerage.Core.Ai
             return input;
         }
 
-        // 目標を選ぶ。落ちそうなら戻る。行き詰まっていたら歩き回る。それ以外は、コイン・拠点・相手のうち点数の高いもの。
         private void Decide(SimWorld world, in CharacterState self, int tick)
+        {
+            DecideGoal(world, self, tick);
+            DecideSkill(world, self, tick);
+        }
+
+        // 目標を選ぶ。落ちそうなら戻る。行き詰まっていたら歩き回る。それ以外は、コイン・拠点・相手のうち点数の高いもの。
+        private void DecideGoal(SimWorld world, in CharacterState self, int tick)
         {
             Vector2 position = Flat(self.Position);
             if (Vector3.Distance(self.Position, _stuckFrom) > 1f)
@@ -286,21 +296,72 @@ namespace Airerage.Core.Ai
                     TargetCharacter = other;
                 }
             }
+        }
 
-            // 技: 使えて、相手が近ければ（確率）。
-            _skillPress = InputButtons.None;
-            int near = NearestOpponent(world, position, SkillRange);
-            if (near >= 0 && self.Action.IsFree)
+        // 技を選ぶ: 使える技のうち、今が使い時のもの（CpuSkills.Plan）を確率で。押すのは PressSkill。
+        private void DecideSkill(SimWorld world, in CharacterState self, int tick)
+        {
+            _skillPlanned = false;
+            if (_skillStartTick >= 0 || !(self.Action.IsFree || self.Wire.Phase == WirePhase.Attached) || self.Combat.Holding)
             {
-                foreach (AttackSlot slot in Skills)
+                return;
+            }
+            Vector2 position = Flat(self.Position);
+            int near = NearestOpponent(world, position, float.MaxValue, out float nearDistance);
+            bool overVoid = world.Bounds.HasValue && OverVoid(world, self);
+            var situation = new CpuSituation(Goal, Target, near, nearDistance, overVoid, _tuning.BankAtHeldCoins);
+            CharacterConfig config = world.GetConfig(_index);
+            foreach (AttackSlot slot in Skills)
+            {
+                if (!ActionController.CanUse(self, slot, config.Combat) || !CpuSkills.Plan(world, _index, self, config, situation, slot, out CpuSkillUse use))
                 {
-                    if (ActionController.CanUse(self, slot, world.GetConfig(_index).Combat) && Chance(tick, 200 + (int)slot, _tuning.SkillChance))
-                    {
-                        _skillPress = ButtonOf(slot);
-                        _skillAim = Flat(world.GetState(near).Position) - position;
-                        break;
-                    }
+                    continue;
                 }
+                float chance = use.Urgent ? Math.Min(1f, _tuning.SkillChance * 2f + 0.2f) : _tuning.SkillChance;
+                if (Chance(tick, 200 + (int)slot, chance))
+                {
+                    _skill = use;
+                    _skillPlanned = true;
+                    return;
+                }
+            }
+        }
+
+        // 選んだ技を押す: 押し始めは、攻撃・ガードをしていないティック。押している間は攻撃・ワイヤー・ガードを押さず（長押しの間の
+        // ワイヤー・攻撃はクリームの味を選んでしまう）、照準は相手の方へ向け続ける。のけぞったら、やめる。
+        private void PressSkill(SimWorld world, in CharacterState self, int tick, ref InputButtons buttons, ref Vector2 aim)
+        {
+            if (_skillStartTick < 0)
+            {
+                bool free = self.Action.IsFree || self.Wire.Phase == WirePhase.Attached;
+                if (!_skillPlanned || !free || (buttons & (InputButtons.Attack | InputButtons.Guard)) != 0)
+                {
+                    return;
+                }
+                _skillPlanned = false;
+                _skillStartTick = tick;
+                SkillsStarted++;
+                buttons &= ~InputButtons.Jump;
+            }
+            int elapsed = tick - _skillStartTick;
+            if (elapsed >= _skill.HoldTicks || self.Action.Kind == ActionKind.Hitstun)
+            {
+                _skillStartTick = -1;
+                return;
+            }
+            buttons &= ~(InputButtons.Attack | InputButtons.Wire | InputButtons.Guard);
+            buttons |= ActionController.ButtonOf(_skill.Slot);
+            if (_skill.Choice != InputButtons.None && elapsed == _skill.ChoiceTick)
+            {
+                buttons |= _skill.Choice;
+            }
+            if (_skill.AimAt >= 0)
+            {
+                aim = Flat(world.GetState(_skill.AimAt).Position) - Flat(self.Position);
+            }
+            else if (_skill.Aim != Vector2.Zero)
+            {
+                aim = _skill.Aim;
             }
         }
 
@@ -677,7 +738,7 @@ namespace Airerage.Core.Ai
             return new Vector2(x, y);
         }
 
-        private int NearestOpponent(SimWorld world, Vector2 position, float range)
+        private int NearestOpponent(SimWorld world, Vector2 position, float range, out float distanceToNearest)
         {
             int nearest = -1;
             float best = range;
@@ -699,20 +760,8 @@ namespace Airerage.Core.Ai
                     nearest = other;
                 }
             }
+            distanceToNearest = nearest >= 0 ? best : float.MaxValue;
             return nearest;
-        }
-
-        private static InputButtons ButtonOf(AttackSlot slot)
-        {
-            switch (slot)
-            {
-                case AttackSlot.Special1:
-                    return InputButtons.Special1;
-                case AttackSlot.Special2:
-                    return InputButtons.Special2;
-                default:
-                    return InputButtons.Super;
-            }
         }
 
         // 0〜1 の乱数（ティック・目的・番号・CPU の値から決まる）。
