@@ -5,6 +5,7 @@ using Airerage.Core.Common;
 using Airerage.Core.Input;
 using Airerage.Core.Movement;
 using Airerage.Core.Physics;
+using Airerage.Core.Skills;
 using Airerage.Core.Wire;
 
 namespace Airerage.Core.Simulation
@@ -76,6 +77,13 @@ namespace Airerage.Core.Simulation
                 state.Combat.FrozenTicksLeft = 0;
                 state.Combat.CreamStickTicksLeft = 0;
                 state.Combat.StunTicksLeft = 0;
+            }
+            else if (state.Combat.PendingStunTicks > 0)
+            {
+                // 攻撃の追加効果の感電（AttackHit.StunTicks。ボールライトニング）: のけぞりが終わったら感電する。
+                int stun = state.Combat.PendingStunTicks;
+                state.Combat.PendingStunTicks = 0;
+                ElectricRules.Stun(ref state, config, stun, config.Skills.Inverter.StunGuardTicks);
             }
             if (state.Combat.StunGuardTicks > 0)
             {

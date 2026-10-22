@@ -118,6 +118,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions: []
       AirNeutral:
         Name: WHIRLWIND
@@ -160,6 +161,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         - StartTick: 10
           ActiveTicks: 3
           UntilEnd: 0
@@ -177,6 +179,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         - StartTick: 16
           ActiveTicks: 4
           UntilEnd: 0
@@ -194,6 +197,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions: []
       AirSide:
         Name: GALE SLASH
@@ -236,6 +240,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions: []
       AirUp:
         Name: 
@@ -278,6 +283,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions: []
       AirDown:
         Name: DOWNBURST
@@ -320,6 +326,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions:
         - StartTick: 12
           Ticks: 10
@@ -478,6 +485,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         HeldCoinsPerBonusPercent: 0
         MaxHeldCoinBonusPercent: 0
       Run:
@@ -538,6 +546,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Beam:
         HalfWidth: 0.75
         IntervalTicks: 10
@@ -560,6 +569,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       SlowFall:
         MaxFallSpeed: 3
       CottonCandy:
@@ -620,6 +630,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Scale:
         OffsetY: -1.2
         Gravity: 32
@@ -649,6 +660,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Inverter:
         RangeScale: 0.33333334
         WhipHalfThickness: 0.25
@@ -671,6 +683,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         WaveSpeed: 36
         WaveRadius: 0.5
         StunTicks: 60
@@ -684,6 +697,25 @@ MonoBehaviour:
         TravelDistance: 14
         TrapTicks: 300
         Radius: 1.1
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 10
+          Gauge: 0
+          HitstopTicks: 6
+          HitstunTicks: 16
+          KnockbackX: 3
+          KnockbackY: 5
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          StunTicks: 60
   _displayName: STORM RUNNER
   _logo: {fileID: 2800000, guid: efe492c73f2279bb083673da4d79f498, type: 2}
   _special1Icon: {fileID: 0}

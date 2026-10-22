@@ -42,6 +42,19 @@ namespace Airerage.PlayMode.Tests
             yield return WaitSeconds(0.6f);
             ISimulationFeed feed = runner;
 
+            // 地上技（THUNDER KICK）: 前と後ろの両方の判定に雷を走らせる（後ろに出ていなかった。2026-10-22）。
+            Assert.That(feed.GetState(0).Grounded, Is.True, "前提: 地上にいる");
+            runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Attack), default });
+            int sparks = 0;
+            float kickStart = Time.time;
+            while (Time.time - kickStart < 0.4f)
+            {
+                sparks = Mathf.Max(sparks, electric.AttackSparkCount(0));
+                yield return null;
+            }
+            Assert.That(sparks, Is.EqualTo(2), "地上技の前後の判定の両方に雷を出さない");
+            yield return WaitSeconds(0.8f);
+
             // Q を短く押す: 突撃の跡。続きを出せる間、札に CHAIN。
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special1), default });
             bool dashed = false;
@@ -89,8 +102,10 @@ namespace Airerage.PlayMode.Tests
             state.Combat.Gauge = CombatTuning.MaxGauge;
             runner.SetPlayerState(state);
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Super), default });
-            yield return WaitSeconds(1.2f);
+            // 3 つとも出した直後に数える（当たった球は消えるので、ダミーに当たると減る。2026-10-22）。
+            yield return WaitSeconds(0.15f);
             Assert.That(feed.Objects.Items.Count(o => o.Kind == WorldObjectKind.BallLightning), Is.EqualTo(3), "電気の球を 3 つ撃たない");
+            yield return WaitSeconds(1f);
         }
 
         [UnityTest]

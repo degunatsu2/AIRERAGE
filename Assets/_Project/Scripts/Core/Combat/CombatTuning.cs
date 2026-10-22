@@ -80,6 +80,12 @@ namespace Airerage.Core.Combat
         /// <summary>長押しの技で、この判定を出す押し方（AttackData.ChargedFromTicks。SOLDERER の Q）。</summary>
         public ChargeFilter Charge;
 
+        /// <summary>
+        /// 攻撃の追加効果の感電（ティック。0 なら感電させない）。当たったら、のけぞりが終わった後にこの長さだけ感電させる（のけぞると
+        /// 感電は解けるため、のけぞりの後に。CombatState.PendingStunTicks。SOLDERER のボールライトニング。2026-10-22）。
+        /// </summary>
+        public int StunTicks;
+
         public bool IsActiveAt(int ticks)
         {
             return ticks >= StartTick && (UntilEnd || ticks < StartTick + ActiveTicks);
@@ -100,6 +106,7 @@ namespace Airerage.Core.Combat
             v.InRange(nameof(Gauge), Gauge, 0f, CombatTuning.MaxGauge);
             v.NonNegative(nameof(HitstopTicks), HitstopTicks);
             v.NonNegative(nameof(HitstunTicks), HitstunTicks);
+            v.NonNegative(nameof(StunTicks), StunTicks);
             v.Positive(nameof(CriticalScale), CriticalScale);
             return v;
         }

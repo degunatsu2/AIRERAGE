@@ -676,7 +676,7 @@ namespace Airerage.Core.Skills
     /// <summary>
     /// ボールライトニング（SOLDERER の R。ユーザーの案、2026-10-21。値は【仮】）。Count 個を IntervalTicks ごとに、放つときの照準の方向へ
     /// 放つ（R を離していても、1 つずつ放つ瞬間の照準の方向へ。AttackData.TracksAim。2026-10-22）。ゆっくり進み、壁で跳ね返る。TravelDistance 進むと止まり、TrapTicks の
-    /// 間残る。触れた相手（持ち主以外）を感電させる（インバータの雷の波動と同じ。InverterTuning.StunTicks）。同じ球は同じ相手に 1 回だけ。
+    /// 間残る。持ち主以外に触れたら攻撃が当たり（Hit。威力と吹き飛び、のけぞりの後に感電）、球は消える（2026-10-22）。
     /// </summary>
     [Serializable]
     public sealed class BallLightningTuning
@@ -693,9 +693,19 @@ namespace Airerage.Core.Skills
         public int TrapTicks = 300;
         public float Radius = 1.1f;
 
+        /// <summary>
+        /// 触れたときの攻撃（位置・大きさ・出る時間は使わない。ユーザーの要望、2026-10-22: 威力 10・吹き飛び 3/5、追加効果で 1 秒の感電）。
+        /// 必殺技なのでゲージは 0。当たったら球は消える。
+        /// </summary>
+        public AttackHit Hit = new AttackHit
+        {
+            Damage = 10, Gauge = 0, HitstopTicks = 6, HitstunTicks = 16, KnockbackX = 3f, KnockbackY = 5f, StunTicks = 60,
+        };
+
         public TuningValidator Validate()
         {
             var v = new TuningValidator(nameof(BallLightningTuning));
+            v.NotNull(nameof(Hit), Hit);
             v.Positive(nameof(Count), Count);
             v.NonNegative(nameof(IntervalTicks), IntervalTicks);
             v.Positive(nameof(Speed), Speed);

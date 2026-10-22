@@ -207,6 +207,11 @@ namespace Airerage.Editor
             GameAudio audio = SandboxWireSceneBuilder.CreateAudio(runner);
             SandboxWireSceneBuilder.CreateComboHud(runner, everyone: true);
             SandboxWireSceneBuilder.CreateSkillHud(runner, audio, count);
+            // 頭上のプレイヤーの番号の札（ローカル対戦だけ。全員が入るカメラで自分を見失わないように。2026-10-22）。
+            var tags = new GameObject("PlayerTagHud").AddComponent<PlayerTagHud>();
+            SandboxWireSceneBuilder.SetReference(tags, "_source", runner);
+            SandboxWireSceneBuilder.SetReferenceArray(tags, "_views", characterViews);
+            SandboxWireSceneBuilder.SetReference(tags, "_camera", camera);
             MatchHud matchHud = SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
             SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();

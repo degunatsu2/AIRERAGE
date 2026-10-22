@@ -207,11 +207,15 @@ namespace Airerage.Core.Tests.Docs
                     return true;
                 case SkillEffect.CosmicRay:
                     hit = skills.Beam.Hit;
-                    label = $"ビーム ×{skills.Beam.Hits}";
+                    label = $"ビーム 1 回あたり。{skills.Beam.Hits} 回当たる";
                     return true;
                 case SkillEffect.TeaParty:
                     hit = skills.TeaParty.Hit;
-                    label = $"緑のマカロン ×{skills.TeaParty.Count}";
+                    label = $"緑のマカロン 1 個あたり。{skills.TeaParty.Count} 個投げる";
+                    return true;
+                case SkillEffect.BallLightning:
+                    hit = skills.BallLightning.Hit;
+                    label = $"電気の球 1 個あたり。{skills.BallLightning.Count} 個撃つ";
                     return true;
                 case SkillEffect.DropScale:
                     hit = skills.Scale.Hit;
@@ -232,7 +236,6 @@ namespace Airerage.Core.Tests.Docs
                 case SkillEffect.SlowFall:
                 case SkillEffect.CottonCandy:
                 case SkillEffect.Cream:
-                case SkillEffect.BallLightning:
                     hit = null;
                     label = null;
                     return false;
@@ -337,6 +340,11 @@ namespace Airerage.Core.Tests.Docs
             {
                 yield return $"指先は相手の中心から {Num(combat.CriticalCenterRadius)}m 以内に重なったときだけ当たり、FATAL";
             }
+            AttackHit stunning = entries.Select(e => e.Hit).FirstOrDefault(h => h.StunTicks > 0);
+            if (stunning != null)
+            {
+                yield return $"当たると、のけぞりの後に {stunning.StunTicks}F 感電";
+            }
             if (attack.BlocksProjectilesAbove)
             {
                 yield return "判定の間、上から来た投射物を防ぐ";
@@ -429,7 +437,7 @@ namespace Airerage.Core.Tests.Docs
                 case SkillEffect.BallLightning:
                     BallLightningTuning ball = s.BallLightning;
                     return $"電気の球 {ball.Count} 個を {ball.IntervalTicks}F ごとに、放つ瞬間の照準の方向へ（{Num(ball.Speed)} m/s、半径 {Num(ball.Radius)}m。" +
-                        $"{Num(ball.TravelDistance)}m で止まり {Seconds(ball.TrapTicks)}残る。触れると感電 {s.Inverter.StunTicks}F）";
+                        $"{Num(ball.TravelDistance)}m で止まり {Seconds(ball.TrapTicks)}残る。当たったら消える）";
                 default:
                     throw new InvalidOperationException($"性能表に効果 {effect} の書き方がない（MoveTable.EffectNote）");
             }

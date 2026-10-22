@@ -35,13 +35,15 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private LineRenderer _lineTemplate;
 
         private readonly List<Effects> _effects = new List<Effects>();
+        private readonly AttackHit[] _activeHits = new AttackHit[AttackData.MaxHits];
         private ISimulationFeed _feed;
 
         private sealed class Effects
         {
             public LineRenderer[] Bolts;
             public LineRenderer Inverter;
-            public LineRenderer AttackSpark;
+            public LineRenderer[] AttackSparks;
+            public int SparkCount;
             public LineRenderer Trail;
             public LineRenderer Aura;
             public readonly Vector3[] TrailPositions = new Vector3[TrailPoints];
@@ -61,6 +63,9 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>キャラクター index の攻撃の判定に稲妻を出しているか（テスト用）。</summary>
         public bool ShowsAttackSpark(int index) => index >= 0 && index < _effects.Count && _effects[index].Sparking;
+
+        /// <summary>キャラクター index の、稲妻を出している判定の数（前後に同時に出る判定は 2。テスト用）。</summary>
+        public int AttackSparkCount(int index) => index >= 0 && index < _effects.Count ? _effects[index].SparkCount : 0;
 
         /// <summary>キャラクター index のイナズマステップの跡を出しているか（テスト用）。</summary>
         public bool ShowsDash(int index) => index >= 0 && index < _effects.Count && _effects[index].Dashing;
@@ -117,12 +122,18 @@ namespace Airerage.Runtime.Presentation
                     DrawInverter(effects.Inverter, center, halfWidth, halfHeight, random);
                 }
 
+                // 出ている判定ごとに稲妻を走らせる（THUNDER KICK は前と後ろに同時に出る。2026-10-22）。
                 bool electric = config.Combat.Get(AttackSlot.Special2).Effect == SkillEffect.Inverter;
-                AttackHit hit = electric && alive ? ActiveHit(state, config.Combat) : null;
-                SetLine(effects.AttackSpark, effects.Sparking = hit != null);
-                if (hit != null)
+                int sparks = electric && alive ? ActiveHits(state, config.Combat, _activeHits) : 0;
+                effects.SparkCount = sparks;
+                effects.Sparking = sparks > 0;
+                for (int k = 0; k < effects.AttackSparks.Length; k++)
                 {
-                    DrawAttackSpark(effects.AttackSpark, state, hit, random);
+                    SetLine(effects.AttackSparks[k], k < sparks);
+                    if (k < sparks)
+                    {
+                        DrawAttackSpark(effects.AttackSparks[k], state, _activeHits[k], random);
+                    }
                 }
 
                 AttackData step = config.Combat.Get(AttackSlot.Special1);
@@ -143,22 +154,23 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        // 今出ている判定（最初の 1 つ。長押しかどうかで使う判定を選ぶ）。
-        private static AttackHit ActiveHit(in CharacterState state, CombatTuning combat)
+        // 今出ている判定（長押しかどうかで使う判定を選ぶ）を into に入れ、その数を返す。
+        private static int ActiveHits(in CharacterState state, CombatTuning combat, AttackHit[] into)
         {
             if (state.Action.Kind != ActionKind.Attack)
             {
-                return null;
+                return 0;
             }
             AttackData attack = combat.Get(state.Action.Attack);
+            int count = 0;
             foreach (AttackHit candidate in attack.Hits)
             {
-                if (candidate.IsActiveAt(state.Action.Ticks) && attack.Uses(candidate.Charge, state.Action.Charge))
+                if (count < into.Length && candidate.IsActiveAt(state.Action.Ticks) && attack.Uses(candidate.Charge, state.Action.Charge))
                 {
-                    return candidate;
+                    into[count++] = candidate;
                 }
             }
-            return null;
+            return count;
         }
 
         // 感電: 体を上から下へ走る 3 本の稲妻。
@@ -299,7 +311,12 @@ namespace Airerage.Runtime.Presentation
         {
             SetStun(effects, false);
             SetLine(effects.Inverter, effects.InverterOn = false);
-            SetLine(effects.AttackSpark, effects.Sparking = false);
+            effects.Sparking = false;
+            effects.SparkCount = 0;
+            foreach (LineRenderer spark in effects.AttackSparks)
+            {
+                SetLine(spark, false);
+            }
             effects.Charging = false;
             SetLine(effects.Aura, false);
             effects.Dashing = false;
@@ -313,13 +330,17 @@ namespace Airerage.Runtime.Presentation
             {
                 Bolts = new LineRenderer[Bolts],
                 Inverter = NewLine(index, "Inverter", 0.06f),
-                AttackSpark = NewLine(index, "AttackSpark", 0.07f),
+                AttackSparks = new LineRenderer[AttackData.MaxHits],
                 Trail = NewLine(index, "Trail", 0.5f),
                 Aura = NewLine(index, "Aura", 0.08f),
             };
             for (int k = 0; k < Bolts; k++)
             {
                 effects.Bolts[k] = NewLine(index, "StunBolt" + k, 0.08f);
+            }
+            for (int k = 0; k < effects.AttackSparks.Length; k++)
+            {
+                effects.AttackSparks[k] = NewLine(index, "AttackSpark" + k, 0.07f);
             }
             return effects;
         }

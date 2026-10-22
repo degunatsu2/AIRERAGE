@@ -416,9 +416,9 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
-        public void BallLightning_ThreeSlowBalls_StopAsTraps_AndStun()
+        public void BallLightning_ThreeSlowBalls_StopAsTraps()
         {
-            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(4f, GroundY, 0f));
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f));
             Edit(world, 0, s => { s.Combat.Gauge = CombatTuning.MaxGauge; return s; });
             Step(world, 2);
             for (int t = 0; t < 45; t++)
@@ -428,12 +428,50 @@ namespace Airerage.Core.Tests.Skills
             List<WorldObject> balls = world.Objects.Items.Where(o => o.Kind == WorldObjectKind.BallLightning).ToList();
             Assert.That(balls.Count, Is.EqualTo(3), "球が 3 つでない");
             Assert.That(world.GetState(0).Combat.Gauge, Is.EqualTo(CombatTuning.MaxGauge - 90 * CombatTuning.GaugePerPercent));
-            Assert.That(world.GetState(1).Combat.StunCount, Is.EqualTo(1), "球に触れて感電しない（同じ間に 2 回感電した）");
             Step(world, 150);
             Assert.That(world.Objects.Items.Where(o => o.Kind == WorldObjectKind.BallLightning).All(o => ElectricRules.IsResting(o)), Is.True,
                 "進んだ後に止まらない");
             Step(world, Sol.Skills.BallLightning.TrapTicks + 10);
             Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.BallLightning), Is.False, "止まってから消えない");
+        }
+
+        [Test]
+        public void BallLightning_HitsForDamage_StunsAfterTheHitstun_AndVanishes()
+        {
+            // 球は攻撃（威力 10・吹き飛び 3/5）で、追加効果としてのけぞりの後に感電させ、当たったら消える（ユーザーの要望、2026-10-22）。
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(4f, GroundY, 0f));
+            Edit(world, 0, s => { s.Combat.Gauge = CombatTuning.MaxGauge; return s; });
+            Step(world, 2);
+            AttackHit ballHit = Sol.Skills.BallLightning.Hit;
+            Assert.That(ballHit.Damage, Is.EqualTo(10));
+            Assert.That(ballHit.KnockbackX, Is.EqualTo(3f));
+            Assert.That(ballHit.KnockbackY, Is.EqualTo(5f));
+            HitRecord? hit = null;
+            for (int t = 0; t < 60 && hit == null; t++)
+            {
+                Step(world, 1, Press(InputButtons.Super).WithAim(Vector2.UnitX));
+                if (world.LastHits.Any(h => h.FromObject && h.Victim == 1))
+                {
+                    hit = world.LastHits.First(h => h.FromObject && h.Victim == 1);
+                }
+            }
+            Assert.That(hit.HasValue, Is.True, "球が当たらない");
+            Assert.That(hit.Value.Result, Is.EqualTo(HitResult.Hit));
+            Assert.That(hit.Value.Damage, Is.EqualTo(10), "威力が 10 でない");
+            Assert.That(world.Objects.Items.Count(o => o.Kind == WorldObjectKind.BallLightning), Is.EqualTo(2), "当たった球が消えない");
+            CharacterState dummy = world.GetState(1);
+            Assert.That(dummy.Action.Kind, Is.EqualTo(ActionKind.Hitstun), "のけぞらない");
+            Assert.That(dummy.Combat.IsStunned, Is.False, "のけぞりの前に感電した");
+            Assert.That(dummy.Combat.PendingStunTicks, Is.EqualTo(ballHit.StunTicks), "追加効果の感電を覚えない");
+
+            bool stunned = false;
+            for (int t = 0; t < 60 && !stunned; t++)
+            {
+                Step(world, 1);
+                stunned = world.GetState(1).Combat.IsStunned;
+            }
+            Assert.That(stunned, Is.True, "のけぞりの後に感電しない");
+            Assert.That(world.GetState(1).Combat.ComboDamage, Is.GreaterThanOrEqualTo(10));
         }
 
         [Test]

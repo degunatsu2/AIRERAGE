@@ -328,6 +328,8 @@ namespace Airerage.Core.Combat
             }
             victim.Combat.RewardDamage = (rewardContinues ? victim.Combat.RewardDamage : 0) + hit.Damage;
             victim.Combat.RewardAttacker = (byte)hit.Attacker;
+            // 追加効果の感電は、のけぞりが終わってから（次の攻撃を受けたら、その攻撃のものに置き換わる。感電させない攻撃なら消える）。
+            victim.Combat.PendingStunTicks = data.StunTicks;
             return !comboContinues;
         }
 

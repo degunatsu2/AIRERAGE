@@ -59,10 +59,11 @@ namespace Airerage.Core.Skills
 
         /// <summary>
         /// ボールライトニング: 放つまでは持ち主についていく。放ったら、そのときの照準（CombatState.SkillAim）の方向へ進み、地形で跳ね返る。
-        /// TravelDistance 進むと止まって TrapTicks の間残る。触れた相手を感電させる。
+        /// TravelDistance 進むと止まって TrapTicks の間残る。持ち主以外に触れたら攻撃が当たり（BallLightningTuning.Hit。追加効果で
+        /// のけぞりの後に感電）、球は消える（ユーザーの要望、2026-10-22）。
         /// </summary>
         public static void StepBall(ref WorldObject ball, ICollisionQuery terrain, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
-            StageBounds? bounds, int tick)
+            StageBounds? bounds, List<HitRecord> hits, int tick)
         {
             CharacterConfig ownerConfig = configs[ball.Owner];
             BallLightningTuning tuning = ownerConfig.Skills.BallLightning;
@@ -89,18 +90,20 @@ namespace Airerage.Core.Skills
             }
             for (int v = 0; v < states.Count; v++)
             {
-                if (v == ball.Owner || (ball.HitMask & (1u << v)) != 0)
+                CharacterState target = states[v];
+                if (v == ball.Owner || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
-                CharacterState target = states[v];
                 Vector3 half = configs[v].Movement.HalfExtents;
                 if (MathF.Abs(target.Position.X - ball.Position.X) < half.X + tuning.Radius
-                    && MathF.Abs(target.Position.Y - ball.Position.Y) < half.Y + tuning.Radius
-                    && Stun(ref target, configs[v], ownerConfig.Skills.Inverter))
+                    && MathF.Abs(target.Position.Y - ball.Position.Y) < half.Y + tuning.Radius)
                 {
-                    states[v] = target;
-                    ball.HitMask |= 1u << v;
+                    // 進んでいる向きへ（止まっていれば、球から離れる向きへ）吹き飛ばす。
+                    int facing = ball.Velocity.X > 0f ? 1 : ball.Velocity.X < 0f ? -1 : (target.Position.X >= ball.Position.X ? 1 : -1);
+                    hits.Add(new HitRecord(ball.Owner, v, ball.Slot, 0, tuning.Hit, facing, AttackPower.Normal, fromObject: true));
+                    ball.Ended = true;
+                    return;
                 }
             }
         }
@@ -149,12 +152,18 @@ namespace Airerage.Core.Skills
         /// </summary>
         public static bool Stun(ref CharacterState target, CharacterConfig targetConfig, InverterTuning tuning)
         {
-            if (target.Combat.IsUntouchable || target.Combat.StunGuardTicks > 0 || tuning.StunTicks <= 0)
+            return Stun(ref target, targetConfig, tuning.StunTicks, tuning.StunGuardTicks);
+        }
+
+        /// <summary>感電させる（stunTicks の間。終わってから guardTicks の間は、もう感電しない）。感電させたら true。</summary>
+        public static bool Stun(ref CharacterState target, CharacterConfig targetConfig, int stunTicks, int guardTicks)
+        {
+            if (target.Combat.IsUntouchable || target.Combat.StunGuardTicks > 0 || stunTicks <= 0)
             {
                 return false;
             }
-            target.Combat.StunTicksLeft = tuning.StunTicks;
-            target.Combat.StunGuardTicks = tuning.StunTicks + tuning.StunGuardTicks;
+            target.Combat.StunTicksLeft = stunTicks;
+            target.Combat.StunGuardTicks = stunTicks + guardTicks;
             target.Combat.StunCount++;
             target.Combat.Holding = false;
             target.Combat.HoldTicks = 0;

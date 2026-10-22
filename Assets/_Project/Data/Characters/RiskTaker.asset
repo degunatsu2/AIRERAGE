@@ -136,6 +136,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions:
         - StartTick: 8
           Ticks: 8
@@ -192,6 +193,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions: []
       AirSide:
         Name: 
@@ -234,6 +236,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions: []
       AirUp:
         Name: COIN TOSS
@@ -301,6 +304,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions:
         - StartTick: 16
           Ticks: 12
@@ -459,6 +463,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         HeldCoinsPerBonusPercent: 3
         MaxHeldCoinBonusPercent: 100
       Run:
@@ -519,6 +524,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Beam:
         HalfWidth: 0.75
         IntervalTicks: 10
@@ -541,6 +547,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       SlowFall:
         MaxFallSpeed: 3
       CottonCandy:
@@ -601,6 +608,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Scale:
         OffsetY: -1.2
         Gravity: 32
@@ -630,6 +638,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Inverter:
         RangeScale: 0.33333334
         WhipHalfThickness: 0.25
@@ -652,6 +661,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         WaveSpeed: 36
         WaveRadius: 0.5
         StunTicks: 60
@@ -665,6 +675,25 @@ MonoBehaviour:
         TravelDistance: 14
         TrapTicks: 300
         Radius: 1.1
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 10
+          Gauge: 0
+          HitstopTicks: 6
+          HitstunTicks: 16
+          KnockbackX: 3
+          KnockbackY: 5
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          StunTicks: 60
   _displayName: RISK TAKER
   _logo: {fileID: 2800000, guid: 1a21ce27e35e469a0a863c15f13e2e64, type: 2}
   _special1Icon: {fileID: 0}

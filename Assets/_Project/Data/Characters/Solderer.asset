@@ -118,6 +118,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         - StartTick: 4
           ActiveTicks: 4
           UntilEnd: 0
@@ -135,6 +136,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions:
         - StartTick: 0
           Ticks: 4
@@ -191,6 +193,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions: []
       AirSide:
         Name: FINGER SPARK
@@ -233,6 +236,7 @@ MonoBehaviour:
           Critical: 1
           CriticalScale: 2.5
           Charge: 0
+          StunTicks: 0
         - StartTick: 6
           ActiveTicks: 14
           UntilEnd: 0
@@ -250,6 +254,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions: []
       AirUp:
         Name: THUNDER FLIP
@@ -292,6 +297,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         - StartTick: 7
           ActiveTicks: 3
           UntilEnd: 0
@@ -309,6 +315,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         - StartTick: 10
           ActiveTicks: 3
           UntilEnd: 0
@@ -326,6 +333,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions:
         - StartTick: 2
           Ticks: 1
@@ -375,6 +383,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         Motions:
         - StartTick: 4
           Ticks: 12
@@ -431,6 +440,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 1
+          StunTicks: 0
         - StartTick: 2
           ActiveTicks: 11
           UntilEnd: 0
@@ -448,6 +458,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 2
+          StunTicks: 0
         Motions:
         - StartTick: 0
           Ticks: 6
@@ -588,6 +599,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         HeldCoinsPerBonusPercent: 0
         MaxHeldCoinBonusPercent: 0
       Run:
@@ -648,6 +660,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Beam:
         HalfWidth: 0.75
         IntervalTicks: 10
@@ -670,6 +683,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       SlowFall:
         MaxFallSpeed: 3
       CottonCandy:
@@ -730,6 +744,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Scale:
         OffsetY: -1.2
         Gravity: 32
@@ -759,6 +774,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
       Inverter:
         RangeScale: 0.33333334
         WhipHalfThickness: 0.25
@@ -781,6 +797,7 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          StunTicks: 0
         WaveSpeed: 36
         WaveRadius: 0.5
         StunTicks: 60
@@ -794,6 +811,25 @@ MonoBehaviour:
         TravelDistance: 14
         TrapTicks: 300
         Radius: 1.1
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 10
+          Gauge: 0
+          HitstopTicks: 6
+          HitstunTicks: 16
+          KnockbackX: 3
+          KnockbackY: 5
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          StunTicks: 60
   _displayName: SOLDERER
   _logo: {fileID: 2800000, guid: 4f7d62fe05f522009a613ea4947a7a38, type: 2}
   _special1Icon: {fileID: 0}
@@ -813,6 +849,6 @@ MonoBehaviour:
     CooldownNote: 
   _superText:
     Name: "\u30DC\u30FC\u30EB\u30E9\u30A4\u30C8\u30CB\u30F3\u30B0"
-    Description: "\u5927\u304D\u306A\u96FB\u6C17\u306E\u7403\u30923\u3064\u3001\u305D\u308C\u305E\u308C\u653E\u3064\u77AC\u9593\u306E\u7167\u6E96\u306E\u65B9\u5411\u3078\u6483\u3064\u3002\u3086\u3063\u304F\u308A\u9032\u3093\u3067\u58C1\u3067\u8DF3\u306D\u8FD4\u308A\u3001\u6B62\u307E\u3063\u305F\u5F8C\u3082\u3057\u3070\u3089\u304F\u6B8B\u3063\u3066\u89E6\u308C\u305F\u4EBA\u3092\u611F\u96FB\u3055\u305B\u308B\u3002"
+    Description: "\u5927\u304D\u306A\u96FB\u6C17\u306E\u7403\u30923\u3064\u3001\u305D\u308C\u305E\u308C\u653E\u3064\u77AC\u9593\u306E\u7167\u6E96\u306E\u65B9\u5411\u3078\u6483\u3064\u3002\u3086\u3063\u304F\u308A\u9032\u3093\u3067\u58C1\u3067\u8DF3\u306D\u8FD4\u308A\u3001\u6B62\u307E\u3063\u305F\u5F8C\u3082\u3057\u3070\u3089\u304F\u6B8B\u308B\u3002\u5F53\u305F\u3063\u305F\u76F8\u624B\u3092\u611F\u96FB\u3055\u305B\u3066\u6D88\u3048\u308B\u3002"
     CooldownNote: 
   _costume: 5

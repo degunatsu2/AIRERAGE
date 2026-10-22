@@ -95,6 +95,21 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(runner.Players[1].Character, Is.EqualTo(character), "選んだキャラクターで始まらない");
                 Assert.That(runner.World.Rules.DurationTicks, Is.GreaterThan(0), "時間の制限がない");
 
+                // 頭上のプレイヤーの番号の札（ローカル対戦だけ。2026-10-22）: プレイヤーの色の枠と番号を、キャラクターの頭の上に出す。
+                var tags = UnityEngine.Object.FindFirstObjectByType<PlayerTagHud>();
+                Assert.That(tags, Is.Not.Null, "頭上の番号の札がない");
+                yield return null;
+                Camera view = Camera.main != null ? Camera.main : UnityEngine.Object.FindFirstObjectByType<Camera>();
+                for (int p = 0; p < runner.CharacterCount; p++)
+                {
+                    Assert.That(tags.TryGetTag(p, out Rect rect, out string label, out Color color), Is.True, $"P{p + 1} の札を出さない");
+                    Assert.That(label, Is.EqualTo(runner.LabelOf(p)), "番号が違う");
+                    Assert.That(color, Is.EqualTo(runner.ColorOf(p)), "枠がプレイヤーの色でない");
+                    Vector3 body = view.WorldToScreenPoint(runner.GetState(p).Position.ToUnity());
+                    Assert.That(rect.yMax, Is.LessThan(Screen.height - body.y), "札が頭の上にない");
+                    Assert.That(rect.center.x, Is.EqualTo(body.x).Within(rect.width), "札がキャラクターの上にない");
+                }
+
                 // カウントダウンの後、それぞれの機器でそのキャラクターだけが動く。
                 int playing = runner.World.Rules.CountdownTicks + 10;
                 yield return WaitFor(() => runner.CurrentTick > playing && runner.GetState(0).Grounded && runner.GetState(1).Grounded, 8f,

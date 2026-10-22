@@ -118,7 +118,7 @@ namespace Airerage.Core.Skills
                         ElectricRules.StepShockWave(ref item, states, configs, tick);
                         break;
                     case WorldObjectKind.BallLightning:
-                        ElectricRules.StepBall(ref item, ground, states, configs, bounds, tick);
+                        ElectricRules.StepBall(ref item, ground, states, configs, bounds, hits, tick);
                         break;
                 }
                 objects[o] = item;
