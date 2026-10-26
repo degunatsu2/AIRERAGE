@@ -228,6 +228,15 @@ namespace Airerage.Core.Combat
         public int DrownTicks;
         public int SplashCount;
 
+        /// <summary>
+        /// 悪魔の手（StageZoneKind.Grab。ユーザーの要望、2026-10-26）: 握られてからのティック（0 なら握られていない。握られている間は
+        /// 動けず、手と一緒に動き、何にも触れない。StageZones.HoldCapture）、握っている手のギミックの番号（SimWorld.Zones）、
+        /// 握られた数（表示と効果音）。
+        /// </summary>
+        public int CaptureTicks;
+        public int CaptureZone;
+        public int CaptureCount;
+
         /// <summary>上から来た投射物を防いだ数（PASTRY CHEF のボウル。AttackData.BlocksProjectilesAbove。表示と効果音）。</summary>
         public int ShieldBlockCount;
 
@@ -253,10 +262,13 @@ namespace Airerage.Core.Combat
         /// 干渉されない（復帰を待つ間と、復帰した後の無干渉。MatchRules.InvincibleTicks）。攻撃・投射物・置かれた物・ステージの危険の影響を
         /// 受けず、自分の攻撃も相手に当たらない。
         /// </summary>
-        public bool IsUntouchable => RespawnTicksLeft > 0 || InvincibleTicksLeft > 0 || HasLeft || DrownTicks > 0;
+        public bool IsUntouchable => RespawnTicksLeft > 0 || InvincibleTicksLeft > 0 || HasLeft || DrownTicks > 0 || CaptureTicks > 0;
 
         /// <summary>溺れているか（水。動けず、沈んで撃破される）。</summary>
         public bool IsDrowning => DrownTicks > 0;
+
+        /// <summary>悪魔の手に握られているか（動けず、牢屋へ移される）。</summary>
+        public bool IsCaptured => CaptureTicks > 0;
 
         public bool Equals(CombatState other)
         {
@@ -309,7 +321,8 @@ namespace Airerage.Core.Combat
                 && WaveCooldownTicks == other.WaveCooldownTicks && HasStunKnockback == other.HasStunKnockback
                 && StunKnockbackX.Equals(other.StunKnockbackX) && StunKnockbackY.Equals(other.StunKnockbackY)
                 && WaterTicksLeft == other.WaterTicksLeft && WaterFloatTicks == other.WaterFloatTicks && DrownTicks == other.DrownTicks
-                && SplashCount == other.SplashCount;
+                && SplashCount == other.SplashCount && CaptureTicks == other.CaptureTicks && CaptureZone == other.CaptureZone
+                && CaptureCount == other.CaptureCount;
         }
 
         public override bool Equals(object obj)
@@ -333,14 +346,14 @@ namespace Airerage.Core.Combat
                         HashCode.Combine(HoldVariant, CreamSpeedPercent, CreamWallJumpPercent, CreamNoCling, CreamStickTicksLeft, CreamStickSpent),
                         HashCode.Combine(ChainCount, ChainTicksLeft, InverterOn, StunTicksLeft, StunGuardTicks, StunCount, WhipGuardTicks,
                             HashCode.Combine(ShieldBlockCount, HasLeft, WaveCooldownTicks, HasStunKnockback, StunKnockbackX, StunKnockbackY,
-                                HashCode.Combine(WaterTicksLeft, WaterFloatTicks, DrownTicks, SplashCount))))));
+                                HashCode.Combine(WaterTicksLeft, WaterFloatTicks, DrownTicks, SplashCount, CaptureTicks, CaptureZone, CaptureCount))))));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} shield={ShieldBlockCount}{(HasLeft ? " left" : "")}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} capture={CaptureTicks}@{CaptureZone}({CaptureCount}) shield={ShieldBlockCount}{(HasLeft ? " left" : "")}";
         }
     }
 }

@@ -58,6 +58,12 @@ namespace Airerage.Core.Simulation
         /// <summary>水面に浮いている間、ジャンプできるようにする長さ（コヨーテタイム。ティック）。</summary>
         public const int WaterJumpCoyoteTicks = 2;
 
+        /// <summary>悪魔の手で牢屋へ移った後、また握られないティック数【仮】。</summary>
+        public const int GrabImmunityTicks = 120;
+
+        /// <summary>悪魔の手に握られている人の中心の、手の上の辺からの高さ（m。体の下が指の間に入る）【仮】。</summary>
+        public const float GrabHoldHeight = 0.4f;
+
         /// <summary>溺れてから沈む速さ（m/s）と、撃破の線に届かなくても撃破にするティック数【仮】。</summary>
         public const float DrownSinkSpeed = 2.5f;
         public const int DrownKnockoutTicks = 180;
@@ -353,10 +359,68 @@ namespace Airerage.Core.Simulation
                     case StageZoneKind.Water:
                         // 移動の前（ApplyWaterForces）と、この関数の初め（UpdateWater）に効かせる。
                         break;
+                    case StageZoneKind.Grab:
+                        if (CanBeHitByStage(state) && !state.Combat.IsUntouchable && state.Combat.HazardImmunityTicks <= 0
+                            && zone.Overlaps(state.Position, halfExtents))
+                        {
+                            Capture(ref state, i, config.Wire);
+                            // 握られたら、ほかのギミックは効かない。
+                            return;
+                        }
+                        break;
                     default:
                         throw new InvalidOperationException($"知らないギミックの種類です: {zone.Kind}");
                 }
             }
+        }
+
+        // 悪魔の手に握られる: 動けなくなり（ワイヤー・攻撃・ため・凍り・感電は終わる）、手と一緒に動き始める。
+        private static void Capture(ref CharacterState state, int zoneIndex, WireTuning wire)
+        {
+            WireController.Interrupt(ref state, wire);
+            state.Action = default;
+            state.Combat.Holding = false;
+            state.Combat.HoldTicks = 0;
+            state.Combat.FrozenTicksLeft = 0;
+            state.Combat.StunTicksLeft = 0;
+            state.Combat.HasStunKnockback = false;
+            state.Combat.CreamStickTicksLeft = 0;
+            state.Combat.CaptureTicks = 1;
+            state.Combat.CaptureZone = zoneIndex;
+            state.Combat.CaptureCount++;
+            state.Velocity = Vector3.Zero;
+            state.Grounded = false;
+            state.WallSide = 0;
+            state.JumpBufferTicksLeft = 0;
+            state.CoyoteTicksLeft = 0;
+        }
+
+        /// <summary>
+        /// 悪魔の手に握られている人を 1 ティック進める（CharacterSimulator が、ほかの処理の代わりに呼ぶ）: 手の上に握られたまま手と
+        /// 一緒に動き、握られてから手の Power 秒で、手の Target（牢屋）へ移る（止まった状態。GrabImmunityTicks の間は、また握られない）。
+        /// </summary>
+        public static void HoldCapture(ref CharacterState state, IReadOnlyList<StageZone> zones, int tick)
+        {
+            int index = state.Combat.CaptureZone;
+            if (zones == null || index < 0 || index >= zones.Count || zones[index].Kind != StageZoneKind.Grab)
+            {
+                // 手がない（ありえないが、状態を壊さないように放す）。
+                state.Combat.CaptureTicks = 0;
+                return;
+            }
+            StageZone hand = zones[index].At(tick);
+            state.Combat.CaptureTicks++;
+            state.Velocity = Vector3.Zero;
+            int total = Math.Max(1, (int)MathF.Round(hand.Power * SimTime.TicksPerSecond));
+            if (state.Combat.CaptureTicks > total)
+            {
+                state.Position = new Vector3(hand.Target.X, hand.Target.Y, 0f);
+                state.Combat.CaptureTicks = 0;
+                state.Combat.HazardImmunityTicks = GrabImmunityTicks;
+                state.Grounded = false;
+                return;
+            }
+            state.Position = new Vector3((hand.MinX + hand.MaxX) * 0.5f, hand.MaxY + GrabHoldHeight, 0f);
         }
 
         // 外から入ったかを調べる範囲: 動くギミックは 1 つ前のティックの範囲（ゲートのほうが動いてきて重なったときも、入ったとみなす）。
@@ -409,11 +473,22 @@ namespace Airerage.Core.Simulation
             {
                 return;
             }
-            WireController.Interrupt(ref state, wire);
             float speed = zone.Limit > 0f ? zone.Limit : HazardKnockbackSpeed(zone.Power);
             // 柱の真ん中から外へ少し押し出す（同じ所に落ちてこないように）。
             float away = p.X >= (minX + maxX) * 0.5f ? 1f : -1f;
-            state.Velocity = new Vector3(zone.Direction.X * speed + away * 3f, zone.Direction.Y * speed, 0f);
+            Strike(ref state, new Vector3(zone.Direction.X * speed + away * 3f, zone.Direction.Y * speed, 0f), Math.Max(1, (int)zone.Power),
+                zone.ActiveTicks + 20, wire);
+        }
+
+        /// <summary>
+        /// ステージの危険に当たる（溶岩流・つらら・研究所のミサイル・競技場のボール）: ワイヤーが外れ、velocity で吹き飛んでのけぞり
+        /// （HazardHitstunTicks。ヒットストップ HazardHitstopTicks）、power の枚数のコインを落とす（SimWorld が CoinDropRules.DropOnHazards
+        /// で落とす。ユーザーの要望、2026-10-20・21）。immunityTicks の間は、ほかのステージの危険に当たらない。
+        /// </summary>
+        public static void Strike(ref CharacterState state, Vector3 velocity, int power, int immunityTicks, WireTuning wire)
+        {
+            WireController.Interrupt(ref state, wire);
+            state.Velocity = velocity;
             state.Action = new ActionState { Kind = ActionKind.Hitstun, Duration = HazardHitstunTicks };
             state.Combat.Holding = false;
             state.Combat.HoldTicks = 0;
@@ -421,13 +496,18 @@ namespace Airerage.Core.Simulation
             state.Combat.StunTicksLeft = 0;
             state.Combat.HasStunKnockback = false;
             state.Combat.HitstopTicksLeft = Math.Max(state.Combat.HitstopTicksLeft, HazardHitstopTicks);
-            state.Combat.HazardImmunityTicks = zone.ActiveTicks + 20;
+            state.Combat.HazardImmunityTicks = Math.Max(state.Combat.HazardImmunityTicks, immunityTicks);
             state.Combat.HazardHitCount++;
-            // 威力の枚数のコインを落とす（SimWorld が CoinDropRules.DropOnHazards で落とす。ユーザーの要望、2026-10-20・21）。
-            state.Combat.HazardDropPower = Math.Max(1, (int)zone.Power);
+            state.Combat.HazardDropPower = Math.Max(1, power);
             state.Grounded = false;
             state.WallSide = 0;
             state.JumpBufferTicksLeft = 0;
+        }
+
+        /// <summary>ステージの危険に当たる状態か（撃破されて待っている間・干渉されない間・危険の後の当たらない間は当たらない）。</summary>
+        public static bool CanBeStruck(in CharacterState state)
+        {
+            return CanBeHitByStage(state) && !state.Combat.IsUntouchable && state.Combat.HazardImmunityTicks <= 0;
         }
 
         private static void Freeze(ref CharacterState state, StageZone zone, WireTuning wire)

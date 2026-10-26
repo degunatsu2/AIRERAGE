@@ -127,6 +127,16 @@ namespace Airerage.Runtime.Audio
                 // 溺れた。
                 _audio.Play(SoundId.Drown, 0.9f, 0.03f);
             }
+            if (n.CaptureCount > b.CaptureCount)
+            {
+                // 悪魔の手に握られた。
+                _audio.Play(SoundId.Grab, 1f, 0.04f);
+            }
+            if (n.CaptureTicks == 0 && b.CaptureTicks > 0)
+            {
+                // 時空に吸い込まれて、牢屋に現れた。
+                _audio.Play(SoundId.Vortex, 0.8f, 0.04f);
+            }
             if (n.FreezeCount > b.FreezeCount)
             {
                 _audio.Play(SoundId.Freeze, 0.9f, 0.04f);

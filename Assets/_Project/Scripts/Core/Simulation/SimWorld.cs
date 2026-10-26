@@ -28,6 +28,7 @@ namespace Airerage.Core.Simulation
         private readonly List<HitRecord> _projectileHits = new List<HitRecord>();
         private readonly WorldCollision _collision;
         private readonly List<StagePlatform> _platforms = new List<StagePlatform>();
+        private readonly List<StageTrap> _traps = new List<StageTrap>();
         private readonly StageState _stage = new StageState();
         private MatchState _match = MatchState.None;
 
@@ -37,16 +38,27 @@ namespace Airerage.Core.Simulation
         /// <param name="coinSpawns">コインの出現地点（docs/12 T4-4）。渡した順によらず、決まった順（CoinSpawnPoint.CompareTo）に並べて番号をつける。</param>
         /// <param name="bankSpots">拠点の候補の地点（docs/12 T4-7）。渡した順によらず、決まった順（BankSpot.CompareTo）に並べて番号をつける。</param>
         /// <param name="platforms">動く足場と扉（ユーザーの要望、2026-10-26）。渡した順によらず、決まった順（StagePlatform.CompareTo）に並べて番号をつける。</param>
+        /// <param name="traps">ステージの仕掛け（赤外線とミサイル、ピッチャーマシン。ユーザーの要望、2026-10-26）。決まった順（StageTrap.CompareTo）に
+        /// 並べて番号をつけ、ボールの道のりを collision（動かない地形）から求める。</param>
         public SimWorld(ICollisionQuery collision, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null, MatchRules rules = null,
             IReadOnlyList<CoinSpawnPoint> coinSpawns = null, IReadOnlyList<BankSpot> bankSpots = null,
-            IReadOnlyList<StagePlatform> platforms = null)
+            IReadOnlyList<StagePlatform> platforms = null, IReadOnlyList<StageTrap> traps = null)
         {
             if (platforms != null)
             {
                 _platforms.AddRange(platforms);
                 _platforms.Sort((a, b) => a.CompareTo(b));
             }
-            _stage.Reset(_platforms.Count);
+            if (traps != null)
+            {
+                _traps.AddRange(traps);
+                _traps.Sort((a, b) => a.CompareTo(b));
+                foreach (StageTrap trap in _traps)
+                {
+                    trap.Prepare(collision);
+                }
+            }
+            _stage.Reset(_platforms.Count, _traps.Count);
             var banks = new List<BankSpot>();
             if (bankSpots != null)
             {
@@ -85,7 +97,10 @@ namespace Airerage.Core.Simulation
         /// <summary>動く足場と扉（番号の順。CastHit.Body・WireState.AnchorBody は番号 + 1）。</summary>
         public IReadOnlyList<StagePlatform> Platforms => _platforms;
 
-        /// <summary>扉の開き具合（状態の一部。巻き戻しとチェックサムに乗る）。表示用に読むだけにする。</summary>
+        /// <summary>ステージの仕掛け（番号の順）。</summary>
+        public IReadOnlyList<StageTrap> Traps => _traps;
+
+        /// <summary>扉の開き具合と仕掛けの時刻（状態の一部。巻き戻しとチェックサムに乗る）。表示用に読むだけにする。</summary>
         public StageState Stage => _stage;
 
         /// <summary>ステージの範囲（null なら撃破はない）。</summary>
@@ -173,7 +188,7 @@ namespace Airerage.Core.Simulation
             }
             _coins.CopyFrom(snapshot.Coins);
             _objects.CopyFrom(snapshot.Objects);
-            if (snapshot.Stage.Count == _stage.Count)
+            if (snapshot.Stage.Count == _stage.Count && snapshot.Stage.TrapCount == _stage.TrapCount)
             {
                 _stage.CopyFrom(snapshot.Stage);
             }
@@ -248,6 +263,8 @@ namespace Airerage.Core.Simulation
                 _states[i] = state;
             }
             Tick++;
+            // ステージの仕掛け（赤外線とミサイル、ピッチャーマシンのボール）。
+            StageTraps.Step(_traps, _stage, _states, _configs, Tick);
             // ステージの危険に当たった人が、威力に応じてコインを落とす。
             CoinDropRules.DropOnHazards(Coins, _states, Rules, Tick);
             SkillRules.FireEffects(_objects, Coins, _states, _configs, Tick);
@@ -271,7 +288,7 @@ namespace Airerage.Core.Simulation
             }
             BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, active);
             CoinBonusRules.Mint(Coins, _states, Tick);
-            StagePlatforms.UpdateDoors(_platforms, _stage, _states, _configs);
+            StagePlatforms.UpdateDoors(_platforms, _stage, _states, _configs, Tick);
             if (phase == MatchPhase.Playing && Rules.HasTimeLimit && Tick == Rules.CountdownTicks + Rules.DurationTicks)
             {
                 MatchFlow.DecideAtTimeUp(ref _match, _states, Tick);

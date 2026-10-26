@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: SECRET LAB
   _sceneName: Stage_Lab
-  _description: Wire a door to open it. Ride the elevator, shoot up the pneumatic
-    tubes, dodge the lasers, float in the anti-gravity chamber.
+  _description: 'Hook the button above a door to open it. Don''t cross the infrared
+    beams: missiles fly along them. Ride the elevator, shoot up the pneumatic tubes.'
   _color: {r: 0.3, g: 0.95, b: 0.85, a: 1}

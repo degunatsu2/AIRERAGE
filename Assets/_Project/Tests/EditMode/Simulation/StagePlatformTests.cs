@@ -162,5 +162,67 @@ namespace Airerage.Core.Tests.Simulation
             Assert.That(world.Stage.OpenOf(0), Is.EqualTo(openBefore), "巻き戻しで扉の開き具合が戻らない");
             Assert.That(world.Checksum(), Is.EqualTo(snapshot.Checksum()));
         }
+        // ボタンで開く扉（ユーザーの要望、2026-10-26）: DoorWorld と同じ天井の穴と扉（ワイヤーがつながらない）、天井の下の左に組 1 のボタン。
+        private static SimWorld ButtonDoorWorld()
+        {
+            BoxTerrain terrain = new BoxTerrain().AddBox(-30f, -2f, 30f, 0f).AddBox(-30f, 4f, -0.5f, 6f).AddBox(0.5f, 4f, 30f, 6f);
+            StagePlatform door = StagePlatform.Door(new Vector2(0f, 2f), new Vector2(0.5f, 2f), false, 3.5f, 30, 180, 1);
+            StagePlatform button = StagePlatform.Button(new Vector2(-2f, 3.7f), new Vector2(0.3f, 0.3f), 1);
+            return new SimWorld(terrain, null, null, null, null, null, new[] { door, button });
+        }
+
+        [Test]
+        public void AButtonDoor_OpensOnlyWhileAWireIsOnItsButton_AndTheDoorItselfTakesNoWire()
+        {
+            SimWorld world = ButtonDoorWorld();
+            int doorIndex = world.Platforms[0].IsDoor ? 0 : 1;
+            world.AddCharacter(new CharacterConfig(), new Vector3(-5f, Movement.HalfHeight, 0f), 1);
+            // 扉そのものを狙っても、つながらず開かない。
+            var toDoor = Vector2.Normalize(new Vector2(5f, 1.5f));
+            Step(world, 30, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(toDoor));
+            Assert.That(world.GetState(0).Wire.Phase, Is.Not.EqualTo(WirePhase.Attached), "ワイヤーがつながらない扉につながった");
+            Assert.That(world.Stage.OpenOf(doorIndex), Is.Zero, "扉そのものを狙って開いた");
+            Step(world, 40);
+
+            // ボタンにつなぐと開く。
+            Vector3 p = world.GetState(0).Position;
+            var toButton = Vector2.Normalize(new Vector2(-2f - p.X, 3.7f - p.Y));
+            for (int t = 0; t < 40 && world.GetState(0).Wire.Phase != WirePhase.Attached; t++)
+            {
+                Step(world, 1, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(toButton));
+            }
+            Assert.That(world.GetState(0).Wire.Phase, Is.EqualTo(WirePhase.Attached), "ボタンにつながらない");
+            Assert.That(world.Platforms[world.GetState(0).Wire.AnchorBody - 1].IsButton, Is.True);
+            Step(world, 40, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(toButton));
+            Assert.That(world.Stage.OpenOf(doorIndex), Is.EqualTo(StagePlatform.DoorScale), "ボタンにつないでいるのに開ききらない");
+
+            // 離すと、閉じる速さ（180 ティック）でゆっくり閉じる。
+            Step(world, 90);
+            int half = world.Stage.OpenOf(doorIndex);
+            Assert.That(half, Is.GreaterThan(StagePlatform.DoorScale / 4).And.LessThan(StagePlatform.DoorScale * 3 / 4), "閉じる速さが違う");
+            Step(world, 100);
+            Assert.That(world.Stage.OpenOf(doorIndex), Is.Zero, "離しても閉じない");
+        }
+
+        [Test]
+        public void ATimedDoor_OpensAtTheStartOfEachPeriod()
+        {
+            BoxTerrain terrain = new BoxTerrain().AddBox(-30f, -2f, 30f, 0f);
+            // 600 ティックごとに、初めの 180 ティックだけ開く（ずれ 0 なので、試合の始まりから開き始める）。
+            StagePlatform bars = StagePlatform.TimedDoor(new Vector2(0f, 2f), new Vector2(0.3f, 2f), false, 4f, 20, 40, 600, 180);
+            var world = new SimWorld(terrain, null, null, null, null, null, new[] { bars });
+            Assert.That(bars.ScheduledOpen(0), Is.True);
+            Assert.That(bars.ScheduledOpen(179), Is.True);
+            Assert.That(bars.ScheduledOpen(180), Is.False);
+            Assert.That(bars.ScheduledOpen(600), Is.True);
+            Step(world, 60);
+            Assert.That(world.Stage.OpenOf(0), Is.EqualTo(StagePlatform.DoorScale), "周期の初めに開かない");
+            Step(world, 200);
+            Assert.That(world.Stage.OpenOf(0), Is.Zero, "開いている間が過ぎても閉じない");
+            Step(world, 400);
+            Assert.That(world.Stage.OpenOf(0), Is.EqualTo(StagePlatform.DoorScale), "次の周期に開かない");
+            Assert.Throws<ArgumentException>(() => StagePlatform.TimedDoor(Vector2.Zero, Vector2.One, false, 1f, 10, 10, 100, 100));
+            Assert.Throws<ArgumentException>(() => StagePlatform.Button(Vector2.Zero, Vector2.One, 0));
+        }
     }
 }

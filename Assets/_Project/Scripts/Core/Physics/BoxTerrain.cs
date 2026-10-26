@@ -35,11 +35,13 @@ namespace Airerage.Core.Physics
 
         private readonly List<Box> _boxes = new List<Box>();
         private readonly List<Vector3> _anchors = new List<Vector3>();
+        private readonly List<float> _anchorRadii = new List<float>();
         private readonly List<RopeCorner> _ropeCorners = new List<RopeCorner>();
         private bool _ropeCornersDirty = true;
 
         public IReadOnlyList<Box> Boxes => _boxes;
         public IReadOnlyList<Vector3> AnchorPoints => _anchors;
+        public IReadOnlyList<float> AnchorRadii => _anchorRadii;
 
         public IReadOnlyList<RopeCorner> RopeCorners
         {
@@ -73,12 +75,19 @@ namespace Airerage.Core.Physics
         {
             _boxes.Clear();
             _anchors.Clear();
+            _anchorRadii.Clear();
             _ropeCornersDirty = true;
         }
 
-        public BoxTerrain AddAnchor(float x, float y)
+        /// <summary>アンカーポイントを追加する（radius はエイムアシストの半径。0 なら WireTuning.AimAssistRadius）。</summary>
+        public BoxTerrain AddAnchor(float x, float y, float radius = 0f)
         {
+            if (radius < 0f || float.IsNaN(radius) || float.IsInfinity(radius))
+            {
+                throw new ArgumentException($"アンカーポイントの半径は 0 以上の有限な値にします（{radius}）");
+            }
             _anchors.Add(new Vector3(x, y, 0f));
+            _anchorRadii.Add(radius);
             return this;
         }
 

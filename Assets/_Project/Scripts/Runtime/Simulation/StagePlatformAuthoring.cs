@@ -50,9 +50,15 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private float _openHeight = 3f;
         [SerializeField] private float _openSeconds = 0.5f;
         [SerializeField] private float _closeSeconds = 1f;
+        [Tooltip("扉とボタンの組（0 なら組なし。ボタンで開く扉と、そのボタンに同じ正の数）")]
+        [SerializeField] private int _group;
+        [Tooltip("周期で開く扉: 周期と、周期の初めの開いている長さ（秒。周期が 0 なら周期では開かない。ずれは _phaseSeconds）")]
+        [SerializeField] private float _openEverySeconds;
+        [SerializeField] private float _openForSeconds;
 
         public StagePlatformKind Kind => _kind;
         public Vector2 Size => _size;
+        public int Group => _group;
 
         /// <summary>道のりを動く足場にする（シーンのビルダー用）。</summary>
         public void ConfigurePath(Vector2 size, bool attachable, Key[] keys, float periodSeconds, float phaseSeconds = 0f, float activeFromSeconds = 0f,
@@ -69,8 +75,12 @@ namespace Airerage.Runtime.Simulation
             _smooth = smooth;
         }
 
-        /// <summary>扉にする（シーンのビルダー用）。</summary>
-        public void ConfigureDoor(Vector2 size, bool attachable, float openHeight, float openSeconds, float closeSeconds)
+        /// <summary>
+        /// 扉にする（シーンのビルダー用）。group が正ならボタンで開き、openEverySeconds が正なら周期で開く（周期の初めの openForSeconds の間。
+        /// ずれ phaseSeconds）。
+        /// </summary>
+        public void ConfigureDoor(Vector2 size, bool attachable, float openHeight, float openSeconds, float closeSeconds, int group = 0,
+            float openEverySeconds = 0f, float openForSeconds = 0f, float phaseSeconds = 0f)
         {
             _kind = StagePlatformKind.Door;
             _size = size;
@@ -78,6 +88,19 @@ namespace Airerage.Runtime.Simulation
             _openHeight = openHeight;
             _openSeconds = openSeconds;
             _closeSeconds = closeSeconds;
+            _group = group;
+            _openEverySeconds = openEverySeconds;
+            _openForSeconds = openForSeconds;
+            _phaseSeconds = phaseSeconds;
+        }
+
+        /// <summary>扉のボタンにする（シーンのビルダー用。ワイヤーがつながる）。</summary>
+        public void ConfigureButton(Vector2 size, int group)
+        {
+            _kind = StagePlatformKind.Button;
+            _size = size;
+            _attachable = true;
+            _group = group;
         }
 
         /// <summary>Core の足場にする（秒はティックに丸める）。値が不正なら ArgumentException。</summary>
@@ -88,7 +111,16 @@ namespace Airerage.Runtime.Simulation
             var half = new NVector2(_size.x * 0.5f, _size.y * 0.5f);
             if (_kind == StagePlatformKind.Door)
             {
-                return StagePlatform.Door(origin, half, _attachable, _openHeight, Ticks(_openSeconds), Ticks(_closeSeconds));
+                if (_openEverySeconds > 0f)
+                {
+                    return StagePlatform.TimedDoor(origin, half, _attachable, _openHeight, Ticks(_openSeconds), Ticks(_closeSeconds),
+                        Ticks(_openEverySeconds), Ticks(_openForSeconds), Ticks(_phaseSeconds));
+                }
+                return StagePlatform.Door(origin, half, _attachable, _openHeight, Ticks(_openSeconds), Ticks(_closeSeconds), _group);
+            }
+            if (_kind == StagePlatformKind.Button)
+            {
+                return StagePlatform.Button(origin, half, _group);
             }
             var keys = new PlatformKey[_keys.Length];
             for (int i = 0; i < keys.Length; i++)
@@ -124,7 +156,8 @@ namespace Airerage.Runtime.Simulation
 
         private void OnDrawGizmos()
         {
-            Gizmos.color = _kind == StagePlatformKind.Door ? new Color(0.4f, 1f, 0.6f) : new Color(1f, 0.8f, 0.3f);
+            Gizmos.color = _kind == StagePlatformKind.Door ? new Color(0.4f, 1f, 0.6f)
+                : _kind == StagePlatformKind.Button ? new Color(1f, 0.3f, 0.3f) : new Color(1f, 0.8f, 0.3f);
             Gizmos.DrawWireCube(transform.position, new Vector3(_size.x, _size.y, 0f));
         }
     }

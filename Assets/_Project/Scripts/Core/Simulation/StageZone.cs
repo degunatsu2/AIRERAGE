@@ -73,6 +73,13 @@ namespace Airerage.Core.Simulation
         /// （下の辺を撃破の線に合わせると、それより速く入った人は撃破される）。StageZones.ApplyWaterForces と UpdateWater。
         /// </summary>
         Water = 12,
+
+        /// <summary>
+        /// 悪魔の手（恐怖の館。ユーザーの要望、2026-10-26）。地面を動き回り（Travel）、触れた人を握って動けなくし（手と一緒に動く）、
+        /// 時空に吸い込んでから Target（牢屋）へ移す。握ってから移すまでが Power 秒。握られている間は何にも触れない。移った後の
+        /// StageZones.GrabImmunityTicks の間は、また握られない。StageZones.HoldCapture。
+        /// </summary>
+        Grab = 13,
     }
 
     /// <summary>ギミックの周期（ティック）。Period が 0 ならいつも効く。</summary>
@@ -138,7 +145,7 @@ namespace Airerage.Core.Simulation
 
         /// <summary>
         /// ジャンプ台・加速リングでは速さ（m/s）、上昇気流では加速度（m/s²）、危険・吹雪では威力（当たる・凍ると、この枚数のコインを
-        /// 落とす。ユーザーの要望、2026-10-21）、水では浮いていられる長さ（秒）。
+        /// 落とす。ユーザーの要望、2026-10-21）、水では浮いていられる長さ（秒）、悪魔の手では握ってから牢屋へ移すまでの長さ（秒）。
         /// </summary>
         public readonly float Power;
 
@@ -152,7 +159,7 @@ namespace Airerage.Core.Simulation
         /// <summary>周期（風・発射台・危険・吹雪）。ほかの種類では 0。</summary>
         public readonly StageZoneTiming Timing;
 
-        /// <summary>ワープゲートの出口（ワールドの位置）。ほかの種類では 0。</summary>
+        /// <summary>ワープゲート・悪魔の手の出口（ワールドの位置。悪魔の手は牢屋）。ほかの種類では 0。</summary>
         public readonly Vector2 Target;
 
         /// <summary>危険の柱の幅（m）。ほかの種類では 0。</summary>
@@ -212,12 +219,12 @@ namespace Airerage.Core.Simulation
                 throw new ArgumentException($"{kind} の強さは 0 より大きく 1 以下にします（{power}）");
             }
             timing = ValidateTiming(kind, timing);
-            if (kind == StageZoneKind.Warp)
+            if (kind == StageZoneKind.Warp || kind == StageZoneKind.Grab)
             {
                 if (float.IsNaN(target.X) || float.IsNaN(target.Y) || float.IsInfinity(target.X) || float.IsInfinity(target.Y)
                     || (target.X >= minX && target.X <= maxX && target.Y >= minY && target.Y <= maxY))
                 {
-                    throw new ArgumentException($"ワープゲートの出口が不正か、ゲートの中です（{target}）");
+                    throw new ArgumentException($"{kind} の出口が不正か、範囲の中です（{target}）");
                 }
             }
             else
@@ -320,11 +327,11 @@ namespace Airerage.Core.Simulation
             return new StageZoneTiming(timing.Period, timing.ActiveTicks, phase, timing.JitterTicks, timing.WarningTicks);
         }
 
-        // 向きを使う種類か（バンパー・氷・低重力・ワープは向きを使わない）。
+        // 向きを使う種類か（バンパー・氷・低重力・ワープ・水・悪魔の手は向きを使わない）。
         private static bool UsesDirection(StageZoneKind kind)
         {
             return kind != StageZoneKind.Bumper && kind != StageZoneKind.Ice && kind != StageZoneKind.LowGravity && kind != StageZoneKind.Warp
-                && kind != StageZoneKind.Water;
+                && kind != StageZoneKind.Water && kind != StageZoneKind.Grab;
         }
 
         /// <summary>範囲の中心。</summary>

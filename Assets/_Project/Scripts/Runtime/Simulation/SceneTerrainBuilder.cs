@@ -47,12 +47,14 @@ namespace Airerage.Runtime.Simulation
             var anchors = new List<Vector3>();
             foreach (WireAnchorPoint anchor in Object.FindObjectsByType<WireAnchorPoint>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
             {
-                anchors.Add(anchor.transform.position);
+                // z にエイムアシストの半径を入れて並べ替える（地形の z は使わない）。
+                Vector3 p = anchor.transform.position;
+                anchors.Add(new Vector3(p.x, p.y, Mathf.Max(0f, anchor.Radius)));
             }
-            anchors.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+            anchors.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y != b.y ? a.y.CompareTo(b.y) : a.z.CompareTo(b.z));
             foreach (Vector3 anchor in anchors)
             {
-                terrain.AddAnchor(anchor.x, anchor.y);
+                terrain.AddAnchor(anchor.x, anchor.y, anchor.z);
             }
             return terrain;
         }

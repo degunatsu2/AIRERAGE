@@ -18,7 +18,7 @@ namespace Airerage.Core.Simulation
     /// キャンセル（攻撃→ジャンプ、攻撃→ワイヤー）で Free に戻ったティックは、入力をそのまま使い、このティックにジャンプ・射出する。
     /// ヒットストップの間は、何も進めずに止まる（ボタンの前の状態も変えないので、押し続けたボタンは止まりが解けてから効く。
     /// 止まっている間に押して離した攻撃（押したときの向き）とジャンプも、止まりが解けてから効く）。
-    /// 撃破されて復帰を待っている間も、何も進めない（docs/12 T4-2）。
+    /// 撃破されて復帰を待っている間も、何も進めない（docs/12 T4-2）。悪魔の手に握られている間は StageZones.HoldCapture だけ。
     /// </summary>
     public sealed class CharacterSimulator
     {
@@ -54,6 +54,14 @@ namespace Airerage.Core.Simulation
             {
                 // 撃破されて復帰を待っている間は動かない（ボタンの前の状態だけ更新し、待ち終わった直後に押したとみなさない）。
                 state.Combat.RespawnTicksLeft--;
+                CountDownInvincibility(ref state);
+                state.PreviousButtons = input.Buttons;
+                return;
+            }
+            if (state.Combat.CaptureTicks > 0)
+            {
+                // 悪魔の手に握られている間は動けず、手と一緒に動き、時間が来たら牢屋へ移る（ユーザーの要望、2026-10-26）。
+                StageZones.HoldCapture(ref state, _zones, tick);
                 CountDownInvincibility(ref state);
                 state.PreviousButtons = input.Buttons;
                 return;

@@ -19,6 +19,7 @@ namespace Airerage.Core.Objects
     {
         private readonly ICollisionQuery _terrain;
         private readonly List<Vector3> _anchors = new List<Vector3>();
+        private readonly List<float> _anchorRadii = new List<float>();
         private readonly List<WorldObject> _hookObjects = new List<WorldObject>();
         private readonly BoxTerrain _platforms = new BoxTerrain();
         private bool _hasPlatforms;
@@ -37,6 +38,8 @@ namespace Airerage.Core.Objects
 
         public IReadOnlyList<Vector3> AnchorPoints => _anchors;
 
+        public IReadOnlyList<float> AnchorRadii => _anchorRadii;
+
         public IReadOnlyList<RopeCorner> RopeCorners => _terrain.RopeCorners;
 
         /// <summary>アンカーポイントを、地形のものと、objects のうちアンカーになる物から作り直す。</summary>
@@ -44,6 +47,8 @@ namespace Airerage.Core.Objects
         {
             _anchors.Clear();
             _anchors.AddRange(_terrain.AnchorPoints);
+            _anchorRadii.Clear();
+            _anchorRadii.AddRange(_terrain.AnchorRadii);
             _hookObjects.Clear();
             if (objects == null)
             {
@@ -54,6 +59,7 @@ namespace Airerage.Core.Objects
                 if (IsAnchor(item))
                 {
                     _anchors.Add(new Vector3(item.Position.X, item.Position.Y, 0f));
+                    _anchorRadii.Add(0f);
                 }
                 if (!item.Ended && (item.Kind == WorldObjectKind.CottonCandy || item.Kind == WorldObjectKind.CreamPatch))
                 {

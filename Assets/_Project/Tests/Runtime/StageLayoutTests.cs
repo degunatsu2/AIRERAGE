@@ -49,11 +49,22 @@ namespace Airerage.Runtime.Tests
             { "Stage_Volcano", new[] { StageZoneKind.Hazard, StageZoneKind.Launcher, StageZoneKind.Bumper } },
             { "Stage_SnowSea", new[] { StageZoneKind.Ice, StageZoneKind.SpeedLane, StageZoneKind.Launcher, StageZoneKind.Hazard, StageZoneKind.Blizzard, StageZoneKind.Water } },
             { "Stage_SpaceStation", new[] { StageZoneKind.LowGravity, StageZoneKind.Warp, StageZoneKind.Launcher } },
-            { "Stage_Lab", new[] { StageZoneKind.Water, StageZoneKind.Gust, StageZoneKind.Warp, StageZoneKind.LowGravity, StageZoneKind.Hazard } },
-            { "Stage_Kitchen", new[] { StageZoneKind.Hazard, StageZoneKind.Launcher, StageZoneKind.Water, StageZoneKind.Ice, StageZoneKind.SpeedLane } },
-            { "Stage_Manor", new[] { StageZoneKind.Water, StageZoneKind.Hazard, StageZoneKind.Gust, StageZoneKind.Warp, StageZoneKind.Bumper } },
-            { "Stage_Stadium", new[] { StageZoneKind.Gust, StageZoneKind.SpeedLane, StageZoneKind.Launcher, StageZoneKind.Bumper } },
-            { "Stage_Wharf", new[] { StageZoneKind.Water, StageZoneKind.Gust, StageZoneKind.SpeedLane, StageZoneKind.Bumper } },
+            // 2026-10-26 のユーザーの要望で消したもの: 研究所のワープ・低重力・水、恐怖の館の水・風・ワープ・バンパー・低重力、競技場の風と
+            // バンパー、埠頭の風。
+            { "Stage_Lab", new[] { StageZoneKind.Gust, StageZoneKind.Hazard, StageZoneKind.SpeedLane, StageZoneKind.Bumper } },
+            { "Stage_Kitchen", new[] { StageZoneKind.Hazard, StageZoneKind.Launcher, StageZoneKind.Water, StageZoneKind.Ice, StageZoneKind.SpeedLane, StageZoneKind.Gust } },
+            { "Stage_Manor", new[] { StageZoneKind.Hazard, StageZoneKind.Grab, StageZoneKind.Launcher } },
+            { "Stage_Stadium", new[] { StageZoneKind.SpeedLane, StageZoneKind.Launcher } },
+            { "Stage_Wharf", new[] { StageZoneKind.Water, StageZoneKind.SpeedLane, StageZoneKind.Bumper } },
+        };
+
+        // ユーザーの要望で消したギミック（2026-10-26）。残っていたら失敗する。
+        private static readonly Dictionary<string, StageZoneKind[]> RemovedGimmicks = new Dictionary<string, StageZoneKind[]>
+        {
+            { "Stage_Lab", new[] { StageZoneKind.Warp, StageZoneKind.LowGravity, StageZoneKind.Water } },
+            { "Stage_Manor", new[] { StageZoneKind.Warp, StageZoneKind.Water, StageZoneKind.LowGravity, StageZoneKind.Bumper, StageZoneKind.Gust } },
+            { "Stage_Stadium", new[] { StageZoneKind.Gust, StageZoneKind.Bumper } },
+            { "Stage_Wharf", new[] { StageZoneKind.Gust } },
         };
 
         private static readonly NVector3 CharacterHalf = new NVector3(0.4f, 0.9f, 0.4f);
@@ -67,6 +78,7 @@ namespace Airerage.Runtime.Tests
         private List<BankSpot> _banks;
         private List<NVector3> _spawns;
         private List<StagePlatform> _platforms;
+        private List<StageTrap> _traps;
         private List<string> _errors;
 
         private void Open(string stage)
@@ -85,6 +97,7 @@ namespace Airerage.Runtime.Tests
             _banks = BankSpotAuthoring.Collect(_errors);
             _spawns = SpawnPointAuthoring.Collect().Select(p => p.ToNumerics()).ToList();
             _platforms = StagePlatformAuthoring.Collect(_errors);
+            _traps = StageTrapAuthoring.Collect(_errors);
             Assert.That(_errors, Is.Empty, "ステージの読み込みで除いたものがある");
         }
 
@@ -465,6 +478,13 @@ namespace Airerage.Runtime.Tests
             {
                 Assert.That(_zones.Any(z => z.Kind == kind), Is.True, $"{stage} に固有のギミック {kind} がない");
             }
+            if (RemovedGimmicks.TryGetValue(stage, out StageZoneKind[] removed))
+            {
+                foreach (StageZoneKind kind in removed)
+                {
+                    Assert.That(_zones.Any(z => z.Kind == kind), Is.False, $"{stage} に消したはずのギミック {kind} がある");
+                }
+            }
             Assert.That(_zones.Any(z => z.Kind == StageZoneKind.JumpPad), Is.True, "ジャンプ台がない");
             Assert.That(_zones.Any(z => z.Kind == StageZoneKind.BoostRing), Is.True, "加速リングがない");
             Assert.That(Object.FindObjectsByType<Airerage.Runtime.Presentation.StageZoneView>(FindObjectsSortMode.None).Length, Is.EqualTo(_zones.Count),
@@ -498,27 +518,136 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
-        public void Lab_Doors_OpenWithAWire_AndLeadIntoTheVaults()
+        public void Lab_Doors_OpenOnlyWithTheirButtons_AndLeadIntoTheVaults()
         {
             Open("Stage_Lab");
             StagePlatform[] doors = _platforms.Where(p => p.IsDoor).ToArray();
             Assert.That(doors.Length, Is.EqualTo(2), "実験室の扉が 2 つない");
-            // 扉の外から、扉にワイヤーをつなぐと開く。
+            Assert.That(doors.All(d => !d.Attachable && d.Group > 0), Is.True, "扉にワイヤーがつながるか、ボタンの組がない");
+            Assert.That(doors.All(d => d.CloseTicks >= 3 * SimTime.TicksPerSecond), Is.True, "扉の閉じる速さが前の 1/3 になっていない");
             StagePlatform door = doors.OrderBy(d => d.Origin.X).First();
-            var start = new NVector3(door.Origin.X + 4f, CharacterHalf.Y + 0.01f, 0f);
+            StagePlatform[] buttons = _platforms.Where(p => p.IsButton && p.Group == door.Group).ToArray();
+            Assert.That(buttons.Length, Is.EqualTo(2), "扉の内側と外側にボタンがない");
+            Assert.That(buttons.Count(b => b.Origin.X < door.Origin.X) == 1 && buttons.Count(b => b.Origin.X > door.Origin.X) == 1, Is.True,
+                "ボタンが扉の内側と外側に 1 つずつない");
+            Assert.That(buttons.All(b => b.Origin.Y > door.Origin.Y + door.HalfSize.Y), Is.True, "ボタンが扉の上にない");
+
+            // 扉の外から、扉そのものを狙っても開かない。外側のボタンにつなぐと開く。
+            StagePlatform outside = buttons.Single(b => b.Origin.X > door.Origin.X);
+            var start = new NVector3(door.Origin.X + 5f, CharacterHalf.Y + 0.01f, 0f);
             SimWorld world = World(start);
-            var aim = NVector2.Normalize(new NVector2(-4f, door.Origin.Y - start.Y + 0.5f));
-            for (int t = 0; t < 60; t++)
-            {
-                Step(world, 1, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(aim));
-            }
             int index = world.Platforms.ToList().FindIndex(p => p.SameAs(door));
-            Assert.That(world.Stage.OpenOf(index), Is.EqualTo(StagePlatform.DoorScale), "ワイヤーをつないでも扉が開ききらない");
+            var toDoor = NVector2.Normalize(new NVector2(-5f, door.Origin.Y - start.Y));
+            for (int t = 0; t < 40; t++)
+            {
+                Step(world, 1, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(toDoor));
+            }
+            Assert.That(world.Stage.OpenOf(index), Is.Zero, "扉そのものを狙って開いた");
+            Step(world, 40, default);
+            NVector3 p0 = world.GetState(0).Position;
+            var toButton = NVector2.Normalize(new NVector2(outside.Origin.X - p0.X, outside.Origin.Y - p0.Y));
+            for (int t = 0; t < 70; t++)
+            {
+                Step(world, 1, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(toButton));
+            }
+            Assert.That(world.Stage.OpenOf(index), Is.EqualTo(StagePlatform.DoorScale), "外側のボタンにつないでも扉が開ききらない");
             // 扉の中（実験室）に、20 枚のコインと拠点の候補がある。
             Assert.That(_coins.Count(c => c.Value == 20 && c.Position.X < door.Origin.X && c.Position.X > door.Origin.X - 16f && c.Position.Y < 7f),
                 Is.GreaterThanOrEqualTo(2), "実験室の中に 20 枚のコインが少ない");
             Assert.That(_banks.Any(b => b.Position.X < door.Origin.X && b.Position.X > door.Origin.X - 16f && b.Position.Y < 7f), Is.True,
                 "実験室の中に拠点の候補がない");
+        }
+
+        [Test]
+        public void Lab_InfraredBeams_RunWallToWall_AndFireAMissileAlongThemselves()
+        {
+            Open("Stage_Lab");
+            StageTrap[] beams = _traps.Where(t => t.Kind == StageTrapKind.Tripwire).ToArray();
+            Assert.That(beams.Length, Is.EqualTo(3), "赤外線が 3 本ない");
+            foreach (StageTrap beam in beams)
+            {
+                Assert.That(beam.Power, Is.EqualTo(60), "ミサイルの威力が 60 でない");
+                Assert.That(beam.ArmTicks, Is.GreaterThan(0), "撃つ前の予告がない");
+                // 発射口から飛ぶ先は壁（赤外線の端の先に地形がある）。
+                var end = new NVector3(beam.Muzzle.X + beam.Direction.X * beam.Range, beam.Muzzle.Y + beam.Direction.Y * beam.Range, 0f);
+                Assert.That(_terrain.Raycast(end - new NVector3(beam.Direction.X, beam.Direction.Y, 0f) * 0.2f,
+                    new NVector3(beam.Direction.X, beam.Direction.Y, 0f), 1f, out _), Is.True, $"{beam} の先に壁がない");
+            }
+            // 屋根の上に立つと触れ、ミサイルがとても吹き飛ばす。
+            StageTrap west = beams.OrderBy(b => b.Muzzle.X).First();
+            SimWorld world = World(new NVector3(west.Muzzle.X + west.Range * 0.5f, 7.6f + CharacterHalf.Y + 0.01f, 0f));
+            for (int t = 0; t < 120 && world.GetState(0).Combat.HazardHitCount == 0; t++)
+            {
+                Step(world, 1, default);
+            }
+            Assert.That(world.GetState(0).Combat.HazardHitCount, Is.EqualTo(1), "実験室の屋根の上でミサイルが当たらない");
+            Assert.That(world.GetState(0).Velocity.Length(), Is.GreaterThan(30f), "ミサイルでとても吹き飛ばない");
+        }
+
+        [Test]
+        public void Manor_DemonHands_SendYouToTheirSidesPrison_WhichOpensEveryTenSeconds()
+        {
+            Open("Stage_Manor");
+            StageZone[] hands = _zones.Where(z => z.Kind == StageZoneKind.Grab).ToArray();
+            Assert.That(hands.Length, Is.EqualTo(2), "悪魔の手が 2 つない");
+            StagePlatform[] bars = _platforms.Where(p => p.IsDoor && p.OpenPeriod > 0).ToArray();
+            Assert.That(bars.Length, Is.EqualTo(4), "牢屋の左右の格子がない");
+            Assert.That(bars.All(b => b.OpenPeriod == 10 * SimTime.TicksPerSecond), Is.True, "格子が 10 秒に 1 回開かない");
+            foreach (StageZone hand in hands)
+            {
+                Assert.That(hand.Moves, Is.True, "悪魔の手が動き回らない");
+                var prison = new NVector3(hand.Target.X, hand.Target.Y, 0f);
+                Assert.That(System.MathF.Sign(prison.X), Is.EqualTo(System.MathF.Sign(hand.Center.X)), "悪魔の手がその側の牢屋へ送らない");
+                Assert.That(prison.Y, Is.GreaterThan(20f), "牢屋が上空にない");
+                Assert.That(_terrain.IsOverlapping(prison, CharacterHalf), Is.False, "牢屋の中が地形に埋まっている");
+                // 牢屋の中は、床と天井と左右の格子（閉じている）で閉じている。
+                Assert.That(_terrain.Raycast(prison, -NVector3.UnitY, 3f, out _), Is.True, "牢屋に床がない");
+                Assert.That(_terrain.Raycast(prison, NVector3.UnitY, 5f, out _), Is.True, "牢屋に天井がない");
+                Assert.That(bars.Count(b => System.MathF.Abs(b.Origin.Y - prison.Y) < 3f && System.MathF.Abs(b.Origin.X - prison.X) < 6f), Is.EqualTo(2),
+                    "牢屋の左右に格子がない");
+            }
+            // 墓場の地面に立っている人を、手が握って牢屋へ送る。
+            StageZone west = hands.OrderBy(h => h.Center.X).First();
+            SimWorld world = World(new NVector3(-41f, CharacterHalf.Y + 0.01f, 0f));
+            bool jailed = false;
+            for (int t = 0; t < 16 * SimTime.TicksPerSecond && !jailed; t++)
+            {
+                Step(world, 1, default);
+                CharacterState state = world.GetState(0);
+                jailed = state.Combat.CaptureCount > 0 && !state.Combat.IsCaptured;
+            }
+            Assert.That(jailed, Is.True, "墓場で悪魔の手に捕まらない");
+            Assert.That(NVector2.Distance(new NVector2(world.GetState(0).Position.X, world.GetState(0).Position.Y), west.Target), Is.LessThan(1f),
+                "左の牢屋に移らない");
+            // 丘の下の洞窟を通れて、納骨堂の中へ上がれる（ユーザーの要望、2026-10-26）。
+            Assert.That(_terrain.IsOverlapping(new NVector3(-40f, -4.4f, 0f), CharacterHalf), Is.False, "丘の下の洞窟を通れない");
+            Assert.That(_terrain.IsOverlapping(new NVector3(-31f, -0.8f, 0f), new NVector3(0.4f, 0.7f, 0.4f)), Is.False, "洞窟から納骨堂へ上がれない");
+            Assert.That(_coins.Count(c => c.Position.X > -33.4f && c.Position.X < -28.6f && c.Position.Y > 0f && c.Position.Y < 5f && c.Value >= 3),
+                Is.GreaterThanOrEqualTo(2), "納骨堂の中のコインがない");
+        }
+
+        [Test]
+        public void Kitchen_TheDrain_FlushesYouFromTheSinkUpToTheShelf()
+        {
+            Open("Stage_Kitchen");
+            // シンクの右の端に浮いている人は、排水溝の水流で右の棚の上まで流される（ユーザーの要望、2026-10-26）。
+            SimWorld world = World(new NVector3(41.4f, -0.4f, 0f));
+            bool shelf = false;
+            for (int t = 0; t < 8 * SimTime.TicksPerSecond && !shelf; t++)
+            {
+                Step(world, 1, default);
+                CharacterState state = world.GetState(0);
+                shelf = state.Grounded && state.Position.Y > 14.5f && state.Position.X > 37f && state.Position.X < 46.4f;
+            }
+            CharacterState end = world.GetState(0);
+            Assert.That(end.Combat.Falls, Is.EqualTo(0), "排水溝で撃破された");
+            Assert.That(shelf, Is.True, $"排水溝から棚の上に出ない（{end.Position}）");
+            Assert.That(_coins.Any(c => c.Value == 20 && c.Position.X > 46.4f && c.Position.X < 49.4f), Is.True, "排水溝の中に赤いコインがない");
+            // 棚は湯気の柱の上にない。プリンのバンパーと調理台の端のジャンプ台はない。
+            StageZone steam = _zones.Single(z => z.Kind == StageZoneKind.Gust && z.Direction.Y > 0.5f && z.MaxY < 13f);
+            Assert.That(_terrain.Raycast(new NVector3(steam.MaxX + 0.4f, 13f, 0f), NVector3.UnitY, 3f, out _), Is.False, "湯気の柱の上に棚がある");
+            Assert.That(_zones.Any(z => z.Kind == StageZoneKind.Bumper), Is.False, "プリンのバンパーが残っている");
+            Assert.That(_zones.Count(z => z.Kind == StageZoneKind.JumpPad), Is.EqualTo(2), "調理台の端のゼリーのジャンプ台が残っている");
         }
 
         [Test]
@@ -580,6 +709,49 @@ namespace Airerage.Runtime.Tests
             Assert.That(world.GetState(0).Combat.Falls, Is.EqualTo(1), "右の撃破の線を越えても撃破されない");
         }
 
+        [Test]
+        public void Stadium_IsForSwingingBetweenAnchors_AndPitchesBaseballs()
+        {
+            Open("Stage_Stadium");
+            Assert.That(_terrain.AnchorPoints.Count, Is.GreaterThanOrEqualTo(25), "空中のアンカーが少ない");
+            Assert.That(_terrain.AnchorRadii.Count(r => r >= 2f), Is.GreaterThanOrEqualTo(3), "大きいアンカーが少ない");
+            // 棒高跳びは左右対称。
+            StageZone[] vaults = _zones.Where(z => z.Kind == StageZoneKind.Launcher && System.MathF.Abs(z.Center.X) < 25f).ToArray();
+            Assert.That(vaults.Length, Is.EqualTo(2));
+            Assert.That(vaults[0].Center.X, Is.EqualTo(-vaults[1].Center.X).Within(1e-3f), "棒高跳びが左右対称の位置にない");
+            Assert.That(vaults[0].Direction.X, Is.EqualTo(-vaults[1].Direction.X).Within(1e-3f), "棒高跳びの飛ぶ向きが左右対称でない");
+            Assert.That(vaults[0].Direction.Y, Is.EqualTo(vaults[1].Direction.Y).Within(1e-3f));
+            // ピッチャーマシンは 20 秒ごとに打ち出し、ボールは止まって点滅してから消える。
+            StageTrap[] pitchers = _traps.Where(t => t.Kind == StageTrapKind.Pitcher).ToArray();
+            Assert.That(pitchers.Length, Is.EqualTo(2), "ピッチャーマシンが 2 つない");
+            foreach (StageTrap pitcher in pitchers)
+            {
+                pitcher.Prepare(_terrain);
+                Assert.That(pitcher.Period, Is.EqualTo(20 * SimTime.TicksPerSecond));
+                Assert.That(pitcher.StopTick, Is.LessThan(pitcher.Period - pitcher.BlinkTicks), $"{pitcher} のボールが次を打つまでに止まらない");
+                Assert.That(pitcher.Path.Count, Is.GreaterThan(pitcher.StopTick + 1), $"{pitcher} のボールが止まった後に点滅しない");
+                float highest = pitcher.Path.Max(p => p.Y);
+                Assert.That(highest, Is.GreaterThan(pitcher.Muzzle.Y), $"{pitcher} のボールが空中へ打ち出されない");
+            }
+        }
+
+        [Test]
+        public void Wharf_ConnectsTheMiddleAndTheOutside_ThroughTheBeamAndUnderThePiers()
+        {
+            Open("Stage_Wharf");
+            // 梁の真ん中の穴と、その上のアンカー。
+            Assert.That(_terrain.IsOverlapping(new NVector3(0f, 30.7f, 0f), CharacterHalf), Is.False, "クレーンの梁の真ん中に穴がない");
+            Assert.That(_terrain.AnchorPoints.Any(a => System.MathF.Abs(a.X) < 1f && a.Y > 31.4f), Is.True, "梁の穴の上にアンカーがない");
+            // 岸壁の下を海が続き、休める浮かぶコンテナ（ワイヤーはつながらない）がある。
+            StageZone sea = _zones.Single(z => z.Kind == StageZoneKind.Water);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Assert.That(_terrain.IsOverlapping(new NVector3(side * 34.5f, sea.MaxY - 0.4f, 0f), CharacterHalf), Is.False, "岸壁の下を泳げない");
+                Assert.That(_terrain.Boxes.Count(b => !b.Attachable && b.Max.Y > sea.MaxY && b.Min.Y < sea.MaxY && System.MathF.Sign(b.Min.X) == side),
+                    Is.GreaterThanOrEqualTo(2), "岸壁の下に浮かぶコンテナがない");
+            }
+        }
+
         private SimWorld World(params NVector3[] positions)
         {
             return World(_zones, positions);
@@ -587,7 +759,7 @@ namespace Airerage.Runtime.Tests
 
         private SimWorld World(IReadOnlyList<StageZone> zones, params NVector3[] positions)
         {
-            var world = new SimWorld(_terrain, _bounds, zones, null, null, null, _platforms);
+            var world = new SimWorld(_terrain, _bounds, zones, null, null, null, _platforms, _traps);
             foreach (NVector3 position in positions)
             {
                 world.AddCharacter(new CharacterConfig(), position, 1);

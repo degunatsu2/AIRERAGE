@@ -1,4 +1,5 @@
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
 using UnityEngine;
 using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
@@ -6,11 +7,13 @@ namespace Airerage.Editor.Stages
 {
     /// <summary>
     /// 恐怖の館（VAMPIRE MANOR。ユーザーの案、2026-10-26）。館の外が舞台: 真ん中に吸血鬼の館（玄関のポーチ、バルコニー、屋根、鐘楼）、
-    /// 左に寂れた墓場（墓石と納骨堂と枯れ木）、右におどろおどろしいカカシの立つトマト農園。館と墓場・農園の間は堀（水の判定）。
-    /// 追加の案（取捨選択はユーザー）: 落雷（墓場と農園のランダムな場所に落ちる危険。予告あり）、コウモリの群れ（鐘楼から左右へ吹く
-    /// 周期のある風）、棺桶（バンパー）、井戸（ワープゲート。鐘楼の上へ）、さまよう幽霊（館の上を行き来するバンパー）、カボチャの発射台
-    /// （農園から館のバルコニーへ）、熟れたトマト（バンパー）、カカシ（腕にワイヤーがつながる）、空飛ぶ棺のふた（動く足場）、赤い満月の
-    /// 光（いちばん上の低重力）、ガーゴイル（アンカー）、堀（水）。
+    /// 左に寂れた墓場（墓石と納骨堂と枯れ木。丘の下は洞窟で、納骨堂の床から入れる）、右におどろおどろしいカカシの立つトマト農園。
+    /// 上空の左右に牢屋。館と墓場・農園の間は底のない谷。
+    /// ギミック（ユーザーの要望、2026-10-26）: 悪魔の手（墓場と農園の地面を這い回り、捕まると握られて時空に吸い込まれ、その側の牢屋へ
+    /// 移される）、牢屋（10 秒に 1 回、左右の格子が開いて通れる）、落雷（墓場と農園のランダムな場所。予告は表示だけで音はない）。
+    /// 追加の案（残したもの）: カボチャの発射台、鬼火の輪（加速リング）、空飛ぶ棺のふた（動く足場）、カカシの腕、ガーゴイル（アンカー）、
+    /// ポーチのジャンプ台。消したもの（ユーザーの要望）: 井戸（ワープ）、堀（水）、赤い満月の光（低重力）、棺桶・幽霊・トマト（バンパー）、
+    /// コウモリの群れ（風）。
     /// </summary>
     internal static class ManorStage
     {
@@ -37,23 +40,24 @@ namespace Airerage.Editor.Stages
                 FogEnd = 110f,
             };
             theme.ZoneColors[StageZoneKind.Hazard] = new Color(0.8f, 0.85f, 1f);
-            theme.ZoneColors[StageZoneKind.Gust] = new Color(0.55f, 0.45f, 0.7f);
-            theme.ZoneColors[StageZoneKind.Bumper] = new Color(0.85f, 0.2f, 0.2f);
-            theme.ZoneColors[StageZoneKind.Warp] = new Color(0.4f, 1f, 0.6f);
             theme.ZoneColors[StageZoneKind.Launcher] = new Color(1f, 0.55f, 0.1f);
-            theme.ZoneColors[StageZoneKind.LowGravity] = new Color(1f, 0.25f, 0.25f);
-            theme.ZoneColors[StageZoneKind.Water] = new Color(0.2f, 0.35f, 0.3f);
+            theme.ZoneColors[StageZoneKind.Grab] = new Color(0.6f, 0.12f, 0.3f);
+            // 牢屋（左右の上空）: 中の広さは 8.8m × 5m。左右の格子が 10 秒に 1 回、3 秒だけ上に開く【仮】。
+            var prisonWest = new Vector2(-40f, 29.2f);
+            var prisonEast = new Vector2(40f, 29.2f);
 
             return new StageLayout
             {
                 Id = "Manor",
                 DisplayName = "VAMPIRE MANOR",
-                Description = "Outside a vampire's manor: a forsaken graveyard and a tomato farm with creepy scarecrows. Lightning, bats and ghosts.",
+                Description = "Outside a vampire's manor. Demon hands crawl the graveyard and the farm: get caught and you are dragged into the prison in the sky.",
                 Color = new Color(0.75f, 0.2f, 0.35f),
                 Terrain = new[]
                 {
-                    // 左の墓場の丘（墓石と納骨堂）。
-                    new TerrainBox("GraveHill", -48f, -30f, -24f, 0f),
+                    // 左の墓場の丘（下は洞窟。左右の端が開いていて、納骨堂の床の穴から中へ上がれる。ユーザーの要望、2026-10-26）。
+                    new TerrainBox("GraveHillCrustWest", -48f, -1.6f, -31.8f, 0f),
+                    new TerrainBox("GraveHillCrustEast", -30.2f, -1.6f, -24f, 0f),
+                    new TerrainBox("GraveHillBase", -48f, -30f, -24f, -5.4f),
                     new TerrainBox("TombstoneA", -44.5f, 0f, -43.5f, 1.6f, attachable: true),
                     new TerrainBox("TombstoneB", -39f, 0f, -38f, 2f, attachable: true),
                     new TerrainBox("CryptPillarWest", -34f, 0f, -33.4f, 5f, attachable: true),
@@ -76,6 +80,11 @@ namespace Airerage.Editor.Stages
                     new TerrainBox("ScarecrowPoleB", 40.8f, 0f, 41.2f, 6f),
                     new TerrainBox("ScarecrowArmsB", 39f, 4.6f, 43f, 5f, attachable: true),
                     new TerrainBox("BarnRoof", 42f, 12f, 48f, 12.6f, attachable: true),
+                    // 上空の牢屋（石の床と天井。ワイヤーはつながらない。左右の格子は周期で開く扉）。
+                    new TerrainBox("PrisonFloorWest", -45f, 27f, -35f, 27.6f),
+                    new TerrainBox("PrisonRoofWest", -44.4f, 32.6f, -35.6f, 33.2f),
+                    new TerrainBox("PrisonFloorEast", 35f, 27f, 45f, 27.6f),
+                    new TerrainBox("PrisonRoofEast", 35.6f, 32.6f, 44.4f, 33.2f),
                 },
                 // ガーゴイル、枯れ木の枝先、カカシの頭、鐘。
                 Anchors = new[]
@@ -83,40 +92,28 @@ namespace Airerage.Editor.Stages
                     new Vector2(-14f, 23f), new Vector2(14f, 23f), new Vector2(0f, 38f), new Vector2(-42f, 15f), new Vector2(31f, 7.5f),
                     new Vector2(41f, 7.5f), new Vector2(-24f, 28f), new Vector2(24f, 28f), new Vector2(-30f, 18f),
                 },
-                // 堀の底が撃破の線。
+                // 館と墓場・農園の間の谷の底が撃破の線。
                 BoundsMin = new Vector2(-60f, -12f),
                 BoundsMax = new Vector2(60f, 46f),
                 Theme = theme,
                 Zones = new[]
                 {
-                    // 堀（水）: 館と墓場・農園の間の黒い水。
-                    new ZoneSpec("Moat", StageZoneKind.Water, new Vector2(0f, -8f), new Vector2(120f, 8f), Vector2.zero, 5f, 24f),
-                    // 落雷: 墓場と農園のランダムな場所に、10〜16 秒ごとに落ちる（1.5 秒前に予告）。当たると威力 12 の枚数のコインを落とす。
-                    new ZoneSpec("LightningGrave", StageZoneKind.Hazard, new Vector2(-36f, 14f), new Vector2(24f, 28f), Vector2.up, 12f, 16f)
-                        .Every(10f, 0.4f, 4f, 6f, 1.5f).Column(1.6f),
-                    new ZoneSpec("LightningFarm", StageZoneKind.Hazard, new Vector2(36f, 14f), new Vector2(24f, 28f), Vector2.up, 12f, 16f)
-                        .Every(10f, 0.4f, 9f, 6f, 1.5f).Column(1.6f),
-                    // コウモリの群れ: 鐘楼から左右へ、18 秒ごとに 3 秒（2 秒前に予告）。
-                    new ZoneSpec("BatsWest", StageZoneKind.Gust, new Vector2(-21f, 28f), new Vector2(38f, 8f), Vector2.left, 40f, 14f).Every(18f, 3f, 6f, 0f, 2f),
-                    new ZoneSpec("BatsEast", StageZoneKind.Gust, new Vector2(21f, 28f), new Vector2(38f, 8f), Vector2.right, 40f, 14f).Every(18f, 3f, 15f, 0f, 2f),
-                    // 棺桶（バンパー）。
-                    new ZoneSpec("CoffinWest", StageZoneKind.Bumper, new Vector2(-41f, 1.4f), new Vector2(1.4f, 2.6f), Vector2.up, 18f),
-                    new ZoneSpec("CoffinCrypt", StageZoneKind.Bumper, new Vector2(-31f, 9f), new Vector2(2.6f, 1.4f), Vector2.up, 20f),
-                    // 井戸（ワープゲート）: 墓場の井戸から鐘楼の上へ。
-                    new ZoneSpec("Well", StageZoneKind.Warp, new Vector2(-46f, 1.2f), new Vector2(1.4f, 2f), Vector2.up, 1f).To(new Vector2(0f, 34f)),
-                    // さまよう幽霊: 館の上を左右に行き来する（触れると弾かれる）。
-                    new ZoneSpec("Ghost", StageZoneKind.Bumper, new Vector2(-18f, 15.5f), new Vector2(2f, 2.4f), Vector2.up, 16f)
-                        .Moving(new Vector2(36f, 0f), 16f),
+                    // 落雷: 墓場と農園のランダムな場所に、10〜16 秒ごとに落ちる（1.5 秒前に予告。予告は表示だけで、音は鳴らさない。ユーザーの
+                    // 要望、2026-10-26）。当たると威力 12 の枚数のコインを落とす。牢屋には届かない。
+                    new ZoneSpec("LightningGrave", StageZoneKind.Hazard, new Vector2(-36f, 13f), new Vector2(24f, 26f), Vector2.up, 12f, 16f)
+                        .Every(10f, 0.4f, 4f, 6f, 1.5f).Column(1.6f).Silent().Styled(StageZoneView.ZoneLook.Lightning),
+                    new ZoneSpec("LightningFarm", StageZoneKind.Hazard, new Vector2(36f, 13f), new Vector2(24f, 26f), Vector2.up, 12f, 16f)
+                        .Every(10f, 0.4f, 9f, 6f, 1.5f).Column(1.6f).Silent().Styled(StageZoneView.ZoneLook.Lightning),
+                    // 悪魔の手（ユーザーの要望、2026-10-26）: 墓場と農園の地面を 16 秒で往復し、触れた人を握って、1.2 秒でその側の牢屋へ移す。
+                    new ZoneSpec("DemonHandWest", StageZoneKind.Grab, new Vector2(-45f, 1.2f), new Vector2(2.6f, 2.4f), Vector2.up, 1.2f)
+                        .To(prisonWest).Moving(new Vector2(19f, 0f), 16f),
+                    new ZoneSpec("DemonHandEast", StageZoneKind.Grab, new Vector2(45f, 1.2f), new Vector2(2.6f, 2.4f), Vector2.up, 1.2f)
+                        .To(prisonEast).Moving(new Vector2(-19f, 0f), 16f),
                     // カボチャの発射台: 農園から館の東のバルコニーへ。
                     ZoneSpec.OnFloor("PumpkinLauncher", StageZoneKind.Launcher, 26f, 28f, 0f, new Vector2(-0.5f, 1f), 32f),
-                    // 熟れたトマト（バンパー）。
-                    new ZoneSpec("TomatoA", StageZoneKind.Bumper, new Vector2(36f, 1.2f), new Vector2(1.6f, 1.6f), Vector2.up, 17f),
-                    new ZoneSpec("TomatoB", StageZoneKind.Bumper, new Vector2(46f, 1.2f), new Vector2(1.6f, 1.6f), Vector2.up, 17f),
                     // 鬼火の輪（加速リング）: 墓場と農園の上から館の屋根へ。
                     new ZoneSpec("WispRingWest", StageZoneKind.BoostRing, new Vector2(-24f, 22f), new Vector2(2.4f, 3f), new Vector2(1f, 0.2f), 18f),
                     new ZoneSpec("WispRingEast", StageZoneKind.BoostRing, new Vector2(24f, 22f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.2f), 18f),
-                    // 赤い満月の光（いちばん上の低重力）。
-                    new ZoneSpec("BloodMoon", StageZoneKind.LowGravity, new Vector2(0f, 41f), new Vector2(34f, 8f), Vector2.zero, 0.45f, 5f),
                     // 館のポーチのジャンプ台。
                     ZoneSpec.OnFloor("PorchPadWest", StageZoneKind.JumpPad, -11f, -9f, 2f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("PorchPadEast", StageZoneKind.JumpPad, 9f, 11f, 2f, Vector2.up, 24f, 0.4f),
@@ -127,53 +124,79 @@ namespace Airerage.Editor.Stages
                     new PlatformSpec("FlyingCoffin", new Vector2(-20f, 26f), new Vector2(4f, 0.5f), true)
                         .Path(14f, (0f, Vector2.zero), (6f, new Vector2(40f, 0f)), (7f, new Vector2(40f, 0f)), (13f, Vector2.zero))
                         .Eased().Tinted(new Color(0.3f, 0.18f, 0.12f)),
+                    // 牢屋の格子（ユーザーの要望、2026-10-26）: 10 秒ごとに 3 秒だけ、左右が上に開く（0.4 秒で開き、0.8 秒で閉じる）。
+                    PrisonBars("PrisonBarsWestOuter", -44.7f), PrisonBars("PrisonBarsWestInner", -35.3f),
+                    PrisonBars("PrisonBarsEastInner", 35.3f), PrisonBars("PrisonBarsEastOuter", 44.7f),
                 },
                 Coins = new (Vector2, int)[]
                 {
-                    // 墓場（墓石の間、納骨堂の中と屋根の上、枯れ木の上）。
+                    // 墓場（墓石の間、納骨堂の中と屋根の上、枯れ木の上）。納骨堂の中へは、丘の下の洞窟から上がる。
                     (new Vector2(-46f, 4f), 1), (new Vector2(-41.5f, 4.5f), 1), (new Vector2(-36f, 2f), 1), (new Vector2(-31f, 2f), 20),
                     (new Vector2(-31f, 3.8f), 3), (new Vector2(-34f, 7.5f), 1), (new Vector2(-28f, 7.5f), 1), (new Vector2(-43f, 14.5f), 3),
                     (new Vector2(-45.5f, 9f), 1), (new Vector2(-26f, 3f), 1),
+                    // 丘の下の洞窟。
+                    (new Vector2(-44f, -3.5f), 20), (new Vector2(-37f, -3.5f), 3), (new Vector2(-27f, -3.5f), 3), (new Vector2(-40.5f, -3.5f), 1),
                     // 墓場の上の空（落雷）。
-                    (new Vector2(-38f, 18f), 1), (new Vector2(-30f, 22f), 1), (new Vector2(-36f, 26f), 3),
+                    (new Vector2(-38f, 18f), 1), (new Vector2(-30f, 22f), 1), (new Vector2(-36f, 25f), 3),
                     // 館のポーチと玄関。
                     (new Vector2(-6f, 4f), 1), (new Vector2(-2f, 4f), 1), (new Vector2(2f, 4f), 1), (new Vector2(6f, 4f), 1), (new Vector2(0f, 7f), 3),
-                    // バルコニーと、その間（幽霊の通り道）。
+                    // バルコニーと、その間。
                     (new Vector2(-10.5f, 12.5f), 1), (new Vector2(10.5f, 12.5f), 1), (new Vector2(-3f, 13f), 1), (new Vector2(3f, 13f), 1),
                     (new Vector2(0f, 16f), 20),
                     // 屋根の上と鐘楼。
                     (new Vector2(-11f, 22.5f), 1), (new Vector2(-6f, 22.5f), 1), (new Vector2(6f, 22.5f), 1), (new Vector2(12.5f, 26f), 1),
                     (new Vector2(-4f, 28f), 1), (new Vector2(4f, 28f), 1), (new Vector2(0f, 35f), 3),
-                    // 空飛ぶ棺のふたの道と、コウモリの群れの中。
+                    // 空飛ぶ棺のふたの道。
                     (new Vector2(-16f, 28f), 1), (new Vector2(16f, 28f), 1), (new Vector2(-26f, 30f), 3), (new Vector2(26f, 30f), 3),
-                    // 赤い満月の光の中。
+                    // 鐘楼の上の空。
                     (new Vector2(-10f, 40f), 1), (new Vector2(10f, 40f), 1), (new Vector2(0f, 43f), 20),
-                    // 農園（カカシの腕の上、トマトの間、納屋の屋根）。
+                    // 牢屋の中（1 枚ずつ）と、牢屋の外。
+                    (new Vector2(-40f, 31f), 1), (new Vector2(40f, 31f), 1), (new Vector2(-30f, 34f), 20), (new Vector2(30f, 34f), 20),
+                    // 農園（カカシの腕の上、畑の上、納屋の屋根）。
                     (new Vector2(29.5f, 7f), 1), (new Vector2(32.5f, 7f), 1), (new Vector2(39.5f, 7f), 1), (new Vector2(42.5f, 7f), 1),
                     (new Vector2(36f, 4f), 1), (new Vector2(33.5f, 2f), 1), (new Vector2(44f, 14.5f), 3), (new Vector2(46f, 17f), 1),
-                    (new Vector2(26f, 4f), 1),
+                    (new Vector2(26f, 4f), 1), (new Vector2(45.5f, 20f), 20),
                     // 農園の上の空（落雷）と、カボチャの発射台の道。
-                    (new Vector2(38f, 20f), 1), (new Vector2(30f, 16f), 1), (new Vector2(36f, 26f), 3), (new Vector2(20f, 12f), 1),
-                    // 堀の中（潜る）と堀の上。
-                    (new Vector2(-19f, -9f), 20), (new Vector2(19f, -9f), 20), (new Vector2(-19f, -2f), 3), (new Vector2(19f, -2f), 3),
+                    (new Vector2(38f, 20f), 1), (new Vector2(30f, 16f), 1), (new Vector2(36f, 25f), 3), (new Vector2(20f, 12f), 1),
+                    // 谷の上。
+                    (new Vector2(-19f, 6f), 3), (new Vector2(19f, 6f), 3),
                     // 高い所とステージの端。
                     (new Vector2(-24f, 36f), 20), (new Vector2(24f, 36f), 20), (new Vector2(-53f, 10f), 20), (new Vector2(53f, 10f), 20),
                     (new Vector2(-52f, 24f), 3), (new Vector2(52f, 24f), 3), (new Vector2(-20f, 19f), 20), (new Vector2(20f, 19f), 20),
-                    (new Vector2(-12f, 31f), 20), (new Vector2(12f, 31f), 20), (new Vector2(-38f, 32f), 20),
+                    (new Vector2(-12f, 31f), 20), (new Vector2(12f, 31f), 20),
                 },
                 Jackpots = new[]
                 {
-                    new Vector2(0f, 44f), new Vector2(-46f, 30f), new Vector2(46f, 30f), new Vector2(-19f, -10f), new Vector2(19f, -10f),
+                    new Vector2(0f, 44f), new Vector2(-50f, 32f), new Vector2(50f, 32f), new Vector2(-38f, -3.5f), new Vector2(36f, 20f),
                     new Vector2(-31f, 3f), new Vector2(0f, 9f),
                 },
                 Banks = new[]
                 {
                     new Vector2(-8f, 24.5f), new Vector2(-9f, 14f), new Vector2(9f, 14f), new Vector2(-37.5f, 6.5f), new Vector2(37f, 9f),
-                    new Vector2(0f, 39f), new Vector2(-30f, 13f), new Vector2(45f, 3f),
+                    new Vector2(0f, 39f), new Vector2(-30f, 13f), new Vector2(-32f, -3.5f),
                 },
-                Spawns = new[] { new Vector3(-4f, 3f, 0f), new Vector3(4f, 3f, 0f), new Vector3(-36f, 1f, 0f), new Vector3(34f, 1f, 0f) },
+                Spawns = new[] { new Vector3(-4f, 3f, 0f), new Vector3(4f, 3f, 0f), new Vector3(-9f, 11.6f, 0f), new Vector3(9f, 11.6f, 0f) },
                 Decorate = Decorate,
             };
+        }
+
+        // 牢屋の格子（周期で開く扉。中心 x、牢屋の床の上から天井の下まで）。
+        private static PlatformSpec PrisonBars(string name, float x)
+        {
+            return PlatformSpec.TimedDoor(name, new Vector2(x, 30.1f), new Vector2(0.6f, 5f), 5.6f, 0.4f, 0.8f, 10f, 3f).Looks(BarsLooks);
+        }
+
+        // 格子: 黒い鉄の縦の棒と、上下の横の帯。
+        private static void BarsLooks(StageDecor decor, Transform visual, PlatformSpec spec)
+        {
+            Material iron = decor.Lit("PrisonIron", new Color(0.12f, 0.12f, 0.14f));
+            for (int i = 0; i < 3; i++)
+            {
+                decor.Box("Bar", visual, new Vector3(0f, 0f, -1.5f + i * 1.5f), new Vector3(0.18f, spec.Size.y, 0.18f), iron);
+            }
+            decor.Box("BandTop", visual, new Vector3(0f, spec.Size.y * 0.5f - 0.2f, 0f), new Vector3(spec.Size.x, 0.25f, 3.8f), iron);
+            decor.Box("BandBottom", visual, new Vector3(0f, -spec.Size.y * 0.5f + 0.2f, 0f), new Vector3(spec.Size.x, 0.25f, 3.8f), iron);
+            decor.Box("BandMiddle", visual, new Vector3(0f, 0f, -1.9f), new Vector3(spec.Size.x * 0.9f, 0.15f, 0.1f), iron);
         }
 
         // 館の正面（窓の明かり、尖った屋根）、墓場の柵と墓石、農園のトマトの株、赤い満月、霧、遠くの森。
@@ -190,7 +213,11 @@ namespace Airerage.Editor.Stages
             Material straw = decor.Lit("Straw", new Color(0.75f, 0.62f, 0.3f));
             Material fog = decor.Transparent("Fog", new Color(0.7f, 0.7f, 0.85f, 0.08f));
             Material tree = decor.Lit("DeadTree", new Color(0.12f, 0.09f, 0.08f));
-            Material moatDeep = decor.Lit("MoatDeep", new Color(0.05f, 0.1f, 0.08f));
+            Material abyss = decor.Lit("Abyss", new Color(0.03f, 0.02f, 0.05f));
+            Material prisonStone = decor.Lit("PrisonStone", new Color(0.2f, 0.18f, 0.22f));
+            Material chain = decor.Lit("Chain", new Color(0.3f, 0.3f, 0.32f));
+            Material candle = decor.Unlit("Candle", new Color(1f, 0.6f, 0.25f));
+            Material bone = decor.Lit("Bone", new Color(0.85f, 0.82f, 0.72f));
 
             // 館の正面（遊ぶ面の奥）と窓、尖った屋根。
             decor.Box("ManorFacade", new Vector3(0f, 10f, 6f), new Vector3(30f, 20f, 6f), stone);
@@ -236,8 +263,26 @@ namespace Airerage.Editor.Stages
                 decor.Box("ScarecrowCoat", new Vector3(x, 3.6f, 0.3f), new Vector3(2.2f, 2.4f, 0.6f), decor.Lit("ScarecrowCoat", new Color(0.35f, 0.2f, 0.25f)));
             }
             decor.Box("Barn", new Vector3(45f, 6f, 4f), new Vector3(6f, 12f, 6f), decor.Lit("Barn", new Color(0.4f, 0.1f, 0.1f)));
-            // 堀の奥と、遠くの森。
-            decor.Box("MoatBack", new Vector3(0f, -20f, 8f), new Vector3(140f, 24f, 12f), moatDeep);
+            // 谷の奥（底のない暗がり）と、遠くの森。
+            decor.Box("AbyssBack", new Vector3(0f, -20f, 8f), new Vector3(140f, 24f, 12f), abyss);
+            // 丘の下の洞窟: 奥の暗い岩壁と、ろうそく、骨。
+            decor.Box("CaveBack", new Vector3(-36f, -3.5f, 3f), new Vector3(24f, 3.8f, 2f), abyss);
+            foreach (float x in new[] { -45f, -38f, -29f })
+            {
+                decor.Sphere("Candle", new Vector3(x, -4.9f, 1.4f), new Vector3(0.25f, 0.5f, 0.25f), candle);
+            }
+            decor.Box("Bones", new Vector3(-34f, -5.25f, 1.6f), new Vector3(1.6f, 0.15f, 0.4f), bone);
+            // 上空の牢屋: 奥の石の壁と、天井から垂れた鎖、柱、上の小さな屋根。
+            foreach (float x in new[] { -40f, 40f })
+            {
+                decor.Box("PrisonBack", new Vector3(x, 30.1f, 2.6f), new Vector3(10f, 5.6f, 1f), prisonStone);
+                decor.Box("PrisonCap", new Vector3(x, 33.6f, 0f), new Vector3(9.4f, 0.6f, 4.2f), roof);
+                decor.Box("PrisonBase", new Vector3(x, 26.6f, 0f), new Vector3(9.4f, 0.6f, 4.2f), prisonStone);
+                for (int i = 0; i < 2; i++)
+                {
+                    decor.Box("Chain", new Vector3(x - 2f + i * 4f, 31.5f, 1.8f), new Vector3(0.12f, 2f, 0.12f), chain);
+                }
+            }
             for (int i = 0; i < 16; i++)
             {
                 float h = decor.Range(14f, 30f);

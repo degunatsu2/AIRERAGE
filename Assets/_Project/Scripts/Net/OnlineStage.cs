@@ -22,7 +22,7 @@ namespace Airerage.Net
         /// <param name="spawns">出現位置（1つ以上）。人数より少なければ、最初の位置を中心に横に並べる。</param>
         public OnlineStage(ICollisionQuery terrain, IReadOnlyList<NVector3> spawns, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null,
             IReadOnlyList<CoinSpawnPoint> coinSpawns = null, IReadOnlyList<BankSpot> bankSpots = null,
-            IReadOnlyList<StagePlatform> platforms = null)
+            IReadOnlyList<StagePlatform> platforms = null, IReadOnlyList<StageTrap> traps = null)
         {
             Terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
             if (spawns == null || spawns.Count == 0)
@@ -39,6 +39,7 @@ namespace Airerage.Net
             CoinSpawns = coinSpawns ?? Array.Empty<CoinSpawnPoint>();
             BankSpots = bankSpots ?? Array.Empty<BankSpot>();
             Platforms = platforms ?? Array.Empty<StagePlatform>();
+            Traps = traps ?? Array.Empty<StageTrap>();
         }
 
         public ICollisionQuery Terrain { get; }
@@ -49,6 +50,9 @@ namespace Airerage.Net
 
         /// <summary>動く足場と扉（ユーザーの要望、2026-10-26）。</summary>
         public IReadOnlyList<StagePlatform> Platforms { get; }
+
+        /// <summary>ステージの仕掛け（赤外線とミサイル、ピッチャーマシン。ユーザーの要望、2026-10-26）。</summary>
+        public IReadOnlyList<StageTrap> Traps { get; }
         public IReadOnlyList<NVector3> Spawns => _spawns;
 
         /// <summary>プレイヤー player（全員で playerCount 人）の出現位置。</summary>

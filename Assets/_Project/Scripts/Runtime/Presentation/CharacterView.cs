@@ -97,6 +97,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private RingGaugeView _waterGauge;
         [Tooltip("水に飛び込んだ瞬間の水しぶき（あれば）")]
         [SerializeField] private BurstEffectView _splashBurst;
+        [Tooltip("悪魔の手に握られた見た目（恐怖の館。ユーザーの要望、2026-10-26）")]
+        [SerializeField] private CaptureEffectView _captureEffect;
         [Tooltip("向きの印（目の帯と突き出た印をまとめた子。右向きで作り、左を向いたら左右を反転する。なければ出さない）")]
         [SerializeField] private Transform _facingMarker;
 
@@ -111,6 +113,11 @@ namespace Airerage.Runtime.Presentation
         private int _shownBounces;
         private int _shownGimmicks;
         private int _shownSplashes;
+        private bool _shownCaptured;
+
+        // 悪魔の手に握られてから、指が閉じきるまでと、渦に吸い込まれきるまで（ティック。見た目だけ）。
+        private const int CaptureGripTicks = 24;
+        private const int CaptureSuckTicks = 40;
         private int _shownHazardHits;
         private int _shownSpecial1Cooldown;
         private int _shownSpecial2Cooldown;
@@ -170,6 +177,10 @@ namespace Airerage.Runtime.Presentation
         public RingGaugeView WallClingGauge => _wallClingGauge;
         public RingGaugeView WaterGauge => _waterGauge;
         public BurstEffectView SplashBurst => _splashBurst;
+        public CaptureEffectView CaptureEffect => _captureEffect;
+
+        /// <summary>悪魔の手の渦に吸い込まれきって、見えなくしているか。</summary>
+        public bool HiddenForCapture { get; private set; }
         public RingGaugeView WaveGauge => _waveGauge;
         public CostumeView Costume => _costume;
 
@@ -217,6 +228,7 @@ namespace Airerage.Runtime.Presentation
             RenderCooldownGauges(current, combat);
             RenderGuard(current);
             RenderBursts(current);
+            RenderCapture(current);
             RenderVisibility(current);
             RenderRespawn(current, respawnDelayTicks);
             if (tint == _shown)
@@ -353,13 +365,48 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
-            _renderer.enabled = !HiddenForRespawn && !(Blinking && Mathf.Repeat(Time.time * BlinkPerSecond, 1f) >= 0.5f);
+            _renderer.enabled = !HiddenForRespawn && !HiddenForCapture && !(Blinking && Mathf.Repeat(Time.time * BlinkPerSecond, 1f) >= 0.5f);
             if (_facingMarker != null)
             {
                 _facingRenderers = _facingRenderers ?? _facingMarker.GetComponentsInChildren<Renderer>(true);
                 foreach (Renderer marker in _facingRenderers)
                 {
                     marker.enabled = _renderer.enabled;
+                }
+            }
+        }
+
+        // 悪魔の手に握られている間: 指が閉じて体を握り、紫の渦に体が小さくなりながら回って吸い込まれ、見えなくなる。放された（牢屋に
+        // 現れた）瞬間に、その場で渦が一瞬広がる。
+        private void RenderCapture(in CharacterState state)
+        {
+            CombatState c = state.Combat;
+            if (c.IsCaptured)
+            {
+                float grip = Mathf.Clamp01(c.CaptureTicks / (float)CaptureGripTicks);
+                float suck = Mathf.Clamp01((c.CaptureTicks - CaptureGripTicks) / (float)CaptureSuckTicks);
+                if (_captureEffect != null)
+                {
+                    _captureEffect.Show(transform.position, grip, suck);
+                }
+                transform.localScale *= Mathf.Max(0.02f, 1f - suck);
+                transform.rotation = Quaternion.Euler(0f, suck * 900f, 0f);
+                HiddenForCapture = suck >= 1f;
+                _shownCaptured = true;
+                return;
+            }
+            HiddenForCapture = false;
+            if (_shownCaptured)
+            {
+                _shownCaptured = false;
+                transform.rotation = Quaternion.Euler(0f, SpinDegrees, 0f);
+                if (_captureEffect != null)
+                {
+                    _captureEffect.Hide();
+                    if (!c.IsWaitingToRespawn)
+                    {
+                        _captureEffect.Arrive(transform.position);
+                    }
                 }
             }
         }

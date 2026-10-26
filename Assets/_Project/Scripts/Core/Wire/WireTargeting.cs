@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using Airerage.Core.Common;
 using Airerage.Core.Objects;
@@ -72,7 +73,8 @@ namespace Airerage.Core.Wire
         }
 
         /// <summary>
-        /// エイムアシストの対象を探す。照準方向から AimAssistAngleDeg 以内か、照準の線がアンカーから AimAssistRadius 以内を通る、
+        /// エイムアシストの対象を探す。照準方向から AimAssistAngleDeg 以内か、照準の線がアンカーから AimAssistRadius（大きいアンカーは
+        /// その半径 ICollisionQuery.AnchorRadii）以内を通る、
         /// 射程内・遮るものがないアンカーポイントのうち、
         /// 照準方向との角度が最も小さいもの（同じなら近いもの）を選ぶ。
         /// </summary>
@@ -85,6 +87,7 @@ namespace Airerage.Core.Wire
             float bestDistance = float.MaxValue;
 
             var anchors = collision.AnchorPoints;
+            var radii = collision.AnchorRadii;
             for (int i = 0; i < anchors.Count; i++)
             {
                 Vector3 toAnchor = anchors[i] - origin;
@@ -97,7 +100,8 @@ namespace Airerage.Core.Wire
 
                 float angle = SimMath.AngleBetweenDeg(aimDirection, toAnchor / distance);
                 float along = Vector3.Dot(toAnchor, aimDirection);
-                bool nearTheLine = along > 0f && (toAnchor - aimDirection * along).Length() <= tuning.AimAssistRadius;
+                float radius = i < radii.Count ? MathF.Max(tuning.AimAssistRadius, radii[i]) : tuning.AimAssistRadius;
+                bool nearTheLine = along > 0f && (toAnchor - aimDirection * along).Length() <= radius;
                 if (angle > tuning.AimAssistAngleDeg && !nearTheLine)
                 {
                     continue;

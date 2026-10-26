@@ -100,5 +100,20 @@ namespace Airerage.Core.Tests.Wire
             Assert.That(preview.Result, Is.EqualTo(WireShotResult.Attach));
             Assert.That(Vector3.Distance(preview.EndPoint, harness.State.Wire.Anchor), Is.LessThan(1e-3f));
         }
+
+        [Test]
+        public void ABigAnchor_IsFoundFromFartherOffTheAim()
+        {
+            // 真上 10m のアンカーを、横に 1.5m ずれた線で狙う（角度は約 8.5°。ふつうのアンカーは 6° と 0.8m の外）。
+            var tuning = new WireTuning();
+            var aim = Vector3.Normalize(new Vector3(1.5f, 10f, 0f));
+            BoxTerrain small = TestArenas.Ground().AddAnchor(0f, StandingY + 10f);
+            BoxTerrain big = TestArenas.Ground().AddAnchor(0f, StandingY + 10f, 2f);
+
+            Assert.That(WireTargeting.TryFindAssistTarget(Origin, aim, tuning, small, out _), Is.False, "前提: ふつうのアンカーは外れる");
+            Assert.That(WireTargeting.TryFindAssistTarget(Origin, aim, tuning, big, out Vector3 target), Is.True, "大きいアンカーが見つからない");
+            Assert.That(target.Y, Is.EqualTo(StandingY + 10f).Within(1e-4f));
+            Assert.That(big.AnchorRadii[0], Is.EqualTo(2f));
+        }
     }
 }

@@ -69,6 +69,12 @@ namespace Airerage.Core.Physics
         IReadOnlyList<Vector3> AnchorPoints { get; }
 
         /// <summary>
+        /// アンカーポイントごとのエイムアシストの半径（m。AnchorPoints と同じ順。0 なら WireTuning.AimAssistRadius。大きいアンカー。
+        /// ユーザーの要望、2026-10-26）。
+        /// </summary>
+        IReadOnlyList<float> AnchorRadii { get; }
+
+        /// <summary>
         /// ロープが巻き付ける地形の角（ほかの地形に埋まっていない角。D-33）。
         /// </summary>
         IReadOnlyList<RopeCorner> RopeCorners { get; }

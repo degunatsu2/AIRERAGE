@@ -53,6 +53,9 @@ namespace Airerage.Runtime.Simulation
         /// <summary>動く足場と扉（番号の順。始まっていなければ null。ユーザーの要望、2026-10-26）。</summary>
         IReadOnlyList<StagePlatform> Platforms { get; }
 
+        /// <summary>ステージの仕掛け（赤外線とミサイル、ピッチャーマシン。ユーザーの要望、2026-10-26。表示が状態を読む）。試合がなければ null。</summary>
+        IReadOnlyList<StageTrap> Traps { get; }
+
         /// <summary>扉の開き具合（始まっていなければ null）。</summary>
         StageState Stage { get; }
 

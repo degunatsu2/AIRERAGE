@@ -7,11 +7,12 @@ namespace Airerage.Editor.Stages
     /// <summary>
     /// 陸上競技場（STORM STADIUM。STORM RUNNER のテーマのステージ。ユーザーの案、2026-10-26）。いちばん下はトラックが地続きで、撃破の線は
     /// 左右と上にしかない（トラックは左右の撃破の線の外まで続く。下へは落ちない）。真ん中に表彰台、左右にスタンドと照明塔、上に
-    /// 大きな得点板。
-    /// 追加の案（取捨選択はユーザー）: 追い風と向かい風（競技場の全体に、左右から交互に吹く周期のある風。地面の上でも流される）、
-    /// 短距離のレーン（真ん中へ向かうスピードレーン）とハードル（低い壁）、棒高跳び（発射台）、走り幅跳びの踏み切り板（発射台）、
-    /// 走り高跳びのマット（ジャンプ台）、転がる砲丸（トラックの上を行き来するバンパー）、つむじ風（トラックの上を行き来する上昇気流）、
-    /// スタンドの屋根と照明塔（ワイヤーがつながる）、得点板（いちばん上の足場。上の撃破の線が近い）、旗（アンカー）。
+    /// 大きな得点板。足場は少なく、空中のたくさんのアンカー（大きいアンカーもある）で飛び回る（ユーザーの要望、2026-10-26）。
+    /// ギミック: ピッチャーマシン（照明塔の柱に付いていて、10 秒ずつずらして 20 秒ごとに野球のボールを空中へ打ち出す。ボールは跳ね回り、
+    /// 止まったら点滅して消える。速いボールに当たると吹き飛ぶ。ユーザーの要望）。追加の案（残したもの）: 短距離のレーン（真ん中へ向かう
+    /// スピードレーン）とハードル、棒高跳び（左右対称の発射台）、走り幅跳びの踏み切り板、スタンドのジャンプ台、つむじ風（表彰台の上を
+    /// 行き来する上昇気流）、得点板へ向かう加速リング、スタンドの屋根と照明塔、得点板、旗（アンカー）。消したもの（ユーザーの要望）:
+    /// 追い風と向かい風（全体の風）、転がる砲丸。
     /// </summary>
     internal static class StadiumStage
     {
@@ -36,10 +37,8 @@ namespace Airerage.Editor.Stages
                 FogStart = 60f,
                 FogEnd = 190f,
             };
-            theme.ZoneColors[StageZoneKind.Gust] = new Color(0.7f, 1f, 0.6f);
             theme.ZoneColors[StageZoneKind.SpeedLane] = new Color(1f, 1f, 1f);
             theme.ZoneColors[StageZoneKind.Launcher] = new Color(1f, 0.85f, 0.3f);
-            theme.ZoneColors[StageZoneKind.Bumper] = new Color(0.55f, 0.55f, 0.6f);
             theme.ZoneColors[StageZoneKind.Updraft] = new Color(0.85f, 0.75f, 0.55f);
             theme.ZoneColors[StageZoneKind.JumpPad] = new Color(0.3f, 0.6f, 1f);
 
@@ -47,7 +46,7 @@ namespace Airerage.Editor.Stages
             {
                 Id = "Stadium",
                 DisplayName = "STORM STADIUM",
-                Description = "No bottom to fall from: knock rivals off the sides of the track or over the scoreboard. Tailwinds and headwinds take turns.",
+                Description = "No bottom to fall from: knock rivals off the sides or over the scoreboard. Swing between the anchors and dodge the pitched baseballs.",
                 Color = new Color(0.55f, 1f, 0.5f),
                 Terrain = new[]
                 {
@@ -81,11 +80,21 @@ namespace Airerage.Editor.Stages
                     // 得点板（いちばん上。上の撃破の線が近い）。
                     new TerrainBox("Scoreboard", -8f, 28f, 8f, 33f, attachable: true),
                 },
-                // 旗と、照明塔と得点板の角。
+                // 旗と、照明塔と得点板の角と、空中のたくさんのアンカー（ユーザーの要望、2026-10-26）。
                 Anchors = new[]
                 {
                     new Vector2(-24f, 20f), new Vector2(24f, 20f), new Vector2(-14f, 26f), new Vector2(14f, 26f), new Vector2(-40f, 28f),
                     new Vector2(40f, 28f), new Vector2(0f, 13f), new Vector2(-10f, 35f), new Vector2(10f, 35f),
+                    new Vector2(-6f, 20f), new Vector2(6f, 20f), new Vector2(-18f, 11f), new Vector2(18f, 11f), new Vector2(-18f, 31f),
+                    new Vector2(18f, 31f), new Vector2(-28f, 15f), new Vector2(28f, 15f), new Vector2(-30f, 36f), new Vector2(30f, 36f),
+                    new Vector2(-38f, 20f), new Vector2(38f, 20f), new Vector2(-52f, 16f), new Vector2(52f, 16f), new Vector2(-52f, 27f),
+                    new Vector2(52f, 27f),
+                },
+                // 大きいアンカー（エイムアシストの半径 2.2m）。
+                BigAnchors = new[]
+                {
+                    (new Vector2(0f, 24f), 2.2f), (new Vector2(-24f, 27f), 2.2f), (new Vector2(24f, 27f), 2.2f), (new Vector2(-46f, 33f), 2.2f),
+                    (new Vector2(46f, 33f), 2.2f),
                 },
                 // 下の撃破の線はトラックのずっと下（届かない）。左右と上だけ（ユーザーの案）。
                 BoundsMin = new Vector2(-60f, -20f),
@@ -93,30 +102,30 @@ namespace Airerage.Editor.Stages
                 Theme = theme,
                 Zones = new[]
                 {
-                    // 追い風と向かい風: 競技場の全体に、24 秒ごとに 5 秒、右へ・左へ交互に吹く（3 秒前に予告）。地面の上でも流される。
-                    // 最初は 6 秒後に向かい風、18 秒後に追い風（周期のずれの分だけ前に始まった周期として数えるので、ずれは 18 秒と 6 秒）。
-                    new ZoneSpec("Tailwind", StageZoneKind.Gust, new Vector2(0f, 18f), new Vector2(120f, 36f), Vector2.right, 25f, 9f).Every(24f, 5f, 6f, 0f, 3f),
-                    new ZoneSpec("Headwind", StageZoneKind.Gust, new Vector2(0f, 18f), new Vector2(120f, 36f), Vector2.left, 25f, 9f).Every(24f, 5f, 18f, 0f, 3f),
                     // 短距離のレーン（真ん中へ向かう）。
                     ZoneSpec.OnFloor("SprintLaneWest", StageZoneKind.SpeedLane, -32f, -15f, 0f, Vector2.right, 12f),
                     ZoneSpec.OnFloor("SprintLaneEast", StageZoneKind.SpeedLane, 15f, 32f, 0f, Vector2.left, 12f),
-                    // 走り高跳びのマット、棒高跳び、走り幅跳びの踏み切り板。
-                    ZoneSpec.OnFloor("HighJumpMat", StageZoneKind.JumpPad, -14f, -12f, 0f, Vector2.up, 28f, 0.4f),
-                    ZoneSpec.OnFloor("PoleVault", StageZoneKind.Launcher, 12f, 14f, 0f, new Vector2(-0.4f, 1f), 30f),
+                    // 棒高跳び（左右対称。真ん中へ向かって高く跳ぶ。ユーザーの要望、2026-10-26）と、走り幅跳びの踏み切り板。
+                    ZoneSpec.OnFloor("PoleVaultWest", StageZoneKind.Launcher, -23f, -21f, 0f, new Vector2(0.3f, 1f), 28f),
+                    ZoneSpec.OnFloor("PoleVaultEast", StageZoneKind.Launcher, 21f, 23f, 0f, new Vector2(-0.3f, 1f), 28f),
                     ZoneSpec.OnFloor("LongJumpBoard", StageZoneKind.Launcher, -31.5f, -29.5f, 0f, new Vector2(1f, 0.55f), 24f),
                     ZoneSpec.OnFloor("LongJumpBoardEast", StageZoneKind.Launcher, 29.5f, 31.5f, 0f, new Vector2(-1f, 0.55f), 24f),
                     // スタンドの上のジャンプ台。
                     ZoneSpec.OnFloor("StandPadWest", StageZoneKind.JumpPad, -47f, -45.5f, 5f, Vector2.up, 26f, 0.4f),
                     ZoneSpec.OnFloor("StandPadEast", StageZoneKind.JumpPad, 45.5f, 47f, 5f, Vector2.up, 26f, 0.4f),
-                    // 転がる砲丸: トラックの上を左右に行き来する（触れると弾かれる）。
-                    new ZoneSpec("RollingShot", StageZoneKind.Bumper, new Vector2(-36f, 1.2f), new Vector2(2.2f, 2.2f), Vector2.up, 20f)
-                        .Moving(new Vector2(72f, 0f), 18f),
                     // つむじ風: 表彰台の上を左右に行き来する上昇気流。
                     new ZoneSpec("DustDevil", StageZoneKind.Updraft, new Vector2(-6f, 8f), new Vector2(3f, 16f), Vector2.up, 50f, 14f)
                         .Moving(new Vector2(12f, 0f), 12f),
                     // 得点板へ向かう加速リング。
                     new ZoneSpec("RingWest", StageZoneKind.BoostRing, new Vector2(-20f, 16f), new Vector2(2.4f, 3f), new Vector2(1f, 0.5f), 18f),
                     new ZoneSpec("RingEast", StageZoneKind.BoostRing, new Vector2(20f, 16f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.5f), 18f),
+                },
+                // ピッチャーマシン（ユーザーの要望、2026-10-26）: 照明塔の柱の内側に付いていて、20 秒ごとに真ん中へ打ち出す（左右で 10 秒ずらす。
+                // 最初は 5 秒後）。当たると威力 10 の枚数のコインを落とし、吹き飛ぶ【仮】。
+                Traps = new[]
+                {
+                    TrapSpec.Pitcher("PitcherWest", new Vector2(-31.4f, 16f), new Vector2(14f, 9f), 20f, 5f, 0.4f, 10, 24f, 7f, 1.5f),
+                    TrapSpec.Pitcher("PitcherEast", new Vector2(31.4f, 16f), new Vector2(-14f, 9f), 20f, 15f, 0.4f, 10, 24f, 7f, 1.5f),
                 },
                 Coins = new (Vector2, int)[]
                 {
@@ -126,9 +135,9 @@ namespace Airerage.Editor.Stages
                     (new Vector2(25.8f, 2.4f), 1), (new Vector2(17.8f, 2.4f), 1),
                     // 表彰台。
                     (new Vector2(-3f, 3f), 1), (new Vector2(3f, 2.5f), 1), (new Vector2(0f, 3.8f), 3),
-                    // 走り高跳びと棒高跳びの道。
-                    (new Vector2(-13f, 5f), 1), (new Vector2(-13f, 9f), 1), (new Vector2(-13f, 13f), 3), (new Vector2(9f, 8f), 1), (new Vector2(5f, 11f), 1),
-                    (new Vector2(0f, 9f), 1),
+                    // 棒高跳びの道（左右対称）。
+                    (new Vector2(-19f, 6.5f), 1), (new Vector2(19f, 6.5f), 1), (new Vector2(-15f, 10.5f), 1), (new Vector2(15f, 10.5f), 1), (new Vector2(0f, 9f), 1),
+                    (new Vector2(-9f, 13f), 3), (new Vector2(9f, 13f), 3),
                     // 走り幅跳びの道。
                     (new Vector2(-34f, 5f), 1), (new Vector2(-28f, 7f), 1), (new Vector2(34f, 5f), 1), (new Vector2(28f, 7f), 1),
                     // スタンド（段の上と屋根の上）。
@@ -152,7 +161,7 @@ namespace Airerage.Editor.Stages
                 Jackpots = new[]
                 {
                     new Vector2(0f, 38f), new Vector2(-54f, 30f), new Vector2(54f, 30f), new Vector2(-54f, 4f), new Vector2(54f, 4f),
-                    new Vector2(0f, 22f),
+                    new Vector2(0f, 16f),
                 },
                 Banks = new[]
                 {
@@ -196,7 +205,13 @@ namespace Airerage.Editor.Stages
             decor.Box("FloodlampWest", new Vector3(-32.7f, 25.5f, 0.6f), new Vector3(5f, 1.6f, 0.4f), light);
             decor.Box("FloodlampEast", new Vector3(32.7f, 25.5f, 0.6f), new Vector3(5f, 1.6f, 0.4f), light);
             decor.Quad("Screen", new Vector3(0f, 30.5f, -2.05f), new Vector2(14f, 4f), screen);
-            decor.Box("HighJumpBar", new Vector3(-13f, 3.5f, 0.6f), new Vector3(3f, 0.12f, 0.12f), bar);
+            // 棒高跳びのボックスと立てたポール（左右対称）。
+            foreach (float x in new[] { -22f, 22f })
+            {
+                decor.Box("VaultBox", new Vector3(x, 0.05f, 1.4f), new Vector3(2f, 0.1f, 0.8f), bar);
+                GameObject pole = decor.Cylinder("VaultPole", new Vector3(x, 3.5f, 2.2f), new Vector3(0.12f, 3.5f, 0.12f), bar);
+                pole.transform.rotation = Quaternion.Euler(0f, 0f, x < 0f ? -12f : 12f);
+            }
             decor.Box("PodiumGold", new Vector3(0f, 2.41f, 0f), new Vector3(3f, 0.04f, 4f), gold);
             // 空の雲。
             for (int i = 0; i < 10; i++)

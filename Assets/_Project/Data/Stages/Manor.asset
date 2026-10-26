@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: VAMPIRE MANOR
   _sceneName: Stage_Manor
-  _description: 'Outside a vampire''s manor: a forsaken graveyard and a tomato farm
-    with creepy scarecrows. Lightning, bats and ghosts.'
+  _description: 'Outside a vampire''s manor. Demon hands crawl the graveyard and
+    the farm: get caught and you are dragged into the prison in the sky.'
   _color: {r: 0.75, g: 0.2, b: 0.35, a: 1}

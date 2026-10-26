@@ -180,6 +180,18 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>溺れた（ごぼごぼと沈んでいく泡の音）。</summary>
         Drown,
+
+        /// <summary>悪魔の手に握られた（低いうなりと、握りつぶす音。ユーザーの要望、2026-10-26）。</summary>
+        Grab,
+
+        /// <summary>時空に吸い込まれる（下がっていくうねり）・牢屋に現れる。</summary>
+        Vortex,
+
+        /// <summary>赤外線に触れた（短い警報）。</summary>
+        Alarm,
+
+        /// <summary>ピッチャーマシンがボールを打ち出した（ポンという音）。</summary>
+        Pitch,
     }
 
     /// <summary>
@@ -748,6 +760,36 @@ namespace Airerage.Runtime.Audio
                         AddTone(b, r, start, 0.08f, 420f - i * 25f, 640f - i * 30f, Wave.Sine, 0.2f, 0.003f, 0.05f);
                     }
                     AddNoise(b, r, rng, 0f, 1f, 0.3f, 0.01f, 0.6f, 900f, 600f, 200f);
+                    break;
+                case SoundId.Grab:
+                    // 低いうなりと、ぎゅっと握る音。
+                    b = new float[Samples(0.6f, r)];
+                    AddTone(b, r, 0f, 0.5f, 90f, 60f, Wave.Saw, 0.3f, 0.01f, 0.3f);
+                    AddNoise(b, r, rng, 0.05f, 0.2f, 0.5f, 0.002f, 0.12f, 700f, 300f, 200f);
+                    AddTone(b, r, 0.08f, 0.12f, 160f, 80f, Wave.Square, 0.25f, 0.002f, 0.08f);
+                    break;
+                case SoundId.Vortex:
+                    // 下がっていくうねり（時空に吸い込まれる）。
+                    b = new float[Samples(1.1f, r)];
+                    for (int i = 0; i < 3; i++)
+                    {
+                        AddTone(b, r, i * 0.05f, 1f, 900f - i * 120f, 120f, Wave.Sine, 0.18f, 0.05f, 0.4f);
+                    }
+                    AddNoise(b, r, rng, 0f, 1f, 0.2f, 0.2f, 0.5f, 2500f, 400f, 300f);
+                    break;
+                case SoundId.Alarm:
+                    // ピピッ（短い警報）。
+                    b = new float[Samples(0.45f, r)];
+                    for (int i = 0; i < 3; i++)
+                    {
+                        AddTone(b, r, i * 0.14f, 0.09f, 1600f, 1600f, Wave.Square, 0.22f, 0.002f, 0.02f);
+                    }
+                    break;
+                case SoundId.Pitch:
+                    // ポン（空気で打ち出す音）。
+                    b = new float[Samples(0.35f, r)];
+                    AddNoise(b, r, rng, 0f, 0.2f, 0.7f, 0.001f, 0.12f, 1200f, 400f, 300f);
+                    AddTone(b, r, 0f, 0.15f, 260f, 120f, Wave.Sine, 0.45f, 0.001f, 0.1f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

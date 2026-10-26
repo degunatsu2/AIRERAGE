@@ -17,6 +17,10 @@ namespace Airerage.Runtime.Presentation
     {
         [Tooltip("動かす見た目（この物体の子）")]
         [SerializeField] private Transform _visual;
+        [Tooltip("ボタンのランプ（ワイヤーをつないでいる間は _lampOn、ほかは _lampOff。ボタンだけ）")]
+        [SerializeField] private Renderer _lamp;
+        [SerializeField] private Material _lampOff;
+        [SerializeField] private Material _lampOn;
 
         private StagePlatformAuthoring _authoring;
         private StagePlatform _platform;
@@ -31,10 +35,21 @@ namespace Airerage.Runtime.Presentation
         /// <summary>見た目の今の中心（テスト用）。</summary>
         public Vector3 ShownCenter => _visual != null ? _visual.position : transform.position;
 
+        /// <summary>ボタンのランプを点けているか（テスト用）。</summary>
+        public bool LampOn { get; private set; }
+
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(Transform visual)
         {
             _visual = visual;
+        }
+
+        /// <summary>ボタンのランプを決める（シーンのビルダー用）。</summary>
+        public void ConfigureLamp(Renderer lamp, Material off, Material on)
+        {
+            _lamp = lamp;
+            _lampOff = off;
+            _lampOn = on;
         }
 
         private void Awake()
@@ -68,6 +83,20 @@ namespace Airerage.Runtime.Presentation
                 int index = IndexIn(_feed.Platforms);
                 open = index >= 0 && _feed.Stage != null ? _feed.Stage.OpenOf(index) : 0;
             }
+            else if (!running && _platform.IsDoor && _platform.OpenPeriod > 0 && _platform.ScheduledOpen(tick))
+            {
+                // メニューの背景: 周期で開く扉（牢屋）は、周期どおりに開いて見せる。
+                open = StagePlatform.DoorScale;
+            }
+            if (_platform.IsButton && _lamp != null)
+            {
+                bool pressed = running && IsPressed(IndexIn(_feed.Platforms));
+                if (pressed != LampOn || _lamp.sharedMaterial == null)
+                {
+                    LampOn = pressed;
+                    _lamp.sharedMaterial = pressed ? _lampOn : _lampOff;
+                }
+            }
             bool active = _platform.TryGetCenter(tick, open, out System.Numerics.Vector2 center);
             if (_visual.gameObject.activeSelf != active)
             {
@@ -77,6 +106,24 @@ namespace Airerage.Runtime.Presentation
             {
                 _visual.position = new Vector3(center.X, center.Y, transform.position.z);
             }
+        }
+
+        // ボタン index に、だれかがワイヤーをつないでいるか。
+        private bool IsPressed(int index)
+        {
+            if (index < 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < _feed.CharacterCount; i++)
+            {
+                CharacterState state = _feed.GetState(i);
+                if (!state.Combat.HasLeft && state.Wire.Phase == Airerage.Core.Wire.WirePhase.Attached && state.Wire.AnchorBody == index + 1)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // シミュレーションの足場の一覧での、自分の番号（値が同じ足場を探す。一覧が変わったら探し直す）。

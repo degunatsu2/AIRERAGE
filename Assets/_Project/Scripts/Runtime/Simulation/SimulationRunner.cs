@@ -122,6 +122,7 @@ namespace Airerage.Runtime.Simulation
         CoinField ISimulationFeed.Coins => _world?.Coins.Field;
         WorldObjects ISimulationFeed.Objects => _world?.Objects;
         IReadOnlyList<StagePlatform> ISimulationFeed.Platforms => _world?.Platforms;
+        IReadOnlyList<StageTrap> ISimulationFeed.Traps => _world?.Traps;
         StageState ISimulationFeed.Stage => _world?.Stage;
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => _world != null ? _world.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => _world != null ? _world.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
@@ -226,13 +227,14 @@ namespace Airerage.Runtime.Simulation
             List<CoinSpawnPoint> coinSpawns = CoinSpawnAuthoring.Collect(errors);
             List<BankSpot> bankSpots = BankSpotAuthoring.Collect(errors);
             List<StagePlatform> platforms = StagePlatformAuthoring.Collect(errors);
+            List<StageTrap> traps = StageTrapAuthoring.Collect(errors);
             foreach (string error in errors)
             {
                 Debug.LogError(error, this);
             }
 
             _terrain = terrain;
-            _world = new SimWorld(terrain, bounds, zones, null, coinSpawns, bankSpots, platforms);
+            _world = new SimWorld(terrain, bounds, zones, null, coinSpawns, bankSpots, platforms, traps);
             _playerCharacter = _character;
             if (_rememberCharacter && _roster != null && _roster.Count > 0)
             {

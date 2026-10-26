@@ -1,4 +1,5 @@
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
 using UnityEngine;
 using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
@@ -9,10 +10,10 @@ namespace Airerage.Editor.Stages
     /// 上の棚とケーキスタンド。調理台から落ちると撃破。
     /// 固有のギミック（ユーザーの案）: オーブンの火柱（40 秒ごとに奥のオーブンから手前へ噴き出す。危険。3 秒前に予告）、ロールケーキ
     /// （左右のステージの外から 1 つずつ出て、交差するように弧を描いて、反対の外へ去る。乗れて、ワイヤーがつながる動く足場。
-    /// 乗ったまま外へ運ばれると撃破）。追加の案（取捨選択はユーザー）: トースター（周期的にポンと跳ね上げる発射台）、シンク（水。
-    /// 5 秒で溺れる）と蛇口の水（下向きの周期のある風。シンクへ押し込む）、バター（氷。滑る）、カップケーキのベルトコンベア（スピード
-    /// レーン）、やかんの湯気（上向きの周期のある風）、プリンのバンパー、ゼリーのジャンプ台、ミキサーの渦（上昇気流）、吊るしたおたま
-    /// （アンカー）。
+    /// 乗ったまま外へ運ばれると撃破）、シンクの排水溝（貯水槽の右から入ると、水流で右の棚の上まで流される。ユーザーの要望、2026-10-26）。
+    /// 追加の案（残したもの）: トースター、シンク（水。5 秒で溺れる）、バター（氷）、カップケーキのベルトコンベア、やかんの湯気、ゼリーの
+    /// ジャンプ台（まな板とボウルの上）、ミキサーの渦（上昇気流）、ドーナツの輪（加速リング）、吊るしたおたま（アンカー）。
+    /// 消したもの（ユーザーの要望、2026-10-26）: プリンのバンパー、調理台の端のゼリーのジャンプ台、蛇口の水（下向きの風）。
     /// </summary>
     internal static class KitchenStage
     {
@@ -48,30 +49,35 @@ namespace Airerage.Editor.Stages
             theme.ZoneColors[StageZoneKind.Updraft] = new Color(1f, 0.9f, 0.95f);
             const float rollTravel = 22f;
             const float rollPeriod = 30f;
-            var rollSize = new Vector2(5f, 2.4f);
+            // ロールケーキ: 前の横 1.5 倍・縦 2 倍（ユーザーの要望、2026-10-26）。
+            var rollSize = new Vector2(7.5f, 4.8f);
+            var drainFlow = new Color(0.35f, 0.75f, 1f);
 
             return new StageLayout
             {
                 Id = "Kitchen",
                 DisplayName = "SWEET KITCHEN",
-                Description = "The oven blasts fire every 40 seconds. Ride the roll cakes across the sky, dodge the toaster, don't drown in the sink.",
+                Description = "The oven blasts fire every 40 seconds. Ride the roll cakes across the sky, and dive into the sink drain to be flushed up to the shelf.",
                 Color = new Color(1f, 0.6f, 0.75f),
                 Terrain = new[]
                 {
                     // 左の調理台（大理石の天板と、ワイヤーがつながる木の戸棚）。
                     new TerrainBox("CounterTopWest", -48f, 1f, -26f, 2f),
                     new TerrainBox("CabinetWest", -47f, -30f, -27f, 1f, attachable: true),
-                    // 右の調理台（真ん中にシンク）。
+                    // 右の調理台（真ん中にシンク。シンクの右の排水溝は、調理台の下を通って右の端で上へ曲がり、棚の上に出る）。
                     new TerrainBox("CounterTopEastA", 26f, 1f, 34f, 2f),
                     new TerrainBox("CabinetEastA", 27f, -30f, 34f, 1f, attachable: true),
                     new TerrainBox("SinkBottom", 34f, -30f, 42f, -6f),
-                    new TerrainBox("CounterTopEastB", 42f, 1f, 48f, 2f),
-                    new TerrainBox("CabinetEastB", 42f, -30f, 47f, 1f, attachable: true),
+                    new TerrainBox("CounterTopEastB", 42f, 1f, 46.4f, 2f),
+                    new TerrainBox("CabinetEastB", 42f, -30f, 49.8f, -2.4f, attachable: true),
+                    new TerrainBox("DrainInnerWall", 46f, 2f, 46.4f, 14f),
+                    new TerrainBox("DrainOuterWall", 49.4f, -2.4f, 49.8f, 18.2f),
+                    new TerrainBox("DrainCap", 43f, 17.6f, 49.8f, 18.2f),
                     // 真ん中のコンロ（鉄。オーブンの火柱の下）。
                     new TerrainBox("Stove", -9f, -30f, 9f, 0f, attachable: true),
-                    // 上の棚とケーキスタンド。
-                    new TerrainBox("ShelfWest", -46f, 14f, -34f, 14.6f, attachable: true),
-                    new TerrainBox("ShelfEast", 34f, 14f, 46f, 14.6f, attachable: true),
+                    // 上の棚とケーキスタンド（棚は外側へずらし、やかんの湯気とトースターで飛んでも頭がぶつからない。ユーザーの要望、2026-10-26）。
+                    new TerrainBox("ShelfWest", -46.4f, 14f, -37.5f, 14.6f, attachable: true),
+                    new TerrainBox("ShelfEast", 37.5f, 14f, 46.4f, 14.6f, attachable: true),
                     new TerrainBox("CakeStandBase", -6f, 20f, 6f, 20.6f),
                     new TerrainBox("CakeStandTop", -3f, 25f, 3f, 25.5f),
                     // 調理台とコンロの間の、まな板とボウル（小さな足場）。
@@ -81,8 +87,8 @@ namespace Airerage.Editor.Stages
                 // 吊るしたおたまとフライ返し。
                 Anchors = new[]
                 {
-                    new Vector2(-15f, 30f), new Vector2(15f, 30f), new Vector2(0f, 36f), new Vector2(-28f, 34f), new Vector2(28f, 34f),
-                    new Vector2(-40f, 23f), new Vector2(40f, 23f), new Vector2(-18f, 16f), new Vector2(18f, 16f),
+                    new Vector2(-15f, 25f), new Vector2(15f, 25f), new Vector2(0f, 36f), new Vector2(-28f, 27f), new Vector2(28f, 27f),
+                    new Vector2(-42f, 23f), new Vector2(42f, 23f), new Vector2(-18f, 16f), new Vector2(18f, 16f),
                 },
                 BoundsMin = new Vector2(-60f, -12f),
                 BoundsMax = new Vector2(60f, 46f),
@@ -94,79 +100,82 @@ namespace Airerage.Editor.Stages
                     new ZoneSpec("OvenFire", StageZoneKind.Hazard, new Vector2(0f, 8.5f), new Vector2(22f, 15f), Vector2.up, 25f, 26f)
                         .Every(40f, 3f, 10f, 0f, 3f).Column(22f),
                     // トースター: 7 秒ごとにポンと跳ね上げる（1.5 秒前に予告）。
-                    new ZoneSpec("Toaster", StageZoneKind.Launcher, new Vector2(-36.5f, 3.2f), new Vector2(3f, 2.4f), Vector2.up, 30f).Every(7f, 0.5f, 3f, 0f, 1.5f),
-                    // シンク（水）と蛇口の水（9 秒ごとに 2 秒、シンクへ押し込む）。
+                    new ZoneSpec("Toaster", StageZoneKind.Launcher, new Vector2(-35.5f, 3.2f), new Vector2(3f, 2.4f), Vector2.up, 30f).Every(7f, 0.5f, 3f, 0f, 1.5f),
+                    // シンク（水）。
                     new ZoneSpec("Sink", StageZoneKind.Water, new Vector2(38f, -3f), new Vector2(8f, 6f), Vector2.zero, 5f, 20f),
-                    new ZoneSpec("Faucet", StageZoneKind.Gust, new Vector2(38f, 6f), new Vector2(1.6f, 10f), Vector2.down, 70f, 14f).Every(9f, 2f, 4f, 0f, 1f),
+                    // 排水溝の水流（ユーザーの要望、2026-10-26）: 貯水槽の右の口から調理台の下を右へ、右の端で上へ、上で左へ流して棚の上に出す。
+                    new ZoneSpec("DrainIn", StageZoneKind.Gust, new Vector2(45.3f, -0.7f), new Vector2(8.2f, 3.4f), Vector2.right, 90f, 14f)
+                        .Styled(StageZoneView.ZoneLook.Flow).Tinted(drainFlow),
+                    new ZoneSpec("DrainUp", StageZoneKind.Gust, new Vector2(47.9f, 6.9f), new Vector2(3f, 18.6f), Vector2.up, 100f, 20f)
+                        .Styled(StageZoneView.ZoneLook.Flow).Tinted(drainFlow),
+                    new ZoneSpec("DrainOut", StageZoneKind.Gust, new Vector2(46.2f, 16.1f), new Vector2(6.4f, 3f), Vector2.left, 90f, 14f)
+                        .Styled(StageZoneView.ZoneLook.Flow).Tinted(drainFlow),
                     // バター（氷。滑る）。
                     ZoneSpec.OnFloor("Butter", StageZoneKind.Ice, -31f, -27f, 2f, Vector2.zero, 0.06f),
                     // カップケーキのベルトコンベア（シンクとは逆、真ん中へ運ぶ）。
                     ZoneSpec.OnFloor("CupcakeConveyor", StageZoneKind.SpeedLane, 26.5f, 31f, 2f, Vector2.left, 11f),
                     // やかんの湯気: 6 秒ごとに 2 秒、上へ。
                     new ZoneSpec("KettleSteam", StageZoneKind.Gust, new Vector2(33f, 7f), new Vector2(2f, 10f), Vector2.up, 60f, 16f).Every(6f, 2f, 1f, 0f, 1f),
-                    // プリンのバンパー。
-                    new ZoneSpec("PuddingWest", StageZoneKind.Bumper, new Vector2(-18f, 11f), new Vector2(2.4f, 2.4f), Vector2.up, 18f),
-                    new ZoneSpec("PuddingEast", StageZoneKind.Bumper, new Vector2(18f, 11f), new Vector2(2.4f, 2.4f), Vector2.up, 18f),
-                    // ゼリーのジャンプ台。
-                    ZoneSpec.OnFloor("JellyWest", StageZoneKind.JumpPad, -46f, -44f, 2f, Vector2.up, 26f, 0.4f),
-                    ZoneSpec.OnFloor("JellyEast", StageZoneKind.JumpPad, 45.5f, 47.5f, 2f, Vector2.up, 26f, 0.4f),
+                    // ゼリーのジャンプ台（まな板とボウルの上）。
                     ZoneSpec.OnFloor("JellyBoard", StageZoneKind.JumpPad, -19f, -17f, 6.5f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("JellyBowl", StageZoneKind.JumpPad, 17f, 19f, 6.5f, Vector2.up, 24f, 0.4f),
                     // ドーナツの輪（加速リング）: 調理台の上の空から真ん中へ。
                     new ZoneSpec("DonutWest", StageZoneKind.BoostRing, new Vector2(-26f, 15f), new Vector2(2.4f, 3f), new Vector2(1f, 0.3f), 19f),
                     new ZoneSpec("DonutEast", StageZoneKind.BoostRing, new Vector2(26f, 15f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.3f), 19f),
                     // ミキサーの渦（左の棚の上から上へ）。
-                    new ZoneSpec("MixerWhirl", StageZoneKind.Updraft, new Vector2(-40f, 19f), new Vector2(4f, 9f), Vector2.up, 45f, 12f),
+                    new ZoneSpec("MixerWhirl", StageZoneKind.Updraft, new Vector2(-42f, 19f), new Vector2(4f, 9f), Vector2.up, 45f, 12f),
                 },
                 Platforms = new[]
                 {
                     // ロールケーキ（ユーザーの案）: 左右の外から同時に出て、片方は高い弧、もう片方は低い弧で交差し、反対の外へ去る（22 秒で渡り、
-                    // 8 秒いない）。乗れて、ワイヤーがつながる。
-                    PlatformSpec.Arc("RollCakeWest", rollSize, true, new Vector2(-72f, 12f), new Vector2(0f, 44f), new Vector2(72f, 12f), rollTravel, rollPeriod)
+                    // 8 秒いない）。乗れて、ワイヤーがつながる。前より上空を飛ぶ（高い弧のいちばん上は 39.5m、低い弧のいちばん下は 30.5m で、
+                    // ケーキスタンドの上を通る。ユーザーの要望、2026-10-26）。
+                    PlatformSpec.Arc("RollCakeWest", rollSize, true, new Vector2(-72f, 18f), new Vector2(0f, 61f), new Vector2(72f, 18f), rollTravel, rollPeriod)
                         .Looks(RollCakeLooks),
-                    PlatformSpec.Arc("RollCakeEast", rollSize, true, new Vector2(72f, 30f), new Vector2(0f, 4f), new Vector2(-72f, 30f), rollTravel, rollPeriod)
+                    PlatformSpec.Arc("RollCakeEast", rollSize, true, new Vector2(72f, 38f), new Vector2(0f, 23f), new Vector2(-72f, 38f), rollTravel, rollPeriod)
                         .Looks(RollCakeLooks),
                 },
                 Coins = new (Vector2, int)[]
                 {
                     // 調理台の上。
-                    (new Vector2(-46f, 4.5f), 1), (new Vector2(-41f, 4f), 1), (new Vector2(-33f, 4f), 1), (new Vector2(-29f, 3.5f), 1),
+                    (new Vector2(-46f, 4.5f), 1), (new Vector2(-41f, 4f), 1), (new Vector2(-32f, 4f), 1), (new Vector2(-29f, 3.5f), 1),
                     (new Vector2(29f, 3.5f), 1), (new Vector2(32.5f, 4f), 1), (new Vector2(44f, 4f), 1),
                     // トースターの上と、やかんの湯気の上。
-                    (new Vector2(-36.5f, 8f), 1), (new Vector2(-36.5f, 12.5f), 3), (new Vector2(33f, 13f), 3),
-                    // シンクの中（潜る）と蛇口の下。
+                    (new Vector2(-35.5f, 8f), 1), (new Vector2(-35.5f, 12.5f), 3), (new Vector2(33f, 13f), 3),
+                    // シンクの中（潜る）と、その上。
                     (new Vector2(38f, -4.5f), 20), (new Vector2(38f, 3.5f), 1), (new Vector2(36f, 1f), 1), (new Vector2(40f, 1f), 1),
+                    // 排水溝の中（上へ流される途中の 20 枚と、調理台の下の 3 枚）。
+                    (new Vector2(47.9f, 10f), 20), (new Vector2(44.5f, -0.8f), 3),
                     // コンロの上（オーブンの火柱が噴く所）。
                     (new Vector2(-6f, 2f), 1), (new Vector2(0f, 2f), 3), (new Vector2(6f, 2f), 1), (new Vector2(-4f, 7f), 1), (new Vector2(4f, 7f), 1),
                     (new Vector2(0f, 11f), 20), (new Vector2(-8f, 13f), 1), (new Vector2(8f, 13f), 1),
-                    // まな板とボウルの上、プリンの周り。
+                    // まな板とボウルの上と、ジャンプ台の上。
                     (new Vector2(-20.5f, 8.5f), 1), (new Vector2(-15.5f, 8.5f), 1), (new Vector2(15.5f, 8.5f), 1), (new Vector2(20.5f, 8.5f), 1),
                     (new Vector2(-18f, 14.5f), 1), (new Vector2(18f, 14.5f), 1), (new Vector2(-22.5f, 11f), 1), (new Vector2(22.5f, 11f), 1),
                     // 棚の上とミキサーの渦。
-                    (new Vector2(-44.5f, 16.5f), 1), (new Vector2(-36f, 16.5f), 1), (new Vector2(-40f, 25f), 3), (new Vector2(-40f, 29f), 20),
-                    (new Vector2(44.5f, 16.5f), 1), (new Vector2(36f, 16.5f), 1), (new Vector2(40f, 19f), 3),
+                    (new Vector2(-45f, 16.5f), 1), (new Vector2(-39f, 16.5f), 1), (new Vector2(-42f, 26f), 3), (new Vector2(-42f, 28.5f), 20),
+                    (new Vector2(45f, 16.5f), 1), (new Vector2(39f, 16.5f), 1), (new Vector2(42f, 19.5f), 3),
                     // ケーキスタンドの上と、その上の空。
-                    (new Vector2(-4.5f, 22.5f), 1), (new Vector2(4.5f, 22.5f), 1), (new Vector2(-6f, 28f), 3), (new Vector2(0f, 32f), 1),
-                    // ロールケーキの道（高い弧と低い弧）。
-                    (new Vector2(-30f, 24.5f), 1), (new Vector2(-20f, 27f), 1), (new Vector2(20f, 27f), 1), (new Vector2(30f, 24.5f), 1),
-                    (new Vector2(-30f, 21f), 1), (new Vector2(-18f, 19f), 1), (new Vector2(18f, 19f), 1), (new Vector2(30f, 21f), 1),
-                    (new Vector2(-10f, 34f), 3), (new Vector2(10f, 34f), 3),
+                    (new Vector2(-4.5f, 22.5f), 1), (new Vector2(4.5f, 22.5f), 1), (new Vector2(-6f, 27f), 3),
+                    // ロールケーキの道（低い弧の上と、高い弧の上）。
+                    (new Vector2(-18f, 34.5f), 1), (new Vector2(18f, 34.5f), 1), (new Vector2(-8f, 34.8f), 3), (new Vector2(8f, 34.8f), 3),
+                    (new Vector2(-30f, 39.6f), 1), (new Vector2(30f, 39.6f), 1),
                     // 調理台の下（戸棚の前。落ちる前に届く）。
                     (new Vector2(-24f, -3f), 20), (new Vector2(24f, -3f), 20), (new Vector2(-12f, -4f), 3), (new Vector2(12f, -4f), 3),
                     // 高い所とステージの端。
-                    (new Vector2(-25f, 38f), 20), (new Vector2(25f, 38f), 20), (new Vector2(-53f, 10f), 20), (new Vector2(53f, 10f), 20),
-                    (new Vector2(0f, 41f), 20), (new Vector2(-52f, 24f), 3), (new Vector2(52f, 24f), 3),
-                    (new Vector2(-16f, 22f), 20), (new Vector2(16f, 22f), 20), (new Vector2(-30f, 34.5f), 20), (new Vector2(30f, 34.5f), 20),
+                    (new Vector2(-25f, 42.5f), 20), (new Vector2(25f, 42.5f), 20), (new Vector2(-53f, 10f), 20),
+                    (new Vector2(0f, 44f), 20), (new Vector2(-52f, 24f), 3), (new Vector2(52f, 24f), 3),
+                    (new Vector2(-16f, 22f), 20), (new Vector2(16f, 22f), 20), (new Vector2(-33f, 27f), 20), (new Vector2(33f, 27f), 20),
                 },
                 Jackpots = new[]
                 {
-                    new Vector2(0f, 42f), new Vector2(-46f, 34f), new Vector2(46f, 34f), new Vector2(38f, -5f), new Vector2(0f, 5f),
+                    new Vector2(0f, 35.5f), new Vector2(-50f, 22f), new Vector2(50f, 22f), new Vector2(38f, -5f), new Vector2(0f, 5f),
                     new Vector2(-24f, -6f), new Vector2(24f, -6f),
                 },
                 Banks = new[]
                 {
-                    new Vector2(0f, 17f), new Vector2(-40f, 16.6f), new Vector2(40f, 16.6f), new Vector2(-18f, 3f), new Vector2(18f, 3f),
-                    new Vector2(0f, 27.5f), new Vector2(-30f, 30f), new Vector2(30f, 30f),
+                    new Vector2(0f, 17f), new Vector2(-42.5f, 16.6f), new Vector2(42.5f, 16.6f), new Vector2(-18f, 3f), new Vector2(18f, 3f),
+                    new Vector2(0f, 27f), new Vector2(-30f, 26f), new Vector2(30f, 26f),
                 },
                 Spawns = new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f), new Vector3(-41.5f, 3f, 0f), new Vector3(43.5f, 3f, 0f) },
                 Decorate = Decorate,
@@ -228,13 +237,21 @@ namespace Airerage.Editor.Stages
             decor.Box("FaucetSpout", new Vector3(38f, 11f, 0.8f), new Vector3(0.5f, 0.5f, 1.8f), steel);
             // やかんとトースター。
             decor.Sphere("Kettle", new Vector3(33f, 3.2f, 1.2f), new Vector3(2.2f, 2.2f, 2.2f), decor.Lit("Kettle", new Color(0.85f, 0.25f, 0.25f)));
-            decor.Box("Toaster", new Vector3(-36.5f, 3.2f, 1.2f), new Vector3(3.2f, 2.4f, 2.4f), steel);
+            decor.Box("Toaster", new Vector3(-35.5f, 3.2f, 1.2f), new Vector3(3.2f, 2.4f, 2.4f), steel);
+            // 排水溝の管（奥の側の半透明の管と、口の格子）。
+            Material pipeGlass = decor.Transparent("DrainPipe", new Color(0.6f, 0.85f, 1f, 0.16f));
+            decor.Box("DrainPipeLow", new Vector3(45.8f, -0.65f, 1.4f), new Vector3(7f, 3.3f, 1.2f), pipeGlass);
+            decor.Box("DrainPipeUp", new Vector3(47.9f, 7.65f, 1.4f), new Vector3(2.9f, 19.9f, 1.2f), pipeGlass);
+            for (int i = 0; i < 4; i++)
+            {
+                decor.Box("DrainGrate", new Vector3(42.15f, -2f + i * 0.8f, -1.6f), new Vector3(0.12f, 0.12f, 0.6f), steel);
+            }
             // 窓と床（遠く下）。
             decor.Quad("WindowWest", new Vector3(-30f, 26f, 14.8f), new Vector2(12f, 9f), window);
             decor.Quad("WindowEast", new Vector3(30f, 26f, 14.8f), new Vector2(12f, 9f), window);
             decor.Box("Floor", new Vector3(0f, -22f, 10f), new Vector3(150f, 2f, 40f), floor);
             // 吊るしたおたまの柄（アンカーの上）。
-            foreach (Vector2 hook in new[] { new Vector2(-15f, 30f), new Vector2(15f, 30f), new Vector2(0f, 36f), new Vector2(-28f, 34f), new Vector2(28f, 34f) })
+            foreach (Vector2 hook in new[] { new Vector2(-15f, 25f), new Vector2(15f, 25f), new Vector2(0f, 36f), new Vector2(-28f, 27f), new Vector2(28f, 27f) })
             {
                 decor.Box("LadleHandle", new Vector3(hook.x, hook.y + 3f, 0.6f), new Vector3(0.15f, 6f, 0.15f), steel);
             }

@@ -84,6 +84,7 @@ namespace Airerage.Core.Combat
             respawned.JumpPadCount = state.JumpPadCount;
             respawned.BoostRingCount = state.BoostRingCount;
             respawned.Combat.SplashCount = state.Combat.SplashCount;
+            respawned.Combat.CaptureCount = state.Combat.CaptureCount;
             // コインはここではなくさない（撃破ドロップは CoinDropRules が、台帳を通して落とす。T4-6）。
             respawned.Coins = state.Coins;
             // 撃破で終わったコンボのダメージ報酬は、このティックの後で CombatRewardRules が払う（T4-5）。

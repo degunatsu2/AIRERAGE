@@ -30,6 +30,19 @@ namespace Airerage.Runtime.Presentation
     [RequireComponent(typeof(StageZoneAuthoring))]
     public sealed class StageZoneView : MonoBehaviour
     {
+        /// <summary>見た目の種類（同じ種類のギミックの見せ方を変える。ユーザーの要望、2026-10-26）。</summary>
+        public enum ZoneLook
+        {
+            /// <summary>種類ごとのふつうの見た目。</summary>
+            Default = 0,
+
+            /// <summary>危険を雷にする（上から下へ走るぎざぎざの稲妻。恐怖の館の落雷）。</summary>
+            Lightning = 1,
+
+            /// <summary>風を水の流れにする（速く長い筋。キッチンの排水溝）。</summary>
+            Flow = 2,
+        }
+
         private const int RingSegments = 40;
 
         /// <summary>周期のある風が吹き始める何秒前から知らせるか（予告の長さを決めていないとき）。</summary>
@@ -48,6 +61,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private bool _warningSound = true;
         [Tooltip("動くギミックで、一緒に動かす見た目の親（なくてもよい）")]
         [SerializeField] private Transform _moving;
+        [Tooltip("見た目の種類（雷・水の流れ）")]
+        [SerializeField] private ZoneLook _look;
 
         private readonly List<LineRenderer> _marks = new List<LineRenderer>();
         private StageZoneAuthoring _zone;
@@ -89,6 +104,15 @@ namespace Airerage.Runtime.Presentation
         {
             _warningSound = sound;
         }
+
+        /// <summary>見た目の種類を決める（シーンのビルダー用）。</summary>
+        public void ConfigureLook(ZoneLook look)
+        {
+            _look = look;
+        }
+
+        /// <summary>見た目の種類（テスト用）。</summary>
+        public ZoneLook Look => _look;
 
         /// <summary>予告の表示（周期のあるギミックだけ。テスト用）。</summary>
         public WarningOverlay Warning => _overlay;
@@ -351,6 +375,9 @@ namespace Airerage.Runtime.Presentation
                 case StageZoneKind.Water:
                     RenderWater(center, half);
                     break;
+                case StageZoneKind.Grab:
+                    // 悪魔の手の見た目は _moving の子（DemonHandView が指を動かす）。線はない。
+                    break;
             }
         }
 
@@ -453,9 +480,10 @@ namespace Airerage.Runtime.Presentation
             {
                 int column = i % columns;
                 float offset = ((column + 0.5f) / columns - 0.5f) * across;
-                float phase = Mathf.Repeat(time * 0.9f + i * 0.37f, 1f);
+                bool flow = _look == ZoneLook.Flow;
+                float phase = Mathf.Repeat(time * (flow ? 2.4f : 0.9f) + i * 0.37f, 1f);
                 Vector2 basePoint = new Vector2(center.x, center.y) + side * offset;
-                float streak = Mathf.Min(1.6f, length * 0.25f);
+                float streak = Mathf.Min(flow ? 2.6f : 1.6f, length * (flow ? 0.35f : 0.25f));
                 Vector2 from = basePoint + _direction * ((phase - 0.5f) * length);
                 Vector2 to = from + _direction * streak;
                 if (warning)
@@ -552,6 +580,11 @@ namespace Airerage.Runtime.Presentation
             }
             ShowWarning(warning);
             Box(_ring, column, columnHalf, 1f, warning ? 0f : 0.9f);
+            if (_look == ZoneLook.Lightning)
+            {
+                RenderBolt(minX, maxX, center.y - half.y, center.y + half.y, active);
+                return;
+            }
             // 上向きなら下から上へ（溶岩流）、下向きなら上から下へ（つらら）流れる。
             Vector2 flow = _direction;
             float height = half.y * 2f;
@@ -566,6 +599,28 @@ namespace Airerage.Runtime.Presentation
                 _marks[i].SetPosition(0, ToWorld(new Vector2(from.x, Mathf.Clamp(from.y, center.y - half.y, center.y + half.y))));
                 _marks[i].SetPosition(1, ToWorld(new Vector2(to.x, Mathf.Clamp(to.y, center.y - half.y, center.y + half.y))));
                 SetColor(_marks[i], active ? Fade(phase) : 0f);
+            }
+        }
+
+        // 雷: 柱の上から下へ、ぎざぎざの稲妻（線の並び）。落ちている間だけ、細かく揺れて光る（落雷。ユーザーの要望、2026-10-26）。
+        private void RenderBolt(float minX, float maxX, float bottom, float top, bool active)
+        {
+            float middle = (minX + maxX) * 0.5f;
+            float swing = (maxX - minX) * 0.45f;
+            int seed = Mathf.FloorToInt(Time.time * 18f);
+            float x = middle;
+            float y = top;
+            float step = (top - bottom) / Mathf.Max(1, _marks.Count);
+            for (int i = 0; i < _marks.Count; i++)
+            {
+                float u = Mathf.Repeat(Mathf.Sin((seed + 1) * 12.9898f + i * 78.233f) * 43758.5453f, 1f);
+                float nextX = middle + (u * 2f - 1f) * swing;
+                float nextY = y - step;
+                _marks[i].SetPosition(0, ToWorld(new Vector2(x, y)));
+                _marks[i].SetPosition(1, ToWorld(new Vector2(nextX, nextY)));
+                SetColor(_marks[i], active ? 1f : 0f);
+                x = nextX;
+                y = nextY;
             }
         }
 

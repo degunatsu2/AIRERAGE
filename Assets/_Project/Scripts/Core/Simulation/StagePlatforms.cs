@@ -9,7 +9,8 @@ namespace Airerage.Core.Simulation
     /// 動く足場と扉（StagePlatform。ユーザーの要望、2026-10-26）の決まり。SimWorld が呼ぶ。
     /// - ティックの初め（Carry）: 前のティックから動いた足場に乗っている人と、横に張り付いている人を、足場と一緒に動かす。足場・扉に
     ///   つないだワイヤーの接続点も動かす（足場がなくなったら外れる）。
-    /// - ティックの終わり（UpdateDoors）: 扉にワイヤーをつないでいる人がいれば開き、いなければ閉じる（閉じる先に人がいれば待つ）。
+    /// - ティックの終わり（UpdateDoors）: 扉が開こうとしていれば（周期・ボタン・扉そのもの。IsAccessed）開き、いなければ閉じる
+    ///   （閉じる先に人がいれば待つ）。
     /// 当たりは WorldCollision.SetPlatforms（地形と同じように乗れる・ぶつかる。Attachable ならワイヤーがつながる）。
     /// </summary>
     public static class StagePlatforms
@@ -129,8 +130,42 @@ namespace Airerage.Core.Simulation
             return true;
         }
 
-        /// <summary>扉 index に、だれかがワイヤーをつないでいるか。</summary>
-        public static bool IsAccessed(int index, IReadOnlyList<CharacterState> states)
+        /// <summary>
+        /// 扉 index が、ティック tick に開こうとしているか: 周期で開く扉は周期の開いている間、ボタンで開く扉は同じ組のボタンに、そうでない
+        /// 扉は扉そのものに、だれかがワイヤーをつないでいる間。
+        /// </summary>
+        public static bool IsAccessed(IReadOnlyList<StagePlatform> platforms, int index, IReadOnlyList<CharacterState> states, int tick)
+        {
+            StagePlatform door = platforms[index];
+            if (door.OpenPeriod > 0)
+            {
+                return door.ScheduledOpen(tick);
+            }
+            for (int c = 0; c < states.Count; c++)
+            {
+                CharacterState state = states[c];
+                if (state.Combat.HasLeft || state.Wire.Phase != WirePhase.Attached || state.Wire.AnchorBody == 0)
+                {
+                    continue;
+                }
+                int body = state.Wire.AnchorBody - 1;
+                if (door.Group > 0)
+                {
+                    if (body < platforms.Count && platforms[body].IsButton && platforms[body].Group == door.Group)
+                    {
+                        return true;
+                    }
+                }
+                else if (body == index)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>ボタン index に、だれかがワイヤーをつないでいるか（表示用）。</summary>
+        public static bool IsPressed(int index, IReadOnlyList<CharacterState> states)
         {
             for (int c = 0; c < states.Count; c++)
             {
@@ -144,11 +179,11 @@ namespace Airerage.Core.Simulation
         }
 
         /// <summary>
-        /// ティックの終わりに、扉の開き具合を進める: ワイヤーをつないでいる人がいれば開き（OpenTicks で全開）、いなければ閉じる
-        /// （CloseTicks で閉じきる。閉じた先の扉にだれかが重なるなら、そのティックは閉じない）。扉でない足場は何もしない。
+        /// ティックの終わりに、扉の開き具合を進める: 開こうとしていれば（IsAccessed。tick は進めた後のティック）開き（OpenTicks で全開）、
+        /// いなければ閉じる（CloseTicks で閉じきる。閉じた先の扉にだれかが重なるなら、そのティックは閉じない）。扉でない足場は何もしない。
         /// </summary>
         public static void UpdateDoors(IReadOnlyList<StagePlatform> platforms, StageState stage, List<CharacterState> states,
-            IReadOnlyList<CharacterConfig> configs)
+            IReadOnlyList<CharacterConfig> configs, int tick)
         {
             if (platforms == null)
             {
@@ -163,7 +198,7 @@ namespace Airerage.Core.Simulation
                 }
                 int open = stage.OpenOf(i);
                 int next;
-                if (IsAccessed(i, states))
+                if (IsAccessed(platforms, i, states, tick))
                 {
                     next = Math.Min(StagePlatform.DoorScale, open + Step(door.OpenTicks));
                 }

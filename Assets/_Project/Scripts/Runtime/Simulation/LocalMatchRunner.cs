@@ -63,6 +63,7 @@ namespace Airerage.Runtime.Simulation
         private List<CoinSpawnPoint> _coinSpawns;
         private List<BankSpot> _bankSpots;
         private List<StagePlatform> _platforms;
+        private List<StageTrap> _traps;
         private List<Vector3> _spawns;
         private SimWorld _world;
         private SimInput[] _tickInputs = new SimInput[0];
@@ -131,6 +132,7 @@ namespace Airerage.Runtime.Simulation
         CoinField ISimulationFeed.Coins => _world?.Coins.Field;
         WorldObjects ISimulationFeed.Objects => _world?.Objects;
         IReadOnlyList<StagePlatform> ISimulationFeed.Platforms => _world?.Platforms;
+        IReadOnlyList<StageTrap> ISimulationFeed.Traps => _world?.Traps;
         StageState ISimulationFeed.Stage => _world?.Stage;
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => _world != null ? _world.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => _world != null ? _world.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
@@ -163,6 +165,7 @@ namespace Airerage.Runtime.Simulation
             _coinSpawns = CoinSpawnAuthoring.Collect(errors);
             _bankSpots = BankSpotAuthoring.Collect(errors);
             _platforms = StagePlatformAuthoring.Collect(errors);
+            _traps = StageTrapAuthoring.Collect(errors);
             foreach (string error in errors)
             {
                 Debug.LogError(error, this);
@@ -305,7 +308,7 @@ namespace Airerage.Runtime.Simulation
                 rules.DurationTicks = 0;
             }
             rules.Seed = Environment.TickCount;
-            _world = new SimWorld(_terrain, _bounds, _zones, rules, _coinSpawns, _bankSpots, _platforms);
+            _world = new SimWorld(_terrain, _bounds, _zones, rules, _coinSpawns, _bankSpots, _platforms, _traps);
             int count = _players.Count;
             for (int p = 0; p < count; p++)
             {

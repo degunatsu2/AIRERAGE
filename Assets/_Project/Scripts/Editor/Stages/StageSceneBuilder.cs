@@ -63,8 +63,10 @@ namespace Airerage.Editor.Stages
 
             SandboxWireSceneBuilder.CreateTerrain(layout.Terrain, layout.Anchors, decor.Lit("Terrain", theme.Terrain),
                 decor.Lit("TerrainAttachable", theme.Attachable), decor.Lit("Anchor", theme.Anchor));
+            CreateBigAnchors(layout.BigAnchors, theme, decor);
             CreateZones(layout.Zones, theme, decor);
             CreatePlatforms(layout.Platforms, theme, decor);
+            CreateTraps(layout.Traps, decor);
             SandboxCombatSceneBuilder.CreateBounds(layout.BoundsMin, layout.BoundsMax);
             SandboxWireSceneBuilder.CreateCoinSpawns(layout.Coins, layout.Jackpots);
             SandboxWireSceneBuilder.CreateBankSpots(layout.Banks);
@@ -104,7 +106,12 @@ namespace Airerage.Editor.Stages
                 var authoring = go.AddComponent<StagePlatformAuthoring>();
                 if (spec.Kind == StagePlatformKind.Door)
                 {
-                    authoring.ConfigureDoor(spec.Size, spec.Attachable, spec.OpenHeight, spec.OpenSeconds, spec.CloseSeconds);
+                    authoring.ConfigureDoor(spec.Size, spec.Attachable, spec.OpenHeight, spec.OpenSeconds, spec.CloseSeconds, spec.Group,
+                        spec.OpenEverySeconds, spec.OpenForSeconds, spec.PhaseSeconds);
+                }
+                else if (spec.Kind == StagePlatformKind.Button)
+                {
+                    authoring.ConfigureButton(spec.Size, spec.Group);
                 }
                 else
                 {
@@ -126,7 +133,107 @@ namespace Airerage.Editor.Stages
                 {
                     AddGlowRims(decor, visual, spec.Size);
                 }
-                go.AddComponent<StagePlatformView>().Configure(visual);
+                var view = go.AddComponent<StagePlatformView>();
+                view.Configure(visual);
+                if (spec.Kind == StagePlatformKind.Button)
+                {
+                    // ボタン: 手前の面の丸いランプ（ワイヤーをつないでいる間は緑、ほかは赤）。
+                    GameObject lamp = decor.Sphere("Lamp", visual, new Vector3(0f, 0f, -2.1f), new Vector3(spec.Size.x * 0.75f, spec.Size.y * 0.75f, 0.2f),
+                        decor.Unlit("ButtonOff", new Color(1f, 0.2f, 0.15f)));
+                    view.ConfigureLamp(lamp.GetComponent<Renderer>(), decor.Unlit("ButtonOff", new Color(1f, 0.2f, 0.15f)),
+                        decor.Unlit("ButtonOn", new Color(0.3f, 1f, 0.45f)));
+                }
+            }
+        }
+
+        // 大きいアンカー（エイムアシストの半径が大きい。見た目も大きな菱形と、まわりの輪。ユーザーの要望、2026-10-26）。
+        private static void CreateBigAnchors((Vector2 Position, float Radius)[] anchors, StageTheme theme, StageDecor decor)
+        {
+            if (anchors == null || anchors.Length == 0)
+            {
+                return;
+            }
+            var root = new GameObject("BigAnchorPoints").transform;
+            Material body = decor.Lit("BigAnchor", theme.Anchor);
+            Material ring = decor.Unlit("BigAnchorRing", Color.Lerp(theme.Anchor, Color.white, 0.4f));
+            foreach ((Vector2 position, float radius) in anchors)
+            {
+                var go = new GameObject("BigAnchor");
+                go.transform.SetParent(root, false);
+                go.transform.localPosition = new Vector3(position.x, position.y, 0f);
+                go.AddComponent<WireAnchorPoint>().Configure(radius);
+                float size = Mathf.Clamp(radius * 0.7f, 0.9f, 2.2f);
+                GameObject diamond = decor.Box("Diamond", go.transform, Vector3.zero, new Vector3(size, size, 0.4f), body);
+                diamond.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+                GameObject outer = decor.Cylinder("Ring", go.transform, new Vector3(0f, 0f, 0.3f), new Vector3(size * 2.1f, 0.03f, size * 2.1f), ring);
+                outer.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                GameObject inner = decor.Cylinder("Hole", go.transform, new Vector3(0f, 0f, 0.25f), new Vector3(size * 1.8f, 0.04f, size * 1.8f),
+                    decor.Lit("BigAnchorBack", Color.Lerp(theme.Anchor, Color.black, 0.6f)));
+                inner.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            }
+        }
+
+        // ステージの仕掛け（StageTrapAuthoring と見た目 StageTrapView）。赤外線: 半透明の赤い板、発射装置とランプ、ミサイル。
+        // ピッチャーマシン: 壁の機械と、ボール（試合のときだけ出る）。
+        private static void CreateTraps(TrapSpec[] traps, StageDecor decor)
+        {
+            if (traps == null || traps.Length == 0)
+            {
+                return;
+            }
+            var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var root = new GameObject("Traps").transform;
+            foreach (TrapSpec spec in traps)
+            {
+                var go = new GameObject(spec.Name);
+                go.transform.SetParent(root, false);
+                go.transform.position = new Vector3(spec.Center.x, spec.Center.y, 0f);
+                var authoring = go.AddComponent<StageTrapAuthoring>();
+                var view = go.AddComponent<StageTrapView>();
+                if (spec.Kind == StageTrapKind.Tripwire)
+                {
+                    authoring.ConfigureTripwire(spec.BeamSize, spec.MuzzleOffset, spec.Direction, spec.Speed, spec.Range, spec.Power, spec.Knockback,
+                        spec.ArmSeconds, spec.CooldownSeconds, spec.MissileSize);
+                    GameObject beam = decor.Quad("Beam", go.transform, new Vector3(0f, 0f, -0.3f), spec.BeamSize,
+                        decor.Transparent("Infrared", new Color(1f, 0.08f, 0.12f, 0.32f)));
+                    // 発射装置（発射口の後ろの箱）とランプ。
+                    Vector2 back = spec.MuzzleOffset - spec.Direction * 0.9f;
+                    GameObject launcher = decor.Box("Launcher", go.transform, new Vector3(back.x, back.y, 0f), new Vector3(1.8f, 1.2f, 2.4f),
+                        decor.Lit("MissileLauncher", new Color(0.3f, 0.32f, 0.36f)));
+                    launcher.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(spec.Direction.y, spec.Direction.x) * Mathf.Rad2Deg);
+                    GameObject lamp = decor.Sphere("Lamp", go.transform, new Vector3(back.x, back.y + 0.85f, -1.2f), new Vector3(0.4f, 0.4f, 0.2f),
+                        decor.Unlit("LauncherLamp", new Color(1f, 0.15f, 0.1f)));
+                    // ミサイル（右向きに作る。StageTrapView が向きに回す）。
+                    var missile = new GameObject("Missile").transform;
+                    missile.SetParent(go.transform, false);
+                    decor.Box("Body", missile, Vector3.zero, new Vector3(spec.MissileSize.x, spec.MissileSize.y * 0.8f, 0.6f),
+                        decor.Lit("MissileBody", new Color(0.85f, 0.87f, 0.9f)));
+                    decor.Sphere("Nose", missile, new Vector3(spec.MissileSize.x * 0.5f, 0f, 0f), new Vector3(0.5f, spec.MissileSize.y * 0.8f, 0.6f),
+                        decor.Lit("MissileNose", new Color(0.9f, 0.15f, 0.1f)));
+                    decor.Box("Flame", missile, new Vector3(-spec.MissileSize.x * 0.65f, 0f, 0f), new Vector3(0.6f, spec.MissileSize.y * 0.5f, 0.3f),
+                        decor.Unlit("MissileFlame", new Color(1f, 0.7f, 0.2f)));
+                    view.Configure(beam.GetComponent<Renderer>(), missile, lamp.GetComponent<Renderer>(), lineMaterial);
+                }
+                else
+                {
+                    authoring.ConfigurePitcher(spec.LaunchVelocity, spec.PeriodSeconds, spec.PhaseSeconds, spec.Radius, spec.Power, spec.Knockback,
+                        spec.MinHitSpeed, spec.BlinkSeconds);
+                    // ピッチャーマシン（壁に付けた箱と、打ち出す筒）。
+                    Material machine = decor.Lit("PitchingMachine", new Color(0.2f, 0.45f, 0.85f));
+                    decor.Box("Machine", go.transform, new Vector3(-spec.Facing * 0.9f, -0.3f, 0f), new Vector3(1.8f, 1.6f, 1.8f), machine);
+                    float angle = Mathf.Atan2(spec.LaunchVelocity.y, spec.LaunchVelocity.x) * Mathf.Rad2Deg;
+                    GameObject barrel = decor.Cylinder("Barrel", go.transform, Vector3.zero, new Vector3(0.6f, 0.7f, 0.6f),
+                        decor.Lit("PitchingBarrel", new Color(0.85f, 0.85f, 0.88f)));
+                    barrel.transform.localRotation = Quaternion.Euler(0f, 0f, angle - 90f);
+                    decor.Cylinder("Wheel", go.transform, new Vector3(-spec.Facing * 0.9f, -1.1f, -0.95f), new Vector3(0.9f, 0.08f, 0.9f),
+                        decor.Lit("PitchingWheel", new Color(0.15f, 0.15f, 0.17f))).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    var ball = new GameObject("Ball").transform;
+                    ball.SetParent(go.transform, false);
+                    decor.Sphere("Leather", ball, Vector3.zero, Vector3.one * spec.Radius * 2f, decor.Lit("Baseball", new Color(0.97f, 0.96f, 0.92f)));
+                    decor.Box("Seam", ball, new Vector3(0f, 0f, -spec.Radius * 0.9f), new Vector3(spec.Radius * 1.6f, 0.05f, 0.05f),
+                        decor.Unlit("BaseballSeam", new Color(0.85f, 0.1f, 0.1f)));
+                    view.Configure(null, ball, null, lineMaterial);
+                }
             }
         }
 
@@ -193,10 +300,11 @@ namespace Airerage.Editor.Stages
                 authoring.ConfigureTiming(zone.PeriodSeconds, zone.ActiveSeconds, zone.PhaseSeconds, zone.JitterSeconds, zone.WarningSeconds);
                 authoring.ConfigureTarget(zone.Target);
                 authoring.ConfigureShape(zone.Width, zone.Travel, zone.TravelSeconds);
-                Color color = theme.ZoneColors.TryGetValue(zone.Kind, out Color themed) ? themed : DefaultColor(zone.Kind);
+                Color color = zone.Color ?? (theme.ZoneColors.TryGetValue(zone.Kind, out Color themed) ? themed : DefaultColor(zone.Kind));
                 var view = go.AddComponent<StageZoneView>();
                 view.Configure(lineMaterial, color);
                 view.ConfigureWarningSound(zone.WarningSound);
+                view.ConfigureLook(zone.Look);
                 Transform propParent = go.transform;
                 if (zone.TravelSeconds > 0f)
                 {
@@ -280,9 +388,41 @@ namespace Airerage.Editor.Stages
                     // 範囲の全体の幕（手前。キャラクターの前にかかる）。
                     return decor.Quad("Storm", parent, new Vector3(0f, 0f, -2.5f), size, decor.Transparent(kind, WithAlpha(color, 0.22f)));
                 }
+                case StageZoneKind.Grab:
+                    return CreateDemonHand(parent, zone, color, decor);
                 default:
                     return null;
             }
+        }
+
+        // 悪魔の手: 地面から生えた黒い手のひらと、長い爪の指 5 本（DemonHandView が指を曲げる）と、手首のまわりの紫のもや。
+        private static GameObject CreateDemonHand(Transform parent, ZoneSpec zone, Color color, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            var hand = new GameObject("DemonHand").transform;
+            hand.SetParent(parent, false);
+            // 地面より少しだけ上（地形の上の面と飾りの面が重なってちらつかないように）。
+            hand.localPosition = new Vector3(0f, -size.y * 0.5f + 0.02f, 0f);
+            Material skin = decor.Lit("DemonSkin", Color.Lerp(color, Color.black, 0.6f));
+            Material claw = decor.Unlit("DemonClaw", Color.Lerp(color, Color.white, 0.3f));
+            decor.Box("Wrist", hand, new Vector3(0f, 0.3f, 0f), new Vector3(size.x * 0.45f, 0.6f, 1.2f), skin);
+            decor.Box("Palm", hand, new Vector3(0f, 0.75f, 0f), new Vector3(size.x * 0.7f, 0.5f, 1.4f), skin);
+            var fingers = new Transform[5];
+            for (int i = 0; i < 5; i++)
+            {
+                float x = (i - 2) * size.x * 0.17f;
+                var pivot = new GameObject($"Finger{i + 1}").transform;
+                pivot.SetParent(hand, false);
+                pivot.localPosition = new Vector3(x, 1f, 0f);
+                float length = i == 0 || i == 4 ? size.y * 0.42f : size.y * 0.55f;
+                decor.Box("Bone", pivot, new Vector3(0f, length * 0.5f, 0f), new Vector3(0.22f, length, 0.3f), skin);
+                decor.Box("Claw", pivot, new Vector3(0f, length + 0.18f, -0.05f), new Vector3(0.12f, 0.4f, 0.16f), claw);
+                fingers[i] = pivot;
+            }
+            decor.Quad("Mist", hand, new Vector3(0f, 0.2f, -0.6f), new Vector2(size.x * 1.3f, 0.9f),
+                decor.Transparent("DemonMist", WithAlpha(new Color(0.55f, 0.15f, 0.8f), 0.35f)));
+            hand.gameObject.AddComponent<DemonHandView>().Configure(fingers);
+            return hand.gameObject;
         }
 
         // 壁の間欠泉: 噴き出し口（範囲の、向きと反対側の辺の真ん中）と、向きへ斜めに伸びる噴き出し（噴いている間だけ出す）。
@@ -324,6 +464,7 @@ namespace Airerage.Editor.Stages
                 case StageZoneKind.Hazard: return new Color(1f, 0.4f, 0.08f);
                 case StageZoneKind.Blizzard: return new Color(0.9f, 0.96f, 1f);
                 case StageZoneKind.Water: return new Color(0.12f, 0.42f, 0.75f);
+                case StageZoneKind.Grab: return new Color(0.55f, 0.1f, 0.25f);
                 default: return Color.white;
             }
         }

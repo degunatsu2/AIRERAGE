@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
 using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
@@ -26,6 +27,12 @@ namespace Airerage.Editor.Stages
 
         /// <summary>動く足場と扉（ユーザーの要望、2026-10-26。なくてもよい）。</summary>
         public PlatformSpec[] Platforms = new PlatformSpec[0];
+
+        /// <summary>ステージの仕掛け（赤外線とミサイル、ピッチャーマシン。ユーザーの要望、2026-10-26。なくてもよい）。</summary>
+        public TrapSpec[] Traps = new TrapSpec[0];
+
+        /// <summary>大きいアンカー（位置とエイムアシストの半径。ユーザーの要望、2026-10-26。なくてもよい）。</summary>
+        public (Vector2 Position, float Radius)[] BigAnchors = new (Vector2, float)[0];
         public (Vector2 Position, int Value)[] Coins;
         public Vector2[] Jackpots;
         public Vector2[] Banks;
@@ -66,6 +73,12 @@ namespace Airerage.Editor.Stages
         /// <summary>予告の間に警告音を鳴らすか（危険・吹雪）。</summary>
         public bool WarningSound = true;
 
+        /// <summary>見た目の種類（雷・水の流れ）。</summary>
+        public StageZoneView.ZoneLook Look = StageZoneView.ZoneLook.Default;
+
+        /// <summary>線と台の色（なければステージの種類ごとの色）。</summary>
+        public Color? Color;
+
         public ZoneSpec(string name, StageZoneKind kind, Vector2 center, Vector2 size, Vector2 direction, float power, float limit = 0f)
         {
             Name = name;
@@ -99,6 +112,20 @@ namespace Airerage.Editor.Stages
         public ZoneSpec Silent()
         {
             WarningSound = false;
+            return this;
+        }
+
+        /// <summary>見た目の種類を決める（雷・水の流れ）。</summary>
+        public ZoneSpec Styled(StageZoneView.ZoneLook look)
+        {
+            Look = look;
+            return this;
+        }
+
+        /// <summary>このギミックだけ色を変える。</summary>
+        public ZoneSpec Tinted(Color color)
+        {
+            Color = color;
             return this;
         }
 
@@ -145,6 +172,13 @@ namespace Airerage.Editor.Stages
         public float OpenHeight;
         public float OpenSeconds;
         public float CloseSeconds;
+
+        /// <summary>扉とボタンの組（ボタンで開く扉と、そのボタン。0 なら組なし）。</summary>
+        public int Group;
+
+        /// <summary>周期で開く扉の周期と、周期の初めの開いている長さ（秒。0 なら周期では開かない）。</summary>
+        public float OpenEverySeconds;
+        public float OpenForSeconds;
 
         /// <summary>箱の色（なければステージの地形の色）。</summary>
         public Color? Color;
@@ -194,15 +228,46 @@ namespace Airerage.Editor.Stages
             return spec;
         }
 
-        /// <summary>扉にする（closed は Center。openHeight だけ上に開く）。</summary>
-        public static PlatformSpec Door(string name, Vector2 center, Vector2 size, float openHeight, float openSeconds, float closeSeconds)
+        /// <summary>
+        /// 扉にする（closed は Center。openHeight だけ上に開く）。group が正なら同じ組のボタンで開き（扉にはワイヤーがつながらない）、
+        /// 0 なら扉そのものにワイヤーをつなぐと開く。
+        /// </summary>
+        public static PlatformSpec Door(string name, Vector2 center, Vector2 size, float openHeight, float openSeconds, float closeSeconds,
+            int group = 0)
         {
-            return new PlatformSpec(name, center, size, true)
+            return new PlatformSpec(name, center, size, group == 0)
             {
                 Kind = StagePlatformKind.Door,
                 OpenHeight = openHeight,
                 OpenSeconds = openSeconds,
                 CloseSeconds = closeSeconds,
+                Group = group,
+            };
+        }
+
+        /// <summary>周期で開く扉にする（every 秒ごとに、初めの openFor 秒だけ開く。ずれ phase 秒。ワイヤーはつながらない）。</summary>
+        public static PlatformSpec TimedDoor(string name, Vector2 center, Vector2 size, float openHeight, float openSeconds, float closeSeconds,
+            float every, float openFor, float phase = 0f)
+        {
+            return new PlatformSpec(name, center, size, false)
+            {
+                Kind = StagePlatformKind.Door,
+                OpenHeight = openHeight,
+                OpenSeconds = openSeconds,
+                CloseSeconds = closeSeconds,
+                OpenEverySeconds = every,
+                OpenForSeconds = openFor,
+                PhaseSeconds = phase,
+            };
+        }
+
+        /// <summary>扉のボタンにする（ワイヤーをつないでいる間、同じ組の扉が開く）。</summary>
+        public static PlatformSpec Button(string name, Vector2 center, Vector2 size, int group)
+        {
+            return new PlatformSpec(name, center, size, true)
+            {
+                Kind = StagePlatformKind.Button,
+                Group = group,
             };
         }
 
@@ -230,6 +295,88 @@ namespace Airerage.Editor.Stages
         {
             Visual = visual;
             return this;
+        }
+    }
+
+    /// <summary>
+    /// ステージの仕掛け 1 つ（Core の StageTrap の値と名前。ユーザーの要望、2026-10-26）。赤外線は Center が赤外線の範囲の中心、
+    /// ピッチャーマシンは Center が発射口。
+    /// </summary>
+    internal sealed class TrapSpec
+    {
+        public readonly string Name;
+        public readonly StageTrapKind Kind;
+        public readonly Vector2 Center;
+        public int Power;
+        public float Knockback;
+
+        // 赤外線とミサイル。
+        public Vector2 BeamSize;
+        public Vector2 MuzzleOffset;
+        public Vector2 Direction;
+        public float Speed;
+        public float Range;
+        public float ArmSeconds;
+        public float CooldownSeconds;
+        public Vector2 MissileSize = new Vector2(1.6f, 0.6f);
+
+        // ピッチャーマシン。
+        public Vector2 LaunchVelocity;
+        public float PeriodSeconds;
+        public float PhaseSeconds;
+        public float Radius;
+        public float MinHitSpeed;
+        public float BlinkSeconds;
+
+        /// <summary>マシンの向き（壁の左に付くなら 1、右なら -1。見た目だけ）。</summary>
+        public float Facing = 1f;
+
+        private TrapSpec(string name, StageTrapKind kind, Vector2 center)
+        {
+            Name = name;
+            Kind = kind;
+            Center = center;
+        }
+
+        /// <summary>
+        /// 赤外線（from から to まで。横か縦の線）と、from の端の発射口から to へ撃つミサイル。thickness は赤外線の太さ。
+        /// </summary>
+        public static TrapSpec Tripwire(string name, Vector2 from, Vector2 to, float thickness, float speed, int power, float knockback,
+            float armSeconds, float cooldownSeconds)
+        {
+            Vector2 center = (from + to) * 0.5f;
+            Vector2 span = to - from;
+            var size = new Vector2(Mathf.Max(Mathf.Abs(span.x), thickness), Mathf.Max(Mathf.Abs(span.y), thickness));
+            return new TrapSpec(name, StageTrapKind.Tripwire, center)
+            {
+                BeamSize = size,
+                MuzzleOffset = from - center,
+                Direction = span.normalized,
+                Speed = speed,
+                Range = span.magnitude,
+                Power = power,
+                Knockback = knockback,
+                ArmSeconds = armSeconds,
+                CooldownSeconds = cooldownSeconds,
+            };
+        }
+
+        /// <summary>ピッチャーマシン（muzzle から launchVelocity で、period 秒ごとに打ち出す。ずれ phase 秒）。</summary>
+        public static TrapSpec Pitcher(string name, Vector2 muzzle, Vector2 launchVelocity, float period, float phase, float radius, int power,
+            float knockback, float minHitSpeed, float blinkSeconds)
+        {
+            return new TrapSpec(name, StageTrapKind.Pitcher, muzzle)
+            {
+                LaunchVelocity = launchVelocity,
+                PeriodSeconds = period,
+                PhaseSeconds = phase,
+                Radius = radius,
+                Power = power,
+                Knockback = knockback,
+                MinHitSpeed = minHitSpeed,
+                BlinkSeconds = blinkSeconds,
+                Facing = launchVelocity.x >= 0f ? 1f : -1f,
+            };
         }
     }
 

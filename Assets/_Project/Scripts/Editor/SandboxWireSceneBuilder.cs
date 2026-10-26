@@ -461,6 +461,13 @@ namespace Airerage.Editor
             BurstEffectView splash = CreateBurst(name + "SplashBurst", parent);
             splash.Configure(new Color(0.75f, 0.9f, 1f, 1f), false, 0.45f, 0.3f, 2.4f, 14, 1.2f, 0.12f, string.Empty, 0, 0f);
             SetReference(view, "_splashBurst", splash);
+            // 悪魔の手に握られた見た目（黒い指と紫の渦。ユーザーの要望、2026-10-26）。
+            var capture = new GameObject(name + "CaptureEffect");
+            capture.transform.SetParent(parent, false);
+            CaptureEffectView captureView = capture.AddComponent<CaptureEffectView>();
+            captureView.Configure(LoadOrCreateMaterial("DemonClaw", new Color(0.12f, 0.05f, 0.12f)),
+                AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), new Color(0.7f, 0.3f, 1f, 0.9f));
+            SetReference(view, "_captureEffect", captureView);
             // 壁に張り付いていられる残り（紫。ユーザーの要望、2026-10-20）。
             SetReference(view, "_wallClingGauge", CreateRingGauge(name + "WallClingGauge", parent, "WALL", 1.15f, new Color(0.72f, 0.4f, 1f, 0.8f)));
             // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。

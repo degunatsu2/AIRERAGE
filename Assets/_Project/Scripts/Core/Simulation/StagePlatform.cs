@@ -11,10 +11,15 @@ namespace Airerage.Core.Simulation
         Path = 0,
 
         /// <summary>
-        /// ワイヤーでつなぐと上に開き、つなぐのをやめると下に閉じる扉（研究所）。開き具合は状態（StageState）。閉じる先に人がいると
-        /// 閉じない。
+        /// 上に開き、下に閉じる扉（研究所の扉、恐怖の館の牢屋）。開き具合は状態（StageState）。閉じる先に人がいると閉じない。開く条件は
+        /// 3 通り: 周期（OpenPeriod が正なら、周期の初めの OpenWindow ティックの間だけ開く。牢屋）、ボタン（Group が正なら、同じ Group の
+        /// ボタンにワイヤーをつないでいる間だけ開く。研究所。ユーザーの要望、2026-10-26）、扉そのもの（どちらでもなければ、扉にワイヤーを
+        /// つないでいる間だけ開く）。
         /// </summary>
         Door = 1,
+
+        /// <summary>扉のボタン（動かない。ワイヤーをつないでいる間、同じ Group の扉が開く。ユーザーの要望、2026-10-26）。</summary>
+        Button = 2,
     }
 
     /// <summary>動く足場の道のりの 1 点（周期の中のティックと、元の位置からのずれ）。</summary>
@@ -50,7 +55,9 @@ namespace Airerage.Core.Simulation
     /// つなげて、つないだ点は足場と一緒に動く。足場に乗っている人と、横に張り付いている人は一緒に運ばれる（StagePlatforms.Carry）。
     /// - 道のり（Path）: 周期 Period の中で、点（Keys）の間をまっすぐ（Smooth なら、ゆっくり動き出して止まる）動く。最後の点の後は、
     ///   周期の終わりまで止まる。ActiveTo が ActiveFrom より大きければ、その間だけある（ほかの間は当たりも見た目もない）。
-    /// - 扉（Door）: 閉じた位置（Origin）から OpenHeight だけ上に開く。開き具合は 0〜DoorScale（StageState）。
+    /// - 扉（Door）: 閉じた位置（Origin）から OpenHeight だけ上に開く。開き具合は 0〜DoorScale（StageState）。開く条件は
+    ///   StagePlatformKind.Door。
+    /// - ボタン（Button）: 動かない。ワイヤーをつなぐと、同じ Group の扉が開く。
     /// 値は作るときに検査する（不正なら ArgumentException）。
     /// </summary>
     public sealed class StagePlatform
@@ -61,7 +68,8 @@ namespace Airerage.Core.Simulation
         private readonly PlatformKey[] _keys;
 
         private StagePlatform(StagePlatformKind kind, Vector2 origin, Vector2 halfSize, bool attachable, PlatformKey[] keys, int period,
-            int phaseTicks, int activeFrom, int activeTo, bool smooth, float openHeight, int openTicks, int closeTicks)
+            int phaseTicks, int activeFrom, int activeTo, bool smooth, float openHeight, int openTicks, int closeTicks, int group = 0,
+            int openPeriod = 0, int openWindow = 0)
         {
             if (!(halfSize.X > 0f) || !(halfSize.Y > 0f) || float.IsInfinity(halfSize.X) || float.IsInfinity(halfSize.Y)
                 || float.IsNaN(origin.X) || float.IsNaN(origin.Y) || float.IsInfinity(origin.X) || float.IsInfinity(origin.Y))
@@ -81,6 +89,9 @@ namespace Airerage.Core.Simulation
             OpenHeight = openHeight;
             OpenTicks = openTicks;
             CloseTicks = closeTicks;
+            Group = group;
+            OpenPeriod = openPeriod;
+            OpenWindow = openWindow;
         }
 
         public StagePlatformKind Kind { get; }
@@ -102,7 +113,15 @@ namespace Airerage.Core.Simulation
         public int OpenTicks { get; }
         public int CloseTicks { get; }
 
+        /// <summary>扉とボタンの組（0 なら組なし。ボタンで開く扉と、そのボタンに同じ正の数をつける）。</summary>
+        public int Group { get; }
+
+        /// <summary>周期で開く扉の周期と、周期の初めの開いている長さ（ティック。OpenPeriod が 0 なら周期では開かない）。ずれは PhaseTicks。</summary>
+        public int OpenPeriod { get; }
+        public int OpenWindow { get; }
+
         public bool IsDoor => Kind == StagePlatformKind.Door;
+        public bool IsButton => Kind == StagePlatformKind.Button;
 
         /// <summary>道のりを動く足場を作る。keys は周期の中のティックの順（最初は 0）。</summary>
         public static StagePlatform Path(Vector2 origin, Vector2 halfSize, bool attachable, IReadOnlyList<PlatformKey> keys, int period,
@@ -136,15 +155,63 @@ namespace Airerage.Core.Simulation
                 smooth, 0f, 0, 0);
         }
 
-        /// <summary>扉を作る（closedCenter は閉じたときの中心）。</summary>
-        public static StagePlatform Door(Vector2 closedCenter, Vector2 halfSize, bool attachable, float openHeight, int openTicks, int closeTicks)
+        /// <summary>
+        /// 扉を作る（closedCenter は閉じたときの中心）。group が正なら、同じ group のボタンにワイヤーをつないでいる間だけ開く（扉そのものに
+        /// つないでも開かない）。0 なら扉そのものにつないでいる間だけ開く。
+        /// </summary>
+        public static StagePlatform Door(Vector2 closedCenter, Vector2 halfSize, bool attachable, float openHeight, int openTicks, int closeTicks,
+            int group = 0)
+        {
+            ValidateDoor(openHeight, openTicks, closeTicks);
+            if (group < 0)
+            {
+                throw new ArgumentException($"扉の組は 0 以上にします（{group}）");
+            }
+            return new StagePlatform(StagePlatformKind.Door, closedCenter, halfSize, attachable, new[] { new PlatformKey(0, Vector2.Zero) }, 1,
+                0, 0, 0, false, openHeight, openTicks, closeTicks, group);
+        }
+
+        /// <summary>周期で開く扉を作る（周期 period の初めの window ティックの間だけ開く。ずれ phaseTicks。恐怖の館の牢屋）。</summary>
+        public static StagePlatform TimedDoor(Vector2 closedCenter, Vector2 halfSize, bool attachable, float openHeight, int openTicks, int closeTicks,
+            int period, int window, int phaseTicks = 0)
+        {
+            ValidateDoor(openHeight, openTicks, closeTicks);
+            if (period <= 0 || window <= 0 || window >= period || phaseTicks < 0)
+            {
+                throw new ArgumentException($"周期で開く扉の周期が不正です（周期 {period}、開いている長さ {window}、ずれ {phaseTicks}）");
+            }
+            return new StagePlatform(StagePlatformKind.Door, closedCenter, halfSize, attachable, new[] { new PlatformKey(0, Vector2.Zero) }, 1,
+                phaseTicks % period, 0, 0, false, openHeight, openTicks, closeTicks, 0, period, window);
+        }
+
+        /// <summary>扉のボタンを作る（group は開く扉の組。正の数）。ワイヤーがつながる。</summary>
+        public static StagePlatform Button(Vector2 center, Vector2 halfSize, int group)
+        {
+            if (group <= 0)
+            {
+                throw new ArgumentException($"扉のボタンの組は正の数にします（{group}）");
+            }
+            return new StagePlatform(StagePlatformKind.Button, center, halfSize, true, new[] { new PlatformKey(0, Vector2.Zero) }, 1,
+                0, 0, 0, false, 0f, 0, 0, group);
+        }
+
+        private static void ValidateDoor(float openHeight, int openTicks, int closeTicks)
         {
             if (!(openHeight > 0f) || float.IsInfinity(openHeight) || openTicks <= 0 || closeTicks <= 0)
             {
                 throw new ArgumentException($"扉の開く高さか速さが不正です（高さ {openHeight}、開く {openTicks}、閉じる {closeTicks} ティック）");
             }
-            return new StagePlatform(StagePlatformKind.Door, closedCenter, halfSize, attachable, new[] { new PlatformKey(0, Vector2.Zero) }, 1,
-                0, 0, 0, false, openHeight, openTicks, closeTicks);
+        }
+
+        /// <summary>周期で開く扉が、ティック tick に開いている間か（周期で開く扉でなければ false）。</summary>
+        public bool ScheduledOpen(int tick)
+        {
+            if (OpenPeriod <= 0)
+            {
+                return false;
+            }
+            int t = (int)((((long)tick + PhaseTicks) % OpenPeriod + OpenPeriod) % OpenPeriod);
+            return t < OpenWindow;
         }
 
         /// <summary>
@@ -155,6 +222,11 @@ namespace Airerage.Core.Simulation
             if (Kind == StagePlatformKind.Door)
             {
                 center = Origin + new Vector2(0f, OpenHeight * Math.Max(0, Math.Min(DoorScale, open)) / DoorScale);
+                return true;
+            }
+            if (Kind == StagePlatformKind.Button)
+            {
+                center = Origin;
                 return true;
             }
             int t = (int)((((long)tick + PhaseTicks) % Period + Period) % Period);
@@ -226,6 +298,14 @@ namespace Airerage.Core.Simulation
             {
                 c = _keys.Length.CompareTo(other._keys.Length);
             }
+            if (c == 0)
+            {
+                c = Group.CompareTo(other.Group);
+            }
+            if (c == 0)
+            {
+                c = OpenPeriod.CompareTo(other.OpenPeriod);
+            }
             for (int i = 0; c == 0 && i < _keys.Length; i++)
             {
                 c = _keys[i].Tick.CompareTo(other._keys[i].Tick);
@@ -246,7 +326,7 @@ namespace Airerage.Core.Simulation
         {
             return other != null && CompareTo(other) == 0 && Attachable == other.Attachable && ActiveFrom == other.ActiveFrom
                 && ActiveTo == other.ActiveTo && Smooth == other.Smooth && OpenHeight.Equals(other.OpenHeight) && OpenTicks == other.OpenTicks
-                && CloseTicks == other.CloseTicks;
+                && CloseTicks == other.CloseTicks && Group == other.Group && OpenPeriod == other.OpenPeriod && OpenWindow == other.OpenWindow;
         }
 
         public override string ToString()
@@ -256,26 +336,40 @@ namespace Airerage.Core.Simulation
     }
 
     /// <summary>
-    /// ステージの状態のうち、キャラクター・コイン・物のどれでもないもの（扉の開き具合。ユーザーの要望、2026-10-26）。巻き戻しと
-    /// チェックサムに乗る（WorldSnapshot、StateCodec.WorldChecksum）。番号は SimWorld.Platforms の番号（扉でない足場は 0 のまま）。
-    /// 前のティックの開き具合も持つ（扉につないだワイヤーの接続点を、開いた分だけ動かす）。
+    /// ステージの状態のうち、キャラクター・コイン・物のどれでもないもの（扉の開き具合と、仕掛けの触れた時刻。ユーザーの要望、2026-10-26）。
+    /// 巻き戻しとチェックサムに乗る（WorldSnapshot、StateCodec.WorldChecksum）。扉の番号は SimWorld.Platforms の番号（扉でない足場は 0 の
+    /// まま）、仕掛けの番号は SimWorld.Traps の番号。前のティックの開き具合も持つ（扉につないだワイヤーの接続点を、開いた分だけ動かす）。
     /// </summary>
     public sealed class StageState
     {
         private int[] _open = new int[0];
         private int[] _previous = new int[0];
+        private int[] _trapTicks = new int[0];
+        private bool[] _trapSpent = new bool[0];
 
+        /// <summary>足場・扉の数。</summary>
         public int Count => _open.Length;
+
+        /// <summary>仕掛けの数。</summary>
+        public int TrapCount => _trapTicks.Length;
 
         /// <summary>扉 index の開き具合（0〜StagePlatform.DoorScale）と、前のティックの開き具合。</summary>
         public int OpenOf(int index) => index >= 0 && index < _open.Length ? _open[index] : 0;
         public int PreviousOf(int index) => index >= 0 && index < _previous.Length ? _previous[index] : 0;
 
-        /// <summary>数を count にする（すべて閉じる）。</summary>
-        public void Reset(int count)
+        /// <summary>
+        /// 仕掛け index（赤外線）がレーダーに触れられたティック（0 なら待っている）と、撃ったミサイルがもう当たって消えたか。
+        /// </summary>
+        public int TrapTickOf(int index) => index >= 0 && index < _trapTicks.Length ? _trapTicks[index] : 0;
+        public bool TrapSpentOf(int index) => index >= 0 && index < _trapSpent.Length && _trapSpent[index];
+
+        /// <summary>数を count（足場・扉）と traps（仕掛け）にする（すべて閉じて、待っている）。</summary>
+        public void Reset(int count, int traps = 0)
         {
             _open = new int[count];
             _previous = new int[count];
+            _trapTicks = new int[traps];
+            _trapSpent = new bool[traps];
         }
 
         /// <summary>扉 index の開き具合を open にする（前のティックの開き具合は、今の値になる）。</summary>
@@ -285,29 +379,45 @@ namespace Airerage.Core.Simulation
             _open[index] = open;
         }
 
+        /// <summary>仕掛け index の触れたティックと、ミサイルが消えたかを決める。</summary>
+        public void SetTrap(int index, int tick, bool spent)
+        {
+            _trapTicks[index] = tick;
+            _trapSpent[index] = spent;
+        }
+
         public void CopyFrom(StageState other)
         {
             if (other == null)
             {
                 throw new ArgumentNullException(nameof(other));
             }
-            if (_open.Length != other._open.Length)
+            if (_open.Length != other._open.Length || _trapTicks.Length != other._trapTicks.Length)
             {
-                Reset(other._open.Length);
+                Reset(other._open.Length, other._trapTicks.Length);
             }
             Array.Copy(other._open, _open, _open.Length);
             Array.Copy(other._previous, _previous, _previous.Length);
+            Array.Copy(other._trapTicks, _trapTicks, _trapTicks.Length);
+            Array.Copy(other._trapSpent, _trapSpent, _trapSpent.Length);
         }
 
         public bool SameAs(StageState other)
         {
-            if (other == null || other._open.Length != _open.Length)
+            if (other == null || other._open.Length != _open.Length || other._trapTicks.Length != _trapTicks.Length)
             {
                 return false;
             }
             for (int i = 0; i < _open.Length; i++)
             {
                 if (_open[i] != other._open[i] || _previous[i] != other._previous[i])
+                {
+                    return false;
+                }
+            }
+            for (int i = 0; i < _trapTicks.Length; i++)
+            {
+                if (_trapTicks[i] != other._trapTicks[i] || _trapSpent[i] != other._trapSpent[i])
                 {
                     return false;
                 }

@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 28;
+        public const int FormatVersion = 29;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -85,11 +85,16 @@ namespace Airerage.Core.Simulation
             hash = Mix(hash, match.Winner);
             if (stage != null)
             {
-                // 扉の開き具合（扉のないステージでは何も足さない）。
+                // 扉の開き具合と、仕掛けの触れた時刻（扉と仕掛けのないステージでは何も足さない）。
                 for (int i = 0; i < stage.Count; i++)
                 {
                     hash = Mix(hash, stage.OpenOf(i));
                     hash = Mix(hash, stage.PreviousOf(i));
+                }
+                for (int i = 0; i < stage.TrapCount; i++)
+                {
+                    hash = Mix(hash, stage.TrapTickOf(i));
+                    hash = Mix(hash, stage.TrapSpentOf(i) ? 1 : 0);
                 }
             }
             return hash;
@@ -340,6 +345,9 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.WaterFloatTicks);
             writer.Write(combat.DrownTicks);
             writer.Write(combat.SplashCount);
+            writer.Write(combat.CaptureTicks);
+            writer.Write(combat.CaptureZone);
+            writer.Write(combat.CaptureCount);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -484,6 +492,9 @@ namespace Airerage.Core.Simulation
                 WaterFloatTicks = reader.ReadInt32(),
                 DrownTicks = reader.ReadInt32(),
                 SplashCount = reader.ReadInt32(),
+                CaptureTicks = reader.ReadInt32(),
+                CaptureZone = reader.ReadInt32(),
+                CaptureCount = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

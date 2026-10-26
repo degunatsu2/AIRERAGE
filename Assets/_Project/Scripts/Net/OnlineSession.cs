@@ -1055,7 +1055,8 @@ namespace Airerage.Net
             _waitFrames = 0;
             _nextChecksumTick = ChecksumIntervalTicks;
             _checksums.Clear();
-            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match, _stage.CoinSpawns, _stage.BankSpots, _stage.Platforms);
+            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match, _stage.CoinSpawns, _stage.BankSpots, _stage.Platforms,
+                _stage.Traps);
             for (int p = 0; p < playerCount; p++)
             {
                 World.AddCharacter(settings.Characters[settings.Picks[p]], _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));

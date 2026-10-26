@@ -15,5 +15,5 @@ MonoBehaviour:
   _displayName: SWEET KITCHEN
   _sceneName: Stage_Kitchen
   _description: The oven blasts fire every 40 seconds. Ride the roll cakes across
-    the sky, dodge the toaster, don't drown in the sink.
+    the sky, and dive into the sink drain to be flushed up to the shelf.
   _color: {r: 1, g: 0.6, b: 0.75, a: 1}
