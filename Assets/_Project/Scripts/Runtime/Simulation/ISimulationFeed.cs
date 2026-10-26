@@ -50,6 +50,12 @@ namespace Airerage.Runtime.Simulation
         /// <summary>ワールドに置かれた物と投射物（始まっていなければ null。docs/13 T5-6）。</summary>
         WorldObjects Objects { get; }
 
+        /// <summary>動く足場と扉（番号の順。始まっていなければ null。ユーザーの要望、2026-10-26）。</summary>
+        IReadOnlyList<StagePlatform> Platforms { get; }
+
+        /// <summary>扉の開き具合（始まっていなければ null）。</summary>
+        StageState Stage { get; }
+
         /// <summary>コインの出現地点（番号の順。CoinField.SpawnReadyTick と FieldCoin.Source の番号。始まっていなければ空）。</summary>
         IReadOnlyList<CoinSpawnPoint> CoinSpawns { get; }
 

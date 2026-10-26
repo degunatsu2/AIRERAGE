@@ -27,6 +27,8 @@ namespace Airerage.Core.Simulation
         private readonly WorldObjects _objects = new WorldObjects();
         private readonly List<HitRecord> _projectileHits = new List<HitRecord>();
         private readonly WorldCollision _collision;
+        private readonly List<StagePlatform> _platforms = new List<StagePlatform>();
+        private readonly StageState _stage = new StageState();
         private MatchState _match = MatchState.None;
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
@@ -34,9 +36,17 @@ namespace Airerage.Core.Simulation
         /// <param name="rules">試合のルール（カウントダウン、制限時間、復帰、コインの出現。docs/12）。null なら MatchRules.FreePlay()。不正なら InvalidTuningException。</param>
         /// <param name="coinSpawns">コインの出現地点（docs/12 T4-4）。渡した順によらず、決まった順（CoinSpawnPoint.CompareTo）に並べて番号をつける。</param>
         /// <param name="bankSpots">拠点の候補の地点（docs/12 T4-7）。渡した順によらず、決まった順（BankSpot.CompareTo）に並べて番号をつける。</param>
+        /// <param name="platforms">動く足場と扉（ユーザーの要望、2026-10-26）。渡した順によらず、決まった順（StagePlatform.CompareTo）に並べて番号をつける。</param>
         public SimWorld(ICollisionQuery collision, StageBounds? bounds = null, IReadOnlyList<StageZone> zones = null, MatchRules rules = null,
-            IReadOnlyList<CoinSpawnPoint> coinSpawns = null, IReadOnlyList<BankSpot> bankSpots = null)
+            IReadOnlyList<CoinSpawnPoint> coinSpawns = null, IReadOnlyList<BankSpot> bankSpots = null,
+            IReadOnlyList<StagePlatform> platforms = null)
         {
+            if (platforms != null)
+            {
+                _platforms.AddRange(platforms);
+                _platforms.Sort((a, b) => a.CompareTo(b));
+            }
+            _stage.Reset(_platforms.Count);
             var banks = new List<BankSpot>();
             if (bankSpots != null)
             {
@@ -71,6 +81,12 @@ namespace Airerage.Core.Simulation
 
         /// <summary>地形に、置かれた物のアンカーポイントを加えた当たりの調べ方（照準の表示の予測に使う）。</summary>
         public ICollisionQuery Collision => _collision;
+
+        /// <summary>動く足場と扉（番号の順。CastHit.Body・WireState.AnchorBody は番号 + 1）。</summary>
+        public IReadOnlyList<StagePlatform> Platforms => _platforms;
+
+        /// <summary>扉の開き具合（状態の一部。巻き戻しとチェックサムに乗る）。表示用に読むだけにする。</summary>
+        public StageState Stage => _stage;
 
         /// <summary>ステージの範囲（null なら撃破はない）。</summary>
         public StageBounds? Bounds { get; }
@@ -136,7 +152,7 @@ namespace Airerage.Core.Simulation
             {
                 throw new ArgumentNullException(nameof(snapshot));
             }
-            snapshot.Capture(Tick, _states, _coins, _match, _objects);
+            snapshot.Capture(Tick, _states, _coins, _match, _objects, _stage);
         }
 
         /// <summary>snapshot の全状態に戻す（ロールバックの巻き戻し）。キャラクターの数が違えば ArgumentException。</summary>
@@ -157,6 +173,10 @@ namespace Airerage.Core.Simulation
             }
             _coins.CopyFrom(snapshot.Coins);
             _objects.CopyFrom(snapshot.Objects);
+            if (snapshot.Stage.Count == _stage.Count)
+            {
+                _stage.CopyFrom(snapshot.Stage);
+            }
             _match = snapshot.Match;
             Tick = snapshot.Tick;
         }
@@ -164,7 +184,7 @@ namespace Airerage.Core.Simulation
         /// <summary>今の全状態のチェックサム（WorldSnapshot.Checksum と同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, _coins, _match, _objects);
+            return StateCodec.WorldChecksum(Tick, _states, _coins, _match, _objects, _stage);
         }
 
         public CharacterConfig GetConfig(int index)
@@ -212,6 +232,9 @@ namespace Airerage.Core.Simulation
             }
             // 置かれた物のアンカーポイントは、このティックの初めの物から決める（巻き戻しても全員で同じ）。
             _collision.Refresh(_objects);
+            // 動く足場と扉: このティックの位置の当たりを作り、動いた分だけ乗っている人とつないだワイヤーを運ぶ。
+            _collision.SetPlatforms(_platforms, _stage, Tick);
+            StagePlatforms.Carry(_platforms, _stage, _states, _configs, Tick);
             for (int i = 0; i < _states.Count; i++)
             {
                 CharacterState state = _states[i];
@@ -248,6 +271,7 @@ namespace Airerage.Core.Simulation
             }
             BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, active);
             CoinBonusRules.Mint(Coins, _states, Tick);
+            StagePlatforms.UpdateDoors(_platforms, _stage, _states, _configs);
             if (phase == MatchPhase.Playing && Rules.HasTimeLimit && Tick == Rules.CountdownTicks + Rules.DurationTicks)
             {
                 MatchFlow.DecideAtTimeUp(ref _match, _states, Tick);

@@ -117,6 +117,16 @@ namespace Airerage.Runtime.Audio
                 // 溶岩流・つららに当たった（ステージの危険）。
                 _audio.Play(SoundId.HeavyHit, 1f, 0.06f);
             }
+            if (n.SplashCount > b.SplashCount)
+            {
+                // 水に飛び込んだ。
+                _audio.Play(SoundId.Splash, 0.85f, 0.06f);
+            }
+            if (n.DrownTicks > 0 && b.DrownTicks == 0)
+            {
+                // 溺れた。
+                _audio.Play(SoundId.Drown, 0.9f, 0.03f);
+            }
             if (n.FreezeCount > b.FreezeCount)
             {
                 _audio.Play(SoundId.Freeze, 0.9f, 0.04f);

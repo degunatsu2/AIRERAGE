@@ -87,6 +87,10 @@ namespace Airerage.Net
         // ホスト: プレイヤーの番号 → ロビーで選んだキャラクターの番号（docs/13 T5-5）。
         private readonly int[] _lobbyCharacters = new int[MaxPlayers];
 
+        // ホスト: プレイヤーの番号 → RANDOM で選んでよいステージの番号のビット（NetKind.StagePool。届くまではすべて）。
+        private readonly ulong[] _lobbyStagePools = { ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue };
+        private ulong _localStagePool = ulong.MaxValue;
+
         // ホスト: プレイヤーの番号 → そのクライアントから最後に届いた入力の試合の番号（まだなら -1）。
         private readonly int[] _peerMatch = new int[MaxPlayers];
 
@@ -190,6 +194,44 @@ namespace Airerage.Net
                 {
                     _link.Send(0, NetMessages.Pick(character), reliable: true);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 自分が RANDOM で選んでよいステージ（StageCatalog の番号のビット。オプションの RANDOM STAGES）。クライアントは、ロビーにいれば
+        /// すぐにホストへ送る。
+        /// </summary>
+        public ulong LocalStagePool
+        {
+            get => _localStagePool;
+            set
+            {
+                if (value == _localStagePool)
+                {
+                    return;
+                }
+                _localStagePool = value;
+                if (!IsHost && LocalPlayer >= 0)
+                {
+                    _link.Send(0, NetMessages.StagePool(value), reliable: true);
+                }
+            }
+        }
+
+        /// <summary>ホスト: ロビーにいる全員が RANDOM で選んでよいステージ（全員のビットの共通部分。0 なら共通のステージがない）。</summary>
+        public ulong CommonStagePool
+        {
+            get
+            {
+                ulong mask = _localStagePool;
+                for (int p = 1; p < MaxPlayers; p++)
+                {
+                    if (_playerPeer[p] >= 0)
+                    {
+                        mask &= _lobbyStagePools[p];
+                    }
+                }
+                return mask;
             }
         }
 
@@ -648,10 +690,12 @@ namespace Airerage.Net
                     _playerPeer[next] = _playerPeer[p];
                     _lobbyNames[next] = _lobbyNames[p];
                     _lobbyCharacters[next] = _lobbyCharacters[p];
+                    _lobbyStagePools[next] = _lobbyStagePools[p];
                     _lobbyReady[next] = _lobbyReady[p];
                     _playerPeer[p] = -1;
                     _lobbyNames[p] = string.Empty;
                     _lobbyCharacters[p] = 0;
+                    _lobbyStagePools[p] = ulong.MaxValue;
                     _lobbyReady[p] = false;
                     _link.Send(_playerPeer[next], NetMessages.Welcome(next), reliable: true);
                 }
@@ -1011,7 +1055,7 @@ namespace Airerage.Net
             _waitFrames = 0;
             _nextChecksumTick = ChecksumIntervalTicks;
             _checksums.Clear();
-            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match, _stage.CoinSpawns, _stage.BankSpots);
+            World = new SimWorld(_stage.Terrain, _stage.Bounds, _stage.Zones, settings.Match, _stage.CoinSpawns, _stage.BankSpots, _stage.Platforms);
             for (int p = 0; p < playerCount; p++)
             {
                 World.AddCharacter(settings.Characters[settings.Picks[p]], _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));
@@ -1101,6 +1145,7 @@ namespace Airerage.Net
                     _playerPeer[player] = e.Peer;
                     _lobbyNames[player] = string.Empty;
                     _lobbyCharacters[player] = 0;
+                    _lobbyStagePools[player] = ulong.MaxValue;
                     _lobbyReady[player] = false;
                     _link.Send(e.Peer, NetMessages.Welcome(player), reliable: true);
                     Status = $"{HostingLabel}: {LobbyPlayerCount} player(s)";
@@ -1115,6 +1160,7 @@ namespace Airerage.Net
                             _playerPeer[p] = -1;
                             _lobbyNames[p] = string.Empty;
                             _lobbyCharacters[p] = 0;
+                            _lobbyStagePools[p] = ulong.MaxValue;
                             _lobbyReady[p] = false;
                             CheckLobbyProgress();
                             BroadcastLobby();
@@ -1179,6 +1225,14 @@ namespace Airerage.Net
                     }
                     break;
 
+                case NetKind.StagePool:
+                    int pooler = PlayerOfPeer(e.Peer);
+                    if (pooler > 0)
+                    {
+                        _lobbyStagePools[pooler] = NetMessages.ReadStagePool(e.Data);
+                    }
+                    break;
+
                 case NetKind.Pick:
                     int picker = PlayerOfPeer(e.Peer);
                     if (picker > 0)
@@ -1234,6 +1288,10 @@ namespace Airerage.Net
                             if (_localCharacter != 0)
                             {
                                 _link.Send(0, NetMessages.Pick(_localCharacter), reliable: true);
+                            }
+                            if (_localStagePool != ulong.MaxValue)
+                            {
+                                _link.Send(0, NetMessages.StagePool(_localStagePool), reliable: true);
                             }
                             Status = $"Joined as player {LocalPlayer + 1}. Waiting for the host to start";
                             break;

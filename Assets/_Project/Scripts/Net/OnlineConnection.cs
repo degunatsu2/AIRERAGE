@@ -6,6 +6,7 @@ using Airerage.Core.Rollback;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
+using Airerage.Runtime.Settings;
 using Unity.Networking.Transport.Relay;
 using Unity.Services.Core;
 using UnityEngine;
@@ -286,6 +287,8 @@ namespace Airerage.Net
                 _session = open();
                 _session.LocalName = playerName;
                 _session.LocalCharacter = Mathf.Clamp(character, 0, _roster.Count - 1);
+                // RANDOM で選んでよいステージ（オプションの RANDOM STAGES。ホストは全員の共通のステージから選ぶ）。
+                _session.LocalStagePool = RandomStagePool.Mask(_flow != null && _flow.Stages != null ? _flow.Stages.Stages : null);
                 Message = string.Empty;
                 return true;
             }

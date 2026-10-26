@@ -289,7 +289,7 @@ namespace Airerage.Core.Combat
                     Guard(configs[hit.Victim].Combat, ref victim, hit, tick);
                     break;
                 default:
-                    startsCombo = Hit(configs[hit.Victim].Wire, ref victim, hit, tick, endedCombos);
+                    startsCombo = Hit(configs[hit.Victim].Wire, configs[hit.Victim].Skills.Inverter.StunGuardTicks, ref victim, hit, tick, endedCombos);
                     break;
             }
             states[hit.Victim] = victim;
@@ -298,7 +298,7 @@ namespace Airerage.Core.Combat
 
         // 当てる。新しいコンボの最初の命中なら true（被弾ドロップに使う。docs/12 T4-6）。前のコンボの払っていないダメージ報酬の元が
         // 残っていれば、endedCombos に出す（T4-5）。
-        private static bool Hit(WireTuning wire, ref CharacterState victim, HitRecord hit, int tick, List<ComboEnd> endedCombos)
+        private static bool Hit(WireTuning wire, int stunGuardTicks, ref CharacterState victim, HitRecord hit, int tick, List<ComboEnd> endedCombos)
         {
             AttackHit data = hit.Data;
             WireController.Interrupt(ref victim, wire);
@@ -328,8 +328,22 @@ namespace Airerage.Core.Combat
             }
             victim.Combat.RewardDamage = (rewardContinues ? victim.Combat.RewardDamage : 0) + hit.Damage;
             victim.Combat.RewardAttacker = (byte)hit.Attacker;
-            // 追加効果の感電は、のけぞりが終わってから（次の攻撃を受けたら、その攻撃のものに置き換わる。感電させない攻撃なら消える）。
-            victim.Combat.PendingStunTicks = data.StunTicks;
+            // 追加効果の感電: 先に感電してその場に止まり、感電が終わってから吹き飛ぶ（のけぞりのまま待つので、コンボと手柄は続く。
+            // ユーザーの要望、2026-10-26）。次の攻撃を受けたら、その攻撃のもので置き換わる。
+            victim.Combat.HasStunKnockback = false;
+            victim.Combat.StunTicksLeft = 0;
+            if (data.StunTicks > 0 && victim.Combat.StunGuardTicks <= 0)
+            {
+                victim.Action.Duration = data.StunTicks + data.HitstunTicks;
+                victim.Combat.StunTicksLeft = data.StunTicks;
+                victim.Combat.StunGuardTicks = data.StunTicks + stunGuardTicks;
+                victim.Combat.StunCount++;
+                victim.Combat.HasStunKnockback = true;
+                victim.Combat.StunKnockbackX = hit.Knockback.X;
+                victim.Combat.StunKnockbackY = hit.Knockback.Y;
+                victim.Velocity = Vector3.Zero;
+                victim.WallSide = 0;
+            }
             return !comboContinues;
         }
 

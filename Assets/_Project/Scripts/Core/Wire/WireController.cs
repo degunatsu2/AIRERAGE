@@ -232,7 +232,7 @@ namespace Airerage.Core.Wire
             {
                 if (hit.Attachable || tuning.AttachAnySurface)
                 {
-                    Attach(ref state, hit.Point, tuning);
+                    Attach(ref state, hit.Point, tuning, hit.Body);
                 }
                 else
                 {
@@ -263,11 +263,13 @@ namespace Airerage.Core.Wire
             }
         }
 
-        private static void Attach(ref CharacterState state, Vector3 anchor, WireTuning tuning)
+        // body: 接続点が付いている物（WireState.AnchorBody。動く足場・扉なら番号 + 1）。
+        private static void Attach(ref CharacterState state, Vector3 anchor, WireTuning tuning, int body = 0)
         {
             anchor.Z = 0f;
             SetPhase(ref state.Wire, WirePhase.Attached);
             state.Wire.Anchor = anchor;
+            state.Wire.AnchorBody = (byte)Math.Max(0, Math.Min(byte.MaxValue, body));
             state.Wire.Pivots = default;
             state.Wire.HookPosition = anchor;
 

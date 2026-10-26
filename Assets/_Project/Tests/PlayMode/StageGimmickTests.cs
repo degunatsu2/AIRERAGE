@@ -67,6 +67,20 @@ namespace Airerage.PlayMode.Tests
                         Assert.That(view.ShowsActive, Is.EqualTo(zone.IsActive(tick, seed)), $"{view.name} の見た目が、効いているかと合わない（ティック {tick}）");
                     }
                 }
+                // 動く足場と扉（2026-10-26）: 見た目がシミュレーションの足場の位置にある（ないときは隠れている）。
+                foreach (StagePlatformView platformView in UnityEngine.Object.FindObjectsByType<StagePlatformView>(FindObjectsSortMode.None))
+                {
+                    StagePlatform platform = platformView.GetComponent<StagePlatformAuthoring>().ToPlatform();
+                    int platformIndex = feed.Platforms.ToList().FindIndex(p => p.SameAs(platform));
+                    Assert.That(platformIndex, Is.GreaterThanOrEqualTo(0), $"{platformView.name} がシミュレーションの足場にない");
+                    bool present = platform.TryGetCenter(feed.CurrentTick, feed.Stage.OpenOf(platformIndex), out System.Numerics.Vector2 center);
+                    Assert.That(platformView.Shown, Is.EqualTo(present), $"{platformView.name} の見た目の出し方が、足場があるかと合わない");
+                    if (present)
+                    {
+                        Assert.That(Vector2.Distance(platformView.ShownCenter, new Vector2(center.X, center.Y)), Is.LessThan(1f),
+                            $"{platformView.name} の見た目が、足場の位置にない");
+                    }
+                }
                 var glow = UnityEngine.Object.FindFirstObjectByType<AttachableGlow>();
                 Assert.That(glow != null && glow.enabled && glow.BoxCount > 0, Is.True, $"{stage.DisplayName} のワイヤーが刺さる足場が光らない");
                 Assert.That(glow.Brightness, Is.GreaterThan(0.5f), $"{stage.DisplayName} の足場の光が動いていない");

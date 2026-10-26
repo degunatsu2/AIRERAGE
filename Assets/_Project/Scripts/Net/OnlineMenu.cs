@@ -443,7 +443,7 @@ namespace Airerage.Net
                     _characterSelect.ShowNetwork(session.LocalPlayer, session.LocalCharacter);
                     break;
                 case Panel.StageSelect:
-                    _stageSelect.ShowNetwork(session.IsHost, session.StageCursor);
+                    _stageSelect.ShowNetwork(session.IsHost, session.StageCursor, session.IsHost ? session.CommonStagePool : ulong.MaxValue);
                     break;
                 case Panel.Loading:
                     if (_loadingPanel != null)

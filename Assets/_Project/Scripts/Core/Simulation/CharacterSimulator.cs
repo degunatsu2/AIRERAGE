@@ -5,7 +5,6 @@ using Airerage.Core.Common;
 using Airerage.Core.Input;
 using Airerage.Core.Movement;
 using Airerage.Core.Physics;
-using Airerage.Core.Skills;
 using Airerage.Core.Wire;
 
 namespace Airerage.Core.Simulation
@@ -71,19 +70,16 @@ namespace Airerage.Core.Simulation
             var halfExtents = movement.HalfExtents;
             var halfExtents2 = new System.Numerics.Vector2(halfExtents.X, halfExtents.Y);
 
-            // 吹雪で凍っている間と、抹茶のクリームに張り付いている間と、感電している間は、入力を受け付けない（攻撃を受けてのけぞったら解ける）。
+            // 吹雪で凍っている間と、抹茶のクリームに張り付いている間と、感電している間は、入力を受け付けない（攻撃を受けてのけぞったら解ける。
+            // ただし、攻撃の追加効果の感電（AttackHit.StunTicks）は、のけぞりのまま先に感電する）。
             if (state.Action.Kind == ActionKind.Hitstun)
             {
                 state.Combat.FrozenTicksLeft = 0;
                 state.Combat.CreamStickTicksLeft = 0;
-                state.Combat.StunTicksLeft = 0;
-            }
-            else if (state.Combat.PendingStunTicks > 0)
-            {
-                // 攻撃の追加効果の感電（AttackHit.StunTicks。ボールライトニング）: のけぞりが終わったら感電する。
-                int stun = state.Combat.PendingStunTicks;
-                state.Combat.PendingStunTicks = 0;
-                ElectricRules.Stun(ref state, config, stun, config.Skills.Inverter.StunGuardTicks);
+                if (!state.Combat.HasStunKnockback)
+                {
+                    state.Combat.StunTicksLeft = 0;
+                }
             }
             if (state.Combat.StunGuardTicks > 0)
             {
@@ -96,6 +92,7 @@ namespace Airerage.Core.Simulation
             bool frozen = state.Combat.FrozenTicksLeft > 0;
             bool stuck = state.Combat.CreamStickTicksLeft > 0;
             bool stunned = state.Combat.StunTicksLeft > 0;
+            bool drowning = state.Combat.DrownTicks > 0;
             if (stunned)
             {
                 state.Combat.StunTicksLeft--;
@@ -108,7 +105,7 @@ namespace Airerage.Core.Simulation
             {
                 state.Combat.CreamStickTicksLeft--;
             }
-            if (frozen || stuck || stunned)
+            if (frozen || stuck || stunned || drowning)
             {
                 effectiveInput = default;
                 frame = new InputFrame(default, state.PreviousButtons);
@@ -165,15 +162,28 @@ namespace Airerage.Core.Simulation
                 ActionController.ApplyMotion(ref state, config);
                 LimitSlowFall(ref state, airJumpsBefore, config);
                 StageZones.ApplyFriction(ref state, velocityBefore, halfExtents2, _zones, tick);
+                StageZones.ApplyWaterForces(ref state, velocityBefore.Y, movement.Gravity, _zones, tick);
             }
             if (frozen)
             {
                 state.Velocity.X = 0f;
             }
-            if (stunned)
+            if (drowning)
             {
-                // 感電: 重力も受けず、その場にとどまる。
+                // 溺れている: 動けず、まっすぐ沈む。
+                state.Velocity = new System.Numerics.Vector3(0f, -StageZones.DrownSinkSpeed, 0f);
+                state.WallSide = 0;
+            }
+            else if (stunned)
+            {
+                // 感電: 重力も受けず、その場にとどまる。攻撃の追加効果の感電が終わったら、その攻撃の吹き飛びで飛ぶ。
                 state.Velocity = System.Numerics.Vector3.Zero;
+                if (state.Combat.StunTicksLeft == 0 && state.Combat.HasStunKnockback)
+                {
+                    state.Velocity = new System.Numerics.Vector3(state.Combat.StunKnockbackX, state.Combat.StunKnockbackY, 0f);
+                    state.Combat.HasStunKnockback = false;
+                    state.Grounded = false;
+                }
             }
             else if (stuck)
             {

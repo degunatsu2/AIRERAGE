@@ -39,6 +39,8 @@ namespace Airerage.PlayMode.Tests
             public MatchState Match => World.Match;
             public CoinField Coins => World.Coins.Field;
             public Airerage.Core.Objects.WorldObjects Objects => World.Objects;
+            public System.Collections.Generic.IReadOnlyList<StagePlatform> Platforms => World.Platforms;
+            public StageState Stage => World.Stage;
             public IReadOnlyList<CoinSpawnPoint> CoinSpawns => World.CoinSpawns;
             public IReadOnlyList<BankSpot> BankSpots => World.BankSpots;
             public event Action Ticked;

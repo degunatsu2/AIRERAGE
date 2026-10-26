@@ -29,6 +29,9 @@ namespace Airerage.Core.Simulation
         /// <summary>アディショナルタイムと勝者の写し。</summary>
         public MatchState Match { get; private set; } = MatchState.None;
 
+        /// <summary>扉の開き具合（StageState。扉のないステージでは空）。</summary>
+        public StageState Stage { get; } = new StageState();
+
         public CharacterState GetState(int index)
         {
             if (index < 0 || index >= CharacterCount)
@@ -41,11 +44,16 @@ namespace Airerage.Core.Simulation
         /// <summary>全状態のチェックサム（ティック数と全キャラクターの状態。PC が違っても同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, Coins, Match, Objects);
+            return StateCodec.WorldChecksum(Tick, _states, Coins, Match, Objects, Stage);
         }
 
-        internal void Capture(int tick, IReadOnlyList<CharacterState> states, CoinField coins, MatchState match, WorldObjects objects)
+        internal void Capture(int tick, IReadOnlyList<CharacterState> states, CoinField coins, MatchState match, WorldObjects objects,
+            StageState stage = null)
         {
+            if (stage != null)
+            {
+                Stage.CopyFrom(stage);
+            }
             Coins.CopyFrom(coins);
             Objects.CopyFrom(objects);
             Match = match;

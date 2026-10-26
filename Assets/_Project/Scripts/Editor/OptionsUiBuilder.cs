@@ -41,8 +41,11 @@ namespace Airerage.Editor
                 generalRows[i] = row;
                 generalValues[i] = Value(row, string.Empty);
             }
+            // RANDOM で選ぶステージ（ステージ選択と同じ画面でチェックを付け外しする。ユーザーの要望、2026-10-26）。
+            MenuOption randomStages = MenuUiBuilder.CreateMenuItem(general, "RandomStages", "RANDOM STAGES", anchor,
+                new Vector2(Left, -235f - GeneralLabels.Length * 70f), new Vector2(Width, RowHeight));
             MenuOption resetGeneral = MenuUiBuilder.CreateMenuItem(general, "ResetGeneral", "RESET TO DEFAULT", anchor,
-                new Vector2(Left, -235f - GeneralLabels.Length * 70f - 8f), new Vector2(Width, RowHeight));
+                new Vector2(Left, -235f - (GeneralLabels.Length + 1) * 70f - 8f), new Vector2(Width, RowHeight));
 
             // CONTROLS: 見出し（キーボード・ゲームパッド）、操作ごとの名前と 2 つの札、元に戻す項目。
             RectTransform controls = MenuUiBuilder.CreateFull(panel, "Controls");
@@ -73,7 +76,7 @@ namespace Airerage.Editor
                 new Vector2(Left, -268f - actions * 60f - 4f), new Vector2(Width, RowHeight));
             controls.gameObject.SetActive(false);
 
-            MenuOption back = MenuUiBuilder.CreateMenuItem(panel, "Back", "BACK", anchor, new Vector2(Left, -780f), new Vector2(Width, RowHeight));
+            MenuOption back = MenuUiBuilder.CreateMenuItem(panel, "Back", "BACK", anchor, new Vector2(Left, -820f), new Vector2(Width, RowHeight));
             Text prompt = MenuUiBuilder.CreateText(panel, "Prompt", string.Empty, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
                 new Vector2(0f, 0f), new Vector2(90f, 125f), new Vector2(1100f, 44f), MenuUiBuilder.Accent);
             MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Left / Right: change     Enter / A: OK     Esc / B: back", 22,
@@ -88,6 +91,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_generalRows", generalRows);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_generalValues", generalValues);
             SandboxWireSceneBuilder.SetReference(screen, "_resetGeneral", resetGeneral);
+            SandboxWireSceneBuilder.SetReference(screen, "_randomStages", randomStages);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_keyCells", keyCells);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_padCells", padCells);
             SandboxWireSceneBuilder.SetReference(screen, "_resetControls", resetControls);

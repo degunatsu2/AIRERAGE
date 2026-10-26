@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Airerage.Runtime.Flow;
+using Airerage.Runtime.Settings;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,6 +16,9 @@ namespace Airerage.Runtime.UI
     /// カーソルがステージの札を回りながら遅くなり、選んだステージで止まってから Confirmed（2026-10-21。回っている間は操作を受け付けない。
     /// ネットワーク対戦では、ホストのカーソルが全員に送られるので、全員が同じルーレットを見る）。カーソルのあるステージは
     /// HighlightedStageChanged で知らせる（メニューの背景に映す。RANDOM では null）。
+    /// RANDOM で選ぶのは、チェックを付けたステージだけ（RandomStagePool。ネットワーク対戦では全員が付けているステージだけ。
+    /// ユーザーの要望、2026-10-26）。オプションから開く「RANDOM STAGES」（ShowRandomPool）では、札の左端のチェックを決定で付け外しし、
+    /// 戻る操作で PoolClosed（RANDOM の札は出さない。最後の 1 つは外せない）。
     /// </summary>
     public sealed class StageSelectScreen : MonoBehaviour
     {
@@ -28,6 +33,9 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Text _note;
         [Tooltip("RANDOM の札（ステージの札の後ろ。なくてもよい）")]
         [SerializeField] private MenuOption _random;
+        [Tooltip("札の左端のチェックの箱と、付いているときの印（_options と同じ順。RANDOM STAGES のときだけ出す。なくてもよい）")]
+        [SerializeField] private GameObject[] _checkBoxes = new GameObject[0];
+        [SerializeField] private GameObject[] _checkMarks = new GameObject[0];
 
         // ルーレット: 回る回数、最初と最後の 1 つ進む間隔（秒）、止まってから決めるまで（秒）。
         private const int RouletteLoops = 2;
@@ -43,6 +51,19 @@ namespace Airerage.Runtime.UI
         private int _rouletteTarget;
         private float _rouletteNextAt;
         private bool _rouletteMoving;
+        private ulong _randomPool = RandomStagePool.All;
+
+        /// <summary>オプションの RANDOM STAGES（RANDOM で選ぶステージのチェックを付け外しする）で出しているか。</summary>
+        public bool PoolMode { get; private set; }
+
+        /// <summary>RANDOM STAGES を閉じた（戻る操作）。</summary>
+        public event Action PoolClosed;
+
+        /// <summary>番号 index のステージに、RANDOM で選ぶチェックが付いているか（RANDOM STAGES の表示。テスト用）。</summary>
+        public bool CheckShown(int index) => index < _checkMarks.Length && _checkMarks[index] != null && _checkMarks[index].activeSelf;
+
+        /// <summary>RANDOM で選べるステージの番号のビット（RandomStagePool.Mask。ネットワーク対戦のホストは全員の共通）。</summary>
+        public ulong RandomPool => _randomPool;
 
         /// <summary>RANDOM のルーレットが回っているか（止まって決めるまで）。</summary>
         public bool Rolling => _rouletteStep >= 0;
@@ -111,14 +132,22 @@ namespace Airerage.Runtime.UI
                 };
                 _options[i].Clicked.AddListener(() =>
                 {
-                    if (!ReadOnly && !Rolling)
+                    if (PoolMode)
+                    {
+                        TogglePool(index);
+                    }
+                    else if (!ReadOnly && !Rolling)
                     {
                         Confirmed?.Invoke(stage);
                     }
                 });
                 _options[i].Cancelled += () =>
                 {
-                    if (!ReadOnly && !Rolling)
+                    if (PoolMode)
+                    {
+                        PoolClosed?.Invoke();
+                    }
+                    else if (!ReadOnly && !Rolling)
                     {
                         Cancelled?.Invoke();
                     }
@@ -142,7 +171,8 @@ namespace Airerage.Runtime.UI
                 {
                     if (!ReadOnly && !Rolling)
                     {
-                        StartRoulette(UnityEngine.Random.Range(0, _stages.Length));
+                        List<int> pool = RandomStagePool.Indices(_stages.Length, _randomPool);
+                        StartRoulette(pool[UnityEngine.Random.Range(0, pool.Count)]);
                     }
                 });
                 _random.Cancelled += () =>
@@ -155,18 +185,74 @@ namespace Airerage.Runtime.UI
             }
         }
 
-        /// <summary>出す（カーソルは最初のステージ。押したボタンで決まらないよう、札を選ぶのは次のフレーム）。</summary>
+        /// <summary>出す（カーソルは最初のステージ。押したボタンで決まらないよう、札を選ぶのは次のフレーム）。RANDOM は自分のチェックから選ぶ。</summary>
         public void Show()
         {
             Open(false, false, 0);
+            _randomPool = RandomStagePool.Mask(_stages);
         }
 
         /// <summary>
         /// ネットワーク対戦で出す。host ならカーソル index から選べ、そうでなければホストのカーソルを見るだけ（ShowRemoteCursor）。
+        /// randomPool は RANDOM で選べるステージ（全員がチェックを付けているもの。ホストだけが使う）。
         /// </summary>
-        public void ShowNetwork(bool host, int index)
+        public void ShowNetwork(bool host, int index, ulong randomPool = RandomStagePool.All)
         {
             Open(true, !host, index);
+            _randomPool = randomPool;
+        }
+
+        /// <summary>
+        /// オプションの RANDOM STAGES として出す: 札の左端にチェックを出し、決定で付け外しする（すぐに保存する）。戻る操作で PoolClosed。
+        /// </summary>
+        public void ShowRandomPool()
+        {
+            Open(false, false, 0);
+            PoolMode = true;
+            if (_random != null)
+            {
+                _random.gameObject.SetActive(false);
+            }
+            RefreshChecks();
+            SetNote("CHECKED STAGES CAN BE PICKED BY RANDOM");
+        }
+
+        // RANDOM STAGES: 番号 index のチェックを付け外しする（最後の 1 つは外せない）。
+        private void TogglePool(int index)
+        {
+            StageDefinition stage = _stages[index];
+            bool included = RandomStagePool.IsIncluded(stage);
+            if (included && RandomStagePool.Indices(_stages.Length, RandomStagePool.Mask(_stages)).Count <= 1)
+            {
+                SetNote("AT LEAST ONE STAGE MUST STAY CHECKED");
+                return;
+            }
+            RandomStagePool.SetIncluded(stage, !included);
+            SetNote("CHECKED STAGES CAN BE PICKED BY RANDOM");
+            RefreshChecks();
+        }
+
+        private void RefreshChecks()
+        {
+            for (int i = 0; i < _checkBoxes.Length; i++)
+            {
+                if (_checkBoxes[i] != null)
+                {
+                    _checkBoxes[i].SetActive(PoolMode);
+                }
+                if (i < _checkMarks.Length && _checkMarks[i] != null && i < _stages.Length)
+                {
+                    _checkMarks[i].SetActive(PoolMode && RandomStagePool.IsIncluded(_stages[i]));
+                }
+            }
+        }
+
+        private void SetNote(string text)
+        {
+            if (_note != null)
+            {
+                _note.text = text;
+            }
         }
 
         /// <summary>ネットワーク対戦（選べない人）: ホストのカーソルを index に出す。</summary>
@@ -186,6 +272,12 @@ namespace Airerage.Runtime.UI
             gameObject.SetActive(true);
             NetworkMode = network;
             ReadOnly = readOnly;
+            PoolMode = false;
+            if (_random != null)
+            {
+                _random.gameObject.SetActive(true);
+            }
+            RefreshChecks();
             _remoteIndex = -1;
             _selectIndex = Mathf.Clamp(index, 0, Mathf.Max(0, _stages.Length - 1));
             Highlight(_stages.Length > 0 ? _stages[_selectIndex] : null);
@@ -200,6 +292,7 @@ namespace Airerage.Runtime.UI
         {
             _selectAtFrame = -1;
             _rouletteStep = -1;
+            PoolMode = false;
             gameObject.SetActive(false);
         }
 

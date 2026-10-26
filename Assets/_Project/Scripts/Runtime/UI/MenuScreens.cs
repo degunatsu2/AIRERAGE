@@ -25,6 +25,7 @@ namespace Airerage.Runtime.UI
     /// - LOCAL VS → 参加とキャラクター選択（T6-5）→ ステージ選択 → ローカル対戦。ステージ選択から戻ると、参加した人は
     ///   そのまま（READY だけ外す）。
     /// - OPTIONS → オプションの画面（OptionsScreen。音量・画面・キーの割り当て。docs/15 T6-9）。閉じるとメインメニューの OPTIONS へ。
+    ///   RANDOM STAGES → ステージ選択の画面で、RANDOM で選ぶステージのチェックを付け外し（閉じるとオプションへ）。
     /// - SINGLE（docs/16 T7-2。D-72【仮】）→ キャラクター選択（トレーニングと同じ 1 人の画面）→ CPU の強さ（CpuLevelScreen）→ ステージ選択 →
     ///   自分＋CPU 3 体のローカル対戦（CPU のキャラクターはランダム。なるべく自分と違うキャラクター）。自分はキーボード＋マウスとどの
     ///   ゲームパッドでも操作できる。
@@ -129,6 +130,17 @@ namespace Airerage.Runtime.UI
                 _optionsScreen.Show();
             });
             _optionsScreen.Closed += () => ShowMain(_options);
+            // RANDOM で選ぶステージ（ステージ選択と同じ画面。閉じたらオプションの RANDOM STAGES へ戻る。ユーザーの要望、2026-10-26）。
+            _optionsScreen.RandomStagesRequested += () =>
+            {
+                HideAll();
+                _stageSelect.ShowRandomPool();
+            };
+            _stageSelect.PoolClosed += () =>
+            {
+                HideAll();
+                _optionsScreen.ShowAtRandomStages();
+            };
             _network.Clicked.AddListener(() =>
             {
                 if (Online != null)

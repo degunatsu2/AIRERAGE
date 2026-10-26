@@ -31,6 +31,12 @@ namespace Airerage.Editor.Stages
             VolcanoStage.Create(),
             SnowSeaStage.Create(),
             SpaceStationStage.Create(),
+            // ユーザーの案（2026-10-26）。
+            LabStage.Create(),
+            KitchenStage.Create(),
+            ManorStage.Create(),
+            StadiumStage.Create(),
+            WharfStage.Create(),
         };
 
         public static string ScenePathOf(StageLayout layout)
@@ -58,6 +64,7 @@ namespace Airerage.Editor.Stages
             SandboxWireSceneBuilder.CreateTerrain(layout.Terrain, layout.Anchors, decor.Lit("Terrain", theme.Terrain),
                 decor.Lit("TerrainAttachable", theme.Attachable), decor.Lit("Anchor", theme.Anchor));
             CreateZones(layout.Zones, theme, decor);
+            CreatePlatforms(layout.Platforms, theme, decor);
             SandboxCombatSceneBuilder.CreateBounds(layout.BoundsMin, layout.BoundsMax);
             SandboxWireSceneBuilder.CreateCoinSpawns(layout.Coins, layout.Jackpots);
             SandboxWireSceneBuilder.CreateBankSpots(layout.Banks);
@@ -79,6 +86,61 @@ namespace Airerage.Editor.Stages
             }
             SandboxWireSceneBuilder.AddToBuildSettings(path);
             Debug.Log($"StageSceneBuilder: {path} を作った");
+        }
+
+        // 動く足場と扉（StagePlatformAuthoring と、見た目を動かす StagePlatformView。見た目の子に当たりはない）。
+        private static void CreatePlatforms(PlatformSpec[] platforms, StageTheme theme, StageDecor decor)
+        {
+            if (platforms == null || platforms.Length == 0)
+            {
+                return;
+            }
+            var root = new GameObject("Platforms").transform;
+            foreach (PlatformSpec spec in platforms)
+            {
+                var go = new GameObject(spec.Name);
+                go.transform.SetParent(root, false);
+                go.transform.position = new Vector3(spec.Center.x, spec.Center.y, 0f);
+                var authoring = go.AddComponent<StagePlatformAuthoring>();
+                if (spec.Kind == StagePlatformKind.Door)
+                {
+                    authoring.ConfigureDoor(spec.Size, spec.Attachable, spec.OpenHeight, spec.OpenSeconds, spec.CloseSeconds);
+                }
+                else
+                {
+                    authoring.ConfigurePath(spec.Size, spec.Attachable, spec.Keys, spec.PeriodSeconds, spec.PhaseSeconds, spec.ActiveFromSeconds,
+                        spec.ActiveToSeconds, spec.Smooth);
+                }
+                var visual = new GameObject("Visual").transform;
+                visual.SetParent(go.transform, false);
+                if (spec.Visual != null)
+                {
+                    spec.Visual(decor, visual, spec);
+                }
+                else
+                {
+                    Color color = spec.Color ?? (spec.Attachable ? theme.Attachable : theme.Terrain);
+                    decor.Box("Body", visual, Vector3.zero, new Vector3(spec.Size.x, spec.Size.y, 4f), decor.Lit(spec.Name + "Body", color));
+                }
+                if (spec.Attachable)
+                {
+                    AddGlowRims(decor, visual, spec.Size);
+                }
+                go.AddComponent<StagePlatformView>().Configure(visual);
+            }
+        }
+
+        // ワイヤーが刺さる動く足場の正面の縁を、オレンジに光らせる（動かない地形の AttachableGlow と同じ色。足場と一緒に動く）。
+        internal static void AddGlowRims(StageDecor decor, Transform visual, Vector2 size)
+        {
+            const float w = 0.14f;
+            Material rim = decor.Unlit("PlatformRim", SandboxWireSceneBuilder.AttachableGlowColor);
+            float front = -2.03f;
+            float rimW = Mathf.Min(w, size.x * 0.5f, size.y * 0.5f);
+            decor.Box("RimTop", visual, new Vector3(0f, size.y * 0.5f - rimW * 0.5f, front), new Vector3(size.x, rimW, 0.02f), rim);
+            decor.Box("RimBottom", visual, new Vector3(0f, -size.y * 0.5f + rimW * 0.5f, front), new Vector3(size.x, rimW, 0.02f), rim);
+            decor.Box("RimLeft", visual, new Vector3(-size.x * 0.5f + rimW * 0.5f, 0f, front), new Vector3(rimW, size.y, 0.02f), rim);
+            decor.Box("RimRight", visual, new Vector3(size.x * 0.5f - rimW * 0.5f, 0f, front), new Vector3(rimW, size.y, 0.02f), rim);
         }
 
         // 名前から決まる種（string.GetHashCode は実行ごとに変わることがあるので使わない）。
@@ -202,6 +264,17 @@ namespace Airerage.Editor.Stages
                     // 幅 1 の柱の板（StageZoneView が周期ごとの柱の位置と幅に合わせる）。
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, -0.5f), new Vector2(1f, size.y), decor.Transparent(kind, WithAlpha(color, 0.78f)));
                 }
+                case StageZoneKind.Water:
+                {
+                    // 水の手前の面（キャラクターと地形の前。水の中のキャラクターとコインが透けて見える。撃破の線より下まで）と、手前の水面。
+                    float depth = size.y + 30f;
+                    GameObject front = decor.Quad("Front", parent, new Vector3(0f, size.y * 0.5f - depth * 0.5f, -2.4f), new Vector2(size.x, depth),
+                        decor.Transparent(kind, WithAlpha(color, 0.5f)));
+                    GameObject surface = decor.Quad("Surface", parent, new Vector3(0f, size.y * 0.5f, -6f), new Vector2(size.x, 8f),
+                        decor.Transparent(kind + "Surface", WithAlpha(Color.Lerp(color, Color.white, 0.25f), 0.4f)));
+                    surface.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    return front;
+                }
                 case StageZoneKind.Blizzard:
                 {
                     // 範囲の全体の幕（手前。キャラクターの前にかかる）。
@@ -250,6 +323,7 @@ namespace Airerage.Editor.Stages
                 case StageZoneKind.Warp: return new Color(0.65f, 0.4f, 1f);
                 case StageZoneKind.Hazard: return new Color(1f, 0.4f, 0.08f);
                 case StageZoneKind.Blizzard: return new Color(0.9f, 0.96f, 1f);
+                case StageZoneKind.Water: return new Color(0.12f, 0.42f, 0.75f);
                 default: return Color.white;
             }
         }
@@ -333,6 +407,17 @@ namespace Airerage.Editor.Stages
         public GameObject Sphere(string name, Vector3 center, Vector3 size, Material material)
         {
             return Create(PrimitiveType.Sphere, name, Root, center, size, material);
+        }
+
+        /// <summary>円柱（Unity の円柱は高さ 2。size.y はその半分の倍率）。</summary>
+        public GameObject Cylinder(string name, Transform parent, Vector3 localCenter, Vector3 size, Material material)
+        {
+            return Create(PrimitiveType.Cylinder, name, parent, localCenter, size, material);
+        }
+
+        public GameObject Cylinder(string name, Vector3 center, Vector3 size, Material material)
+        {
+            return Create(PrimitiveType.Cylinder, name, Root, center, size, material);
         }
 
         /// <summary>カメラ（-Z 側）に向いた板。</summary>

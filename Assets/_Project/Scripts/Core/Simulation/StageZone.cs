@@ -65,6 +65,14 @@ namespace Airerage.Core.Simulation
         /// WarningTicks 前から予告する。
         /// </summary>
         Blizzard = 11,
+
+        /// <summary>
+        /// 水（海。ユーザーの要望、2026-10-26）。範囲の上の辺が水面。中心が水面より下に入ると、重力の代わりに浮力で水面に浮き、横は泳ぐ速さ
+        /// まで遅くなる（水面に浮いている間はジャンプできる）。陸に着くかワイヤーをつなぐまでに、合わせて Power 秒水の中にいると溺れ、
+        /// 沈んで撃破される。水の中では下向きの速さを一定の割合で落とし、水面に Limit（m/s）で入ると、ちょうど範囲の下の辺まで沈む
+        /// （下の辺を撃破の線に合わせると、それより速く入った人は撃破される）。StageZones.ApplyWaterForces と UpdateWater。
+        /// </summary>
+        Water = 12,
     }
 
     /// <summary>ギミックの周期（ティック）。Period が 0 ならいつも効く。</summary>
@@ -130,12 +138,12 @@ namespace Airerage.Core.Simulation
 
         /// <summary>
         /// ジャンプ台・加速リングでは速さ（m/s）、上昇気流では加速度（m/s²）、危険・吹雪では威力（当たる・凍ると、この枚数のコインを
-        /// 落とす。ユーザーの要望、2026-10-21）。
+        /// 落とす。ユーザーの要望、2026-10-21）、水では浮いていられる長さ（秒）。
         /// </summary>
         public readonly float Power;
 
         /// <summary>
-        /// 上昇気流・風では速さの上限（m/s）、低重力では落ちる速さの上限（m/s）、吹雪では影になる距離（m。風上のこの距離の中に地形があれば
+        /// 上昇気流・風では速さの上限（m/s）、低重力では落ちる速さの上限（m/s）、水では下の辺まで沈む速さ（m/s）、吹雪では影になる距離（m。風上のこの距離の中に地形があれば
         /// 凍らない。0 なら StageZones.BlizzardShelterDistance）、危険では吹き飛ばす速さ（m/s。0 なら StageZones.HazardKnockbackSpeed で
         /// 威力から決める）。ほかの種類では使わない。
         /// </summary>
@@ -190,7 +198,7 @@ namespace Airerage.Core.Simulation
             {
                 throw new ArgumentException($"ギミックの強さは正の有限な値にします（{power}）");
             }
-            if ((kind == StageZoneKind.Updraft || kind == StageZoneKind.Gust || kind == StageZoneKind.LowGravity)
+            if ((kind == StageZoneKind.Updraft || kind == StageZoneKind.Gust || kind == StageZoneKind.LowGravity || kind == StageZoneKind.Water)
                 && (!(limit > 0f) || float.IsInfinity(limit)))
             {
                 throw new ArgumentException($"{kind} の速さの上限は正の有限な値にします（{limit}）");
@@ -315,7 +323,8 @@ namespace Airerage.Core.Simulation
         // 向きを使う種類か（バンパー・氷・低重力・ワープは向きを使わない）。
         private static bool UsesDirection(StageZoneKind kind)
         {
-            return kind != StageZoneKind.Bumper && kind != StageZoneKind.Ice && kind != StageZoneKind.LowGravity && kind != StageZoneKind.Warp;
+            return kind != StageZoneKind.Bumper && kind != StageZoneKind.Ice && kind != StageZoneKind.LowGravity && kind != StageZoneKind.Warp
+                && kind != StageZoneKind.Water;
         }
 
         /// <summary>範囲の中心。</summary>

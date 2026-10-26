@@ -18,11 +18,15 @@ namespace Airerage.Core.Physics
             public readonly Vector2 Max;
             public readonly bool Attachable;
 
-            public Box(Vector2 min, Vector2 max, bool attachable)
+            /// <summary>当たったときの CastHit.Body（動かない地形は 0。動く足場は番号 + 1）。</summary>
+            public readonly int Tag;
+
+            public Box(Vector2 min, Vector2 max, bool attachable, int tag = 0)
             {
                 Min = min;
                 Max = max;
                 Attachable = attachable;
+                Tag = tag;
             }
         }
 
@@ -49,17 +53,27 @@ namespace Airerage.Core.Physics
             }
         }
 
-        /// <summary>矩形を追加する。最小値が最大値より小さくない（NaN を含む）場合は ArgumentException。</summary>
-        public BoxTerrain AddBox(float minX, float minY, float maxX, float maxY, bool attachable = false)
+        /// <summary>
+        /// 矩形を追加する。最小値が最大値より小さくない（NaN を含む）場合は ArgumentException。tag は当たったときの CastHit.Body。
+        /// </summary>
+        public BoxTerrain AddBox(float minX, float minY, float maxX, float maxY, bool attachable = false, int tag = 0)
         {
             if (!(minX < maxX) || !(minY < maxY))
             {
                 throw new ArgumentException(
                     $"矩形の最小値は最大値より小さくしてください（min=({minX}, {minY}) max=({maxX}, {maxY})）");
             }
-            _boxes.Add(new Box(new Vector2(minX, minY), new Vector2(maxX, maxY), attachable));
+            _boxes.Add(new Box(new Vector2(minX, minY), new Vector2(maxX, maxY), attachable, tag));
             _ropeCornersDirty = true;
             return this;
+        }
+
+        /// <summary>矩形とアンカーポイントをすべて取り除く（動く足場の当たりを、ティックごとに作り直す。WorldCollision）。</summary>
+        public void Clear()
+        {
+            _boxes.Clear();
+            _anchors.Clear();
+            _ropeCornersDirty = true;
         }
 
         public BoxTerrain AddAnchor(float x, float y)
@@ -106,6 +120,7 @@ namespace Airerage.Core.Physics
                         Point = new Vector3(origin + direction * t, 0f),
                         Normal = new Vector3(normal, 0f),
                         Attachable = box.Attachable,
+                        Body = box.Tag,
                     };
                 }
             }

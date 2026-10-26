@@ -210,8 +210,23 @@ namespace Airerage.Core.Combat
         /// <summary>雷の波動（インバータの間に足場につなぐ）を次に出せるまでの残り（ティック。InverterTuning.WaveCooldownTicks）。</summary>
         public int WaveCooldownTicks;
 
-        /// <summary>のけぞりが終わったら感電する長さ（ティック。攻撃の追加効果 AttackHit.StunTicks。0 ならない）。</summary>
-        public int PendingStunTicks;
+        /// <summary>
+        /// 感電が終わったら受ける吹き飛び（攻撃の追加効果の感電 AttackHit.StunTicks。ボールライトニング）。先に感電してその場に止まり
+        /// （のけぞりのまま）、感電が終わったらこの速さで吹き飛ぶ（ユーザーの要望、2026-10-26）。HasStunKnockback が false なら、ない。
+        /// </summary>
+        public bool HasStunKnockback;
+        public float StunKnockbackX;
+        public float StunKnockbackY;
+
+        /// <summary>
+        /// 水（StageZoneKind.Water。ユーザーの要望、2026-10-26）: 溺れるまでの残り（ティック。水の中にいる間だけ減る。陸に着くかワイヤーを
+        /// つなぐと 0 に戻る。0 なら水に入っていない）と、その全体の長さ（表示のゲージ）。DrownTicks は溺れてからのティック（0 なら溺れて
+        /// いない。溺れたら動けず、沈んで撃破される。何にも触れない）。SplashCount は水に飛び込んだ数（表示と効果音）。
+        /// </summary>
+        public int WaterTicksLeft;
+        public int WaterFloatTicks;
+        public int DrownTicks;
+        public int SplashCount;
 
         /// <summary>上から来た投射物を防いだ数（PASTRY CHEF のボウル。AttackData.BlocksProjectilesAbove。表示と効果音）。</summary>
         public int ShieldBlockCount;
@@ -238,7 +253,10 @@ namespace Airerage.Core.Combat
         /// 干渉されない（復帰を待つ間と、復帰した後の無干渉。MatchRules.InvincibleTicks）。攻撃・投射物・置かれた物・ステージの危険の影響を
         /// 受けず、自分の攻撃も相手に当たらない。
         /// </summary>
-        public bool IsUntouchable => RespawnTicksLeft > 0 || InvincibleTicksLeft > 0 || HasLeft;
+        public bool IsUntouchable => RespawnTicksLeft > 0 || InvincibleTicksLeft > 0 || HasLeft || DrownTicks > 0;
+
+        /// <summary>溺れているか（水。動けず、沈んで撃破される）。</summary>
+        public bool IsDrowning => DrownTicks > 0;
 
         public bool Equals(CombatState other)
         {
@@ -288,7 +306,10 @@ namespace Airerage.Core.Combat
                 && ChainCount == other.ChainCount && ChainTicksLeft == other.ChainTicksLeft && InverterOn == other.InverterOn
                 && StunTicksLeft == other.StunTicksLeft && StunGuardTicks == other.StunGuardTicks && StunCount == other.StunCount
                 && WhipGuardTicks == other.WhipGuardTicks && ShieldBlockCount == other.ShieldBlockCount && HasLeft == other.HasLeft
-                && WaveCooldownTicks == other.WaveCooldownTicks && PendingStunTicks == other.PendingStunTicks;
+                && WaveCooldownTicks == other.WaveCooldownTicks && HasStunKnockback == other.HasStunKnockback
+                && StunKnockbackX.Equals(other.StunKnockbackX) && StunKnockbackY.Equals(other.StunKnockbackY)
+                && WaterTicksLeft == other.WaterTicksLeft && WaterFloatTicks == other.WaterFloatTicks && DrownTicks == other.DrownTicks
+                && SplashCount == other.SplashCount;
         }
 
         public override bool Equals(object obj)
@@ -311,14 +332,15 @@ namespace Airerage.Core.Combat
                         HashCode.Combine(InPortalId, WarpCooldownTicks, WarpCount, FrozenTicksLeft, FreezeCount, HazardImmunityTicks, HazardHitCount, HazardDropPower),
                         HashCode.Combine(HoldVariant, CreamSpeedPercent, CreamWallJumpPercent, CreamNoCling, CreamStickTicksLeft, CreamStickSpent),
                         HashCode.Combine(ChainCount, ChainTicksLeft, InverterOn, StunTicksLeft, StunGuardTicks, StunCount, WhipGuardTicks,
-                            HashCode.Combine(ShieldBlockCount, HasLeft, WaveCooldownTicks, PendingStunTicks)))));
+                            HashCode.Combine(ShieldBlockCount, HasLeft, WaveCooldownTicks, HasStunKnockback, StunKnockbackX, StunKnockbackY,
+                                HashCode.Combine(WaterTicksLeft, WaterFloatTicks, DrownTicks, SplashCount))))));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} pendingStun={PendingStunTicks} shield={ShieldBlockCount}{(HasLeft ? " left" : "")}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} shield={ShieldBlockCount}{(HasLeft ? " left" : "")}";
         }
     }
 }

@@ -19,6 +19,9 @@ namespace Airerage.Core.Physics
 
         /// <summary>当たった地形にワイヤーを接続できるか。</summary>
         public bool Attachable;
+
+        /// <summary>当たった物（0 なら動かない地形。動く足場・扉なら、その番号 + 1。StagePlatform。ユーザーの要望、2026-10-26）。</summary>
+        public int Body;
     }
 
     /// <summary>

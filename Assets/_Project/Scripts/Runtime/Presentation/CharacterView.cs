@@ -93,6 +93,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private CostumeView _costume;
         [Tooltip("壁に張り付いていられる残り（紫の円形ゲージ。ユーザーの要望、2026-10-20）")]
         [SerializeField] private RingGaugeView _wallClingGauge;
+        [Tooltip("水の中で溺れるまでの残り（水色。あれば。ユーザーの要望、2026-10-26）")]
+        [SerializeField] private RingGaugeView _waterGauge;
+        [Tooltip("水に飛び込んだ瞬間の水しぶき（あれば）")]
+        [SerializeField] private BurstEffectView _splashBurst;
         [Tooltip("向きの印（目の帯と突き出た印をまとめた子。右向きで作り、左を向いたら左右を反転する。なければ出さない）")]
         [SerializeField] private Transform _facingMarker;
 
@@ -106,6 +110,7 @@ namespace Airerage.Runtime.Presentation
         private int _shownWireCancelCooldown;
         private int _shownBounces;
         private int _shownGimmicks;
+        private int _shownSplashes;
         private int _shownHazardHits;
         private int _shownSpecial1Cooldown;
         private int _shownSpecial2Cooldown;
@@ -163,6 +168,8 @@ namespace Airerage.Runtime.Presentation
         /// <summary>復帰までの残りのゲージ（なければ null）。</summary>
         public RingGaugeView RespawnGauge => _respawnGauge;
         public RingGaugeView WallClingGauge => _wallClingGauge;
+        public RingGaugeView WaterGauge => _waterGauge;
+        public BurstEffectView SplashBurst => _splashBurst;
         public RingGaugeView WaveGauge => _waveGauge;
         public CostumeView Costume => _costume;
 
@@ -201,6 +208,7 @@ namespace Airerage.Runtime.Presentation
         public void RenderAction(in CharacterState current, CombatTuning combat, int respawnDelayTicks = 0, MovementTuning movement = null)
         {
             RenderWallCling(current, movement);
+            RenderWater(current);
             RenderHitbox(current, combat);
             RenderSpin(current, combat);
             RenderFacing(current);
@@ -260,6 +268,24 @@ namespace Airerage.Runtime.Presentation
             else if (_wallClingGauge.IsShowing)
             {
                 _wallClingGauge.Hide();
+            }
+        }
+
+        // 水の中で溺れるまでの残り（陸に着くかワイヤーをつなぐまで。水から出ている間も、残りがあれば出す）。溺れたら隠す。
+        private void RenderWater(in CharacterState state)
+        {
+            if (_waterGauge == null)
+            {
+                return;
+            }
+            CombatState c = state.Combat;
+            if (c.WaterTicksLeft > 0 && c.WaterFloatTicks > 0 && !c.IsDrowning && !c.IsWaitingToRespawn)
+            {
+                _waterGauge.Show(transform.position, c.WaterTicksLeft / (float)c.WaterFloatTicks);
+            }
+            else if (_waterGauge.IsShowing)
+            {
+                _waterGauge.Hide();
             }
         }
 
@@ -362,6 +388,11 @@ namespace Airerage.Runtime.Presentation
             {
                 _bounceBurst.Play(center);
             }
+            if (c.SplashCount > _shownSplashes && _splashBurst != null)
+            {
+                _splashBurst.Play(center);
+            }
+            _shownSplashes = c.SplashCount;
             // ジャンプ台・加速リング・壁ジャンプ。
             int gimmicks = state.JumpPadCount + state.BoostRingCount + state.WallJumpCount;
             if (gimmicks > _shownGimmicks && _gimmickBurst != null)

@@ -41,6 +41,12 @@ namespace Airerage.Net
         /// ホスト → クライアント: 試合中にプレイヤーが抜けた（試合の番号、抜けた人、抜けたティック、その前までのその人の入力。docs/15 T6-10）。
         /// </summary>
         Left = 10,
+
+        /// <summary>
+        /// クライアント → ホスト: RANDOM で選んでよいステージ（StageCatalog の番号のビット。オプションの RANDOM STAGES。ロビーに入ったときに
+        /// 送る。ユーザーの要望、2026-10-26）。ホストは全員が選んでよいステージだけから RANDOM で選ぶ。
+        /// </summary>
+        StagePool = 11,
     }
 
     /// <summary>
@@ -142,6 +148,29 @@ namespace Airerage.Net
         {
             Expect(data, NetKind.Hello, 1);
             return Encoding.UTF8.GetString(data, 1, data.Length - 1);
+        }
+
+        /// <summary>RANDOM で選んでよいステージの番号のビット。</summary>
+        public static byte[] StagePool(ulong mask)
+        {
+            var data = new byte[9];
+            data[0] = (byte)NetKind.StagePool;
+            for (int i = 0; i < 8; i++)
+            {
+                data[1 + i] = (byte)(mask >> (8 * i));
+            }
+            return data;
+        }
+
+        public static ulong ReadStagePool(byte[] data)
+        {
+            Expect(data, NetKind.StagePool, 9);
+            ulong mask = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                mask |= (ulong)data[1 + i] << (8 * i);
+            }
+            return mask;
         }
 
         /// <summary>選んだキャラクターの番号（0〜255）。</summary>

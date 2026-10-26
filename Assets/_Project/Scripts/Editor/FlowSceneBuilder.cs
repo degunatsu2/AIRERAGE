@@ -392,26 +392,31 @@ namespace Airerage.Editor
             return screen;
         }
 
-        // ステージ選択（docs/15 T6-4）: 左にステージの札を縦に並べ、右にカーソルのあるステージの名前と説明（ステージの色の帯）。
+        // ステージ選択（docs/15 T6-4）: 左にステージの札を 2 列に並べ（ステージが増えたので。2026-10-26）、右にカーソルのあるステージの
+        // 名前と説明（ステージの色の帯）。札の左端に、RANDOM で選ぶかのチェック（オプションの RANDOM STAGES のときだけ出す）。
         private static StageSelectScreen CreateStageSelect(Transform canvas)
         {
             StageCatalog catalog = LoadOrCreateStages();
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "StageSelect");
-            MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.42f, 1f));
+            MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.49f, 1f));
             MenuUiBuilder.CreateText(panel, "Title", "STAGE SELECT", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
             var options = new Object[catalog.Count];
             var stages = new Object[catalog.Count];
+            var checkBoxes = new Object[catalog.Count];
+            var checkMarks = new Object[catalog.Count];
             for (int i = 0; i < catalog.Count; i++)
             {
                 StageDefinition stage = catalog.Get(i);
                 stages[i] = stage;
-                options[i] = MenuUiBuilder.CreateMenuItem(panel, $"Stage{i + 1}", stage.DisplayName, new Vector2(0f, 1f),
-                    new Vector2(110f, -230f - i * 88f), new Vector2(560f, 72f));
+                MenuOption option = CreateStagePlate(panel, $"Stage{i + 1}", stage.DisplayName, i);
+                options[i] = option;
+                CreateStageCheck(option.transform, out GameObject box, out GameObject mark);
+                checkBoxes[i] = box;
+                checkMarks[i] = mark;
             }
             // 最後に RANDOM（ユーザーの要望、2026-10-19）。
-            MenuOption random = MenuUiBuilder.CreateMenuItem(panel, "Random", "RANDOM", new Vector2(0f, 1f),
-                new Vector2(110f, -230f - catalog.Count * 88f), new Vector2(560f, 72f));
+            MenuOption random = CreateStagePlate(panel, "Random", "RANDOM", catalog.Count);
             UnityEngine.UI.Image band = MenuUiBuilder.CreateFill(panel, "Band", new Color(0.35f, 0.85f, 1f, 0.35f),
                 new Vector2(0.45f, 0.55f), new Vector2(1f, 0.75f));
             // 名前と説明は右の帯の側に、右の端から置く（左の札と重ならないように。説明は折り返す）。
@@ -433,8 +438,43 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_band", band);
             SandboxWireSceneBuilder.SetReference(screen, "_note", note);
             SandboxWireSceneBuilder.SetReference(screen, "_random", random);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_checkBoxes", checkBoxes);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_checkMarks", checkMarks);
             panel.gameObject.SetActive(false);
             return screen;
+        }
+
+        // ステージの札（2 列。番号の順に左の列から右の列へ、上から下へ）。上下左右の移動は、並びから決める（Automatic）。
+        private static MenuOption CreateStagePlate(RectTransform panel, string name, string label, int index)
+        {
+            const int columns = 2;
+            var position = new Vector2(130f + (index % columns) * 430f, -200f - (index / columns) * 76f);
+            MenuOption option = MenuUiBuilder.CreateMenuItem(panel, name, label, new Vector2(0f, 1f), position, new Vector2(360f, 64f));
+            option.LabelText.fontSize = 28;
+            UnityEngine.UI.Button button = option.Button;
+            button.navigation = new UnityEngine.UI.Navigation { mode = UnityEngine.UI.Navigation.Mode.Automatic };
+            return option;
+        }
+
+        // 札の左端のチェック（白い枠の箱と、付いているときの水色の印）。
+        private static void CreateStageCheck(Transform plate, out GameObject box, out GameObject mark)
+        {
+            box = new GameObject("Check", typeof(RectTransform));
+            box.transform.SetParent(plate, false);
+            var rect = (RectTransform)box.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.anchoredPosition = new Vector2(-8f, 0f);
+            rect.sizeDelta = new Vector2(34f, 34f);
+            box.AddComponent<UnityEngine.UI.Image>().color = Color.white;
+            UnityEngine.UI.Image inner = MenuUiBuilder.CreateFill(rect, "Inner", new Color(0.08f, 0.09f, 0.12f, 1f), Vector2.zero, Vector2.one);
+            inner.rectTransform.offsetMin = new Vector2(3f, 3f);
+            inner.rectTransform.offsetMax = new Vector2(-3f, -3f);
+            UnityEngine.UI.Image check = MenuUiBuilder.CreateFill(rect, "Mark", MenuUiBuilder.Accent, Vector2.zero, Vector2.one);
+            check.rectTransform.offsetMin = new Vector2(8f, 8f);
+            check.rectTransform.offsetMax = new Vector2(-8f, -8f);
+            mark = check.gameObject;
+            box.SetActive(false);
         }
 
         private static void BuildApp()

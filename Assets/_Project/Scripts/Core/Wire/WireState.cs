@@ -94,6 +94,12 @@ namespace Airerage.Core.Wire
         /// <summary>接続点（Attached 中）。フックが刺さった点。</summary>
         public Vector3 Anchor;
 
+        /// <summary>
+        /// 接続点が付いている物（0 なら動かない地形・アンカーポイント。動く足場・扉なら、その番号 + 1。接続点は足場と一緒に動く。
+        /// StagePlatforms。ユーザーの要望、2026-10-26）。
+        /// </summary>
+        public byte AnchorBody;
+
         /// <summary>ロープが地形の角に巻き付いてできた支点（D-33）。</summary>
         public RopePivots Pivots;
 
@@ -137,6 +143,7 @@ namespace Airerage.Core.Wire
                 && HasTargetPoint == other.HasTargetPoint
                 && TargetPoint.Equals(other.TargetPoint)
                 && Anchor.Equals(other.Anchor)
+                && AnchorBody == other.AnchorBody
                 && Pivots.Equals(other.Pivots)
                 && RopeLength.Equals(other.RopeLength)
                 && AttachSpeed.Equals(other.AttachSpeed)
@@ -161,6 +168,7 @@ namespace Airerage.Core.Wire
             hash.Add(HasTargetPoint);
             hash.Add(TargetPoint);
             hash.Add(Anchor);
+            hash.Add(AnchorBody);
             hash.Add(Pivots);
             hash.Add(RopeLength);
             hash.Add(AttachSpeed);

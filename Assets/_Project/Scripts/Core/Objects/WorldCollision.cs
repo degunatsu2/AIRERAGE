@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Airerage.Core.Physics;
+using Airerage.Core.Simulation;
 
 namespace Airerage.Core.Objects
 {
@@ -11,12 +12,16 @@ namespace Airerage.Core.Objects
     /// SimWorld が各ティックの初めに Refresh で物の一覧から作り直す（状態から決まるので、巻き戻しても全員で同じ）。
     /// ワイヤーのフック（RaycastHook）だけは、置かれた物も調べる: わたがしの足場（PASTRY CHEF の Q）に当たると弾かれ、地形に張り付いた
     /// クリーム（E）の上では、オレンジならつながり、抹茶ならつながらない（ロープの遮りと巻き付きは、地形だけを調べる）。
+    /// ステージの動く足場と扉（StagePlatform。ユーザーの要望、2026-10-26）は、ティックごとに SetPlatforms でその位置の箱を作り、地形と
+    /// 同じように調べる（当たった物は CastHit.Body。足場の番号 + 1）。ロープの巻き付きの角は、動かない地形だけ。
     /// </summary>
     public sealed class WorldCollision : ICollisionQuery
     {
         private readonly ICollisionQuery _terrain;
         private readonly List<Vector3> _anchors = new List<Vector3>();
         private readonly List<WorldObject> _hookObjects = new List<WorldObject>();
+        private readonly BoxTerrain _platforms = new BoxTerrain();
+        private bool _hasPlatforms;
 
         // クリームの上の当たった点を、クリームの箱の中とみなす余裕（m）。
         private const float PatchTolerance = 0.05f;
@@ -57,13 +62,34 @@ namespace Airerage.Core.Objects
             }
         }
 
+        /// <summary>動く足場と扉の当たりを、ティック tick の位置で作り直す（ない足場は入れない）。</summary>
+        public void SetPlatforms(IReadOnlyList<StagePlatform> platforms, StageState stage, int tick)
+        {
+            _platforms.Clear();
+            _hasPlatforms = false;
+            if (platforms == null)
+            {
+                return;
+            }
+            for (int i = 0; i < platforms.Count; i++)
+            {
+                if (!StagePlatforms.TryGetCenter(platforms, stage, i, tick, false, out Vector2 center))
+                {
+                    continue;
+                }
+                platforms[i].BoundsAt(center, out Vector2 min, out Vector2 max);
+                _platforms.AddBox(min.X, min.Y, max.X, max.Y, platforms[i].Attachable, i + 1);
+                _hasPlatforms = true;
+            }
+        }
+
         /// <summary>
         /// ワイヤーのフックの当たり: 地形と、わたがしの足場（つながらない）。地形の当たった点にクリームが張り付いていれば、その味で
         /// つながるかを決める（後から張り付いたものが優先）。
         /// </summary>
         public bool RaycastHook(Vector3 origin, Vector3 direction, float maxDistance, out CastHit hit)
         {
-            bool found = _terrain.Raycast(origin, direction, maxDistance, out hit);
+            bool found = Raycast(origin, direction, maxDistance, out hit);
             if (found)
             {
                 foreach (WorldObject item in _hookObjects)
@@ -148,17 +174,35 @@ namespace Airerage.Core.Objects
 
         public bool SweepBox(Vector3 center, Vector3 halfExtents, Vector3 delta, out CastHit hit)
         {
-            return _terrain.SweepBox(center, halfExtents, delta, out hit);
+            bool found = _terrain.SweepBox(center, halfExtents, delta, out hit);
+            if (_hasPlatforms && _platforms.SweepBox(center, halfExtents, delta, out CastHit platform) && (!found || platform.Distance < hit.Distance))
+            {
+                hit = platform;
+                found = true;
+            }
+            return found;
         }
 
         public bool ComputePenetration(Vector3 center, Vector3 halfExtents, out Vector3 correction)
         {
-            return _terrain.ComputePenetration(center, halfExtents, out correction);
+            bool any = _terrain.ComputePenetration(center, halfExtents, out correction);
+            if (_hasPlatforms && _platforms.ComputePenetration(center + correction, halfExtents, out Vector3 more))
+            {
+                correction += more;
+                any = true;
+            }
+            return any;
         }
 
         public bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, out CastHit hit)
         {
-            return _terrain.Raycast(origin, direction, maxDistance, out hit);
+            bool found = _terrain.Raycast(origin, direction, maxDistance, out hit);
+            if (_hasPlatforms && _platforms.Raycast(origin, direction, maxDistance, out CastHit platform) && (!found || platform.Distance < hit.Distance))
+            {
+                hit = platform;
+                found = true;
+            }
+            return found;
         }
     }
 }

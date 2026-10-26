@@ -30,6 +30,21 @@ EditorBuildSettings:
     path: Assets/_Project/Scenes/Stages/Stage_SpaceStation.unity
     guid: 59ab422a4b599b80b99ea56faef399af
   - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_Lab.unity
+    guid: 505959ab9829c257ca7e6a03ed60ce30
+  - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_Kitchen.unity
+    guid: 2fad809956d9c1e68a469f6668a35c36
+  - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_Manor.unity
+    guid: 3593c790b5fa60c1a8d20f310a7d5312
+  - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_Stadium.unity
+    guid: 33eb3a483f1422d0e8986d64c758a5a8
+  - enabled: 1
+    path: Assets/_Project/Scenes/Stages/Stage_Wharf.unity
+    guid: 140aae3d63bc0c7ad88717c48d8003b2
+  - enabled: 1
     path: Assets/_Project/Scenes/Modes/Match_Training.unity
     guid: 6e06c256619b418bfb4d041913d107e9
   - enabled: 1

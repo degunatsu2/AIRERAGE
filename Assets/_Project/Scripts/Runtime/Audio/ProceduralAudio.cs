@@ -174,6 +174,12 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>ボウルで上からの投射物を防いだ（高い金属の「カン」と弾く音。PASTRY CHEF の空中上）。</summary>
         ShieldBlock,
+
+        /// <summary>水に飛び込んだ（低く砕ける水しぶきと、泡の音。ユーザーの要望、2026-10-26）。</summary>
+        Splash,
+
+        /// <summary>溺れた（ごぼごぼと沈んでいく泡の音）。</summary>
+        Drown,
     }
 
     /// <summary>
@@ -721,6 +727,27 @@ namespace Airerage.Runtime.Audio
                     AddTone(b, r, 0f, 0.4f, 2470f, 2450f, Wave.Sine, 0.16f, 0.001f, 0.15f);
                     AddNoise(b, r, rng, 0f, 0.05f, 0.6f, 0.001f, 0.02f, 8000f, 6000f, 2000f);
                     AddTone(b, r, 0f, 0.12f, 500f, 900f, Wave.Triangle, 0.2f, 0.002f, 0.05f);
+                    break;
+                case SoundId.Splash:
+                    // 砕ける水（低めのノイズ）と、上がっていく泡の音。
+                    b = new float[Samples(0.7f, r)];
+                    AddNoise(b, r, rng, 0f, 0.5f, 0.85f, 0.002f, 0.35f, 1800f, 5000f, 400f);
+                    AddTone(b, r, 0f, 0.15f, 220f, 90f, Wave.Sine, 0.35f, 0.002f, 0.1f);
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float start = 0.12f + i * 0.09f;
+                        AddTone(b, r, start, 0.06f, 500f + i * 140f, 900f + i * 160f, Wave.Sine, 0.14f, 0.002f, 0.04f);
+                    }
+                    break;
+                case SoundId.Drown:
+                    // ごぼごぼ（下がっていく泡の音の連なり）。
+                    b = new float[Samples(1.1f, r)];
+                    for (int i = 0; i < 9; i++)
+                    {
+                        float start = i * 0.11f;
+                        AddTone(b, r, start, 0.08f, 420f - i * 25f, 640f - i * 30f, Wave.Sine, 0.2f, 0.003f, 0.05f);
+                    }
+                    AddNoise(b, r, rng, 0f, 1f, 0.3f, 0.01f, 0.6f, 900f, 600f, 200f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

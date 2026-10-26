@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 27;
+        public const int FormatVersion = 28;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -71,7 +71,7 @@ namespace Airerage.Core.Simulation
         /// objects が null なら、置かれた物はない（空の一覧と同じ値）。
         /// </summary>
         public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states, CoinField coins, Match.MatchState match,
-            WorldObjects objects = null)
+            WorldObjects objects = null, StageState stage = null)
         {
             ulong hash = Mix(FnvOffsetBasis, tick);
             for (int i = 0; i < states.Count; i++)
@@ -82,7 +82,17 @@ namespace Airerage.Core.Simulation
             hash = Mix(hash, Checksum(objects));
             hash = Mix(hash, match.OvertimeStartTick);
             hash = Mix(hash, match.EndTick);
-            return Mix(hash, match.Winner);
+            hash = Mix(hash, match.Winner);
+            if (stage != null)
+            {
+                // 扉の開き具合（扉のないステージでは何も足さない）。
+                for (int i = 0; i < stage.Count; i++)
+                {
+                    hash = Mix(hash, stage.OpenOf(i));
+                    hash = Mix(hash, stage.PreviousOf(i));
+                }
+            }
+            return hash;
         }
 
         /// <summary>ワールド全体のコイン（フィールドのコイン、次の番号、生成・破棄の枚数）のチェックサム。</summary>
@@ -221,6 +231,7 @@ namespace Airerage.Core.Simulation
             writer.Write(wire.HasTargetPoint);
             Write(writer, wire.TargetPoint);
             Write(writer, wire.Anchor);
+            writer.Write(wire.AnchorBody);
             RopePivots pivots = wire.Pivots;
             writer.Write(pivots.Count);
             Write(writer, pivots.P0);
@@ -322,7 +333,13 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.ShieldBlockCount);
             writer.Write(combat.HasLeft);
             writer.Write(combat.WaveCooldownTicks);
-            writer.Write(combat.PendingStunTicks);
+            writer.Write(combat.HasStunKnockback);
+            writer.Write(combat.StunKnockbackX);
+            writer.Write(combat.StunKnockbackY);
+            writer.Write(combat.WaterTicksLeft);
+            writer.Write(combat.WaterFloatTicks);
+            writer.Write(combat.DrownTicks);
+            writer.Write(combat.SplashCount);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -356,6 +373,7 @@ namespace Airerage.Core.Simulation
                 HasTargetPoint = reader.ReadBoolean(),
                 TargetPoint = ReadVector3(reader),
                 Anchor = ReadVector3(reader),
+                AnchorBody = reader.ReadByte(),
                 Pivots = new RopePivots
                 {
                     Count = reader.ReadByte(),
@@ -459,7 +477,13 @@ namespace Airerage.Core.Simulation
                 ShieldBlockCount = reader.ReadInt32(),
                 HasLeft = reader.ReadBoolean(),
                 WaveCooldownTicks = reader.ReadInt32(),
-                PendingStunTicks = reader.ReadInt32(),
+                HasStunKnockback = reader.ReadBoolean(),
+                StunKnockbackX = reader.ReadSingle(),
+                StunKnockbackY = reader.ReadSingle(),
+                WaterTicksLeft = reader.ReadInt32(),
+                WaterFloatTicks = reader.ReadInt32(),
+                DrownTicks = reader.ReadInt32(),
+                SplashCount = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

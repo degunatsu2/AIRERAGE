@@ -607,6 +607,27 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
+        public void RandomStagePool_IsWhatEveryoneHasChecked()
+        {
+            // オプションの RANDOM STAGES（ユーザーの要望、2026-10-26）: ホストは全員がチェックを付けているステージだけから RANDOM で選ぶ。
+            OnlineSession host = Host();
+            host.LocalStagePool = 0b1111UL;
+            OnlineSession first = Join(host);
+            first.LocalStagePool = 0b0111UL;
+            OnlineSession second = Join(host);
+            PumpUntil(() => first.LocalPlayer >= 0 && second.LocalPlayer >= 0);
+            second.LocalStagePool = 0b1110UL;
+            PumpUntil(() => host.CommonStagePool == 0b0110UL);
+            Assert.That(host.CommonStagePool, Is.EqualTo(0b0110UL), "全員の共通のステージ");
+
+            // 抜けた人のチェックは数えない。
+            second.Dispose();
+            _sessions.Remove(second);
+            PumpUntil(() => host.CommonStagePool == 0b0111UL);
+            Assert.That(host.CommonStagePool, Is.EqualTo(0b0111UL));
+        }
+
+        [Test]
         public void Lobby_ALeavingPlayer_IsShownAsWaiting_AndTheNumbersCloseUpAtTheStart()
         {
             OnlineSession host = Host();

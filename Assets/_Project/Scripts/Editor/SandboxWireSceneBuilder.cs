@@ -456,6 +456,11 @@ namespace Airerage.Editor
             SetReference(view, "_feverGauge", CreateRingGauge(name + "FeverGauge", parent, "FEVER", 1.9f, new Color(1f, 0.8f, 0.2f, 0.75f)));
             // 雷の波動を次に出せるまで（SOLDERER のインバータ。電気の水色。ユーザーの要望、2026-10-22）。
             SetReference(view, "_waveGauge", CreateRingGauge(name + "WaveGauge", parent, "WAVE", 2.2f, new Color(0.35f, 0.8f, 1f, 0.8f)));
+            // 水の中で溺れるまでの残り（水色。ユーザーの要望、2026-10-26）と、飛び込んだ瞬間の水しぶき。
+            SetReference(view, "_waterGauge", CreateRingGauge(name + "WaterGauge", parent, "WATER", 1.6f, new Color(0.3f, 0.65f, 1f, 0.85f)));
+            BurstEffectView splash = CreateBurst(name + "SplashBurst", parent);
+            splash.Configure(new Color(0.75f, 0.9f, 1f, 1f), false, 0.45f, 0.3f, 2.4f, 14, 1.2f, 0.12f, string.Empty, 0, 0f);
+            SetReference(view, "_splashBurst", splash);
             // 壁に張り付いていられる残り（紫。ユーザーの要望、2026-10-20）。
             SetReference(view, "_wallClingGauge", CreateRingGauge(name + "WallClingGauge", parent, "WALL", 1.15f, new Color(0.72f, 0.4f, 1f, 0.8f)));
             // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。

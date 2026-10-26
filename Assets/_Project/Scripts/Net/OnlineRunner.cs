@@ -130,6 +130,8 @@ namespace Airerage.Net
         MatchState ISimulationFeed.Match => Running ? _session.World.Match : MatchState.None;
         CoinField ISimulationFeed.Coins => Running ? _session.World.Coins.Field : null;
         WorldObjects ISimulationFeed.Objects => Running ? _session.World.Objects : null;
+        IReadOnlyList<StagePlatform> ISimulationFeed.Platforms => Running ? _session.World.Platforms : null;
+        StageState ISimulationFeed.Stage => Running ? _session.World.Stage : null;
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => Running ? _session.World.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => Running ? _session.World.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
         Color ISimulationFeed.ColorOf(int index) => index < _playerColors.Length ? _playerColors[index] : Color.white;
@@ -301,7 +303,8 @@ namespace Airerage.Net
             List<StageZone> zones = StageZoneAuthoring.Collect(_errors);
             List<CoinSpawnPoint> coinSpawns = CoinSpawnAuthoring.Collect(_errors);
             List<BankSpot> bankSpots = BankSpotAuthoring.Collect(_errors);
-            _stage = new OnlineStage(_terrain, SpawnPositions(), bounds, zones, coinSpawns, bankSpots);
+            List<StagePlatform> platforms = StagePlatformAuthoring.Collect(_errors);
+            _stage = new OnlineStage(_terrain, SpawnPositions(), bounds, zones, coinSpawns, bankSpots, platforms);
             foreach (string error in _errors)
             {
                 Debug.LogError(error, this);

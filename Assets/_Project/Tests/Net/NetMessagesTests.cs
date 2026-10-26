@@ -40,6 +40,16 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
+        public void StagePool_RoundTrips()
+        {
+            const ulong mask = 0x8000_0000_0000_0105UL;
+            byte[] data = NetMessages.StagePool(mask);
+            Assert.That(NetMessages.KindOf(data), Is.EqualTo(NetKind.StagePool));
+            Assert.That(NetMessages.ReadStagePool(data), Is.EqualTo(mask));
+            Assert.Throws<FormatException>(() => NetMessages.ReadStagePool(new[] { (byte)NetKind.StagePool, (byte)1 }));
+        }
+
+        [Test]
         public void Pick_RoundTrips()
         {
             byte[] data = NetMessages.Pick(2);

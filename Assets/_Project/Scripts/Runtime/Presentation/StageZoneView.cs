@@ -202,6 +202,14 @@ namespace Airerage.Runtime.Presentation
                         _marks.Add(CreateLine($"Streak{i + 1}", 2, 0.16f));
                     }
                     break;
+                case StageZoneKind.Water:
+                    // 揺れる水面の線と、上がっていく泡。
+                    _ring = CreateLine("Surface", WaterPoints, 0.08f);
+                    for (int i = 0; i < 10; i++)
+                    {
+                        _marks.Add(CreateLine($"Bubble{i + 1}", 2, 0.1f));
+                    }
+                    break;
                 case StageZoneKind.Blizzard:
                     _ring = CreateBox("Outline", 0.18f);
                     int flakes = Mathf.Clamp(Mathf.RoundToInt(_zone.Size.x * _zone.Size.y / 40f), 12, 60);
@@ -340,6 +348,35 @@ namespace Airerage.Runtime.Presentation
                 case StageZoneKind.Blizzard:
                     RenderBlizzard(center, half, time, tick);
                     break;
+                case StageZoneKind.Water:
+                    RenderWater(center, half);
+                    break;
+            }
+        }
+
+        private const int WaterPoints = 48;
+
+        // 水面の波（ゆっくり揺れる線）と、水の中を上がっていく泡（シミュレーションの水面は動かない。見た目だけ）。
+        private void RenderWater(Vector3 center, Vector2 half)
+        {
+            float top = center.y + half.y;
+            float t = Time.time;
+            for (int i = 0; i < WaterPoints; i++)
+            {
+                float x = center.x - half.x + half.x * 2f * i / (WaterPoints - 1);
+                float y = top + Mathf.Sin(x * 0.45f + t * 1.6f) * 0.08f + Mathf.Sin(x * 1.1f - t * 2.3f) * 0.04f;
+                _ring.SetPosition(i, new Vector3(x, y, -2.5f));
+            }
+            SetColor(_ring, 0.8f);
+            for (int i = 0; i < _marks.Count; i++)
+            {
+                float u = Mathf.Repeat(i * 0.618f, 1f);
+                float phase = Mathf.Repeat(t * 0.3f + i * 0.37f, 1f);
+                float x = center.x - half.x + u * half.x * 2f + Mathf.Sin(t * 2f + i) * 0.15f;
+                float y = top - half.y * 2f * (1f - phase);
+                _marks[i].SetPosition(0, new Vector3(x, y, -2.5f));
+                _marks[i].SetPosition(1, new Vector3(x, y + 0.12f, -2.5f));
+                SetColor(_marks[i], Fade(phase) * 0.6f);
             }
         }
 

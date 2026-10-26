@@ -5,7 +5,8 @@ using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 namespace Airerage.Editor.Stages
 {
     /// <summary>
-    /// 雪原と海（FROST COAST）。左は雪原と尾根、右は海に浮かぶ氷と氷山、右の端に船。海に落ちると撃破（ほかのステージより下の範囲が浅い）。
+    /// 雪原と海（FROST COAST）。左は雪原と尾根、右は海に浮かぶ氷と氷山、右の端に船。海に落ちると 5 秒浮いていられ、その後は溺れて撃破
+    /// （海の判定。ユーザーの要望、2026-10-26。強く叩き落とされると撃破の線まで沈む）。
     /// 固有のギミック: 氷（滑る。止まりにくく曲がりにくい）、スキージャンプ（尾根のスピードレーンから発射台で海の上へ。着いた氷の上を
     /// 滑ったまま跳ぶ）、海の波（周期のある上向きの風。落ちた人を氷の上へ押し上げる）。ユーザーの要望（2026-10-19）で、船の中を
     /// 通り抜けられるようにし、雪原の下を右からくりぬいた洞窟（中につららが落ちる。落ちる前に警告。奥に拠点の候補）を作り、上空の風を
@@ -122,6 +123,9 @@ namespace Airerage.Editor.Stages
                     // 吹雪: 30〜40 秒ごとに 1.5 秒、左上から吹きつける。風上 14m の中に地形がない（何かの影に隠れていない）と 2 秒凍る。
                     // 5 秒前から、当たる場所（影の外）にだけ警告（黄色の斜線と記号。ユーザーの要望、2026-10-20）と警告音。
                     // 凍ると威力 20 の枚数のコインを落とす（凍るのは 2 秒。StageZones.BlizzardFreezeTicks。2026-10-21）。
+                    // 海（ユーザーの要望、2026-10-26）: 着水すると 5 秒浮いていられ、その後は溺れて沈む。24 m/s 以上で着水すると撃破の線まで沈む
+                    // （ふつうに落ちる速さの上限は 20 m/s。強く叩き落とされたときだけ）。底は撃破の線（y = -10）。
+                    new ZoneSpec("Sea", StageZoneKind.Water, new Vector2(0f, -8f), new Vector2(120f, 4f), Vector2.zero, 5f, 24f),
                     new ZoneSpec("Blizzard", StageZoneKind.Blizzard, new Vector2(0f, 18f), new Vector2(120f, 56f), new Vector2(1f, -0.5f), 20f, 14f)
                         .Every(30f, 1.5f, 0f, 10f, 5f),
                 },
@@ -198,8 +202,8 @@ namespace Airerage.Editor.Stages
             Material sail = decor.Lit("Sail", new Color(0.92f, 0.9f, 0.85f));
             Material flake = decor.Unlit("Snowflake", Color.white);
 
-            // 海（手前まで深くして、氷の下を隠す）。
-            decor.Box("Sea", new Vector3(0f, -23f, 10f), new Vector3(150f, 34f, 100f), sea);
+            // 奥の海（遊ぶ面より奥だけ。手前は海の判定の半透明の水で、沈んでいく人と水の中のコインが見える。2026-10-26）。
+            decor.Box("Sea", new Vector3(0f, -23f, 31f), new Vector3(150f, 34f, 58f), sea);
             for (int i = 0; i < 18; i++)
             {
                 decor.Quad("Foam", new Vector3(decor.Range(-24f, 48f), -5.95f, decor.Range(-12f, 30f)), new Vector2(decor.Range(1f, 4f), 0.12f), foam);

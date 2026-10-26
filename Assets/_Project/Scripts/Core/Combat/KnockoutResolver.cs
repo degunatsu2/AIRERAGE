@@ -29,7 +29,9 @@ namespace Airerage.Core.Combat
             for (int i = 0; i < states.Count; i++)
             {
                 CharacterState state = states[i];
-                if (state.Combat.IsWaitingToRespawn || bounds.Contains(state.Position))
+                // 溺れて沈み続けた人も撃破（水の底に地形があって、撃破の線まで沈めないとき）。
+                bool drowned = state.Combat.DrownTicks >= StageZones.DrownKnockoutTicks;
+                if (state.Combat.IsWaitingToRespawn || (bounds.Contains(state.Position) && !drowned))
                 {
                     continue;
                 }
@@ -81,6 +83,7 @@ namespace Airerage.Core.Combat
             respawned.PreviousButtons = state.PreviousButtons;
             respawned.JumpPadCount = state.JumpPadCount;
             respawned.BoostRingCount = state.BoostRingCount;
+            respawned.Combat.SplashCount = state.Combat.SplashCount;
             // コインはここではなくさない（撃破ドロップは CoinDropRules が、台帳を通して落とす。T4-6）。
             respawned.Coins = state.Coins;
             // 撃破で終わったコンボのダメージ報酬は、このティックの後で CombatRewardRules が払う（T4-5）。

@@ -343,7 +343,7 @@ namespace Airerage.Core.Tests.Docs
             AttackHit stunning = entries.Select(e => e.Hit).FirstOrDefault(h => h.StunTicks > 0);
             if (stunning != null)
             {
-                yield return $"当たると、のけぞりの後に {stunning.StunTicks}F 感電";
+                yield return $"当たると、先に {stunning.StunTicks}F 感電してから吹き飛ぶ";
             }
             if (attack.BlocksProjectilesAbove)
             {

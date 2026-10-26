@@ -13,7 +13,8 @@ namespace Airerage.Runtime.UI
     /// オプションの画面（docs/15 T6-9。D-68）。いちばん上の PAGE の項目で、左右（か決定）でページを切り替える:
     /// - GENERAL: 全体・BGM・効果音の音量（0〜100%、10% ずつ）、表示（FULLSCREEN ／ WINDOWED）、解像度（この画面で使える大きさ）、
     ///   垂直同期（ON ／ OFF）、RESET TO DEFAULT。項目を選んで左右で変える（値の左半分・右半分のクリックでも左右。OptionArrow。
-    ///   決定でも次の値へ）。変えたらすぐに当てて保存する。
+    ///   決定でも次の値へ）。変えたらすぐに当てて保存する。RANDOM STAGES で、ステージ選択の RANDOM で選ぶステージのチェックを付け外し
+    ///   する画面へ（RandomStagesRequested。ステージ選択と同じ画面。ユーザーの要望、2026-10-26）。
     /// 変えた結果の案内（左下）は 3 秒で消え、ページを切り替えても消える。
     /// - CONTROLS: 変えられる操作（BindingSettings）ごとに、キーボードのキー（マウスの左・右・サイドのボタンも）とゲームパッドのボタン。項目を決定すると、次に押した
     ///   キー（ボタン）に変わる（キーボードは Esc、ゲームパッドは Start でやめる）。ほかの操作と同じキーなら入れ替える。RESET CONTROLS で
@@ -49,6 +50,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption[] _generalRows = new MenuOption[0];
         [SerializeField] private Text[] _generalValues = new Text[0];
         [SerializeField] private MenuOption _resetGeneral;
+        [Tooltip("RANDOM で選ぶステージを決める画面へ（なくてもよい）")]
+        [SerializeField] private MenuOption _randomStages;
         [Tooltip("CONTROLS の項目（BindingSettings.Actions の順）。キーボードとゲームパッド")]
         [SerializeField] private MenuOption[] _keyCells = new MenuOption[0];
         [SerializeField] private MenuOption[] _padCells = new MenuOption[0];
@@ -70,6 +73,9 @@ namespace Airerage.Runtime.UI
         /// <summary>閉じた（設定は保存してある）。</summary>
         public event Action Closed;
 
+        /// <summary>RANDOM STAGES を決定した（設定を保存して隠してある。呼んだ側がステージ選択を RANDOM STAGES として出す）。</summary>
+        public event Action RandomStagesRequested;
+
         /// <summary>出しているか（テスト用）。</summary>
         public bool IsShowing => gameObject.activeSelf;
 
@@ -88,6 +94,7 @@ namespace Airerage.Runtime.UI
         public MenuOption Page => _page;
         public MenuOption Back => _back;
         public MenuOption ResetGeneral => _resetGeneral;
+        public MenuOption RandomStages => _randomStages;
         public MenuOption ResetControls => _resetControls;
         public MenuOption GeneralRow(Row row) => _generalRows[(int)row];
         public string GeneralValue(Row row) => _generalValues[(int)row].text;
@@ -144,6 +151,16 @@ namespace Airerage.Runtime.UI
                 _generalRows[i].Clicked.AddListener(() => Step(row, 1, wrap: true, quiet: true));
             }
             _resetGeneral.Clicked.AddListener(ResetGeneralSettings);
+            if (_randomStages != null)
+            {
+                _randomStages.Clicked.AddListener(() =>
+                {
+                    CancelRebind();
+                    _settings?.Save();
+                    gameObject.SetActive(false);
+                    RandomStagesRequested?.Invoke();
+                });
+            }
             for (int i = 0; i < _keyCells.Length; i++)
             {
                 int action = i;
@@ -177,6 +194,10 @@ namespace Airerage.Runtime.UI
                 yield return row;
             }
             yield return _resetGeneral;
+            if (_randomStages != null)
+            {
+                yield return _randomStages;
+            }
             foreach (MenuOption cell in _keyCells)
             {
                 yield return cell;
@@ -187,6 +208,16 @@ namespace Airerage.Runtime.UI
             }
             yield return _resetControls;
             yield return _back;
+        }
+
+        /// <summary>出して、RANDOM STAGES の項目を選ぶ（RANDOM STAGES の画面から戻ったとき）。</summary>
+        public void ShowAtRandomStages()
+        {
+            Show();
+            if (_randomStages != null && IsShowing)
+            {
+                _randomStages.SelectQuietly();
+            }
         }
 
         /// <summary>出す（GENERAL のページから。保存した設定を読む）。</summary>
@@ -277,6 +308,10 @@ namespace Airerage.Runtime.UI
             foreach (MenuOption row in _generalRows)
             {
                 column.Add(row.Button);
+            }
+            if (_randomStages != null)
+            {
+                column.Add(_randomStages.Button);
             }
             column.Add(_resetGeneral.Button);
             column.Add(_back.Button);

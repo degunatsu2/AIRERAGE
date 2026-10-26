@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Simulation;
 using UnityEngine;
 using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
@@ -22,6 +23,9 @@ namespace Airerage.Editor.Stages
         public TerrainBox[] Terrain;
         public Vector2[] Anchors;
         public ZoneSpec[] Zones;
+
+        /// <summary>動く足場と扉（ユーザーの要望、2026-10-26。なくてもよい）。</summary>
+        public PlatformSpec[] Platforms = new PlatformSpec[0];
         public (Vector2 Position, int Value)[] Coins;
         public Vector2[] Jackpots;
         public Vector2[] Banks;
@@ -118,6 +122,114 @@ namespace Airerage.Editor.Stages
             float height = 0.3f)
         {
             return new ZoneSpec(name, kind, new Vector2((minX + maxX) * 0.5f, top + height * 0.5f), new Vector2(maxX - minX, height), direction, power);
+        }
+    }
+
+    /// <summary>
+    /// 動く足場・扉 1 つ（Core の StagePlatform の値と名前と見た目。ユーザーの要望、2026-10-26）。Center は道のりの元の位置（扉は閉じた
+    /// ときの中心）。Visual がなければ、大きさの箱を作る（Attachable なら縁をオレンジに光らせる）。
+    /// </summary>
+    internal sealed class PlatformSpec
+    {
+        public readonly string Name;
+        public readonly Vector2 Center;
+        public readonly Vector2 Size;
+        public readonly bool Attachable;
+        public StagePlatformKind Kind = StagePlatformKind.Path;
+        public StagePlatformAuthoring.Key[] Keys = { new StagePlatformAuthoring.Key(0f, Vector2.zero) };
+        public float PeriodSeconds = 10f;
+        public float PhaseSeconds;
+        public float ActiveFromSeconds;
+        public float ActiveToSeconds;
+        public bool Smooth;
+        public float OpenHeight;
+        public float OpenSeconds;
+        public float CloseSeconds;
+
+        /// <summary>箱の色（なければステージの地形の色）。</summary>
+        public Color? Color;
+
+        /// <summary>見た目を作る（visual は足場と一緒に動く子。原点が足場の中心）。なければ箱。</summary>
+        public Action<StageDecor, Transform, PlatformSpec> Visual;
+
+        public PlatformSpec(string name, Vector2 center, Vector2 size, bool attachable)
+        {
+            Name = name;
+            Center = center;
+            Size = size;
+            Attachable = attachable;
+        }
+
+        /// <summary>道のり（秒とずれの並び。最初は 0 秒・ずれ 0）を決める。</summary>
+        public PlatformSpec Path(float periodSeconds, params (float Seconds, Vector2 Offset)[] keys)
+        {
+            Kind = StagePlatformKind.Path;
+            PeriodSeconds = periodSeconds;
+            Keys = Array.ConvertAll(keys, k => new StagePlatformAuthoring.Key(k.Seconds, k.Offset));
+            return this;
+        }
+
+        /// <summary>
+        /// from から to まで、control へ引かれる弧（2 次のベジェ曲線）を travelSeconds 秒で進み、周期 periodSeconds の残りはない
+        /// （ロールケーキ）。元の位置は from。
+        /// </summary>
+        public static PlatformSpec Arc(string name, Vector2 size, bool attachable, Vector2 from, Vector2 control, Vector2 to, float travelSeconds,
+            float periodSeconds, float phaseSeconds = 0f, int segments = 24)
+        {
+            var spec = new PlatformSpec(name, from, size, attachable)
+            {
+                PeriodSeconds = periodSeconds,
+                PhaseSeconds = phaseSeconds,
+                ActiveFromSeconds = 0f,
+                ActiveToSeconds = travelSeconds,
+            };
+            var keys = new StagePlatformAuthoring.Key[segments + 1];
+            for (int i = 0; i <= segments; i++)
+            {
+                float t = (float)i / segments;
+                Vector2 point = (1f - t) * (1f - t) * from + 2f * (1f - t) * t * control + t * t * to;
+                keys[i] = new StagePlatformAuthoring.Key(travelSeconds * t, point - from);
+            }
+            spec.Keys = keys;
+            return spec;
+        }
+
+        /// <summary>扉にする（closed は Center。openHeight だけ上に開く）。</summary>
+        public static PlatformSpec Door(string name, Vector2 center, Vector2 size, float openHeight, float openSeconds, float closeSeconds)
+        {
+            return new PlatformSpec(name, center, size, true)
+            {
+                Kind = StagePlatformKind.Door,
+                OpenHeight = openHeight,
+                OpenSeconds = openSeconds,
+                CloseSeconds = closeSeconds,
+            };
+        }
+
+        /// <summary>ゆっくり動き出して止まるようにする。</summary>
+        public PlatformSpec Eased()
+        {
+            Smooth = true;
+            return this;
+        }
+
+        /// <summary>周期のずれを決める（秒）。</summary>
+        public PlatformSpec Phase(float seconds)
+        {
+            PhaseSeconds = seconds;
+            return this;
+        }
+
+        public PlatformSpec Tinted(Color color)
+        {
+            Color = color;
+            return this;
+        }
+
+        public PlatformSpec Looks(Action<StageDecor, Transform, PlatformSpec> visual)
+        {
+            Visual = visual;
+            return this;
         }
     }
 

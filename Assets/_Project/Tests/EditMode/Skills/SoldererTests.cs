@@ -436,9 +436,10 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
-        public void BallLightning_HitsForDamage_StunsAfterTheHitstun_AndVanishes()
+        public void BallLightning_HitsForDamage_StunsFirst_ThenKnocksBack_AndVanishes()
         {
-            // 球は攻撃（威力 10・吹き飛び 3/5）で、追加効果としてのけぞりの後に感電させ、当たったら消える（ユーザーの要望、2026-10-22）。
+            // 球は攻撃（威力 10・吹き飛び 3/5）で、追加効果の感電があり、当たったら消える（ユーザーの要望、2026-10-22）。
+            // 先に感電してその場に止まり、感電が終わってから吹き飛ぶ（ユーザーの要望、2026-10-26）。
             SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(4f, GroundY, 0f));
             Edit(world, 0, s => { s.Combat.Gauge = CombatTuning.MaxGauge; return s; });
             Step(world, 2);
@@ -460,18 +461,56 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(hit.Value.Damage, Is.EqualTo(10), "威力が 10 でない");
             Assert.That(world.Objects.Items.Count(o => o.Kind == WorldObjectKind.BallLightning), Is.EqualTo(2), "当たった球が消えない");
             CharacterState dummy = world.GetState(1);
-            Assert.That(dummy.Action.Kind, Is.EqualTo(ActionKind.Hitstun), "のけぞらない");
-            Assert.That(dummy.Combat.IsStunned, Is.False, "のけぞりの前に感電した");
-            Assert.That(dummy.Combat.PendingStunTicks, Is.EqualTo(ballHit.StunTicks), "追加効果の感電を覚えない");
+            Assert.That(dummy.Action.Kind, Is.EqualTo(ActionKind.Hitstun), "のけぞりにならない（コンボと手柄が続かない）");
+            Assert.That(dummy.Combat.IsStunned, Is.True, "当たってすぐに感電しない");
+            Assert.That(dummy.Combat.HasStunKnockback, Is.True, "感電の後の吹き飛びを覚えない");
+            Assert.That(dummy.Combat.ComboDamage, Is.GreaterThanOrEqualTo(10));
+            Vector3 stunnedAt = dummy.Position;
 
-            bool stunned = false;
-            for (int t = 0; t < 60 && !stunned; t++)
+            // 感電の間はその場に止まる（重力も受けない）。
+            Edit(world, 0, s => { s.Position = new Vector3(-20f, GroundY, 0f); return s; });
+            int stunTicks = 0;
+            while (world.GetState(1).Combat.IsStunned && stunTicks < 200)
             {
                 Step(world, 1);
-                stunned = world.GetState(1).Combat.IsStunned;
+                stunTicks++;
+                if (world.GetState(1).Combat.IsStunned)
+                {
+                    Assert.That(Vector3.Distance(world.GetState(1).Position, stunnedAt), Is.LessThan(1e-3f), "感電の間に動いた");
+                    Assert.That(world.GetState(1).Action.Kind, Is.EqualTo(ActionKind.Hitstun), "感電の間にのけぞりが終わった");
+                }
             }
-            Assert.That(stunned, Is.True, "のけぞりの後に感電しない");
-            Assert.That(world.GetState(1).Combat.ComboDamage, Is.GreaterThanOrEqualTo(10));
+            Assert.That(stunTicks, Is.InRange(ballHit.StunTicks - 2, ballHit.StunTicks + ballHit.HitstopTicks + 2), "感電の長さが違う");
+            CharacterState after = world.GetState(1);
+            Assert.That(after.Action.Kind, Is.EqualTo(ActionKind.Hitstun), "感電の後にのけぞらない");
+            Assert.That(after.Combat.HasStunKnockback, Is.False);
+            Assert.That(after.Position.Y, Is.GreaterThan(stunnedAt.Y), "感電の後に吹き飛ばない");
+            Assert.That(after.Velocity.X, Is.GreaterThan(0f), "球の進む向きに吹き飛ばない");
+        }
+
+        [Test]
+        public void BallLightning_StunIsReplaced_ByTheNextHit()
+        {
+            // 感電の間にほかの攻撃を受けたら、その攻撃の吹き飛びとのけぞりで置き換わる（感電の後の吹き飛びは消える）。
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(4f, GroundY, 0f));
+            Edit(world, 0, s => { s.Combat.Gauge = CombatTuning.MaxGauge; return s; });
+            Step(world, 2);
+            for (int t = 0; t < 60 && !world.GetState(1).Combat.IsStunned; t++)
+            {
+                Step(world, 1, Press(InputButtons.Super).WithAim(Vector2.UnitX));
+            }
+            Assert.That(world.GetState(1).Combat.HasStunKnockback, Is.True);
+            // 撃った側を相手のすぐそばに置き、ほかの球が当たらないうちに地上技を当てる。
+            Edit(world, 0, s => { s.Position = new Vector3(3f, GroundY, 0f); s.Facing = 1; s.Action = default; return s; });
+            bool replaced = false;
+            for (int t = 0; t < 40 && !replaced; t++)
+            {
+                Step(world, 1, t == 0 ? Press(InputButtons.Attack) : default(PlayerInput));
+                replaced = world.LastHits.Any(h => !h.FromObject && h.Victim == 1 && h.Result == HitResult.Hit);
+            }
+            Assert.That(replaced, Is.True, "感電の間に攻撃が当たらない");
+            Assert.That(world.GetState(1).Combat.HasStunKnockback, Is.False, "感電の後の吹き飛びが残った");
+            Assert.That(world.GetState(1).Combat.IsStunned, Is.False, "攻撃を受けても感電が解けない");
         }
 
         [Test]

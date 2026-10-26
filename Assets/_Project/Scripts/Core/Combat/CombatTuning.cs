@@ -81,8 +81,9 @@ namespace Airerage.Core.Combat
         public ChargeFilter Charge;
 
         /// <summary>
-        /// 攻撃の追加効果の感電（ティック。0 なら感電させない）。当たったら、のけぞりが終わった後にこの長さだけ感電させる（のけぞると
-        /// 感電は解けるため、のけぞりの後に。CombatState.PendingStunTicks。SOLDERER のボールライトニング。2026-10-22）。
+        /// 攻撃の追加効果の感電（ティック。0 なら感電させない。SOLDERER のボールライトニング。2026-10-22）。当たったら先にこの長さだけ
+        /// 感電してその場に止まり、感電が終わってから吹き飛んでのけぞる（ユーザーの要望、2026-10-26。のけぞりは感電の分だけ長い。
+        /// CombatState.HasStunKnockback）。感電しない間（StunGuardTicks）なら、ふつうに吹き飛ぶ。
         /// </summary>
         public int StunTicks;
 

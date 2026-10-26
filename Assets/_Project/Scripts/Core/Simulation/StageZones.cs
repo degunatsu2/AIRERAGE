@@ -44,6 +44,24 @@ namespace Airerage.Core.Simulation
         /// <summary>吹雪で凍っている長さ（ティック）【仮】。威力（Power）は落とすコインの枚数（2026-10-21）。</summary>
         public const int BlizzardFreezeTicks = 120;
 
+        /// <summary>水に浮いているときの、中心の水面からの深さ（m。頭が水の上に出る）【仮】。</summary>
+        public const float WaterFloatDepth = 0.35f;
+
+        /// <summary>水の中で浮き上がる速さ（m/s）と、そこまでの加速（m/s²）【仮】。</summary>
+        public const float WaterRiseSpeed = 4.5f;
+        public const float WaterBuoyancy = 25f;
+
+        /// <summary>水の中の横の速さの上限（m/s。泳ぐ速さ）と、それより速いときに落とす割合（m/s²）【仮】。</summary>
+        public const float WaterSwimSpeed = 4f;
+        public const float WaterDrag = 40f;
+
+        /// <summary>水面に浮いている間、ジャンプできるようにする長さ（コヨーテタイム。ティック）。</summary>
+        public const int WaterJumpCoyoteTicks = 2;
+
+        /// <summary>溺れてから沈む速さ（m/s）と、撃破の線に届かなくても撃破にするティック数【仮】。</summary>
+        public const float DrownSinkSpeed = 2.5f;
+        public const int DrownKnockoutTicks = 180;
+
         /// <summary>危険の吹き飛ばす速さ（m/s）を決めていない（Limit が 0）ときの、威力からの速さ: 8 + 威力 × 0.25【仮】。</summary>
         public static float HazardKnockbackSpeed(float power)
         {
@@ -102,6 +120,144 @@ namespace Airerage.Core.Simulation
             }
         }
 
+        /// <summary>水 zone の中（中心が水面より下で、範囲の中）か。</summary>
+        public static bool InWater(in StageZone zone, System.Numerics.Vector3 position)
+        {
+            return position.X >= zone.MinX && position.X <= zone.MaxX && position.Y < zone.MaxY && position.Y >= zone.MinY;
+        }
+
+        /// <summary>
+        /// 水の中で下向きの速さを落とす割合（m/s²）: 水面に Limit で入ると、浮く深さから範囲の下の辺まで沈んで止まる（Limit² / (2 × 深さ)）。
+        /// </summary>
+        public static float WaterDeceleration(in StageZone zone)
+        {
+            float depth = MathF.Max(0.5f, zone.MaxY - WaterFloatDepth - zone.MinY);
+            return zone.Limit * zone.Limit / (2f * depth);
+        }
+
+        /// <summary>
+        /// 水の力（移動の前。速度を決めた直後）: 水の中なら、このティックにかかった重力を打ち消し、下へ動いていれば一定の割合で止め、止まったら浮き
+        /// 上がり、浮く深さで止める（ジャンプ・波・吹き飛びで速く上へ動いている人は止めない）。横は泳ぐ速さまで遅くする。溺れている人には
+        /// 何もしない（CharacterSimulator が沈める）。ワイヤーの接続中と壁の張り付き中は呼ばない。
+        /// </summary>
+        /// <param name="velocityBeforeY">速度を決める前の上下の速さ（このティックにかかった重力を、かかった分だけ打ち消す。落ちる速さの上限で
+        /// 重力がかからなかったときは打ち消さない）。</param>
+        public static void ApplyWaterForces(ref CharacterState state, float velocityBeforeY, float gravity, IReadOnlyList<StageZone> zones, int tick)
+        {
+            if (zones == null || state.Combat.DrownTicks > 0)
+            {
+                return;
+            }
+            for (int i = 0; i < zones.Count; i++)
+            {
+                if (zones[i].Kind != StageZoneKind.Water)
+                {
+                    continue;
+                }
+                StageZone zone = zones[i].At(tick);
+                if (!InWater(zone, state.Position))
+                {
+                    continue;
+                }
+                float dt = SimTime.DeltaTime;
+                float pulled = velocityBeforeY - state.Velocity.Y;
+                if (pulled > 0f)
+                {
+                    state.Velocity.Y += MathF.Min(pulled, gravity * dt);
+                }
+                float floatLine = zone.MaxY - WaterFloatDepth;
+                if (state.Velocity.Y < 0f)
+                {
+                    state.Velocity.Y = MathF.Min(0f, state.Velocity.Y + WaterDeceleration(zone) * dt);
+                }
+                else if (state.Position.Y < floatLine)
+                {
+                    if (state.Velocity.Y < WaterRiseSpeed)
+                    {
+                        state.Velocity.Y = MathF.Min(WaterRiseSpeed, state.Velocity.Y + WaterBuoyancy * dt);
+                    }
+                }
+                else if (state.Velocity.Y <= WaterRiseSpeed)
+                {
+                    state.Velocity.Y = 0f;
+                }
+                float capped = Math.Clamp(state.Velocity.X, -WaterSwimSpeed, WaterSwimSpeed);
+                state.Velocity.X = SimMath.MoveTowards(state.Velocity.X, capped, WaterDrag * dt);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// 水の状態（移動の後）: 水に入ったら溺れるまでの残りを数え始め（陸に着くかワイヤーをつなぐと戻る）、水の中にいる間だけ減らし、
+        /// 0 になったら溺れる。水面に浮いている間はジャンプできるようにし、壁には張り付かない。溺れている間は数えるだけ。
+        /// </summary>
+        private static void UpdateWater(ref CharacterState state, Vector3 startPosition, CharacterConfig config, IReadOnlyList<StageZone> zones,
+            int tick)
+        {
+            if (state.Combat.DrownTicks > 0)
+            {
+                state.Combat.DrownTicks++;
+                return;
+            }
+            bool attached = state.Wire.Phase == WirePhase.Attached;
+            for (int i = 0; i < zones.Count; i++)
+            {
+                if (zones[i].Kind != StageZoneKind.Water)
+                {
+                    continue;
+                }
+                StageZone zone = zones[i].At(tick);
+                if (!InWater(zone, state.Position))
+                {
+                    continue;
+                }
+                if (startPosition.Y >= zone.MaxY)
+                {
+                    state.Combat.SplashCount++;
+                }
+                int total = Math.Max(1, (int)MathF.Round(zone.Power * SimTime.TicksPerSecond));
+                if (state.Combat.WaterTicksLeft <= 0 || attached)
+                {
+                    state.Combat.WaterTicksLeft = total;
+                    state.Combat.WaterFloatTicks = total;
+                }
+                state.WallSide = 0;
+                if (!attached && --state.Combat.WaterTicksLeft <= 0)
+                {
+                    Drown(ref state, config.Wire);
+                    return;
+                }
+                if (state.Position.Y >= zone.MaxY - WaterFloatDepth - 0.3f)
+                {
+                    state.CoyoteTicksLeft = Math.Max(state.CoyoteTicksLeft, WaterJumpCoyoteTicks);
+                }
+                return;
+            }
+            if (state.Grounded || attached)
+            {
+                state.Combat.WaterTicksLeft = 0;
+                state.Combat.WaterFloatTicks = 0;
+            }
+        }
+
+        // 溺れる: 動けなくなり、沈み始める（何にも触れない。撃破の線を越えるか DrownKnockoutTicks で撃破）。
+        private static void Drown(ref CharacterState state, WireTuning wire)
+        {
+            WireController.Interrupt(ref state, wire);
+            state.Combat.WaterTicksLeft = 0;
+            state.Combat.DrownTicks = 1;
+            state.Combat.Holding = false;
+            state.Combat.HoldTicks = 0;
+            state.Combat.StunTicksLeft = 0;
+            state.Combat.HasStunKnockback = false;
+            state.Combat.FrozenTicksLeft = 0;
+            state.Action = default;
+            state.Velocity = new Vector3(0f, -DrownSinkSpeed, 0f);
+            state.WallSide = 0;
+            state.JumpBufferTicksLeft = 0;
+            state.CoyoteTicksLeft = 0;
+        }
+
         /// <param name="startPosition">このティックの初めの位置（加速リング・ワープゲートに入ったかを調べる）。</param>
         /// <param name="tick">試合のティック数（周期と動き）。</param>
         /// <param name="seed">試合の種（ランダムな周期と位置）。</param>
@@ -114,6 +270,7 @@ namespace Airerage.Core.Simulation
                 return;
             }
             var halfExtents = new Vector2(config.Movement.HalfExtents.X, config.Movement.HalfExtents.Y);
+            UpdateWater(ref state, startPosition, config, zones, tick);
             for (int i = 0; i < zones.Count; i++)
             {
                 StageZone zone = zones[i].At(tick);
@@ -193,6 +350,9 @@ namespace Airerage.Core.Simulation
                             Freeze(ref state, zone, config.Wire);
                         }
                         break;
+                    case StageZoneKind.Water:
+                        // 移動の前（ApplyWaterForces）と、この関数の初め（UpdateWater）に効かせる。
+                        break;
                     default:
                         throw new InvalidOperationException($"知らないギミックの種類です: {zone.Kind}");
                 }
@@ -258,6 +418,8 @@ namespace Airerage.Core.Simulation
             state.Combat.Holding = false;
             state.Combat.HoldTicks = 0;
             state.Combat.FrozenTicksLeft = 0;
+            state.Combat.StunTicksLeft = 0;
+            state.Combat.HasStunKnockback = false;
             state.Combat.HitstopTicksLeft = Math.Max(state.Combat.HitstopTicksLeft, HazardHitstopTicks);
             state.Combat.HazardImmunityTicks = zone.ActiveTicks + 20;
             state.Combat.HazardHitCount++;

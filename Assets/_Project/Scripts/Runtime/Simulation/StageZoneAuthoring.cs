@@ -126,6 +126,9 @@ namespace Airerage.Runtime.Simulation
                 case StageZoneKind.Gust:
                     Gizmos.color = new Color(0.5f, 0.85f, 1f);
                     break;
+                case StageZoneKind.Water:
+                    Gizmos.color = new Color(0.2f, 0.5f, 1f);
+                    break;
                 case StageZoneKind.Warp:
                     Gizmos.color = new Color(0.8f, 0.4f, 1f);
                     Gizmos.DrawLine(transform.position, new Vector3(_target.x, _target.y, 0f));
