@@ -245,6 +245,13 @@ namespace Airerage.Core.Wire
 
             if (wire.HasTargetPoint && targetDistance <= step)
             {
+                // 狙ったアンカーが動いた・なくなった（動く足場のアンカー、置かれた物）なら、何もない所にはつながらない。
+                if (!WireTargeting.IsAnchorPoint(_collision, wire.TargetPoint))
+                {
+                    wire.HookPosition = wire.TargetPoint;
+                    Miss(ref state, WireMissReason.OutOfRange);
+                    return;
+                }
                 Attach(ref state, wire.TargetPoint, tuning);
                 return;
             }

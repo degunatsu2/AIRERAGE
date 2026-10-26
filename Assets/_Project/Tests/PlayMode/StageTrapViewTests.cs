@@ -13,7 +13,8 @@ using UnityEngine.TestTools;
 namespace Airerage.PlayMode.Tests
 {
     /// <summary>
-    /// ステージの仕掛けと悪魔の手の見た目（ユーザーの要望、2026-10-26）: 研究所の赤外線に触れると予告が出てミサイルが飛び、競技場の
+    /// ステージの仕掛けと悪魔の手の見た目（ユーザーの要望、2026-10-26）: 研究所の赤外線に触れると予告が出てミサイルが飛び（撃った後の待ちは
+    /// 赤外線を消して発射装置に円形のゲージ）、競技場の
     /// ピッチャーマシンがボールを打ち出し、恐怖の館の悪魔の手に握られると指と渦が出て、吸い込まれて見えなくなってから牢屋に現れる。
     /// </summary>
     public sealed class StageTrapViewTests
@@ -36,6 +37,15 @@ namespace Airerage.PlayMode.Tests
             yield return WaitFor(() => view.ShowsProjectile || runner.PlayerState.Combat.HazardHitCount > 0, 2f, "予告の後にミサイルが飛ばない");
             yield return WaitFor(() => runner.PlayerState.Combat.HazardHitCount > 0, 2f, "ミサイルが当たらない");
             Assert.That(runner.PlayerState.Velocity.Length(), Is.GreaterThan(20f), "ミサイルでとても吹き飛ばない");
+            // 撃った後の待ちの間は、赤外線を消して、発射装置に待ちの円形のゲージを出す（ユーザーの要望、2026-10-26）。
+            RingGaugeView reload = view.GetComponentInChildren<RingGaugeView>(true);
+            Assert.That(reload, Is.Not.Null, "発射装置に待ちのゲージがない");
+            yield return WaitFor(() => view.Reloading && reload.IsShowing, 1f, "撃った後に待ちのゲージが出ない");
+            Renderer beam = view.transform.Find("Beam").GetComponent<Renderer>();
+            Assert.That(beam.enabled, Is.False, "待ちの間も赤外線が見えている");
+            float first = reload.Fraction;
+            yield return WaitSeconds(0.5f);
+            Assert.That(reload.Fraction, Is.LessThan(first), "待ちのゲージが減らない");
         }
 
         [UnityTest]

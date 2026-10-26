@@ -930,10 +930,12 @@ namespace Airerage.Editor
         }
 
         /// <summary>
-        /// 円形のゲージ（薄い輪、残りの弧、先端の火花）。label が空でなければ、シーンのカメラで画面に写して上に出す。
+        /// 円形のゲージ（薄い輪、残りの弧、先端の火花）。label が空でなければ、シーンのカメラで画面に写して上に出す（sceneCamera が
+        /// false なら、カメラのないステージのシーン用に参照を付けず、試合のシーンのメインカメラを使う）。
         /// 大きさの影響を受けないように、キャラクターの子にしない。
         /// </summary>
-        internal static RingGaugeView CreateRingGauge(string name, Transform parent, string label, float radius, Color? color = null)
+        internal static RingGaugeView CreateRingGauge(string name, Transform parent, string label, float radius, Color? color = null,
+            bool sceneCamera = true)
         {
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             var root = new GameObject(name);
@@ -943,7 +945,10 @@ namespace Airerage.Editor
             SetReference(view, "_track", CreateIndicatorLine(root.transform, "Track", material, 0.08f));
             SetReference(view, "_fuse", CreateIndicatorLine(root.transform, "Fuse", material, 0.12f));
             SetReference(view, "_spark", CreateIndicatorLine(root.transform, "Spark", material, 0.1f));
-            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            if (sceneCamera)
+            {
+                SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            }
             return view;
         }
 

@@ -117,6 +117,7 @@ namespace Airerage.Editor.Stages
                 {
                     authoring.ConfigurePath(spec.Size, spec.Attachable, spec.Keys, spec.PeriodSeconds, spec.PhaseSeconds, spec.ActiveFromSeconds,
                         spec.ActiveToSeconds, spec.Smooth);
+                    authoring.ConfigureAnchor(spec.AnchorPoint, spec.AnchorRadius);
                 }
                 var visual = new GameObject("Visual").transform;
                 visual.SetParent(go.transform, false);
@@ -212,7 +213,10 @@ namespace Airerage.Editor.Stages
                         decor.Lit("MissileNose", new Color(0.9f, 0.15f, 0.1f)));
                     decor.Box("Flame", missile, new Vector3(-spec.MissileSize.x * 0.65f, 0f, 0f), new Vector3(0.6f, spec.MissileSize.y * 0.5f, 0.3f),
                         decor.Unlit("MissileFlame", new Color(1f, 0.7f, 0.2f)));
-                    view.Configure(beam.GetComponent<Renderer>(), missile, lamp.GetComponent<Renderer>(), lineMaterial);
+                    // 撃った後の待ちの円形のゲージ（発射装置の周り。ユーザーの要望、2026-10-26）。
+                    RingGaugeView reload = SandboxWireSceneBuilder.CreateRingGauge("ReloadGauge", go.transform, "RELOAD", 1.5f,
+                        new Color(1f, 0.3f, 0.25f, 0.85f), sceneCamera: false);
+                    view.Configure(beam.GetComponent<Renderer>(), missile, lamp.GetComponent<Renderer>(), lineMaterial, reload, launcher.transform);
                 }
                 else
                 {

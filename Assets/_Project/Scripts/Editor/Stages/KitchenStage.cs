@@ -9,7 +9,7 @@ namespace Airerage.Editor.Stages
     /// キッチン（SWEET KITCHEN。PASTRY CHEF のテーマのステージ。ユーザーの案、2026-10-26）。左右の調理台、真ん中のコンロと奥の大きなオーブン、
     /// 上の棚とケーキスタンド。調理台から落ちると撃破。
     /// 固有のギミック（ユーザーの案）: オーブンの火柱（40 秒ごとに奥のオーブンから手前へ噴き出す。危険。3 秒前に予告）、ロールケーキ
-    /// （左右のステージの外から 1 つずつ出て、交差するように弧を描いて、反対の外へ去る。乗れて、ワイヤーがつながる動く足場。
+    /// （左右のステージの外から 1 つずつ出て、交差するように山なりの弧を描いて、反対の外へ去る。乗れて、ワイヤーがつながる動く足場。
     /// 乗ったまま外へ運ばれると撃破）、シンクの排水溝（貯水槽の右から入ると、水流で右の棚の上まで流される。ユーザーの要望、2026-10-26）。
     /// 追加の案（残したもの）: トースター、シンク（水。5 秒で溺れる）、バター（氷）、カップケーキのベルトコンベア、やかんの湯気、ゼリーの
     /// ジャンプ台（まな板とボウルの上）、ミキサーの渦（上昇気流）、ドーナツの輪（加速リング）、吊るしたおたま（アンカー）。
@@ -127,12 +127,13 @@ namespace Airerage.Editor.Stages
                 },
                 Platforms = new[]
                 {
-                    // ロールケーキ（ユーザーの案）: 左右の外から同時に出て、片方は高い弧、もう片方は低い弧で交差し、反対の外へ去る（22 秒で渡り、
-                    // 8 秒いない）。乗れて、ワイヤーがつながる。前より上空を飛ぶ（高い弧のいちばん上は 39.5m、低い弧のいちばん下は 30.5m で、
-                    // ケーキスタンドの上を通る。ユーザーの要望、2026-10-26）。
-                    PlatformSpec.Arc("RollCakeWest", rollSize, true, new Vector2(-72f, 18f), new Vector2(0f, 61f), new Vector2(72f, 18f), rollTravel, rollPeriod)
+                    // ロールケーキ（ユーザーの案）: 左右の外から同時に出て、どちらも山なりの弧を描いて（高い弧と低い弧）真ん中で交差し、反対の外へ
+                    // 去る（22 秒で渡り、8 秒いない）。乗れて、ワイヤーがつながる。高い弧は画面の端の約 19m から真ん中の 39.5m まで、低い弧は
+                    // 約 20m から 30.5m まで上がる（前は端との差が小さく、まっすぐ飛んで見えた。ユーザーの要望、2026-10-26）。真ん中では、
+                    // 低い弧もケーキスタンドの上を通る。排水溝のふたと棚の上に立つ人には当たらない高さ。
+                    PlatformSpec.Arc("RollCakeWest", rollSize, true, new Vector2(-72f, 10f), new Vector2(0f, 69f), new Vector2(72f, 10f), rollTravel, rollPeriod)
                         .Looks(RollCakeLooks),
-                    PlatformSpec.Arc("RollCakeEast", rollSize, true, new Vector2(72f, 38f), new Vector2(0f, 23f), new Vector2(-72f, 38f), rollTravel, rollPeriod)
+                    PlatformSpec.Arc("RollCakeEast", rollSize, true, new Vector2(72f, 16f), new Vector2(0f, 45f), new Vector2(-72f, 16f), rollTravel, rollPeriod)
                         .Looks(RollCakeLooks),
                 },
                 Coins = new (Vector2, int)[]

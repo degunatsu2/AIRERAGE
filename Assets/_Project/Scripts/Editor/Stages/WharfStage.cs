@@ -8,7 +8,9 @@ namespace Airerage.Editor.Stages
     /// <summary>
     /// 埠頭（FROZEN WHARF。ユーザーの案、2026-10-26）。左右の岸壁（薄い桟橋で、下は海が続く）と、間の海に浮かぶタグボート、岸壁をまたぐ
     /// ガントリークレーン（上の梁の真ん中に穴があり、その上にアンカー）。奥の海の向こうに、氷山のステージ（FROST COAST）の氷山と船が
-    /// 見える。海は水の判定（5 秒浮いていられる）。岸壁の下の海には、休める灰色のコンテナが浮かぶ（ワイヤーはつながらない）。
+    /// 見える。海は水の判定（5 秒浮いていられる）。岸壁の下の海には、休める灰色のコンテナが左右に 1 つずつ浮かぶ（ワイヤーはつながらない）。
+    /// 右の外と真ん中を仕切るクレーンの脚の両側には、脚の下から上まで定期的に速く動く、アンカー付きのボラードがある（つないだまま運ばれる。
+    /// ユーザーの要望、2026-10-26）。
     /// 固有のギミック（ユーザーの案）: ボラード（岸壁の係船柱。アンカーポイント）、赤いコンテナ（中がくりぬかれていて左右の両側から入れる。
     /// 屋根と床に乗れて、ワイヤーがつながる。20 秒ごとに次の場所へ運ばれる。奥の岸壁を走る大きなフォークリフトが運んでいるように見せる）。
     /// 追加の案（残したもの）: フォークリフトの荷台（上下する動く足場）、ベルトコンベア、漁網（バンパー）、灯台、積み上げたコンテナ、
@@ -63,11 +65,9 @@ namespace Airerage.Editor.Stages
                     // 岸壁（左右。下は海が続く薄い桟橋。海を泳いで、外と真ん中を行き来できる。ユーザーの要望、2026-10-26）。
                     new TerrainBox("QuayWest", -48f, -0.6f, -20f, 1f),
                     new TerrainBox("QuayEast", 20f, -0.6f, 48f, 1f),
-                    // 岸壁の下の海に浮かぶ灰色のコンテナ（休める。ワイヤーはつながらない）。
-                    new TerrainBox("FloatWestInner", -32f, -6.4f, -26f, -3.6f),
-                    new TerrainBox("FloatWestOuter", -43f, -6.4f, -37f, -3.6f),
-                    new TerrainBox("FloatEastInner", 26f, -6.4f, 32f, -3.6f),
-                    new TerrainBox("FloatEastOuter", 37f, -6.4f, 43f, -3.6f),
+                    // 岸壁の下の海に浮かぶ灰色のコンテナ（左右に 1 つずつ。休める。ワイヤーはつながらない。ユーザーの要望、2026-10-26）。
+                    new TerrainBox("FloatWest", -37f, -6.4f, -31f, -3.6f),
+                    new TerrainBox("FloatEast", 31f, -6.4f, 37f, -3.6f),
                     // タグボート（船体と操舵室とマストはワイヤーがつながる）。
                     new TerrainBox("TugHull", -6f, -7f, 6f, -3f, attachable: true),
                     new TerrainBox("TugCabin", -2f, -3f, 2.5f, 0f, attachable: true),
@@ -88,12 +88,14 @@ namespace Airerage.Editor.Stages
                     // 倉庫の屋根。
                     new TerrainBox("WarehouseRoof", 38f, 12f, 48f, 12.6f, attachable: true),
                 },
-                // ボラード（岸壁の端の係船柱。ユーザーの案）と、タグボートのボラード、クレーンの梁の下の鉤、灯台の上、梁の穴の上。
+                // ボラード（岸壁の端の係船柱。ユーザーの案）と、タグボートのボラード、クレーンの梁の下の鉤、灯台の上、梁の穴の上、左右の高い所の
+                // 赤いコインの下（積み上げたコンテナ・倉庫の屋根から上へ行き来する。ユーザーの要望、2026-10-26）。右の岸壁のクレーンの脚の横の
+                // ボラードは、脚に沿って動く（Platforms の BollardOuter）。
                 Anchors = new[]
                 {
                     new Vector2(-21f, 1.9f), new Vector2(-44f, 1.9f), new Vector2(21f, 1.9f), new Vector2(46f, 1.9f), new Vector2(-5f, -2.1f),
-                    new Vector2(5f, -2.1f), new Vector2(-27.5f, 1.9f), new Vector2(27.5f, 1.9f), new Vector2(-14f, 26f), new Vector2(14f, 26f),
-                    new Vector2(-47f, 27f), new Vector2(0f, 37f),
+                    new Vector2(5f, -2.1f), new Vector2(-27.5f, 1.9f), new Vector2(-14f, 26f), new Vector2(14f, 26f),
+                    new Vector2(-47f, 27f), new Vector2(0f, 37f), new Vector2(-37f, 17f), new Vector2(37f, 17f),
                 },
                 // 海の底が撃破の線。
                 BoundsMin = new Vector2(-60f, -12f),
@@ -110,7 +112,8 @@ namespace Airerage.Editor.Stages
                     new ZoneSpec("NetEast", StageZoneKind.Bumper, new Vector2(18f, 14f), new Vector2(3f, 1f), Vector2.up, 16f),
                     // 岸壁のジャンプ台。
                     ZoneSpec.OnFloor("QuayPadWest", StageZoneKind.JumpPad, -24.5f, -22.5f, 1f, Vector2.up, 26f, 0.4f),
-                    ZoneSpec.OnFloor("QuayPadEast", StageZoneKind.JumpPad, 22.5f, 24.5f, 1f, Vector2.up, 26f, 0.4f),
+                    // 右は、クレーンの脚の横の動くボラードを避けて、少し左（ユーザーの要望、2026-10-26）。
+                    ZoneSpec.OnFloor("QuayPadEast", StageZoneKind.JumpPad, 22f, 23.8f, 1f, Vector2.up, 26f, 0.4f),
                     // 海の上の加速リング（反対の岸壁へ）。
                     new ZoneSpec("RingWest", StageZoneKind.BoostRing, new Vector2(-8f, 12f), new Vector2(2.4f, 3f), new Vector2(1f, 0.1f), 18f),
                     new ZoneSpec("RingEast", StageZoneKind.BoostRing, new Vector2(8f, 12f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.1f), 18f),
@@ -120,18 +123,26 @@ namespace Airerage.Editor.Stages
                     // クレーンのコンテナ（ユーザーの案）: 屋根と床の 2 枚が一緒に運ばれる（左右は開いていて、両側から入れる）。
                     ContainerPlate("ContainerRoof", spotA + new Vector2(0f, plateOffset), spotA, spotC, spotB, containerRed, roof: true),
                     ContainerPlate("ContainerFloor", spotA - new Vector2(0f, plateOffset), spotA, spotC, spotB, containerRed, roof: false),
-                    // フォークリフトの荷台: 左の岸壁で上下する（8 秒で 1 往復）。
+                    // フォークリフトの荷台: 左の岸壁で、灯台のてっぺんより少し上（上面 24.5m）まで上下する（14 秒で 1 往復。ユーザーの要望、
+                    // 2026-10-26）。
                     new PlatformSpec("ForkliftPallet", new Vector2(-31f, 1.25f), new Vector2(3.2f, 0.5f), true)
-                        .Path(8f, (0f, Vector2.zero), (1f, Vector2.zero), (4f, new Vector2(0f, 5.2f)), (5f, new Vector2(0f, 5.2f)))
+                        .Path(14f, (0f, Vector2.zero), (1.5f, Vector2.zero), (6.5f, new Vector2(0f, PalletRise)), (8.5f, new Vector2(0f, PalletRise)),
+                            (13.5f, Vector2.zero))
                         .Eased().Tinted(new Color(0.85f, 0.65f, 0.3f)),
+                    // クレーンの右の脚の両側のボラード（ユーザーの要望、2026-10-26）: 9 秒ごとに、岸壁の上で 3.3 秒待ち、1.2 秒で上へ、上で
+                    // 3.3 秒待ち、1.2 秒で下へ。内側と外側は半分ずらす（片方が上なら、もう片方は下）。中心がアンカー（ワイヤーはつないだまま
+                    // 運ばれる）。内側は梁の下（乗っても頭がぶつからない高さ）まで、外側は梁の上面の高さまで上がる。
+                    Bollard("BollardInner", new Vector2(24.45f, 1.46f), 27.6f, 0f),
+                    Bollard("BollardOuter", new Vector2(27.5f, 1.46f), 30.95f, 4.5f),
                 },
                 Coins = new (Vector2, int)[]
                 {
                     // 岸壁の上。
                     (new Vector2(-44f, 3.5f), 1), (new Vector2(-34f, 3f), 1), (new Vector2(-28f, 3f), 1), (new Vector2(-21.5f, 4f), 1),
                     (new Vector2(21.5f, 4f), 1), (new Vector2(28f, 3f), 1), (new Vector2(31f, 3f), 1), (new Vector2(34f, 3f), 1), (new Vector2(44f, 3.5f), 1),
-                    // 積み上げたコンテナの上とフォークリフトの上。
+                    // 積み上げたコンテナの上とフォークリフトの荷台の道。
                     (new Vector2(-39f, 7.2f), 3), (new Vector2(39f, 7.2f), 3), (new Vector2(-31f, 9f), 1), (new Vector2(-31f, 12f), 3),
+                    (new Vector2(-31f, 16f), 1),
                     // コンテナの止まる場所（中に入ったコイン）と、運ばれる道。
                     (new Vector2(-12f, 6f), 20), (new Vector2(12f, 6f), 20), (new Vector2(0f, 18f), 20), (new Vector2(-15f, 9f), 1), (new Vector2(15f, 9f), 1),
                     (new Vector2(-6f, 13f), 1), (new Vector2(6f, 13f), 1), (new Vector2(0f, 21.5f), 3),
@@ -140,9 +151,9 @@ namespace Airerage.Editor.Stages
                     // 海の中（潜る）と海の上。
                     (new Vector2(-13f, -9f), 20), (new Vector2(13f, -9f), 20), (new Vector2(-13f, -2f), 1), (new Vector2(13f, -2f), 1),
                     (new Vector2(-17f, -3.5f), 3), (new Vector2(17f, -3.5f), 3),
-                    // 岸壁の下（浮かぶコンテナの上と、その間の海）。
-                    (new Vector2(-29f, -2.4f), 1), (new Vector2(29f, -2.4f), 1), (new Vector2(-40f, -2.4f), 3), (new Vector2(40f, -2.4f), 3),
-                    (new Vector2(-34.5f, -4f), 1), (new Vector2(34.5f, -4f), 1),
+                    // 岸壁の下（浮かぶコンテナの上と、その左右の海の上）。
+                    (new Vector2(-34f, -2.4f), 3), (new Vector2(34f, -2.4f), 3), (new Vector2(-27.5f, -4f), 1), (new Vector2(27.5f, -4f), 1),
+                    (new Vector2(-41f, -4f), 1), (new Vector2(41f, -4f), 1),
                     // 漁網の周りと加速リング。
                     (new Vector2(-18f, 16.5f), 1), (new Vector2(18f, 16.5f), 1), (new Vector2(-11f, 12f), 1), (new Vector2(11f, 12f), 1),
                     // クレーンの脚と梁。
@@ -170,6 +181,26 @@ namespace Airerage.Editor.Stages
                 Spawns = new[] { new Vector3(-21.5f, 2f, 0f), new Vector3(21.5f, 2f, 0f), new Vector3(-44f, 2f, 0f), new Vector3(44f, 2f, 0f) },
                 Decorate = Decorate,
             };
+        }
+
+        // フォークリフトの荷台の上がる高さ（m。上面が灯台のてっぺん 22.6m より少し上の 24.5m）。
+        private const float PalletRise = 23f;
+
+        // クレーンの脚の横の動くボラード（下の中心 bottom から、top の高さまで。ずれ phase 秒）。
+        private static PlatformSpec Bollard(string name, Vector2 bottom, float top, float phase)
+        {
+            var up = new Vector2(0f, top - bottom.y);
+            return new PlatformSpec(name, bottom, new Vector2(0.9f, 0.9f), true)
+                .Path(9f, (0f, Vector2.zero), (3.3f, Vector2.zero), (4.5f, up), (7.8f, up), (9f, Vector2.zero))
+                .Eased().Phase(phase).Anchor()
+                .Looks((decor, visual, spec) =>
+                {
+                    // 黒い係船柱と、手前の菱形のアンカー。
+                    decor.Cylinder("Post", visual, Vector3.zero, new Vector3(0.8f, 0.45f, 0.8f), decor.Lit("Bollard", new Color(0.15f, 0.15f, 0.17f)));
+                    GameObject diamond = decor.Box("Anchor", visual, new Vector3(0f, 0f, -0.6f), new Vector3(0.6f, 0.6f, 0.3f),
+                        decor.Unlit("MovingAnchor", new Color(1f, 0.85f, 0.25f)));
+                    diamond.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+                });
         }
 
         // クレーンのコンテナの屋根か床（道のりは止まる場所の中心から、板の分だけずらす）。
@@ -233,9 +264,19 @@ namespace Airerage.Editor.Stages
             // 桟橋の奥行き（遊ぶ面と同じ薄さ。下は海が続いて見えるように）。
             decor.Box("QuayWestBack", new Vector3(-34f, 0.2f, 6f), new Vector3(28f, 1.6f, 8f), concrete);
             decor.Box("QuayEastBack", new Vector3(34f, 0.2f, 6f), new Vector3(28f, 1.6f, 8f), concrete);
-            foreach (float x in new[] { -21f, -44f, -27.5f, 21f, 46f, 27.5f })
+            foreach (float x in new[] { -21f, -44f, -27.5f, 21f, 46f })
             {
                 decor.Cylinder("Bollard", new Vector3(x, 1.45f, 0f), new Vector3(0.7f, 0.45f, 0.7f), bollard);
+            }
+            // 動くボラードの溝（クレーンの右の脚の両側。見た目だけ）と、フォークリフトの荷台の柱（奥）。
+            Material rail = decor.Lit("BollardRail", new Color(0.25f, 0.27f, 0.3f));
+            foreach (float x in new[] { 24.45f, 27.5f })
+            {
+                decor.Box("BollardRail", new Vector3(x, 16.2f, 1.2f), new Vector3(0.3f, 30f, 0.3f), rail);
+            }
+            foreach (float x in new[] { -32.4f, -29.6f })
+            {
+                decor.Box("PalletMast", new Vector3(x, 13.2f, 2.4f), new Vector3(0.4f, 24.2f, 0.4f), rail);
             }
             foreach (float x in new[] { -5f, 5f })
             {

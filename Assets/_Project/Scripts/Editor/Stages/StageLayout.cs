@@ -180,6 +180,10 @@ namespace Airerage.Editor.Stages
         public float OpenEverySeconds;
         public float OpenForSeconds;
 
+        /// <summary>箱の中心をアンカーポイントにするか（道のりを動く足場だけ。埠頭の動くボラード）と、エイムアシストの半径（0 ならふつう）。</summary>
+        public bool AnchorPoint;
+        public float AnchorRadius;
+
         /// <summary>箱の色（なければステージの地形の色）。</summary>
         public Color? Color;
 
@@ -275,6 +279,14 @@ namespace Airerage.Editor.Stages
         public PlatformSpec Eased()
         {
             Smooth = true;
+            return this;
+        }
+
+        /// <summary>箱の中心をアンカーポイントにする（足場と一緒に動く。radius はエイムアシストの半径。0 ならふつう）。</summary>
+        public PlatformSpec Anchor(float radius = 0f)
+        {
+            AnchorPoint = true;
+            AnchorRadius = radius;
             return this;
         }
 

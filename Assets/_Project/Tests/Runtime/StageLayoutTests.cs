@@ -3,6 +3,7 @@ using System.Linq;
 using Airerage.Core.Common;
 using Airerage.Core.Economy;
 using Airerage.Core.Input;
+using Airerage.Core.Movement;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Flow;
@@ -627,6 +628,43 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
+        public void Manor_ThePorchPadsHaveRoomAbove_TheCryptHasAPad_AndALiftRunsUpTheRightEdge()
+        {
+            Open("Stage_Manor");
+            // ポーチのジャンプ台の上は、跳んだ高さまで空いている（バルコニーは真ん中に 1 つ。ユーザーの要望、2026-10-26）。
+            StageZone[] pads = _zones.Where(z => z.Kind == StageZoneKind.JumpPad).ToArray();
+            foreach (StageZone pad in pads.Where(p => p.MinY < 3f))
+            {
+                float x = (pad.MinX + pad.MaxX) * 0.5f;
+                float rise = pad.Power * pad.Power / (2f * new MovementTuning().Gravity);
+                Assert.That(_terrain.Raycast(new NVector3(x, pad.MinY + CharacterHalf.Y * 2f, 0f), NVector3.UnitY, rise, out _), Is.False,
+                    $"ジャンプ台 {pad} の上で頭がぶつかる");
+            }
+            Assert.That(_terrain.Boxes.Count(b => b.Attachable && b.Min.Y > 9f && b.Max.Y < 11f && b.Min.X < 0f && b.Max.X > 0f), Is.EqualTo(1),
+                "真ん中のバルコニーがない");
+            // 納骨堂の屋根の上のジャンプ台。
+            Assert.That(pads.Any(p => p.MinX > -34.5f && p.MaxX < -27.5f && System.MathF.Abs(p.MinY - 5.6f) < 0.01f), Is.True, "納骨堂の上にジャンプ台がない");
+            // 右の端の昇降台: 地面の高さから牢屋の高さまで上下し、端の赤いコインと 3 枚のコインを通る。
+            StagePlatform lift = _platforms.Single(p => !p.IsDoor && p.Origin.X > 45f);
+            float low = float.MaxValue;
+            float high = float.MinValue;
+            for (int t = 0; t < lift.Period; t++)
+            {
+                lift.TryGetCenter(t, 0, out NVector2 c);
+                low = System.MathF.Min(low, c.Y);
+                high = System.MathF.Max(high, c.Y);
+            }
+            Assert.That(low, Is.LessThan(1f), "昇降台が地面の高さまで下りない");
+            Assert.That(high, Is.GreaterThan(27f), "昇降台が牢屋の高さまで上がらない");
+            foreach (CoinSpawnPoint coin in _coins.Where(c => c.Position.X > 50f))
+            {
+                Assert.That(coin.Position.X, Is.InRange(lift.Origin.X - lift.HalfSize.X, lift.Origin.X + lift.HalfSize.X), $"昇降台がコイン {coin.Position} を通らない");
+                Assert.That(coin.Position.Y, Is.InRange(low, high + 3f), $"昇降台がコイン {coin.Position} の高さを通らない");
+            }
+            Assert.That(_coins.Count(c => c.Position.X > 50f && c.Value == 20) + _coins.Count(c => c.Position.X > 50f && c.Value == 3), Is.EqualTo(2));
+        }
+
+        [Test]
         public void Kitchen_TheDrain_FlushesYouFromTheSinkUpToTheShelf()
         {
             Open("Stage_Kitchen");
@@ -665,6 +703,14 @@ namespace Airerage.Runtime.Tests
                 Assert.That(System.MathF.Abs(to.X), Is.GreaterThan(_bounds.MaxX), "ロールケーキがステージの外へ去らない");
                 Assert.That(System.MathF.Sign(from.X), Is.Not.EqualTo(System.MathF.Sign(to.X)), "ロールケーキが反対の外へ去らない");
                 Assert.That(cake.TryGetCenter(cake.ActiveTo + 10, 0, out _), Is.False, "去った後もロールケーキがある");
+            }
+            // どちらも山なりの弧: 渡る途中の真ん中は、画面の端より 8m 以上高い（ユーザーの要望、2026-10-26）。
+            foreach (StagePlatform cake in cakes)
+            {
+                cake.TryGetCenter(cake.ActiveTo / 2, 0, out NVector2 middle);
+                int edge = Enumerable.Range(0, cake.ActiveTo).First(t => { cake.TryGetCenter(t, 0, out NVector2 c); return System.MathF.Abs(c.X) <= _bounds.MaxX; });
+                cake.TryGetCenter(edge, 0, out NVector2 enter);
+                Assert.That(middle.Y - enter.Y, Is.GreaterThan(8f), $"ロールケーキが弧を描かない（端 {enter}、真ん中 {middle}）");
             }
             // 2 つは反対の側から同時に出る（交差する）。
             cakes[0].TryGetCenter(0, 0, out NVector2 a);
@@ -732,7 +778,14 @@ namespace Airerage.Runtime.Tests
                 Assert.That(pitcher.Path.Count, Is.GreaterThan(pitcher.StopTick + 1), $"{pitcher} のボールが止まった後に点滅しない");
                 float highest = pitcher.Path.Max(p => p.Y);
                 Assert.That(highest, Is.GreaterThan(pitcher.Muzzle.Y), $"{pitcher} のボールが空中へ打ち出されない");
+                // 大きなボールを強く打ち出す（ユーザーの要望、2026-10-26）。
+                Assert.That(pitcher.HalfSize.X, Is.GreaterThanOrEqualTo(0.8f), $"{pitcher} のボールが大きくない");
+                Assert.That(pitcher.LaunchVelocity.Length(), Is.GreaterThan(28f), $"{pitcher} の打ち出しが強くない");
             }
+            // つむじ風は前の 2 倍ほどの大きさ（幅 6m）。
+            StageZone devil = _zones.Single(z => z.Kind == StageZoneKind.Updraft);
+            Assert.That(devil.MaxX - devil.MinX, Is.GreaterThanOrEqualTo(6f), "つむじ風が大きくない");
+            Assert.That(devil.MaxY - devil.MinY, Is.GreaterThanOrEqualTo(24f), "つむじ風が高くない");
         }
 
         [Test]
@@ -742,13 +795,69 @@ namespace Airerage.Runtime.Tests
             // 梁の真ん中の穴と、その上のアンカー。
             Assert.That(_terrain.IsOverlapping(new NVector3(0f, 30.7f, 0f), CharacterHalf), Is.False, "クレーンの梁の真ん中に穴がない");
             Assert.That(_terrain.AnchorPoints.Any(a => System.MathF.Abs(a.X) < 1f && a.Y > 31.4f), Is.True, "梁の穴の上にアンカーがない");
-            // 岸壁の下を海が続き、休める浮かぶコンテナ（ワイヤーはつながらない）がある。
+            // 岸壁の下を海が続き、休める浮かぶコンテナ（ワイヤーはつながらない）が左右に 1 つずつある（ユーザーの要望、2026-10-26）。
             StageZone sea = _zones.Single(z => z.Kind == StageZoneKind.Water);
             foreach (float side in new[] { -1f, 1f })
             {
-                Assert.That(_terrain.IsOverlapping(new NVector3(side * 34.5f, sea.MaxY - 0.4f, 0f), CharacterHalf), Is.False, "岸壁の下を泳げない");
+                foreach (float x in new[] { 27.5f, 41f })
+                {
+                    Assert.That(_terrain.IsOverlapping(new NVector3(side * x, sea.MaxY - 0.4f, 0f), CharacterHalf), Is.False, "岸壁の下を泳げない");
+                }
                 Assert.That(_terrain.Boxes.Count(b => !b.Attachable && b.Max.Y > sea.MaxY && b.Min.Y < sea.MaxY && System.MathF.Sign(b.Min.X) == side),
-                    Is.GreaterThanOrEqualTo(2), "岸壁の下に浮かぶコンテナがない");
+                    Is.EqualTo(1), "岸壁の下に浮かぶコンテナが 1 つでない");
+            }
+        }
+
+        [Test]
+        public void Wharf_MovingBollards_CarryYouUpTheCraneLeg_AndThePalletRisesAboveTheLighthouse()
+        {
+            Open("Stage_Wharf");
+            // 右のクレーンの脚（右の外と真ん中の仕切り）の両側に、岸壁の上から脚の上まで動く、アンカー付きのボラード（ユーザーの要望、2026-10-26）。
+            BoxTerrain.Box leg = _terrain.Boxes.Where(b => b.Min.X > 20f && b.Min.X < 30f && b.Max.Y - b.Min.Y > 20f).Single();
+            StagePlatform[] bollards = _platforms.Where(p => p.HasAnchor).ToArray();
+            Assert.That(bollards.Length, Is.EqualTo(2), "動くボラードが 2 つない");
+            Assert.That(bollards.Count(b => b.Origin.X < leg.Min.X), Is.EqualTo(1), "脚の内側にボラードがない");
+            Assert.That(bollards.Count(b => b.Origin.X > leg.Max.X), Is.EqualTo(1), "脚の外側にボラードがない");
+            foreach (StagePlatform bollard in bollards)
+            {
+                // 脚の面からボラードの箱までの隙間（外側は梁の端の張り出しをよけるので少し離れる）。
+                float gap = bollard.Origin.X < leg.Min.X ? leg.Min.X - (bollard.Origin.X + bollard.HalfSize.X) : bollard.Origin.X - bollard.HalfSize.X - leg.Max.X;
+                Assert.That(gap, Is.InRange(0f, 1.2f), "ボラードが脚の横にない");
+                float lowest = float.MaxValue;
+                float highest = float.MinValue;
+                int fastest = 0;
+                NVector2 previous = default;
+                for (int t = 0; t < bollard.Period; t++)
+                {
+                    bollard.TryGetCenter(t, 0, out NVector2 center);
+                    lowest = System.MathF.Min(lowest, center.Y);
+                    highest = System.MathF.Max(highest, center.Y);
+                    if (t > 0 && System.MathF.Abs(center.Y - previous.Y) * SimTime.TicksPerSecond > 15f)
+                    {
+                        fastest++;
+                    }
+                    previous = center;
+                }
+                Assert.That(lowest, Is.LessThan(3f), "ボラードが岸壁の上まで下りない");
+                Assert.That(highest, Is.GreaterThan(leg.Max.Y - 3f), "ボラードが脚の上の方まで上がらない");
+                Assert.That(fastest, Is.GreaterThan(0), "ボラードが速く動かない");
+                Assert.That(bollard.Period, Is.LessThanOrEqualTo(10 * SimTime.TicksPerSecond), "ボラードが定期的に動かない");
+            }
+            // 乗って運ばれても、梁に頭がぶつからない（内側は梁の下まで）。
+            StagePlatform inner = bollards.OrderBy(b => b.Origin.X).First();
+            float innerTop = Enumerable.Range(0, inner.Period).Max(t => { inner.TryGetCenter(t, 0, out NVector2 c); return c.Y; }) + inner.HalfSize.Y;
+            Assert.That(_terrain.IsOverlapping(new NVector3(inner.Origin.X, innerTop + CharacterHalf.Y + 0.02f, 0f), CharacterHalf), Is.False,
+                "内側のボラードに乗って上がると梁にぶつかる");
+            // フォークリフトの荷台は、灯台のてっぺんより少し上まで上がる。
+            BoxTerrain.Box lighthouseTop = _terrain.Boxes.Where(b => b.Max.X < -40f && b.Min.Y > 15f).OrderByDescending(b => b.Max.Y).First();
+            StagePlatform pallet = _platforms.Single(p => !p.HasAnchor && p.Period != 60 * SimTime.TicksPerSecond && p.Origin.X < 0f);
+            float palletTop = Enumerable.Range(0, pallet.Period).Max(t => { pallet.TryGetCenter(t, 0, out NVector2 c); return c.Y; }) + pallet.HalfSize.Y;
+            Assert.That(palletTop, Is.GreaterThan(lighthouseTop.Max.Y).And.LessThan(lighthouseTop.Max.Y + 4f), "荷台が灯台のてっぺんの少し上まで上がらない");
+            // 左右の高い所の赤いコインの下に、アンカー（積み上げたコンテナの上から届く）。
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Assert.That(_terrain.AnchorPoints.Any(a => System.MathF.Sign(a.X) == side && System.MathF.Abs(a.X) > 32f && System.MathF.Abs(a.X) < 42f
+                    && a.Y > 12f && a.Y < 20f), Is.True, "高い所の赤いコインの下にアンカーがない");
             }
         }
 

@@ -245,9 +245,18 @@ namespace Airerage.Runtime.Presentation
 
         private void OnGUI()
         {
-            if (!IsShowing || _camera == null || string.IsNullOrEmpty(_label))
+            if (!IsShowing || string.IsNullOrEmpty(_label))
             {
                 return;
+            }
+            if (_camera == null)
+            {
+                // ステージのシーンに置いたゲージ（研究所の発射装置）は、試合のシーンのカメラを使う。
+                _camera = Camera.main;
+                if (_camera == null)
+                {
+                    return;
+                }
             }
             float labelY = _labelBelow ? -(Radius + 0.35f) : Radius + 0.35f;
             Vector3 screen = _camera.WorldToScreenPoint(_center + new Vector3(0f, labelY, 0f));

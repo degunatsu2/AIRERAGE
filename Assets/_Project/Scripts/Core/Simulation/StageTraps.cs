@@ -11,8 +11,10 @@ namespace Airerage.Core.Simulation
     /// - 赤外線（Tripwire）: 待っている間にだれかがレーダーに触れると、触れたティックを覚える。ArmTicks の予告の後に撃ち、ミサイルは
     ///   向きへまっすぐ飛ぶ（前のティックの位置から今の位置までに重なった人のうち、発射口に近い人に当たって消える）。撃ってから
     ///   FlightTicks で飛び終わり、さらに CooldownTicks で待つ状態に戻る。
-    /// - ピッチャーマシン（Pitcher）: ボールの道のりは決まっている（StageTrap.TryGetBall）。速さが MinHitSpeed 以上のボールに重なった人が
-    ///   吹き飛ぶ（ボールは止まらない。当たった人は危険の後の当たらない間に入るので、続けては当たらない）。
+    /// - ピッチャーマシン（Pitcher）: ボールの道のりは決まっている（StageTrap.TryGetBall）。ボールに重なった人は、バンパーのように
+    ///   ボールの中心から外向きに弾き返される（BallBumpPower。ユーザーの要望、2026-10-26）。速さが MinHitSpeed 以上のボールなら、
+    ///   その向きに吹き飛び、コインを落とす（ボールは人で止まらず、跳ね返りもしない。当たった人は危険の後の当たらない間に入るので、
+    ///   続けては吹き飛ばない）。
     /// </summary>
     public static class StageTraps
     {
@@ -21,6 +23,9 @@ namespace Airerage.Core.Simulation
 
         /// <summary>ボールに当たったときの、上向きに足す速さ（m/s）【仮】。</summary>
         public const float BallLift = 7f;
+
+        /// <summary>ボールに触れたときに弾き返す速さ（m/s。バンパーと同じ決まり。StageZones.BumpAlong）【仮】。</summary>
+        public const float BallBumpPower = 20f;
 
         /// <summary>ミサイルに当たったときの、上向きに足す速さ（吹き飛びの速さに対する割合）【仮】。</summary>
         public const float MissileLiftRatio = 0.35f;
@@ -50,6 +55,28 @@ namespace Airerage.Core.Simulation
             }
             position = MissileAt(trap, age);
             return true;
+        }
+
+        /// <summary>
+        /// 赤外線の仕掛け index が、ティック tick に撃った後の待ち（ミサイルが飛んでいる間を含む。また触れられるようになるまで）か。
+        /// そうなら、残り left と全体 total（ティック）。表示（赤外線を消して、発射装置に待ちの円形のゲージを出す）に使う。
+        /// </summary>
+        public static bool TryGetReload(StageTrap trap, StageState stage, int index, int tick, out int left, out int total)
+        {
+            total = trap.FlightTicks + trap.CooldownTicks;
+            left = 0;
+            int tripped = stage.TrapTickOf(index);
+            if (trap.Kind != StageTrapKind.Tripwire || tripped <= 0)
+            {
+                return false;
+            }
+            int fired = tripped + trap.ArmTicks;
+            if (tick < fired)
+            {
+                return false;
+            }
+            left = fired + total - tick;
+            return left > 0;
         }
 
         private static Vector2 MissileAt(StageTrap trap, int age)
@@ -148,14 +175,11 @@ namespace Airerage.Core.Simulation
                 return;
             }
             float speed = velocity.Length();
-            if (speed < trap.MinHitSpeed || !(speed > 0f))
-            {
-                return;
-            }
+            bool fast = speed >= trap.MinHitSpeed && speed > 0f;
             for (int c = 0; c < states.Count; c++)
             {
                 CharacterState state = states[c];
-                if (!StageZones.CanBeStruck(state))
+                if (!StageZones.CanBeHitByStage(state) || state.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -163,9 +187,19 @@ namespace Airerage.Core.Simulation
                 {
                     continue;
                 }
-                Vector2 direction = velocity / speed;
-                var knock = new Vector3(direction.X * trap.Knockback, direction.Y * trap.Knockback + BallLift, 0f);
-                StageZones.Strike(ref state, knock, trap.Power, StrikeImmunityTicks, configs[c].Wire);
+                // ボールの中心から外向き（真ん中に重なっていれば上）。
+                var away = new Vector2(state.Position.X - position.X, state.Position.Y - position.Y);
+                float distance = away.Length();
+                Vector2 normal = distance > 1e-4f ? away / distance : Vector2.UnitY;
+                if (fast && StageZones.CanBeStruck(state))
+                {
+                    var knock = new Vector3(normal.X * trap.Knockback, normal.Y * trap.Knockback + BallLift, 0f);
+                    StageZones.Strike(ref state, knock, trap.Power, StrikeImmunityTicks, configs[c].Wire);
+                }
+                else if (!StageZones.BumpAlong(ref state, normal, BallBumpPower))
+                {
+                    continue;
+                }
                 states[c] = state;
             }
         }

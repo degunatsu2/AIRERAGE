@@ -11,6 +11,8 @@ namespace Airerage.Runtime.Presentation
     /// ステージの仕掛け（StageTrapAuthoring。ユーザーの要望、2026-10-26）の見た目（表示だけ。状態を読むだけで、書き換えない）。
     /// - 赤外線とミサイル: 半透明の赤い赤外線（_beam）がゆっくり明滅し、触れられると予告の間は赤外線の上に黄色の斜線と警告の記号
     ///   （WarningOverlay）と発射装置のランプの点滅、警報。撃ったらミサイル（_projectile）をレーダーに沿って動かし、当たったら消す。
+    ///   撃ってからまた触れられるようになるまで（待ち）は、赤外線を消して、発射装置の周りに残りの円形のゲージ（_reload）を出す
+    ///   （ユーザーの要望、2026-10-26）。
     /// - ピッチャーマシン: ボール（_projectile）を道のりの位置へ動かし、止まったら点滅させ、消えたら隠す。打ち出した瞬間に音。
     /// 表示する試合がなければ（メニューの背景）、赤外線とマシンだけを出す。
     /// </summary>
@@ -27,6 +29,9 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private Renderer _lamp;
         [Tooltip("予告の表示に使う線の材質")]
         [SerializeField] private Material _lineMaterial;
+        [Tooltip("撃った後の待ちの円形のゲージ（発射装置の周り）と、その中心（発射装置）")]
+        [SerializeField] private RingGaugeView _reload;
+        [SerializeField] private Transform _launcher;
 
         private StageTrapAuthoring _authoring;
         private StageTrap _trap;
@@ -51,13 +56,22 @@ namespace Airerage.Runtime.Presentation
         /// <summary>ボールを点滅させているか（テスト用）。</summary>
         public bool Blinking { get; private set; }
 
+        /// <summary>撃った後の待ちで、赤外線を消して円形のゲージを出しているか（テスト用）。</summary>
+        public bool Reloading { get; private set; }
+
+        /// <summary>赤外線を見せているか（明滅で消えている瞬間も含む。待ちの間は false。テスト用）。</summary>
+        public bool ShowsBeam => _beam != null && !Reloading;
+
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(Renderer beam, Transform projectile, Renderer lamp, Material lineMaterial)
+        public void Configure(Renderer beam, Transform projectile, Renderer lamp, Material lineMaterial, RingGaugeView reload = null,
+            Transform launcher = null)
         {
             _beam = beam;
             _projectile = projectile;
             _lamp = lamp;
             _lineMaterial = lineMaterial;
+            _reload = reload;
+            _launcher = launcher;
         }
 
         private void Awake()
@@ -105,12 +119,31 @@ namespace Airerage.Runtime.Presentation
         {
             bool arming = false;
             bool flying = false;
+            bool reloading = false;
+            float reloadLeft = 0f;
             Vector2 position = default;
             if (trap != null && _feed.Stage != null)
             {
                 flying = StageTraps.TryGetMissile(trap, _feed.Stage, index, _feed.CurrentTick, out arming, out System.Numerics.Vector2 at);
                 flying &= !arming;
                 position = new Vector2(at.X, at.Y);
+                if (StageTraps.TryGetReload(trap, _feed.Stage, index, _feed.CurrentTick, out int left, out int total) && total > 0)
+                {
+                    reloading = true;
+                    reloadLeft = (float)left / total;
+                }
+            }
+            Reloading = reloading;
+            if (_reload != null)
+            {
+                if (reloading)
+                {
+                    _reload.Show(_launcher != null ? _launcher.position : transform.position, reloadLeft);
+                }
+                else if (_reload.IsShowing)
+                {
+                    _reload.Hide();
+                }
             }
             if (arming && !_wasArming)
             {
@@ -150,9 +183,9 @@ namespace Airerage.Runtime.Presentation
             }
             if (_beam != null)
             {
-                // 赤外線はいつも出して、ゆっくり明滅（触れられたら速く）。
+                // 赤外線は待ちの間だけ消し、ほかはゆっくり明滅（触れられたら速く）。
                 float speed = arming ? 8f : 1.2f;
-                _beam.enabled = Mathf.Repeat(Time.time * speed, 1f) < (arming ? 0.5f : 0.92f);
+                _beam.enabled = !reloading && Mathf.Repeat(Time.time * speed, 1f) < (arming ? 0.5f : 0.92f);
             }
             SetProjectile(flying, position);
             if (flying && _projectile != null)

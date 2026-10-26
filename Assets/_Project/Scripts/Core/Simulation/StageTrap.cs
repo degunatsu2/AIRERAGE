@@ -18,8 +18,9 @@ namespace Airerage.Core.Simulation
 
         /// <summary>
         /// ピッチャーマシン（陸上競技場）。周期 Period ごとに、発射口（Muzzle）から LaunchVelocity でボールを打ち出す。ボールは重力で落ち、
-        /// 動かない地形で跳ね、転がって止まったら BlinkTicks だけ点滅して消える。ボールの道のりは人に関係なく決まる（作るときに地形から
-        /// 求める。Prepare）ので、状態を持たない。速さが MinHitSpeed 以上のボールに触れると吹き飛ぶ。
+        /// 動かない地形で跳ね（天井と壁ではよく跳ね返る）、転がって止まったら BlinkTicks だけ点滅して消える。ボールの道のりは人に関係なく
+        /// 決まる（作るときに地形から求める。Prepare）ので、状態を持たない。触れた人はバンパーのように弾き返され、速さが MinHitSpeed 以上の
+        /// ボールなら吹き飛ぶ（StageTraps）。
         /// </summary>
         Pitcher = 1,
     }
@@ -30,17 +31,21 @@ namespace Airerage.Core.Simulation
     /// </summary>
     public sealed class StageTrap
     {
-        /// <summary>ボールの重力（m/s²）と、跳ね返り・転がりの値【仮】。</summary>
+        /// <summary>ボールの重力（m/s²）と、床での跳ね返り・転がりの値【仮】。</summary>
         public const float BallGravity = 26f;
         public const float BallRestitution = 0.7f;
         public const float BallBounceFriction = 0.86f;
+
+        /// <summary>天井と壁での跳ね返り（面に垂直な速さの割合）と、面に沿う速さの割合【仮】（ユーザーの要望、2026-10-26: 大きく跳ね返る）。</summary>
+        public const float BallWallRestitution = 0.95f;
+        public const float BallWallFriction = 1f;
         public const float BallRollDeceleration = 5f;
         public const float BallStopSpeed = 0.6f;
 
         /// <summary>ボールが跳ねなくなる（転がり始める）上下の速さ（m/s）【仮】。</summary>
         public const float BallSettleSpeed = 2.4f;
 
-        /// <summary>ボールが飛んでいられる長さの上限（ティック。止まらなくても、ここで点滅を始める）【仮】。</summary>
+        /// <summary>ボールが飛んでいられる長さの上限（ティック。止まらなくても、ここで点滅を始める。点滅の間も動き続ける）【仮】。</summary>
         public const int BallMaxFlightTicks = 900;
 
         private Vector2[] _path = new Vector2[0];
@@ -152,8 +157,9 @@ namespace Airerage.Core.Simulation
 
         /// <summary>
         /// ボールの道のりを、動かない地形 terrain から求める（ピッチャーマシンだけ。SimWorld が作るときに呼ぶ。同じ地形なら、どの PC でも
-        /// 同じ道のりになる）。重力で落ち、地形で跳ね返り（BallRestitution。面に沿う向きは BallBounceFriction 倍）、跳ねなくなったら
-        /// 転がって（BallRollDeceleration）止まる。止まるか、飛んでいられる長さを超えたら、その場で BlinkTicks だけ点滅する。
+        /// 同じ道のりになる）。重力で落ち、床で跳ね返り（BallRestitution。面に沿う向きは BallBounceFriction 倍）、天井と壁ではよく跳ね返り
+        /// （BallWallRestitution・BallWallFriction）、跳ねなくなったら転がって（BallRollDeceleration）止まる。止まったら、その場で
+        /// BlinkTicks だけ点滅する。飛んでいられる長さを超えたら、動き続けながら BlinkTicks だけ点滅する。
         /// ステージの外（下）へ落ちたら、そこで終わる（点滅しない）。
         /// </summary>
         public void Prepare(ICollisionQuery terrain)
@@ -166,50 +172,13 @@ namespace Airerage.Core.Simulation
             Vector2 position = Muzzle;
             Vector2 velocity = LaunchVelocity;
             var half = new Vector3(HalfSize.X, HalfSize.Y, 0.5f);
-            float dt = SimTime.DeltaTime;
             bool rolling = false;
             bool fell = false;
+            bool stopped = false;
             path.Add(position);
             for (int t = 1; t <= BallMaxFlightTicks; t++)
             {
-                if (rolling)
-                {
-                    // 転がる: 横だけ動き、遅くなる。下に地面がなければ、また落ちる。
-                    float speed = MathF.Abs(velocity.X);
-                    speed = MathF.Max(0f, speed - BallRollDeceleration * dt);
-                    velocity = new Vector2(MathF.Sign(velocity.X) * speed, 0f);
-                    if (!terrain.SweepBox(new Vector3(position, 0f), half, new Vector3(0f, -0.05f, 0f), out _))
-                    {
-                        rolling = false;
-                    }
-                }
-                if (!rolling)
-                {
-                    velocity.Y -= BallGravity * dt;
-                }
-                Vector2 delta = velocity * dt;
-                if (delta.LengthSquared() > 0f && terrain.SweepBox(new Vector3(position, 0f), half, new Vector3(delta, 0f), out CastHit hit))
-                {
-                    float length = delta.Length();
-                    float along = MathF.Max(0f, hit.Distance - 0.002f);
-                    position += delta / length * along;
-                    var normal = new Vector2(hit.Normal.X, hit.Normal.Y);
-                    float into = Vector2.Dot(velocity, normal);
-                    if (into < 0f)
-                    {
-                        Vector2 tangent = velocity - normal * into;
-                        velocity = tangent * BallBounceFriction - normal * into * BallRestitution;
-                    }
-                    if (normal.Y > 0.7f && MathF.Abs(velocity.Y) < BallSettleSpeed)
-                    {
-                        velocity.Y = 0f;
-                        rolling = true;
-                    }
-                }
-                else
-                {
-                    position += delta;
-                }
+                StepBall(terrain, half, ref position, ref velocity, ref rolling);
                 path.Add(position);
                 if (position.Y < -80f || MathF.Abs(position.X) > 160f)
                 {
@@ -218,23 +187,73 @@ namespace Airerage.Core.Simulation
                 }
                 if (rolling && MathF.Abs(velocity.X) < BallStopSpeed)
                 {
+                    stopped = true;
                     break;
                 }
             }
             StopTick = path.Count - 1;
-            if (!fell)
+            for (int i = 0; i < BlinkTicks && !fell; i++)
             {
-                for (int i = 0; i < BlinkTicks; i++)
+                // 止まったボールはその場で、止まらなかったボールは動き続けながら点滅する。
+                if (!stopped)
                 {
-                    path.Add(position);
+                    StepBall(terrain, half, ref position, ref velocity, ref rolling);
+                    fell = position.Y < -80f || MathF.Abs(position.X) > 160f;
                 }
+                path.Add(position);
             }
             _path = path.ToArray();
         }
 
+        // ボールを 1 ティック進める（転がっている間は横だけ動いて遅くなり、下に地面がなければまた落ちる）。
+        private static void StepBall(ICollisionQuery terrain, Vector3 half, ref Vector2 position, ref Vector2 velocity, ref bool rolling)
+        {
+            float dt = SimTime.DeltaTime;
+            if (rolling)
+            {
+                float speed = MathF.Abs(velocity.X);
+                speed = MathF.Max(0f, speed - BallRollDeceleration * dt);
+                velocity = new Vector2(MathF.Sign(velocity.X) * speed, 0f);
+                if (!terrain.SweepBox(new Vector3(position, 0f), half, new Vector3(0f, -0.05f, 0f), out _))
+                {
+                    rolling = false;
+                }
+            }
+            if (!rolling)
+            {
+                velocity.Y -= BallGravity * dt;
+            }
+            Vector2 delta = velocity * dt;
+            if (delta.LengthSquared() > 0f && terrain.SweepBox(new Vector3(position, 0f), half, new Vector3(delta, 0f), out CastHit hit))
+            {
+                float length = delta.Length();
+                float along = MathF.Max(0f, hit.Distance - 0.002f);
+                position += delta / length * along;
+                var normal = new Vector2(hit.Normal.X, hit.Normal.Y);
+                float into = Vector2.Dot(velocity, normal);
+                bool floor = normal.Y > 0.7f;
+                if (into < 0f)
+                {
+                    Vector2 tangent = velocity - normal * into;
+                    velocity = floor
+                        ? tangent * BallBounceFriction - normal * into * BallRestitution
+                        : tangent * BallWallFriction - normal * into * BallWallRestitution;
+                }
+                if (floor && MathF.Abs(velocity.Y) < BallSettleSpeed)
+                {
+                    velocity.Y = 0f;
+                    rolling = true;
+                }
+            }
+            else
+            {
+                position += delta;
+            }
+        }
+
         /// <summary>
         /// ピッチャーマシンのボールが、ティック tick にあるか（あれば、打ち出してからのティック age と位置と速度）。点滅している間は
-        /// blinking。道のりを求めていなければ、ない。
+        /// blinking。道のりを求めていなければ、ない。試合の始まりより前に打ち出したことになるボールもない。
         /// </summary>
         public bool TryGetBall(int tick, out int age, out Vector2 position, out Vector2 velocity, out bool blinking)
         {
@@ -252,7 +271,8 @@ namespace Airerage.Core.Simulation
                 return false;
             }
             age = (int)(shifted % Period);
-            if (age >= _path.Length)
+            // 試合が始まる前に打ち出したことになるボールは、ない（最初のボールは Period - PhaseTicks のティックに打ち出す）。
+            if (age >= _path.Length || tick - age < 0)
             {
                 return false;
             }

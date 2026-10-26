@@ -8,8 +8,9 @@ namespace Airerage.Editor.Stages
     /// 陸上競技場（STORM STADIUM。STORM RUNNER のテーマのステージ。ユーザーの案、2026-10-26）。いちばん下はトラックが地続きで、撃破の線は
     /// 左右と上にしかない（トラックは左右の撃破の線の外まで続く。下へは落ちない）。真ん中に表彰台、左右にスタンドと照明塔、上に
     /// 大きな得点板。足場は少なく、空中のたくさんのアンカー（大きいアンカーもある）で飛び回る（ユーザーの要望、2026-10-26）。
-    /// ギミック: ピッチャーマシン（照明塔の柱に付いていて、10 秒ずつずらして 20 秒ごとに野球のボールを空中へ打ち出す。ボールは跳ね回り、
-    /// 止まったら点滅して消える。速いボールに当たると吹き飛ぶ。ユーザーの要望）。追加の案（残したもの）: 短距離のレーン（真ん中へ向かう
+    /// ギミック: ピッチャーマシン（照明塔の柱に付いていて、10 秒ずつずらして 20 秒ごとに大きな野球のボールを空中へ強く打ち出す。ボールは
+    /// 天井と壁で大きく跳ね返りながら跳ね回り、止まったら点滅して消える。触れるとバンパーのように弾き返され、速いボールなら吹き飛ぶ。
+    /// ユーザーの要望）。追加の案（残したもの）: 短距離のレーン（真ん中へ向かう
     /// スピードレーン）とハードル、棒高跳び（左右対称の発射台）、走り幅跳びの踏み切り板、スタンドのジャンプ台、つむじ風（表彰台の上を
     /// 行き来する上昇気流）、得点板へ向かう加速リング、スタンドの屋根と照明塔、得点板、旗（アンカー）。消したもの（ユーザーの要望）:
     /// 追い風と向かい風（全体の風）、転がる砲丸。
@@ -113,19 +114,20 @@ namespace Airerage.Editor.Stages
                     // スタンドの上のジャンプ台。
                     ZoneSpec.OnFloor("StandPadWest", StageZoneKind.JumpPad, -47f, -45.5f, 5f, Vector2.up, 26f, 0.4f),
                     ZoneSpec.OnFloor("StandPadEast", StageZoneKind.JumpPad, 45.5f, 47f, 5f, Vector2.up, 26f, 0.4f),
-                    // つむじ風: 表彰台の上を左右に行き来する上昇気流。
-                    new ZoneSpec("DustDevil", StageZoneKind.Updraft, new Vector2(-6f, 8f), new Vector2(3f, 16f), Vector2.up, 50f, 14f)
+                    // つむじ風: 表彰台の上を左右に行き来する上昇気流（前の幅 2 倍・高さ 1.6 倍。得点板の 2m 下まで。ユーザーの要望、2026-10-26）。
+                    new ZoneSpec("DustDevil", StageZoneKind.Updraft, new Vector2(-6f, 13f), new Vector2(6f, 26f), Vector2.up, 50f, 14f)
                         .Moving(new Vector2(12f, 0f), 12f),
                     // 得点板へ向かう加速リング。
                     new ZoneSpec("RingWest", StageZoneKind.BoostRing, new Vector2(-20f, 16f), new Vector2(2.4f, 3f), new Vector2(1f, 0.5f), 18f),
                     new ZoneSpec("RingEast", StageZoneKind.BoostRing, new Vector2(20f, 16f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.5f), 18f),
                 },
                 // ピッチャーマシン（ユーザーの要望、2026-10-26）: 照明塔の柱の内側に付いていて、20 秒ごとに真ん中へ打ち出す（左右で 10 秒ずらす。
-                // 最初は 5 秒後）。当たると威力 10 の枚数のコインを落とし、吹き飛ぶ【仮】。
+                // 最初は右が 5 秒後、左が 15 秒後）。ボールは半径 0.8m（前の 2 倍）で、前より強く打ち出す。触れるとバンパーのように弾き返され、速いボールなら
+                // 吹き飛んで威力 10 の枚数のコインを落とす【仮】。
                 Traps = new[]
                 {
-                    TrapSpec.Pitcher("PitcherWest", new Vector2(-31.4f, 16f), new Vector2(14f, 9f), 20f, 5f, 0.4f, 10, 24f, 7f, 1.5f),
-                    TrapSpec.Pitcher("PitcherEast", new Vector2(31.4f, 16f), new Vector2(-14f, 9f), 20f, 15f, 0.4f, 10, 24f, 7f, 1.5f),
+                    TrapSpec.Pitcher("PitcherWest", new Vector2(-31.4f, 16f), new Vector2(26f, 18f), 20f, 5f, 0.8f, 10, 24f, 7f, 1.5f),
+                    TrapSpec.Pitcher("PitcherEast", new Vector2(31.4f, 16f), new Vector2(-26f, 18f), 20f, 15f, 0.8f, 10, 24f, 7f, 1.5f),
                 },
                 Coins = new (Vector2, int)[]
                 {
@@ -168,7 +170,8 @@ namespace Airerage.Editor.Stages
                     new Vector2(0f, 6.5f), new Vector2(-46f, 11f), new Vector2(46f, 11f), new Vector2(-32.7f, 27.5f), new Vector2(32.7f, 27.5f),
                     new Vector2(-12f, 33f), new Vector2(-20f, 11f), new Vector2(20f, 11f),
                 },
-                Spawns = new[] { new Vector3(-9f, 1f, 0f), new Vector3(9f, 1f, 0f), new Vector3(-43.5f, 3.5f, 0f), new Vector3(43.5f, 3.5f, 0f) },
+                // トラックの出現位置は、大きくなったつむじ風（左右の端で x = ±9 まで）の外（2026-10-26）。
+                Spawns = new[] { new Vector3(-10.5f, 1f, 0f), new Vector3(10.5f, 1f, 0f), new Vector3(-43.5f, 3.5f, 0f), new Vector3(43.5f, 3.5f, 0f) },
                 Decorate = Decorate,
             };
         }

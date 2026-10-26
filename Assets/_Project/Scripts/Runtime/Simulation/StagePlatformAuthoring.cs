@@ -55,8 +55,14 @@ namespace Airerage.Runtime.Simulation
         [Tooltip("周期で開く扉: 周期と、周期の初めの開いている長さ（秒。周期が 0 なら周期では開かない。ずれは _phaseSeconds）")]
         [SerializeField] private float _openEverySeconds;
         [SerializeField] private float _openForSeconds;
+        [Tooltip("道のりを動く足場: 箱の中心をアンカーポイントにするか（埠頭の動くボラード）と、エイムアシストの半径（m。0 ならふつう）")]
+        [SerializeField] private bool _anchor;
+        [SerializeField] private float _anchorRadius;
 
         public StagePlatformKind Kind => _kind;
+
+        /// <summary>箱の中心がアンカーポイントか（道のりを動く足場だけ）。</summary>
+        public bool HasAnchor => _anchor && _kind == StagePlatformKind.Path;
         public Vector2 Size => _size;
         public int Group => _group;
 
@@ -73,6 +79,13 @@ namespace Airerage.Runtime.Simulation
             _activeFromSeconds = activeFromSeconds;
             _activeToSeconds = activeToSeconds;
             _smooth = smooth;
+        }
+
+        /// <summary>道のりを動く足場の箱の中心を、アンカーポイントにする（シーンのビルダー用。radius はエイムアシストの半径。0 ならふつう）。</summary>
+        public void ConfigureAnchor(bool anchor, float radius = 0f)
+        {
+            _anchor = anchor;
+            _anchorRadius = radius;
         }
 
         /// <summary>
@@ -127,8 +140,9 @@ namespace Airerage.Runtime.Simulation
             {
                 keys[i] = new PlatformKey(Ticks(_keys[i].Seconds), new NVector2(_keys[i].Offset.x, _keys[i].Offset.y));
             }
-            return StagePlatform.Path(origin, half, _attachable, keys, Ticks(_periodSeconds), Ticks(_phaseSeconds), Ticks(_activeFromSeconds),
-                Ticks(_activeToSeconds), _smooth);
+            StagePlatform platform = StagePlatform.Path(origin, half, _attachable, keys, Ticks(_periodSeconds), Ticks(_phaseSeconds),
+                Ticks(_activeFromSeconds), Ticks(_activeToSeconds), _smooth);
+            return _anchor ? platform.WithAnchor(_anchorRadius) : platform;
         }
 
         private static int Ticks(float seconds)

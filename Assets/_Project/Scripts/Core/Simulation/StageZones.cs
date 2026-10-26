@@ -457,7 +457,7 @@ namespace Airerage.Core.Simulation
         }
 
         // ステージの危険に当たる状態か（撃破されて待っている間・復帰の無敵の間は当たらない）。
-        private static bool CanBeHitByStage(in CharacterState state)
+        internal static bool CanBeHitByStage(in CharacterState state)
         {
             return !state.Combat.IsWaitingToRespawn && state.Combat.InvincibleTicksLeft <= 0;
         }

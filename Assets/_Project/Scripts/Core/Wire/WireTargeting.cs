@@ -109,7 +109,7 @@ namespace Airerage.Core.Wire
 
                 bool better = angle < bestAngle - SimMath.Epsilon
                     || (angle <= bestAngle + SimMath.Epsilon && distance < bestDistance);
-                if (!better || !HasLineOfSight(origin, anchors[i], collision))
+                if (!better || !HasLineOfSight(origin, anchors[i], collision, AnchorBodyOf(collision, i)))
                 {
                     continue;
                 }
@@ -178,8 +178,9 @@ namespace Airerage.Core.Wire
 
         /// <summary>
         /// from から to までの間に地形がないか。to が地形の表面にある場合も、その面自体は遮蔽とみなさない。
+        /// ownBody が 0 でなければ、最初に当たったのがその物（to のアンカーが付いている動く足場）なら遮蔽とみなさない。
         /// </summary>
-        public static bool HasLineOfSight(Vector3 from, Vector3 to, ICollisionQuery collision)
+        public static bool HasLineOfSight(Vector3 from, Vector3 to, ICollisionQuery collision, int ownBody = 0)
         {
             Vector3 delta = to - from;
             delta.Z = 0f;
@@ -189,7 +190,27 @@ namespace Airerage.Core.Wire
             {
                 return true;
             }
-            return !collision.Raycast(from, delta / distance, checkDistance, out _);
+            return !collision.Raycast(from, delta / distance, checkDistance, out CastHit hit) || (ownBody != 0 && hit.Body == ownBody);
+        }
+
+        /// <summary>point が、今もアンカーポイントか（動く足場のアンカーは動くと変わる。置かれた物のアンカーはなくなることがある）。</summary>
+        public static bool IsAnchorPoint(ICollisionQuery collision, Vector3 point)
+        {
+            var anchors = collision.AnchorPoints;
+            for (int i = 0; i < anchors.Count; i++)
+            {
+                if (anchors[i].X == point.X && anchors[i].Y == point.Y)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // アンカーポイント index が付いている物（動く足場なら番号 + 1。ほかは 0）。
+        private static int AnchorBodyOf(ICollisionQuery collision, int index)
+        {
+            return collision is WorldCollision world ? world.AnchorBodyOf(index) : 0;
         }
     }
 }

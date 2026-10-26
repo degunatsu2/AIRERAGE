@@ -89,6 +89,60 @@ namespace Airerage.Core.Tests.Simulation
             Assert.That(world.GetState(0).Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.AnchorGone));
         }
 
+        // 上下に動くアンカー付きのボラード（埠頭。中心 (x, 1.45) から、wait ティック待って move ティックで rise m 上へ、そのまま止まる）。
+        private static StagePlatform Bollard(float x, int wait, int move, float rise)
+        {
+            return StagePlatform.Path(new Vector2(x, 1.45f), new Vector2(0.45f, 0.45f), true,
+                new[] { new PlatformKey(0, Vector2.Zero), new PlatformKey(wait, Vector2.Zero), new PlatformKey(wait + move, new Vector2(0f, rise)) },
+                wait + move + 600).WithAnchor();
+        }
+
+        [Test]
+        public void AnAnchorOnAMovingPlatform_IsAimedAt_AndCarriesTheWireUp()
+        {
+            var world = new SimWorld(new BoxTerrain().AddBox(-30f, -2f, 30f, 0f), null, null, null, null, null, new[] { Bollard(4f, 60, 60, 10f) });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-3f, Movement.HalfHeight, 0f), 1);
+            Step(world, 1);
+            var collision = (Airerage.Core.Objects.WorldCollision)world.Collision;
+            int last = collision.AnchorPoints.Count - 1;
+            Assert.That(collision.AnchorPoints[last].X, Is.EqualTo(4f), "動く足場の中心がアンカーにならない");
+            Assert.That(collision.AnchorPoints[last].Y, Is.EqualTo(1.45f).Within(1e-4f));
+            Assert.That(collision.AnchorBodyOf(last), Is.EqualTo(1), "アンカーの足場を覚えない");
+            // 少しずれた照準でも、エイムアシストでボラードへ向かい、ボラードの箱につながる。
+            var aim = new Vector2(1f, 0.15f);
+            for (int t = 0; t < 30 && world.GetState(0).Wire.Phase != WirePhase.Attached; t++)
+            {
+                Step(world, 1, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(aim));
+            }
+            CharacterState attached = world.GetState(0);
+            Assert.That(attached.Wire.Phase, Is.EqualTo(WirePhase.Attached), "動くボラードのアンカーにつながらない");
+            Assert.That(attached.Wire.AnchorBody, Is.EqualTo(1), "ボラードにつながっていない（空中につながった）");
+            float startY = attached.Wire.Anchor.Y;
+            // ボラードが上がると、接続点も一緒に上がる。
+            Step(world, 125 - world.Tick, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(aim));
+            CharacterState carried = world.GetState(0);
+            Assert.That(carried.Wire.Phase, Is.EqualTo(WirePhase.Attached), "運ばれる間にワイヤーが外れた");
+            Assert.That(carried.Wire.Anchor.Y, Is.EqualTo(startY + 10f).Within(0.05f), "接続点がボラードと一緒に上がらない");
+            Assert.That(carried.Position.Y, Is.GreaterThan(Movement.HalfHeight + 3f), "ワイヤーで引き上げられない");
+        }
+
+        [Test]
+        public void AHookAimedAtAMovingAnchor_MissesIfTheAnchorHasMovedAway()
+        {
+            // 撃ってすぐボラードが上へ速く動く。フックは撃ったときの位置へ飛ぶが、もうないので、何もない所にはつながらない。
+            var world = new SimWorld(new BoxTerrain().AddBox(-30f, -2f, 30f, 0f), null, null, null, null, null, new[] { Bollard(6f, 2, 8, 12f) });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-4f, Movement.HalfHeight, 0f), 1);
+            var aim = new Vector2(1f, 0.05f);
+            bool attached = false;
+            for (int t = 0; t < 40; t++)
+            {
+                Step(world, 1, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(aim));
+                attached |= world.GetState(0).Wire.Phase == WirePhase.Attached;
+            }
+            Assert.That(attached, Is.False, "動いて離れたアンカーの元の位置（空中）につながった");
+            Assert.That(world.GetState(0).Wire.LastMissReason, Is.EqualTo(WireMissReason.OutOfRange));
+        }
+
         // 床（上面 y = 0）と天井（y = 4〜6。扉の通る穴 x = -0.5〜0.5 を開ける）。扉は穴の下（y = 0〜4）を閉じ、3.5m 上へ開く。
         private static SimWorld DoorWorld(out StagePlatform door)
         {

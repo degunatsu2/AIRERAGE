@@ -12,7 +12,7 @@ namespace Airerage.Editor.Stages
     /// ギミック（ユーザーの要望、2026-10-26）: 悪魔の手（墓場と農園の地面を這い回り、捕まると握られて時空に吸い込まれ、その側の牢屋へ
     /// 移される）、牢屋（10 秒に 1 回、左右の格子が開いて通れる）、落雷（墓場と農園のランダムな場所。予告は表示だけで音はない）。
     /// 追加の案（残したもの）: カボチャの発射台、鬼火の輪（加速リング）、空飛ぶ棺のふた（動く足場）、カカシの腕、ガーゴイル（アンカー）、
-    /// ポーチのジャンプ台。消したもの（ユーザーの要望）: 井戸（ワープ）、堀（水）、赤い満月の光（低重力）、棺桶・幽霊・トマト（バンパー）、
+    /// ポーチのジャンプ台。ユーザーの要望で足したもの（2026-10-26）: 納骨堂の屋根のジャンプ台、右の端を牢屋の高さまで上下する鎖の昇降台。消したもの（ユーザーの要望）: 井戸（ワープ）、堀（水）、赤い満月の光（低重力）、棺桶・幽霊・トマト（バンパー）、
     /// コウモリの群れ（風）。
     /// </summary>
     internal static class ManorStage
@@ -66,8 +66,8 @@ namespace Airerage.Editor.Stages
                     new TerrainBox("DeadTreeBranch", -46f, 12f, -40f, 12.5f, attachable: true),
                     // 真ん中の館（玄関のポーチ、バルコニー、屋根、鐘楼、煙突）。
                     new TerrainBox("Porch", -14f, -30f, 14f, 2f),
-                    new TerrainBox("BalconyWest", -12f, 10f, -6f, 10.6f, attachable: true),
-                    new TerrainBox("BalconyEast", 6f, 10f, 12f, 10.6f, attachable: true),
+                    // バルコニー（真ん中に 1 つ。ポーチのジャンプ台の上を空け、跳んでも頭がぶつからない。ユーザーの要望、2026-10-26）。
+                    new TerrainBox("Balcony", -6f, 10f, 6f, 10.6f, attachable: true),
                     new TerrainBox("RoofWest", -14f, 20f, -2f, 20.8f, attachable: true),
                     new TerrainBox("RoofEast", 2f, 20f, 14f, 20.8f, attachable: true),
                     new TerrainBox("BellTower", -2f, 20f, 2f, 32f, attachable: true),
@@ -86,10 +86,10 @@ namespace Airerage.Editor.Stages
                     new TerrainBox("PrisonFloorEast", 35f, 27f, 45f, 27.6f),
                     new TerrainBox("PrisonRoofEast", 35.6f, 32.6f, 44.4f, 33.2f),
                 },
-                // ガーゴイル、枯れ木の枝先、カカシの頭、鐘。
+                // ガーゴイル（屋根の端より外の、少し下。ユーザーの要望、2026-10-26）、枯れ木の枝先、カカシの頭、鐘。
                 Anchors = new[]
                 {
-                    new Vector2(-14f, 23f), new Vector2(14f, 23f), new Vector2(0f, 38f), new Vector2(-42f, 15f), new Vector2(31f, 7.5f),
+                    new Vector2(-17f, 18f), new Vector2(17f, 18f), new Vector2(0f, 38f), new Vector2(-42f, 15f), new Vector2(31f, 7.5f),
                     new Vector2(41f, 7.5f), new Vector2(-24f, 28f), new Vector2(24f, 28f), new Vector2(-30f, 18f),
                 },
                 // 館と墓場・農園の間の谷の底が撃破の線。
@@ -114,9 +114,10 @@ namespace Airerage.Editor.Stages
                     // 鬼火の輪（加速リング）: 墓場と農園の上から館の屋根へ。
                     new ZoneSpec("WispRingWest", StageZoneKind.BoostRing, new Vector2(-24f, 22f), new Vector2(2.4f, 3f), new Vector2(1f, 0.2f), 18f),
                     new ZoneSpec("WispRingEast", StageZoneKind.BoostRing, new Vector2(24f, 22f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.2f), 18f),
-                    // 館のポーチのジャンプ台。
+                    // 館のポーチのジャンプ台と、納骨堂の屋根のジャンプ台（ユーザーの要望、2026-10-26）。
                     ZoneSpec.OnFloor("PorchPadWest", StageZoneKind.JumpPad, -11f, -9f, 2f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("PorchPadEast", StageZoneKind.JumpPad, 9f, 11f, 2f, Vector2.up, 24f, 0.4f),
+                    ZoneSpec.OnFloor("CryptPad", StageZoneKind.JumpPad, -32f, -30f, 5.6f, Vector2.up, 24f, 0.4f),
                 },
                 Platforms = new[]
                 {
@@ -127,6 +128,12 @@ namespace Airerage.Editor.Stages
                     // 牢屋の格子（ユーザーの要望、2026-10-26）: 10 秒ごとに 3 秒だけ、左右が上に開く（0.4 秒で開き、0.8 秒で閉じる）。
                     PrisonBars("PrisonBarsWestOuter", -44.7f), PrisonBars("PrisonBarsWestInner", -35.3f),
                     PrisonBars("PrisonBarsEastInner", 35.3f), PrisonBars("PrisonBarsEastOuter", 44.7f),
+                    // 鎖の昇降台（ユーザーの要望、2026-10-26）: 右の端で、農園の地面の高さから牢屋の高さまで 14 秒で上下する（端の赤いコインと
+                    // 3 枚のコインを通る。ワイヤーがつながる）。
+                    new PlatformSpec("ChainLift", new Vector2(51.5f, 0.5f), new Vector2(3.4f, 0.5f), true)
+                        .Path(14f, (0f, Vector2.zero), (1.5f, Vector2.zero), (6.5f, new Vector2(0f, 27.5f)), (8.5f, new Vector2(0f, 27.5f)),
+                            (13.5f, Vector2.zero))
+                        .Eased().Looks(ChainLiftLooks),
                 },
                 Coins = new (Vector2, int)[]
                 {
@@ -140,7 +147,7 @@ namespace Airerage.Editor.Stages
                     (new Vector2(-38f, 18f), 1), (new Vector2(-30f, 22f), 1), (new Vector2(-36f, 25f), 3),
                     // 館のポーチと玄関。
                     (new Vector2(-6f, 4f), 1), (new Vector2(-2f, 4f), 1), (new Vector2(2f, 4f), 1), (new Vector2(6f, 4f), 1), (new Vector2(0f, 7f), 3),
-                    // バルコニーと、その間。
+                    // ジャンプ台の上と、バルコニーの上。
                     (new Vector2(-10.5f, 12.5f), 1), (new Vector2(10.5f, 12.5f), 1), (new Vector2(-3f, 13f), 1), (new Vector2(3f, 13f), 1),
                     (new Vector2(0f, 16f), 20),
                     // 屋根の上と鐘楼。
@@ -175,7 +182,7 @@ namespace Airerage.Editor.Stages
                     new Vector2(-8f, 24.5f), new Vector2(-9f, 14f), new Vector2(9f, 14f), new Vector2(-37.5f, 6.5f), new Vector2(37f, 9f),
                     new Vector2(0f, 39f), new Vector2(-30f, 13f), new Vector2(-32f, -3.5f),
                 },
-                Spawns = new[] { new Vector3(-4f, 3f, 0f), new Vector3(4f, 3f, 0f), new Vector3(-9f, 11.6f, 0f), new Vector3(9f, 11.6f, 0f) },
+                Spawns = new[] { new Vector3(-4f, 3f, 0f), new Vector3(4f, 3f, 0f), new Vector3(-4.5f, 11.6f, 0f), new Vector3(4.5f, 11.6f, 0f) },
                 Decorate = Decorate,
             };
         }
@@ -184,6 +191,18 @@ namespace Airerage.Editor.Stages
         private static PlatformSpec PrisonBars(string name, float x)
         {
             return PlatformSpec.TimedDoor(name, new Vector2(x, 30.1f), new Vector2(0.6f, 5f), 5.6f, 0.4f, 0.8f, 10f, 3f).Looks(BarsLooks);
+        }
+
+        // 鎖の昇降台: 古い木の板と鉄の縁、上へ伸びる 2 本の鎖（台と一緒に動く）。
+        private static void ChainLiftLooks(StageDecor decor, Transform visual, PlatformSpec spec)
+        {
+            decor.Box("Plank", visual, Vector3.zero, new Vector3(spec.Size.x, spec.Size.y, 4f), decor.Lit("LiftWood", new Color(0.3f, 0.2f, 0.14f)));
+            Material iron = decor.Lit("LiftIron", new Color(0.2f, 0.2f, 0.22f));
+            decor.Box("RimFront", visual, new Vector3(0f, -spec.Size.y * 0.25f, -2.05f), new Vector3(spec.Size.x * 1.02f, spec.Size.y * 0.4f, 0.1f), iron);
+            foreach (float x in new[] { -spec.Size.x * 0.42f, spec.Size.x * 0.42f })
+            {
+                decor.Box("Chain", visual, new Vector3(x, 4.2f, 1.7f), new Vector3(0.12f, 8f, 0.12f), iron);
+            }
         }
 
         // 格子: 黒い鉄の縦の棒と、上下の横の帯。

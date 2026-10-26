@@ -14,12 +14,16 @@ namespace Airerage.Core.Objects
     /// クリーム（E）の上では、オレンジならつながり、抹茶ならつながらない（ロープの遮りと巻き付きは、地形だけを調べる）。
     /// ステージの動く足場と扉（StagePlatform。ユーザーの要望、2026-10-26）は、ティックごとに SetPlatforms でその位置の箱を作り、地形と
     /// 同じように調べる（当たった物は CastHit.Body。足場の番号 + 1）。ロープの巻き付きの角は、動かない地形だけ。
+    /// アンカーのある足場（StagePlatform.HasAnchor。埠頭の動くボラード）は、その位置の中心をアンカーポイントの最後に加える
+    /// （AnchorBodyOf がその足場の番号 + 1。ほかのアンカーは 0）。
     /// </summary>
     public sealed class WorldCollision : ICollisionQuery
     {
         private readonly ICollisionQuery _terrain;
         private readonly List<Vector3> _anchors = new List<Vector3>();
         private readonly List<float> _anchorRadii = new List<float>();
+        private readonly List<int> _anchorBodies = new List<int>();
+        private int _fixedAnchors;
         private readonly List<WorldObject> _hookObjects = new List<WorldObject>();
         private readonly BoxTerrain _platforms = new BoxTerrain();
         private bool _hasPlatforms;
@@ -42,6 +46,12 @@ namespace Airerage.Core.Objects
 
         public IReadOnlyList<RopeCorner> RopeCorners => _terrain.RopeCorners;
 
+        /// <summary>アンカーポイント index が付いている物（動く足場なら番号 + 1。動かない地形と置かれた物は 0）。</summary>
+        public int AnchorBodyOf(int index)
+        {
+            return index >= 0 && index < _anchorBodies.Count ? _anchorBodies[index] : 0;
+        }
+
         /// <summary>アンカーポイントを、地形のものと、objects のうちアンカーになる物から作り直す。</summary>
         public void Refresh(WorldObjects objects)
         {
@@ -50,6 +60,12 @@ namespace Airerage.Core.Objects
             _anchorRadii.Clear();
             _anchorRadii.AddRange(_terrain.AnchorRadii);
             _hookObjects.Clear();
+            _anchorBodies.Clear();
+            for (int i = 0; i < _anchors.Count; i++)
+            {
+                _anchorBodies.Add(0);
+            }
+            _fixedAnchors = _anchors.Count;
             if (objects == null)
             {
                 return;
@@ -60,6 +76,8 @@ namespace Airerage.Core.Objects
                 {
                     _anchors.Add(new Vector3(item.Position.X, item.Position.Y, 0f));
                     _anchorRadii.Add(0f);
+                    _anchorBodies.Add(0);
+                    _fixedAnchors = _anchors.Count;
                 }
                 if (!item.Ended && (item.Kind == WorldObjectKind.CottonCandy || item.Kind == WorldObjectKind.CreamPatch))
                 {
@@ -68,11 +86,18 @@ namespace Airerage.Core.Objects
             }
         }
 
-        /// <summary>動く足場と扉の当たりを、ティック tick の位置で作り直す（ない足場は入れない）。</summary>
+        /// <summary>動く足場と扉の当たりを、ティック tick の位置で作り直す（ない足場は入れない）。足場のアンカーも作り直す。</summary>
         public void SetPlatforms(IReadOnlyList<StagePlatform> platforms, StageState stage, int tick)
         {
             _platforms.Clear();
             _hasPlatforms = false;
+            if (_anchors.Count > _fixedAnchors)
+            {
+                int extra = _anchors.Count - _fixedAnchors;
+                _anchors.RemoveRange(_fixedAnchors, extra);
+                _anchorRadii.RemoveRange(_fixedAnchors, extra);
+                _anchorBodies.RemoveRange(_fixedAnchors, extra);
+            }
             if (platforms == null)
             {
                 return;
@@ -86,6 +111,12 @@ namespace Airerage.Core.Objects
                 platforms[i].BoundsAt(center, out Vector2 min, out Vector2 max);
                 _platforms.AddBox(min.X, min.Y, max.X, max.Y, platforms[i].Attachable, i + 1);
                 _hasPlatforms = true;
+                if (platforms[i].HasAnchor)
+                {
+                    _anchors.Add(new Vector3(center.X, center.Y, 0f));
+                    _anchorRadii.Add(platforms[i].AnchorRadius);
+                    _anchorBodies.Add(i + 1);
+                }
             }
         }
 

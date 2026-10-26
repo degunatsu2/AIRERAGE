@@ -58,6 +58,8 @@ namespace Airerage.Core.Simulation
     /// - 扉（Door）: 閉じた位置（Origin）から OpenHeight だけ上に開く。開き具合は 0〜DoorScale（StageState）。開く条件は
     ///   StagePlatformKind.Door。
     /// - ボタン（Button）: 動かない。ワイヤーをつなぐと、同じ Group の扉が開く。
+    /// HasAnchor なら、箱の中心がアンカーポイントにもなる（埠頭の動くボラード。エイムアシストの半径は AnchorRadius。0 ならふつうの
+    /// アンカーと同じ。ワイヤーは箱につながり、足場と一緒に動く。WithAnchor。ユーザーの要望、2026-10-26）。
     /// 値は作るときに検査する（不正なら ArgumentException）。
     /// </summary>
     public sealed class StagePlatform
@@ -119,6 +121,10 @@ namespace Airerage.Core.Simulation
         /// <summary>周期で開く扉の周期と、周期の初めの開いている長さ（ティック。OpenPeriod が 0 なら周期では開かない）。ずれは PhaseTicks。</summary>
         public int OpenPeriod { get; }
         public int OpenWindow { get; }
+
+        /// <summary>箱の中心がアンカーポイントか（WithAnchor）と、そのエイムアシストの半径（m。0 ならふつうのアンカーと同じ）。</summary>
+        public bool HasAnchor { get; private set; }
+        public float AnchorRadius { get; private set; }
 
         public bool IsDoor => Kind == StagePlatformKind.Door;
         public bool IsButton => Kind == StagePlatformKind.Button;
@@ -193,6 +199,18 @@ namespace Airerage.Core.Simulation
             }
             return new StagePlatform(StagePlatformKind.Button, center, halfSize, true, new[] { new PlatformKey(0, Vector2.Zero) }, 1,
                 0, 0, 0, false, 0f, 0, 0, group);
+        }
+
+        /// <summary>箱の中心をアンカーポイントにする（radius はエイムアシストの半径。0 ならふつうのアンカーと同じ）。この足場を返す。</summary>
+        public StagePlatform WithAnchor(float radius = 0f)
+        {
+            if (!(radius >= 0f) || float.IsInfinity(radius))
+            {
+                throw new ArgumentException($"動く足場のアンカーの半径が不正です（{radius}）");
+            }
+            HasAnchor = true;
+            AnchorRadius = radius;
+            return this;
         }
 
         private static void ValidateDoor(float openHeight, int openTicks, int closeTicks)
@@ -326,7 +344,8 @@ namespace Airerage.Core.Simulation
         {
             return other != null && CompareTo(other) == 0 && Attachable == other.Attachable && ActiveFrom == other.ActiveFrom
                 && ActiveTo == other.ActiveTo && Smooth == other.Smooth && OpenHeight.Equals(other.OpenHeight) && OpenTicks == other.OpenTicks
-                && CloseTicks == other.CloseTicks && Group == other.Group && OpenPeriod == other.OpenPeriod && OpenWindow == other.OpenWindow;
+                && CloseTicks == other.CloseTicks && Group == other.Group && OpenPeriod == other.OpenPeriod && OpenWindow == other.OpenWindow
+                && HasAnchor == other.HasAnchor && AnchorRadius.Equals(other.AnchorRadius);
         }
 
         public override string ToString()
