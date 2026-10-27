@@ -199,6 +199,7 @@ namespace Airerage.Editor.Stages
             return new StageLayout
             {
                 Id = "CityNight",
+                Music = "CityNight",
                 DisplayName = "SKYLINE NIGHT",
                 Description = "The same rooftops after dark. Neon signs bounce you, subway vents blast up from the canyons.",
                 DescriptionJa = "夜の同じ屋上。ネオン看板に弾かれ、ビルの谷間では地下鉄の通風口が上へ吹き上げる。",

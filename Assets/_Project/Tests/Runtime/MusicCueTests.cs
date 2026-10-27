@@ -14,7 +14,7 @@ namespace Airerage.Runtime.Tests
     /// 始まり 8.170 秒、1 周 58.904 秒、終わりは曲の終わり）。恐怖の館の曲は、LOOPLENGTH に曲全体の長さが入っていたので、
     /// ループの長さ（曲の終わり − 始まり）に直し、その後に頭の無音（1.662 秒）を切った（ループの位置は同じ。44.1kHz、始まり 8.791 秒、
     /// 終わりは曲の終わり）。研究所の曲と競技場の曲は、くり返しの波形からループを作った（44.1kHz。研究所は始まり 8.540 秒・1 周 59.077 秒、
-    /// 競技場は始まり 13.480 秒・1 周 53.161 秒）。
+    /// 競技場は始まり 13.480 秒・1 周 53.161 秒、夜のビル街は始まり 15.820 秒・1 周 76.820 秒）。
     /// </summary>
     public sealed class MusicCueTests
     {
@@ -83,6 +83,7 @@ namespace Airerage.Runtime.Tests
 
         [TestCase(LabMusicPath, LabCuePath, 376614, 2605292)]
         [TestCase("Assets/_Project/Audio/Music/Stadium.ogg", "Assets/_Project/Data/Audio/StadiumMusic.asset", 594468, 2344395)]
+        [TestCase("Assets/_Project/Audio/Music/CityNight.ogg", "Assets/_Project/Data/Audio/CityNightMusic.asset", 697662, 3387776)]
         public void StageMusic_LoopTags_AndCue(string musicPath, string cuePath, long loopStart, long loopLength)
         {
             Dictionary<string, string> tags = OggLoopTags.Read(musicPath);

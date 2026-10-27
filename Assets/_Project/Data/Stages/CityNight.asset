@@ -18,4 +18,4 @@ MonoBehaviour:
     blast up from the canyons.
   _descriptionJa: "\u591C\u306E\u540C\u3058\u5C4B\u4E0A\u3002\u30CD\u30AA\u30F3\u770B\u677F\u306B\u5F3E\u304B\u308C\u3001\u30D3\u30EB\u306E\u8C37\u9593\u3067\u306F\u5730\u4E0B\u9244\u306E\u901A\u98A8\u53E3\u304C\u4E0A\u3078\u5439\u304D\u4E0A\u3052\u308B\u3002"
   _color: {r: 0.85, g: 0.3, b: 1, a: 1}
-  _music: {fileID: 0}
+  _music: {fileID: 11400000, guid: 2fc6474b9201e383bbd0194c2bd31f6b, type: 2}
