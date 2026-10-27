@@ -11,8 +11,7 @@ namespace Airerage.Runtime.Audio
     /// 曲を選ぶ: タイトル・メインメニュー・オプション・ネットワーク対戦の接続と待機所はタイトルの曲、キャラクター選択・CPU の強さ・
     /// ステージ選択は選択の曲。曲が変わるときは今の曲を小さくして止めてから、次の曲を頭から鳴らす（小さくしている途中で元の画面へ
     /// 戻ったら、止めずに大きさを戻す）。
-    /// ループは 2 つの AudioSource を交互に PlayScheduled で予約して、サンプルの単位でつなぐ（前奏は 1 回だけ）。
-    /// 音量はオプションの BGM の音量（GameSettings）を掛ける。
+    /// ループは LoopingMusic が、サンプルの単位でつなぐ（前奏は 1 回だけ）。音量はオプションの BGM の音量（GameSettings）を掛ける。
     /// </summary>
     public sealed class MusicPlayer : MonoBehaviour
     {
@@ -25,10 +24,6 @@ namespace Airerage.Runtime.Audio
             Select,
         }
 
-        // 最初の予約までの余裕と、切り替わってから次の予約をするまでの待ち（秒）。
-        private const double StartDelay = 0.1;
-        private const double RescheduleAfter = 0.1;
-
         [Tooltip("タイトル・メインメニューの曲")]
         [SerializeField] private MusicCue _menuMusic;
         [Tooltip("キャラクター選択・CPU の強さ・ステージ選択の曲（なければタイトルの曲）")]
@@ -36,14 +31,11 @@ namespace Airerage.Runtime.Audio
         [Range(0f, 1f)] [SerializeField] private float _volume = 0.8f;
         [SerializeField] private float _fadeOutSeconds = 0.8f;
 
-        private AudioSource[] _sources;
+        private LoopingMusic _music;
         private GameFlow _flow;
         private MenuScreens _menus;
         private MusicCue _cue;
         private MusicCue _wanted;
-        private int _playing;
-        private double _nextSwitch;
-        private bool _rescheduled;
         private float _scale = 1f;
         private float _fade = 1f;
 
@@ -61,13 +53,7 @@ namespace Airerage.Runtime.Audio
 
         private void Awake()
         {
-            _sources = new AudioSource[2];
-            for (int i = 0; i < _sources.Length; i++)
-            {
-                _sources[i] = gameObject.AddComponent<AudioSource>();
-                _sources[i].playOnAwake = false;
-                _sources[i].loop = false;
-            }
+            _music = new LoopingMusic(gameObject, this);
             ApplySettings(GameSettings.Load());
         }
 
@@ -90,7 +76,7 @@ namespace Airerage.Runtime.Audio
                 Play(_wanted);
             }
             ApplyVolume();
-            KeepLooping();
+            _music.Update();
         }
 
         // 今の画面で流したい曲（メニューの外と、メニューの画面を出す前は null）。
@@ -125,35 +111,17 @@ namespace Airerage.Runtime.Audio
             {
                 return;
             }
-            if (!cue.HasValidLoop)
-            {
-                Debug.LogError($"{name}: {cue.name} のループの位置が曲の中にない（始まり {cue.LoopStart}、終わり {cue.LoopEnd}、" +
-                               $"曲の長さ {cue.Clip.samples} サンプル）。曲の頭から終わりまでをくり返す", this);
-            }
             _cue = cue;
             _fade = 1f;
             PlayCount++;
             ApplyVolume();
-            AudioClip clip = cue.Clip;
-            int loopStart = cue.HasValidLoop ? cue.LoopStart : 0;
-            int loopEnd = cue.HasValidLoop ? cue.LoopEnd : clip.samples;
-            double start = AudioSettings.dspTime + StartDelay;
-            double firstEnd = start + (double)loopEnd / clip.frequency;
-            Schedule(0, clip, 0, start, firstEnd);
-            Schedule(1, clip, loopStart, firstEnd, firstEnd + (double)(loopEnd - loopStart) / clip.frequency);
-            _playing = 0;
-            _nextSwitch = firstEnd;
-            _rescheduled = true;
+            _music.Play(cue);
         }
 
         /// <summary>すぐに止める。</summary>
         public void Stop()
         {
-            foreach (AudioSource source in _sources)
-            {
-                source.Stop();
-                source.clip = null;
-            }
+            _music.Stop();
             _cue = null;
             _fade = 1f;
         }
@@ -165,51 +133,11 @@ namespace Airerage.Runtime.Audio
             ApplyVolume();
         }
 
-        // ループの終わりを過ぎたら（もう片方が鳴り始めたら）、空いたほうを次の終わりに予約する。
-        private void KeepLooping()
-        {
-            if (_cue == null || _cue.Clip == null)
-            {
-                return;
-            }
-            double now = AudioSettings.dspTime;
-            if (_rescheduled && now >= _nextSwitch)
-            {
-                _playing = 1 - _playing;
-                _rescheduled = false;
-            }
-            if (!_rescheduled && now >= _nextSwitch + RescheduleAfter)
-            {
-                AudioClip clip = _cue.Clip;
-                int loopStart = _cue.HasValidLoop ? _cue.LoopStart : 0;
-                int loopEnd = _cue.HasValidLoop ? _cue.LoopEnd : clip.samples;
-                double length = (double)(loopEnd - loopStart) / clip.frequency;
-                double next = _nextSwitch + length;
-                Schedule(1 - _playing, clip, loopStart, next, next + length);
-                _nextSwitch = next;
-                _rescheduled = true;
-            }
-        }
-
-        private void Schedule(int index, AudioClip clip, int fromSample, double startAt, double endAt)
-        {
-            AudioSource source = _sources[index];
-            source.clip = clip;
-            source.timeSamples = fromSample;
-            source.PlayScheduled(startAt);
-            source.SetScheduledEndTime(endAt);
-        }
-
         private void ApplyVolume()
         {
-            if (_sources == null)
+            if (_music != null)
             {
-                return;
-            }
-            float volume = _volume * _scale * _fade * (_cue != null ? _cue.Volume : 1f);
-            foreach (AudioSource source in _sources)
-            {
-                source.volume = volume;
+                _music.Volume = _volume * _scale * _fade;
             }
         }
     }

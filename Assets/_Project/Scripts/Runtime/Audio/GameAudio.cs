@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Airerage.Runtime.Flow;
 using Airerage.Runtime.Settings;
 using UnityEngine;
 
@@ -8,6 +9,9 @@ namespace Airerage.Runtime.Audio
     /// <summary>
     /// BGM と効果音を鳴らす（仮の音。ユーザーの要望、2026-10-13）。音は ProceduralAudio がその場で合成する。
     /// 本番の音ができたら、_bgmOverride と _overrides に音声ファイルを設定すれば置き換わる（合成はしない）。
+    /// ステージに曲（StageDefinition.Music。docs/18 6 章）があれば、BGM はその曲（前奏を 1 回鳴らしてからループ。LoopingMusic）。
+    /// その曲は 100 枚のコインの予告の後も鳴らし続ける（残り 1 分の版ができたら切り替える）。ステージは GameFlow の行き先から知る
+    /// （App のシーンから始めたときだけ。検証用のシーンでは仮の BGM）。
     /// 効果音は少数の AudioSource を順番に使い、重なっても切れないようにする。
     /// 音量はオプション（GameSettings の BGM と効果音。docs/15 T6-9）を掛ける。
     /// </summary>
@@ -29,12 +33,16 @@ namespace Airerage.Runtime.Audio
         [Tooltip("効果音の差し替え（設定がない効果音は合成する）")]
         [SerializeField] private ClipOverride[] _overrides = new ClipOverride[0];
         [Range(0f, 1f)] [SerializeField] private float _bgmVolume = 0.3f;
+        [Tooltip("ステージの曲の音量（メニューの曲と同じ。曲ごとの音量 MusicCue.Volume を掛ける）")]
+        [Range(0f, 1f)] [SerializeField] private float _stageMusicVolume = 0.8f;
         [Range(0f, 1f)] [SerializeField] private float _seVolume = 0.7f;
         [SerializeField] private bool _playBgmOnStart = true;
 
         private readonly Dictionary<SoundId, AudioClip> _clips = new Dictionary<SoundId, AudioClip>();
         private readonly List<SoundId> _history = new List<SoundId>();
         private AudioSource _bgm;
+        private MusicCue _stageCue;
+        private LoopingMusic _stageMusic;
         private AudioClip _normalClip;
         private AudioClip _tenseClip;
         private AudioSource[] _se;
@@ -43,8 +51,14 @@ namespace Airerage.Runtime.Audio
         private float _bgmScale = 1f;
         private float _seScale = 1f;
 
-        /// <summary>BGM の音源（テスト用）。</summary>
+        /// <summary>BGM の音源（仮の BGM。テスト用）。</summary>
         public AudioSource BgmSource => _bgm;
+
+        /// <summary>ステージの曲（なければ null。仮の BGM を鳴らす）。</summary>
+        public MusicCue StageMusic => _stageCue;
+
+        /// <summary>ステージの曲を鳴らしているか（テスト用）。</summary>
+        public bool StageMusicPlaying => _stageMusic != null && _stageMusic.Cue != null;
 
         /// <summary>これまでに鳴らした効果音（古い順。最後の 64 個まで。テストと確認用）。</summary>
         public IReadOnlyList<SoundId> History => _history;
@@ -52,9 +66,22 @@ namespace Airerage.Runtime.Audio
         /// <summary>BGM を鳴らしているか（F9 で切り替える）。</summary>
         public bool BgmOn
         {
-            get => _bgm != null && _bgm.isPlaying;
+            get => _stageMusic != null ? StageMusicPlaying : _bgm != null && _bgm.isPlaying;
             set
             {
+                if (_stageMusic != null)
+                {
+                    if (value && !StageMusicPlaying)
+                    {
+                        _stageMusic.Play(_stageCue);
+                    }
+                    else if (!value)
+                    {
+                        _stageMusic.Stop();
+                    }
+                    BgmEnabled = value;
+                    return;
+                }
                 if (_bgm == null)
                 {
                     return;
@@ -77,7 +104,10 @@ namespace Airerage.Runtime.Audio
         /// <summary>緊張感のある BGM にしているか（MatchAtmosphere が切り替える）。</summary>
         public bool BgmTense { get; private set; }
 
-        /// <summary>BGM を、ふつうのものと緊張感のあるものとで切り替える（鳴らす設定なら、頭から鳴らし直す）。</summary>
+        /// <summary>
+        /// BGM を、ふつうのものと緊張感のあるものとで切り替える（鳴らす設定なら、頭から鳴らし直す）。ステージの曲は切り替えずに
+        /// 鳴らし続ける（残り 1 分の版はまだない）。
+        /// </summary>
         public void SetBgmTense(bool tense)
         {
             if (_bgm == null || tense == BgmTense)
@@ -85,6 +115,10 @@ namespace Airerage.Runtime.Audio
                 return;
             }
             BgmTense = tense;
+            if (_stageMusic != null)
+            {
+                return;
+            }
             _bgm.clip = tense ? _tenseClip : _normalClip;
             if (BgmEnabled)
             {
@@ -115,6 +149,12 @@ namespace Airerage.Runtime.Audio
             _bgm.clip = _normalClip;
             _bgm.loop = true;
             _bgm.playOnAwake = false;
+            var flow = FindFirstObjectByType<GameFlow>();
+            _stageCue = flow != null && flow.TargetStage != null ? flow.TargetStage.Music : null;
+            if (_stageCue != null)
+            {
+                _stageMusic = new LoopingMusic(gameObject, this);
+            }
             ApplySettings(GameSettings.Load());
 
             _se = new AudioSource[SePoolSize];
@@ -130,6 +170,11 @@ namespace Airerage.Runtime.Audio
             BgmOn = _playBgmOnStart;
         }
 
+        private void Update()
+        {
+            _stageMusic?.Update();
+        }
+
         /// <summary>オプションの BGM と効果音の音量を当てる（docs/15 T6-9。全体の音量は AudioListener）。</summary>
         public void ApplySettings(GameSettings settings)
         {
@@ -139,10 +184,14 @@ namespace Airerage.Runtime.Audio
             {
                 _bgm.volume = _bgmVolume * _bgmScale;
             }
+            if (_stageMusic != null)
+            {
+                _stageMusic.Volume = _stageMusicVolume * _bgmScale;
+            }
         }
 
-        /// <summary>今の BGM の音量（オプションを掛けたもの。テスト用）。</summary>
-        public float BgmVolume => _bgm != null ? _bgm.volume : 0f;
+        /// <summary>今の BGM の音量（オプションを掛けたもの。ステージの曲なら曲ごとの音量も掛けたもの。テスト用）。</summary>
+        public float BgmVolume => _stageMusic != null ? _stageMusic.Volume * _stageCue.Volume : _bgm != null ? _bgm.volume : 0f;
 
         /// <summary>今の効果音の音量の倍率（オプション。テスト用）。</summary>
         public float SeScale => _seScale;

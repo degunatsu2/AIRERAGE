@@ -58,6 +58,12 @@ namespace Airerage.Runtime.Flow
         /// <summary>向かっている画面（読み込みの途中は行き先、済んだら今の画面。メニューの BGM がこれを見る）。</summary>
         public FlowScreen Target { get; private set; }
 
+        /// <summary>
+        /// 向かっている画面のステージ（読み込みを始めたときに決まる。試合の仕組みのシーンが起動したときにはもう入っている。試合の BGM が
+        /// これを見る。CurrentStage は読み込みが済んでから入る）。
+        /// </summary>
+        public StageDefinition TargetStage { get; private set; }
+
         /// <summary>タイトルを通ったか（メニューへ戻ったときは、タイトルを出さずにメインメニューを出す）。</summary>
         public bool TitlePassed { get; private set; }
 
@@ -264,6 +270,7 @@ namespace Airerage.Runtime.Flow
                 return;
             }
             Target = screen;
+            TargetStage = stage;
             StartCoroutine(Load(screen, stage, scenes));
         }
 

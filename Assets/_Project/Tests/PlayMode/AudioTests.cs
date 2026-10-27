@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Airerage.Core.Input;
 using Airerage.Runtime.Audio;
+using Airerage.Runtime.Flow;
+using Airerage.Runtime.Settings;
 using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEngine;
@@ -66,6 +68,64 @@ namespace Airerage.PlayMode.Tests
 
             Assert.That(audio.History.Contains(SoundId.Swing), Is.True, "攻撃の音が鳴らない");
             Assert.That(audio.History.Contains(SoundId.Hit), Is.True, "当たった音が鳴らない");
+        }
+
+        /// <summary>
+        /// ステージの曲（docs/18 4.5）: 恐怖の館の試合では、ステージの曲（ループのタグ付き）を鳴らす。メニューの曲は止まる。100 枚のコインの
+        /// 予告（緊張感のある BGM）でも切り替えずに鳴らし続ける。F9（BgmOn）で止めて、また鳴らせる。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator StageMusic_PlaysInTheManor_AndKeepsPlayingInCoinRush()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            Assert.That(flow, Is.Not.Null);
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            StageDefinition manor = null;
+            for (int i = 0; i < flow.Stages.Count; i++)
+            {
+                if (flow.Stages.Get(i).SceneName == "Stage_Manor")
+                {
+                    manor = flow.Stages.Get(i);
+                }
+            }
+            Assert.That(manor, Is.Not.Null, "恐怖の館のステージがない");
+            Assert.That(manor.Music, Is.Not.Null, "恐怖の館に曲が設定されていない");
+            Assert.That(manor.Music.HasValidLoop, Is.True, "恐怖の館の曲のループの位置が曲の中にない");
+            Assert.That(flow.Stages.Get(0).Music, Is.Null, "曲のないステージ（ATHLETIC）に曲が入っている");
+
+            flow.StartTraining(manor);
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+            yield return null;
+            var audio = Object.FindFirstObjectByType<GameAudio>();
+            Assert.That(audio.StageMusic, Is.SameAs(manor.Music), "ステージの曲を使わない");
+            Assert.That(audio.StageMusicPlaying, Is.True, "ステージの曲を鳴らさない");
+            Assert.That(audio.BgmEnabled, Is.True);
+            Assert.That(audio.BgmVolume, Is.EqualTo(0.8f * GameSettings.Load().Bgm01).Within(1e-3f), "ステージの曲の音量が違う");
+            var music = Object.FindFirstObjectByType<MusicPlayer>();
+            yield return WaitFor(() => music.Current == null, 2f, "試合でもメニューの曲が鳴っている");
+
+            audio.SetBgmTense(true);
+            Assert.That(audio.BgmTense, Is.True);
+            Assert.That(audio.StageMusicPlaying, Is.True, "100 枚のコインの予告でステージの曲が止まる");
+            audio.BgmOn = false;
+            Assert.That(audio.StageMusicPlaying, Is.False, "F9 で止まらない");
+            audio.BgmOn = true;
+            Assert.That(audio.StageMusicPlaying, Is.True, "F9 でまた鳴らない");
+        }
+
+        private static IEnumerator WaitFor(System.Func<bool> condition, float seconds, string message)
+        {
+            float start = Time.realtimeSinceStartup;
+            while (!condition())
+            {
+                if (Time.realtimeSinceStartup - start > seconds)
+                {
+                    Assert.Fail(message);
+                }
+                yield return null;
+            }
         }
 
         private sealed class Script : ITickInputSource

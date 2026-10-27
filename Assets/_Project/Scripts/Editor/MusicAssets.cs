@@ -18,6 +18,12 @@ namespace Airerage.Editor
         public const string TitleCuePath = CueFolder + "/TitleMusic.asset";
         public const string SelectMusicPath = MusicFolder + "/Select.ogg";
         public const string SelectCuePath = CueFolder + "/SelectMusic.asset";
+
+        /// <summary>ステージの曲のファイル（name はステージの配置の Music）。</summary>
+        public static string StageMusicPath(string name) => $"{MusicFolder}/{name}.ogg";
+
+        /// <summary>ステージの曲の MusicCue。</summary>
+        public static string StageCuePath(string name) => $"{CueFolder}/{name}Music.asset";
         public const string TitleStartSePath = SeFolder + "/TitleStart.wav";
         public const string CharacterDecideSePath = SeFolder + "/CharacterDecide.wav";
 
@@ -40,7 +46,8 @@ namespace Airerage.Editor
                 if (end > clip.samples)
                 {
                     Debug.LogError($"{musicPath}: ループの終わり（{end}）が曲の長さ（{clip.samples} サンプル、{clip.frequency}Hz）を超えている。" +
-                                   "タグは、ファイルのサンプリング周波数の単位で書く（44.1kHz の値のまま 48kHz のファイルにしていないか）");
+                                   "タグは、ファイルのサンプリング周波数の単位で書く（44.1kHz の値のまま 48kHz のファイルにしていないか）。" +
+                                   "LOOPLENGTH はループの長さ（終わり − 始まり）で、曲全体の長さではない（終わりの位置を書くなら LOOPEND）");
                 }
             }
             else

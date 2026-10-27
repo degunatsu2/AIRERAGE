@@ -516,8 +516,13 @@ namespace Airerage.Editor
             };
             foreach (StageLayout layout in StageSceneBuilder.Layouts)
             {
-                stages.Add(LoadOrCreateStage($"{StageFolder}/{layout.Id}.asset", layout.DisplayName, layout.SceneName, layout.Description,
-                    layout.DescriptionJa, layout.Color));
+                StageDefinition stage = LoadOrCreateStage($"{StageFolder}/{layout.Id}.asset", layout.DisplayName, layout.SceneName,
+                    layout.Description, layout.DescriptionJa, layout.Color);
+                // ステージの曲（ループの位置は曲のファイルのタグから。docs/18 6 章）。曲ごとの音量は 1（ファイルの大きさのまま）。
+                stage.SetMusic(string.IsNullOrEmpty(layout.Music)
+                    ? null
+                    : MusicAssets.LoadOrCreateCue(MusicAssets.StageMusicPath(layout.Music), MusicAssets.StageCuePath(layout.Music), 1f));
+                stages.Add(stage);
             }
 
             var catalog = AssetDatabase.LoadAssetAtPath<StageCatalog>(StageCatalogPath);
