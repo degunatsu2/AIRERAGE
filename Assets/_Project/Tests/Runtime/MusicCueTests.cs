@@ -13,7 +13,8 @@ namespace Airerage.Runtime.Tests
     /// キャラクター・ステージの選択の曲は、頭の無音を切り、くり返しの波形からループを作った（tools/audio/music_loop.py。44.1kHz、
     /// 始まり 8.170 秒、1 周 58.904 秒、終わりは曲の終わり）。恐怖の館の曲は、LOOPLENGTH に曲全体の長さが入っていたので、
     /// ループの長さ（曲の終わり − 始まり）に直し、その後に頭の無音（1.662 秒）を切った（ループの位置は同じ。44.1kHz、始まり 8.791 秒、
-    /// 終わりは曲の終わり）。研究所の曲は、くり返しの波形からループを作った（44.1kHz、始まり 8.540 秒、1 周 59.077 秒）。
+    /// 終わりは曲の終わり）。研究所の曲と競技場の曲は、くり返しの波形からループを作った（44.1kHz。研究所は始まり 8.540 秒・1 周 59.077 秒、
+    /// 競技場は始まり 13.480 秒・1 周 53.161 秒）。
     /// </summary>
     public sealed class MusicCueTests
     {
@@ -80,15 +81,16 @@ namespace Airerage.Runtime.Tests
             Assert.That(cue.HasValidLoop, Is.True);
         }
 
-        [Test]
-        public void LabMusic_LoopTags_AndCue()
+        [TestCase(LabMusicPath, LabCuePath, 376614, 2605292)]
+        [TestCase("Assets/_Project/Audio/Music/Stadium.ogg", "Assets/_Project/Data/Audio/StadiumMusic.asset", 594468, 2344395)]
+        public void StageMusic_LoopTags_AndCue(string musicPath, string cuePath, long loopStart, long loopLength)
         {
-            Dictionary<string, string> tags = OggLoopTags.Read(LabMusicPath);
+            Dictionary<string, string> tags = OggLoopTags.Read(musicPath);
             Assert.That(OggLoopTags.TryGetLoop(tags, out long start, out long end), Is.True, "ループのタグがない");
-            Assert.That(start, Is.EqualTo(376614));
-            Assert.That(end - start, Is.EqualTo(2605292));
-            var cue = AssetDatabase.LoadAssetAtPath<MusicCue>(LabCuePath);
-            Assert.That(cue, Is.Not.Null, "研究所の曲の MusicCue がない（FlowSceneBuilder が作る）");
+            Assert.That(start, Is.EqualTo(loopStart));
+            Assert.That(end - start, Is.EqualTo(loopLength));
+            var cue = AssetDatabase.LoadAssetAtPath<MusicCue>(cuePath);
+            Assert.That(cue, Is.Not.Null, $"{cuePath} がない（FlowSceneBuilder が作る）");
             Assert.That(cue.Clip.frequency, Is.EqualTo(44100));
             Assert.That(cue.Clip.samples, Is.EqualTo(end), "ループの終わりが曲の終わりでない");
             Assert.That(cue.HasValidLoop, Is.True);

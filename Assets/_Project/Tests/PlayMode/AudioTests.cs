@@ -96,10 +96,11 @@ namespace Airerage.PlayMode.Tests
             Assert.That(flow.Stages.Get(0).Music, Is.Null, "曲のないステージ（ATHLETIC）に曲が入っている");
             for (int i = 0; i < flow.Stages.Count; i++)
             {
-                if (flow.Stages.Get(i).SceneName == "Stage_Lab")
+                string scene = flow.Stages.Get(i).SceneName;
+                if (scene == "Stage_Lab" || scene == "Stage_Stadium")
                 {
-                    Assert.That(flow.Stages.Get(i).Music, Is.Not.Null, "研究所に曲が設定されていない");
-                    Assert.That(flow.Stages.Get(i).Music.HasValidLoop, Is.True, "研究所の曲のループの位置が曲の中にない");
+                    Assert.That(flow.Stages.Get(i).Music, Is.Not.Null, $"{scene} に曲が設定されていない");
+                    Assert.That(flow.Stages.Get(i).Music.HasValidLoop, Is.True, $"{scene} の曲のループの位置が曲の中にない");
                 }
             }
 
