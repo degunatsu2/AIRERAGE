@@ -48,6 +48,7 @@ namespace Airerage.Editor.Stages
                 Id = "Stadium",
                 DisplayName = "STORM STADIUM",
                 Description = "No bottom to fall from: knock rivals off the sides or over the scoreboard. Swing between the anchors and dodge the pitched baseballs.",
+                DescriptionJa = "下に落ちる場所はない。相手を左右か得点板の上へ吹き飛ばして撃破。アンカーを渡り、飛んでくる野球のボールをかわせ。",
                 Color = new Color(0.55f, 1f, 0.5f),
                 Terrain = new[]
                 {

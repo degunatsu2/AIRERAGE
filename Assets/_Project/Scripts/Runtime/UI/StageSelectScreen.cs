@@ -19,6 +19,7 @@ namespace Airerage.Runtime.UI
     /// RANDOM で選ぶのは、チェックを付けたステージだけ（RandomStagePool。ネットワーク対戦では全員が付けているステージだけ。
     /// ユーザーの要望、2026-10-26）。オプションから開く「RANDOM STAGES」（ShowRandomPool）では、札の左端のチェックを決定で付け外しし、
     /// 戻る操作で PoolClosed（RANDOM の札は出さない。最後の 1 つは外せない）。
+    /// 説明は、オプションの LANGUAGE（GameSettings.LoadLanguage）の言語で出す（日本語は PC の日本語の字体 JapaneseFont。2026-10-27）。
     /// </summary>
     public sealed class StageSelectScreen : MonoBehaviour
     {
@@ -52,6 +53,12 @@ namespace Airerage.Runtime.UI
         private float _rouletteNextAt;
         private bool _rouletteMoving;
         private ulong _randomPool = RandomStagePool.All;
+        private Font _japanese;
+        private Font _latin;
+
+        /// <summary>RANDOM の札の説明（英語と日本語）。</summary>
+        public const string RandomDescription = "Picks one of the stages at random.";
+        public const string RandomDescriptionJa = "ステージをランダムに選びます。";
 
         /// <summary>オプションの RANDOM STAGES（RANDOM で選ぶステージのチェックを付け外しする）で出しているか。</summary>
         public bool PoolMode { get; private set; }
@@ -113,6 +120,10 @@ namespace Airerage.Runtime.UI
                 Debug.LogError($"{name}: ステージの札がないか、札（{_options.Length}）とステージ（{_stages.Length}）の数が違います", this);
                 enabled = false;
                 return;
+            }
+            if (_description != null)
+            {
+                _latin = _description.font;
             }
             for (int i = 0; i < _options.Length; i++)
             {
@@ -363,6 +374,37 @@ namespace Airerage.Runtime.UI
             }
         }
 
+        private void OnDestroy()
+        {
+            if (_japanese != null)
+            {
+                Destroy(_japanese);
+            }
+        }
+
+        /// <summary>今出している説明（テスト用）。</summary>
+        public string ShownDescription => _description != null ? _description.text : string.Empty;
+
+        // 説明を、オプションの言語で出す（日本語なら日本語の字体。PC になければ Unity に入っている字体のまま）。
+        private void ShowDescription(string english, string japanese)
+        {
+            if (_description == null)
+            {
+                return;
+            }
+            bool ja = GameSettings.LoadLanguage() == GameLanguage.Japanese && !string.IsNullOrEmpty(japanese);
+            if (ja && _japanese == null)
+            {
+                _japanese = JapaneseFont.Create(32);
+            }
+            if (_latin == null)
+            {
+                _latin = _description.font;
+            }
+            _description.font = ja && _japanese != null ? _japanese : _latin;
+            _description.text = ja ? japanese : english;
+        }
+
         // 番号 index の札（RandomIndex なら RANDOM の札。範囲の外なら null）。
         private MenuOption OptionAt(int index)
         {
@@ -389,10 +431,7 @@ namespace Airerage.Runtime.UI
                 {
                     _name.text = "RANDOM";
                 }
-                if (_description != null)
-                {
-                    _description.text = "Picks one of the stages at random.";
-                }
+                ShowDescription(RandomDescription, RandomDescriptionJa);
                 if (_band != null)
                 {
                     _band.color = new Color(0.7f, 0.7f, 0.75f, 0.35f);
@@ -403,10 +442,7 @@ namespace Airerage.Runtime.UI
             {
                 _name.text = stage.DisplayName;
             }
-            if (_description != null)
-            {
-                _description.text = stage.Description;
-            }
+            ShowDescription(stage.Description, stage.DescriptionJa);
             if (_band != null)
             {
                 _band.color = new Color(stage.Color.r, stage.Color.g, stage.Color.b, 0.35f);

@@ -18,7 +18,10 @@ namespace Airerage.Editor.Stages
         public string Id;
 
         public string DisplayName;
+
+        /// <summary>ステージ選択に出す説明（英語と日本語。オプションの LANGUAGE で切り替える。2026-10-27）。</summary>
         public string Description;
+        public string DescriptionJa;
         public Color Color;
 
         public TerrainBox[] Terrain;

@@ -59,6 +59,7 @@ namespace Airerage.Editor.Stages
                 Id = "Wharf",
                 DisplayName = "FROZEN WHARF",
                 Description = "Bollards to hook onto, a hollow red container carried every 20 seconds, a cold sea under the piers you can only float in for a while.",
+                DescriptionJa = "ワイヤーをつなげるボラードと、20 秒ごとに運ばれる中が空洞の赤いコンテナ。桟橋の下の冷たい海には、少しの間しか浮いていられない。",
                 Color = new Color(0.95f, 0.35f, 0.25f),
                 Terrain = new[]
                 {
@@ -88,12 +89,13 @@ namespace Airerage.Editor.Stages
                     // 倉庫の屋根。
                     new TerrainBox("WarehouseRoof", 38f, 12f, 48f, 12.6f, attachable: true),
                 },
-                // ボラード（岸壁の端の係船柱。ユーザーの案）と、タグボートのボラード、クレーンの梁の下の鉤、灯台の上、梁の穴の上、左右の高い所の
+                // ボラード（岸壁の端の係船柱。ユーザーの案。右の岸壁の右端のものは、端ぎりぎりに置き、右の海から浮いたままつなげて
+                // 岸壁へ上がれる。ユーザーの要望、2026-10-27）と、タグボートのボラード、クレーンの梁の下の鉤、灯台の上、梁の穴の上、左右の高い所の
                 // 赤いコインの下（積み上げたコンテナ・倉庫の屋根から上へ行き来する。ユーザーの要望、2026-10-26）。右の岸壁のクレーンの脚の横の
                 // ボラードは、脚に沿って動く（Platforms の BollardOuter）。
                 Anchors = new[]
                 {
-                    new Vector2(-21f, 1.9f), new Vector2(-44f, 1.9f), new Vector2(21f, 1.9f), new Vector2(46f, 1.9f), new Vector2(-5f, -2.1f),
+                    new Vector2(-21f, 1.9f), new Vector2(-44f, 1.9f), new Vector2(21f, 1.9f), new Vector2(EastEdgeBollardX, 1.9f), new Vector2(-5f, -2.1f),
                     new Vector2(5f, -2.1f), new Vector2(-27.5f, 1.9f), new Vector2(-14f, 26f), new Vector2(14f, 26f),
                     new Vector2(-47f, 27f), new Vector2(0f, 37f), new Vector2(-37f, 17f), new Vector2(37f, 17f),
                 },
@@ -183,6 +185,10 @@ namespace Airerage.Editor.Stages
             };
         }
 
+        // 右の岸壁（右端 x = 48）の右端のボラードの位置（端ぎりぎり。柱の右の縁が岸壁の端から 0.2m 出る。右の海から、浮いたまま
+        // 岸壁の角に遮られずにつなげる）。
+        private const float EastEdgeBollardX = 47.85f;
+
         // フォークリフトの荷台の上がる高さ（m。上面が灯台のてっぺん 22.6m より少し上の 24.5m）。
         private const float PalletRise = 23f;
 
@@ -264,7 +270,7 @@ namespace Airerage.Editor.Stages
             // 桟橋の奥行き（遊ぶ面と同じ薄さ。下は海が続いて見えるように）。
             decor.Box("QuayWestBack", new Vector3(-34f, 0.2f, 6f), new Vector3(28f, 1.6f, 8f), concrete);
             decor.Box("QuayEastBack", new Vector3(34f, 0.2f, 6f), new Vector3(28f, 1.6f, 8f), concrete);
-            foreach (float x in new[] { -21f, -44f, -27.5f, 21f, 46f })
+            foreach (float x in new[] { -21f, -44f, -27.5f, 21f, EastEdgeBollardX })
             {
                 decor.Cylinder("Bollard", new Vector3(x, 1.45f, 0f), new Vector3(0.7f, 0.45f, 0.7f), bollard);
             }

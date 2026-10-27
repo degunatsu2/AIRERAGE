@@ -16,4 +16,5 @@ MonoBehaviour:
   _sceneName: Stage_Manor
   _description: 'Outside a vampire''s manor. Demon hands crawl the graveyard and
     the farm: get caught and you are dragged into the prison in the sky.'
+  _descriptionJa: "\u5438\u8840\u9B3C\u306E\u9928\u306E\u5916\u3002\u5893\u5834\u3068\u8FB2\u5712\u3092\u60AA\u9B54\u306E\u624B\u304C\u9019\u3044\u56DE\u308A\u3001\u6355\u307E\u308B\u3068\u4E0A\u7A7A\u306E\u7262\u5C4B\u3078\u5F15\u304D\u305A\u308A\u8FBC\u307E\u308C\u308B\u3002"
   _color: {r: 0.75, g: 0.2, b: 0.35, a: 1}

@@ -12,7 +12,8 @@ namespace Airerage.Runtime.UI
     /// <summary>
     /// オプションの画面（docs/15 T6-9。D-68）。いちばん上の PAGE の項目で、左右（か決定）でページを切り替える:
     /// - GENERAL: 全体・BGM・効果音の音量（0〜100%、10% ずつ）、表示（FULLSCREEN ／ WINDOWED）、解像度（この画面で使える大きさ）、
-    ///   垂直同期（ON ／ OFF）、RESET TO DEFAULT。項目を選んで左右で変える（値の左半分・右半分のクリックでも左右。OptionArrow。
+    ///   垂直同期（ON ／ OFF）、言語（LANGUAGE: 日本語 ／ ENGLISH。今はステージ選択の説明だけを切り替える。初めは日本語。
+    ///   ユーザーの要望、2026-10-27）、RESET TO DEFAULT。項目を選んで左右で変える（値の左半分・右半分のクリックでも左右。OptionArrow。
     ///   決定でも次の値へ）。変えたらすぐに当てて保存する。RANDOM STAGES で、ステージ選択の RANDOM で選ぶステージのチェックを付け外し
     ///   する画面へ（RandomStagesRequested。ステージ選択と同じ画面。ユーザーの要望、2026-10-26）。
     /// 変えた結果の案内（左下）は 3 秒で消え、ページを切り替えても消える。
@@ -33,7 +34,12 @@ namespace Airerage.Runtime.UI
             Display,
             Resolution,
             VSync,
+            Language,
         }
+
+        /// <summary>LANGUAGE の値の文字。</summary>
+        public const string JapaneseLabel = "日本語";
+        public const string EnglishLabel = "ENGLISH";
 
         private const float NavigationRestoreDelay = 0.2f;
 
@@ -69,6 +75,8 @@ namespace Airerage.Runtime.UI
         private float _navigationRestoreAt = -1f;
         private float _promptHideAt = -1f;
         private bool _wired;
+        private Font _japanese;
+        private Font _latin;
 
         /// <summary>閉じた（設定は保存してある）。</summary>
         public event Action Closed;
@@ -368,6 +376,9 @@ namespace Airerage.Runtime.UI
                 case Row.VSync:
                     _settings.VSync = !_settings.VSync;
                     break;
+                case Row.Language:
+                    _settings.Language = _settings.Language == GameLanguage.Japanese ? GameLanguage.English : GameLanguage.Japanese;
+                    break;
             }
             if (!quiet)
             {
@@ -449,6 +460,32 @@ namespace Airerage.Runtime.UI
             Vector2Int size = _resolutionIndex >= 0 && _resolutionIndex < _resolutions.Count ? _resolutions[_resolutionIndex] : Vector2Int.zero;
             _generalValues[(int)Row.Resolution].text = $"{size.x} x {size.y}";
             _generalValues[(int)Row.VSync].text = _settings.VSync ? "ON" : "OFF";
+            ShowLanguage(_settings.Language);
+        }
+
+        // 言語の値（「日本語」は PC の日本語の字体で書く。PC になければ Unity に入っている字体のまま）。
+        private void ShowLanguage(GameLanguage language)
+        {
+            Text value = _generalValues[(int)Row.Language];
+            if (_latin == null)
+            {
+                _latin = value.font;
+            }
+            bool ja = language == GameLanguage.Japanese;
+            if (ja && _japanese == null)
+            {
+                _japanese = JapaneseFont.Create(32);
+            }
+            value.font = ja && _japanese != null ? _japanese : _latin;
+            value.text = ja ? JapaneseLabel : EnglishLabel;
+        }
+
+        private void OnDestroy()
+        {
+            if (_japanese != null)
+            {
+                Destroy(_japanese);
+            }
         }
 
         private static string VolumeText(int volume)

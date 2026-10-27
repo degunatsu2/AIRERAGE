@@ -502,11 +502,12 @@ namespace Airerage.Editor
             var stages = new List<StageDefinition>
             {
                 LoadOrCreateStage(AthleticStageAssetPath, "ATHLETIC", Path.GetFileNameWithoutExtension(AthleticStagePath),
-                    "Jump pads, updrafts and boost rings.", new Color(0.35f, 0.85f, 1f)),
+                    "Jump pads, updrafts and boost rings.", "ジャンプ台、上昇気流、加速リングで空を飛び回るアスレチック。", new Color(0.35f, 0.85f, 1f)),
             };
             foreach (StageLayout layout in StageSceneBuilder.Layouts)
             {
-                stages.Add(LoadOrCreateStage($"{StageFolder}/{layout.Id}.asset", layout.DisplayName, layout.SceneName, layout.Description, layout.Color));
+                stages.Add(LoadOrCreateStage($"{StageFolder}/{layout.Id}.asset", layout.DisplayName, layout.SceneName, layout.Description,
+                    layout.DescriptionJa, layout.Color));
             }
 
             var catalog = AssetDatabase.LoadAssetAtPath<StageCatalog>(StageCatalogPath);
@@ -521,7 +522,8 @@ namespace Airerage.Editor
             return catalog;
         }
 
-        private static StageDefinition LoadOrCreateStage(string path, string displayName, string sceneName, string description, Color color)
+        private static StageDefinition LoadOrCreateStage(string path, string displayName, string sceneName, string description, string descriptionJa,
+            Color color)
         {
             var stage = AssetDatabase.LoadAssetAtPath<StageDefinition>(path);
             if (stage == null)
@@ -529,7 +531,7 @@ namespace Airerage.Editor
                 stage = ScriptableObject.CreateInstance<StageDefinition>();
                 AssetDatabase.CreateAsset(stage, path);
             }
-            stage.Configure(displayName, sceneName, description, color);
+            stage.Configure(displayName, sceneName, description, descriptionJa, color);
             EditorUtility.SetDirty(stage);
             return stage;
         }

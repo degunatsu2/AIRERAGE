@@ -16,4 +16,5 @@ MonoBehaviour:
   _sceneName: Stage_Lab
   _description: 'Hook the button above a door to open it. Don''t cross the infrared
     beams: missiles fly along them. Ride the elevator, shoot up the pneumatic tubes.'
+  _descriptionJa: "\u6249\u306E\u4E0A\u306E\u30DC\u30BF\u30F3\u306B\u30EF\u30A4\u30E4\u30FC\u3092\u3064\u306A\u3050\u3068\u6249\u304C\u958B\u304F\u3002\u8D64\u5916\u7DDA\u306B\u89E6\u308C\u308B\u3068\u30DF\u30B5\u30A4\u30EB\u304C\u98DB\u3093\u3067\u304F\u308B\u3002\u30A8\u30EC\u30D9\u30FC\u30BF\u30FC\u306B\u4E57\u308A\u3001\u6C17\u9001\u7BA1\u3067\u4E0A\u3078\u98DB\u3070\u3055\u308C\u308B\u3002"
   _color: {r: 0.3, g: 0.95, b: 0.85, a: 1}

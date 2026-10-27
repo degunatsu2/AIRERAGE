@@ -47,6 +47,7 @@ namespace Airerage.Editor.Stages
                 Id = "SpaceStation",
                 DisplayName = "ORBITAL STATION",
                 Description = "Zero-g inside the hollow starships, warp gates that wrap around the edges, a roaming rescue gate below.",
+                DescriptionJa = "中が空洞の宇宙船の中は無重力。左右の端をつなぐワープゲートと、下を動き回る救助のゲート。",
                 Color = new Color(0.65f, 0.45f, 1f),
                 Terrain = new[]
                 {

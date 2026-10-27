@@ -12,10 +12,16 @@ namespace Airerage.Editor
     /// </summary>
     internal static class OptionsUiBuilder
     {
-        private static readonly string[] GeneralLabels = { "MASTER VOLUME", "BGM VOLUME", "SE VOLUME", "DISPLAY", "RESOLUTION", "VSYNC" };
+        private static readonly string[] GeneralLabels =
+        {
+            "MASTER VOLUME", "BGM VOLUME", "SE VOLUME", "DISPLAY", "RESOLUTION", "VSYNC", "LANGUAGE",
+        };
         private const float Left = 110f;
         private const float Width = 980f;
         private const float RowHeight = 60f;
+
+        // GENERAL の項目の間隔（LANGUAGE を足して 7 つ。BACK に重ならないように詰めた。2026-10-27）。
+        private const float GeneralStep = 64f;
 
         public static OptionsScreen Create(Transform canvas, InputActionAsset inputActions)
         {
@@ -36,16 +42,16 @@ namespace Airerage.Editor
             for (int i = 0; i < GeneralLabels.Length; i++)
             {
                 MenuOption row = MenuUiBuilder.CreateMenuItem(general, GeneralLabels[i].Replace(" ", string.Empty), GeneralLabels[i], anchor,
-                    new Vector2(Left, -235f - i * 70f), new Vector2(Width, RowHeight));
+                    new Vector2(Left, -235f - i * GeneralStep), new Vector2(Width, RowHeight));
                 row.gameObject.AddComponent<OptionStepper>();
                 generalRows[i] = row;
                 generalValues[i] = Value(row, string.Empty);
             }
             // RANDOM で選ぶステージ（ステージ選択と同じ画面でチェックを付け外しする。ユーザーの要望、2026-10-26）。
             MenuOption randomStages = MenuUiBuilder.CreateMenuItem(general, "RandomStages", "RANDOM STAGES", anchor,
-                new Vector2(Left, -235f - GeneralLabels.Length * 70f), new Vector2(Width, RowHeight));
+                new Vector2(Left, -235f - GeneralLabels.Length * GeneralStep), new Vector2(Width, RowHeight));
             MenuOption resetGeneral = MenuUiBuilder.CreateMenuItem(general, "ResetGeneral", "RESET TO DEFAULT", anchor,
-                new Vector2(Left, -235f - (GeneralLabels.Length + 1) * 70f - 8f), new Vector2(Width, RowHeight));
+                new Vector2(Left, -235f - (GeneralLabels.Length + 1) * GeneralStep - 8f), new Vector2(Width, RowHeight));
 
             // CONTROLS: 見出し（キーボード・ゲームパッド）、操作ごとの名前と 2 つの札、元に戻す項目。
             RectTransform controls = MenuUiBuilder.CreateFull(panel, "Controls");

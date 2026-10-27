@@ -5,7 +5,8 @@ namespace Airerage.Runtime.Settings
 {
     /// <summary>
     /// オプションの設定（docs/15 T6-9。D-68）: 音量（全体・BGM・効果音）、画面（フルスクリーンかウィンドウか、解像度、垂直同期）、
-    /// キーの割り当て（Input System の割り当ての変更を JSON で）。保存先は PlayerPrefs（プレイヤーネームやキャラクターの選択と同じ）。
+    /// キーの割り当て（Input System の割り当ての変更を JSON で）、表示の言語（GameLanguage。初めは日本語。ユーザーの要望、2026-10-27）。
+    /// 保存先は PlayerPrefs（プレイヤーネームやキャラクターの選択と同じ）。
     /// 読み込みと保存だけを受け持ち、今の値をどこかに持ち続けることはしない（使う側が Load で読む）。
     /// 音量は 0〜10 の 11 段階（10 が今までの大きさ）。
     /// </summary>
@@ -23,8 +24,12 @@ namespace Airerage.Runtime.Settings
         private const string HeightKey = Prefix + "Height";
         private const string VSyncKey = Prefix + "VSync";
         private const string BindingsKey = Prefix + "Bindings";
+        private const string LanguageKey = Prefix + "Language";
 
-        private static readonly string[] AllKeys = { MasterKey, BgmKey, SeKey, FullscreenKey, WidthKey, HeightKey, VSyncKey, BindingsKey };
+        private static readonly string[] AllKeys =
+        {
+            MasterKey, BgmKey, SeKey, FullscreenKey, WidthKey, HeightKey, VSyncKey, BindingsKey, LanguageKey,
+        };
 
         public int MasterVolume = MaxVolume;
         public int BgmVolume = MaxVolume;
@@ -39,6 +44,9 @@ namespace Airerage.Runtime.Settings
 
         /// <summary>キーの割り当ての変更（InputActionAsset.SaveBindingOverridesAsJson の形。空なら変更なし）。</summary>
         public string BindingOverrides = string.Empty;
+
+        /// <summary>表示の言語（初めは日本語）。</summary>
+        public GameLanguage Language = GameLanguage.Japanese;
 
         public float Master01 => Volume01(MasterVolume);
         public float Bgm01 => Volume01(BgmVolume);
@@ -68,9 +76,18 @@ namespace Airerage.Runtime.Settings
                 Height = Mathf.Max(0, PlayerPrefs.GetInt(HeightKey, 0)),
                 VSync = PlayerPrefs.GetInt(VSyncKey, 1) != 0,
                 BindingOverrides = PlayerPrefs.GetString(BindingsKey, string.Empty),
+                Language = LoadLanguage(),
                 ScreenSaved = PlayerPrefs.HasKey(FullscreenKey),
             };
             return settings;
+        }
+
+        /// <summary>保存した表示の言語だけを読む（ステージ選択の説明を出すとき。保存していなければ日本語）。</summary>
+        public static GameLanguage LoadLanguage()
+        {
+            return PlayerPrefs.GetInt(LanguageKey, (int)GameLanguage.Japanese) == (int)GameLanguage.English
+                ? GameLanguage.English
+                : GameLanguage.Japanese;
         }
 
         /// <summary>保存したキーの割り当ての変更だけを読む（試合の入力を作るとき）。</summary>
@@ -90,6 +107,7 @@ namespace Airerage.Runtime.Settings
             PlayerPrefs.SetInt(HeightKey, Mathf.Max(0, Height));
             PlayerPrefs.SetInt(VSyncKey, VSync ? 1 : 0);
             PlayerPrefs.SetString(BindingsKey, BindingOverrides ?? string.Empty);
+            PlayerPrefs.SetInt(LanguageKey, (int)Language);
             PlayerPrefs.Save();
             ScreenSaved = true;
         }

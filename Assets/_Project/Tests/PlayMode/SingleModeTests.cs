@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using Airerage.Core.Ai;
+using Airerage.Core.Common;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Presentation;
@@ -85,10 +86,13 @@ namespace Airerage.PlayMode.Tests
                     Assert.That(runner.LabelOf(p), Is.EqualTo($"CPU{p + 1}"));
                 }
 
-                // CPU が動き、攻撃する。CPU の技の札は出さない（自分の札だけ）。
+                // CPU が動き、攻撃する。CPU の技の札は出さない（自分の札だけ）。最初の攻撃は、乱数の種とキャラクターによって試合の
+                // 始まりから 6〜19 秒ほど（カウントダウンを含む。CPU は初めにコインを集める）なので、シミュレーションの時間で 40 秒まで待つ
+                // （画面の時間で待つと、遅い PC や遅い種で足りないことがあった。2026-10-27）。
                 Vector3 before = runner.World.GetState(1).Position.ToUnity();
-                yield return WaitFor(() => runner.CpuOf(1).AttacksStarted + runner.CpuOf(2).AttacksStarted + runner.CpuOf(3).AttacksStarted > 0,
-                    15f, "CPU が攻撃しない");
+                Func<int> attacks = () => runner.CpuOf(1).AttacksStarted + runner.CpuOf(2).AttacksStarted + runner.CpuOf(3).AttacksStarted;
+                yield return WaitFor(() => attacks() > 0 || runner.World.Tick > 40 * SimTime.TicksPerSecond, 90f, "試合が進まない");
+                Assert.That(attacks(), Is.GreaterThan(0), $"CPU が攻撃しない（{runner.World.Tick} ティック）");
                 Assert.That(Vector3.Distance(runner.World.GetState(1).Position.ToUnity(), before), Is.GreaterThan(0.5f), "CPU が動かない");
                 foreach (SkillHud hud in UnityEngine.Object.FindObjectsByType<SkillHud>(FindObjectsSortMode.None))
                 {

@@ -51,6 +51,7 @@ namespace Airerage.Editor.Stages
                 Id = "Manor",
                 DisplayName = "VAMPIRE MANOR",
                 Description = "Outside a vampire's manor. Demon hands crawl the graveyard and the farm: get caught and you are dragged into the prison in the sky.",
+                DescriptionJa = "吸血鬼の館の外。墓場と農園を悪魔の手が這い回り、捕まると上空の牢屋へ引きずり込まれる。",
                 Color = new Color(0.75f, 0.2f, 0.35f),
                 Terrain = new[]
                 {

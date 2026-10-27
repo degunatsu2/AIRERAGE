@@ -45,6 +45,7 @@ namespace Airerage.Editor.Stages
                 Id = "Volcano",
                 DisplayName = "CRATER",
                 Description = "Inside an active crater. Lava bursts from random spots, steam geysers blast from the walls, molten rocks bounce you away.",
+                DescriptionJa = "活火山の火口の中。溶岩が噴き出し、壁の間欠泉から蒸気が吹き上がり、溶けた岩に弾き飛ばされる。",
                 Color = new Color(1f, 0.45f, 0.15f),
                 Terrain = new[]
                 {

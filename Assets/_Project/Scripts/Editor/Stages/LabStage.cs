@@ -60,6 +60,7 @@ namespace Airerage.Editor.Stages
                 Id = "Lab",
                 DisplayName = "SECRET LAB",
                 Description = "Hook the button above a door to open it. Don't cross the infrared beams: missiles fly along them. Ride the elevator, shoot up the pneumatic tubes.",
+                DescriptionJa = "扉の上のボタンにワイヤーをつなぐと扉が開く。赤外線に触れるとミサイルが飛んでくる。エレベーターに乗り、気送管で上へ飛ばされる。",
                 Color = new Color(0.3f, 0.95f, 0.85f),
                 Terrain = new[]
                 {

@@ -16,4 +16,5 @@ MonoBehaviour:
   _sceneName: Stage_SpaceStation
   _description: Zero-g inside the hollow starships, warp gates that wrap around the
     edges, a roaming rescue gate below.
+  _descriptionJa: "\u4E2D\u304C\u7A7A\u6D1E\u306E\u5B87\u5B99\u8239\u306E\u4E2D\u306F\u7121\u91CD\u529B\u3002\u5DE6\u53F3\u306E\u7AEF\u3092\u3064\u306A\u3050\u30EF\u30FC\u30D7\u30B2\u30FC\u30C8\u3068\u3001\u4E0B\u3092\u52D5\u304D\u56DE\u308B\u6551\u52A9\u306E\u30B2\u30FC\u30C8\u3002"
   _color: {r: 0.65, g: 0.45, b: 1, a: 1}

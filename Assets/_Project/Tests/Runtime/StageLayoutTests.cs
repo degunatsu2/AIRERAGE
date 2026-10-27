@@ -6,7 +6,9 @@ using Airerage.Core.Input;
 using Airerage.Core.Movement;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 using Airerage.Runtime.Flow;
+using Airerage.Runtime.Settings;
 using Airerage.Runtime.Simulation;
 using NUnit.Framework;
 using UnityEditor;
@@ -116,6 +118,20 @@ namespace Airerage.Runtime.Tests
         {
             var catalog = AssetDatabase.LoadAssetAtPath<StageCatalog>(CatalogPath);
             Assert.That(catalog.Stages.Select(s => s.SceneName).ToArray(), Is.EqualTo(Stages), "ステージの一覧とこのテストの一覧が違う");
+        }
+
+        [Test]
+        public void EveryStage_HasADescription_InEnglishAndJapanese()
+        {
+            // ステージ選択の説明は、オプションの LANGUAGE で日本語と英語を切り替える（ユーザーの要望、2026-10-27）。
+            var catalog = AssetDatabase.LoadAssetAtPath<StageCatalog>(CatalogPath);
+            foreach (StageDefinition stage in catalog.Stages)
+            {
+                Assert.That(stage.Description, Is.Not.Empty, $"{stage.DisplayName} に英語の説明がない");
+                Assert.That(stage.DescriptionJa.Any(c => c >= '\u3040' && c <= '\u30ff'), Is.True, $"{stage.DisplayName} に日本語の説明がない");
+                Assert.That(stage.DescriptionIn(GameLanguage.English), Is.EqualTo(stage.Description));
+                Assert.That(stage.DescriptionIn(GameLanguage.Japanese), Is.EqualTo(stage.DescriptionJa));
+            }
         }
 
         [TestCaseSource(nameof(Stages))]
@@ -805,6 +821,26 @@ namespace Airerage.Runtime.Tests
                 }
                 Assert.That(_terrain.Boxes.Count(b => !b.Attachable && b.Max.Y > sea.MaxY && b.Min.Y < sea.MaxY && System.MathF.Sign(b.Min.X) == side),
                     Is.EqualTo(1), "岸壁の下に浮かぶコンテナが 1 つでない");
+            }
+        }
+
+        [Test]
+        public void Wharf_TheBollardAtTheRightEndOfTheQuay_CanBeHookedFromTheSea()
+        {
+            Open("Stage_Wharf");
+            // 右の岸壁の右端のボラードは、岸壁の端ぎりぎりにあり、右の海に浮いたまま（岸壁の角に遮られずに）つなげる（ユーザーの要望、2026-10-27）。
+            BoxTerrain.Box quay = _terrain.Boxes.Where(b => b.Min.X > 15f && b.Max.Y > 0.5f && b.Max.Y < 1.5f).OrderByDescending(b => b.Max.X).First();
+            NVector3 bollard = _terrain.AnchorPoints.Where(a => a.X > 0f && a.Y > quay.Max.Y && a.Y < 3f).OrderByDescending(a => a.X).First();
+            Assert.That(quay.Max.X - bollard.X, Is.InRange(0f, 0.3f), "右端のボラードが岸壁の端ぎりぎりにない");
+            StageZone sea = _zones.Single(z => z.Kind == StageZoneKind.Water);
+            var wire = new WireTuning();
+            foreach (float away in new[] { 1.5f, 3f, 6f })
+            {
+                var floating = new NVector3(quay.Max.X + away, sea.MaxY + 0.4f, 0f);
+                NVector3 toward = NVector3.Normalize(bollard - floating);
+                Assert.That(WireTargeting.TryFindAssistTarget(floating, toward, wire, _terrain, out NVector3 target), Is.True,
+                    $"海に浮いた {floating} から右端のボラードにつなげない");
+                Assert.That(target, Is.EqualTo(bollard));
             }
         }
 

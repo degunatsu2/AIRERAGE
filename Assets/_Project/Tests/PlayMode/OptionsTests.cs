@@ -99,6 +99,44 @@ namespace Airerage.PlayMode.Tests
         }
 
         [UnityTest]
+        public IEnumerator Language_SwitchesTheStageDescriptions_BetweenJapaneseAndEnglish()
+        {
+            MenuScreens menu = null;
+            yield return OpenOptions(m => menu = m);
+            OptionsScreen options = menu.OptionsScreen;
+            // 初めは日本語（ユーザーの要望、2026-10-27）。ステージ選択と同じ画面（RANDOM STAGES）の説明は日本語。
+            Assert.That(options.GeneralValue(OptionsScreen.Row.Language), Is.EqualTo(OptionsScreen.JapaneseLabel), "初めが日本語でない");
+            StageSelectScreen stages = menu.StageSelect;
+            yield return OpenRandomStages(options);
+            Assert.That(stages.Highlighted, Is.Not.Null, "前提: ステージにカーソルがある");
+            Assert.That(stages.ShownDescription, Is.EqualTo(stages.Highlighted.DescriptionJa), "ステージの説明が日本語でない");
+            stages.Option(0).OnCancel(null);
+            yield return null;
+
+            // 決定（左右でも）で ENGLISH に切り替わって保存され、説明が英語になる。ほかの表示は英語のまま。
+            options.GeneralRow(OptionsScreen.Row.Language).Button.onClick.Invoke();
+            Assert.That(options.GeneralValue(OptionsScreen.Row.Language), Is.EqualTo(OptionsScreen.EnglishLabel));
+            Assert.That(GameSettings.LoadLanguage(), Is.EqualTo(GameLanguage.English), "言語が保存されない");
+            yield return OpenRandomStages(options);
+            Assert.That(stages.ShownDescription, Is.EqualTo(stages.Highlighted.Description), "ステージの説明が英語にならない");
+            stages.Option(0).OnCancel(null);
+            yield return null;
+
+            // 左右でも日本語に戻る。
+            Move(options.GeneralRow(OptionsScreen.Row.Language).gameObject, MoveDirection.Left);
+            Assert.That(options.GeneralValue(OptionsScreen.Row.Language), Is.EqualTo(OptionsScreen.JapaneseLabel));
+            Assert.That(GameSettings.LoadLanguage(), Is.EqualTo(GameLanguage.Japanese));
+        }
+
+        // オプションから RANDOM STAGES（ステージ選択と同じ画面）を開き、ステージにカーソルが来るのを待つ。
+        private static IEnumerator OpenRandomStages(OptionsScreen options)
+        {
+            options.RandomStages.Button.onClick.Invoke();
+            yield return null;
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator Bindings_ChangeWithAKeyPress_Swap_ReachTheMatchInput_AndReset()
         {
             var keyboard = InputSystem.AddDevice<Keyboard>();
