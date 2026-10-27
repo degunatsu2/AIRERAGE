@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: ManorMusic
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Audio.MusicCue
   _clip: {fileID: 8300000, guid: 5b2fd32c0331fb6ed83493cd12915cfa, type: 3}
-  _loopStart: 460979
-  _loopEnd: 1970470
+  _loopStart: 387693
+  _loopEnd: 1897184
   _volume: 1

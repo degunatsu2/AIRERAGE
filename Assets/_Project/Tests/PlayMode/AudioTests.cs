@@ -94,6 +94,14 @@ namespace Airerage.PlayMode.Tests
             Assert.That(manor.Music, Is.Not.Null, "恐怖の館に曲が設定されていない");
             Assert.That(manor.Music.HasValidLoop, Is.True, "恐怖の館の曲のループの位置が曲の中にない");
             Assert.That(flow.Stages.Get(0).Music, Is.Null, "曲のないステージ（ATHLETIC）に曲が入っている");
+            for (int i = 0; i < flow.Stages.Count; i++)
+            {
+                if (flow.Stages.Get(i).SceneName == "Stage_Lab")
+                {
+                    Assert.That(flow.Stages.Get(i).Music, Is.Not.Null, "研究所に曲が設定されていない");
+                    Assert.That(flow.Stages.Get(i).Music.HasValidLoop, Is.True, "研究所の曲のループの位置が曲の中にない");
+                }
+            }
 
             flow.StartTraining(manor);
             yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");

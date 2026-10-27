@@ -12,7 +12,8 @@ namespace Airerage.Runtime.Tests
     /// タイトルの曲は、ユーザーのタグが 44.1kHz の単位だったので 48kHz の値に直した（始まり 49.475 秒、終わりは曲の終わり）。
     /// キャラクター・ステージの選択の曲は、頭の無音を切り、くり返しの波形からループを作った（tools/audio/music_loop.py。44.1kHz、
     /// 始まり 8.170 秒、1 周 58.904 秒、終わりは曲の終わり）。恐怖の館の曲は、LOOPLENGTH に曲全体の長さが入っていたので、
-    /// ループの長さ（曲の終わり − 始まり）に直した（44.1kHz、始まり 10.453 秒、終わりは曲の終わり）。
+    /// ループの長さ（曲の終わり − 始まり）に直し、その後に頭の無音（1.662 秒）を切った（ループの位置は同じ。44.1kHz、始まり 8.791 秒、
+    /// 終わりは曲の終わり）。研究所の曲は、くり返しの波形からループを作った（44.1kHz、始まり 8.540 秒、1 周 59.077 秒）。
     /// </summary>
     public sealed class MusicCueTests
     {
@@ -22,6 +23,8 @@ namespace Airerage.Runtime.Tests
         private const string SelectCuePath = "Assets/_Project/Data/Audio/SelectMusic.asset";
         private const string ManorMusicPath = "Assets/_Project/Audio/Music/Manor.ogg";
         private const string ManorCuePath = "Assets/_Project/Data/Audio/ManorMusic.asset";
+        private const string LabMusicPath = "Assets/_Project/Audio/Music/Lab.ogg";
+        private const string LabCuePath = "Assets/_Project/Data/Audio/LabMusic.asset";
 
         [Test]
         public void TitleMusic_LoopTags_AreInTheFileSampleRate()
@@ -66,13 +69,28 @@ namespace Airerage.Runtime.Tests
         {
             Dictionary<string, string> tags = OggLoopTags.Read(ManorMusicPath);
             Assert.That(OggLoopTags.TryGetLoop(tags, out long start, out long end), Is.True, "ループのタグがない");
-            Assert.That(start, Is.EqualTo(460979));
-            Assert.That(end, Is.EqualTo(1970470), "ループの終わりが曲の終わりでない");
+            Assert.That(start, Is.EqualTo(387693));
+            Assert.That(end - start, Is.EqualTo(1509491), "頭を切ったらループの長さが変わった");
+            Assert.That(end, Is.EqualTo(1897184), "ループの終わりが曲の終わりでない");
             var cue = AssetDatabase.LoadAssetAtPath<MusicCue>(ManorCuePath);
             Assert.That(cue, Is.Not.Null, "恐怖の館の曲の MusicCue がない（FlowSceneBuilder が作る）");
             Assert.That(cue.Clip, Is.Not.Null);
             Assert.That(cue.Clip.frequency, Is.EqualTo(44100));
             Assert.That(cue.Clip.samples, Is.EqualTo(end), "曲の長さがタグと合わない");
+            Assert.That(cue.HasValidLoop, Is.True);
+        }
+
+        [Test]
+        public void LabMusic_LoopTags_AndCue()
+        {
+            Dictionary<string, string> tags = OggLoopTags.Read(LabMusicPath);
+            Assert.That(OggLoopTags.TryGetLoop(tags, out long start, out long end), Is.True, "ループのタグがない");
+            Assert.That(start, Is.EqualTo(376614));
+            Assert.That(end - start, Is.EqualTo(2605292));
+            var cue = AssetDatabase.LoadAssetAtPath<MusicCue>(LabCuePath);
+            Assert.That(cue, Is.Not.Null, "研究所の曲の MusicCue がない（FlowSceneBuilder が作る）");
+            Assert.That(cue.Clip.frequency, Is.EqualTo(44100));
+            Assert.That(cue.Clip.samples, Is.EqualTo(end), "ループの終わりが曲の終わりでない");
             Assert.That(cue.HasValidLoop, Is.True);
         }
 

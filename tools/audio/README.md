@@ -29,10 +29,11 @@ bash tools/audio/install_audio_tools.sh   # 何度実行してもよい。音源
 ## 曲のループのタグ（Suno などで作った曲）
 
 ```bash
-/opt/airerage-audio/bin/python tools/audio/music_loop.py 入力.ogg 出力.ogg   # 頭の無音を切り、くり返しの波形からループを作る
+/opt/airerage-audio/bin/python tools/audio/music_loop.py 入力.ogg 出力.ogg               # 頭の無音を切り、くり返しの波形からループを作る
+/opt/airerage-audio/bin/python tools/audio/music_loop.py 入力.ogg 出力.ogg --keep-tags   # タグ付きの曲の頭の無音だけを切る（ループの位置は同じ）
 ```
 
-ループのタグはユーザーが付ける（2026-10-27。`docs/18` 4.5）。この道具は、くり返しの入った曲からこちらでループを作るときのために残す。
+ループのタグはこちらで付ける（2026-10-27。`docs/18` 4.6）。
 曲の後ろが前のくり返し（同じ波形がもう一度入っている）になっている曲に使う。頭の無音を切り、くり返しの周期をサンプルの単位で決め、
 つなぎ目の差がいちばん小さい所をループの始まりにして、1 周の所で曲を終える（終わりの 30ms は始まりの直前の音へ重ねる）。
 Vorbis の品質 10 で書き出し、LOOPSTART・LOOPLENGTH（そのファイルのサンプリング周波数の単位）を付ける。読み直して長さ・タグ・

@@ -1,9 +1,10 @@
 """曲（Suno などで作った OGG）に、ループのタグを付ける（docs/18 6 章）。
 
-/opt/airerage-audio/bin/python tools/audio/music_loop.py 入力.ogg 出力.ogg [--keep-silence] [--crossfade-ms 30] [--quality 10]
+/opt/airerage-audio/bin/python tools/audio/music_loop.py 入力.ogg 出力.ogg [--silence-db -80] [--keep-silence] [--keep-tags]
+    [--crossfade-ms 30] [--quality 10]
 
 曲の後ろが、前のどこかのくり返し（同じ波形がもう一度入っている）になっていることを前提にする:
-1. 頭の無音（値がまったくの 0 の所）を切る。
+1. 頭の無音（--silence-db より小さい音。初めは -80 dBFS。聞こえない大きさ）を切る。
 2. 曲の最後の数秒と同じ波形の場所を探し、くり返しの周期（ループの長さ）をサンプルの単位で決める。
 3. 1 周目と 2 周目の波形がそろっている範囲から、つなぎ目の前後の差がいちばん小さい所をループの始まりにし、そこから 1 周の所で
    曲を終える（それより後ろは鳴らないので切る）。
@@ -12,6 +13,9 @@
 5. OGG（Vorbis、品質 10。ゲームに読み込むときに Unity がもう一度圧縮するので、ここでは元の音にできるだけ近く）に書き出し、
    LOOPSTART と LOOPLENGTH（このファイルのサンプリング周波数の単位）を書く。
 書き出したファイルを読み直して、長さ・タグ・つなぎ目の段差を確かめて表示する。
+
+--keep-tags: 入力のファイルのループのタグ（LOOPSTART と LOOPLENGTH か LOOPEND）をそのまま使い、頭の無音を切った分だけ
+LOOPSTART をずらす（ループの位置は変わらない。つなぎ目はそのまま。重ねない）。ループの終わりより後ろも残す。
 """
 
 import argparse
@@ -82,19 +86,78 @@ def find_period(a, sr):
     return min(errors)[1], float(ncc[j])
 
 
+def head_cut(a, silence_db):
+    """頭の無音の終わり（silence_db より大きい音の最初のサンプル。-inf なら値が 0 でない最初のサンプル）。"""
+    threshold = 0.0 if np.isinf(silence_db) else 10 ** (silence_db / 20)
+    loud = np.nonzero(np.abs(a).max(axis=1) > threshold)[0]
+    return int(loud[0]) if len(loud) else 0
+
+
+def encode(y, sr, output, quality, loop_start, loop_length):
+    with tempfile.TemporaryDirectory() as tmp:
+        wav = os.path.join(tmp, "loop.wav")
+        sf.write(wav, y.astype(np.float32), sr, subtype="FLOAT")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", wav, "-map_metadata", "-1", "-c:a", "libvorbis",
+                        "-q:a", str(quality), "-metadata:s:a:0", f"LOOPSTART={loop_start}",
+                        "-metadata:s:a:0", f"LOOPLENGTH={loop_length}", output], check=True)
+
+
+def verify(output, y, sr, loop_start, loop_length):
+    """読み直して、長さとタグを確かめ、つなぎ目の段差と元の音との差を返す。"""
+    b, sr_out = decode(output)
+    tags = stream_tags(output)
+    assert sr_out == sr and len(b) == len(y), (sr_out, len(b), len(y))
+    assert tags.get("LOOPSTART") == str(loop_start) and tags.get("LOOPLENGTH") == str(loop_length), tags
+    end = loop_start + loop_length
+    assert end <= len(b), (end, len(b))
+    seam = np.abs(b[loop_start] - b[end - 1]).max()
+    steps = np.abs(np.diff(b, axis=0))
+    codec = 10 * np.log10(np.mean((b - y) ** 2) / np.mean(y * y))
+    return b, seam, steps, codec
+
+
+def keep_tags(args, a, sr, cut):
+    """入力のループのタグのまま、頭の無音を切る（LOOPSTART を切った分だけずらす）。"""
+    tags = stream_tags(args.source)
+    if "LOOPSTART" not in tags:
+        sys.exit("入力のファイルにループのタグ（LOOPSTART）がない")
+    start = int(tags["LOOPSTART"])
+    end = start + int(tags["LOOPLENGTH"]) if "LOOPLENGTH" in tags else int(tags["LOOPEND"])
+    if not (0 <= start < end <= len(a)):
+        sys.exit(f"ループのタグが曲の中にない（始まり {start}、終わり {end}、曲の長さ {len(a)}）")
+    if cut > start:
+        sys.exit(f"頭の無音（{cut} サンプルまで）がループの始まり（{start}）より後ろまである")
+    y = a[cut:].copy()
+    loop_start, loop_length = start - cut, end - start
+    encode(y, sr, args.output, args.quality, loop_start, loop_length)
+    b, seam, steps, codec = verify(args.output, y, sr, loop_start, loop_length)
+    print(f"元のファイル: {clock(len(a), sr)}（{sr}Hz、{len(a)} サンプル）。ループ {clock(start, sr)}〜{clock(end, sr)}")
+    print(f"頭の無音: {clock(cut, sr)} まで（{cut} サンプル）を切った")
+    print(f"ループ: 始まり {clock(loop_start, sr)}（LOOPSTART={loop_start}）、長さ {clock(loop_length, sr)}"
+          f"（LOOPLENGTH={loop_length}）。終わり {clock(loop_start + loop_length, sr)}（曲の長さ {clock(len(b), sr)}）")
+    print(f"書き出し: {args.output}（Vorbis 品質 {args.quality:g}。元の音との差 {codec:.1f} dB）")
+    print(f"つなぎ目の段差 {seam:.4f}（曲の中の隣り合うサンプルの差: 中央値 {np.median(steps):.4f}、"
+          f"99% {np.percentile(steps, 99):.4f}）")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="曲にループのタグを付ける（くり返しの波形から探す）")
     parser.add_argument("source")
     parser.add_argument("output")
+    parser.add_argument("--silence-db", type=float, default=-80.0,
+                        help="頭の無音とみなす大きさ（dBFS。これより小さい音を切る。-inf なら値が 0 の所だけ）")
     parser.add_argument("--keep-silence", action="store_true", help="頭の無音を切らない")
+    parser.add_argument("--keep-tags", action="store_true", help="入力のループのタグをそのまま使い、頭の無音だけを切る")
     parser.add_argument("--crossfade-ms", type=float, default=30.0)
     parser.add_argument("--quality", type=float, default=10.0, help="Vorbis の品質（-1〜10）")
     args = parser.parse_args()
 
     a, sr = decode(args.source)
     n = len(a)
-    loud = np.nonzero(np.abs(a).max(axis=1) > 0)[0]
-    cut = 0 if args.keep_silence or len(loud) == 0 else int(loud[0])
+    cut = 0 if args.keep_silence else head_cut(a, args.silence_db)
+    if args.keep_tags:
+        keep_tags(args, a, sr, cut)
+        return
     period, ncc = find_period(a, sr)
 
     # 1 周目のどこから 2 周目とそろっているか
@@ -124,22 +187,9 @@ def main() -> None:
     fade = (0.5 - 0.5 * np.cos(np.linspace(0, np.pi, x_len)))[:, None]
     y[-x_len:] = (1 - fade) * a[end - x_len:end] + fade * a[loop_start - x_len:loop_start]
     tag_start = loop_start - cut
-    with tempfile.TemporaryDirectory() as tmp:
-        wav = os.path.join(tmp, "loop.wav")
-        sf.write(wav, y.astype(np.float32), sr, subtype="FLOAT")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", wav, "-map_metadata", "-1", "-c:a", "libvorbis",
-                        "-q:a", str(args.quality), "-metadata:s:a:0", f"LOOPSTART={tag_start}",
-                        "-metadata:s:a:0", f"LOOPLENGTH={period}", args.output], check=True)
-
-    # 読み直して確かめる
-    b, sr_out = decode(args.output)
-    tags = stream_tags(args.output)
-    assert sr_out == sr and len(b) == len(y), (sr_out, len(b), len(y))
-    assert tags.get("LOOPSTART") == str(tag_start) and tags.get("LOOPLENGTH") == str(period), tags
+    encode(y, sr, args.output, args.quality, tag_start, period)
+    b, seam, steps, codec = verify(args.output, y, sr, tag_start, period)
     assert tag_start + period == len(b)
-    seam = np.abs(b[tag_start] - b[-1]).max()
-    steps = np.abs(np.diff(b, axis=0))
-    codec = 10 * np.log10(np.mean((b - y) ** 2) / np.mean(y * y))
     print(f"元のファイル: {clock(n, sr)}（{sr}Hz、{n} サンプル）")
     print(f"頭の無音: {clock(cut, sr)} まで（{cut} サンプル）を切った")
     print(f"くり返し: 1 周 {clock(period, sr)}（{period} サンプル。手がかりの相関 {ncc:.3f}）。"
