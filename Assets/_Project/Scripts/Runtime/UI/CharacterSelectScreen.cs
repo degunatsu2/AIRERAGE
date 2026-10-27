@@ -557,7 +557,7 @@ namespace Airerage.Runtime.UI
         private void Confirm(int slotIndex)
         {
             Slot slot = _slots[slotIndex];
-            UiSounds.Find().Play(SoundId.UiConfirm);
+            UiSounds.Find().Play(SoundId.UiCharacterDecide);
             if (slot.Character == RandomIndex)
             {
                 // RANDOM: ここでキャラクターを決める（ネットワーク対戦では、決めたキャラクターをほかの人へ知らせてから準備完了にする）。

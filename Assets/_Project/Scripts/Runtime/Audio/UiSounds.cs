@@ -5,7 +5,8 @@ using UnityEngine;
 namespace Airerage.Runtime.Audio
 {
     /// <summary>
-    /// メニューの効果音（仮の音。ユーザーの要望、2026-10-16）: カーソルの移動（UiMove）、決定（UiConfirm）、一時停止を開く（UiPause）。
+    /// メニューの効果音（仮の音。ユーザーの要望、2026-10-16）: カーソルの移動（UiMove）、決定（UiConfirm）、一時停止を開く（UiPause）、
+    /// タイトルの決定（UiTitleStart）、キャラクターの決定（UiCharacterDecide。この 2 つは tools/audio で作った音声ファイル。docs/18 4.3）。
     /// いつも読み込んでおく App のシーンに 1 つ置く（決定した直後に画面のシーンを外しても、音が途切れないように）。検証用のシーンを
     /// 直接再生したときは、Find が今のシーンに作る。音は ProceduralAudio が合成する（差し替えの音声ファイルがあればそれを使う）。
     /// 音量はオプションの効果音の音量（GameSettings。docs/15 T6-9）を掛ける。
@@ -19,6 +20,8 @@ namespace Airerage.Runtime.Audio
         [SerializeField] private AudioClip _moveOverride;
         [SerializeField] private AudioClip _confirmOverride;
         [SerializeField] private AudioClip _pauseOverride;
+        [SerializeField] private AudioClip _titleStartOverride;
+        [SerializeField] private AudioClip _characterDecideOverride;
 
         private readonly Dictionary<SoundId, AudioClip> _clips = new Dictionary<SoundId, AudioClip>();
         private readonly List<SoundId> _history = new List<SoundId>();
@@ -42,6 +45,10 @@ namespace Airerage.Runtime.Audio
             _clips[SoundId.UiMove] = _moveOverride != null ? _moveOverride : ProceduralAudio.CreateClip(SoundId.UiMove);
             _clips[SoundId.UiConfirm] = _confirmOverride != null ? _confirmOverride : ProceduralAudio.CreateClip(SoundId.UiConfirm);
             _clips[SoundId.UiPause] = _pauseOverride != null ? _pauseOverride : ProceduralAudio.CreateClip(SoundId.UiPause);
+            _clips[SoundId.UiTitleStart] = _titleStartOverride != null ? _titleStartOverride : ProceduralAudio.CreateClip(SoundId.UiTitleStart);
+            _clips[SoundId.UiCharacterDecide] = _characterDecideOverride != null
+                ? _characterDecideOverride
+                : ProceduralAudio.CreateClip(SoundId.UiCharacterDecide);
             ApplySettings(GameSettings.Load());
         }
 
@@ -51,7 +58,7 @@ namespace Airerage.Runtime.Audio
             _scale = settings.Se01;
         }
 
-        /// <summary>メニューの効果音を鳴らす（UiMove、UiConfirm、UiPause のどれか）。</summary>
+        /// <summary>メニューの効果音を鳴らす（UiMove、UiConfirm、UiPause、UiTitleStart、UiCharacterDecide のどれか）。</summary>
         public void Play(SoundId id)
         {
             if (!_clips.TryGetValue(id, out AudioClip clip))

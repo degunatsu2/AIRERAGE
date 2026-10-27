@@ -22,7 +22,7 @@ namespace Airerage.Editor
 {
     /// <summary>
     /// ゲームの流れのシーン（docs/15 T6-1、T6-2、T6-6。D-66）を作る:
-    /// - App: いつも読み込んでおくシーン（GameFlow、EventSystem、メニューの効果音 UiSounds）。ビルドの最初のシーン。
+    /// - App: いつも読み込んでおくシーン（GameFlow、EventSystem、メニューの効果音 UiSounds、メニューの BGM MusicPlayer）。ビルドの最初のシーン。
     /// - Menu: タイトル、メインメニュー、キャラクター選択、ステージ選択（uGUI）。背景にステージを映すカメラ。
     /// - Stage_Athletic: アスレチックステージ（地形、ギミック、撃破の範囲、コインの出現地点、拠点の候補、出現位置、光）。
     ///   Sandbox_Online と同じ配置（値は SandboxOnlineSceneBuilder の 1 か所）。
@@ -487,7 +487,14 @@ namespace Airerage.Editor
             events.AddComponent<EventSystem>();
             events.AddComponent<InputSystemUIInputModule>().AssignDefaultActions();
             // メニューの効果音（決定した直後に画面のシーンを外しても途切れないよう、いつも読み込むシーンに置く）。
-            new GameObject("UiSounds").AddComponent<UiSounds>();
+            // タイトルとキャラクターの決定は音声ファイル（docs/18 4.3）。
+            var sounds = new GameObject("UiSounds").AddComponent<UiSounds>();
+            SandboxWireSceneBuilder.SetReference(sounds, "_titleStartOverride", MusicAssets.LoadSe(MusicAssets.TitleStartSePath));
+            SandboxWireSceneBuilder.SetReference(sounds, "_characterDecideOverride", MusicAssets.LoadSe(MusicAssets.CharacterDecideSePath));
+            // メニューの BGM（タイトルの曲。ループの位置は曲のファイルのタグから。docs/18 6 章）。
+            var music = new GameObject("MusicPlayer").AddComponent<MusicPlayer>();
+            SandboxWireSceneBuilder.SetReference(music, "_menuMusic",
+                MusicAssets.LoadOrCreateCue(MusicAssets.TitleMusicPath, MusicAssets.TitleCuePath, 1f));
             // ネットワーク対戦の接続（メニューと試合のシーンをまたいで保つ。T6-7）。
             var connection = new GameObject("OnlineConnection").AddComponent<Airerage.Net.OnlineConnection>();
             SandboxWireSceneBuilder.SetReference(connection, "_roster",

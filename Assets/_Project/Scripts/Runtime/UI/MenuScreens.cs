@@ -338,7 +338,7 @@ namespace Airerage.Runtime.UI
         {
             _anyButton?.Dispose();
             _anyButton = null;
-            UiSounds.Find().Play(SoundId.UiConfirm);
+            UiSounds.Find().Play(SoundId.UiTitleStart);
             ShowMain();
         }
 

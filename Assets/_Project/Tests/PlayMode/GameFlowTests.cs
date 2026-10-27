@@ -49,12 +49,18 @@ namespace Airerage.PlayMode.Tests
                 var sounds = UnityEngine.Object.FindFirstObjectByType<UiSounds>();
                 Assert.That(sounds, Is.Not.Null, "App のシーンにメニューの効果音がない");
                 Assert.That(menu.ShowingTitle, Is.True, "最初にタイトルを出さない");
+                // タイトルの曲（docs/18 6 章）: メニューにいる間は鳴らし、ループの位置は曲の中にある。
+                var music = UnityEngine.Object.FindFirstObjectByType<MusicPlayer>();
+                Assert.That(music, Is.Not.Null, "App のシーンにメニューの BGM がない");
+                Assert.That(music.MenuMusic, Is.Not.Null, "メニューの曲が設定されていない");
+                Assert.That(music.MenuMusic.HasValidLoop, Is.True, "タイトルの曲のループの位置が曲の中にない");
+                Assert.That(music.Current, Is.SameAs(music.MenuMusic), "タイトルで曲を鳴らさない");
                 menu.ContinueFromTitle();
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingMain, Is.True, "タイトルの後にメインメニューを出さない");
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Single.gameObject), "使える最初の項目（SINGLE）を選んでいない");
-                Assert.That(sounds.History, Is.EqualTo(new[] { SoundId.UiConfirm }), "タイトルを抜けたときに決定の音だけを鳴らさない（最初の項目は音なしで選ぶ）");
+                Assert.That(sounds.History, Is.EqualTo(new[] { SoundId.UiTitleStart }), "タイトルを抜けたときにタイトルの決定の音だけを鳴らさない（最初の項目は音なしで選ぶ）");
 
                 // カーソルを動かすと移動の音、決定すると決定の音（ユーザーの要望、2026-10-16）。
                 EventSystem.current.SetSelectedGameObject(menu.Training.gameObject);
@@ -114,6 +120,7 @@ namespace Airerage.PlayMode.Tests
                 yield return Tap(keyboard, Key.RightArrow);
                 yield return Tap(keyboard, Key.Enter);
                 Assert.That(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0), Is.EqualTo(3), "選んだキャラクターを覚えない");
+                Assert.That(sounds.History, Does.Contain(SoundId.UiCharacterDecide), "キャラクターを決めてもキャラクターの決定の音が鳴らない");
                 yield return null;
 
                 // ステージ選択（T6-4）: 戻るとキャラクター選択、決定でトレーニング。
@@ -132,6 +139,7 @@ namespace Airerage.PlayMode.Tests
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
                 Assert.That(flow.CurrentStage, Is.SameAs(flow.Stages.Get(0)), "選んだステージでない");
                 Assert.That(sounds != null, Is.True, "画面を移ると効果音が消える（決定の音が途切れる）");
+                Assert.That(music.Current, Is.Null, "トレーニングでもメニューの曲が鳴っている（試合の BGM と重なる）");
                 Assert.That(flow.LoadedScenes, Is.EqualTo(new[] { "Stage_Athletic", "Match_Training" }), "ステージを先に、試合の仕組みを後に読み込んでいない");
                 Assert.That(UnityEngine.Object.FindFirstObjectByType<MenuScreens>(), Is.Null, "メニューが残っている");
                 var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
@@ -165,6 +173,7 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 menu = UnityEngine.Object.FindFirstObjectByType<MenuScreens>();
                 Assert.That(menu.ShowingMain, Is.True, "戻ったときにタイトルからやり直す");
+                Assert.That(music.Current, Is.SameAs(music.MenuMusic), "メニューに戻っても曲を鳴らさない");
             }
             finally
             {

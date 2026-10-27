@@ -192,6 +192,12 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>ピッチャーマシンがボールを打ち出した（ポンという音）。</summary>
         Pitch,
+
+        /// <summary>タイトルで決定した（音声ファイル。なければ UiConfirm と同じ合成の音。docs/18 4.3）。</summary>
+        UiTitleStart,
+
+        /// <summary>キャラクターを決定した（音声ファイル。なければ UiConfirm と同じ合成の音。docs/18 4.3）。</summary>
+        UiCharacterDecide,
     }
 
     /// <summary>
@@ -672,6 +678,8 @@ namespace Airerage.Runtime.Audio
                     AddTone(b, r, 0f, 0.03f, NoteFrequency(98), NoteFrequency(98), Wave.Sine, 0.08f, 0.001f, 0.01f);
                     break;
                 case SoundId.UiConfirm:
+                case SoundId.UiTitleStart:
+                case SoundId.UiCharacterDecide:
                     b = new float[Samples(0.3f, r)];
                     AddTone(b, r, 0f, 0.1f, NoteFrequency(79), NoteFrequency(79), Wave.Pulse25, 0.22f, 0.002f, 0.05f);
                     AddTone(b, r, 0.07f, 0.2f, NoteFrequency(86), NoteFrequency(86), Wave.Pulse25, 0.22f, 0.002f, 0.08f);

@@ -55,6 +55,9 @@ namespace Airerage.Runtime.Flow
         /// <summary>シーンを読み込んでいる途中か。</summary>
         public bool IsLoading { get; private set; }
 
+        /// <summary>向かっている画面（読み込みの途中は行き先、済んだら今の画面。メニューの BGM がこれを見る）。</summary>
+        public FlowScreen Target { get; private set; }
+
         /// <summary>タイトルを通ったか（メニューへ戻ったときは、タイトルを出さずにメインメニューを出す）。</summary>
         public bool TitlePassed { get; private set; }
 
@@ -260,6 +263,7 @@ namespace Airerage.Runtime.Flow
                 Debug.LogWarning($"{name}: 読み込みの途中なので、{screen} へは移らない", this);
                 return;
             }
+            Target = screen;
             StartCoroutine(Load(screen, stage, scenes));
         }
 

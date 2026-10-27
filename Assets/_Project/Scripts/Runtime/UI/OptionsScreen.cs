@@ -418,6 +418,10 @@ namespace Airerage.Runtime.UI
             {
                 sounds.ApplySettings(_settings);
             }
+            foreach (MusicPlayer music in FindObjectsByType<MusicPlayer>(FindObjectsSortMode.None))
+            {
+                music.ApplySettings(_settings);
+            }
             if (screen)
             {
                 _settings.ApplyScreen();
