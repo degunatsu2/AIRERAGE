@@ -67,7 +67,7 @@ def drums(hits: Sequence[Tuple[float, str, int]], seconds: float) -> np.ndarray:
     return DrumKit().render([Note(s, 0.25, 0, v, art=piece) for s, piece, v in hits], 60.0, seconds)
 
 
-def finish(a: np.ndarray, peak_db: float = -1.0, fade_out: float = 0.05) -> np.ndarray:
+def finish(a: np.ndarray, peak_db: float = -1.0, fade_out: float = 0.15) -> np.ndarray:
     """最後の無音を切り、頭の高さをそろえる。"""
     level = np.abs(a).max(axis=1)
     above = np.nonzero(level > mix.db(-70))[0]

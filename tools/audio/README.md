@@ -9,8 +9,8 @@ bash tools/audio/install_audio_tools.sh   # 何度実行してもよい。音源
 ```
 
 入るもの: Surge XT 1.3.4（シンセ）、Dexed 0.9.8（DX7）、Dragonfly Reverb（残響）、sox・ffmpeg、Python の仮想環境
-（`/opt/airerage-audio`。DawDreamer・pedalboard・pyloudnorm ほか。版は `requirements.txt`）、音源 3 つ
-（Virtuosity Drums・Black And Blue Basses は CC0、jRhodes3d は「音楽を作るのに使うのは自由」）。音源は曲の書き出しにだけ使い、
+（`/opt/airerage-audio`。DawDreamer・pedalboard・pyloudnorm ほか。版は `requirements.txt`）、音源 4 つ
+（Virtuosity Drums・Unruly Drums（シンバルとハイハットだけ）・Black And Blue Basses は CC0、jRhodes3d は「音楽を作るのに使うのは自由」）。音源は曲の書き出しにだけ使い、
 ゲームには入れない（入るのは書き出した音だけ）。
 
 ## 書き出し
@@ -36,7 +36,7 @@ bash tools/audio/install_audio_tools.sh   # 何度実行してもよい。音源
 | `airerage_audio/sampler.py` | 録音された音源を鳴らす（ドラム・ベース・ローズ） |
 | `airerage_audio/synth.py` | Surge XT を画面なしで鳴らす（音色の読み込み、MIDI のビブラート） |
 | `airerage_audio/mix.py` | エフェクト、ラウドネス、残響、仕上げ（-16 LUFS、真のピーク -1 dBTP 以下）、書き出し |
-| `airerage_audio/song.py` | 曲を書き出す（前奏＋本体 2 回を鳴らして 2 回目を切り出し、つなぎ目のないループにする） |
+| `airerage_audio/song.py` | 曲を書き出す（前奏＋本体 2 回を鳴らして 2 回目を切り出し、つなぎ目のないループにする。場面ごとの強弱） |
 | `airerage_audio/sfx.py` | 効果音の部品（低いドン、帯域が動くノイズ） |
 | `songs/` | 曲の楽譜（1 曲 1 ファイル） |
 | `sounds/` | 効果音の定義 |

@@ -45,13 +45,15 @@ class Song:
     tracks: List[Track]
     transpose: int = 0
     hall: Dict[str, float] = field(default_factory=lambda: dict(
-        decay_s=2.4, size_m=32, predelay_ms=24, early_level=12, late_level=100, high_cut_hz=9000, low_cut_hz=120,
+        decay_s=1.6, size_m=24, predelay_ms=18, early_level=10, late_level=100, high_cut_hz=9000, low_cut_hz=150,
         width=120))
     master_lufs: float = -16.0
+    # 場面ごとの強弱: (拍, dB) の点を直線でつなぐ（前奏＋本体の 1 回分の拍。本体の点は 2 回目にもくり返す）
+    dynamics: Sequence = ()
     # 仕上げの前の音色の調整: 中低域を少し減らし、高域（空気感）を足して、透明感を出す。
     master_eq: Sequence = field(default_factory=lambda: [
         pb.PeakFilter(cutoff_frequency_hz=320, gain_db=-1.5, q=0.7),
-        pb.HighShelfFilter(cutoff_frequency_hz=9000, gain_db=2.5)])
+        pb.HighShelfFilter(cutoff_frequency_hz=9000, gain_db=1.5)])
 
     def seconds(self, beats: float) -> float:
         return beats * 60.0 / self.bpm
@@ -99,6 +101,18 @@ def _looped_notes(song: Song, notes: List[Note], passes: int, pitched: bool) -> 
     return out
 
 
+def _apply_dynamics(song: Song, a: np.ndarray) -> np.ndarray:
+    if not song.dynamics:
+        return a
+    points = [(b, g) for b, g in song.dynamics if b < song.intro]
+    body = [(b, g) for b, g in song.dynamics if b >= song.intro]
+    points += body + [(b + song.body, g) for b, g in body]
+    times = np.array([song.seconds(b) for b, _ in points]) * SAMPLE_RATE
+    gains = np.array([g for _, g in points])
+    curve = np.interp(np.arange(len(a)), times, gains)
+    return a * (10 ** (curve / 20))[:, None].astype(np.float32)
+
+
 def render(song: Song, out_dir: str, stems: bool = False, preview_beats: Optional[float] = None) -> Dict[str, str]:
     """前奏と本体 2 回を鳴らし、試聴用（前奏＋本体＋少し）と、ゲーム用の前奏・ループを書き出す。"""
     os.makedirs(out_dir, exist_ok=True)
@@ -131,10 +145,11 @@ def render(song: Song, out_dir: str, stems: bool = False, preview_beats: Optiona
     beat = 60.0 / song.bpm
     delayed = mix.process(delay_send, [
         pb.HighpassFilter(cutoff_frequency_hz=400), pb.LowpassFilter(cutoff_frequency_hz=7000),
-        pb.Delay(delay_seconds=beat * 0.75, feedback=0.32, mix=1.0)])
-    hall_send += delayed * 0.5
+        pb.Delay(delay_seconds=beat * 0.75, feedback=0.25, mix=1.0)])
+    hall_send += delayed * 0.3
     wet = mix.reverb(hall_send, **song.hall)
     full = dry + delayed + wet
+    full = _apply_dynamics(song, full)
     full = mix.master(mix.process(full, song.master_eq), song.master_lufs)
     intro_n = int(song.seconds(song.intro) * SAMPLE_RATE)
     body_n = int(round(song.seconds(song.body) * SAMPLE_RATE))

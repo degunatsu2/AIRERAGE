@@ -58,6 +58,21 @@ def _write_state(path: str, template_xml: str, component: bytes) -> None:
         f.write(b"VC2!" + struct.pack("<I", len(body)) + body)
 
 
+REVERB_TYPES = ("2", "11", "22", "27")  # Surge XT の FX の種類: Reverb 1・Reverb 2・Nimbus・Spring Reverb
+
+
+def strip_reverb(component: bytes) -> bytes:
+    """音色（sub3 のかたまり）の中の残響の FX を切る（残響は曲の側でまとめて掛ける）。
+    かたまりは 4 文字の印・XML の長さ（リトルエンディアン）・ウェーブテーブルの長さ 6 つ・XML・ウェーブテーブルの並び。"""
+    if component[:4] != b"sub3":
+        raise ValueError("Surge XT の音色のかたまりではない")
+    size = struct.unpack("<I", component[4:8])[0]
+    xml = component[32:32 + size].decode("utf-8")
+    xml = re.sub(r'(<fx\d+_type type="0" value=")(' + "|".join(REVERB_TYPES) + r')(")', r"\g<1>0\3", xml)
+    body = xml.encode("utf-8")
+    return component[:4] + struct.pack("<I", len(body)) + component[8:32] + body + component[32 + size:]
+
+
 def surge_patch(name: str) -> str:
     """'Leads/Classic Lead 1' のような名前から音色のファイルを探す。"""
     path = os.path.join(SURGE_PATCHES, name + ".fxp")
@@ -109,8 +124,10 @@ def _write_midi(path: str, notes: List[Note], bpm: float, vibrato: float) -> Non
 class Synth:
     """1 つの音色で音の並びを鳴らす。"""
 
-    def __init__(self, patch: Optional[str] = None, plugin: str = SURGE, params: Optional[dict] = None):
+    def __init__(self, patch: Optional[str] = None, plugin: str = SURGE, params: Optional[dict] = None,
+                 dry: bool = True):
         self.patch = patch
+        self.dry = dry  # 音色に入っている残響を切る
         self.plugin = plugin
         self.params = params or {}
 
@@ -127,7 +144,7 @@ class Synth:
                 template = os.path.join(tmp, "template.bin")
                 state = os.path.join(tmp, "state.bin")
                 synth.save_state(template)
-                _write_state(state, _read_state(template), raw[60:])
+                _write_state(state, _read_state(template), strip_reverb(raw[60:]) if self.dry else raw[60:])
                 synth.load_state(state)
         if self.params:
             names = {p["name"]: p["index"] for p in synth.get_parameters_description()}

@@ -188,70 +188,102 @@ class MultiSampler:
         return out
 
 
-# ---- ドラム（Virtuosity Drums。ファイル名で選ぶ） ----
+# ---- ドラム（ファイル名で選ぶ。キック・スネア・タムは Virtuosity Drums、シンバルとハイハットは Unruly Drums） ----
+
+VIRTUOSITY = os.path.join(SAMPLES_DIR, "virtuosity_drums", "Samples")
+UNRULY = os.path.join(SAMPLES_DIR, "unruly_drums", "Samples")
+
+
+@dataclass
+class DrumMic:
+    pattern: str  # ファイルを探す glob
+    name: str  # ファイル名の頭（この後に _vl と _rr が続く）
+    gain: float
+    pan: float = 0.0  # モノラルの音の左右の位置（ステレオの音はそのまま）
+
 
 @dataclass
 class DrumPiece:
-    folder: str
-    articulation: str
-    mics: Dict[str, float]
+    mics: List[DrumMic]
     choke: Optional[str] = None
-    layers: List[List[str]] = field(default_factory=list)  # [マイク][強さ][交互]
+    layers: List[List[List[str]]] = field(default_factory=list)  # [マイク][強さ][交互]
 
 
-DEFAULT_MICS = {
-    "kick": {"kickmic": 1.0, "oh": 0.45, "room": 0.35},
-    "snare": {"snaremic": 1.0, "oh": 0.55, "room": 0.35},
-    "cymbal": {"oh": 1.0, "room": 0.3},
-    "tom": {"oh": 1.0, "mid": 0.6, "room": 0.35},
-}
+def _virtuosity(folder: str, art: str, mics: Dict[str, float]) -> List[DrumMic]:
+    return [DrumMic(os.path.join(VIRTUOSITY, mic, folder, f"{mic}_{art}_*"), f"{mic}_{art}", gain)
+            for mic, gain in mics.items()]
+
+
+def _unruly(folder: str, art: str, mics: Dict[str, tuple]) -> List[DrumMic]:
+    return [DrumMic(os.path.join(UNRULY, folder, mic, "rr*", f"{art}_*"), art, gain, pan)
+            for mic, (gain, pan) in mics.items()]
+
+
+KICK_MICS = {"kickmic": 1.0, "oh": 0.45, "room": 0.3}
+SNARE_MICS = {"snaremic": 1.0, "oh": 0.5, "room": 0.3}
+TOM_MICS = {"oh": 1.0, "mid": 0.6, "room": 0.3}
+HAT_MICS = {"cl": (1.0, 0.2), "ohl": (0.4, -1.0), "ohr": (0.4, 1.0)}
+CYMBAL_MICS = {"cl": (0.6, -0.3), "oh": (0.9, 0.0)}
 
 DRUM_PIECES = {
-    "kick": ("kick", "kick_snon", "kick", None),
-    "snare": ("snare", "snare_center", "snare", None),
-    "rim": ("snare", "snare_rimshot", "snare", None),
-    "xstick": ("snare", "snare_crossstick", "snare", None),
-    "hh": ("hh", "hh_closed", "cymbal", "hh"),
-    "hh_half": ("hh", "hh_half", "cymbal", "hh"),
-    "hh_open": ("hh", "hh_open", "cymbal", "hh"),
-    "hh_pedal": ("hh", "hh_pedal", "cymbal", "hh"),
-    "ride": ("ride", "ride_ride", "cymbal", None),
-    "bell": ("ride", "ride_bell", "cymbal", None),
-    "crash": ("crash", "crash_crash", "cymbal", None),
-    "crash2": ("flatride", "flatride_crash", "cymbal", None),
-    "splash": ("hh", "hh_splash", "cymbal", None),
-    "tom_hi": ("htom", "htom_center", "tom", None),
-    "tom_lo": ("ltom", "ltom_center", "tom", None),
+    "kick": (_virtuosity("kick", "kick_snon", KICK_MICS), None),
+    "snare": (_virtuosity("snare", "snare_center", SNARE_MICS), None),
+    "rim": (_virtuosity("snare", "snare_rimshot", SNARE_MICS), None),
+    "xstick": (_virtuosity("snare", "snare_crossstick", SNARE_MICS), None),
+    "tom_hi": (_virtuosity("htom", "htom_center", TOM_MICS), None),
+    "tom_lo": (_virtuosity("ltom", "ltom_center", TOM_MICS), None),
+    "hh": (_unruly("h14", "hh_closed_tip", HAT_MICS), "hh"),
+    "hh_half": (_unruly("h14", "hh_half_tip", HAT_MICS), "hh"),
+    "hh_open": (_unruly("h14", "hh_open_tip", HAT_MICS), "hh"),
+    "hh_pedal": (_unruly("h14", "hh_footchik", HAT_MICS), "hh"),
+    "ride": (_unruly("r20", "ride_bow", CYMBAL_MICS), None),
+    "bell": (_unruly("r20", "ride_bell", CYMBAL_MICS), None),
+    "crash": (_unruly("c16", "cr_bow", CYMBAL_MICS), None),
+    "crash_choke": (_unruly("c16", "cr_choke", CYMBAL_MICS), None),
+    "splash": (_virtuosity("hh", "hh_splash", {"oh": 1.0}), None),
+}
+
+
+# 部位ごとの音量の補正（dB）。2 つの音源は録音の大きさが違うので、強さ 98 の 1 打の短時間のラウドネスを測り、
+# スネアを 0 として キック +1・ハイハット -10・オープン -6・ペダル -13・ライド -9・ベル -7・クラッシュ -1 などにそろえた。
+DRUM_LEVEL_DB = {
+    "kick": -8.2, "snare": 0.0, "rim": -4.1, "xstick": -3.2, "tom_hi": -8.1, "tom_lo": -4.9,
+    "hh": -17.1, "hh_half": -6.3, "hh_open": -3.6, "hh_pedal": -20.2,
+    "ride": -0.9, "bell": -0.5, "crash": 4.4, "crash_choke": -6.1, "splash": 14.3,
 }
 
 
 class DrumKit:
     """部位の名前（kick・snare・hh など）と強さで鳴らす。マイクの混ぜ方は部位ごとに決める。"""
 
-    def __init__(self, root: Optional[str] = None, mics: Optional[Dict[str, Dict[str, float]]] = None):
-        self.root = root or os.path.join(SAMPLES_DIR, "virtuosity_drums", "Samples")
-        self.mics = dict(DEFAULT_MICS, **(mics or {}))
+    def __init__(self):
         self.pieces: Dict[str, DrumPiece] = {}
         self._rr = defaultdict(int)
 
     def piece(self, name: str) -> DrumPiece:
         if name in self.pieces:
             return self.pieces[name]
-        folder, art, mic_kind, choke = DRUM_PIECES[name]
-        piece = DrumPiece(folder, art, self.mics[mic_kind], choke)
-        for mic in piece.mics:
-            files = glob.glob(os.path.join(self.root, mic, folder, f"{mic}_{art}_*.flac"))
-            files += glob.glob(os.path.join(self.root, mic, folder, f"{mic}_{art}_*.wav"))
+        mics, choke = DRUM_PIECES[name]
+        piece = DrumPiece(mics, choke)
+        for mic in mics:
             layers = defaultdict(list)
-            for f in files:
-                m = re.fullmatch(rf"{mic}_{art}(?:_vl(\d+))?(?:_rr(\d+))?\.\w+", os.path.basename(f))
+            for f in glob.glob(mic.pattern):
+                m = re.fullmatch(rf"{re.escape(mic.name)}(?:_vl(\d+))?(?:_rr(\d+))?\.(?:flac|wav)", os.path.basename(f))
                 if m:  # 強さの段階がない音（スプラッシュ）は 1 段階
                     layers[int(m.group(1) or 1)].append((int(m.group(2) or 1), f))
             if not layers:
-                raise FileNotFoundError(f"ドラムの音源がない: {mic}/{folder}/{art}")
+                raise FileNotFoundError(f"ドラムの音源がない: {mic.pattern}")
             piece.layers.append([[f for _, f in sorted(layers[k])] for k in sorted(layers)])
         self.pieces[name] = piece
         return piece
+
+    @staticmethod
+    def _place(data: np.ndarray, pan: float) -> np.ndarray:
+        """モノラルで録った音（読み込みで左右に同じ音）を pan の位置に置く。"""
+        if pan == 0.0 or not np.array_equal(data[:64, 0], data[:64, 1]):
+            return data
+        angle = (pan + 1) * np.pi / 4
+        return data * np.array([np.cos(angle), np.sin(angle)], dtype=np.float32) * np.sqrt(2)
 
     def render(self, notes: List[Note], bpm: float, seconds: float) -> np.ndarray:
         out = np.zeros((int(seconds * SAMPLE_RATE) + 1, 2), dtype=np.float32)
@@ -276,14 +308,15 @@ class DrumKit:
                             out[s + cut:seg_end] -= mixed[cut:cut + n] * (1 - env[:n, None])
                 sounding[piece.choke] = []
             mixed = None
-            for (mic, gain), layers in zip(piece.mics.items(), piece.layers):
+            for mic, layers in zip(piece.mics, piece.layers):
                 index = min(len(layers) - 1, int(note.vel / 128 * len(layers)))
-                rr_key = (note.art, mic, index)
+                rr_key = (note.art, mic.pattern, index)
                 files = layers[index]
-                data = load_sample(files[self._rr[rr_key] % len(files)])
+                data = self._place(load_sample(files[self._rr[rr_key] % len(files)]), mic.pan)
                 self._rr[rr_key] += 1
                 layer_top = (index + 1) / len(layers) * 127
-                g = gain * min(1.0, note.vel / layer_top) ** 0.8 * note.extra.get("gain", 1.0)
+                g = (mic.gain * min(1.0, note.vel / layer_top) ** 0.8 * note.extra.get("gain", 1.0)
+                     * 10 ** (DRUM_LEVEL_DB.get(note.art, 0.0) / 20))
                 if mixed is None:
                     mixed = data * g
                 else:
