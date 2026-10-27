@@ -30,6 +30,7 @@ namespace Airerage.Runtime.UI
     ///   自分＋CPU 3 体のローカル対戦（CPU のキャラクターはランダム。なるべく自分と違うキャラクター）。自分はキーボード＋マウスとどの
     ///   ゲームパッドでも操作できる。
     /// 画面の移り変わりは App のシーンの GameFlow に頼む（App のシーンから始めないと、試合へは移らない）。
+    /// 流す曲（Music）は出している画面で決まる: キャラクター選択・CPU の強さ・ステージ選択は選択の曲、ほかはタイトルの曲（docs/18 6 章）。
     /// </summary>
     public sealed class MenuScreens : MonoBehaviour
     {
@@ -67,9 +68,27 @@ namespace Airerage.Runtime.UI
         private IReadOnlyList<LocalPlayerSetup> _localPlayers;
         private bool _localTimed = true;
         private Airerage.Core.Ai.CpuLevel _level = Airerage.Core.Ai.CpuLevel.Normal;
+        private bool _started;
 
         /// <summary>タイトルを出しているか（テスト用）。</summary>
         public bool ShowingTitle => _title != null && _title.activeSelf;
+
+        /// <summary>
+        /// 今の画面で流す曲（App のシーンの MusicPlayer が見る）。キャラクター選択・CPU の強さ・ステージ選択（オプションの RANDOM STAGES は
+        /// 除く）は選択の曲、ほかはタイトルの曲。最初の画面を出すまでは None（読み込んだ直後に、違う曲が一瞬鳴り始めないように）。
+        /// </summary>
+        public MusicPlayer.MenuTrack Music
+        {
+            get
+            {
+                if (!_started)
+                {
+                    return MusicPlayer.MenuTrack.None;
+                }
+                bool selecting = ShowingCharacterSelect || ShowingCpuLevel || (ShowingStageSelect && !_stageSelect.PoolMode);
+                return selecting ? MusicPlayer.MenuTrack.Select : MusicPlayer.MenuTrack.Title;
+            }
+        }
 
         /// <summary>メインメニューを出しているか（テスト用）。</summary>
         public bool ShowingMain => _main != null && _main.activeSelf;
@@ -284,6 +303,7 @@ namespace Airerage.Runtime.UI
             {
                 ShowTitle();
             }
+            _started = true;
         }
 
         private void OnDestroy()

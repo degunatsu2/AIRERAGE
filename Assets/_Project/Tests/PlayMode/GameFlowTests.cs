@@ -49,12 +49,15 @@ namespace Airerage.PlayMode.Tests
                 var sounds = UnityEngine.Object.FindFirstObjectByType<UiSounds>();
                 Assert.That(sounds, Is.Not.Null, "App のシーンにメニューの効果音がない");
                 Assert.That(menu.ShowingTitle, Is.True, "最初にタイトルを出さない");
-                // タイトルの曲（docs/18 6 章）: メニューにいる間は鳴らし、ループの位置は曲の中にある。
+                // メニューの曲（docs/18 6 章）: タイトル・メインメニューはタイトルの曲、キャラクター選択・ステージ選択は選択の曲。
+                // ループの位置は曲の中にある。
                 var music = UnityEngine.Object.FindFirstObjectByType<MusicPlayer>();
                 Assert.That(music, Is.Not.Null, "App のシーンにメニューの BGM がない");
                 Assert.That(music.MenuMusic, Is.Not.Null, "メニューの曲が設定されていない");
                 Assert.That(music.MenuMusic.HasValidLoop, Is.True, "タイトルの曲のループの位置が曲の中にない");
-                Assert.That(music.Current, Is.SameAs(music.MenuMusic), "タイトルで曲を鳴らさない");
+                Assert.That(music.SelectMusic, Is.Not.Null, "選択の曲が設定されていない");
+                Assert.That(music.SelectMusic.HasValidLoop, Is.True, "選択の曲のループの位置が曲の中にない");
+                yield return WaitFor(() => music.Current == music.MenuMusic, 2f, "タイトルで曲を鳴らさない");
                 menu.ContinueFromTitle();
                 yield return null;
                 yield return null;
@@ -77,6 +80,7 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "TRAINING でキャラクター選択を出さない");
                 Assert.That(menu.ShowingMain, Is.False);
+                yield return WaitFor(() => music.Current == music.SelectMusic, 3f, "キャラクター選択で選択の曲に変わらない");
                 CharacterSelectScreen characters = menu.CharacterSelect;
                 Assert.That(characters.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Single));
                 Assert.That(characters.Count, Is.EqualTo(6), "6 体のアイコンがない");
@@ -113,6 +117,7 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 Assert.That(menu.ShowingMain, Is.True, "キャラクター選択から戻れない");
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Training.gameObject), "戻ったときに TRAINING を選んでいない");
+                yield return WaitFor(() => music.Current == music.MenuMusic, 3f, "メインメニューに戻ってもタイトルの曲に戻らない");
                 menu.Training.Button.onClick.Invoke();
                 yield return null;
                 yield return null;
@@ -125,6 +130,8 @@ namespace Airerage.PlayMode.Tests
 
                 // ステージ選択（T6-4）: 戻るとキャラクター選択、決定でトレーニング。
                 Assert.That(menu.ShowingStageSelect, Is.True, "キャラクターを決めてもステージ選択を出さない");
+                yield return WaitFor(() => music.Current == music.SelectMusic, 3f, "ステージ選択で選択の曲を鳴らさない");
+                int selectPlays = music.PlayCount;
                 StageSelectScreen stages = menu.StageSelect;
                 Assert.That(stages.Count, Is.EqualTo(flow.Stages.Count));
                 Assert.That(stages.ShownName, Is.EqualTo(flow.Stages.Get(0).DisplayName));
@@ -132,6 +139,8 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "ステージ選択から戻れない");
+                Assert.That(music.Current, Is.SameAs(music.SelectMusic), "キャラクター選択に戻ると選択の曲が止まる");
+                Assert.That(music.PlayCount, Is.EqualTo(selectPlays), "ステージ選択とキャラクター選択を行き来すると、曲を頭からやり直す");
                 Assert.That(characters.CharacterOf(0), Is.EqualTo(3), "戻ったときに選んだキャラクターにいない");
                 yield return Tap(keyboard, Key.Enter);
                 yield return null;
@@ -173,7 +182,7 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 menu = UnityEngine.Object.FindFirstObjectByType<MenuScreens>();
                 Assert.That(menu.ShowingMain, Is.True, "戻ったときにタイトルからやり直す");
-                Assert.That(music.Current, Is.SameAs(music.MenuMusic), "メニューに戻っても曲を鳴らさない");
+                yield return WaitFor(() => music.Current == music.MenuMusic, 2f, "メニューに戻っても曲を鳴らさない");
             }
             finally
             {

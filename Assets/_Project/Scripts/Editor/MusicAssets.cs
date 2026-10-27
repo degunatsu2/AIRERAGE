@@ -16,6 +16,8 @@ namespace Airerage.Editor
         public const string CueFolder = "Assets/_Project/Data/Audio";
         public const string TitleMusicPath = MusicFolder + "/Title.ogg";
         public const string TitleCuePath = CueFolder + "/TitleMusic.asset";
+        public const string SelectMusicPath = MusicFolder + "/Select.ogg";
+        public const string SelectCuePath = CueFolder + "/SelectMusic.asset";
         public const string TitleStartSePath = SeFolder + "/TitleStart.wav";
         public const string CharacterDecideSePath = SeFolder + "/CharacterDecide.wav";
 

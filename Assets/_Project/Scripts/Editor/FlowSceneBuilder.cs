@@ -491,10 +491,13 @@ namespace Airerage.Editor
             var sounds = new GameObject("UiSounds").AddComponent<UiSounds>();
             SandboxWireSceneBuilder.SetReference(sounds, "_titleStartOverride", MusicAssets.LoadSe(MusicAssets.TitleStartSePath));
             SandboxWireSceneBuilder.SetReference(sounds, "_characterDecideOverride", MusicAssets.LoadSe(MusicAssets.CharacterDecideSePath));
-            // メニューの BGM（タイトルの曲。ループの位置は曲のファイルのタグから。docs/18 6 章）。
+            // メニューの BGM（タイトルの曲と、キャラクター・ステージの選択の曲。ループの位置は曲のファイルのタグから。docs/18 6 章）。
+            // 2 曲のラウドネスはそろっている（-16 LUFS ほど）ので、曲ごとの音量はどちらも 1。
             var music = new GameObject("MusicPlayer").AddComponent<MusicPlayer>();
             SandboxWireSceneBuilder.SetReference(music, "_menuMusic",
                 MusicAssets.LoadOrCreateCue(MusicAssets.TitleMusicPath, MusicAssets.TitleCuePath, 1f));
+            SandboxWireSceneBuilder.SetReference(music, "_selectMusic",
+                MusicAssets.LoadOrCreateCue(MusicAssets.SelectMusicPath, MusicAssets.SelectCuePath, 1f));
             // ネットワーク対戦の接続（メニューと試合のシーンをまたいで保つ。T6-7）。
             var connection = new GameObject("OnlineConnection").AddComponent<Airerage.Net.OnlineConnection>();
             SandboxWireSceneBuilder.SetReference(connection, "_roster",

@@ -10,11 +10,15 @@ namespace Airerage.Runtime.Tests
     /// <summary>
     /// メニューの曲（docs/18 6 章）: 曲のファイルのタグ（LOOPSTART・LOOPLENGTH）からループの位置を読み、MusicCue に入っている。
     /// タイトルの曲は、ユーザーのタグが 44.1kHz の単位だったので 48kHz の値に直した（始まり 49.475 秒、終わりは曲の終わり）。
+    /// キャラクター・ステージの選択の曲は、頭の無音を切り、くり返しの波形からループを作った（tools/audio/music_loop.py。44.1kHz、
+    /// 始まり 8.170 秒、1 周 58.904 秒、終わりは曲の終わり）。
     /// </summary>
     public sealed class MusicCueTests
     {
         private const string TitleMusicPath = "Assets/_Project/Audio/Music/Title.ogg";
         private const string TitleCuePath = "Assets/_Project/Data/Audio/TitleMusic.asset";
+        private const string SelectMusicPath = "Assets/_Project/Audio/Music/Select.ogg";
+        private const string SelectCuePath = "Assets/_Project/Data/Audio/SelectMusic.asset";
 
         [Test]
         public void TitleMusic_LoopTags_AreInTheFileSampleRate()
@@ -36,6 +40,22 @@ namespace Airerage.Runtime.Tests
             Assert.That(cue.LoopStart, Is.EqualTo(2374798));
             Assert.That(cue.HasValidLoop, Is.True, $"ループの終わり {cue.LoopEnd} が曲の長さ {cue.Clip.samples} を超えている");
             Assert.That((cue.LoopEnd - cue.LoopStart) / (float)cue.Clip.frequency, Is.GreaterThan(20f), "ループが短すぎる");
+        }
+
+        [Test]
+        public void SelectMusic_LoopTags_AndCue()
+        {
+            Dictionary<string, string> tags = OggLoopTags.Read(SelectMusicPath);
+            Assert.That(OggLoopTags.TryGetLoop(tags, out long start, out long end), Is.True, "ループのタグがない");
+            Assert.That(start, Is.EqualTo(360297));
+            Assert.That(end - start, Is.EqualTo(2597674));
+            var cue = AssetDatabase.LoadAssetAtPath<MusicCue>(SelectCuePath);
+            Assert.That(cue, Is.Not.Null, "選択の曲の MusicCue がない（FlowSceneBuilder が作る）");
+            Assert.That(cue.Clip, Is.Not.Null);
+            Assert.That(cue.Clip.frequency, Is.EqualTo(44100));
+            Assert.That(cue.Clip.samples, Is.EqualTo(end), "ループの終わりが曲の終わりでない");
+            Assert.That(cue.LoopStart, Is.EqualTo(360297));
+            Assert.That(cue.HasValidLoop, Is.True, $"ループの終わり {cue.LoopEnd} が曲の長さ {cue.Clip.samples} を超えている");
         }
 
         [Test]
