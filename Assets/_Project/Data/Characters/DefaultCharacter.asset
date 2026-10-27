@@ -801,16 +801,27 @@ MonoBehaviour:
   _superIcon: {fileID: 0}
   _tags:
   - "#\u7279\u5FB4\u7121\u3057"
+  _tagsEn:
+  - '#Balanced'
   _special1Text:
     Name: "\u30C0\u30C3\u30B7\u30E5"
     Description: "\u524D\u3078\u7D20\u65E9\u304F\u8E0F\u307F\u8FBC\u3093\u3067\u653B\u6483\u3059\u308B\u3002"
     CooldownNote: 
+    NameEn: DASH
+    DescriptionEn: Lunge forward quickly and strike.
+    CooldownNoteEn: 
   _special2Text:
     Name: "\u30E9\u30A4\u30BA"
     Description: "\u659C\u3081\u4E0A\u3078\u98DB\u3073\u4E0A\u304C\u308A\u306A\u304C\u3089\u3001\u982D\u4E0A\u3092\u653B\u6483\u3059\u308B\u3002\u4E0A\u3078\u306E\u79FB\u52D5\u306B\u3082\u4F7F\u3048\u308B\u3002"
     CooldownNote: 
+    NameEn: RISE
+    DescriptionEn: Fly up diagonally while striking above you. Also good for climbing.
+    CooldownNoteEn: 
   _superText:
     Name: "\u30D0\u30FC\u30B9\u30C8"
     Description: "\u305D\u306E\u5834\u3067\u305F\u3081\u3066\u304B\u3089\u3001\u5468\u308A\u3092\u5927\u304D\u304F\u5439\u304D\u98DB\u3070\u3059\u3002"
     CooldownNote: 
+    NameEn: BURST
+    DescriptionEn: Charge up in place, then blast everyone around you far away.
+    CooldownNoteEn: 
   _costume: 0

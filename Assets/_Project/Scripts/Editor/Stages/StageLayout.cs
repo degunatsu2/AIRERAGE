@@ -19,7 +19,10 @@ namespace Airerage.Editor.Stages
 
         public string DisplayName;
 
-        /// <summary>ステージ選択に出す説明（英語と日本語。オプションの LANGUAGE で切り替える。2026-10-27）。</summary>
+        /// <summary>
+        /// ステージ選択に出す説明（英語と日本語。オプションの LANGUAGE で切り替える。2026-10-27）。日本語には半角の空白を入れない
+        /// （uGUI は空白で改行するので、「40 秒」の間で行が変わる）。
+        /// </summary>
         public string Description;
         public string DescriptionJa;
         public Color Color;

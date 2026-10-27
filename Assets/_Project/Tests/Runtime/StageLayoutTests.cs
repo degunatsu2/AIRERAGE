@@ -129,6 +129,8 @@ namespace Airerage.Runtime.Tests
             {
                 Assert.That(stage.Description, Is.Not.Empty, $"{stage.DisplayName} に英語の説明がない");
                 Assert.That(stage.DescriptionJa.Any(c => c >= '\u3040' && c <= '\u30ff'), Is.True, $"{stage.DisplayName} に日本語の説明がない");
+                // 半角の空白があると uGUI はそこで改行する（「40 秒」の間で行が変わった。2026-10-27）。
+                Assert.That(stage.DescriptionJa, Does.Not.Contain(" "), $"{stage.DisplayName} の日本語の説明に半角の空白");
                 Assert.That(stage.DescriptionIn(GameLanguage.English), Is.EqualTo(stage.Description));
                 Assert.That(stage.DescriptionIn(GameLanguage.Japanese), Is.EqualTo(stage.DescriptionJa));
             }

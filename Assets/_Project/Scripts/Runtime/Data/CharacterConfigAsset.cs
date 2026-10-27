@@ -1,6 +1,7 @@
 using Airerage.Core.Combat;
 using Airerage.Core.Common;
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Settings;
 using UnityEngine;
 
 namespace Airerage.Runtime.Data
@@ -47,8 +48,9 @@ namespace Airerage.Runtime.Data
         [SerializeField] private Texture2D _special2Icon;
         [Tooltip("必殺技の絵（なければ技の名前で表示する）")]
         [SerializeField] private Texture2D _superIcon;
-        [Tooltip("性能の種類を表すハッシュタグ（キャラクター選択。例: #高速）")]
+        [Tooltip("性能の種類を表すハッシュタグ（キャラクター選択。例: #高速）と、その英語（例: #Fast）")]
         [SerializeField] private string[] _tags = new string[0];
+        [SerializeField] private string[] _tagsEn = new string[0];
         [Tooltip("特殊攻撃 1（Q）・特殊攻撃 2（E）・必殺技（R）の名前と説明（キャラクター選択）")]
         [SerializeField] private SkillText _special1Text = new SkillText();
         [SerializeField] private SkillText _special2Text = new SkillText();
@@ -81,6 +83,12 @@ namespace Airerage.Runtime.Data
         /// <summary>性能の種類を表すハッシュタグ（キャラクター選択）。</summary>
         public string[] Tags => _tags;
 
+        /// <summary>言語 language のハッシュタグ（英語がなければ日本語）。</summary>
+        public string[] TagsIn(GameLanguage language)
+        {
+            return language == GameLanguage.English && _tagsEn != null && _tagsEn.Length > 0 ? _tagsEn : _tags;
+        }
+
         /// <summary>技の表示用の名前と説明（特殊攻撃と必殺技。それ以外は null）。</summary>
         public SkillText TextOf(AttackSlot slot)
         {
@@ -93,10 +101,11 @@ namespace Airerage.Runtime.Data
             }
         }
 
-        /// <summary>シーンのビルダー用: ハッシュタグと技の説明を設定する。</summary>
-        public void SetProfile(string[] tags, SkillText special1, SkillText special2, SkillText super)
+        /// <summary>シーンのビルダー用: ハッシュタグ（日本語と英語）と技の説明を設定する。</summary>
+        public void SetProfile(string[] tags, string[] tagsEn, SkillText special1, SkillText special2, SkillText super)
         {
             _tags = tags ?? new string[0];
+            _tagsEn = tagsEn ?? new string[0];
             _special1Text = special1 ?? new SkillText();
             _special2Text = special2 ?? new SkillText();
             _superText = super ?? new SkillText();

@@ -8,10 +8,12 @@ namespace Airerage.Editor
     /// シーンのビルダーがキャラクターのアセットを作り直すときに設定する（値はここの 1 か所で決める）。クールタイム・スタック数・必要な
     /// ゲージは、キャラクターの調整値から画面が出す。説明は「何ができるか」を短く書き、調整で変わる数値は書かない。
     /// 説明には半角の空白を入れない（uGUI は空白で改行するので、「2 つ」の間で行が変わる）。
+    /// 英語の文も持つ（オプションの LANGUAGE が ENGLISH のとき。2026-10-27）。名前は英語の大文字。
     /// </summary>
     internal static class CharacterProfiles
     {
         private const string AfterEffect = "効果が終わってから";
+        private const string AfterEffectEn = "after the effect ends";
 
         /// <summary>名前が displayName のキャラクターの文を設定する（知らないキャラクターなら何もしない）。</summary>
         public static void Apply(CharacterConfigAsset character, string displayName)
@@ -19,47 +21,67 @@ namespace Airerage.Editor
             switch (displayName)
             {
                 case CharacterPresets.StandardName:
-                    character.SetProfile(new[] { "#特徴無し" },
-                        new SkillText("ダッシュ", "前へ素早く踏み込んで攻撃する。"),
-                        new SkillText("ライズ", "斜め上へ飛び上がりながら、頭上を攻撃する。上への移動にも使える。"),
-                        new SkillText("バースト", "その場でためてから、周りを大きく吹き飛ばす。"));
+                    character.SetProfile(new[] { "#特徴無し" }, new[] { "#Balanced" },
+                        new SkillText("ダッシュ", "前へ素早く踏み込んで攻撃する。")
+                            .English("DASH", "Lunge forward quickly and strike."),
+                        new SkillText("ライズ", "斜め上へ飛び上がりながら、頭上を攻撃する。上への移動にも使える。")
+                            .English("RISE", "Fly up diagonally while striking above you. Also good for climbing."),
+                        new SkillText("バースト", "その場でためてから、周りを大きく吹き飛ばす。")
+                            .English("BURST", "Charge up in place, then blast everyone around you far away."));
                     character.SetCostume(CharacterCostume.Standard);
                     break;
                 case CharacterPresets.RiskTakerName:
-                    character.SetProfile(new[] { "#コイン重視", "#大器晩成" },
-                        new SkillText("ターンオンザライト", "ワイヤーをつなげるミラーボールを置く。つないでいる人はゲージがたまる。"),
+                    character.SetProfile(new[] { "#コイン重視", "#大器晩成" }, new[] { "#CoinFocused", "#LateBloomer" },
+                        new SkillText("ターンオンザライト", "ワイヤーをつなげるミラーボールを置く。つないでいる人はゲージがたまる。")
+                            .English("TURN ON THE LIGHT", "Place a mirror ball you can hook your wire onto. Anyone hooked to it fills their gauge."),
                         new SkillText("セーフティボックス", "コインが増えていく金庫を置く。長押しで手持ちのコインを預ける。壊されるとコインが散らばる。",
-                            "壊されてから"),
-                        new SkillText("フィーバータイム", "しばらくの間、手に入るコインとゲージが増える。"));
+                            "壊されてから")
+                            .English("SAFETY BOX", "Place a safe whose coins keep growing. Hold to deposit your coins. If it is destroyed, the coins scatter.",
+                                "after it is destroyed"),
+                        new SkillText("フィーバータイム", "しばらくの間、手に入るコインとゲージが増える。")
+                            .English("FEVER TIME", "For a while, you earn more coins and gauge."));
                     character.SetCostume(CharacterCostume.RiskTaker);
                     break;
                 case CharacterPresets.StormRunnerName:
-                    character.SetProfile(new[] { "#高速", "#高機動", "#風" },
+                    character.SetProfile(new[] { "#高速", "#高機動", "#風" }, new[] { "#Fast", "#Agile", "#Wind" },
                         new SkillText("ウインドクローク", "しばらくの間、すべての行動が速くなる。効果中にもう一度押すと、照準の方向へ突風を撃って押し出す。",
-                            AfterEffect),
-                        new SkillText("スカイロケット", "照準の方向へ吹く風の帯を置く。入ったものを風の向きへ運ぶ。"),
-                        new SkillText("キャッスルインジエアー", "しばらくの間、すべての行動が大きく速くなり、ワイヤーを空中やどこにでもつなげる。"));
+                            AfterEffect)
+                            .English("WIND CLOAK", "For a while, all your actions get faster. Press again during the effect to fire a gust toward your aim and push things away.",
+                                AfterEffectEn),
+                        new SkillText("スカイロケット", "照準の方向へ吹く風の帯を置く。入ったものを風の向きへ運ぶ。")
+                            .English("SKY ROCKET", "Place a wind lane blowing toward your aim. Anything inside is carried along with the wind."),
+                        new SkillText("キャッスルインジエアー", "しばらくの間、すべての行動が大きく速くなり、ワイヤーを空中やどこにでもつなげる。")
+                            .English("CASTLE IN THE AIR", "For a while, all your actions get much faster, and your wire can attach to thin air or anything at all."));
                     character.SetCostume(CharacterCostume.StormRunner);
                     break;
                 case CharacterPresets.SpaceTravelerName:
-                    character.SetProfile(new[] { "#変則的", "#遠距離" },
-                        new SkillText("ワープポータル", "その場にポータルを置く。2つあると間をワープできる。長押しで置いたポータルにそのまま入る。"),
-                        new SkillText("スペースミサイル", "長押しで狙い、離すと照準の方向へまっすぐ飛ぶミサイルを撃つ。長く飛ぶほど強い。"),
-                        new SkillText("コズミックレイ", "2つのポータルの間を、壁を貫くビームで攻撃する。ビームが拠点に触れると手持ちのコインを確定する。"));
+                    character.SetProfile(new[] { "#変則的", "#遠距離" }, new[] { "#Tricky", "#LongRange" },
+                        new SkillText("ワープポータル", "その場にポータルを置く。2つあると間をワープできる。長押しで置いたポータルにそのまま入る。")
+                            .English("WARP PORTAL", "Place a portal where you stand. With two, you can warp between them. Hold to step right into the portal you place."),
+                        new SkillText("スペースミサイル", "長押しで狙い、離すと照準の方向へまっすぐ飛ぶミサイルを撃つ。長く飛ぶほど強い。")
+                            .English("SPACE MISSILE", "Hold to aim, release to fire a missile straight toward your aim. The farther it flies, the harder it hits."),
+                        new SkillText("コズミックレイ", "2つのポータルの間を、壁を貫くビームで攻撃する。ビームが拠点に触れると手持ちのコインを確定する。")
+                            .English("COSMIC RAY", "Fire a wall-piercing beam between your two portals. If the beam touches the bank, your held coins are banked."));
                     character.SetCostume(CharacterCostume.SpaceTraveler);
                     break;
                 case CharacterPresets.PastryChefName:
-                    character.SetProfile(new[] { "#設置", "#罠", "#お菓子" },
-                        new SkillText("フラッフィベイス", "触れた人を弾き飛ばすわたがしの足場を置く。短く押すと足元に、長押しで照準の方向へ向けて置く。ワイヤーはつながらない。"),
-                        new SkillText("スイートトラップ", "照準の方向へクリームを飛ばして張り付かせる。長押し中にワイヤーでオレンジ（速くなり、ワイヤーがつながる）、攻撃で抹茶（遅くなり、壁と天井に張り付く。ワイヤーはつながらない）。"),
-                        new SkillText("ティーパーティ", "上へマカロンを次々と投げる。跳ね返りながら相手に当たる。色で威力が違い、虹色はとても強い。"));
+                    character.SetProfile(new[] { "#設置", "#罠", "#お菓子" }, new[] { "#Setups", "#Traps", "#Sweets" },
+                        new SkillText("フラッフィベイス", "触れた人を弾き飛ばすわたがしの足場を置く。短く押すと足元に、長押しで照準の方向へ向けて置く。ワイヤーはつながらない。")
+                            .English("FLUFFY BASE", "Place a cotton candy platform that bounces anyone who touches it. Tap to place it at your feet, hold to angle it toward your aim. Wires can't attach to it."),
+                        new SkillText("スイートトラップ", "照準の方向へクリームを飛ばして張り付かせる。長押し中にワイヤーでオレンジ（速くなり、ワイヤーがつながる）、攻撃で抹茶（遅くなり、壁と天井に張り付く。ワイヤーはつながらない）。")
+                            .English("SWEET TRAP", "Throw cream toward your aim that sticks where it lands. While holding, press Wire for orange (speeds you up, wires attach) or Attack for matcha (slows you down, sticks to walls and ceilings, wires can't attach)."),
+                        new SkillText("ティーパーティ", "上へマカロンを次々と投げる。跳ね返りながら相手に当たる。色で威力が違い、虹色はとても強い。")
+                            .English("TEA PARTY", "Toss macarons upward one after another. They bounce around and hit opponents. Power depends on the color, and rainbow ones are very strong."));
                     character.SetCostume(CharacterCostume.PastryChef);
                     break;
                 case CharacterPresets.SoldererName:
-                    character.SetProfile(new[] { "#高速", "#ヒット＆アウェイ", "#電気" },
-                        new SkillText("イナズマステップ", "照準の方向へ短く突撃する。続けて2回まで出せる。長押しすると、その瞬間に強い雷をまとって長く突撃する。使った回数でクールタイムが延びる。"),
-                        new SkillText("インバータ", "押すたびに切り替える。オンの間はワイヤーが短く電気を帯び、足場につなぐと雷が地面を伝って触れた人を感電させる（3秒に1回）。何もない所へ飛ばして押し続けると鞭になり、攻撃しても消えない。"),
-                        new SkillText("ボールライトニング", "大きな電気の球を3つ、それぞれ放つ瞬間の照準の方向へ撃つ。ゆっくり進んで壁で跳ね返り、止まった後もしばらく残る。当たった相手を感電させて消える。"));
+                    character.SetProfile(new[] { "#高速", "#ヒット＆アウェイ", "#電気" }, new[] { "#Fast", "#HitAndRun", "#Electric" },
+                        new SkillText("イナズマステップ", "照準の方向へ短く突撃する。続けて2回まで出せる。長押しすると、その瞬間に強い雷をまとって長く突撃する。使った回数でクールタイムが延びる。")
+                            .English("INAZUMA STEP", "Dash a short way toward your aim, up to twice in a row. Hold to wrap yourself in strong lightning at that moment and dash farther. The cooldown grows with each use."),
+                        new SkillText("インバータ", "押すたびに切り替える。オンの間はワイヤーが短く電気を帯び、足場につなぐと雷が地面を伝って触れた人を感電させる（3秒に1回）。何もない所へ飛ばして押し続けると鞭になり、攻撃しても消えない。")
+                            .English("INVERTER", "Toggles on and off. While on, your wire is short and electrified: hook a platform and lightning runs along the ground, shocking anyone it touches (once every 3 seconds). Fire it into empty space and keep holding to make a whip that stays even when you attack."),
+                        new SkillText("ボールライトニング", "大きな電気の球を3つ、それぞれ放つ瞬間の照準の方向へ撃つ。ゆっくり進んで壁で跳ね返り、止まった後もしばらく残る。当たった相手を感電させて消える。")
+                            .English("BALL LIGHTNING", "Fire three big electric balls, each toward your aim at the moment it is released. They drift slowly, bounce off walls, and linger after stopping. Each shocks the opponent it hits, then vanishes."));
                     character.SetCostume(CharacterCostume.Solderer);
                     break;
             }

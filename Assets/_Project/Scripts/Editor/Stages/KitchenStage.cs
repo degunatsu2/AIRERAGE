@@ -58,7 +58,7 @@ namespace Airerage.Editor.Stages
                 Id = "Kitchen",
                 DisplayName = "SWEET KITCHEN",
                 Description = "The oven blasts fire every 40 seconds. Ride the roll cakes across the sky, and dive into the sink drain to be flushed up to the shelf.",
-                DescriptionJa = "40 秒ごとにオーブンから火柱が噴き出す。空を渡るロールケーキに乗り、シンクの排水溝に飛び込めば棚の上まで流される。",
+                DescriptionJa = "40秒ごとにオーブンから火柱が噴き出す。空を渡るロールケーキに乗り、シンクの排水溝に飛び込めば棚の上まで流される。",
                 Color = new Color(1f, 0.6f, 0.75f),
                 Terrain = new[]
                 {

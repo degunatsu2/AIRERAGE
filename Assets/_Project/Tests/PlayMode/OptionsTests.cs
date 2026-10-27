@@ -122,9 +122,21 @@ namespace Airerage.PlayMode.Tests
             stages.Option(0).OnCancel(null);
             yield return null;
 
-            // 左右でも日本語に戻る。
-            Move(options.GeneralRow(OptionsScreen.Row.Language).gameObject, MoveDirection.Left);
-            Assert.That(options.GeneralValue(OptionsScreen.Row.Language), Is.EqualTo(OptionsScreen.JapaneseLabel));
+            // キャラクター選択のハッシュタグと技の説明も英語（2026-10-27）。
+            options.Close();
+            yield return null;
+            menu.Training.Button.onClick.Invoke();
+            yield return null;
+            yield return null;
+            CharacterSelectScreen characters = menu.CharacterSelect;
+            Assert.That(menu.ShowingCharacterSelect, Is.True, "前提: キャラクター選択");
+            Assert.That(characters.ShownTags(0), Does.StartWith("#"));
+            Assert.That(characters.ShownTags(0), Does.Not.Match("[ぁ-ヿ一-龯]"), "ハッシュタグが英語にならない");
+
+            // 日本語に戻す。
+            GameSettings settings = GameSettings.Load();
+            settings.Language = GameLanguage.Japanese;
+            settings.Save();
             Assert.That(GameSettings.LoadLanguage(), Is.EqualTo(GameLanguage.Japanese));
         }
 

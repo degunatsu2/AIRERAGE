@@ -1,6 +1,7 @@
 using Airerage.Core.Combat;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Data;
+using Airerage.Runtime.Settings;
 using Airerage.Runtime.UI;
 using NUnit.Framework;
 using UnityEditor;
@@ -35,6 +36,18 @@ namespace Airerage.Runtime.Tests
                     Assert.That(text, Is.Not.Null);
                     Assert.That(text.Name, Does.Match("^[゠-ヿ]+$"), $"{character.DisplayName} の {slot} の名前がカタカナでない");
                     Assert.That(text.Description, Is.Not.Empty, $"{character.DisplayName} の {slot} に説明がない");
+                    Assert.That(text.Description, Does.Not.Contain(" "), $"{character.DisplayName} の {slot} の説明に半角の空白（そこで改行される）");
+                    // 英語（オプションの LANGUAGE。2026-10-27）: 大文字の名前と、日本語の字のない説明。
+                    Assert.That(text.NameIn(GameLanguage.English), Does.Match("^[A-Z ]+$"), $"{character.DisplayName} の {slot} の英語の名前");
+                    Assert.That(text.DescriptionIn(GameLanguage.English), Does.Match("^[\\x20-\\x7E]+$"),
+                        $"{character.DisplayName} の {slot} の英語の説明");
+                    Assert.That(text.NameIn(GameLanguage.Japanese), Is.EqualTo(text.Name));
+                }
+                string[] english = character.TagsIn(GameLanguage.English);
+                Assert.That(english.Length, Is.EqualTo(character.Tags.Length), $"{character.DisplayName} の英語のハッシュタグの数が違う");
+                foreach (string tag in english)
+                {
+                    Assert.That(tag, Does.Match("^#[A-Za-z]+$"), $"{character.DisplayName} の英語のハッシュタグ {tag}");
                 }
             }
         }
@@ -56,6 +69,13 @@ namespace Airerage.Runtime.Tests
             Assert.That(CharacterSelectScreen.CooldownText(odd, AttackSlot.Special1, "効果が終わってから"),
                 Is.EqualTo("クールタイム 1.5 秒（効果が終わってから）"));
             Assert.That(CharacterSelectScreen.CooldownText(odd, AttackSlot.Super, ""), Is.EqualTo("必要ゲージ 75.5%"));
+
+            // 英語。
+            Assert.That(CharacterSelectScreen.CooldownText(standard, AttackSlot.Special1, "", GameLanguage.English), Is.EqualTo("COOLDOWN 4s"));
+            Assert.That(CharacterSelectScreen.CooldownText(standard, AttackSlot.Super, "", GameLanguage.English), Is.EqualTo("GAUGE 70%"));
+            Assert.That(CharacterSelectScreen.CooldownText(space, AttackSlot.Special1, "", GameLanguage.English), Is.EqualTo("COOLDOWN 10s  /  STACKS 2"));
+            Assert.That(CharacterSelectScreen.CooldownText(odd, AttackSlot.Special1, "after the effect ends", GameLanguage.English),
+                Is.EqualTo("COOLDOWN 1.5s (after the effect ends)"));
         }
     }
 }

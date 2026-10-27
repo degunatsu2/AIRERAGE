@@ -59,7 +59,7 @@ namespace Airerage.Editor.Stages
                 Id = "Wharf",
                 DisplayName = "FROZEN WHARF",
                 Description = "Bollards to hook onto, a hollow red container carried every 20 seconds, a cold sea under the piers you can only float in for a while.",
-                DescriptionJa = "ワイヤーをつなげるボラードと、20 秒ごとに運ばれる中が空洞の赤いコンテナ。桟橋の下の冷たい海には、少しの間しか浮いていられない。",
+                DescriptionJa = "ワイヤーをつなげるボラードと、20秒ごとに運ばれる中が空洞の赤いコンテナ。桟橋の下の冷たい海には、少しの間しか浮いていられない。",
                 Color = new Color(0.95f, 0.35f, 0.25f),
                 Terrain = new[]
                 {

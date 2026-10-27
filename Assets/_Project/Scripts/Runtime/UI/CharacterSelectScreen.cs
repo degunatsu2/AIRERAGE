@@ -6,6 +6,7 @@ using Airerage.Core.Common;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
+using Airerage.Runtime.Settings;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
@@ -85,6 +86,8 @@ namespace Airerage.Runtime.UI
         private int _localSlot;
         private string _networkMessage = string.Empty;
         private Font _japanese;
+        private Font _latin;
+        private GameLanguage _language = GameLanguage.Japanese;
         private int _detailsSlot = -1;
         private float _detailsOpen;
 
@@ -203,24 +206,30 @@ namespace Airerage.Runtime.UI
             }
         }
 
-        // ハッシュタグと技の文字（日本語）を、PC の日本語の字体で書く（なければ Unity に入っている字体のまま）。
+        // ハッシュタグと技の文字を、日本語なら PC の日本語の字体で、英語なら Unity に入っている字体で書く（日本語の字体がなければ
+        // Unity に入っている字体のまま。言語はオプションの LANGUAGE。2026-10-27）。
         private void UseJapaneseFont()
         {
-            _japanese = JapaneseFont.Create(32);
+            if (_latin == null)
+            {
+                _latin = _detailTags.font;
+            }
             if (_japanese == null)
             {
-                return;
+                _japanese = JapaneseFont.Create(32);
             }
-            _detailTags.font = _japanese;
+            _language = GameSettings.LoadLanguage();
+            Font font = _language == GameLanguage.Japanese && _japanese != null ? _japanese : _latin;
+            _detailTags.font = font;
             foreach (Text tags in _cornerTags)
             {
-                tags.font = _japanese;
+                tags.font = font;
             }
             for (int i = 0; i < SkillSlots.Length; i++)
             {
-                _skillNames[i].font = _japanese;
-                _skillDescriptions[i].font = _japanese;
-                _skillCooldowns[i].font = _japanese;
+                _skillNames[i].font = font;
+                _skillDescriptions[i].font = font;
+                _skillCooldowns[i].font = font;
             }
         }
 
@@ -364,6 +373,7 @@ namespace Airerage.Runtime.UI
         {
             gameObject.SetActive(true);
             Mode = mode;
+            UseJapaneseFont();
             _detailsSlot = -1;
             _detailsOpen = 0f;
             _networkMessage = string.Empty;
@@ -766,7 +776,7 @@ namespace Airerage.Runtime.UI
             {
                 _cornerLogos[i].enabled = false;
                 _cornerNames[i].text = "RANDOM";
-                _cornerTags[i].text = "#？？？";
+                _cornerTags[i].text = _language == GameLanguage.Japanese ? "#？？？" : "#???";
             }
             else
             {
@@ -774,7 +784,7 @@ namespace Airerage.Runtime.UI
                 _cornerLogos[i].texture = character.Logo;
                 _cornerLogos[i].enabled = character.Logo != null;
                 _cornerNames[i].text = character.DisplayName;
-                _cornerTags[i].text = TagsText(character.Tags);
+                _cornerTags[i].text = TagsText(character.TagsIn(_language));
             }
             _cornerStates[i].text = slot.Ready ? "READY!" : "SELECTING";
             _cornerStates[i].color = slot.Ready ? color : new Color(1f, 1f, 1f, 0.7f);
@@ -839,7 +849,8 @@ namespace Airerage.Runtime.UI
             if (index == RandomIndex)
             {
                 _detailName.text = "RANDOM";
-                _detailTags.text = "決めたときに、ランダムなキャラクターになる";
+                _detailTags.text = _language == GameLanguage.Japanese ? "決めたときに、ランダムなキャラクターになる"
+                    : "Becomes a random character when you decide.";
                 if (_detailLogo != null)
                 {
                     _detailLogo.enabled = false;
@@ -858,7 +869,7 @@ namespace Airerage.Runtime.UI
                 return;
             }
             _detailName.text = character.DisplayName;
-            _detailTags.text = TagsText(character.Tags);
+            _detailTags.text = TagsText(character.TagsIn(_language));
             if (_detailLogo != null)
             {
                 _detailLogo.texture = character.Logo;
@@ -869,9 +880,10 @@ namespace Airerage.Runtime.UI
             {
                 AttackSlot slot = SkillSlots[i];
                 SkillText text = character.TextOf(slot);
-                _skillNames[i].text = text != null && !string.IsNullOrEmpty(text.Name) ? text.Name : combat.Get(slot).Name;
-                _skillDescriptions[i].text = text != null ? text.Description : string.Empty;
-                _skillCooldowns[i].text = CooldownText(combat, slot, text != null ? text.CooldownNote : string.Empty);
+                string skillName = text != null ? text.NameIn(_language) : string.Empty;
+                _skillNames[i].text = !string.IsNullOrEmpty(skillName) ? skillName : combat.Get(slot).Name;
+                _skillDescriptions[i].text = text != null ? text.DescriptionIn(_language) : string.Empty;
+                _skillCooldowns[i].text = CooldownText(combat, slot, text != null ? text.CooldownNoteIn(_language) : string.Empty, _language);
             }
         }
 
@@ -882,33 +894,36 @@ namespace Airerage.Runtime.UI
         }
 
         /// <summary>
-        /// 技の説明の下に出す行: 特殊攻撃はクールタイム（数え始めるときの注記と、2 回以上続けて使えるならスタック数）、必殺技は必要なゲージ。
+        /// 技の説明の下に出す行: 特殊攻撃はクールタイム（数え始めるときの注記と、2 回以上続けて使えるならスタック数）、必殺技は必要なゲージ
+        /// （言語 language で）。
         /// </summary>
-        public static string CooldownText(CombatTuning combat, AttackSlot slot, string cooldownNote)
+        public static string CooldownText(CombatTuning combat, AttackSlot slot, string cooldownNote, GameLanguage language = GameLanguage.Japanese)
         {
+            bool ja = language == GameLanguage.Japanese;
             if (slot == AttackSlot.Super)
             {
-                return $"必要ゲージ {GaugeText(combat.SuperGaugeCost)}";
+                return (ja ? "必要ゲージ " : "GAUGE ") + GaugeText(combat.SuperGaugeCost);
             }
-            string text = $"クールタイム {SecondsText(combat.CooldownTicksOf(slot))}";
+            string seconds = SecondsText(combat.CooldownTicksOf(slot));
+            string text = ja ? $"クールタイム {seconds} 秒" : $"COOLDOWN {seconds}s";
             if (!string.IsNullOrEmpty(cooldownNote))
             {
-                text += $"（{cooldownNote}）";
+                text += ja ? $"（{cooldownNote}）" : $" ({cooldownNote})";
             }
             int charges = combat.MaxChargesOf(slot);
             if (charges >= 2)
             {
-                text += $"  ／  スタック {charges}";
+                text += ja ? $"  ／  スタック {charges}" : $"  /  STACKS {charges}";
             }
             return text;
         }
 
-        // 秒（端数があれば小数 1 桁）。
+        // 秒の数（端数があれば小数 1 桁）。
         private static string SecondsText(int ticks)
         {
             return ticks % SimTime.TicksPerSecond == 0
-                ? $"{ticks / SimTime.TicksPerSecond} 秒"
-                : ((float)ticks / SimTime.TicksPerSecond).ToString("0.0", CultureInfo.InvariantCulture) + " 秒";
+                ? $"{ticks / SimTime.TicksPerSecond}"
+                : ((float)ticks / SimTime.TicksPerSecond).ToString("0.0", CultureInfo.InvariantCulture);
         }
 
         // ゲージ（0.1% 単位）を % で（端数があれば小数 1 桁。D-60）。
