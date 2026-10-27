@@ -1,0 +1,10 @@
+# BGM と SE の制作に使う Python のパッケージ（tools/audio/install_audio_tools.sh が入れる。版は固定する）
+dawdreamer==0.9.0
+pedalboard==0.9.26
+pyloudnorm==0.2.0
+mido==1.3.3
+numpy==2.5.4
+scipy==1.18.1
+soundfile==0.14.0
+soxr==0.5.0
+matplotlib==3.11.2
