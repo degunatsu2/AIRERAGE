@@ -107,6 +107,11 @@ namespace Airerage.Runtime.Tests
             Assert.That(end, Is.EqualTo(900));
             Assert.That(OggLoopTags.TryGetLoop(new Dictionary<string, string>(), out _, out _), Is.False);
             Assert.Throws<InvalidDataException>(() => OggLoopTags.Read(new MemoryStream(new byte[64])));
+            // Git LFS の目印のファイル（曲のファイルを取り込んでいない）は、そうと分かるエラーにする。
+            byte[] pointer = System.Text.Encoding.ASCII.GetBytes(
+                "version https://git-lfs.github.com/spec/v1\noid sha256:0000000000000000000000000000000000000000000000000000000000000000\nsize 100\n");
+            var error = Assert.Throws<InvalidDataException>(() => OggLoopTags.Read(new MemoryStream(pointer)));
+            Assert.That(error.Message, Does.Contain("git lfs pull"));
         }
     }
 }

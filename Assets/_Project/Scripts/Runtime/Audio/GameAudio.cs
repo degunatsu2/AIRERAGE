@@ -11,7 +11,8 @@ namespace Airerage.Runtime.Audio
     /// 本番の音ができたら、_bgmOverride と _overrides に音声ファイルを設定すれば置き換わる（合成はしない）。
     /// ステージに曲（StageDefinition.Music。docs/18 6 章）があれば、BGM はその曲（前奏を 1 回鳴らしてからループ。LoopingMusic）。
     /// その曲は 100 枚のコインの予告の後も鳴らし続ける（残り 1 分の版ができたら切り替える）。ステージは GameFlow の行き先から知る
-    /// （App のシーンから始めたときだけ。検証用のシーンでは仮の BGM）。
+    /// （App のシーンから始めたときだけ。検証用のシーンでは仮の BGM）。ステージの曲のファイルを読み込めていない（Git LFS のファイルを
+    /// 取り込んでいない）ときは、エラーを出して仮の BGM を鳴らす（黙って無音にしない）。
     /// 効果音は少数の AudioSource を順番に使い、重なっても切れないようにする。
     /// 音量はオプション（GameSettings の BGM と効果音。docs/15 T6-9）を掛ける。
     /// </summary>
@@ -151,6 +152,11 @@ namespace Airerage.Runtime.Audio
             _bgm.playOnAwake = false;
             var flow = FindFirstObjectByType<GameFlow>();
             _stageCue = flow != null && flow.TargetStage != null ? flow.TargetStage.Music : null;
+            if (_stageCue != null && !_stageCue.IsPlayable)
+            {
+                Debug.LogError($"{name}: ステージ {flow.TargetStage.DisplayName} の {_stageCue.UnplayableMessage}。代わりに仮の BGM を鳴らす", this);
+                _stageCue = null;
+            }
             if (_stageCue != null)
             {
                 _stageMusic = new LoopingMusic(gameObject, this);

@@ -90,6 +90,11 @@ namespace Airerage.Runtime.Audio
                 }
                 if (header[0] != 'O' || header[1] != 'g' || header[2] != 'g' || header[3] != 'S')
                 {
+                    // Git LFS の目印のファイル（"version https://git-lfs..."）なら、そう知らせる（曲のファイルを取り込んでいない）。
+                    if (Encoding.ASCII.GetString(header, 0, 8) == "version ")
+                    {
+                        throw new InvalidDataException("曲のファイルではなく Git LFS の目印のファイル（手もとで git lfs pull をしていない）");
+                    }
                     throw new InvalidDataException("Ogg のページの印がない");
                 }
                 int segments = header[26];

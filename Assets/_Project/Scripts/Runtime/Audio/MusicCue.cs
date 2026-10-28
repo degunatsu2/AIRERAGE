@@ -26,6 +26,17 @@ namespace Airerage.Runtime.Audio
 
         public float Volume => _volume;
 
+        /// <summary>
+        /// 鳴らせるか（曲のファイルを読み込めているか）。曲のファイルは Git LFS なので、手もとで取り込んでいない（中身が LFS の目印の
+        /// 小さなファイルのまま）と、Unity が音として読み込めず、曲がないことになる。
+        /// </summary>
+        public bool IsPlayable => _clip != null && _clip.loadState != AudioDataLoadState.Failed;
+
+        /// <summary>鳴らせないときのエラーの文。</summary>
+        public string UnplayableMessage =>
+            $"{name} の曲を鳴らせない（曲のファイルを読み込めていない。曲のファイルは Git LFS なので、手もとで git lfs pull をしてから " +
+            "Unity を開き直す。Unity のコンソールに曲のファイルの読み込みのエラーが出ていないかも確かめる）";
+
         /// <summary>ループの位置が曲の中に収まっているか。</summary>
         public bool HasValidLoop => _clip != null && _loopStart >= 0 && LoopEnd > _loopStart && LoopEnd <= _clip.samples;
 

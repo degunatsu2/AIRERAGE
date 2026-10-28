@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Settings;
 using Airerage.Runtime.UI;
@@ -36,6 +37,8 @@ namespace Airerage.Runtime.Audio
         private MenuScreens _menus;
         private MusicCue _cue;
         private MusicCue _wanted;
+        // 鳴らせないことを知らせた曲（毎フレーム同じエラーを出さない）。
+        private readonly HashSet<MusicCue> _reported = new HashSet<MusicCue>();
         private float _scale = 1f;
         private float _fade = 1f;
 
@@ -95,12 +98,27 @@ namespace Airerage.Runtime.Audio
             switch (track)
             {
                 case MenuTrack.Title:
-                    return _menuMusic;
+                    return Playable(_menuMusic);
                 case MenuTrack.Select:
-                    return _selectMusic != null ? _selectMusic : _menuMusic;
+                    MusicCue select = Playable(_selectMusic);
+                    return select != null ? select : Playable(_menuMusic);
                 default:
                     return null;
             }
+        }
+
+        // 鳴らせる曲ならそのまま、鳴らせない（曲のファイルを読み込めていない）ならエラーを 1 回出して null。
+        private MusicCue Playable(MusicCue cue)
+        {
+            if (cue == null || cue.IsPlayable)
+            {
+                return cue;
+            }
+            if (_reported.Add(cue))
+            {
+                Debug.LogError($"{name}: {cue.UnplayableMessage}", this);
+            }
+            return null;
         }
 
         /// <summary>曲を頭から鳴らす（前奏から）。</summary>

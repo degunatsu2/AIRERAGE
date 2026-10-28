@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Airerage.Core.Input;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Flow;
@@ -122,6 +123,44 @@ namespace Airerage.PlayMode.Tests
             Assert.That(audio.StageMusicPlaying, Is.False, "F9 で止まらない");
             audio.BgmOn = true;
             Assert.That(audio.StageMusicPlaying, Is.True, "F9 でまた鳴らない");
+        }
+
+        /// <summary>
+        /// ステージの曲のファイルを読み込めていない（Git LFS のファイルを取り込んでいない）ときは、黙って無音にせず、エラーを出して仮の BGM を
+        /// 鳴らす（2026-10-28。昼のビル街で BGM が鳴らなかった件）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator StageMusic_WithoutItsFile_ReportsIt_AndPlaysTheTemporaryBgm()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            var broken = ScriptableObject.CreateInstance<MusicCue>();
+            broken.name = "BrokenMusic";
+            broken.Configure(null, 0, 0, 1f);
+            var stage = ScriptableObject.CreateInstance<StageDefinition>();
+            stage.Configure("BROKEN", "Stage_CityDay", string.Empty, string.Empty, Color.white);
+            stage.SetMusic(broken);
+            try
+            {
+                Assert.That(broken.IsPlayable, Is.False);
+                LogAssert.Expect(LogType.Error, new Regex("BrokenMusic の曲を鳴らせない.*git lfs pull"));
+                flow.StartTraining(stage);
+                yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+                yield return null;
+                var audio = Object.FindFirstObjectByType<GameAudio>();
+                Assert.That(audio.StageMusic, Is.Null, "鳴らせないステージの曲を使っている");
+                Assert.That(audio.StageMusicPlaying, Is.False);
+                Assert.That(audio.BgmEnabled, Is.True, "BGM を鳴らす設定になっていない");
+                Assert.That(audio.BgmSource.clip, Is.Not.Null, "仮の BGM がない（無音になる）");
+                Assert.That(audio.BgmVolume, Is.EqualTo(0.3f * GameSettings.Load().Bgm01).Within(1e-3f), "仮の BGM の音量でない");
+            }
+            finally
+            {
+                Object.Destroy(stage);
+                Object.Destroy(broken);
+            }
         }
 
         private static IEnumerator WaitFor(System.Func<bool> condition, float seconds, string message)
