@@ -10,15 +10,18 @@ namespace Airerage.Runtime.Audio
     /// BGM と効果音を鳴らす（仮の音。ユーザーの要望、2026-10-13）。音は ProceduralAudio がその場で合成する。
     /// 本番の音ができたら、_bgmOverride と _overrides に音声ファイルを設定すれば置き換わる（合成はしない）。
     /// ステージに曲（StageDefinition.Music。docs/18 6 章）があれば、BGM はその曲（前奏を 1 回鳴らしてからループ。LoopingMusic）。
-    /// その曲は 100 枚のコインの予告の後も鳴らし続ける（残り 1 分の版ができたら切り替える）。ステージは GameFlow の行き先から知る
-    /// （App のシーンから始めたときだけ。検証用のシーンでは仮の BGM）。ステージの曲のファイルを読み込めていない（Git LFS のファイルを
-    /// 取り込んでいない）ときは、エラーを出して仮の BGM を鳴らす（黙って無音にしない）。
+    /// 100 枚のコインの予告（残り 1 分）からは、その曲を 1.2 倍の速さで鳴らす（音の高さも上がる。ユーザーの決定、2026-10-28。docs/18 4.12）。
+    /// ステージは GameFlow の行き先から知る（App のシーンから始めたときだけ。検証用のシーンでは仮の BGM）。ステージの曲のファイルを
+    /// 読み込めていない（Git LFS のファイルを取り込んでいない）ときは、エラーを出して仮の BGM を鳴らす（黙って無音にしない）。
     /// 効果音は少数の AudioSource を順番に使い、重なっても切れないようにする。
     /// 音量はオプション（GameSettings の BGM と効果音。docs/15 T6-9）を掛ける。
     /// </summary>
     public sealed class GameAudio : MonoBehaviour
     {
         private const int SePoolSize = 8;
+        // ステージの曲を鳴らし始めるまでの余裕（秒）。試合のシーンを読み込んだ直後のフレームは長いことがあり、短いと前奏が遅れて
+        // 始まって最初のつなぎ目が飛ぶ（クラウドの Unity で 1 度、約 7ms 遅れた。docs/18 4.12）。
+        private const double StageMusicStartDelay = 0.5;
 
         [Serializable]
         public sealed class ClipOverride
@@ -36,6 +39,8 @@ namespace Airerage.Runtime.Audio
         [Range(0f, 1f)] [SerializeField] private float _bgmVolume = 0.3f;
         [Tooltip("ステージの曲の音量（メニューの曲と同じ。曲ごとの音量 MusicCue.Volume を掛ける）")]
         [Range(0f, 1f)] [SerializeField] private float _stageMusicVolume = 0.8f;
+        [Tooltip("100 枚のコインの予告（残り 1 分）からのステージの曲の速さ（音の高さも上がる）")]
+        [Range(1f, 2f)] [SerializeField] private float _rushMusicSpeed = 1.2f;
         [Range(0f, 1f)] [SerializeField] private float _seVolume = 0.7f;
         [SerializeField] private bool _playBgmOnStart = true;
 
@@ -61,6 +66,12 @@ namespace Airerage.Runtime.Audio
         /// <summary>ステージの曲を鳴らしているか（テスト用）。</summary>
         public bool StageMusicPlaying => _stageMusic != null && _stageMusic.Cue != null;
 
+        /// <summary>ステージの曲の速さ（1 で元の速さ。ステージの曲がなければ 1。テスト用）。</summary>
+        public float StageMusicSpeed => _stageMusic != null ? _stageMusic.Speed : 1f;
+
+        /// <summary>ステージの曲を鳴らすもの（ステージの曲がなければ null。テスト用）。</summary>
+        public LoopingMusic StageMusicPlayer => _stageMusic;
+
         /// <summary>これまでに鳴らした効果音（古い順。最後の 64 個まで。テストと確認用）。</summary>
         public IReadOnlyList<SoundId> History => _history;
 
@@ -74,7 +85,7 @@ namespace Airerage.Runtime.Audio
                 {
                     if (value && !StageMusicPlaying)
                     {
-                        _stageMusic.Play(_stageCue);
+                        _stageMusic.Play(_stageCue, StageMusicStartDelay);
                     }
                     else if (!value)
                     {
@@ -106,8 +117,8 @@ namespace Airerage.Runtime.Audio
         public bool BgmTense { get; private set; }
 
         /// <summary>
-        /// BGM を、ふつうのものと緊張感のあるものとで切り替える（鳴らす設定なら、頭から鳴らし直す）。ステージの曲は切り替えずに
-        /// 鳴らし続ける（残り 1 分の版はまだない）。
+        /// BGM を、ふつうのものと緊張感のあるものとで切り替える（鳴らす設定なら、頭から鳴らし直す）。ステージの曲は切り替えずに、
+        /// 鳴っている位置のまま速さだけを変える（緊張感のあるときは _rushMusicSpeed 倍）。
         /// </summary>
         public void SetBgmTense(bool tense)
         {
@@ -118,6 +129,7 @@ namespace Airerage.Runtime.Audio
             BgmTense = tense;
             if (_stageMusic != null)
             {
+                _stageMusic.Speed = tense ? _rushMusicSpeed : 1f;
                 return;
             }
             _bgm.clip = tense ? _tenseClip : _normalClip;

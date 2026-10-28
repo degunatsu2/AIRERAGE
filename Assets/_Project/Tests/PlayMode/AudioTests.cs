@@ -73,10 +73,11 @@ namespace Airerage.PlayMode.Tests
 
         /// <summary>
         /// ステージの曲（docs/18 4.5）: 恐怖の館の試合では、ステージの曲（ループのタグ付き）を鳴らす。メニューの曲は止まる。100 枚のコインの
-        /// 予告（緊張感のある BGM）でも切り替えずに鳴らし続ける。F9（BgmOn）で止めて、また鳴らせる。
+        /// 予告（緊張感のある BGM）からは、切り替えずに 1.2 倍の速さで鳴らし続ける（docs/18 4.12）。F9（BgmOn）で止めて、また鳴らせる
+        /// （速さはそのまま）。再戦などで緊張感のある BGM をやめると、元の速さに戻る。
         /// </summary>
         [UnityTest]
-        public IEnumerator StageMusic_PlaysInTheManor_AndKeepsPlayingInCoinRush()
+        public IEnumerator StageMusic_PlaysInTheManor_AndSpeedsUpInCoinRush()
         {
             SceneManager.LoadScene("App");
             yield return null;
@@ -116,13 +117,153 @@ namespace Airerage.PlayMode.Tests
             var music = Object.FindFirstObjectByType<MusicPlayer>();
             yield return WaitFor(() => music.Current == null, 2f, "試合でもメニューの曲が鳴っている");
 
+            Assert.That(audio.StageMusicSpeed, Is.EqualTo(1f));
             audio.SetBgmTense(true);
             Assert.That(audio.BgmTense, Is.True);
             Assert.That(audio.StageMusicPlaying, Is.True, "100 枚のコインの予告でステージの曲が止まる");
+            Assert.That(audio.StageMusicSpeed, Is.EqualTo(1.2f), "100 枚のコインの予告でステージの曲が 1.2 倍の速さにならない");
+            yield return WaitFor(() => audio.StageMusicPlayer.Parts.Last().Speed == 1.2f, 2f, "曲の予約が 1.2 倍の速さにならない");
             audio.BgmOn = false;
             Assert.That(audio.StageMusicPlaying, Is.False, "F9 で止まらない");
             audio.BgmOn = true;
             Assert.That(audio.StageMusicPlaying, Is.True, "F9 でまた鳴らない");
+            Assert.That(audio.StageMusicPlayer.Parts.All(part => part.Speed == 1.2f), Is.True, "F9 でまた鳴らすと元の速さに戻る");
+            audio.SetBgmTense(false);
+            Assert.That(audio.StageMusicSpeed, Is.EqualTo(1f), "緊張感のある BGM をやめても元の速さに戻らない");
+            yield return WaitFor(() => audio.StageMusicPlayer.Parts.Last().Speed == 1f, 2f, "曲の予約が元の速さに戻らない");
+        }
+
+        /// <summary>
+        /// 曲の速さを変える（docs/18 4.12。COIN RUSH で 1.2 倍）: 鳴らした直後・鳴っている途中・つなぎ目の近く・つなぎ目の直前のどれで変えても、
+        /// 予約した区間がすき間も重なりもなくつながり、鳴る位置が飛ばない（途中で引き継いだら同じ位置から、ループの終わりからはループの
+        /// 始まりへ）。新しい速さになるまでの遅れも確かめる。時計は偽物（音の出る機器がなくても確かめられる）。
+        /// </summary>
+        [Test]
+        public void LoopingMusic_ChangingSpeed_KeepsTheLoopSeamless()
+        {
+            const int rate = 44100;
+            const int loopStart = 2 * rate;
+            const int loopEnd = 8 * rate;
+            var host = new GameObject("LoopingMusicTest");
+            AudioClip clip = AudioClip.Create("Loop", 10 * rate, 1, rate, false);
+            var cue = ScriptableObject.CreateInstance<MusicCue>();
+            cue.name = "LoopTest";
+            cue.Configure(clip, loopStart, loopEnd, 0f);
+            double now = 1.0;
+            var music = new LoopingMusic(host, host, () => now);
+            void Advance(double seconds)
+            {
+                double until = now + seconds;
+                while (now < until)
+                {
+                    now += 1.0 / 60.0;
+                    music.Update();
+                    AssertSeamless(music, loopStart, loopEnd, rate);
+                }
+            }
+            double NextSeam() => music.Parts.Max(part => part.Start);
+            try
+            {
+                // 鳴らした直後（まだ何も鳴っていない）: 頭から予約し直す。
+                music.Play(cue);
+                music.Speed = 1.2f;
+                Assert.That(music.Parts.Count, Is.EqualTo(2));
+                Assert.That(music.Parts.All(part => part.Speed == 1.2f), Is.True, "鳴らした直後に速さを変えても、予約が新しい速さにならない");
+                Assert.That(music.Parts[0].From, Is.EqualTo(0), "前奏から鳴らさない");
+                AssertSeamless(music, loopStart, loopEnd, rate);
+
+                // 鳴っている途中（次のつなぎ目まで 1 秒より長い）: 0.1 秒後に、その位置から新しい速さで引き継ぐ。
+                Advance(3.0);
+                double changed = now;
+                music.Speed = 1f;
+                Assert.That(SpeedAt(music, changed + 0.05), Is.EqualTo(1.2f));
+                Assert.That(SpeedAt(music, changed + 0.11), Is.EqualTo(1f), "鳴っている途中で速さを変えても、すぐに変わらない");
+                LoopingMusic.Part spliced = music.Parts.Last();
+                Assert.That(spliced.From, Is.GreaterThan(0).And.LessThan(loopEnd), "途中の位置から引き継がない");
+                AssertSeamless(music, loopStart, loopEnd, rate);
+
+                // つなぎ目の 0.5 秒前: つなぎ目から新しい速さにする（引き継いだほうが鳴り始め、次のくり返しを予約してから）。
+                Advance(0.5);
+                double seam = NextSeam();
+                Assert.That(seam, Is.EqualTo(spliced.End), "引き継いだ区間の後を予約していない");
+                Advance(seam - 0.5 - now);
+                music.Speed = 1.2f;
+                Assert.That(SpeedAt(music, seam - 0.01), Is.EqualTo(1f));
+                Assert.That(SpeedAt(music, seam + 0.01), Is.EqualTo(1.2f), "つなぎ目の近くで速さを変えても、つなぎ目から変わらない");
+                AssertSeamless(music, loopStart, loopEnd, rate);
+
+                // つなぎ目の直前（もう片方が鳴り始める寸前）: つなぎ目を過ぎて、空いたほうを予約してから引き継ぐ。
+                Advance(1.0);
+                seam = NextSeam();
+                Advance(seam - 0.05 - now);
+                music.Speed = 1f;
+                Advance(0.5);
+                Assert.That(SpeedAt(music, seam + 0.05), Is.EqualTo(1.2f));
+                Assert.That(SpeedAt(music, seam + 0.3), Is.EqualTo(1f), "つなぎ目の直前で速さを変えると、つなぎ目の後もしばらく変わらない");
+
+                // その後も何周もつながる。
+                Advance(20.0);
+                Assert.That(music.Parts.Last().Speed, Is.EqualTo(1f));
+
+                // 止めている間に変えた速さは、次に鳴らすときから。
+                music.Stop();
+                Assert.That(music.Parts.Count, Is.EqualTo(0));
+                music.Speed = 1.2f;
+                Assert.That(music.Parts.Count, Is.EqualTo(0));
+                music.Play(cue);
+                Assert.That(music.Parts.All(part => part.Speed == 1.2f), Is.True);
+                Assert.Throws<System.ArgumentOutOfRangeException>(() => music.Speed = 0f);
+            }
+            finally
+            {
+                music.Stop();
+                Object.Destroy(host);
+                Object.Destroy(cue);
+                Object.Destroy(clip);
+            }
+        }
+
+        // 予約した区間が、すき間も重なりもなく、鳴る位置が飛ばずにつながっているか（ループの終わりからは、ループの始まりへ）。
+        private static void AssertSeamless(LoopingMusic music, int loopStart, int loopEnd, int rate)
+        {
+            List<LoopingMusic.Part> parts = music.Parts.OrderBy(part => part.Start).ToList();
+            for (int i = 0; i < parts.Count; i++)
+            {
+                LoopingMusic.Part part = parts[i];
+                Assert.That(part.Start - part.ScheduledAt, Is.GreaterThanOrEqualTo(0.05), "鳴り始める直前（か過ぎてから）に予約している");
+                Assert.That(part.End, Is.GreaterThan(part.Start), "長さのない区間を予約している");
+                Assert.That(part.PositionAt(part.End, rate), Is.LessThanOrEqualTo(loopEnd + 0.5), "ループの終わりを越えて鳴らす");
+                if (i == 0)
+                {
+                    continue;
+                }
+                LoopingMusic.Part before = parts[i - 1];
+                Assert.That(part.Start, Is.EqualTo(before.End).Within(1e-9), "前の区間との間にすき間か重なりがある");
+                Assert.That(part.Source, Is.Not.EqualTo(before.Source), "同じ AudioSource を続けて使っている");
+                double end = before.PositionAt(before.End, rate);
+                if (System.Math.Abs(end - loopEnd) < 0.5)
+                {
+                    Assert.That(part.From, Is.EqualTo(loopStart), "ループの終わりから、ループの始まりへ戻らない");
+                }
+                else
+                {
+                    Assert.That((double)part.From, Is.EqualTo(end).Within(0.5), "途中で引き継いだ位置が飛んでいる");
+                }
+            }
+        }
+
+        // time に鳴っている区間の速さ。
+        private static float SpeedAt(LoopingMusic music, double time)
+        {
+            foreach (LoopingMusic.Part part in music.Parts)
+            {
+                if (part.Start <= time && time < part.End)
+                {
+                    return part.Speed;
+                }
+            }
+            Assert.Fail($"{time:F3} 秒に鳴っている区間がない");
+            return 0f;
         }
 
         /// <summary>
