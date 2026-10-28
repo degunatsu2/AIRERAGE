@@ -216,7 +216,7 @@ namespace Airerage.Runtime.Audio
             }
             if (now.Wire.Phase == WirePhase.Firing && before.Wire.Phase != WirePhase.Firing)
             {
-                _audio.Play(SoundId.WireFire, 0.7f, 0.05f);
+                _audio.Play(SoundId.WireFire, 0.55f, 0.05f);
             }
             if (now.Wire.Phase == WirePhase.Attached && before.Wire.Phase != WirePhase.Attached)
             {

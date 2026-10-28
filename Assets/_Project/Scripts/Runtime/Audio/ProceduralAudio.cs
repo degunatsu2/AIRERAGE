@@ -27,7 +27,10 @@ namespace Airerage.Runtime.Audio
         /// <summary>撃破技のチャージ（上がっていく音）。</summary>
         Charge,
 
+        /// <summary>ジャンプした（息を吐くような柔らかい音。いちばんよく鳴るので小さく低く。ユーザーの要望、2026-10-28）。</summary>
         Jump,
+
+        /// <summary>ワイヤーを撃った（すぐに丸くなる「シュッ」。よく鳴るので小さく低く。ユーザーの要望、2026-10-28）。</summary>
         WireFire,
         WireAttach,
 
@@ -297,13 +300,18 @@ namespace Airerage.Runtime.Audio
                     ApplyTremolo(b, r, 28f, 0.5f);
                     break;
                 case SoundId.Jump:
-                    b = new float[Samples(0.12f, r)];
-                    AddTone(b, r, 0f, 0.12f, 320f, 760f, Wave.Square, 0.3f, 0.002f, 0.05f);
+                    // 4 人分が重なっても耳に響かないよう、矩形波をやめて、低く絞ったノイズの「フッ」と低い正弦波の小さな「ポン」に
+                    // した（ユーザーの要望、2026-10-28。前より聞こえの大きさで約 10 dB 小さく、音の中心は約 950 → 450Hz）。
+                    b = new float[Samples(0.16f, r)];
+                    AddNoise(b, r, rng, 0f, 0.16f, 0.6f, 0.008f, 0.04f, 1400f, 500f, 150f);
+                    AddTone(b, r, 0f, 0.1f, 170f, 300f, Wave.Sine, 0.5f, 0.004f, 0.03f);
                     break;
                 case SoundId.WireFire:
+                    // のこぎり波と明るいノイズをやめて、すぐに丸くなるノイズの「シュッ」と下がる正弦波にした（ユーザーの要望、
+                    // 2026-10-28。前より約 8 dB 小さく、音の中心は約 3800 → 1300Hz）。
                     b = new float[Samples(0.14f, r)];
-                    AddTone(b, r, 0f, 0.14f, 1800f, 500f, Wave.Saw, 0.25f, 0.002f, 0.05f);
-                    AddNoise(b, r, rng, 0f, 0.1f, 0.25f, 0.002f, 0.04f, 6000f, 2000f, 1000f);
+                    AddNoise(b, r, rng, 0f, 0.13f, 0.7f, 0.004f, 0.04f, 2000f, 600f, 300f);
+                    AddTone(b, r, 0f, 0.1f, 420f, 180f, Wave.Sine, 0.35f, 0.002f, 0.03f);
                     break;
                 case SoundId.WireAttach:
                     b = new float[Samples(0.12f, r)];
