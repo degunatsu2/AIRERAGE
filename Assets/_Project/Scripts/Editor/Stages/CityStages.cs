@@ -85,6 +85,7 @@ namespace Airerage.Editor.Stages
             return new StageLayout
             {
                 Id = "CityDay",
+                Music = "CityDay",
                 DisplayName = "SKYLINE DAY",
                 Description = "Rooftop parkour. Moving walkways, rooftop ducts and gusts between the towers.",
                 DescriptionJa = "ビルの屋上を駆けるパルクール。動く歩道、屋上のダクト、ビルの間を吹き抜ける風。",

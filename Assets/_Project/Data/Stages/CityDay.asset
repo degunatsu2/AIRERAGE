@@ -18,4 +18,4 @@ MonoBehaviour:
     the towers.
   _descriptionJa: "\u30D3\u30EB\u306E\u5C4B\u4E0A\u3092\u99C6\u3051\u308B\u30D1\u30EB\u30AF\u30FC\u30EB\u3002\u52D5\u304F\u6B69\u9053\u3001\u5C4B\u4E0A\u306E\u30C0\u30AF\u30C8\u3001\u30D3\u30EB\u306E\u9593\u3092\u5439\u304D\u629C\u3051\u308B\u98A8\u3002"
   _color: {r: 0.4, g: 0.75, b: 1, a: 1}
-  _music: {fileID: 0}
+  _music: {fileID: 11400000, guid: 01ba0b25d3811b6948f91d71810d2776, type: 2}
