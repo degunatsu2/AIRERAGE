@@ -85,6 +85,7 @@ MonoBehaviour:
         HoldRooted: 0
         Run: 0
         SpinPerHit: 1
+        Flip: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -118,6 +119,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         - StartTick: 12
           ActiveTicks: 4
@@ -136,6 +140,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         - StartTick: 19
           ActiveTicks: 6
@@ -154,6 +161,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         Motions:
         - StartTick: 0
@@ -178,6 +188,7 @@ MonoBehaviour:
         HoldRooted: 0
         Run: 0
         SpinPerHit: 0
+        Flip: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -211,6 +222,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         - StartTick: 11
           ActiveTicks: 5
@@ -229,6 +243,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         Motions: []
       AirSide:
@@ -239,6 +256,7 @@ MonoBehaviour:
         HoldRooted: 0
         Run: 0
         SpinPerHit: 0
+        Flip: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -272,6 +290,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         - StartTick: 9
           ActiveTicks: 2
@@ -290,6 +311,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         - StartTick: 13
           ActiveTicks: 2
@@ -308,6 +332,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         - StartTick: 17
           ActiveTicks: 3
@@ -326,6 +353,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         Motions:
         - StartTick: 3
@@ -343,6 +373,7 @@ MonoBehaviour:
         HoldRooted: 0
         Run: 0
         SpinPerHit: 0
+        Flip: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -376,6 +407,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         Motions: []
       AirDown:
@@ -386,6 +420,7 @@ MonoBehaviour:
         HoldRooted: 0
         Run: 0
         SpinPerHit: 0
+        Flip: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -418,6 +453,7 @@ MonoBehaviour:
         HoldRooted: 0
         Run: 0
         SpinPerHit: 0
+        Flip: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -446,6 +482,7 @@ MonoBehaviour:
         HoldRooted: 0
         Run: 0
         SpinPerHit: 0
+        Flip: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -472,6 +509,7 @@ MonoBehaviour:
         HoldRooted: 0
         Run: 0
         SpinPerHit: 0
+        Flip: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -560,6 +598,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         HeldCoinsPerBonusPercent: 0
         MaxHeldCoinBonusPercent: 0
@@ -621,6 +662,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
       Beam:
         HalfWidth: 0.75
@@ -644,6 +688,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
       SlowFall:
         MaxFallSpeed: 3
@@ -705,6 +752,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
       Scale:
         OffsetY: -1.2
@@ -735,6 +785,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
       Inverter:
         RangeScale: 0.33333334
@@ -758,6 +811,9 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 0
         WaveSpeed: 36
         WaveRadius: 0.5
@@ -790,7 +846,85 @@ MonoBehaviour:
           Critical: 0
           CriticalScale: 1
           Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
           StunTicks: 60
+      Thief:
+        SmokeBallSpeed: 26
+        SmokeBallRadius: 0.3
+        SmokeBallLifetimeTicks: 90
+        ExplosionRadius: 0.8
+        SmokeHit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          Gauge: 70
+          HitstopTicks: 8
+          HitstunTicks: 20
+          KnockbackX: 4
+          KnockbackY: 6
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        SmokeRadius: 2.6
+        SmokeTicks: 300
+        PuffRadius: 1.6
+        PuffTicks: 90
+        SnatchSpeed: 60
+        SnatchRange: 30
+        SnatchRadius: 0.3
+        SnatchLaunchOffset: 0.8
+        TrapBodyRadius: 1.2
+        PlaceGap: 0.8
+        PlaceMaxSize: 6
+        PlaceMaxHazardHeight: 8
+        TrapPlaceDistance: 2
+        MaxPlaced: 2
+        PlaceAttack:
+          Name: PLACE
+          Effect: 20
+          EffectTick: 2
+          HoldMaxTicks: 0
+          HoldRooted: 0
+          Run: 0
+          SpinPerHit: 0
+          Flip: 0
+          ChargeLevels: []
+          Roulette: 0
+          ChargedFromTicks: 0
+          ChargedTotalTicks: 0
+          FiresWhenCharged: 0
+          TracksAim: 0
+          AimTurnsFacing: 0
+          ChainMax: 0
+          ChainWindowTicks: 0
+          ExclusiveHits: 0
+          SpeedScaled: 0
+          EndsOnHit: 0
+          BlocksProjectilesAbove: 0
+          TotalTicks: 14
+          WireCancelFromTick: 4
+          Hits: []
+          Motions: []
+        MisdirectionTicks: 180
+        CloneTurnIntervalTicks: 60
+        CloneTurnPercent: 25
+        CloneWireHoldTicks: 45
+        HeistRange: 6
+        HeistCoinsPerSecond: 1
+        HeistBonusPerFive: 20
+        HeistBonusPerTen: 20
   _displayName: PASTRY CHEF
   _logo: {fileID: 2800000, guid: 523089f68ab3afce4b4cb6a7d027b383, type: 2}
   _special1Icon: {fileID: 0}

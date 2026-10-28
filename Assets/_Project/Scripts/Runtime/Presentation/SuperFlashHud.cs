@@ -76,7 +76,9 @@ namespace Airerage.Runtime.Presentation
             {
                 ActionState now = _feed.GetState(i).Action;
                 ActionState before = _previous[i];
-                bool super = now.Kind == ActionKind.Attack && now.Attack == AttackSlot.Super;
+                // バンクハイスト（THIEF の R）は暗転しない（こっそり始める。ユーザーの案）。
+                bool super = now.Kind == ActionKind.Attack && now.Attack == AttackSlot.Super
+                    && _feed.GetConfig(i).Combat.Super.Effect != Airerage.Core.Skills.SkillEffect.BankHeist;
                 bool wasSuper = before.Kind == ActionKind.Attack && before.Attack == AttackSlot.Super;
                 if (super && (!wasSuper || now.Ticks < before.Ticks))
                 {

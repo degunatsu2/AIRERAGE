@@ -134,6 +134,8 @@ namespace Airerage.Runtime.Simulation
         IReadOnlyList<StagePlatform> ISimulationFeed.Platforms => _world?.Platforms;
         IReadOnlyList<StageTrap> ISimulationFeed.Traps => _world?.Traps;
         StageState ISimulationFeed.Stage => _world?.Stage;
+        IReadOnlyList<StageZone> ISimulationFeed.Zones => _world?.Zones;
+        bool ISimulationFeed.TryGetClone(int index, out CharacterState clone) => SimWorldFeed.TryGetClone(_world, index, out clone);
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => _world != null ? _world.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => _world != null ? _world.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
 
@@ -408,6 +410,8 @@ namespace Airerage.Runtime.Simulation
                 _characterViews[p].RenderAction(current, config.Combat, _world.Rules.RespawnDelayTicks, config.Movement);
                 _characterViews[p].SetCostume(CharacterOf(p));
                 _wireViews[p].Render(_previous[p], current, alpha, config.Wire);
+                bool cloned = SimWorldFeed.TryGetClone(_world, p, out CharacterState clone);
+                _characterViews[p].RenderClone(cloned, clone, config.Movement.HalfExtents.ToUnity(), _world.Tick, _wireViews[p]);
 
                 if (_cpus[p] != null)
                 {
@@ -419,7 +423,7 @@ namespace Airerage.Runtime.Simulation
                 var frame = new InputFrame(_inputs[p].Peek(simOrigin), current.PreviousButtons);
                 WireTuning wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, config).Wire;
                 WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _world.Collision);
-                _aimIndicators[p].Render(origin, current.Wire, preview, wire.MaxLength);
+                _aimIndicators[p].Render(origin, current.Wire, preview, wire.MaxLength, current.Combat.InvisibleTicksLeft > 0);
             }
         }
     }

@@ -43,8 +43,16 @@ namespace Airerage.Runtime.Presentation
             _aimLine.positionCount = 2;
         }
 
-        public void Render(Vector3 origin, in WireState wire, in WireShotPreview preview, float maxLength)
+        /// <summary>照準を描く。hidden なら（透明の間。THIEF の E）すべて隠す。</summary>
+        public void Render(Vector3 origin, in WireState wire, in WireShotPreview preview, float maxLength, bool hidden = false)
         {
+            _rangeRing.enabled = !hidden;
+            if (hidden)
+            {
+                _aimLine.enabled = false;
+                _targetMarker.enabled = false;
+                return;
+            }
             float alphaScale = wire.Phase == WirePhase.Ready ? 1f : _notReadyAlphaScale;
 
             SetColor(_rangeRing, _rangeColor, alphaScale);

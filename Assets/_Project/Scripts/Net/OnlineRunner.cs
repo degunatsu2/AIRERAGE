@@ -133,6 +133,8 @@ namespace Airerage.Net
         IReadOnlyList<StagePlatform> ISimulationFeed.Platforms => Running ? _session.World.Platforms : null;
         IReadOnlyList<StageTrap> ISimulationFeed.Traps => Running ? _session.World.Traps : null;
         StageState ISimulationFeed.Stage => Running ? _session.World.Stage : null;
+        IReadOnlyList<StageZone> ISimulationFeed.Zones => Running ? _session.World.Zones : null;
+        bool ISimulationFeed.TryGetClone(int index, out CharacterState clone) => SimWorldFeed.TryGetClone(Running ? _session.World : null, index, out clone);
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => Running ? _session.World.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => Running ? _session.World.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
         Color ISimulationFeed.ColorOf(int index) => index < _playerColors.Length ? _playerColors[index] : Color.white;
@@ -535,6 +537,8 @@ namespace Airerage.Net
                     _session.World.GetConfig(p).Movement);
                 _characterViews[p].SetCostume(((ISimulationFeed)this).CharacterOf(p));
                 _wireViews[p].Render(previous, current, alpha, wire);
+                bool cloned = SimWorldFeed.TryGetClone(_session.World, p, out CharacterState clone);
+                _characterViews[p].RenderClone(cloned, clone, halfExtents, _session.World.Tick, _wireViews[p]);
             }
 
             Transform local = _characterViews[_session.LocalPlayer].transform;
@@ -559,7 +563,7 @@ namespace Airerage.Net
             // 強化（キャッスルインジエアーの空中への接続など）も含めた調整値で予測する。
             wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, _session.World.GetConfig(_session.LocalPlayer)).Wire;
             WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _session.World.Collision);
-            _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength);
+            _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, current.Combat.InvisibleTicksLeft > 0);
         }
 
         private void OnGUI()

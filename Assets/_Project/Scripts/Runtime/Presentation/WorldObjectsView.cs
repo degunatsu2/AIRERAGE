@@ -30,9 +30,13 @@ namespace Airerage.Runtime.Presentation
     /// - 雷の波動（SOLDERER のインバータ）: 地形の箱の縁を両回りに進むジグザグの光。
     /// - ボールライトニング（SOLDERER の R）: 脈打つ光の球と、周りのジグザグ。放つ前は隠し、止まった後は消える前に点滅する。
     /// 物が出たとき・セーフティボックスが消えたとき（ばらまき）に音を鳴らす（_audio があれば）。状態を読むだけで、書き換えない。
+    /// THIEF の物（煙球・煙・タレントスナッチの弾・置いたギミックと仕掛け。LastKind より後の種類）は ThiefEffectsView が出す。
     /// </summary>
     public sealed class WorldObjectsView : MonoBehaviour
     {
+        /// <summary>ここで出す最後の種類（見本はミラーボールからここまで。これより後は ThiefEffectsView）。</summary>
+        public const WorldObjectKind LastKind = WorldObjectKind.BallLightning;
+
         private const float BlinkSeconds = 1f;
         private const float FlashSeconds = 0.2f;
         private const int RaySegments = 16;
@@ -236,7 +240,7 @@ namespace Airerage.Runtime.Presentation
         private void Awake()
         {
             _feed = _source as ISimulationFeed;
-            int kinds = System.Enum.GetValues(typeof(WorldObjectKind)).Length;
+            int kinds = (int)LastKind;
             if (_feed == null || _templates.Length != kinds || System.Array.IndexOf(_templates, null) >= 0)
             {
                 Debug.LogError($"{name}: 状態を読む相手（ISimulationFeed）か、{kinds} 種類の見た目の見本が設定されていません", this);
@@ -262,6 +266,10 @@ namespace Airerage.Runtime.Presentation
             {
                 foreach (WorldObject item in objects.Items)
                 {
+                    if (item.Kind > LastKind)
+                    {
+                        continue;
+                    }
                     _present.Add(item.Id);
                     if (_shown.TryGetValue(item.Id, out Shown changed) && changed.Kind != item.Kind)
                     {

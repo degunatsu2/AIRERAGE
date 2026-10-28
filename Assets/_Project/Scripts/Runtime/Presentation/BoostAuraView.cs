@@ -124,7 +124,8 @@ namespace Airerage.Runtime.Presentation
                 }
                 CharacterState state = _feed.GetState(i);
                 CharacterConfig config = _feed.GetConfig(i);
-                bool alive = !state.Combat.IsWaitingToRespawn;
+                // 透明の間（THIEF の E）も出さない。
+                bool alive = !state.Combat.IsWaitingToRespawn && state.Combat.InvisibleTicksLeft <= 0;
                 bool attacking = alive && state.Action.Kind == ActionKind.Attack;
                 AttackData attack = attacking ? config.Combat.Get(state.Action.Attack) : null;
                 bool cloak = alive && state.Combat.SpeedBoostTicksLeft > 0;

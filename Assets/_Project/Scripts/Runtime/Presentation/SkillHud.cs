@@ -20,6 +20,8 @@ namespace Airerage.Runtime.Presentation
     /// - 使えるようになった瞬間は、自分のキャラクターの頭上にも小さな通知（技の名前。絵があれば絵）を出す（札を見なくても分かるように。
     ///   ユーザーの要望、2026-10-15）。この PC で操作しているキャラクターのものだけなので、ほかのプレイヤーには見えない。
     /// 技の絵は、キャラクターのアセット（CharacterConfigAsset）にあれば使う（まだない）。
+    /// THIEF（docs/14 1.6）: タレントスナッチでコピーした技は、その技の名前と「STOLEN」、奪ったギミック・仕掛けは、その名前と「PLACE」
+    /// （絵は出さない）。バンクハイストの詠唱中は、得られる枚数と詠唱した秒数。拠点から遠くて出せないときは「NEAR BANK」。
     /// ローカル対戦（docs/15 T6-5）では人ごとに 1 つ置く（_player）。画面の下を人数で等分して、自分の番号の場所に札と名前（P1 など）を出す
     /// （狭ければ縮める）。頭上の通知も、その人のキャラクターに出す。
     /// オフライン（SimulationRunner）とオンライン（OnlineRunner）のどちらでも使う（ISimulationFeed）。状態を読むだけで、書き換えない。
@@ -195,6 +197,16 @@ namespace Airerage.Runtime.Presentation
                 string moveName = combat.Get(move).Name;
                 slot.Name = string.IsNullOrEmpty(moveName) ? (move == AttackSlot.Super ? "SUPER" : $"SPECIAL {i + 1}") : moveName;
                 slot.Icon = character != null ? character.IconOf(move) : null;
+                // タレントスナッチで奪ったもの（THIEF の Q）。
+                string stolen = move == AttackSlot.Special1 ? StolenLabel(state.Combat) : null;
+                if (stolen != null)
+                {
+                    slot.Icon = null;
+                    if (state.Combat.StealKind != StealKind.Skill)
+                    {
+                        slot.Name = StolenName(state.Combat);
+                    }
+                }
                 if (slot.Shown && ready && !slot.Ready)
                 {
                     slot.ReadyCount++;
@@ -218,7 +230,17 @@ namespace Airerage.Runtime.Presentation
                     // コズミックレイは、ゲージがたまっていても自分のポータルが 2 つないと出せない。
                     bool needsPortals = combat.Super.Effect == Airerage.Core.Skills.SkillEffect.CosmicRay
                         && state.Combat.Gauge >= combat.SuperGaugeCost && state.Combat.PortalCount < 2;
-                    slot.Label = ready ? "READY!" : needsPortals ? "PORTAL x2" : slot.Name;
+                    // バンクハイストは、拠点の近くでなければ出せない（THIEF の R）。
+                    bool heist = combat.Super.Effect == Airerage.Core.Skills.SkillEffect.BankHeist;
+                    bool needsBank = heist && state.Combat.Gauge >= combat.SuperGaugeCost && !state.Combat.NearBank;
+                    slot.Label = ready ? "READY!" : needsPortals ? "PORTAL x2" : needsBank ? "NEAR BANK" : slot.Name;
+                    if (heist && state.Combat.HeistTicks > 0)
+                    {
+                        // 詠唱中: 今止めたときに得る枚数と、詠唱した秒数。
+                        int chanted = state.Combat.HeistTicks - 1;
+                        slot.Text = $"+{_feed.GetConfig(local).Skills.Thief.HeistCoins(chanted)}";
+                        slot.Label = $"HEIST {chanted * SimTime.DeltaTime:0.0}s";
+                    }
                 }
                 else
                 {
@@ -254,7 +276,7 @@ namespace Airerage.Runtime.Presentation
                     {
                         slot.Fill = total <= 0 ? 1f : 1f - Mathf.Clamp01(left / (float)total);
                         slot.Text = ready ? slot.Name : (left * SimTime.DeltaTime).ToString("0.0");
-                        slot.Label = ready ? string.Empty : slot.Name;
+                        slot.Label = ready ? stolen ?? string.Empty : slot.Name;
                     }
                     int charges = slot.MaxCharges;
                     if (charges > 1)
@@ -271,6 +293,47 @@ namespace Airerage.Runtime.Presentation
                 }
             }
             _notices.RemoveAll(n => Time.time - n.At >= HeadNoticeSeconds);
+        }
+
+        // タレントスナッチで奪ったものの、札の下の文字（奪っていなければ null）。
+        private static string StolenLabel(in CombatState combat)
+        {
+            switch (combat.StealKind)
+            {
+                case StealKind.Skill: return "STOLEN";
+                case StealKind.Zone:
+                case StealKind.Trap: return "PLACE";
+                default: return null;
+            }
+        }
+
+        // 奪ったギミック・仕掛けの名前（札の真ん中に出す）。
+        private string StolenName(in CombatState combat)
+        {
+            if (combat.StealKind == StealKind.Trap)
+            {
+                IReadOnlyList<StageTrap> traps = _feed.Traps;
+                bool pitcher = traps != null && combat.StealSource >= 0 && combat.StealSource < traps.Count
+                    && traps[combat.StealSource].Kind == StageTrapKind.Pitcher;
+                return pitcher ? "PITCHER" : "MISSILE";
+            }
+            IReadOnlyList<StageZone> zones = _feed.Zones;
+            if (zones == null || combat.StealSource < 0 || combat.StealSource >= zones.Count)
+            {
+                return "GIMMICK";
+            }
+            switch (zones[combat.StealSource].Kind)
+            {
+                case StageZoneKind.JumpPad: return "JUMP PAD";
+                case StageZoneKind.Updraft: return "UPDRAFT";
+                case StageZoneKind.BoostRing: return "BOOST RING";
+                case StageZoneKind.SpeedLane: return "SPEED LANE";
+                case StageZoneKind.Launcher: return "LAUNCHER";
+                case StageZoneKind.Bumper: return "BUMPER";
+                case StageZoneKind.Gust: return "GUST";
+                case StageZoneKind.Hazard: return "HAZARD";
+                default: return "GIMMICK";
+            }
         }
 
         private void AddHeadNotice(Slot slot, Color color)
@@ -397,6 +460,11 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             CharacterState state = _feed.GetState(local);
+            if (state.Combat.InvisibleTicksLeft > 0)
+            {
+                // 透明の間（THIEF の E）は、居場所が分かるので出さない。
+                return;
+            }
             float top = state.Position.Y + _feed.GetConfig(local).Movement.HalfHeight + 0.5f;
             Vector3 p = _camera.WorldToScreenPoint(new Vector3(state.Position.X, top, 0f));
             if (p.z <= 0f)

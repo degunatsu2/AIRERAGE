@@ -61,7 +61,17 @@ namespace Airerage.Runtime.Presentation
                 return false;
             }
             float halfHeight = _feed.GetConfig(index).Movement.HalfHeight;
-            Vector3 head = _views[index].transform.position + Vector3.up * (halfHeight + _headGap);
+            Vector3 body = _views[index].transform.position;
+            if (state.Combat.InvisibleTicksLeft > 0)
+            {
+                // 透明の間（THIEF の E）は、分身の上に出す（分身がいなければ出さない）。
+                if (!_views[index].ShowingClone)
+                {
+                    return false;
+                }
+                body = _views[index].ClonePosition;
+            }
+            Vector3 head = body + Vector3.up * (halfHeight + _headGap);
             Vector3 screen = _camera.WorldToScreenPoint(head);
             if (screen.z <= 0f)
             {

@@ -201,6 +201,18 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>キャラクターを決定した（音声ファイル。なければ UiConfirm と同じ合成の音。docs/18 4.3）。</summary>
         UiCharacterDecide,
+
+        /// <summary>煙が広がった（THIEF の煙球の着弾、分身が煙になって消えた。こもった「ボフッ」）。</summary>
+        Smoke,
+
+        /// <summary>タレントスナッチの弾を撃った（THIEF の Q。短く鋭い「ピュッ」）。</summary>
+        Snatch,
+
+        /// <summary>技やギミックを奪った（THIEF の Q が当たった。高い 2 音の「キラン」）。</summary>
+        Steal,
+
+        /// <summary>バンクハイストでコインを得た（THIEF の R。コインがざらざらと流れ込み、最後に高い音）。</summary>
+        Heist,
     }
 
     /// <summary>
@@ -807,6 +819,41 @@ namespace Airerage.Runtime.Audio
                     AddNoise(b, r, rng, 0f, 0.2f, 0.7f, 0.001f, 0.12f, 1200f, 400f, 300f);
                     AddTone(b, r, 0f, 0.15f, 260f, 120f, Wave.Sine, 0.45f, 0.001f, 0.1f);
                     break;
+                case SoundId.Smoke:
+                    // ボフッ（低く絞ったノイズが広がって消える）。
+                    b = new float[Samples(0.6f, r)];
+                    AddNoise(b, r, rng, 0f, 0.55f, 0.9f, 0.004f, 0.3f, 900f, 300f, 120f);
+                    AddTone(b, r, 0f, 0.18f, 150f, 70f, Wave.Sine, 0.4f, 0.002f, 0.1f);
+                    break;
+                case SoundId.Snatch:
+                    // ピュッ（上がっていく短い音と、細いノイズ）。
+                    b = new float[Samples(0.16f, r)];
+                    AddTone(b, r, 0f, 0.12f, 700f, 2400f, Wave.Triangle, 0.3f, 0.001f, 0.04f);
+                    AddNoise(b, r, rng, 0f, 0.08f, 0.35f, 0.001f, 0.03f, 6000f, 9000f, 2000f);
+                    break;
+                case SoundId.Steal:
+                    // キラン（高い 2 音）。
+                    b = new float[Samples(0.45f, r)];
+                    AddTone(b, r, 0f, 0.12f, NoteFrequency(91), NoteFrequency(91), Wave.Sine, 0.35f, 0.001f, 0.05f);
+                    AddTone(b, r, 0.07f, 0.35f, NoteFrequency(98), NoteFrequency(98), Wave.Sine, 0.4f, 0.001f, 0.14f);
+                    AddTone(b, r, 0.07f, 0.25f, NoteFrequency(110), NoteFrequency(110), Wave.Sine, 0.1f, 0.001f, 0.08f);
+                    break;
+                case SoundId.Heist:
+                {
+                    // コインがざらざらと流れ込み（高いコインの音を不規則に重ねる）、最後に高い音で締める。
+                    b = new float[Samples(1.2f, r)];
+                    for (int i = 0; i < 14; i++)
+                    {
+                        float start = i * 0.05f + (float)rng.NextDouble() * 0.03f;
+                        float f = NoteFrequency(88 + rng.Next(0, 3) * 4);
+                        AddTone(b, r, start, 0.12f, f, f, Wave.Square, 0.1f, 0.001f, 0.04f);
+                        AddTone(b, r, start, 0.18f, f * 1.5f, f * 1.5f, Wave.Sine, 0.12f, 0.001f, 0.06f);
+                    }
+                    float top = NoteFrequency(100);
+                    AddTone(b, r, 0.72f, 0.45f, top, top, Wave.Sine, 0.4f, 0.002f, 0.2f);
+                    AddTone(b, r, 0.72f, 0.3f, top * 2f, top * 2f, Wave.Sine, 0.1f, 0.002f, 0.12f);
+                    break;
+                }
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");
             }

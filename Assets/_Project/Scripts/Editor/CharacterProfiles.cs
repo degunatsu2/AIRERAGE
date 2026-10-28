@@ -84,6 +84,18 @@ namespace Airerage.Editor
                             .English("BALL LIGHTNING", "Fire three big electric balls, each toward your aim at the moment it is released. They drift slowly, bounce off walls, and linger after stopping. Each shocks the opponent it hits, then vanishes."));
                     character.SetCostume(CharacterCostume.Solderer);
                     break;
+                case CharacterPresets.ThiefName:
+                    character.SetProfile(new[] { "#盗む", "#コイン重視", "#変則的" }, new[] { "#Steal", "#CoinFocused", "#Tricky" },
+                        new SkillText("タレントスナッチ", "照準の方向へ速い弾を撃つ。当たった相手のQをコピーするか、ステージのギミックや仕掛けを奪う。もう一度押すと、コピーした技を使うか、奪ったギミックを目の前に置く（2つまで）。",
+                            "使うか外れてから")
+                            .English("TALENT SNATCH", "Fire a fast shot toward your aim. Copy the Q of the opponent it hits, or steal a stage gimmick or trap. Press again to use the copied skill, or place the stolen gimmick right in front of you (up to two).",
+                                "after using it or missing"),
+                        new SkillText("ミスディレクション", "その場に分身を残し、透明になって照準の方向へ短く移動する。3秒たつか、R以外の行動をするか、もう一度押すと解ける。分身は攻撃を受けると煙になって消える。")
+                            .English("MISDIRECTION", "Leave a decoy behind, turn invisible and slip a short way toward your aim. Ends after 3 seconds, when you do anything but R, or when you press again. The decoy vanishes in smoke when hit."),
+                        new SkillText("バンクハイスト", "拠点の近くでだけ使える。その場で止まって盗み続け、もう一度押すと、続けた長さに応じてコインを得る。長いほど大きく増える。攻撃を受けると失敗する。")
+                            .English("BANK HEIST", "Only near the bank. Stand still and keep stealing, then press again to collect coins for how long you kept at it. The longer, the bigger the haul. Getting hit ruins it."));
+                    character.SetCostume(CharacterCostume.Thief);
+                    break;
             }
         }
     }

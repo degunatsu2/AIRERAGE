@@ -15,6 +15,7 @@ namespace Airerage.Editor
     /// - SPACE TRAVELER: 白い宇宙服と胸のパネル、首の輪、透明な宇宙帽、背中の生命維持装置。
     /// - PASTRY CHEF: クリーム色のコック帽（ふくらんだ上と帯）とコックコート（2 列のボタン、首のスカーフ）。
     /// - SOLDERER: 濃い紺の作業着と胸の稲妻の線（光る水色）、額のゴーグル、背中のバッテリーと端子。
+    /// - THIEF: 黒い服とニット帽、目元の覆面、首の赤いスカーフ（後ろへなびく）、腰の茶色い巾着袋。
     /// </summary>
     internal static class CostumeBuilder
     {
@@ -100,6 +101,26 @@ namespace Airerage.Editor
             Part(soldererFacing, PrimitiveType.Cube, "Battery", new Vector3(-0.5f, -0.05f, 0f), new Vector3(0.2f, 0.62f, 0.5f), Lit("CostumeBattery", new Color(0.85f, 0.65f, 0.1f)));
             Part(soldererFacing, PrimitiveType.Cube, "TerminalTop", new Vector3(-0.5f, 0.3f, -0.12f), new Vector3(0.1f, 0.1f, 0.1f), spark);
             Part(soldererFacing, PrimitiveType.Cube, "TerminalBottom", new Vector3(-0.5f, 0.3f, 0.12f), new Vector3(0.1f, 0.1f, 0.1f), black);
+
+            // THIEF: 黒い服、目元の覆面、赤いスカーフ（後ろへなびく）、腰の茶色い巾着袋。
+            Transform thief = Set(view.transform, "CostumeThief");
+            bodySets[(int)CharacterCostume.Thief] = thief.gameObject;
+            Part(thief, PrimitiveType.Cube, "ThiefSuit", new Vector3(0f, -0.2f, 0f), new Vector3(0.87f, 1.04f, 0.87f), Lit("CostumeThiefSuit", new Color(0.13f, 0.12f, 0.15f)));
+            // ニット帽（頭の上を覆う帯と、丸い上）。
+            Material cap = Lit("CostumeThiefHood", new Color(0.18f, 0.16f, 0.2f));
+            Part(thief, PrimitiveType.Cube, "CapBand", new Vector3(0f, 0.8f, 0f), new Vector3(0.86f, 0.22f, 0.86f), cap);
+            Part(thief, PrimitiveType.Sphere, "CapTop", new Vector3(0f, 0.9f, 0f), new Vector3(0.84f, 0.32f, 0.84f), cap);
+            Part(thief, PrimitiveType.Cube, "Mask", new Vector3(0f, 0.5f, 0f), new Vector3(0.86f, 0.13f, 0.86f), black);
+            Material scarf = Lit("CostumeThiefScarf", new Color(0.72f, 0.12f, 0.12f));
+            Part(thief, PrimitiveType.Cube, "Scarf", new Vector3(0f, 0.32f, 0f), new Vector3(0.94f, 0.09f, 0.94f), scarf);
+            Material leather = Lit("CostumeThiefLeather", new Color(0.36f, 0.22f, 0.1f));
+            Part(thief, PrimitiveType.Cube, "ThiefBelt", new Vector3(0f, -0.38f, 0f), new Vector3(0.9f, 0.07f, 0.9f), leather);
+            Material pouch = Lit("CostumeThiefPouch", new Color(0.62f, 0.4f, 0.2f));
+            Part(thief, PrimitiveType.Sphere, "Pouch", new Vector3(0.22f, -0.5f, -0.44f), new Vector3(0.24f, 0.24f, 0.14f), pouch);
+            Part(thief, PrimitiveType.Cube, "PouchTie", new Vector3(0.22f, -0.38f, -0.46f), new Vector3(0.1f, 0.06f, 0.04f), leather);
+            Transform thiefFacing = Set(facing, "CostumeThiefFacing");
+            facingSets[(int)CharacterCostume.Thief] = thiefFacing.gameObject;
+            PartRotated(thiefFacing, PrimitiveType.Cube, "ScarfTail", new Vector3(-0.56f, 0.24f, 0f), new Vector3(0.42f, 0.08f, 0.2f), new Vector3(0f, 0f, 18f), scarf);
 
             var costume = view.gameObject.AddComponent<CostumeView>();
             costume.Configure(bodySets, facingSets, texts.ToArray(), view.GetComponent<Renderer>());

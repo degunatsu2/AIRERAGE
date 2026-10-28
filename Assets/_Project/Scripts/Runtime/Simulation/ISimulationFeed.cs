@@ -59,6 +59,12 @@ namespace Airerage.Runtime.Simulation
         /// <summary>扉の開き具合（始まっていなければ null）。</summary>
         StageState Stage { get; }
 
+        /// <summary>ステージのギミック（SimWorld.Zones。THIEF が置いたギミックの元。始まっていなければ null）。</summary>
+        IReadOnlyList<StageZone> Zones { get; }
+
+        /// <summary>キャラクター index の分身（THIEF の E）が出ていれば、その状態（SimWorld.GetClone）。</summary>
+        bool TryGetClone(int index, out CharacterState clone);
+
         /// <summary>コインの出現地点（番号の順。CoinField.SpawnReadyTick と FieldCoin.Source の番号。始まっていなければ空）。</summary>
         IReadOnlyList<CoinSpawnPoint> CoinSpawns { get; }
 

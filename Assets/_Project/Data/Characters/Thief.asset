@@ -1,0 +1,1066 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17401b775c1c455396f260bce2a3c785, type: 3}
+  m_Name: Thief
+  m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Data.CharacterConfigAsset
+  _config:
+    Movement:
+      RunSpeed: 8
+      GroundAcceleration: 80
+      AirAcceleration: 30
+      AirDrag: 2
+      Gravity: 30
+      MaxFallSpeed: 20
+      JumpSpeed: 12
+      AirJumps: 1
+      CoyoteTicks: 6
+      JumpBufferTicks: 6
+      MoveDeadzone: 0.2
+      WallJumpSpeedX: 9
+      WallJumpSpeedY: 13
+      WallClingMaxTicks: 240
+      WallSlideSpeed: 1
+      WallClingMaxRiseSpeed: 6
+      HalfWidth: 0.4
+      HalfHeight: 0.9
+    Wire:
+      ModelType: 0
+      ButtonMode: 0
+      MaxLength: 12
+      FireSpeed: 60
+      MissRetractTicks: 10
+      CooldownTicks: 20
+      ReleaseCooldownTicks: 0
+      RestoreAirJumpsOnRelease: 1
+      AttachedInputInfluence: 0.25
+      AimAssistAngleDeg: 6
+      AimAssistRadius: 0.8
+      NeutralAimAngleDeg: 45
+      AimDeadzone: 0.3
+      MinRopeLength: 1
+      ReleaseWhenLineBlocked: 0
+      RopeWrapping: 1
+      MaxAttachTicks: 180
+      MaxAttachedSpeed: 22
+      ExitSpeedCap: 18
+      AttachTurnSpeed: 1
+      AttachTurnBehind: 0.5
+      AttachAnySurface: 0
+      AttachInAir: 0
+      Inertial:
+        NeutralMode: 1
+        UpMode: 0
+        DownMode: 2
+        ReelSpeed: 8
+        ReelOutSpeed: 6
+        UpInputThreshold: 0.9
+        DownInputThreshold: 0.5
+        HoldSwingAcceleration: 16
+        SwingAcceleration: 10
+        Damping: 0
+        StartPullSpeed: 16
+        StartPullTicks: 20
+        StartPullFadeTicks: 20
+      Responsive:
+        PullSpeed: 16
+        PullAcceleration: 120
+        SteerSpeed: 6
+        GravityScale: 0.2
+        ArrivalRadius: 1
+    Combat:
+      Ground:
+        Name: SMOKE BOMB
+        Effect: 18
+        EffectTick: 3
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        Flip: 0
+        ChargeLevels: []
+        Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
+        AimTurnsFacing: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        SpeedScaled: 0
+        EndsOnHit: 0
+        BlocksProjectilesAbove: 0
+        TotalTicks: 30
+        WireCancelFromTick: 6
+        Hits: []
+        Motions:
+        - StartTick: 3
+          Ticks: 1
+          VelocityX: -9
+          VelocityY: 15
+          RequiresHit: 0
+          AlongAim: 0
+          Charge: 0
+      AirNeutral:
+        Name: ROLLING CUT
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        Flip: 1
+        ChargeLevels: []
+        Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
+        AimTurnsFacing: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 1
+        SpeedScaled: 0
+        EndsOnHit: 0
+        BlocksProjectilesAbove: 0
+        TotalTicks: 26
+        WireCancelFromTick: 5
+        Hits:
+        - StartTick: 4
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0
+          OffsetY: 1.35
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 2
+          Gauge: 60
+          HitstopTicks: 8
+          HitstunTicks: 18
+          KnockbackX: 4
+          KnockbackY: 7
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 7
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 1.25
+          OffsetY: 0.1
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 2
+          Gauge: 60
+          HitstopTicks: 8
+          HitstunTicks: 18
+          KnockbackX: 4
+          KnockbackY: 7
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 10
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0
+          OffsetY: -1.35
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 2
+          Gauge: 60
+          HitstopTicks: 8
+          HitstunTicks: 18
+          KnockbackX: 4
+          KnockbackY: 7
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 13
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: -1.25
+          OffsetY: 0.1
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 2
+          Gauge: 60
+          HitstopTicks: 8
+          HitstunTicks: 18
+          KnockbackX: 4
+          KnockbackY: 7
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        Motions: []
+      AirSide:
+        Name: UPRIGHT SLASH
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        Flip: 0
+        ChargeLevels: []
+        Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
+        AimTurnsFacing: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 1
+        SpeedScaled: 0
+        EndsOnHit: 0
+        BlocksProjectilesAbove: 0
+        TotalTicks: 30
+        WireCancelFromTick: 10
+        Hits:
+        - StartTick: 10
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: 0.95
+          OffsetY: 1.25
+          HalfWidth: 0.5
+          HalfHeight: 0.65
+          Damage: 3
+          Gauge: 80
+          HitstopTicks: 12
+          HitstunTicks: 24
+          KnockbackX: 9
+          KnockbackY: 6
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 12
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: 1.3
+          OffsetY: 0
+          HalfWidth: 0.5
+          HalfHeight: 0.75
+          Damage: 3
+          Gauge: 80
+          HitstopTicks: 12
+          HitstunTicks: 24
+          KnockbackX: 11
+          KnockbackY: 3
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 14
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: 0.95
+          OffsetY: -1.25
+          HalfWidth: 0.5
+          HalfHeight: 0.65
+          Damage: 3
+          Gauge: 80
+          HitstopTicks: 12
+          HitstunTicks: 24
+          KnockbackX: 9
+          KnockbackY: -2
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        Motions: []
+      AirUp:
+        Name: FIVE STABS
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        Flip: 0
+        ChargeLevels: []
+        Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
+        AimTurnsFacing: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        SpeedScaled: 0
+        EndsOnHit: 0
+        BlocksProjectilesAbove: 0
+        TotalTicks: 34
+        WireCancelFromTick: 6
+        Hits:
+        - StartTick: 5
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: -0.16
+          OffsetY: 1.45
+          HalfWidth: 0.055999998
+          HalfHeight: 0.5
+          Damage: 4
+          Gauge: 40
+          HitstopTicks: 4
+          HitstunTicks: 16
+          KnockbackX: 0
+          KnockbackY: 3
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 8
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: 0.16
+          OffsetY: 1.45
+          HalfWidth: 0.055999998
+          HalfHeight: 0.5
+          Damage: 4
+          Gauge: 40
+          HitstopTicks: 4
+          HitstunTicks: 16
+          KnockbackX: 0
+          KnockbackY: 3
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 11
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: -0.32
+          OffsetY: 1.45
+          HalfWidth: 0.055999998
+          HalfHeight: 0.5
+          Damage: 4
+          Gauge: 40
+          HitstopTicks: 4
+          HitstunTicks: 16
+          KnockbackX: 0
+          KnockbackY: 3
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 14
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: 0.32
+          OffsetY: 1.45
+          HalfWidth: 0.055999998
+          HalfHeight: 0.5
+          Damage: 4
+          Gauge: 40
+          HitstopTicks: 4
+          HitstunTicks: 16
+          KnockbackX: 0
+          KnockbackY: 3
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 17
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: 0
+          OffsetY: 1.45
+          HalfWidth: 0.055999998
+          HalfHeight: 0.5
+          Damage: 14
+          Gauge: 90
+          HitstopTicks: 14
+          HitstunTicks: 26
+          KnockbackX: 2
+          KnockbackY: 14
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 1
+          LoneFatalDamage: 80
+          LoneFatalKnockbackScale: 2.2
+          StunTicks: 0
+        Motions: []
+      AirDown:
+        Name: LOW SWEEP
+        Effect: 0
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        Flip: 0
+        ChargeLevels: []
+        Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
+        AimTurnsFacing: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 1
+        SpeedScaled: 0
+        EndsOnHit: 0
+        BlocksProjectilesAbove: 0
+        TotalTicks: 30
+        WireCancelFromTick: 10
+        Hits:
+        - StartTick: 10
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: 1.25
+          OffsetY: -1
+          HalfWidth: 0.7
+          HalfHeight: 0.5
+          Damage: 3
+          Gauge: 80
+          HitstopTicks: 12
+          HitstunTicks: 24
+          KnockbackX: 5
+          KnockbackY: -8
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 12
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: 0
+          OffsetY: -1.35
+          HalfWidth: 0.8
+          HalfHeight: 0.5
+          Damage: 3
+          Gauge: 80
+          HitstopTicks: 12
+          HitstunTicks: 24
+          KnockbackX: 2
+          KnockbackY: -11
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        - StartTick: 14
+          ActiveTicks: 2
+          UntilEnd: 0
+          OffsetX: -1.25
+          OffsetY: -1
+          HalfWidth: 0.7
+          HalfHeight: 0.5
+          Damage: 3
+          Gauge: 80
+          HitstopTicks: 12
+          HitstunTicks: 24
+          KnockbackX: -5
+          KnockbackY: -8
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        Motions: []
+      Special1:
+        Name: TALENT SNATCH
+        Effect: 19
+        EffectTick: 3
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        Flip: 0
+        ChargeLevels: []
+        Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
+        AimTurnsFacing: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        SpeedScaled: 0
+        EndsOnHit: 0
+        BlocksProjectilesAbove: 0
+        TotalTicks: 16
+        WireCancelFromTick: 4
+        Hits: []
+        Motions: []
+      Special1CooldownTicks: 720
+      Special1MaxCharges: 1
+      Special2MaxCharges: 1
+      Special2:
+        Name: MISDIRECTION
+        Effect: 21
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        Flip: 0
+        ChargeLevels: []
+        Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
+        AimTurnsFacing: 1
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        SpeedScaled: 0
+        EndsOnHit: 0
+        BlocksProjectilesAbove: 0
+        TotalTicks: 10
+        WireCancelFromTick: 6
+        Hits: []
+        Motions:
+        - StartTick: 1
+          Ticks: 5
+          VelocityX: 16
+          VelocityY: 0
+          RequiresHit: 0
+          AlongAim: 1
+          Charge: 0
+      Special2CooldownTicks: 1200
+      Super:
+        Name: BANK HEIST
+        Effect: 22
+        EffectTick: 0
+        HoldMaxTicks: 0
+        HoldRooted: 0
+        Run: 0
+        SpinPerHit: 0
+        Flip: 0
+        ChargeLevels: []
+        Roulette: 0
+        ChargedFromTicks: 0
+        ChargedTotalTicks: 0
+        FiresWhenCharged: 0
+        TracksAim: 0
+        AimTurnsFacing: 0
+        ChainMax: 0
+        ChainWindowTicks: 0
+        ExclusiveHits: 0
+        SpeedScaled: 0
+        EndsOnHit: 0
+        BlocksProjectilesAbove: 0
+        TotalTicks: 6
+        WireCancelFromTick: 6
+        Hits: []
+        Motions:
+        - StartTick: 0
+          Ticks: 6
+          VelocityX: 0
+          VelocityY: 0
+          RequiresHit: 0
+          AlongAim: 0
+          Charge: 0
+      SuperGaugeCost: 800
+      KoAttack: 3
+      KoKnockbackBase: 0.5
+      KoKnockbackPerSpeed: 0.3
+      FatalStrikeSpeed: 14
+      CriticalCenterRadius: 0.3
+      FatalHitstopMultiplier: 2
+      BounceMinSpeed: 10
+      BounceRestitution: 0.6
+      WireCancelCooldownTicks: 180
+      AttackBufferTicks: 10
+      GuardTicks: 30
+      JustGuardTicks: 6
+      GuardCooldownTicks: 120
+      GuardStunTicks: 12
+      GuardKnockbackScale: 0.4
+      ParriedStunTicks: 30
+      ParriedPushbackX: 4
+      ParriedPushbackY: 6
+      GaugeGuardedPercent: 40
+      GaugeOnDamaged: 40
+      GaugeOnGuard: 20
+      GaugeOnJustGuard: 200
+      GaugePerCoin: 2
+    Skills:
+      MirrorBall:
+        DurationTicks: 300
+        OffsetY: 2.2
+        GaugeIntervalTicks: 12
+        GaugePerInterval: 10
+      Safe:
+        DurationTicks: 10800
+        ChargeIntervalTicks: 300
+        ChargeCoins: 2
+        ChargeRatePercent: 110
+        MaxCoins: 300
+        GoldCoins: 150
+        Durability: 9
+        DepositPerSecond: 30
+        HalfWidth: 0.7
+        HalfHeight: 0.7
+      CoinBoost:
+        DurationTicks: 300
+        BonusPercent: 20
+        GaugeBonusPercent: 20
+      Projectile:
+        OffsetX: 0.3
+        OffsetY: 1
+        VelocityX: 2
+        VelocityY: 16
+        Gravity: 30
+        LifetimeTicks: 40
+        Radius: 0.5
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 2
+          Gauge: 75
+          HitstopTicks: 10
+          HitstunTicks: 22
+          KnockbackX: 2
+          KnockbackY: 13
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        HeldCoinsPerBonusPercent: 0
+        MaxHeldCoinBonusPercent: 0
+      Run:
+        InitialSpeed: 12.5
+        Acceleration: 6
+        MaxSpeed: 28
+        JumpAngleDeg: 20
+        TurnTicks: 8
+        RehitTicks: 30
+      SpeedBoost:
+        DurationTicks: 300
+        SpeedPercent: 20
+        GustSpeed: 30
+        GustRange: 15
+        GustHalfWidth: 1
+        GustPush: 12
+        GustWindupTicks: 10
+        GustRecoveryTicks: 14
+        GustRecoilSpeed: 9
+        GustWindupBrake: 0.8
+      WindZone:
+        DurationTicks: 600
+        Length: 10
+        HalfWidth: 1.5
+        Acceleration: 70
+        SpeedLimit: 20
+      SkyBoost:
+        DurationTicks: 600
+        SpeedPercent: 50
+      Portal:
+        DurationTicks: 1800
+        Radius: 1.2
+        MaxPerOwner: 2
+        WarpCooldownTicks: 30
+        EnterHoldTicks: 12
+      Missile:
+        Speed: 18
+        Radius: 0.4
+        ExplosionRadius: 1.6
+        OffsetY: 0.2
+        BonusPercentPerSecond: 200
+        LifetimeTicks: 1200
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 2
+          Gauge: 70
+          HitstopTicks: 10
+          HitstunTicks: 24
+          KnockbackX: 9
+          KnockbackY: 7
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+      Beam:
+        HalfWidth: 0.75
+        IntervalTicks: 10
+        Hits: 6
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          Gauge: 0
+          HitstopTicks: 6
+          HitstunTicks: 20
+          KnockbackX: 3
+          KnockbackY: 4
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+      SlowFall:
+        MaxFallSpeed: 3
+      CottonCandy:
+        DurationTicks: 600
+        ShortPressTicks: 6
+        PlaceDistance: 1.9
+        FeetOffset: 0.2
+        HalfLength: 1.8
+        HalfThickness: 0.4
+        BouncePower: 20
+      Cream:
+        ShotCount: 7
+        SpreadDeg: 22
+        Speed: 21
+        Gravity: 25
+        LaunchOffset: 0.5
+        ShotLifetimeTicks: 150
+        PatchTicks: 600
+        PatchHalfLength: 0.7
+        PatchThickness: 0.25
+        OrangeSpeedPercent: 30
+        OrangeWallJumpPercent: 150
+        MatchaSpeedPercent: -30
+        MatchaStickTicks: 60
+      TeaParty:
+        Count: 6
+        IntervalTicks: 8
+        OffsetY: 1.9
+        MinSpeed: 13
+        MaxSpeed: 19
+        MaxAngleDeg: 55
+        Gravity: 25
+        Restitution: 0.7
+        Friction: 0.85
+        StopSpeed: 1.5
+        Radius: 0.9
+        BlinkTicks: 30
+        MaxLifetimeTicks: 600
+        GreenPercent: 60
+        YellowPercent: 35
+        YellowBonusPercent: 100
+        RainbowBonusPercent: 400
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 6
+          Gauge: 0
+          HitstopTicks: 14
+          HitstunTicks: 28
+          KnockbackX: 7
+          KnockbackY: 9
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+      Scale:
+        OffsetY: -1.2
+        Gravity: 32
+        MaxFallSpeed: 34
+        HalfWidth: 0.85
+        HalfHeight: 0.5
+        BaseGrams: 100
+        GramsPerSecond: 1200
+        FatalGrams: 1000
+        BonusPercentPer100Grams: 25
+        MaxBonusPercent: 400
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 2
+          Gauge: 80
+          HitstopTicks: 16
+          HitstunTicks: 30
+          KnockbackX: 3
+          KnockbackY: -13
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+      Inverter:
+        RangeScale: 0.33333334
+        WhipHalfThickness: 0.25
+        WhipRehitTicks: 24
+        WhipHit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 2
+          Gauge: 50
+          HitstopTicks: 2
+          HitstunTicks: 14
+          KnockbackX: 0
+          KnockbackY: 0
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        WaveSpeed: 36
+        WaveRadius: 0.5
+        StunTicks: 60
+        StunGuardTicks: 30
+        WaveCooldownTicks: 180
+      BallLightning:
+        Count: 3
+        IntervalTicks: 18
+        LaunchOffset: 1.2
+        Speed: 7
+        TravelDistance: 14
+        TrapTicks: 300
+        Radius: 1.1
+        Hit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 10
+          Gauge: 0
+          HitstopTicks: 6
+          HitstunTicks: 16
+          KnockbackX: 3
+          KnockbackY: 5
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 60
+      Thief:
+        SmokeBallSpeed: 26
+        SmokeBallRadius: 0.3
+        SmokeBallLifetimeTicks: 90
+        ExplosionRadius: 0.8
+        SmokeHit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 5
+          Gauge: 70
+          HitstopTicks: 8
+          HitstunTicks: 20
+          KnockbackX: 4
+          KnockbackY: 6
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+        SmokeRadius: 2.6
+        SmokeTicks: 300
+        PuffRadius: 1.6
+        PuffTicks: 90
+        SnatchSpeed: 60
+        SnatchRange: 30
+        SnatchRadius: 0.3
+        SnatchLaunchOffset: 0.8
+        TrapBodyRadius: 1.2
+        PlaceGap: 0.8
+        PlaceMaxSize: 6
+        PlaceMaxHazardHeight: 8
+        TrapPlaceDistance: 2
+        MaxPlaced: 2
+        PlaceAttack:
+          Name: PLACE
+          Effect: 20
+          EffectTick: 2
+          HoldMaxTicks: 0
+          HoldRooted: 0
+          Run: 0
+          SpinPerHit: 0
+          Flip: 0
+          ChargeLevels: []
+          Roulette: 0
+          ChargedFromTicks: 0
+          ChargedTotalTicks: 0
+          FiresWhenCharged: 0
+          TracksAim: 0
+          AimTurnsFacing: 0
+          ChainMax: 0
+          ChainWindowTicks: 0
+          ExclusiveHits: 0
+          SpeedScaled: 0
+          EndsOnHit: 0
+          BlocksProjectilesAbove: 0
+          TotalTicks: 14
+          WireCancelFromTick: 4
+          Hits: []
+          Motions: []
+        MisdirectionTicks: 180
+        CloneTurnIntervalTicks: 60
+        CloneTurnPercent: 25
+        CloneWireHoldTicks: 45
+        HeistRange: 6
+        HeistCoinsPerSecond: 1
+        HeistBonusPerFive: 20
+        HeistBonusPerTen: 20
+  _displayName: THIEF
+  _logo: {fileID: 2800000, guid: 4bf5c5e4b4cfcb0398385700f4992699, type: 2}
+  _special1Icon: {fileID: 0}
+  _special2Icon: {fileID: 0}
+  _superIcon: {fileID: 0}
+  _tags:
+  - "#\u76D7\u3080"
+  - "#\u30B3\u30A4\u30F3\u91CD\u8996"
+  - "#\u5909\u5247\u7684"
+  _tagsEn:
+  - '#Steal'
+  - '#CoinFocused'
+  - '#Tricky'
+  _special1Text:
+    Name: "\u30BF\u30EC\u30F3\u30C8\u30B9\u30CA\u30C3\u30C1"
+    Description: "\u7167\u6E96\u306E\u65B9\u5411\u3078\u901F\u3044\u5F3E\u3092\u6483\u3064\u3002\u5F53\u305F\u3063\u305F\u76F8\u624B\u306EQ\u3092\u30B3\u30D4\u30FC\u3059\u308B\u304B\u3001\u30B9\u30C6\u30FC\u30B8\u306E\u30AE\u30DF\u30C3\u30AF\u3084\u4ED5\u639B\u3051\u3092\u596A\u3046\u3002\u3082\u3046\u4E00\u5EA6\u62BC\u3059\u3068\u3001\u30B3\u30D4\u30FC\u3057\u305F\u6280\u3092\u4F7F\u3046\u304B\u3001\u596A\u3063\u305F\u30AE\u30DF\u30C3\u30AF\u3092\u76EE\u306E\u524D\u306B\u7F6E\u304F\uFF082\u3064\u307E\u3067\uFF09\u3002"
+    CooldownNote: "\u4F7F\u3046\u304B\u5916\u308C\u3066\u304B\u3089"
+    NameEn: TALENT SNATCH
+    DescriptionEn: Fire a fast shot toward your aim. Copy the Q of the opponent it
+      hits, or steal a stage gimmick or trap. Press again to use the copied skill,
+      or place the stolen gimmick right in front of you (up to two).
+    CooldownNoteEn: after using it or missing
+  _special2Text:
+    Name: "\u30DF\u30B9\u30C7\u30A3\u30EC\u30AF\u30B7\u30E7\u30F3"
+    Description: "\u305D\u306E\u5834\u306B\u5206\u8EAB\u3092\u6B8B\u3057\u3001\u900F\u660E\u306B\u306A\u3063\u3066\u7167\u6E96\u306E\u65B9\u5411\u3078\u77ED\u304F\u79FB\u52D5\u3059\u308B\u30023\u79D2\u305F\u3064\u304B\u3001R\u4EE5\u5916\u306E\u884C\u52D5\u3092\u3059\u308B\u304B\u3001\u3082\u3046\u4E00\u5EA6\u62BC\u3059\u3068\u89E3\u3051\u308B\u3002\u5206\u8EAB\u306F\u653B\u6483\u3092\u53D7\u3051\u308B\u3068\u7159\u306B\u306A\u3063\u3066\u6D88\u3048\u308B\u3002"
+    CooldownNote: 
+    NameEn: MISDIRECTION
+    DescriptionEn: Leave a decoy behind, turn invisible and slip a short way toward
+      your aim. Ends after 3 seconds, when you do anything but R, or when you press
+      again. The decoy vanishes in smoke when hit.
+    CooldownNoteEn: 
+  _superText:
+    Name: "\u30D0\u30F3\u30AF\u30CF\u30A4\u30B9\u30C8"
+    Description: "\u62E0\u70B9\u306E\u8FD1\u304F\u3067\u3060\u3051\u4F7F\u3048\u308B\u3002\u305D\u306E\u5834\u3067\u6B62\u307E\u3063\u3066\u76D7\u307F\u7D9A\u3051\u3001\u3082\u3046\u4E00\u5EA6\u62BC\u3059\u3068\u3001\u7D9A\u3051\u305F\u9577\u3055\u306B\u5FDC\u3058\u3066\u30B3\u30A4\u30F3\u3092\u5F97\u308B\u3002\u9577\u3044\u307B\u3069\u5927\u304D\u304F\u5897\u3048\u308B\u3002\u653B\u6483\u3092\u53D7\u3051\u308B\u3068\u5931\u6557\u3059\u308B\u3002"
+    CooldownNote: 
+    NameEn: BANK HEIST
+    DescriptionEn: Only near the bank. Stand still and keep stealing, then press
+      again to collect coins for how long you kept at it. The longer, the bigger
+      the haul. Getting hit ruins it.
+    CooldownNoteEn: 
+  _costume: 6

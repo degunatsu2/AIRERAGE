@@ -1,6 +1,9 @@
 using Airerage.Core.Combat;
+using Airerage.Core.Common;
 using Airerage.Core.Movement;
 using Airerage.Core.Simulation;
+using Airerage.Core.Skills;
+using Airerage.Core.Wire;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
@@ -20,7 +23,11 @@ namespace Airerage.Runtime.Presentation
     /// ルーレットの最大（JACKPOT）を受けた瞬間は _jackpotBurst、コインの効率が上がっている間（フィーバータイム）は周りに金色のゲージ
     /// （_feverGauge）を出す（RISK TAKER。docs/14。あれば）。雷の波動のクールタイムの間は、水色のゲージ（_waveGauge。SOLDERER。あれば）。
     /// 撃破されて復帰を待っている間は見えなくし、復帰した後の無敵の間は点滅させる（docs/12 T4-2）。
-    /// 回る技（AttackData.SpinPerHit）の間は、判定 1 つにつき 1 回転させる。
+    /// 回る技（AttackData.SpinPerHit）の間は、判定 1 つにつき 1 回転させる。前転する技（AttackData.Flip。THIEF の空中 N）は、最初の判定から
+    /// 最後の判定の終わりまでに前へ 1 回転させる。
+    /// 透明の間（THIEF の E）は、体と、体の周りのゲージ・光を見せない（足元の影は ThiefEffectsView）。分身（RenderClone）は、体の見た目
+    /// （箱・衣装・向きの印）の写しを、分身の位置に出す（分身のワイヤーも線で描く）。必殺技がバンクハイスト（THIEF の R）なら、出した瞬間の
+    /// 光を出さない（ユーザーの案。光は詠唱を止めてコインを得たとき。ThiefEffectsView）。
     /// 向いている方向は、箱の前の面の目の帯と、横へ突き出た印（_facingMarker。あれば）で示す（向きで左右を反転する。ユーザーの要望、2026-10-16）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
@@ -196,6 +203,15 @@ namespace Airerage.Runtime.Presentation
         /// <summary>撃破されて復帰を待っているので、見えなくしているか。</summary>
         public bool HiddenForRespawn { get; private set; }
 
+        /// <summary>透明（THIEF の E）なので、体と周りのゲージを見えなくしているか。</summary>
+        public bool HiddenForInvisible { get; private set; }
+
+        /// <summary>分身（THIEF の E）を出しているか。</summary>
+        public bool ShowingClone => _clone != null && _clone.activeSelf;
+
+        /// <summary>分身を出している位置（出していなければ体の位置）。</summary>
+        public Vector3 ClonePosition => ShowingClone ? _clone.transform.position : transform.position;
+
         /// <summary>無敵なので点滅させているか。</summary>
         public bool Blinking { get; private set; }
 
@@ -227,10 +243,14 @@ namespace Airerage.Runtime.Presentation
             RenderCharge(current, combat, tint == Tint.Charge);
             RenderCooldownGauges(current, combat);
             RenderGuard(current);
-            RenderBursts(current);
+            RenderBursts(current, combat);
             RenderCapture(current);
             RenderVisibility(current);
             RenderRespawn(current, respawnDelayTicks);
+            if (HiddenForInvisible)
+            {
+                HideIndicators();
+            }
             if (tint == _shown)
             {
                 return;
@@ -304,10 +324,32 @@ namespace Airerage.Runtime.Presentation
         /// <summary>回る技で、今回している角度（度。回っていなければ 0）。</summary>
         public float SpinDegrees { get; private set; }
 
+        /// <summary>前転する技で、今回している角度（度。画面の上で反時計回りが正。回っていなければ 0）。</summary>
+        public float FlipDegrees { get; private set; }
+
+        /// <summary>前転する技（AttackData.Flip）の、攻撃の経過 ticks での回転（度。最初の判定から最後の判定の終わりまでに 0 → 360）。</summary>
+        public static float FlipAngle(AttackData attack, float ticks)
+        {
+            AttackHit[] hits = attack.Hits;
+            if (hits.Length == 0)
+            {
+                return 0f;
+            }
+            float from = hits[0].StartTick;
+            float to = from;
+            foreach (AttackHit hit in hits)
+            {
+                from = Mathf.Min(from, hit.StartTick);
+                to = Mathf.Max(to, hit.StartTick + hit.ActiveTicks);
+            }
+            return 360f * Mathf.Clamp01((ticks - from) / Mathf.Max(1f, to - from));
+        }
+
         // 回る技（AttackData.SpinPerHit。つむじ風）: 判定 1 つにつき 1 回転し、終わったら元の向きで止まる（ユーザーの要望、2026-10-16）。
         private void RenderSpin(in CharacterState state, CombatTuning combat)
         {
             float degrees = 0f;
+            float flip = 0f;
             if (state.Action.Kind == ActionKind.Attack)
             {
                 AttackData attack = combat.Get(state.Action.Attack);
@@ -315,11 +357,17 @@ namespace Airerage.Runtime.Presentation
                 {
                     degrees = Mathf.Repeat(BoostAuraView.SpinAngle(attack, state.Action.Ticks), 360f) * state.Facing;
                 }
+                else if (attack.Flip)
+                {
+                    // 前転: 右向きなら画面の上で時計回り（頭が前へ）。
+                    flip = -FlipAngle(attack, state.Action.Ticks) * state.Facing;
+                }
             }
-            if (degrees != SpinDegrees)
+            if (degrees != SpinDegrees || flip != FlipDegrees)
             {
                 SpinDegrees = degrees;
-                transform.rotation = Quaternion.Euler(0f, degrees, 0f);
+                FlipDegrees = flip;
+                transform.rotation = Quaternion.Euler(0f, degrees, flip);
             }
         }
 
@@ -360,12 +408,14 @@ namespace Airerage.Runtime.Presentation
         private void RenderVisibility(in CharacterState state)
         {
             HiddenForRespawn = state.Combat.IsWaitingToRespawn;
+            HiddenForInvisible = !HiddenForRespawn && state.Combat.InvisibleTicksLeft > 0;
             Blinking = !HiddenForRespawn && state.Combat.InvincibleTicksLeft > 0;
             if (_renderer == null && !TryGetComponent(out _renderer))
             {
                 return;
             }
-            _renderer.enabled = !HiddenForRespawn && !HiddenForCapture && !(Blinking && Mathf.Repeat(Time.time * BlinkPerSecond, 1f) >= 0.5f);
+            _renderer.enabled = !HiddenForRespawn && !HiddenForCapture && !HiddenForInvisible
+                && !(Blinking && Mathf.Repeat(Time.time * BlinkPerSecond, 1f) >= 0.5f);
             if (_facingMarker != null)
             {
                 _facingRenderers = _facingRenderers ?? _facingMarker.GetComponentsInChildren<Renderer>(true);
@@ -399,7 +449,7 @@ namespace Airerage.Runtime.Presentation
             if (_shownCaptured)
             {
                 _shownCaptured = false;
-                transform.rotation = Quaternion.Euler(0f, SpinDegrees, 0f);
+                transform.rotation = Quaternion.Euler(0f, SpinDegrees, FlipDegrees);
                 if (_captureEffect != null)
                 {
                     _captureEffect.Hide();
@@ -412,37 +462,39 @@ namespace Airerage.Runtime.Presentation
         }
 
         // 状態の変化（受けた時刻、FATAL を受けた数、ワイヤーキャンセルのクールタイムの始まり）から、一瞬の光を出す。
-        private void RenderBursts(in CharacterState state)
+        private void RenderBursts(in CharacterState state, CombatTuning combat)
         {
             CombatState c = state.Combat;
             Vector3 center = transform.position;
-            if (c.FatalHitCount > _shownFatalHits && _fatalBurst != null)
+            // 透明の間は、居場所が分かる光を出さない（透明になった瞬間の技の光だけは出す）。
+            bool shown = c.InvisibleTicksLeft <= 0;
+            if (c.FatalHitCount > _shownFatalHits && shown && _fatalBurst != null)
             {
                 _fatalBurst.Play(center);
             }
             else if (((c.LastDamagedTick != _shownDamagedTick && state.Action.Kind == ActionKind.Hitstun) || c.HazardHitCount > _shownHazardHits)
-                && _hitSpark != null)
+                && shown && _hitSpark != null)
             {
                 // 攻撃と、ステージの危険（溶岩流・つらら）に当たったとき。
                 _hitSpark.Play(center);
             }
             _shownHazardHits = c.HazardHitCount;
-            if (c.WireCancelCooldownTicksLeft > _shownWireCancelCooldown && _wireCancelBurst != null)
+            if (c.WireCancelCooldownTicksLeft > _shownWireCancelCooldown && shown && _wireCancelBurst != null)
             {
                 _wireCancelBurst.Play(center);
             }
-            if (c.BounceCount > _shownBounces && _bounceBurst != null)
+            if (c.BounceCount > _shownBounces && shown && _bounceBurst != null)
             {
                 _bounceBurst.Play(center);
             }
-            if (c.SplashCount > _shownSplashes && _splashBurst != null)
+            if (c.SplashCount > _shownSplashes && shown && _splashBurst != null)
             {
                 _splashBurst.Play(center);
             }
             _shownSplashes = c.SplashCount;
             // ジャンプ台・加速リング・壁ジャンプ。
             int gimmicks = state.JumpPadCount + state.BoostRingCount + state.WallJumpCount;
-            if (gimmicks > _shownGimmicks && _gimmickBurst != null)
+            if (gimmicks > _shownGimmicks && shown && _gimmickBurst != null)
             {
                 _gimmickBurst.Play(center);
             }
@@ -452,12 +504,14 @@ namespace Airerage.Runtime.Presentation
             {
                 _specialBurst.Play(center);
             }
-            bool super = c.Gauge < _shownGauge && state.Action.Kind == ActionKind.Attack && state.Action.Attack == AttackSlot.Super;
-            if (super && _superBurst != null)
+            // バンクハイスト（THIEF の R）は、出した瞬間の光を出さない（ユーザーの案）。
+            bool super = c.Gauge < _shownGauge && state.Action.Kind == ActionKind.Attack && state.Action.Attack == AttackSlot.Super
+                && combat.Super.Effect != SkillEffect.BankHeist;
+            if (super && shown && _superBurst != null)
             {
                 _superBurst.Play(center);
             }
-            if (c.JackpotHitCount > _shownJackpots && _jackpotBurst != null)
+            if (c.JackpotHitCount > _shownJackpots && shown && _jackpotBurst != null)
             {
                 _jackpotBurst.Play(center);
             }
@@ -529,6 +583,187 @@ namespace Airerage.Runtime.Presentation
             {
                 _guardGauge.SetLayout(both ? StackedOuterRadius : (float?)null, false);
                 ShowOrHide(_guardGauge, guard);
+            }
+        }
+
+        // 透明の間: 体の周りのゲージと、ため・判定の表示を隠す。
+        private void HideIndicators()
+        {
+            foreach (RingGaugeView gauge in new[] { _wireCancelGauge, _guardGauge, _feverGauge, _waveGauge, _wallClingGauge, _waterGauge })
+            {
+                if (gauge != null && gauge.IsShowing)
+                {
+                    gauge.Hide();
+                }
+            }
+            if (_chargeEffect != null && _chargeEffect.IsShowing)
+            {
+                _chargeEffect.Hide();
+            }
+            if (_hitboxLine != null)
+            {
+                _hitboxLine.enabled = false;
+            }
+        }
+
+        // 分身（THIEF の E）の、体の見た目の写しと、分身のワイヤーの線。
+        private GameObject _clone;
+        private Transform _cloneFacing;
+        private LineRenderer _cloneWire;
+        private CharacterCostume _cloneCostume;
+        private Vector3 _cloneFrom;
+        private Vector3 _cloneTo;
+        private float _cloneChangedAt;
+        private int _cloneTick = int.MinValue;
+
+        /// <summary>
+        /// 分身（THIEF の E）を出す（試合の仕組みが毎フレーム呼ぶ。exists が false なら隠す）。見た目は、この体（箱・衣装・向きの印）の
+        /// 写し。tick は分身の状態のティック（変わったら、前の位置から 1 ティックかけて動かす）。wire は線の見た目の元（この人の
+        /// WireView。なければ分身のワイヤーは描かない）。
+        /// </summary>
+        public void RenderClone(bool exists, in CharacterState clone, Vector3 halfExtents, int tick, WireView wire)
+        {
+            if (!exists)
+            {
+                if (_clone != null && _clone.activeSelf)
+                {
+                    _clone.SetActive(false);
+                }
+                if (_cloneWire != null)
+                {
+                    _cloneWire.enabled = false;
+                }
+                _cloneTick = int.MinValue;
+                return;
+            }
+            CharacterCostume costume = _costume != null ? _costume.Current : CharacterCostume.Standard;
+            if (_clone == null || costume != _cloneCostume)
+            {
+                BuildClone(costume);
+            }
+            Vector3 target = clone.Position.ToUnity();
+            if (!_clone.activeSelf || _cloneTick == int.MinValue)
+            {
+                _clone.SetActive(true);
+                _cloneFrom = target;
+                _cloneTo = target;
+                _cloneChangedAt = Time.time;
+                _cloneTick = tick;
+            }
+            else if (tick != _cloneTick)
+            {
+                _cloneFrom = _clone.transform.position;
+                _cloneTo = target;
+                _cloneChangedAt = Time.time;
+                _cloneTick = tick;
+            }
+            Vector3 position = Vector3.Lerp(_cloneFrom, _cloneTo, Mathf.Clamp01((Time.time - _cloneChangedAt) / SimTime.DeltaTime));
+            _clone.transform.position = position;
+            _clone.transform.localScale = halfExtents * 2f;
+            if (_cloneFacing != null)
+            {
+                float sign = clone.Facing < 0 ? -1f : 1f;
+                Vector3 scale = _cloneFacing.localScale;
+                _cloneFacing.localScale = new Vector3(Mathf.Abs(scale.x) * sign, scale.y, scale.z);
+            }
+            RenderCloneWire(clone, position, wire);
+        }
+
+        // 体の見た目を写す（隠した親の下で複製し、動き出す前にスクリプトと線を外す）。衣装が変わったら作り直す。
+        private void BuildClone(CharacterCostume costume)
+        {
+            if (_clone != null)
+            {
+                Destroy(_clone);
+            }
+            var holder = new GameObject("CloneHolder");
+            holder.SetActive(false);
+            GameObject copy = Instantiate(gameObject, holder.transform);
+            foreach (MonoBehaviour behaviour in copy.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                DestroyImmediate(behaviour);
+            }
+            foreach (Renderer part in copy.GetComponentsInChildren<Renderer>(true))
+            {
+                if (part is MeshRenderer)
+                {
+                    part.enabled = true;
+                }
+                else
+                {
+                    DestroyImmediate(part);
+                }
+            }
+            copy.name = name + "Clone";
+            copy.transform.SetParent(null, false);
+            copy.transform.rotation = Quaternion.identity;
+            Destroy(holder);
+            _clone = copy;
+            _cloneCostume = costume;
+            _cloneFacing = _facingMarker != null ? copy.transform.Find(_facingMarker.name) : null;
+        }
+
+        // 分身のワイヤー（フックが飛んでいる間と接続中。線は、この人のワイヤーの線と同じ見た目）。
+        private void RenderCloneWire(in CharacterState clone, Vector3 from, WireView wire)
+        {
+            WireState w = clone.Wire;
+            bool shown = wire != null && (w.Phase == WirePhase.Firing || w.Phase == WirePhase.Attached);
+            if (!shown)
+            {
+                if (_cloneWire != null)
+                {
+                    _cloneWire.enabled = false;
+                }
+                return;
+            }
+            if (_cloneWire == null)
+            {
+                var source = wire.GetComponent<LineRenderer>();
+                _cloneWire = new GameObject(name + "CloneWire").AddComponent<LineRenderer>();
+                _cloneWire.useWorldSpace = true;
+                _cloneWire.sharedMaterial = source.sharedMaterial;
+                _cloneWire.widthCurve = source.widthCurve;
+                _cloneWire.widthMultiplier = source.widthMultiplier;
+                _cloneWire.startColor = source.startColor;
+                _cloneWire.endColor = source.endColor;
+                _cloneWire.numCapVertices = source.numCapVertices;
+                _cloneWire.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            Vector3 to = w.Phase == WirePhase.Attached ? w.Anchor.ToUnity() : w.HookPosition.ToUnity();
+            int pivots = w.Phase == WirePhase.Attached ? w.Pivots.Count : 0;
+            _cloneWire.positionCount = pivots + 2;
+            _cloneWire.SetPosition(0, from);
+            for (int i = 0; i < pivots; i++)
+            {
+                _cloneWire.SetPosition(i + 1, w.Pivots[pivots - 1 - i].ToUnity());
+            }
+            _cloneWire.SetPosition(pivots + 1, to);
+            _cloneWire.enabled = true;
+        }
+
+        // 体を隠したら（試合が終わった・抜けた）、分身も隠す。
+        private void OnDisable()
+        {
+            if (_clone != null)
+            {
+                _clone.SetActive(false);
+            }
+            if (_cloneWire != null)
+            {
+                _cloneWire.enabled = false;
+            }
+            _cloneTick = int.MinValue;
+        }
+
+        private void OnDestroy()
+        {
+            if (_clone != null)
+            {
+                Destroy(_clone);
+            }
+            if (_cloneWire != null)
+            {
+                Destroy(_cloneWire.gameObject);
             }
         }
 

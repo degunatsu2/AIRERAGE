@@ -35,6 +35,7 @@ namespace Airerage.Editor
         public const string SpaceTravelerPath = "Assets/_Project/Data/Characters/SpaceTraveler.asset";
         public const string PastryChefPath = "Assets/_Project/Data/Characters/PastryChef.asset";
         public const string SoldererPath = "Assets/_Project/Data/Characters/Solderer.asset";
+        public const string ThiefPath = "Assets/_Project/Data/Characters/Thief.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
@@ -538,6 +539,7 @@ namespace Airerage.Editor
             electricLine.gameObject.SetActive(false);
             SetReference(electric, "_source", source);
             SetReference(electric, "_lineTemplate", electricLine);
+            CreateThiefEffects(source, audio);
             var boost = new GameObject("BoostAura").AddComponent<BoostAuraView>();
             LineRenderer boostLine = CreateIndicatorLine(boost.transform, "BoostLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
             boostLine.gameObject.SetActive(false);
@@ -562,6 +564,67 @@ namespace Airerage.Editor
                 SetReference(playerHud, "_audio", audio);
                 SetReference(playerHud, "_camera", Object.FindFirstObjectByType<Camera>());
                 SetInt(playerHud, "_player", player);
+            }
+        }
+
+        /// <summary>
+        /// THIEF の技の表示（ThiefEffectsView。docs/14 1.6）: 煙球と煙、タレントスナッチの弾、置いたギミックと仕掛け、透明の影、
+        /// STEAL! と HEIST! の光。見本は隠しておく。
+        /// </summary>
+        internal static void CreateThiefEffects(MonoBehaviour source, GameAudio audio)
+        {
+            var view = new GameObject("ThiefEffects").AddComponent<ThiefEffectsView>();
+            var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            LineRenderer line = CreateIndicatorLine(view.transform, "ThiefLineTemplate", lineMaterial, 0.08f);
+            GameObject Template(PrimitiveType type, string templateName, Material material, Vector3 scale)
+            {
+                GameObject go = CreateVisual(type, templateName, material, scale);
+                go.transform.SetParent(view.transform, false);
+                go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                return go;
+            }
+            GameObject puff = Template(PrimitiveType.Sphere, "SmokePuffTemplate", LoadOrCreateMaterial("ThiefSmoke", new Color(0.6f, 0.6f, 0.63f)), Vector3.one);
+            GameObject ball = Template(PrimitiveType.Sphere, "SmokeBallTemplate", LoadOrCreateMaterial("ThiefSmokeBall", new Color(0.22f, 0.22f, 0.25f)), Vector3.one);
+            GameObject shot = Template(PrimitiveType.Sphere, "SnatchShotTemplate",
+                LoadOrCreateMaterial("ThiefSnatchShot", new Color(0.36f, 0.2f, 0.1f), unlit: true), Vector3.one);
+            GameObject launcher = Template(PrimitiveType.Cube, "PlacedLauncherTemplate", LoadOrCreateMaterial("ThiefLauncher", new Color(0.3f, 0.3f, 0.34f)),
+                new Vector3(0.9f, 0.7f, 0.7f));
+            GameObject muzzle = CreateVisual(PrimitiveType.Cube, "Muzzle", LoadOrCreateMaterial("ThiefLauncherLamp", new Color(1f, 0.25f, 0.2f), unlit: true),
+                new Vector3(0.3f, 0.5f, 0.5f));
+            muzzle.transform.SetParent(launcher.transform, false);
+            muzzle.transform.localPosition = new Vector3(0.6f, 0f, 0f);
+            GameObject beam = Template(PrimitiveType.Cube, "PlacedBeamTemplate", LoadOrCreateTransparentMaterial("ThiefPlacedBeam", ThiefEffectsView.PlacedBeamColor),
+                Vector3.one);
+            GameObject missile = Template(PrimitiveType.Capsule, "PlacedMissileTemplate", LoadOrCreateMaterial("ThiefMissile", new Color(0.85f, 0.85f, 0.88f)),
+                new Vector3(0.35f, 0.5f, 0.35f));
+            GameObject trapBall = Template(PrimitiveType.Sphere, "TrapBallTemplate", LoadOrCreateMaterial("ThiefTrapBall", new Color(0.95f, 0.95f, 0.92f)), Vector3.one);
+            GameObject shadow = Template(PrimitiveType.Sphere, "InvisibleShadowTemplate",
+                LoadOrCreateTransparentMaterial("ThiefShadow", new Color(0f, 0f, 0f, ThiefEffectsView.ShadowOpacity)), Vector3.one);
+            // 奪った瞬間（こげ茶の光と STEAL!）と、バンクハイストでコインを得た瞬間（金色の大きな光と HEIST! +枚数。文字は出すたびに変える）。
+            BurstEffectView steal = CreateBurst("StealBurstTemplate", view.transform);
+            steal.Configure(ThiefEffectsView.StealBurstColor, false, 0.5f, 0.3f, 1.8f, 10, 1.1f, 0.12f, "STEAL!", 36, 0f);
+            BurstEffectView heist = CreateBurst("HeistBurstTemplate", view.transform);
+            heist.Configure(new Color(1f, 0.82f, 0.2f), false, 0.9f, 0.5f, 4f, 16, 2.4f, 0.2f, "HEIST!", 56, 0.2f);
+            foreach (GameObject template in new[] { line.gameObject, puff, ball, shot, launcher, beam, missile, trapBall, shadow, steal.gameObject, heist.gameObject })
+            {
+                template.SetActive(false);
+            }
+            SetReference(view, "_source", source);
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            SetReference(view, "_lineTemplate", line);
+            SetReference(view, "_puffTemplate", puff);
+            SetReference(view, "_ballTemplate", ball);
+            SetReference(view, "_shotTemplate", shot);
+            SetReference(view, "_launcherTemplate", launcher);
+            SetReference(view, "_beamTemplate", beam);
+            SetReference(view, "_missileTemplate", missile);
+            SetReference(view, "_trapBallTemplate", trapBall);
+            SetReference(view, "_shadowTemplate", shadow);
+            SetReference(view, "_stealTemplate", steal);
+            SetReference(view, "_heistTemplate", heist);
+            if (audio != null)
+            {
+                SetReference(view, "_audio", audio);
             }
         }
 
@@ -1184,7 +1247,7 @@ namespace Airerage.Editor
 
         /// <summary>
         /// 選べるキャラクターの一覧（docs/13 T5-5、T5-6）を作り直す: character（STANDARD）と、CharacterPresets から作るキャラクター
-        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER、PASTRY CHEF、SOLDERER）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
+        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER、PASTRY CHEF、SOLDERER、THIEF）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
         /// （値はコードの 1 か所で決める）。仮のロゴ（CharacterLogoPainter）も描き直して設定する（docs/13 T5-8）。
         /// </summary>
         internal static CharacterRoster LoadOrCreateCharacterRoster(CharacterConfigAsset character)
@@ -1200,6 +1263,8 @@ namespace Airerage.Editor
             AssignLogo(pastryChef, "PastryChef", CharacterLogoPainter.PastryChef());
             CharacterConfigAsset solderer = WritePresetCharacter(SoldererPath, CharacterPresets.Solderer(), CharacterPresets.SoldererName);
             AssignLogo(solderer, "Solderer", CharacterLogoPainter.Solderer());
+            CharacterConfigAsset thief = WritePresetCharacter(ThiefPath, CharacterPresets.Thief(), CharacterPresets.ThiefName);
+            AssignLogo(thief, "Thief", CharacterLogoPainter.Thief());
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
             if (roster == null)
             {
@@ -1207,7 +1272,7 @@ namespace Airerage.Editor
                 roster = ScriptableObject.CreateInstance<CharacterRoster>();
                 AssetDatabase.CreateAsset(roster, CharacterRosterPath);
             }
-            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler, pastryChef, solderer });
+            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler, pastryChef, solderer, thief });
             EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return roster;

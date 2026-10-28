@@ -8,7 +8,7 @@ namespace Airerage.Runtime.Tests
 {
     /// <summary>
     /// キャラクターのロゴ（仮の絵。docs/13 T5-8）: 選べるキャラクター全員にロゴがあり、絵が描かれていて、色がユーザーの案のとおり
-    /// （STANDARD 白、SPACE TRAVELER 紫、STORM RUNNER 黄緑、RISK TAKER 黄色、PASTRY CHEF クリーム色、SOLDERER 電気の水色）。シーンのビルダーが作る。
+    /// （STANDARD 白、SPACE TRAVELER 紫、STORM RUNNER 黄緑、RISK TAKER 黄色、PASTRY CHEF クリーム色、SOLDERER 電気の水色、THIEF 茶色の袋と銀のナイフ）。シーンのビルダーが作る。
     /// </summary>
     public sealed class CharacterLogoTests
     {
@@ -19,7 +19,7 @@ namespace Airerage.Runtime.Tests
         {
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(RosterPath);
             Assert.That(roster, Is.Not.Null, "キャラクターの一覧がない");
-            Assert.That(roster.Count, Is.EqualTo(6));
+            Assert.That(roster.Count, Is.EqualTo(7));
             for (int i = 0; i < roster.Count; i++)
             {
                 CharacterConfigAsset character = roster.Get(i);
@@ -65,6 +65,14 @@ namespace Airerage.Runtime.Tests
                 else if (name == CharacterPresets.SoldererName)
                 {
                     Assert.That(hue * 360f, Is.InRange(180f, 205f), $"{name} のロゴが電気の水色でない（{mean}）");
+                }
+                else if (name == CharacterPresets.ThiefName)
+                {
+                    // 茶色の袋と銀のナイフを合わせた色（茶色は暗いので、明るさの下限を下げる）。
+                    Assert.That(hue * 360f, Is.InRange(18f, 45f), $"{name} のロゴが茶色でない（{mean}）");
+                    Assert.That(saturation, Is.InRange(0.2f, 0.7f), $"{name} のロゴが茶色と銀でない（{mean}）");
+                    Assert.That(value, Is.GreaterThan(0.7f), $"{name} のロゴが暗い（{mean}）");
+                    continue;
                 }
                 else
                 {

@@ -26,6 +26,9 @@ namespace Airerage.Runtime.Data
 
         /// <summary>黒い作業着と黄色の稲妻の線、ゴーグル、背中のバッテリー。</summary>
         Solderer = 5,
+
+        /// <summary>黒い服とニット帽、目元の覆面、赤いスカーフ、腰の茶色い巾着袋。</summary>
+        Thief = 6,
     }
 
     /// <summary>

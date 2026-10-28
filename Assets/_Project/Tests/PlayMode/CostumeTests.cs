@@ -12,7 +12,7 @@ namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// キャラクターの仮の見た目（衣装。ユーザーの要望、2026-10-20）: F3 でキャラクターを切り替えると、そのキャラクターの衣装の部品だけが
-    /// 出る（STANDARD は箱のまま）。RISK TAKER・STORM RUNNER・SPACE TRAVELER・PASTRY CHEF・SOLDERER はそれぞれ違う衣装。
+    /// 出る（STANDARD は箱のまま）。RISK TAKER・STORM RUNNER・SPACE TRAVELER・PASTRY CHEF・SOLDERER・THIEF はそれぞれ違う衣装。
     /// </summary>
     public sealed class CostumeTests
     {
@@ -47,8 +47,8 @@ namespace Airerage.PlayMode.Tests
             Assert.That(seen, Is.EquivalentTo(new[]
             {
                 CharacterCostume.Standard, CharacterCostume.RiskTaker, CharacterCostume.StormRunner, CharacterCostume.SpaceTraveler,
-                CharacterCostume.PastryChef, CharacterCostume.Solderer,
-            }), "6 体の衣装がそろっていない");
+                CharacterCostume.PastryChef, CharacterCostume.Solderer, CharacterCostume.Thief,
+            }), "7 体の衣装がそろっていない");
         }
     }
 }

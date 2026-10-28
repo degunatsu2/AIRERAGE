@@ -99,7 +99,7 @@ namespace Airerage.Core.Tests.Combat
             foreach (CharacterConfig config in new[]
             {
                 CharacterPresets.Standard(), CharacterPresets.RiskTaker(), CharacterPresets.StormRunner(), CharacterPresets.SpaceTraveler(),
-                CharacterPresets.PastryChef(), CharacterPresets.Solderer(),
+                CharacterPresets.PastryChef(), CharacterPresets.Solderer(), CharacterPresets.Thief(),
             })
             {
                 foreach (AttackHit hit in config.Combat.Super.Hits)

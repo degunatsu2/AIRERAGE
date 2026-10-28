@@ -55,6 +55,15 @@ namespace Airerage.Runtime.Presentation
                 }
                 Color color = _feed.ColorOf(i);
                 var position = new Vector3(state.Position.X, state.Position.Y, 0f);
+                if (state.Combat.InvisibleTicksLeft > 0)
+                {
+                    // 透明の間（THIEF の E）は、分身を指す（分身がいなければ出さない）。
+                    if (!_feed.TryGetClone(i, out CharacterState clone))
+                    {
+                        continue;
+                    }
+                    position = new Vector3(clone.Position.X, clone.Position.Y, 0f);
+                }
                 shown += _guides.Add(position, color, IconOf(color), _feed.LabelOf(i)) ? 1 : 0;
             }
             ShownCount = shown;

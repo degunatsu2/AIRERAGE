@@ -81,7 +81,12 @@ namespace Airerage.Runtime.Audio
                 _audio.Play(SoundId.Knockout);
                 return;
             }
-            if (now.Coins.Banked > before.Coins.Banked)
+            if (n.HeistPayoutCount > b.HeistPayoutCount)
+            {
+                // バンクハイストでコインを得た（THIEF の R）。
+                _audio.Play(SoundId.Heist);
+            }
+            else if (now.Coins.Banked > before.Coins.Banked)
             {
                 _audio.Play(SoundId.Bank);
             }
@@ -146,6 +151,11 @@ namespace Airerage.Runtime.Audio
                 // 雷で感電した（SOLDERER）。
                 _audio.Play(SoundId.Zap, 0.9f, 0.05f);
             }
+            if (n.StealCount > b.StealCount)
+            {
+                // タレントスナッチで技・ギミックを奪った（THIEF の Q）。
+                _audio.Play(SoundId.Steal, 0.9f, 0.03f);
+            }
             if (n.ShieldBlockCount > b.ShieldBlockCount)
             {
                 // ボウルで上からの投射物を防いだ（PASTRY CHEF）。
@@ -174,7 +184,11 @@ namespace Airerage.Runtime.Audio
                 switch (now.Action.Attack)
                 {
                     case AttackSlot.Super:
-                        _audio.Play(SoundId.SuperStart);
+                        // バンクハイスト（THIEF の R）は、出したときに鳴らさない（こっそり始める。ユーザーの案）。
+                        if (combat.Super.Effect != Airerage.Core.Skills.SkillEffect.BankHeist)
+                        {
+                            _audio.Play(SoundId.SuperStart);
+                        }
                         break;
                     case AttackSlot.Special1:
                     case AttackSlot.Special2:

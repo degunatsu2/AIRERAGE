@@ -71,6 +71,13 @@ namespace Airerage.Runtime.Presentation
             _startedAt = Time.time;
         }
 
+        /// <summary>文字を label にして、center で光らせ始める（バンクハイストの枚数など、毎回変わる文字）。</summary>
+        public void Play(Vector3 center, string label)
+        {
+            _label = label ?? string.Empty;
+            Play(center);
+        }
+
         private void Update()
         {
             float progress = (Time.time - _startedAt) / _duration;

@@ -15,6 +15,7 @@ namespace Airerage.Editor
     /// - RISK TAKER: 黄色の、お金が降ってくる金庫。
     /// - PASTRY CHEF: クリーム色の、コック帽（ふくらんだ 3 つの山と帯）。
     /// - SOLDERER: 電気の水色の、稲妻（RISK TAKER の黄色・STORM RUNNER の黄緑と見分けられる色）。
+    /// - THIEF: 茶色の巾着袋に、斜めの銀のナイフが重なる。
     /// 形は距離の関数（負なら中）で書き、縁はなめらかにする。形ごとに暗い縁取りをつける（どの背景でも読めるように）。
     /// 座標は 0〜1（左上が 0、下が 1）。
     /// </summary>
@@ -34,6 +35,10 @@ namespace Airerage.Editor
         public static readonly Color RiskTakerColor = new Color(1f, 0.84f, 0.15f);
         public static readonly Color PastryChefColor = new Color(1f, 0.93f, 0.74f);
         public static readonly Color SoldererColor = new Color(0.36f, 0.88f, 1f);
+        public static readonly Color ThiefColor = new Color(0.74f, 0.47f, 0.24f);
+        private static readonly Color ThiefStringColor = new Color(0.9f, 0.7f, 0.42f);
+        private static readonly Color KnifeColor = new Color(0.86f, 0.89f, 0.94f);
+        private static readonly Color KnifeHandleColor = new Color(0.3f, 0.18f, 0.1f);
 
         private delegate float Shape(Vector2 p);
 
@@ -124,6 +129,31 @@ namespace Airerage.Editor
                 Segment(p, new Vector2(0.12f, 0.42f), new Vector2(0.22f, 0.42f), 0.022f)), SoldererColor);
             Fill(layers, p => Mathf.Min(Segment(p, new Vector2(0.86f, 0.62f), new Vector2(0.76f, 0.66f), 0.022f),
                 Segment(p, new Vector2(0.88f, 0.76f), new Vector2(0.78f, 0.74f), 0.022f)), SoldererColor);
+            return Rasterize(layers);
+        }
+
+        /// <summary>THIEF: 口を紐で絞った茶色の巾着袋に、左下から右上へ斜めの銀のナイフ（つばと暗い柄）が重なる。</summary>
+        public static Color[] Thief()
+        {
+            var layers = new List<Layer>();
+            // 袋（丸い胴と、絞った首と、口のひだ）。
+            Fill(layers, p => Mathf.Min(Circle(p, new Vector2(0.47f, 0.63f), 0.27f),
+                RoundBox(p, new Vector2(0.47f, 0.35f), new Vector2(0.085f, 0.06f), 0.02f)), ThiefColor);
+            Fill(layers, p => Mathf.Min(Mathf.Min(Circle(p, new Vector2(0.35f, 0.25f), 0.07f), Circle(p, new Vector2(0.59f, 0.25f), 0.07f)),
+                Circle(p, new Vector2(0.47f, 0.22f), 0.08f)), ThiefColor);
+            // 絞った紐と、垂れた端。
+            Fill(layers, p => Mathf.Min(Segment(p, new Vector2(0.36f, 0.34f), new Vector2(0.58f, 0.34f), 0.018f),
+                Segment(p, new Vector2(0.58f, 0.34f), new Vector2(0.66f, 0.44f), 0.016f)), ThiefStringColor);
+            // ナイフ（刃は左下の根元から右上の切っ先へ。背はまっすぐで、刃先の側が切っ先の手前でふくらむ）。
+            Vector2[] blade =
+            {
+                new Vector2(0.285f, 0.705f), new Vector2(0.805f, 0.228f), new Vector2(0.87f, 0.19f), new Vector2(0.8f, 0.31f),
+                new Vector2(0.355f, 0.775f),
+            };
+            Fill(layers, p => Polygon(p, blade), KnifeColor);
+            Fill(layers, p => Segment(p, new Vector2(0.245f, 0.665f), new Vector2(0.395f, 0.815f), 0.024f), KnifeColor);
+            Fill(layers, p => Mathf.Min(Segment(p, new Vector2(0.3f, 0.76f), new Vector2(0.17f, 0.89f), 0.036f),
+                Circle(p, new Vector2(0.15f, 0.91f), 0.04f)), KnifeHandleColor);
             return Rasterize(layers);
         }
 
