@@ -74,6 +74,24 @@ namespace Airerage.Core.Skills
 
         /// <summary>ボールライトニングを次々と放つ（SOLDERER の R）。</summary>
         BallLightning,
+
+        /// <summary>真下へ煙球を投げる（THIEF の地上技。着弾すると攻撃と煙）。</summary>
+        SmokeBall,
+
+        /// <summary>
+        /// タレントスナッチの弾を照準の方向へ撃つ（THIEF の Q）。当たったキャラクターの Q をコピーし、ステージのギミック・仕掛けを奪う
+        /// （ThiefRules）。奪ったものがあるときの Q は、コピーした技か、置く技（ThiefTuning.PlaceAttack）になる。
+        /// </summary>
+        TalentSnatch,
+
+        /// <summary>奪ったギミック・仕掛けを、照準の方向の目の前に置く（THIEF の Q で奪った後）。</summary>
+        PlaceGimmick,
+
+        /// <summary>分身を残して透明になる（THIEF の E。ミスディレクション）。</summary>
+        Misdirection,
+
+        /// <summary>拠点の近くで詠唱を始める（THIEF の R。バンクハイスト。拠点の近くでないと出せない）。</summary>
+        BankHeist,
     }
 
     /// <summary>
@@ -870,6 +888,7 @@ namespace Airerage.Core.Skills
         public ScaleTuning Scale = new ScaleTuning();
         public InverterTuning Inverter = new InverterTuning();
         public BallLightningTuning BallLightning = new BallLightningTuning();
+        public ThiefTuning Thief = new ThiefTuning();
 
         public TuningValidator Validate()
         {
@@ -963,6 +982,11 @@ namespace Airerage.Core.Skills
             if (BallLightning != null)
             {
                 v.Merge(BallLightning.Validate());
+            }
+            v.NotNull(nameof(Thief), Thief);
+            if (Thief != null)
+            {
+                v.Merge(Thief.Validate());
             }
             return v;
         }

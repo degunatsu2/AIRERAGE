@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 29;
+        public const int FormatVersion = 30;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -71,7 +71,7 @@ namespace Airerage.Core.Simulation
         /// objects が null なら、置かれた物はない（空の一覧と同じ値）。
         /// </summary>
         public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states, CoinField coins, Match.MatchState match,
-            WorldObjects objects = null, StageState stage = null)
+            WorldObjects objects = null, StageState stage = null, IReadOnlyList<CharacterState> clones = null)
         {
             ulong hash = Mix(FnvOffsetBasis, tick);
             for (int i = 0; i < states.Count; i++)
@@ -95,6 +95,17 @@ namespace Airerage.Core.Simulation
                 {
                     hash = Mix(hash, stage.TrapTickOf(i));
                     hash = Mix(hash, stage.TrapSpentOf(i) ? 1 : 0);
+                }
+            }
+            if (clones != null)
+            {
+                // THIEF の分身（出ているものだけ。出ていない分身の状態は使わない）。
+                for (int i = 0; i < clones.Count && i < states.Count; i++)
+                {
+                    if (states[i].Combat.CloneTicksLeft > 0)
+                    {
+                        hash = Mix(hash, Checksum(clones[i]));
+                    }
                 }
             }
             return hash;
@@ -348,6 +359,20 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.CaptureTicks);
             writer.Write(combat.CaptureZone);
             writer.Write(combat.CaptureCount);
+            writer.Write((byte)combat.StealKind);
+            writer.Write(combat.StealSource);
+            writer.Write(combat.StealUses);
+            writer.Write(combat.StealSerial);
+            writer.Write(combat.StealFromSerial);
+            writer.Write(combat.StealCount);
+            writer.Write(combat.InvisibleTicksLeft);
+            writer.Write(combat.CloneTicksLeft);
+            writer.Write(combat.ClonePopCount);
+            writer.Write(combat.HeistTicks);
+            writer.Write(combat.HeistSpot);
+            writer.Write(combat.NearBank);
+            writer.Write(combat.HeistPayoutCount);
+            writer.Write(combat.HeistLastPayout);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -404,7 +429,7 @@ namespace Airerage.Core.Simulation
                 Attack = (AttackSlot)reader.ReadByte(),
                 Ticks = reader.ReadInt32(),
                 Duration = reader.ReadInt32(),
-                HitMask = reader.ReadUInt32(),
+                HitMask = reader.ReadUInt64(),
                 StrikeSpeed = reader.ReadSingle(),
                 Connected = reader.ReadBoolean(),
                 CancelFromTick = reader.ReadInt32(),
@@ -495,6 +520,20 @@ namespace Airerage.Core.Simulation
                 CaptureTicks = reader.ReadInt32(),
                 CaptureZone = reader.ReadInt32(),
                 CaptureCount = reader.ReadInt32(),
+                StealKind = (StealKind)reader.ReadByte(),
+                StealSource = reader.ReadInt32(),
+                StealUses = reader.ReadInt32(),
+                StealSerial = reader.ReadInt32(),
+                StealFromSerial = reader.ReadInt32(),
+                StealCount = reader.ReadInt32(),
+                InvisibleTicksLeft = reader.ReadInt32(),
+                CloneTicksLeft = reader.ReadInt32(),
+                ClonePopCount = reader.ReadInt32(),
+                HeistTicks = reader.ReadInt32(),
+                HeistSpot = reader.ReadInt32(),
+                NearBank = reader.ReadBoolean(),
+                HeistPayoutCount = reader.ReadInt32(),
+                HeistLastPayout = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

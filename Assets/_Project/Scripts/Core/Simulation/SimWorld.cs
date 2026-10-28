@@ -30,6 +30,15 @@ namespace Airerage.Core.Simulation
         private readonly List<StagePlatform> _platforms = new List<StagePlatform>();
         private readonly List<StageTrap> _traps = new List<StageTrap>();
         private readonly StageState _stage = new StageState();
+        // 効かせるギミック（ステージのギミック ＋ THIEF が置いたギミック。毎ティックの初めに作り直す。ThiefRules.RefreshZones）。
+        private readonly List<StageZone> _zoneList = new List<StageZone>();
+        // 今の調整値（THIEF がコピーした Q を持っていれば、その技にしたもの。ThiefRules.ConfigFor）。状態から決まる。
+        private readonly List<CharacterConfig> _tickConfigs = new List<CharacterConfig>();
+        // 分身の状態（THIEF の E。キャラクターごと。持ち主の CombatState.CloneTicksLeft が 0 より大きい間だけ動く）。
+        private readonly List<CharacterState> _clones = new List<CharacterState>();
+        // このティックに押したボタン（THIEF のもう一度の E・R）。
+        private readonly List<InputButtons> _pressed = new List<InputButtons>();
+        private readonly ThiefContext _thief;
         private MatchState _match = MatchState.None;
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
@@ -82,10 +91,12 @@ namespace Airerage.Core.Simulation
                 sorted.Sort((a, b) => a.CompareTo(b));
             }
             Zones = sorted;
+            _zoneList.AddRange(sorted);
             Coins = new CoinLedger(_coins);
             _collision = new WorldCollision(collision);
-            _simulator = new CharacterSimulator(_collision, sorted);
+            _simulator = new CharacterSimulator(_collision, _zoneList);
             Bounds = bounds;
+            _thief = new ThiefContext(sorted, _traps, Rules, BankSpots, _clones);
         }
 
         /// <summary>ワールドに置かれた物と投射物（docs/13 T5-6）。状態の一部（巻き戻しとチェックサムに乗る）。表示用に読むだけにする。</summary>
@@ -108,6 +119,12 @@ namespace Airerage.Core.Simulation
 
         /// <summary>ステージのギミック（効かせる順）。</summary>
         public IReadOnlyList<StageZone> Zones { get; }
+
+        /// <summary>
+        /// 今効かせているギミック（ステージのギミック Zones の後に、THIEF が置いたギミックの写しが続く。次の Step の初めに作り直す）。
+        /// 表示用に読むだけにする。
+        /// </summary>
+        public IReadOnlyList<StageZone> ActiveZones => _zoneList;
 
         /// <summary>試合のルール。</summary>
         public MatchRules Rules { get; }
@@ -143,9 +160,12 @@ namespace Airerage.Core.Simulation
         {
             ValidateConfig(config);
             _configs.Add(config);
+            _tickConfigs.Add(config);
             CharacterState spawn = CharacterState.Spawn(spawnPosition, facing);
             _spawns.Add(spawn);
             _states.Add(spawn);
+            _clones.Add(default);
+            _pressed.Add(InputButtons.None);
             return _states.Count - 1;
         }
 
@@ -154,10 +174,23 @@ namespace Airerage.Core.Simulation
             return _states[index];
         }
 
+        /// <summary>キャラクター index の分身の状態（THIEF の E。持ち主の CombatState.CloneTicksLeft が 0 より大きい間だけ意味がある）。</summary>
+        public CharacterState GetClone(int index)
+        {
+            return _clones[index];
+        }
+
+        /// <summary>キャラクター index の分身が出ているか。</summary>
+        public bool HasClone(int index)
+        {
+            return _states[index].Combat.CloneTicksLeft > 0;
+        }
+
         /// <summary>状態を直接書き換える（位置のリセット、テスト、入力の再生で使う）。</summary>
         public void SetState(int index, CharacterState state)
         {
             _states[index] = state;
+            RefreshConfig(index);
         }
 
         /// <summary>全状態（ティック数、全キャラクターの状態、ワールド全体のコイン）を snapshot に書き写す（ロールバックの保存）。</summary>
@@ -167,7 +200,7 @@ namespace Airerage.Core.Simulation
             {
                 throw new ArgumentNullException(nameof(snapshot));
             }
-            snapshot.Capture(Tick, _states, _coins, _match, _objects, _stage);
+            snapshot.Capture(Tick, _states, _coins, _match, _objects, _stage, _clones);
         }
 
         /// <summary>snapshot の全状態に戻す（ロールバックの巻き戻し）。キャラクターの数が違えば ArgumentException。</summary>
@@ -185,6 +218,7 @@ namespace Airerage.Core.Simulation
             for (int i = 0; i < _states.Count; i++)
             {
                 _states[i] = snapshot.GetState(i);
+                _clones[i] = snapshot.GetClone(i);
             }
             _coins.CopyFrom(snapshot.Coins);
             _objects.CopyFrom(snapshot.Objects);
@@ -194,15 +228,27 @@ namespace Airerage.Core.Simulation
             }
             _match = snapshot.Match;
             Tick = snapshot.Tick;
+            RefreshConfigs();
+            ThiefRules.RefreshZones(_zoneList, Zones, _objects);
         }
 
         /// <summary>今の全状態のチェックサム（WorldSnapshot.Checksum と同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, _coins, _match, _objects, _stage);
+            return StateCodec.WorldChecksum(Tick, _states, _coins, _match, _objects, _stage, _clones);
         }
 
+        /// <summary>
+        /// キャラクター index の今の調整値（THIEF がコピーした Q・奪ったギミックを持っていれば、Q をその技にしたもの。ThiefRules.ConfigFor）。
+        /// 表示と CPU はこちらを使う。
+        /// </summary>
         public CharacterConfig GetConfig(int index)
+        {
+            return _tickConfigs[index];
+        }
+
+        /// <summary>キャラクター index のもとの調整値（SetConfig・AddCharacter で渡したもの）。</summary>
+        public CharacterConfig GetBaseConfig(int index)
         {
             return _configs[index];
         }
@@ -211,6 +257,20 @@ namespace Airerage.Core.Simulation
         {
             ValidateConfig(config);
             _configs[index] = config;
+            RefreshConfig(index);
+        }
+
+        private void RefreshConfigs()
+        {
+            for (int i = 0; i < _states.Count; i++)
+            {
+                RefreshConfig(i);
+            }
+        }
+
+        private void RefreshConfig(int index)
+        {
+            _tickConfigs[index] = ThiefRules.ConfigFor(_states[index], _configs[index], _configs);
         }
 
         /// <summary>
@@ -245,11 +305,13 @@ namespace Airerage.Core.Simulation
                 Tick++;
                 return;
             }
+            // THIEF が置いたギミックも、ステージのギミックと一緒に効かせる（このティックの初めの物から決める）。
+            ThiefRules.RefreshZones(_zoneList, Zones, _objects);
             // 置かれた物のアンカーポイントは、このティックの初めの物から決める（巻き戻しても全員で同じ）。
             _collision.Refresh(_objects);
             // 動く足場と扉: このティックの位置の当たりを作り、動いた分だけ乗っている人とつないだワイヤーを運ぶ。
             _collision.SetPlatforms(_platforms, _stage, Tick);
-            StagePlatforms.Carry(_platforms, _stage, _states, _configs, Tick);
+            StagePlatforms.Carry(_platforms, _stage, _states, _tickConfigs, Tick);
             for (int i = 0; i < _states.Count; i++)
             {
                 CharacterState state = _states[i];
@@ -258,41 +320,51 @@ namespace Airerage.Core.Simulation
                     // 試合から抜けた（ネットワーク対戦。全員が同じティックからこの入力を使う。docs/15 T6-10）。
                     state = KnockoutResolver.Departed(state, _spawns[i]);
                 }
+                PlayerInput input = phase == MatchPhase.Countdown ? default : inputs[i];
+                // このティックに押したボタン（止まっている間は、押したことにしない）。
+                _pressed[i] = state.Combat.HitstopTicksLeft > 0 ? InputButtons.None : input.Buttons & ~state.PreviousButtons;
                 // 行動の速さの強化の間は、速さを上げた調整値で動かす（SpeedBoosts）。
-                _simulator.Step(ref state, phase == MatchPhase.Countdown ? default : inputs[i], SpeedBoosts.EffectiveConfig(state, _configs[i]), Tick, Rules.Seed);
+                _simulator.Step(ref state, input, SpeedBoosts.EffectiveConfig(state, _tickConfigs[i]), Tick, Rules.Seed);
                 _states[i] = state;
             }
+            // THIEF の分身（移動とワイヤーだけ）。
+            ThiefRules.StepClones(_clones, _states, _simulator, _configs, _collision, Bounds, Tick, Rules.Seed);
             Tick++;
             // ステージの仕掛け（赤外線とミサイル、ピッチャーマシンのボール）。
-            StageTraps.Step(_traps, _stage, _states, _configs, Tick);
+            StageTraps.Step(_traps, _stage, _states, _tickConfigs, Tick);
             // ステージの危険に当たった人が、威力に応じてコインを落とす。
             CoinDropRules.DropOnHazards(Coins, _states, Rules, Tick);
-            SkillRules.FireEffects(_objects, Coins, _states, _configs, Tick);
+            SkillRules.FireEffects(_objects, Coins, _states, _tickConfigs, Tick, _thief);
             _projectileHits.Clear();
-            SkillRules.StepObjects(_objects, _collision, _states, _configs, Bounds, Tick, _projectileHits);
-            _hits.Resolve(_states, _configs, Tick, _objects, Rules.Seed, _projectileHits);
-            SkillRules.EndObjects(_objects, Coins, _states, _configs, Rules, Tick, BankSpots,
+            SkillRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits);
+            ThiefRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits, _thief, _stage);
+            _hits.Resolve(_states, _tickConfigs, Tick, _objects, Rules.Seed, _projectileHits);
+            ThiefRules.PopClones(_clones, _states, _tickConfigs, _objects, Tick);
+            SkillRules.EndObjects(_objects, Coins, _states, _tickConfigs, Rules, Tick, BankSpots,
                 phase == MatchPhase.Playing || phase == MatchPhase.Overtime);
             CoinDropRules.DropOnHits(Coins, _states, _hits.LastHits, Rules, Tick);
             if (Bounds.HasValue)
             {
-                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts, _configs);
+                KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts, _tickConfigs);
                 CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, CoinSpawns, Rules, Tick);
             }
-            CombatRewardRules.Step(Coins, _states, _hits.LastEndedCombos, _knockouts, Rules, Tick, _configs);
+            CombatRewardRules.Step(Coins, _states, _hits.LastEndedCombos, _knockouts, Rules, Tick, _tickConfigs);
             bool active = phase == MatchPhase.Playing || phase == MatchPhase.Overtime;
-            FieldCoinRules.Step(Coins, _states, _configs, CoinSpawns, Rules, Tick, active);
+            FieldCoinRules.Step(Coins, _states, _tickConfigs, CoinSpawns, Rules, Tick, active);
             if (phase == MatchPhase.Overtime)
             {
-                MatchFlow.StepOvertime(ref _match, _states, _configs, BankSpots, Rules, Tick);
+                MatchFlow.StepOvertime(ref _match, _states, _tickConfigs, BankSpots, Rules, Tick);
             }
-            BankRules.Step(Coins, _states, _configs, BankSpots, Rules, Tick, active);
+            BankRules.Step(Coins, _states, _tickConfigs, BankSpots, Rules, Tick, active);
+            ThiefRules.StepHeist(Coins, _states, _tickConfigs, _thief, Tick, active, _pressed);
+            ThiefRules.AfterStep(_states, _tickConfigs, _configs, _pressed, _thief, Tick, active);
             CoinBonusRules.Mint(Coins, _states, Tick);
-            StagePlatforms.UpdateDoors(_platforms, _stage, _states, _configs, Tick);
+            StagePlatforms.UpdateDoors(_platforms, _stage, _states, _tickConfigs, Tick);
             if (phase == MatchPhase.Playing && Rules.HasTimeLimit && Tick == Rules.CountdownTicks + Rules.DurationTicks)
             {
                 MatchFlow.DecideAtTimeUp(ref _match, _states, Tick);
             }
+            RefreshConfigs();
         }
 
         private static void ValidateConfig(CharacterConfig config)

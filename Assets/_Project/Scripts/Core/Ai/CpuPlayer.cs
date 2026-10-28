@@ -66,6 +66,10 @@ namespace Airerage.Core.Ai
         // ガードを考える相手の近さ（m）。
         private const float GuardRange = 3.5f;
 
+        // バンクハイストの詠唱を止める、相手の近さ（m）と、止める詠唱の長さ（ティック。15 秒）。
+        private const float HeistDangerDistance = 7f;
+        private const int HeistTargetTicks = 900;
+
         // 撃破技を優先する、相手と撃破の範囲の端との距離（m）。
         private const float KoEdgeDistance = 12f;
 
@@ -156,6 +160,14 @@ namespace Airerage.Core.Ai
                 return default;
             }
 
+            if (self.Combat.HeistTicks > 0)
+            {
+                // バンクハイストの詠唱中（動けない）: 相手が近づいたか、十分に詠唱したら、もう一度 R で止めてコインを得る。
+                bool stop = HeistShouldStop(world, self) && (_lastButtons & InputButtons.Super) == 0;
+                _lastButtons = stop ? InputButtons.Super : InputButtons.None;
+                return PlayerInput.FromAxes(0f, 0f, _lastButtons);
+            }
+
             CharacterConfig config = SpeedBoosts.EffectiveConfig(self, world.GetConfig(_index));
             if (tick >= _nextDecisionTick)
             {
@@ -165,7 +177,7 @@ namespace Airerage.Core.Ai
             if (Goal == CpuGoalKind.Fight && TargetCharacter >= 0)
             {
                 CharacterState opponent = world.GetState(TargetCharacter);
-                if (opponent.Combat.IsUntouchable)
+                if (opponent.Combat.IsUntouchable || IsHidden(opponent))
                 {
                     _nextDecisionTick = tick;
                 }
@@ -285,7 +297,7 @@ namespace Airerage.Core.Ai
                     continue;
                 }
                 CharacterState opponent = world.GetState(other);
-                if (opponent.Combat.IsUntouchable)
+                if (opponent.Combat.IsUntouchable || IsHidden(opponent))
                 {
                     continue;
                 }
@@ -543,7 +555,7 @@ namespace Airerage.Core.Ai
                     continue;
                 }
                 CharacterState opponent = world.GetState(other);
-                if (opponent.Combat.IsUntouchable)
+                if (opponent.Combat.IsUntouchable || IsHidden(opponent))
                 {
                     continue;
                 }
@@ -754,6 +766,19 @@ namespace Airerage.Core.Ai
             return new Vector2(x, y);
         }
 
+        // 透明の相手（THIEF の E）は見えないので、ねらわない。
+        private static bool IsHidden(in CharacterState opponent)
+        {
+            return opponent.Combat.InvisibleTicksLeft > 0;
+        }
+
+        // バンクハイストの詠唱を止めるか: 相手が近づいた（HeistDangerDistance）か、HeistTargetTicks 詠唱した（15 秒で 95 枚）。
+        private bool HeistShouldStop(SimWorld world, in CharacterState self)
+        {
+            NearestOpponent(world, Flat(self.Position), HeistDangerDistance, out float distance);
+            return distance <= HeistDangerDistance || self.Combat.HeistTicks >= HeistTargetTicks;
+        }
+
         private int NearestOpponent(SimWorld world, Vector2 position, float range, out float distanceToNearest)
         {
             int nearest = -1;
@@ -765,7 +790,7 @@ namespace Airerage.Core.Ai
                     continue;
                 }
                 CharacterState opponent = world.GetState(other);
-                if (opponent.Combat.IsUntouchable)
+                if (opponent.Combat.IsUntouchable || IsHidden(opponent))
                 {
                     continue;
                 }

@@ -16,6 +16,7 @@ namespace Airerage.Core.Simulation
         public const string SpaceTravelerName = "SPACE TRAVELER";
         public const string PastryChefName = "PASTRY CHEF";
         public const string SoldererName = "SOLDERER";
+        public const string ThiefName = "THIEF";
 
         /// <summary>STANDARD（基準のキャラクター。DASH・RISE・BURST）。</summary>
         public static CharacterConfig Standard()
@@ -792,6 +793,187 @@ namespace Airerage.Core.Simulation
             };
             combat.SuperGaugeCost = 90 * CombatTuning.GaugePerPercent;
             return config;
+        }
+
+        /// <summary>
+        /// THIEF（docs/14 1.6。ユーザーの案、2026-10-28）。盗む・コイン重視・変則的。決まりは ThiefRules、値は ThiefTuning。
+        /// - 地上技 SMOKE BOMB: 真下に煙球を投げながら、斜め後ろに飛び上がる（煙球は着弾すると、ごく狭い範囲に威力 5 と弱い吹き飛び、
+        ///   狭い範囲に煙。煙の中の物は見えない）。
+        /// - 空中 N ROLLING CUT: 慣性のまま前転し、体の周りを円を描くように小さな判定が回る。
+        /// - 空中上（撃破技）FIVE STABS: 慣性のまま、ナイフで真上を 5 回突く。体の幅を 5 つに分けて、2・4・1・5・3 の順に短く細い判定を
+        ///   頭上に出す。威力は 4 × 4（ごく弱い吹き飛び）＋ 最後が 14（中くらいの吹き飛び）。1〜4 発目を外して 5 発目だけを当てると FATAL で、
+        ///   最後が威力 80・大きな吹き飛び（ユーザーの案）。
+        /// - 空中横 UPRIGHT SLASH: 慣性のまま、少しためてから前を薙ぎ払う（横に狭く縦に広い弧）。
+        /// - 空中下 LOW SWEEP: 慣性のまま、少しためてから下を薙ぎ払う（縦に狭く横に広い弧）。
+        /// - Q TALENT SNATCH: 照準の方向へ、こげ茶色の小さな弾をとても速く撃つ（威力・吹き飛びなし）。当たった人の Q をコピーし、ステージの
+        ///   ギミック・仕掛けに当てると奪う。もう一度 Q で使う・置く。クールタイム 12 秒。
+        /// - E MISDIRECTION: 分身を残して透明になり、照準の方向へごく短く突進する（3 秒）。クールタイム 20 秒。
+        /// - R BANK HEIST: 拠点の近くで、その場で止まって詠唱し、もう一度 R で止めると詠唱した長さでコインを得る。ゲージ 80%。
+        /// </summary>
+        public static CharacterConfig Thief()
+        {
+            var config = new CharacterConfig();
+            CombatTuning combat = config.Combat;
+            float column = config.Movement.HalfWidth * 2f / 5f;
+            float overHead = config.Movement.HalfHeight + 0.55f;
+
+            combat.Ground = new AttackData
+            {
+                Name = "SMOKE BOMB",
+                TotalTicks = 30,
+                WireCancelFromTick = 6,
+                Effect = SkillEffect.SmokeBall,
+                EffectTick = 3,
+                Hits = new AttackHit[0],
+                Motions = new[]
+                {
+                    // 投げながら、斜め後ろへ飛び上がる。
+                    new AttackMotion { StartTick = 3, Ticks = 1, VelocityX = -9f, VelocityY = 15f },
+                },
+            };
+
+            combat.AirNeutral = new AttackData
+            {
+                Name = "ROLLING CUT",
+                TotalTicks = 26,
+                WireCancelFromTick = 5,
+                ExclusiveHits = true,
+                Flip = true,
+                Hits = new[]
+                {
+                    // 前転: 頭の上 → 前 → 足の下 → 後ろ と、体の周りを小さな判定が回る。
+                    RollHit(4, 0f, 1.35f),
+                    RollHit(7, 1.25f, 0.1f),
+                    RollHit(10, 0f, -1.35f),
+                    RollHit(13, -1.25f, 0.1f),
+                },
+            };
+
+            combat.AirUp = new AttackData
+            {
+                Name = "FIVE STABS",
+                TotalTicks = 34,
+                WireCancelFromTick = 6,
+                Hits = new[]
+                {
+                    // 体の幅を 5 つに分けた列（左から 1〜5）の、2・4・1・5・3 の順に、短く細い判定を頭上に出す。
+                    Stab(5, 2, column, overHead, last: false),
+                    Stab(8, 4, column, overHead, last: false),
+                    Stab(11, 1, column, overHead, last: false),
+                    Stab(14, 5, column, overHead, last: false),
+                    Stab(17, 3, column, overHead, last: true),
+                },
+            };
+            combat.KoAttack = AttackSlot.AirUp;
+
+            combat.AirSide = new AttackData
+            {
+                Name = "UPRIGHT SLASH",
+                TotalTicks = 30,
+                WireCancelFromTick = 10,
+                ExclusiveHits = true,
+                Hits = new[]
+                {
+                    // 少しためてから、前を上から下へ（横に狭く縦に広い弧）。
+                    Slash(10, 0.95f, 1.25f, 0.5f, 0.65f, 9f, 6f),
+                    Slash(12, 1.3f, 0f, 0.5f, 0.75f, 11f, 3f),
+                    Slash(14, 0.95f, -1.25f, 0.5f, 0.65f, 9f, -2f),
+                },
+            };
+
+            combat.AirDown = new AttackData
+            {
+                Name = "LOW SWEEP",
+                TotalTicks = 30,
+                WireCancelFromTick = 10,
+                ExclusiveHits = true,
+                Hits = new[]
+                {
+                    // 少しためてから、下を前から後ろへ（縦に狭く横に広い弧）。
+                    Slash(10, 1.25f, -1.0f, 0.7f, 0.5f, 5f, -8f),
+                    Slash(12, 0f, -1.35f, 0.8f, 0.5f, 2f, -11f),
+                    Slash(14, -1.25f, -1.0f, 0.7f, 0.5f, -5f, -8f),
+                },
+            };
+
+            combat.Special1 = new AttackData
+            {
+                Name = "TALENT SNATCH",
+                TotalTicks = 16,
+                WireCancelFromTick = 4,
+                Effect = SkillEffect.TalentSnatch,
+                EffectTick = 3,
+                Hits = new AttackHit[0],
+            };
+            combat.Special1CooldownTicks = 720;
+
+            combat.Special2 = new AttackData
+            {
+                Name = "MISDIRECTION",
+                TotalTicks = 10,
+                WireCancelFromTick = 6,
+                Effect = SkillEffect.Misdirection,
+                EffectTick = 0,
+                AimTurnsFacing = true,
+                Hits = new AttackHit[0],
+                Motions = new[]
+                {
+                    // 照準の方向へ、ごく短く（約 1.3m。その後の慣性で地上なら合わせて約 2m）。分身を残したティック（0）の次から。
+                    new AttackMotion { StartTick = 1, Ticks = 5, VelocityX = 16f, AlongAim = true },
+                },
+            };
+            combat.Special2CooldownTicks = 1200;
+
+            combat.Super = new AttackData
+            {
+                Name = "BANK HEIST",
+                TotalTicks = 6,
+                WireCancelFromTick = 6,
+                Effect = SkillEffect.BankHeist,
+                EffectTick = 0,
+                Hits = new AttackHit[0],
+                Motions = new[]
+                {
+                    new AttackMotion { StartTick = 0, Ticks = 6, VelocityX = 0f, VelocityY = 0f },
+                },
+            };
+            combat.SuperGaugeCost = 80 * CombatTuning.GaugePerPercent;
+            return config;
+        }
+
+        // 前転の判定 1 つ（小さめ。ユーザーの案）。
+        private static AttackHit RollHit(int startTick, float offsetX, float offsetY)
+        {
+            return new AttackHit
+            {
+                StartTick = startTick, ActiveTicks = 3, OffsetX = offsetX, OffsetY = offsetY, HalfWidth = 0.6f, HalfHeight = 0.6f,
+                Damage = 2, Gauge = 60, HitstopTicks = 8, HitstunTicks = 18, KnockbackX = 4f, KnockbackY = 7f,
+            };
+        }
+
+        // 頭上の刺突 1 つ（列 index は左から 1〜5。向いている方向が右）。1〜4 発目は威力 4・ごく弱い吹き飛び、5 発目は威力 14・中くらいの
+        // 吹き飛びで、前の 4 発をどれも当てずに当てたら FATAL（威力 80・大きな吹き飛び。ユーザーの案）。
+        private static AttackHit Stab(int startTick, int index, float column, float overHead, bool last)
+        {
+            return new AttackHit
+            {
+                StartTick = startTick, ActiveTicks = 2, OffsetX = (index - 3) * column, OffsetY = overHead,
+                HalfWidth = column * 0.35f, HalfHeight = 0.5f,
+                Damage = last ? 14 : 4, Gauge = last ? 90 : 40, HitstopTicks = last ? 14 : 4, HitstunTicks = last ? 26 : 16,
+                KnockbackX = last ? 2f : 0f, KnockbackY = last ? 14f : 3f,
+                LoneFatal = last, LoneFatalDamage = last ? 80 : 0, LoneFatalKnockbackScale = last ? 2.2f : 1f,
+            };
+        }
+
+        // ナイフの薙ぎ払いの判定 1 つ（弧の一部）。
+        private static AttackHit Slash(int startTick, float offsetX, float offsetY, float halfWidth, float halfHeight, float knockbackX,
+            float knockbackY)
+        {
+            return new AttackHit
+            {
+                StartTick = startTick, ActiveTicks = 2, OffsetX = offsetX, OffsetY = offsetY, HalfWidth = halfWidth, HalfHeight = halfHeight,
+                Damage = 3, Gauge = 80, HitstopTicks = 12, HitstunTicks = 24, KnockbackX = knockbackX, KnockbackY = knockbackY,
+            };
         }
     }
 }

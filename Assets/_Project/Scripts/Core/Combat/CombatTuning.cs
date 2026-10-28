@@ -81,6 +81,14 @@ namespace Airerage.Core.Combat
         public ChargeFilter Charge;
 
         /// <summary>
+        /// この判定より前の判定がどれも当たっていない相手に当たったら FATAL（THIEF の空中上の 5 段目。1〜4 段目を外して 5 段目だけを
+        /// 当てる。ユーザーの案、2026-10-28）。FATAL なら威力を LoneFatalDamage にし、吹き飛びに LoneFatalKnockbackScale を掛ける。
+        /// </summary>
+        public bool LoneFatal;
+        public int LoneFatalDamage;
+        public float LoneFatalKnockbackScale = 1f;
+
+        /// <summary>
         /// 攻撃の追加効果の感電（ティック。0 なら感電させない。SOLDERER のボールライトニング。2026-10-22）。当たったら先にこの長さだけ
         /// 感電してその場に止まり、感電が終わってから吹き飛んでのけぞる（ユーザーの要望、2026-10-26。のけぞりは感電の分だけ長い。
         /// CombatState.HasStunKnockback）。感電しない間（StunGuardTicks）なら、ふつうに吹き飛ぶ。
@@ -109,6 +117,8 @@ namespace Airerage.Core.Combat
             v.NonNegative(nameof(HitstunTicks), HitstunTicks);
             v.NonNegative(nameof(StunTicks), StunTicks);
             v.Positive(nameof(CriticalScale), CriticalScale);
+            v.NonNegative(nameof(LoneFatalDamage), LoneFatalDamage);
+            v.Positive(nameof(LoneFatalKnockbackScale), LoneFatalKnockbackScale);
             return v;
         }
     }
@@ -179,8 +189,8 @@ namespace Airerage.Core.Combat
     [Serializable]
     public sealed class AttackData
     {
-        /// <summary>1つの攻撃が持てる判定の数の上限（当てた相手の記録のビット数による）。</summary>
-        public const int MaxHits = 4;
+        /// <summary>1つの攻撃が持てる判定の数の上限（当てた相手の記録 ActionState.HitMask のビット数による）。</summary>
+        public const int MaxHits = 8;
 
         /// <summary>技の名前（表示用。特殊攻撃と必殺技の表示に使う。空なら表示しない）。</summary>
         public string Name = string.Empty;
@@ -211,6 +221,9 @@ namespace Airerage.Core.Combat
         /// （ユーザーの要望、2026-10-16）。
         /// </summary>
         public bool SpinPerHit;
+
+        /// <summary>前転する技（表示だけに使う。THIEF の空中 N）。最初の判定から最後の判定の終わりまでに、体を前へ 1 回転させる。</summary>
+        public bool Flip;
 
         /// <summary>
         /// ための段階（長押しの攻撃。FromTicks の小さい順。最初は 0）。空なら、ためても威力は変わらない。
@@ -710,6 +723,19 @@ namespace Airerage.Core.Combat
         /// 拾ったとき（フィールドのコインとドロップ）だけで、戦闘の報酬や拠点での確定では得ない。
         /// </summary>
         public int GaugePerCoin = 2;
+
+        /// <summary>
+        /// 特殊攻撃 1 だけを attack にした写し（クールタイムは cooldownTicks、続けて使える回数は 1。ほかの値は同じものを指す）。THIEF が
+        /// コピーした Q を使うとき・奪ったギミックを置くときに使う（ThiefRules.ConfigFor）。
+        /// </summary>
+        public CombatTuning WithSpecial1(AttackData attack, int cooldownTicks)
+        {
+            var copy = (CombatTuning)MemberwiseClone();
+            copy.Special1 = attack;
+            copy.Special1CooldownTicks = cooldownTicks;
+            copy.Special1MaxCharges = 1;
+            return copy;
+        }
 
         public AttackData Get(AttackSlot slot)
         {

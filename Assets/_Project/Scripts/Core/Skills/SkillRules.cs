@@ -26,9 +26,9 @@ namespace Airerage.Core.Skills
         // 置いた物の位置が同じとみなす距離（m。ワイヤーの接続点と比べる）。
         private const float SamePointTolerance = 0.01f;
 
-        /// <summary>1. 技の効果を起こす。tick は進めた後のティック。</summary>
+        /// <summary>1. 技の効果を起こす。tick は進めた後のティック。thief は THIEF の技が使うステージの情報（null なら置く技などは何もしない）。</summary>
         public static void FireEffects(WorldObjects objects, CoinLedger ledger, List<CharacterState> states,
-            IReadOnlyList<CharacterConfig> configs, int tick)
+            IReadOnlyList<CharacterConfig> configs, int tick, ThiefContext thief = null)
         {
             for (int i = 0; i < states.Count; i++)
             {
@@ -47,6 +47,11 @@ namespace Airerage.Core.Skills
                 }
                 state.Action.EffectDone = true;
                 states[i] = state;
+                if (ThiefRules.Handles(attack.Effect))
+                {
+                    ThiefRules.Fire(attack.Effect, objects, states, i, config, tick, thief);
+                    continue;
+                }
                 Fire(attack.Effect, objects, ledger, states, i, config, tick);
             }
         }

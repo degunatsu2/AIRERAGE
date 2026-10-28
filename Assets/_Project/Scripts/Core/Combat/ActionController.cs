@@ -150,6 +150,7 @@ namespace Airerage.Core.Combat
                 WireController.Release(ref state, WireReleaseReason.Attack, config.Wire);
             }
             StartAttack(ref state, slot, combat, input);
+            TurnToAim(ref state, combat.Get(slot), config.Wire.AimDeadzone);
         }
 
         /// <summary>技の枠のボタン（特殊攻撃と必殺技。それ以外は攻撃ボタン）。</summary>
@@ -253,20 +254,27 @@ namespace Airerage.Core.Combat
             StartAttack(ref state, slot, combat, input);
             state.Action.Charge = charge;
             AttackData started = combat.Get(slot);
-            if (started.AimTurnsFacing)
-            {
-                // 照準（マウスポインター。ゲームパッドは右スティックか移動のスティック）の方向へ。向きもそちらへ変える。
-                state.Action.Aim = SkillRules.AimDirection(state.Combat.SkillAim, state.Facing, config.Wire.AimDeadzone);
-                if (MathF.Abs(state.Action.Aim.X) > 0.1f)
-                {
-                    state.Facing = state.Action.Aim.X > 0f ? 1 : -1;
-                }
-            }
+            TurnToAim(ref state, started, config.Wire.AimDeadzone);
             if (slot == AttackSlot.Special1 && started.ChainMax > 1)
             {
                 AfterChainStep(ref state, combat);
             }
             return true;
+        }
+
+        // 照準の向きに出す技（AttackData.AimTurnsFacing）: 技の向きを照準（マウスポインター。ゲームパッドは右スティックか移動のスティック）の
+        // 方向の長さ 1 にし、向きもそちらへ変える（照準がなければ向いている方向）。
+        private static void TurnToAim(ref CharacterState state, AttackData attack, float deadzone)
+        {
+            if (!attack.AimTurnsFacing)
+            {
+                return;
+            }
+            state.Action.Aim = SkillRules.AimDirection(state.Combat.SkillAim, state.Facing, deadzone);
+            if (MathF.Abs(state.Action.Aim.X) > 0.1f)
+            {
+                state.Facing = state.Action.Aim.X > 0f ? 1 : -1;
+            }
         }
 
         /// <summary>
@@ -284,9 +292,11 @@ namespace Airerage.Core.Combat
                     return combat.Special2MaxCharges > 1 ? state.Combat.Special2Spent < combat.Special2MaxCharges
                         : state.Combat.Special2CooldownTicksLeft == 0 || CanRecast(state, slot, combat);
                 case AttackSlot.Super:
-                    // コズミックレイは、自分のワープポータルが 2 つないと出せない（docs/14 1.1）。
+                    // コズミックレイは、自分のワープポータルが 2 つないと出せない（docs/14 1.1）。バンクハイストは、拠点の近くでだけ
+                    // （THIEF の R。ThiefRules が CombatState.NearBank を決める）。詠唱している間は、もう一度は出せない。
                     return state.Combat.Gauge >= combat.SuperGaugeCost
-                        && (combat.Super.Effect != SkillEffect.CosmicRay || state.Combat.PortalCount >= 2);
+                        && (combat.Super.Effect != SkillEffect.CosmicRay || state.Combat.PortalCount >= 2)
+                        && (combat.Super.Effect != SkillEffect.BankHeist || (state.Combat.NearBank && state.Combat.HeistTicks == 0));
                 default: return true;
             }
         }
@@ -684,6 +694,7 @@ namespace Airerage.Core.Combat
                 if (!TryBeginHold(ref state, BufferedSlot(state), input, config.Combat))
                 {
                     StartAttack(ref state, BufferedSlot(state), config.Combat, input);
+                    TurnToAim(ref state, config.Combat.Get(state.Action.Attack), config.Wire.AimDeadzone);
                 }
             }
         }
@@ -818,6 +829,7 @@ namespace Airerage.Core.Combat
                 if (!TryBeginHold(ref state, next, input, combat))
                 {
                     StartAttack(ref state, next, combat, input);
+                    TurnToAim(ref state, combat.Get(next), config.Wire.AimDeadzone);
                 }
                 return;
             }
@@ -829,6 +841,7 @@ namespace Airerage.Core.Combat
             if (!TryBeginHold(ref state, next, input, combat))
             {
                 StartAttack(ref state, next, combat, input);
+                TurnToAim(ref state, combat.Get(next), config.Wire.AimDeadzone);
             }
             state.Combat.AttackCancelUsed = true;
         }

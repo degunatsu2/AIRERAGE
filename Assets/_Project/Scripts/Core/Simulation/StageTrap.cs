@@ -205,8 +205,11 @@ namespace Airerage.Core.Simulation
             _path = path.ToArray();
         }
 
-        // ボールを 1 ティック進める（転がっている間は横だけ動いて遅くなり、下に地面がなければまた落ちる）。
-        private static void StepBall(ICollisionQuery terrain, Vector3 half, ref Vector2 position, ref Vector2 velocity, ref bool rolling)
+        /// <summary>
+        /// ボールを 1 ティック進める（転がっている間は横だけ動いて遅くなり、下に地面がなければまた落ちる）。THIEF が置いたピッチャーマシンの
+        /// ボールも、これで動かす（ThiefRules）。
+        /// </summary>
+        internal static void StepBall(ICollisionQuery terrain, Vector3 half, ref Vector2 position, ref Vector2 velocity, ref bool rolling)
         {
             float dt = SimTime.DeltaTime;
             if (rolling)

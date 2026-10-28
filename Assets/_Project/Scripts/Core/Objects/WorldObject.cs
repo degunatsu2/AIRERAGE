@@ -72,6 +72,41 @@ namespace Airerage.Core.Objects
         /// しばらく残る罠になる。触れた人を感電させる。Stored は 0: 放つ前、1: 進んでいる、2: 止まった。ChargeMilli は進んだ距離（mm）。
         /// </summary>
         BallLightning = 15,
+
+        /// <summary>煙球（THIEF の地上技）。真下へ落ち、地形か持ち主以外のキャラクターに触れると、ごく狭い範囲を攻撃して煙（Smoke）を出す。</summary>
+        SmokeBall = 16,
+
+        /// <summary>
+        /// 煙（THIEF の煙球と、分身が消えたとき）。Position を中心、End.X を半径にした円。中の物を見えなくする（見た目だけ。シミュレーション
+        /// には効かない）。Variant は 0: 煙球の煙、1: 分身が消えた煙。
+        /// </summary>
+        Smoke = 17,
+
+        /// <summary>
+        /// タレントスナッチの弾（THIEF の Q）。照準の方向へまっすぐ速く飛ぶ。ChargeMilli は飛んだ距離（mm）。キャラクター・奪えるギミック・
+        /// 仕掛けに当たると、それを奪う。地形・ステージの外・届く距離の終わりで外れて消える。
+        /// </summary>
+        SnatchShot = 18,
+
+        /// <summary>
+        /// 置いたギミック（THIEF が奪ったステージのギミックの写し）。Stored は元のギミックの番号（SimWorld.Zones）、Position は中心、End は
+        /// 半分の大きさ、Variant は 1 なら向きを左右に反転、SpawnTick は置いたティック（周期のあるギミックは、ここで 1 回効き始める）。
+        /// SimWorld が、ステージのギミックに加えて効かせる。
+        /// </summary>
+        PlacedZone = 19,
+
+        /// <summary>
+        /// 置いた仕掛け（THIEF が奪った赤外線とミサイル・ピッチャーマシンの写し）。Stored は元の仕掛けの番号（SimWorld.Traps）、Position は
+        /// 発射口、Variant は 1 なら向きを左右に反転、SpawnTick は置いたティック。赤外線は ChargeMilli がレーダーに触れたティック（0 は待って
+        /// いる）、HitMask が 1 ならミサイルがもう当たった。置いた瞬間に 1 回撃つ（ThiefRules）。
+        /// </summary>
+        PlacedTrap = 20,
+
+        /// <summary>
+        /// 置いたピッチャーマシンのボール（PlacedTrap が打ち出す）。重力で落ち、地形で跳ね、止まったら点滅して消える。Stored は 1 なら
+        /// 転がっている、ChargeMilli は止まったティック（0 は動いている）、Variant は元の仕掛けの番号の下位（表示用）。
+        /// </summary>
+        TrapBall = 21,
     }
 
     /// <summary>クリームの味（PASTRY CHEF の E。WorldObject.Variant）。</summary>

@@ -78,6 +78,9 @@ namespace Airerage.Core.Ai
     ///   相手が線の近くにいるときに撃つ。金庫は、コインを多く持っていて、拠点が遠く相手もいないときに長押しで預ける。
     /// - クリーム: 少し離れた相手へ、長押しの間に攻撃を押して抹茶（遅くして張り付かせる）。
     /// - インバータ: 相手が近ければオン（ワイヤーで足場につなぐと雷が伝わる）、落ちそうなとき・相手が遠いときはオフ（射程を戻す）。
+    /// - THIEF: タレントスナッチは相手の方へ撃ち（コピーした Q は、その技の効果の種類で使い分ける）、奪ったギミックは落ちそうなら足もとへ・
+    ///   相手が近ければ相手の方へ置く。ミスディレクションは相手が近いときに反対の方へ。バンクハイストは拠点の近くで相手がいないときに始め、
+    ///   相手が近づくか 15 秒たったら止める（CpuPlayer）。透明の THIEF は、ほかの CPU からねらわれない。
     /// </summary>
     public static class CpuSkills
     {
@@ -88,6 +91,9 @@ namespace Airerage.Core.Ai
         private const float ProjectileRange = 12f;
         private const float CreamMinRange = 2.5f;
         private const float CreamMaxRange = 10f;
+        private const float SnatchRange = 20f;
+        private const float PlaceRange = 9f;
+        private const float MisdirectionRange = 5f;
 
         // 自分を強くする技: 相手がこの近さなら（m）、目的地がこの遠さなら（m）使う。
         private const float BoostNearOpponent = 8f;
@@ -209,6 +215,34 @@ namespace Airerage.Core.Ai
 
                 case SkillEffect.CosmicRay:
                     return opponent >= 0 && OnBeam(world, index, config, Flat(world.GetState(opponent).Position));
+
+                case SkillEffect.TalentSnatch:
+                    // 相手の Q をコピーする（相手の方へ撃つ）。
+                    return AimedShot(world, self, opponent, distance, SnatchRange, ref use);
+
+                case SkillEffect.PlaceGimmick:
+                    // 奪ったギミック: 落ちそうなら足もとへ（ジャンプ台などで戻る）、相手が近ければ相手の方へ置く。
+                    if (situation.Recovering)
+                    {
+                        use.Aim = new Vector2(0f, -1f);
+                        use.Urgent = true;
+                        return true;
+                    }
+                    use.AimAt = opponent;
+                    return opponent >= 0 && distance <= PlaceRange;
+
+                case SkillEffect.Misdirection:
+                    // 相手が近いとき、分身を残して相手と反対の方へ。
+                    if (opponent < 0 || distance > MisdirectionRange)
+                    {
+                        return false;
+                    }
+                    use.Aim = toOpponent.LengthSquared() > SimMath.Epsilon ? -Vector2.Normalize(toOpponent) : new Vector2(-self.Facing, 0f);
+                    return true;
+
+                case SkillEffect.BankHeist:
+                    // 拠点の近くで（ActionController.CanUse が調べる）、相手が近くにいないとき。止めるのは CpuPlayer。
+                    return distance > QuietDistance;
 
                 case SkillEffect.Inverter:
                     use.Urgent = situation.Recovering;

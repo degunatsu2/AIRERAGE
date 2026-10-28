@@ -37,6 +37,11 @@ namespace Airerage.Core.Combat
 
         /// <summary>上乗せ（威力と吹き飛び）: 落ちていた時間（PASTRY CHEF のデジタルスケール）。</summary>
         FallTime = 1 << 7,
+
+        /// <summary>
+        /// 威力の置き換えと吹き飛びの倍率: 前の判定を外して最後の判定だけを当てた（THIEF の空中上。AttackHit.LoneFatal）。
+        /// </summary>
+        LoneFatal = 1 << 8,
     }
 
     /// <summary>
@@ -68,8 +73,11 @@ namespace Airerage.Core.Combat
         /// <summary>かかった強さの元（内訳。表示用）。</summary>
         public readonly PowerSource Sources;
 
+        /// <summary>威力をこの値にする（0 以上なら。倍率と上乗せを掛けない。THIEF の空中上の FATAL。-1 なら置き換えない）。</summary>
+        public readonly int DamageOverride;
+
         public AttackPower(float multiplier, int bonusPercent, int knockbackBonusPercent = 0, bool fatal = false, bool jackpot = false,
-            PowerSource sources = PowerSource.None)
+            PowerSource sources = PowerSource.None, int damageOverride = -1)
         {
             Multiplier = multiplier;
             BonusPercent = bonusPercent;
@@ -77,12 +85,21 @@ namespace Airerage.Core.Combat
             Fatal = fatal;
             Jackpot = jackpot;
             Sources = sources;
+            DamageOverride = damageOverride;
         }
 
         /// <summary>クリティカル判定が当たった強さ（倍率に scale を掛け、FATAL にする）。</summary>
         public AttackPower WithCritical(float scale)
         {
-            return new AttackPower(Multiplier * scale, BonusPercent, KnockbackBonusPercent, true, Jackpot, Sources | PowerSource.Critical);
+            return new AttackPower(Multiplier * scale, BonusPercent, KnockbackBonusPercent, true, Jackpot, Sources | PowerSource.Critical,
+                DamageOverride);
+        }
+
+        /// <summary>前の判定を外して最後の判定だけを当てた強さ（威力を damage にし、吹き飛びに knockbackScale を掛け、FATAL にする）。</summary>
+        public AttackPower WithLoneFatal(int damage, float knockbackScale)
+        {
+            return new AttackPower(Multiplier * knockbackScale, BonusPercent, KnockbackBonusPercent, true, Jackpot, Sources | PowerSource.LoneFatal,
+                damage);
         }
 
         /// <summary>何もかからない強さ（倍率 1、上乗せ 0）。</summary>

@@ -131,6 +131,11 @@ namespace Airerage.Core.Combat
                         if (touches)
                         {
                             AttackPower hitPower = hitData.Critical ? power.WithCritical(hitData.CriticalScale) : power;
+                            if (hitData.LoneFatal && !HitAny(attacker.Action.HitMask, h, v))
+                            {
+                                // 前の判定をどれも当てずに、この判定だけを当てた（THIEF の空中上の 5 段目）。
+                                hitPower = hitPower.WithLoneFatal(hitData.LoneFatalDamage, hitData.LoneFatalKnockbackScale);
+                            }
                             _hits.Add(new HitRecord(a, v, attacker.Action.Attack, h, hitData, attacker.Facing, hitPower));
                             exclusive |= 1u << v;
                         }
@@ -212,7 +217,7 @@ namespace Airerage.Core.Combat
         }
 
         // 判定のどれか（count 個）が、キャラクター victim にもう当たったか。
-        private static bool HitAny(uint mask, int count, int victim)
+        private static bool HitAny(ulong mask, int count, int victim)
         {
             for (int h = 0; h < count; h++)
             {
@@ -225,9 +230,9 @@ namespace Airerage.Core.Combat
         }
 
         /// <summary>判定 hitIndex がキャラクター victim に当たったことを示す、ActionState.HitMask のビット。</summary>
-        public static uint HitBit(int hitIndex, int victim)
+        public static ulong HitBit(int hitIndex, int victim)
         {
-            return 1u << (hitIndex * MaxCharacters + victim);
+            return 1UL << (hitIndex * MaxCharacters + victim);
         }
 
         // 判定のデータ、向き、倍率は、集めたときのものを使う（相打ちで、先に当てた命中が攻撃した側をのけぞらせていることがある）。
@@ -490,7 +495,7 @@ namespace Airerage.Core.Combat
         /// <summary>
         /// 威力（ダメージ。倍率と威力の上乗せをかけて四捨五入。AttackPower）。コンボが終わったときに、ダメージ報酬になる（docs/12 T4-5）。
         /// </summary>
-        public int Damage => AttackPower.Damage(Data.Damage, Power.Multiplier, Power.BonusPercent);
+        public int Damage => Power.DamageOverride >= 0 ? Power.DamageOverride : AttackPower.Damage(Data.Damage, Power.Multiplier, Power.BonusPercent);
 
         /// <summary>FATAL として当たったか。</summary>
         public bool IsFatalHit => Fatal && Result == HitResult.Hit;

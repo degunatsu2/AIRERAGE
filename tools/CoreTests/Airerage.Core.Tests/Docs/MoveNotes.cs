@@ -61,6 +61,14 @@ namespace Airerage.Core.Tests.Docs
             [Key(CharacterPresets.SoldererName, AttackSlot.Special1)] = "雷をまとって突撃（長押しは回りながら長く）",
             [Key(CharacterPresets.SoldererName, AttackSlot.Special2)] = "インバータ",
             [Key(CharacterPresets.SoldererName, AttackSlot.Super)] = "ボールライトニング",
+            [Key(CharacterPresets.ThiefName, AttackSlot.Ground)] = "真下へ煙球を投げながら、斜め後ろへ飛び上がる",
+            [Key(CharacterPresets.ThiefName, AttackSlot.AirNeutral)] = "慣性のまま前転し、体の周りを小さな判定が回る",
+            [Key(CharacterPresets.ThiefName, AttackSlot.AirSide)] = "慣性のまま、少しためてから前を薙ぎ払う（横に狭く縦に広い弧）",
+            [Key(CharacterPresets.ThiefName, AttackSlot.AirUp)] = "慣性のまま、頭上をナイフで 5 回突く（体の幅を 5 つに分けた 2・4・1・5・3 の列に、短く細い判定）",
+            [Key(CharacterPresets.ThiefName, AttackSlot.AirDown)] = "慣性のまま、少しためてから下を薙ぎ払う（縦に狭く横に広い弧）",
+            [Key(CharacterPresets.ThiefName, AttackSlot.Special1)] = "タレントスナッチ",
+            [Key(CharacterPresets.ThiefName, AttackSlot.Special2)] = "ミスディレクション",
+            [Key(CharacterPresets.ThiefName, AttackSlot.Super)] = "バンクハイスト",
         };
 
         /// <summary>キャラクター character の技 slot の説明（なければ、名前のない技は「STANDARD と同じ技」）。</summary>

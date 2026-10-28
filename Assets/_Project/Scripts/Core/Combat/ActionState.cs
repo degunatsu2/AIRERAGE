@@ -71,10 +71,10 @@ namespace Airerage.Core.Combat
         public int Duration;
 
         /// <summary>
-        /// 今の攻撃がすでに当たった相手。判定 h（0〜3）がキャラクター v（0〜7）に当たったら、ビット h × 8 + v を立てる
-        /// （同じ判定は同じ相手に1回だけ当たる。0 でなければ、この攻撃は何かに当たった）。
+        /// 今の攻撃がすでに当たった相手。判定 h（0〜7）がキャラクター v（0〜7）に当たったら、ビット h × 8 + v を立てる
+        /// （同じ判定は同じ相手に1回だけ当たる。0 でなければ、この攻撃は何かに当たった。THIEF の 5 段の刺突のために 64 ビットにした）。
         /// </summary>
-        public uint HitMask;
+        public ulong HitMask;
 
         /// <summary>撃破技を打つ直前の速さ（m/s）。吹き飛びの倍率に使う（D-38）。</summary>
         public float StrikeSpeed;

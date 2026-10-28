@@ -174,6 +174,16 @@ namespace Airerage.Core.Simulation
             {
                 return;
             }
+            StrikeWithBall(trap, position, velocity, states, configs);
+        }
+
+        /// <summary>
+        /// 位置 position・速度 velocity のピッチャーマシン trap のボールに重なった人を、弾き返すか（遅いボール）、吹き飛ばす（速いボール）。
+        /// THIEF が置いたピッチャーマシンのボールにも使う（ThiefRules）。
+        /// </summary>
+        public static void StrikeWithBall(StageTrap trap, Vector2 position, Vector2 velocity, List<CharacterState> states,
+            IReadOnlyList<CharacterConfig> configs)
+        {
             float speed = velocity.Length();
             bool fast = speed >= trap.MinHitSpeed && speed > 0f;
             for (int c = 0; c < states.Count; c++)
@@ -212,6 +222,12 @@ namespace Airerage.Core.Simulation
         private static bool Overlaps(Vector3 position, Vector2 half, Vector2 min, Vector2 max)
         {
             return position.X + half.X >= min.X && position.X - half.X <= max.X && position.Y + half.Y >= min.Y && position.Y - half.Y <= max.Y;
+        }
+
+        /// <summary>線分 from→to が箱 min〜max と交わるか（交われば、from から最初に入るまでの割合 along）。</summary>
+        public static bool SweptBox(Vector2 from, Vector2 to, Vector2 min, Vector2 max, out float along)
+        {
+            return Swept(from, to, min, max, out along);
         }
 
         // 線分 from→to が箱 min〜max と交わるか（交われば、from から最初に入るまでの割合 along）。

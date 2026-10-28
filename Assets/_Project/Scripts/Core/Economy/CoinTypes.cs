@@ -135,6 +135,9 @@ namespace Airerage.Core.Economy
 
         /// <summary>ステージの危険（溶岩流・つらら）に当たったドロップ（移動。所持 → フィールド。威力に応じた量）。</summary>
         HazardDrop = 12,
+
+        /// <summary>バンクハイストの詠唱で得たコイン（生成。→ 所持。THIEF の R）。</summary>
+        Heist = 13,
     }
 
     /// <summary>

@@ -3,6 +3,21 @@ using Airerage.Core.Input;
 
 namespace Airerage.Core.Combat
 {
+    /// <summary>タレントスナッチ（THIEF の Q）で奪ったものの種類。</summary>
+    public enum StealKind : byte
+    {
+        None,
+
+        /// <summary>ほかのキャラクターの Q（コピー。StealSource はキャラクターの番号）。</summary>
+        Skill,
+
+        /// <summary>ステージのギミック（StealSource は SimWorld.Zones の番号）。</summary>
+        Zone,
+
+        /// <summary>ステージの仕掛け（StealSource は SimWorld.Traps の番号）。</summary>
+        Trap,
+    }
+
     /// <summary>
     /// 戦闘のための、アクション状態とは別に続く値（docs/11_combat_plan.md T3-2、T3-3）。値だけで完結させる。
     /// HP はない（D-23）。ダメージはコインへの変換（Phase 4）と、コンボの表示に使う。
@@ -241,6 +256,38 @@ namespace Airerage.Core.Combat
         public int ShieldBlockCount;
 
         /// <summary>
+        /// タレントスナッチ（THIEF の Q。ユーザーの案、2026-10-28。ThiefRules）で奪ったもの（StealKind）と、その出どころ（技ならキャラクター
+        /// の番号、ギミックならステージのギミックの番号 SimWorld.Zones、仕掛けなら仕掛けの番号 SimWorld.Traps）。技を奪ったら、残りの回数
+        /// （StealUses）と、今使っている攻撃の番号（StealSerial。AttackSerial。0 なら使っていない）。
+        /// </summary>
+        public StealKind StealKind;
+        public int StealSource;
+        public int StealUses;
+        public int StealSerial;
+
+        /// <summary>弾が当たったときに撃っていたタレントスナッチの攻撃の番号（その攻撃が終わるまでは、奪ったものを使わない）と、奪った数（表示と効果音）。</summary>
+        public int StealFromSerial;
+        public int StealCount;
+
+        /// <summary>
+        /// ミスディレクション（THIEF の E）: 透明でいる残り（ティック）と、分身が残っている残り（ティック。分身は SimWorld.GetClone）。
+        /// ClonePopCount は分身が煙になって消えた数（表示と効果音）。
+        /// </summary>
+        public int InvisibleTicksLeft;
+        public int CloneTicksLeft;
+        public int ClonePopCount;
+
+        /// <summary>
+        /// バンクハイスト（THIEF の R）: 詠唱を始めてからのティック + 1（0 なら詠唱していない）、詠唱を始めたときの拠点の地点の番号、
+        /// 拠点の近くにいるか（R を出せる。ThiefRules がティックの終わりに決める）、詠唱を終えてコインを得た数と、最後に得た枚数（表示）。
+        /// </summary>
+        public int HeistTicks;
+        public int HeistSpot;
+        public bool NearBank;
+        public int HeistPayoutCount;
+        public int HeistLastPayout;
+
+        /// <summary>
         /// 試合から抜けた（ネットワーク対戦で切れた。入力の InputButtons.Leave で決まる。docs/15 T6-10）。抜けた人は見えず、その場から
         /// 動かず、何にも触れない（復帰を待つ間と同じ扱いが続く。IsWaitingToRespawn・IsUntouchable）。確定したコインは結果に残る。
         /// </summary>
@@ -322,7 +369,12 @@ namespace Airerage.Core.Combat
                 && StunKnockbackX.Equals(other.StunKnockbackX) && StunKnockbackY.Equals(other.StunKnockbackY)
                 && WaterTicksLeft == other.WaterTicksLeft && WaterFloatTicks == other.WaterFloatTicks && DrownTicks == other.DrownTicks
                 && SplashCount == other.SplashCount && CaptureTicks == other.CaptureTicks && CaptureZone == other.CaptureZone
-                && CaptureCount == other.CaptureCount;
+                && CaptureCount == other.CaptureCount && StealKind == other.StealKind && StealSource == other.StealSource
+                && StealUses == other.StealUses && StealSerial == other.StealSerial && StealFromSerial == other.StealFromSerial
+                && StealCount == other.StealCount && InvisibleTicksLeft == other.InvisibleTicksLeft
+                && CloneTicksLeft == other.CloneTicksLeft && ClonePopCount == other.ClonePopCount && HeistTicks == other.HeistTicks
+                && HeistSpot == other.HeistSpot && NearBank == other.NearBank && HeistPayoutCount == other.HeistPayoutCount
+                && HeistLastPayout == other.HeistLastPayout;
         }
 
         public override bool Equals(object obj)
@@ -346,14 +398,16 @@ namespace Airerage.Core.Combat
                         HashCode.Combine(HoldVariant, CreamSpeedPercent, CreamWallJumpPercent, CreamNoCling, CreamStickTicksLeft, CreamStickSpent),
                         HashCode.Combine(ChainCount, ChainTicksLeft, InverterOn, StunTicksLeft, StunGuardTicks, StunCount, WhipGuardTicks,
                             HashCode.Combine(ShieldBlockCount, HasLeft, WaveCooldownTicks, HasStunKnockback, StunKnockbackX, StunKnockbackY,
-                                HashCode.Combine(WaterTicksLeft, WaterFloatTicks, DrownTicks, SplashCount, CaptureTicks, CaptureZone, CaptureCount))))));
+                                HashCode.Combine(WaterTicksLeft, WaterFloatTicks, DrownTicks, SplashCount, CaptureTicks, CaptureZone, CaptureCount,
+                                    HashCode.Combine(StealKind, StealSource, StealUses, StealSerial, InvisibleTicksLeft, CloneTicksLeft, ClonePopCount,
+                                        HashCode.Combine(HeistTicks, HeistSpot, NearBank, HeistPayoutCount, HeistLastPayout, StealFromSerial, StealCount))))))));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} capture={CaptureTicks}@{CaptureZone}({CaptureCount}) shield={ShieldBlockCount}{(HasLeft ? " left" : "")}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} capture={CaptureTicks}@{CaptureZone}({CaptureCount}) shield={ShieldBlockCount}{(HasLeft ? " left" : "")} steal={StealKind}:{StealSource}x{StealUses}@{StealSerial}/{StealFromSerial}({StealCount}) invisible={InvisibleTicksLeft} clone={CloneTicksLeft}({ClonePopCount}) heist={HeistTicks}@{HeistSpot}{(NearBank ? " nearBank" : "")}({HeistPayoutCount},{HeistLastPayout})";
         }
     }
 }

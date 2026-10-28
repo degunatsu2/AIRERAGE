@@ -84,6 +84,8 @@ namespace Airerage.Core.Simulation
             {
                 state.Combat.FrozenTicksLeft = 0;
                 state.Combat.CreamStickTicksLeft = 0;
+                // バンクハイストの詠唱は、のけぞったら止まる（コインは得ない。ユーザーの回答、2026-10-28）。
+                state.Combat.HeistTicks = 0;
                 if (!state.Combat.HasStunKnockback)
                 {
                     state.Combat.StunTicksLeft = 0;
@@ -101,6 +103,8 @@ namespace Airerage.Core.Simulation
             bool stuck = state.Combat.CreamStickTicksLeft > 0;
             bool stunned = state.Combat.StunTicksLeft > 0;
             bool drowning = state.Combat.DrownTicks > 0;
+            // バンクハイストの詠唱の間は、その場で止まって入力を受け付けない（もう一度の R は ThiefRules が押したボタンから調べる）。
+            bool chanting = state.Combat.HeistTicks > 0;
             if (stunned)
             {
                 state.Combat.StunTicksLeft--;
@@ -113,7 +117,7 @@ namespace Airerage.Core.Simulation
             {
                 state.Combat.CreamStickTicksLeft--;
             }
-            if (frozen || stuck || stunned || drowning)
+            if (frozen || stuck || stunned || drowning || chanting)
             {
                 effectiveInput = default;
                 frame = new InputFrame(default, state.PreviousButtons);
@@ -192,6 +196,11 @@ namespace Airerage.Core.Simulation
                     state.Combat.HasStunKnockback = false;
                     state.Grounded = false;
                 }
+            }
+            else if (chanting)
+            {
+                // 詠唱: 重力も受けず、その場にとどまる。
+                state.Velocity = System.Numerics.Vector3.Zero;
             }
             else if (stuck)
             {

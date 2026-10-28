@@ -31,6 +31,7 @@ namespace Airerage.Core.Tests.Docs
             (CharacterPresets.SpaceTravelerName, CharacterPresets.SpaceTraveler),
             (CharacterPresets.PastryChefName, CharacterPresets.PastryChef),
             (CharacterPresets.SoldererName, CharacterPresets.Solderer),
+            (CharacterPresets.ThiefName, CharacterPresets.Thief),
         };
 
         private static readonly (AttackSlot Slot, string Label)[] Slots =
@@ -225,6 +226,14 @@ namespace Airerage.Core.Tests.Docs
                     hit = skills.Inverter.WhipHit;
                     label = "鞭";
                     return true;
+                case SkillEffect.SmokeBall:
+                    hit = skills.Thief.SmokeHit;
+                    label = "煙球の着弾";
+                    return true;
+                case SkillEffect.TalentSnatch:
+                case SkillEffect.PlaceGimmick:
+                case SkillEffect.Misdirection:
+                case SkillEffect.BankHeist:
                 case SkillEffect.None:
                 case SkillEffect.MirrorBall:
                 case SkillEffect.Safe:
@@ -336,6 +345,11 @@ namespace Airerage.Core.Tests.Docs
             {
                 yield return "1 人には判定 1 つだけ当たる";
             }
+            AttackHit lone = entries.Select(e => e.Hit).FirstOrDefault(h => h.LoneFatal);
+            if (lone != null)
+            {
+                yield return $"前の判定をどれも当てずに最後の判定だけを当てると FATAL（威力 {lone.LoneFatalDamage}、吹き飛び ×{Num(lone.LoneFatalKnockbackScale)}）";
+            }
             if (entries.Any(e => e.Hit.Critical))
             {
                 yield return $"指先は相手の中心から {Num(combat.CriticalCenterRadius)}m 以内に重なったときだけ当たり、FATAL";
@@ -438,6 +452,22 @@ namespace Airerage.Core.Tests.Docs
                     BallLightningTuning ball = s.BallLightning;
                     return $"電気の球 {ball.Count} 個を {ball.IntervalTicks}F ごとに、放つ瞬間の照準の方向へ（{Num(ball.Speed)} m/s、半径 {Num(ball.Radius)}m。" +
                         $"{Num(ball.TravelDistance)}m で止まり {Seconds(ball.TrapTicks)}残る。当たったら消える）";
+                case SkillEffect.SmokeBall:
+                    ThiefTuning smoke = s.Thief;
+                    return $"真下へ煙球を投げる（{Num(smoke.SmokeBallSpeed)} m/s）。着弾すると半径 {Num(smoke.ExplosionRadius)}m を攻撃し、半径 {Num(smoke.SmokeRadius)}m の煙を " +
+                        $"{Seconds(smoke.SmokeTicks)}（中の物が見えない。見た目だけ）";
+                case SkillEffect.TalentSnatch:
+                    ThiefTuning snatch = s.Thief;
+                    return $"照準の方向へ弾（{Num(snatch.SnatchSpeed)} m/s、{Num(snatch.SnatchRange)}m。威力・吹き飛びなし）。当たった人の Q をコピー（相手はそのまま使える）、" +
+                        $"ステージのギミック・仕掛けに当てると奪う。もう一度 Q で使う・目の前に置く（{snatch.MaxPlaced} つまで）。使うか外れると、クールタイム";
+                case SkillEffect.PlaceGimmick:
+                    return "奪ったギミック・仕掛けを照準の方向の目の前に置く";
+                case SkillEffect.Misdirection:
+                    return $"分身を残して {Seconds(s.Thief.MisdirectionTicks)}透明になる（R 以外の行動・もう一度 E で解ける。分身は攻撃が当たると煙になって消える）";
+                case SkillEffect.BankHeist:
+                    ThiefTuning heist = s.Thief;
+                    return $"拠点の中心から {Num(heist.HeistRange)}m 以内で、その場で詠唱。もう一度 R で止めると、1 秒 {heist.HeistCoinsPerSecond} 枚 ＋ 5 秒ごとに " +
+                        $"{heist.HeistBonusPerFive} 枚 ＋ 10 秒ごとに {heist.HeistBonusPerTen} 枚（10 秒で {heist.HeistCoins(600)} 枚）。拠点が移ると止まって得る。のけぞると得ない";
                 default:
                     throw new InvalidOperationException($"性能表に効果 {effect} の書き方がない（MoveTable.EffectNote）");
             }
