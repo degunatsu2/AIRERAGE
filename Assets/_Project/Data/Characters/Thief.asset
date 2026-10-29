@@ -15,12 +15,14 @@ MonoBehaviour:
   _config:
     Movement:
       RunSpeed: 8
+      AirRunSpeed: 0
       GroundAcceleration: 80
       AirAcceleration: 30
       AirDrag: 2
       Gravity: 30
       MaxFallSpeed: 20
       JumpSpeed: 12
+      JumpStartupTicks: 0
       AirJumps: 1
       CoyoteTicks: 6
       JumpBufferTicks: 6
@@ -86,6 +88,12 @@ MonoBehaviour:
         Run: 0
         SpinPerHit: 0
         Flip: 0
+        Mobile: 0
+        HeldSustain: 0
+        SustainRiseFromTicks: 0
+        SustainMaxTicks: 0
+        SustainRiseSpeed: 0
+        RehitTicks: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -120,6 +128,12 @@ MonoBehaviour:
         Run: 0
         SpinPerHit: 0
         Flip: 1
+        Mobile: 0
+        HeldSustain: 0
+        SustainRiseFromTicks: 0
+        SustainMaxTicks: 0
+        SustainRiseSpeed: 0
+        RehitTicks: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -158,6 +172,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 7
           ActiveTicks: 3
           UntilEnd: 0
@@ -179,6 +195,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 10
           ActiveTicks: 3
           UntilEnd: 0
@@ -200,6 +218,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 13
           ActiveTicks: 3
           UntilEnd: 0
@@ -221,6 +241,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         Motions: []
       AirSide:
         Name: UPRIGHT SLASH
@@ -231,6 +253,12 @@ MonoBehaviour:
         Run: 0
         SpinPerHit: 0
         Flip: 0
+        Mobile: 0
+        HeldSustain: 0
+        SustainRiseFromTicks: 0
+        SustainMaxTicks: 0
+        SustainRiseSpeed: 0
+        RehitTicks: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -269,6 +297,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 12
           ActiveTicks: 2
           UntilEnd: 0
@@ -290,6 +320,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 14
           ActiveTicks: 2
           UntilEnd: 0
@@ -311,6 +343,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         Motions: []
       AirUp:
         Name: FIVE STABS
@@ -321,6 +355,12 @@ MonoBehaviour:
         Run: 0
         SpinPerHit: 0
         Flip: 0
+        Mobile: 0
+        HeldSustain: 0
+        SustainRiseFromTicks: 0
+        SustainMaxTicks: 0
+        SustainRiseSpeed: 0
+        RehitTicks: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -359,6 +399,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 8
           ActiveTicks: 2
           UntilEnd: 0
@@ -380,6 +422,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 11
           ActiveTicks: 2
           UntilEnd: 0
@@ -401,6 +445,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 14
           ActiveTicks: 2
           UntilEnd: 0
@@ -422,6 +468,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 17
           ActiveTicks: 2
           UntilEnd: 0
@@ -443,6 +491,8 @@ MonoBehaviour:
           LoneFatalDamage: 80
           LoneFatalKnockbackScale: 2.2
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         Motions: []
       AirDown:
         Name: LOW SWEEP
@@ -453,6 +503,12 @@ MonoBehaviour:
         Run: 0
         SpinPerHit: 0
         Flip: 0
+        Mobile: 0
+        HeldSustain: 0
+        SustainRiseFromTicks: 0
+        SustainMaxTicks: 0
+        SustainRiseSpeed: 0
+        RehitTicks: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -491,6 +547,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 12
           ActiveTicks: 2
           UntilEnd: 0
@@ -512,6 +570,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         - StartTick: 14
           ActiveTicks: 2
           UntilEnd: 0
@@ -533,6 +593,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         Motions: []
       Special1:
         Name: TALENT SNATCH
@@ -543,6 +605,12 @@ MonoBehaviour:
         Run: 0
         SpinPerHit: 0
         Flip: 0
+        Mobile: 0
+        HeldSustain: 0
+        SustainRiseFromTicks: 0
+        SustainMaxTicks: 0
+        SustainRiseSpeed: 0
+        RehitTicks: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -573,6 +641,12 @@ MonoBehaviour:
         Run: 0
         SpinPerHit: 0
         Flip: 0
+        Mobile: 0
+        HeldSustain: 0
+        SustainRiseFromTicks: 0
+        SustainMaxTicks: 0
+        SustainRiseSpeed: 0
+        RehitTicks: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -608,6 +682,12 @@ MonoBehaviour:
         Run: 0
         SpinPerHit: 0
         Flip: 0
+        Mobile: 0
+        HeldSustain: 0
+        SustainRiseFromTicks: 0
+        SustainMaxTicks: 0
+        SustainRiseSpeed: 0
+        RehitTicks: 0
         ChargeLevels: []
         Roulette: 0
         ChargedFromTicks: 0
@@ -647,6 +727,8 @@ MonoBehaviour:
       GuardTicks: 30
       JustGuardTicks: 6
       GuardCooldownTicks: 120
+      GuardHoldMaxTicks: 0
+      GuardWalk: 0
       GuardStunTicks: 12
       GuardKnockbackScale: 0.4
       ParriedStunTicks: 30
@@ -709,6 +791,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         HeldCoinsPerBonusPercent: 0
         MaxHeldCoinBonusPercent: 0
       Run:
@@ -773,6 +857,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
       Beam:
         HalfWidth: 0.75
         IntervalTicks: 10
@@ -799,6 +885,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
       SlowFall:
         MaxFallSpeed: 3
       CottonCandy:
@@ -863,6 +951,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
       Scale:
         OffsetY: -1.2
         Gravity: 32
@@ -896,6 +986,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
       Inverter:
         RangeScale: 0.33333334
         WhipHalfThickness: 0.25
@@ -922,6 +1014,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         WaveSpeed: 36
         WaveRadius: 0.5
         StunTicks: 60
@@ -957,6 +1051,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 60
+          SweepTicks: 0
+          FatalScale: 0
       Thief:
         SmokeBallSpeed: 26
         SmokeBallRadius: 0.3
@@ -984,6 +1080,8 @@ MonoBehaviour:
           LoneFatalDamage: 0
           LoneFatalKnockbackScale: 1
           StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
         SmokeRadius: 2.6
         SmokeTicks: 300
         PuffRadius: 1.6
@@ -1007,6 +1105,12 @@ MonoBehaviour:
           Run: 0
           SpinPerHit: 0
           Flip: 0
+          Mobile: 0
+          HeldSustain: 0
+          SustainRiseFromTicks: 0
+          SustainMaxTicks: 0
+          SustainRiseSpeed: 0
+          RehitTicks: 0
           ChargeLevels: []
           Roulette: 0
           ChargedFromTicks: 0
@@ -1033,6 +1137,108 @@ MonoBehaviour:
         HeistCoinsPerSecond: 1
         HeistBonusPerFive: 20
         HeistBonusPerTen: 20
+      Juggernaut:
+        CannonSpeed: 24
+        CannonRadius: 0.35
+        CannonRange: 30
+        CannonOffsetX: 1.6
+        CannonOffsetY: 0.35
+        CannonHit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 10
+          Gauge: 80
+          HitstopTicks: 10
+          HitstunTicks: 24
+          KnockbackX: 11
+          KnockbackY: 6
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
+        FlakSpeeds:
+        - 14
+        - 20
+        - 26
+        - 33
+        FlakDefaultLevel: 2
+        FlakGravity: 22
+        FlakRadius: 0.35
+        FlakExplosionRadius: 2
+        FlakLifetimeTicks: 600
+        FlakMuzzleHeight: 0.6
+        FlakMuzzleDistance: 1.3
+        FlakHit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 30
+          Gauge: 100
+          HitstopTicks: 14
+          HitstunTicks: 34
+          KnockbackX: 15
+          KnockbackY: 16
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
+        MineSpeed: 22
+        MineRadius: 0.3
+        MineFlightTicks: 90
+        MineLaunchOffset: 1.1
+        MineExplosionRadius: 2.4
+        MineHit:
+          StartTick: 5
+          ActiveTicks: 3
+          UntilEnd: 0
+          OffsetX: 0.9
+          OffsetY: 0
+          HalfWidth: 0.6
+          HalfHeight: 0.6
+          Damage: 30
+          Gauge: 100
+          HitstopTicks: 14
+          HitstunTicks: 32
+          KnockbackX: 13
+          KnockbackY: 15
+          AngleDeg: 0
+          Critical: 0
+          CriticalScale: 1
+          Charge: 0
+          LoneFatal: 0
+          LoneFatalDamage: 0
+          LoneFatalKnockbackScale: 1
+          StunTicks: 0
+          SweepTicks: 0
+          FatalScale: 0
+        BlastTicks: 20
+        MaydayLiftTicks: 50
+        MaydaySelectTicks: 600
+        MaydayCarryTicks: 60
+        MaydayEdgeMargin: 3
+        MaydayDefaultHalfWidth: 64
+        MaydayDefaultHalfHeight: 40
   _displayName: THIEF
   _logo: {fileID: 2800000, guid: 4bf5c5e4b4cfcb0398385700f4992699, type: 2}
   _special1Icon: {fileID: 0}

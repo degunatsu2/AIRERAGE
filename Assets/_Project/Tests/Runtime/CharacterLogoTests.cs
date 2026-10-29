@@ -19,7 +19,7 @@ namespace Airerage.Runtime.Tests
         {
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(RosterPath);
             Assert.That(roster, Is.Not.Null, "キャラクターの一覧がない");
-            Assert.That(roster.Count, Is.EqualTo(7));
+            Assert.That(roster.Count, Is.EqualTo(8));
             for (int i = 0; i < roster.Count; i++)
             {
                 CharacterConfigAsset character = roster.Get(i);
@@ -72,6 +72,14 @@ namespace Airerage.Runtime.Tests
                     Assert.That(hue * 360f, Is.InRange(18f, 45f), $"{name} のロゴが茶色でない（{mean}）");
                     Assert.That(saturation, Is.InRange(0.2f, 0.7f), $"{name} のロゴが茶色と銀でない（{mean}）");
                     Assert.That(value, Is.GreaterThan(0.7f), $"{name} のロゴが暗い（{mean}）");
+                    continue;
+                }
+                else if (name == CharacterPresets.JuggernautName)
+                {
+                    // 苔色の大砲（苔色は暗めなので、明るさの下限を下げる）。
+                    Assert.That(hue * 360f, Is.InRange(70f, 100f), $"{name} のロゴが苔色でない（{mean}）");
+                    Assert.That(saturation, Is.InRange(0.35f, 0.7f), $"{name} のロゴが苔色でない（{mean}）");
+                    Assert.That(value, Is.GreaterThan(0.55f), $"{name} のロゴが暗い（{mean}）");
                     continue;
                 }
                 else

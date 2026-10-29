@@ -31,7 +31,7 @@ namespace Airerage.Core.Combat
                 CharacterState state = states[i];
                 // 溺れて沈み続けた人も撃破（水の底に地形があって、撃破の線まで沈めないとき）。
                 bool drowned = state.Combat.DrownTicks >= StageZones.DrownKnockoutTicks;
-                if (state.Combat.IsWaitingToRespawn || (bounds.Contains(state.Position) && !drowned))
+                if (state.Combat.IsWaitingToRespawn || state.Combat.IsAway || (bounds.Contains(state.Position) && !drowned))
                 {
                     continue;
                 }
@@ -85,6 +85,11 @@ namespace Airerage.Core.Combat
             respawned.BoostRingCount = state.BoostRingCount;
             respawned.Combat.SplashCount = state.Combat.SplashCount;
             respawned.Combat.CaptureCount = state.Combat.CaptureCount;
+            // JUGGERNAUT: フラックの弾道の段階は、その試合の間は覚えておく（ユーザーの案、2026-10-29）。表示が数える回数も引き継ぐ。
+            respawned.Combat.FlakLevelShift = state.Combat.FlakLevelShift;
+            respawned.Combat.FlakShotCount = state.Combat.FlakShotCount;
+            respawned.Combat.MineBlastCount = state.Combat.MineBlastCount;
+            respawned.Combat.MaydayRejectCount = state.Combat.MaydayRejectCount;
             // コインはここではなくさない（撃破ドロップは CoinDropRules が、台帳を通して落とす。T4-6）。
             respawned.Coins = state.Coins;
             // 撃破で終わったコンボのダメージ報酬は、このティックの後で CombatRewardRules が払う（T4-5）。

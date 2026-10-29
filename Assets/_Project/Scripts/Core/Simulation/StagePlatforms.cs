@@ -47,7 +47,8 @@ namespace Airerage.Core.Simulation
             for (int c = 0; c < states.Count; c++)
             {
                 CharacterState state = states[c];
-                if (state.Combat.IsWaitingToRespawn)
+                // メーデーで吊られている人（JUGGERNAUT の R）は、その場にいないので運ばない。
+                if (state.Combat.IsWaitingToRespawn || state.Combat.IsAway)
                 {
                     continue;
                 }
@@ -228,7 +229,7 @@ namespace Airerage.Core.Simulation
             for (int c = 0; c < states.Count; c++)
             {
                 CharacterState state = states[c];
-                if (state.Combat.IsWaitingToRespawn)
+                if (state.Combat.IsWaitingToRespawn || state.Combat.IsAway)
                 {
                     continue;
                 }

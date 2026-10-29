@@ -223,7 +223,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState state = states[v];
-                if (state.Combat.IsWaitingToRespawn)
+                if (state.Combat.IsWaitingToRespawn || state.Combat.IsAway)
                 {
                     continue;
                 }

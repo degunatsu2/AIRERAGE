@@ -17,7 +17,7 @@ namespace Airerage.Core.Tests.Ai
     /// <summary>
     /// CPU の技の使い分け（docs/16 T7-4）: 技のデータから使い時と押し方を決める（CpuSkills）。撃つ技は相手が見えるときだけ、
     /// 落ちそうなときの技（わたがし・ワープ）、長押しの間に押すボタン（抹茶）、切り替え（インバータ）、動きで届く技（イナズマステップ）、
-    /// 試合で 7 体それぞれが技を使う。
+    /// 試合で 8 体それぞれが技を使う。
     /// </summary>
     public class CpuSkillsTests
     {
@@ -171,6 +171,7 @@ namespace Airerage.Core.Tests.Ai
         [TestCase(CharacterPresets.PastryChefName)]
         [TestCase(CharacterPresets.SoldererName)]
         [TestCase(CharacterPresets.ThiefName)]
+        [TestCase(CharacterPresets.JuggernautName)]
         public void InAMatch_EachCharacterUsesItsSkills(string name)
         {
             // 撃破の範囲とコインと拠点のある遊び場で、そのキャラクターの CPU（HARD）と STANDARD の CPU 3 体が 1 分半遊ぶ。
@@ -222,6 +223,7 @@ namespace Airerage.Core.Tests.Ai
                 case CharacterPresets.PastryChefName: return CharacterPresets.PastryChef();
                 case CharacterPresets.SoldererName: return CharacterPresets.Solderer();
                 case CharacterPresets.ThiefName: return CharacterPresets.Thief();
+                case CharacterPresets.JuggernautName: return CharacterPresets.Juggernaut();
                 default: return CharacterPresets.Standard();
             }
         }

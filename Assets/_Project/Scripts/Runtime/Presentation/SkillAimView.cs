@@ -109,6 +109,9 @@ namespace Airerage.Runtime.Presentation
                 case SkillEffect.WindZone:
                     reach = config.Skills.WindZone.Length;
                     break;
+                case SkillEffect.Mine:
+                    reach = config.Skills.Juggernaut.MineRange;
+                    break;
                 case SkillEffect.PlaceGimmick:
                     reach = config.Movement.HalfWidth + config.Skills.Thief.PlaceGap + 2f;
                     break;

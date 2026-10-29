@@ -1,5 +1,7 @@
 using Airerage.Core.Combat;
+using Airerage.Core.Movement;
 using Airerage.Core.Skills;
+using Airerage.Core.Wire;
 
 namespace Airerage.Core.Simulation
 {
@@ -17,6 +19,7 @@ namespace Airerage.Core.Simulation
         public const string PastryChefName = "PASTRY CHEF";
         public const string SoldererName = "SOLDERER";
         public const string ThiefName = "THIEF";
+        public const string JuggernautName = "JUGGERNAUT";
 
         /// <summary>STANDARD（基準のキャラクター。DASH・RISE・BURST）。</summary>
         public static CharacterConfig Standard()
@@ -942,6 +945,202 @@ namespace Airerage.Core.Simulation
                 },
             };
             combat.SuperGaugeCost = 80 * CombatTuning.GaugePerPercent;
+            return config;
+        }
+
+        /// <summary>
+        /// JUGGERNAUT（docs/14 1.7。ユーザーの案、2026-10-29）。苔色の戦車。地上で強く、空中では鈍い（#地上戦 #鈍重）。
+        /// - 体: ふつうより大きい（見た目と当たり）。地上の速さ +50%、空中とワイヤーの間の速さ -50%、ワイヤーの射程 1.5 倍。ジャンプは
+        ///   発生が遅く、跳ぶ高さが半分（速さ 1/√2。ユーザーの回答、2026-10-29）。ガードのクールタイム 2 倍、押し続けると 4 秒まで延び、
+        ///   地上ならガードしながらふだんの速さで歩ける（ユーザーの回答）。
+        /// - 地上技（撃破技）TURRET SPIN: 回って、体に判定。回りながら左右に動ける。押し続けると回り続け、とてもゆっくり上がる（離すと
+        ///   終わる）。回る砲塔の先が当たると FATAL で、威力と吹き飛びが 2 倍。
+        /// - 空中 N HULL ROLL: ゆっくり縦に回り、体に判定。空中上 SKY BURST: 頭上で爆発（上向きの判定。反動で少し下がる）。空中横 CANNON SHOT:
+        ///   前へ重力を受けない砲弾（威力 10）を撃ち、反動で後ろへ下がる。空中下 GROUND BURST: 足もとで爆発（下向きの判定。反動で少し
+        ///   上がる）。どれも発生が遅く、後隙が長い。
+        /// - Q FLAK: 地上で構えて、構えている間に Q で重力のある砲弾を照準の方向へ撃つ（爆発。威力 30・強い吹き飛び）。3 回まで、1 回分は
+        ///   4 秒で戻る。上下で弾道を弱・中・強・弩に（初めは強。試合の間覚えておく）。
+        /// - E MINE TRAP: 照準の方向へ地雷を撃ち、地形かキャラクターに張り付く。もう一度 E で爆発（威力 30）。クールタイム 10 秒（爆発の後から）。
+        /// - R MAYDAY: ジェット機で飛び去り、ステージ全体から空いた場所を選んで運ばれる（その間は無敵。10 秒で元の場所へ）。ゲージ 100%。
+        /// 技の規則は JuggernautRules、技の値は SkillTuning.Juggernaut。
+        /// </summary>
+        public static CharacterConfig Juggernaut()
+        {
+            var config = new CharacterConfig();
+            MovementTuning movement = config.Movement;
+            float baseRun = movement.RunSpeed;
+            movement.HalfWidth = 0.75f;
+            movement.HalfHeight = 0.95f;
+            movement.RunSpeed = baseRun * 1.5f;
+            movement.AirRunSpeed = baseRun * 0.5f;
+            // 跳ぶ高さは速さの 2 乗に比例するので、高さを半分にするには速さを 1/√2 にする。
+            movement.JumpSpeed *= 0.7071f;
+            movement.WallJumpSpeedY *= 0.7071f;
+            movement.JumpStartupTicks = 8;
+
+            WireTuning wire = config.Wire;
+            wire.MaxLength *= 1.5f;
+            wire.MaxAttachedSpeed *= 0.5f;
+            wire.ExitSpeedCap *= 0.5f;
+            wire.Inertial.StartPullSpeed *= 0.5f;
+            wire.Inertial.ReelSpeed *= 0.5f;
+            wire.Inertial.ReelOutSpeed *= 0.5f;
+            wire.Inertial.SwingAcceleration *= 0.5f;
+            wire.Inertial.HoldSwingAcceleration *= 0.5f;
+            wire.Responsive.PullSpeed *= 0.5f;
+            wire.Responsive.SteerSpeed *= 0.5f;
+
+            CombatTuning combat = config.Combat;
+            combat.GuardCooldownTicks *= 2;
+            combat.GuardHoldMaxTicks = 240;
+            combat.GuardWalk = true;
+
+            float side = movement.HalfWidth;
+            float head = movement.HalfHeight;
+            combat.Ground = new AttackData
+            {
+                Name = "TURRET SPIN",
+                TotalTicks = 40,
+                WireCancelFromTick = 20,
+                Mobile = true,
+                HeldSustain = true,
+                SustainRiseFromTicks = 40,
+                SustainMaxTicks = 300,
+                SustainRiseSpeed = 1.2f,
+                ExclusiveHits = true,
+                RehitTicks = 20,
+                Hits = new[]
+                {
+                    // 砲塔の先（1 周 20 ティックで前と後ろを行き来する）。当たれば FATAL で 2 倍。体の判定より先に並べる。
+                    new AttackHit
+                    {
+                        StartTick = 4, UntilEnd = true, OffsetX = side + 0.8f, OffsetY = 0.35f, HalfWidth = 0.35f, HalfHeight = 0.35f,
+                        SweepTicks = 20, FatalScale = 2f,
+                        Damage = 6, Gauge = 120, HitstopTicks = 12, HitstunTicks = 30, KnockbackX = 12f, KnockbackY = 10f,
+                    },
+                    // 回っている体。
+                    new AttackHit
+                    {
+                        StartTick = 4, UntilEnd = true, OffsetX = 0f, OffsetY = 0f, HalfWidth = side + 0.2f, HalfHeight = head + 0.1f,
+                        Damage = 3, Gauge = 50, HitstopTicks = 8, HitstunTicks = 20, KnockbackX = 7f, KnockbackY = 6f,
+                    },
+                },
+            };
+            combat.KoAttack = AttackSlot.Ground;
+
+            combat.AirNeutral = new AttackData
+            {
+                Name = "HULL ROLL",
+                TotalTicks = 52,
+                WireCancelFromTick = 34,
+                Flip = true,
+                Hits = new[]
+                {
+                    // ゆっくり縦に回る体。
+                    new AttackHit
+                    {
+                        StartTick = 14, ActiveTicks = 18, OffsetX = 0f, OffsetY = 0f, HalfWidth = side + 0.45f, HalfHeight = head + 0.3f,
+                        Damage = 6, Gauge = 90, HitstopTicks = 12, HitstunTicks = 26, KnockbackX = 6f, KnockbackY = 10f,
+                    },
+                },
+            };
+
+            combat.AirUp = new AttackData
+            {
+                Name = "SKY BURST",
+                TotalTicks = 54,
+                WireCancelFromTick = 34,
+                Hits = new[]
+                {
+                    // 頭上の爆発（上向き）。
+                    new AttackHit
+                    {
+                        StartTick = 16, ActiveTicks = 4, OffsetX = 0f, OffsetY = head + 1f, HalfWidth = 1.4f, HalfHeight = 1f,
+                        Damage = 9, Gauge = 110, HitstopTicks = 14, HitstunTicks = 30, KnockbackX = 3f, KnockbackY = 17f,
+                    },
+                },
+                Motions = new[]
+                {
+                    // 反動で少し下がる。
+                    new AttackMotion { StartTick = 16, Ticks = 1, VelocityX = 0f, VelocityY = -6f },
+                },
+            };
+
+            combat.AirSide = new AttackData
+            {
+                Name = "CANNON SHOT",
+                TotalTicks = 50,
+                WireCancelFromTick = 32,
+                Effect = SkillEffect.Cannon,
+                EffectTick = 16,
+                Hits = new AttackHit[0],
+                Motions = new[]
+                {
+                    // 撃った反動で後ろへ下がる。
+                    new AttackMotion { StartTick = 16, Ticks = 1, VelocityX = -8f, VelocityY = 2f },
+                },
+            };
+
+            combat.AirDown = new AttackData
+            {
+                Name = "GROUND BURST",
+                TotalTicks = 54,
+                WireCancelFromTick = 34,
+                Hits = new[]
+                {
+                    // 足もとの爆発（下向き）。
+                    new AttackHit
+                    {
+                        StartTick = 16, ActiveTicks = 4, OffsetX = 0f, OffsetY = -(head + 1f), HalfWidth = 1.4f, HalfHeight = 1f,
+                        Damage = 9, Gauge = 110, HitstopTicks = 14, HitstunTicks = 30, KnockbackX = 3f, KnockbackY = -16f,
+                    },
+                },
+                Motions = new[]
+                {
+                    // 反動で少し上がる。
+                    new AttackMotion { StartTick = 16, Ticks = 1, VelocityX = 0f, VelocityY = 8f },
+                },
+            };
+
+            combat.Special1 = new AttackData
+            {
+                Name = "FLAK",
+                TotalTicks = 20,
+                WireCancelFromTick = 20,
+                Effect = SkillEffect.Flak,
+                EffectTick = 4,
+                Hits = new AttackHit[0],
+            };
+            combat.Special1CooldownTicks = 240;
+            combat.Special1MaxCharges = 3;
+
+            combat.Special2 = new AttackData
+            {
+                Name = "MINE TRAP",
+                TotalTicks = 18,
+                WireCancelFromTick = 8,
+                Effect = SkillEffect.Mine,
+                EffectTick = 4,
+                AimHold = true,
+                Hits = new AttackHit[0],
+            };
+            combat.Special2CooldownTicks = 600;
+
+            combat.Super = new AttackData
+            {
+                Name = "MAYDAY",
+                TotalTicks = 21,
+                WireCancelFromTick = 21,
+                Effect = SkillEffect.Mayday,
+                EffectTick = 20,
+                Hits = new AttackHit[0],
+                Motions = new[]
+                {
+                    // ジェット機が来るまで、その場で待つ。
+                    new AttackMotion { StartTick = 0, Ticks = 21, VelocityX = 0f, VelocityY = 0f },
+                },
+            };
+            combat.SuperGaugeCost = 100 * CombatTuning.GaugePerPercent;
             return config;
         }
 

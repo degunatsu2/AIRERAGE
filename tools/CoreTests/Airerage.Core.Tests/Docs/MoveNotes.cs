@@ -69,6 +69,14 @@ namespace Airerage.Core.Tests.Docs
             [Key(CharacterPresets.ThiefName, AttackSlot.Special1)] = "タレントスナッチ",
             [Key(CharacterPresets.ThiefName, AttackSlot.Special2)] = "ミスディレクション",
             [Key(CharacterPresets.ThiefName, AttackSlot.Super)] = "バンクハイスト",
+            [Key(CharacterPresets.JuggernautName, AttackSlot.Ground)] = "その場で回り、回る体と砲塔の先に判定",
+            [Key(CharacterPresets.JuggernautName, AttackSlot.AirNeutral)] = "ゆっくり縦に回り、体に判定",
+            [Key(CharacterPresets.JuggernautName, AttackSlot.AirSide)] = "前へ砲弾を撃ち、反動で後ろへ下がる",
+            [Key(CharacterPresets.JuggernautName, AttackSlot.AirUp)] = "頭上で爆発（上向き）。反動で少し下がる",
+            [Key(CharacterPresets.JuggernautName, AttackSlot.AirDown)] = "足もとで爆発（下向き）。反動で少し上がる",
+            [Key(CharacterPresets.JuggernautName, AttackSlot.Special1)] = "フラック",
+            [Key(CharacterPresets.JuggernautName, AttackSlot.Special2)] = "マイントラップ",
+            [Key(CharacterPresets.JuggernautName, AttackSlot.Super)] = "メーデー",
         };
 
         /// <summary>キャラクター character の技 slot の説明（なければ、名前のない技は「STANDARD と同じ技」）。</summary>

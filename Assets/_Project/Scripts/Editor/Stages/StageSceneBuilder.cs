@@ -359,6 +359,9 @@ namespace Airerage.Editor.Stages
                     return decor.Box("Sheet", parent, new Vector3(0f, -size.y * 0.5f + 0.03f, 0f), new Vector3(size.x, 0.06f, 4.1f), decor.Lit(kind, color));
                 case StageZoneKind.Updraft:
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, 1f), size, decor.Transparent(kind, WithAlpha(color, 0.12f)));
+                case StageZoneKind.Gust when IsSteadyDraft(zone):
+                    // いつも吹いている縦の風は、上昇気流と同じ見た目（StageZoneView も同じ筋を流す。ユーザーの要望、2026-10-29）。
+                    return decor.Quad("Column", parent, new Vector3(0f, 0f, 1f), size, decor.Transparent(kind + "Draft", WithAlpha(color, 0.12f)));
                 case StageZoneKind.Gust:
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, 1f), size, decor.Transparent(kind, WithAlpha(color, 0.14f)));
                 case StageZoneKind.LowGravity:
@@ -449,6 +452,13 @@ namespace Airerage.Editor.Stages
                 decor.Transparent("GeyserJet", WithAlpha(Color.Lerp(color, Color.white, 0.55f), 0.55f)));
             jet.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
             return jet;
+        }
+
+        // いつも吹いている縦の風（周期のない上下向きの風。水の流れは除く）か（StageZoneView.IsSteadyDraft と同じ決め方）。
+        private static bool IsSteadyDraft(ZoneSpec zone)
+        {
+            return zone.Kind == StageZoneKind.Gust && zone.PeriodSeconds <= 0f && zone.Look != StageZoneView.ZoneLook.Flow
+                && Mathf.Abs(zone.Direction.y) > Mathf.Abs(zone.Direction.x);
         }
 
         private static Color DefaultColor(StageZoneKind kind)

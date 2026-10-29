@@ -1,5 +1,7 @@
 using System;
 using Airerage.Core.Input;
+using Airerage.Core.Simulation;
+using Airerage.Core.Skills;
 using Airerage.Runtime.Settings;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -18,10 +20,15 @@ namespace Airerage.Runtime.Input
     /// シミュレーションが左スティックの方向で照準する。
     /// ローカル対戦（docs/15 T6-5）では、人ごとに機器を限った入力のアセット（InputActionAsset.devices）を渡す。
     /// オプションで変えたキーの割り当て（BindingSettings。docs/15 T6-9）は、作るときにアセットへ当てる。
+    /// メーデー（JUGGERNAUT の R）で場所を選んでいる間は、照準の代わりに選ぶ場所を入れる（UpdateTargeting。JuggernautRules.EncodeTarget）。
+    /// 場所は、マウスならポインターの位置、ゲームパッドならスティックで動かす大きなカーソル（ユーザーの案、2026-10-29）。
     /// </summary>
     public sealed class InputSystemAdapter : IDisposable
     {
         private const string MapName = "Player";
+
+        /// <summary>ゲームパッドでメーデーの場所を選ぶカーソルの速さ（m/s。スティックをいっぱいに倒したとき）【仮】。</summary>
+        public const float TargetCursorSpeed = 32f;
 
         private readonly InputActionMap _map;
         private readonly InputAction _move;
@@ -46,6 +53,11 @@ namespace Airerage.Runtime.Input
         private bool _hasPointer;
         private Vector2 _pointerWorld;
         private float _aimStickDeadzone;
+
+        // メーデーで場所を選んでいる間のカーソルと、選べる範囲。
+        private System.Numerics.Vector2 _cursor;
+        private System.Numerics.Vector2 _targetCenter;
+        private System.Numerics.Vector2 _targetHalf;
 
         public InputSystemAdapter(InputActionAsset actions)
         {
@@ -93,6 +105,27 @@ namespace Airerage.Runtime.Input
 
         /// <summary>マウスポインターで照準しているか（最後に使った機器がキーボードかマウス）。</summary>
         public bool UsingPointer { get; private set; }
+
+        /// <summary>メーデー（JUGGERNAUT の R）で場所を選んでいるか（UpdateTargeting で決める）。</summary>
+        public bool Targeting { get; private set; }
+
+        /// <summary>メーデーで選んでいる場所（ゲームプレイ平面の m。Targeting の間だけ意味がある）。</summary>
+        public System.Numerics.Vector2 TargetCursor => _cursor;
+
+        /// <summary>
+        /// 操作するキャラクターの状態 state を見て、メーデーで場所を選んでいる間は、入力の照準に場所を入れるようにする（毎フレーム、Poll の
+        /// 前に呼ぶ）。選び始めたときのカーソルは、吊られた場所。bounds は選べる範囲を決めるステージの範囲。
+        /// </summary>
+        public void UpdateTargeting(in CharacterState state, CharacterConfig config, StageBounds? bounds)
+        {
+            bool targeting = config != null && state.Combat.MaydayPhase == JuggernautRules.MaydaySelect;
+            if (targeting && !Targeting)
+            {
+                JuggernautRules.TargetArea(bounds, config.Skills.Juggernaut, out _targetCenter, out _targetHalf);
+                _cursor = ClampToArea(state.Combat.MaydayFrom);
+            }
+            Targeting = targeting;
+        }
 
         public void Enable()
         {
@@ -147,6 +180,38 @@ namespace Airerage.Runtime.Input
             UpdateActiveDevice();
             _hasPointer = UsingPointer && camera != null
                 && TryProjectToGameplayPlane(camera, _point.ReadValue<Vector2>(), out _pointerWorld);
+            if (Targeting)
+            {
+                MoveCursor();
+            }
+        }
+
+        // メーデーのカーソルを動かす: マウスならポインターの位置、ゲームパッドなら右スティック（倒していなければ左スティック）の向きへ。
+        private void MoveCursor()
+        {
+            if (_hasPointer)
+            {
+                _cursor = ClampToArea(new System.Numerics.Vector2(_pointerWorld.x, _pointerWorld.y));
+                return;
+            }
+            Vector2 stick = _aim.ReadValue<Vector2>();
+            if (stick.magnitude < _aimStickDeadzone)
+            {
+                stick = _move.ReadValue<Vector2>();
+            }
+            if (stick.sqrMagnitude > 1f)
+            {
+                stick.Normalize();
+            }
+            float step = TargetCursorSpeed * Time.unscaledDeltaTime;
+            _cursor = ClampToArea(_cursor + new System.Numerics.Vector2(stick.x, stick.y) * step);
+        }
+
+        private System.Numerics.Vector2 ClampToArea(System.Numerics.Vector2 point)
+        {
+            System.Numerics.Vector2 min = _targetCenter - _targetHalf;
+            System.Numerics.Vector2 max = _targetCenter + _targetHalf;
+            return System.Numerics.Vector2.Clamp(point, min, max);
         }
 
         /// <summary>
@@ -242,6 +307,11 @@ namespace Airerage.Runtime.Input
 
             Vector2 move = _move.ReadValue<Vector2>();
             SimInput input = SimInput.FromAxes(move.x, move.y, buttons);
+            if (Targeting)
+            {
+                // メーデーで場所を選んでいる: 照準に場所を入れる（スティックはカーソルを動かすのに使い、移動には使わない）。
+                return JuggernautRules.EncodeTarget(SimInput.FromAxes(0f, 0f, buttons), _cursor, _targetCenter, _targetHalf);
+            }
             if (_hasPointer)
             {
                 return input.WithAim(new System.Numerics.Vector2(_pointerWorld.x - position.X, _pointerWorld.y - position.Y));

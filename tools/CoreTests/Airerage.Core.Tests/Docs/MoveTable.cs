@@ -32,6 +32,7 @@ namespace Airerage.Core.Tests.Docs
             (CharacterPresets.PastryChefName, CharacterPresets.PastryChef),
             (CharacterPresets.SoldererName, CharacterPresets.Solderer),
             (CharacterPresets.ThiefName, CharacterPresets.Thief),
+            (CharacterPresets.JuggernautName, CharacterPresets.Juggernaut),
         };
 
         private static readonly (AttackSlot Slot, string Label)[] Slots =
@@ -119,7 +120,21 @@ namespace Airerage.Core.Tests.Docs
         {
             CombatTuning combat = config.Combat;
             text.Append("## ").Append(name).Append("\n\n");
-            text.Append($"必殺技に必要なゲージ {Percent(combat.SuperGaugeCost)}。撃破技（★）は {LabelOf(combat.KoAttack)}。\n\n");
+            text.Append($"必殺技に必要なゲージ {Percent(combat.SuperGaugeCost)}。撃破技（★）は {LabelOf(combat.KoAttack)}。");
+            if (combat.GuardHoldMaxTicks > 0 || combat.GuardWalk)
+            {
+                text.Append($"ガードはクールタイム {Seconds(combat.GuardCooldownTicks)}");
+                if (combat.GuardHoldMaxTicks > 0)
+                {
+                    text.Append($"、押し続けると最大 {Seconds(combat.GuardHoldMaxTicks)}");
+                }
+                if (combat.GuardWalk)
+                {
+                    text.Append("、地上ならガードしながら歩ける");
+                }
+                text.Append('。');
+            }
+            text.Append("\n\n");
             text.Append("| 枠 | 技 | 威力 | 吹き飛び（横・縦） | ゲージ | 発生 | 持続 | 後隙 | 全体 | のけぞり | 備考 |\n");
             text.Append("|---|---|---|---|---|---|---|---|---|---|---|\n");
             foreach ((AttackSlot slot, string label) in Slots)
@@ -157,7 +172,7 @@ namespace Airerage.Core.Tests.Docs
                 Join(entries, e => $"{Num(e.Hit.KnockbackX)}・{Num(e.Hit.KnockbackY)}"),
                 Join(entries, e => Percent(e.Hit.Gauge)),
                 Join(entries, e => e.Startup.ToString(Invariant)),
-                Join(entries, e => e.FromObject ? "—" : e.Hit.UntilEnd ? "走る間" : e.Hit.ActiveTicks.ToString(Invariant)),
+                Join(entries, e => e.FromObject ? "—" : e.Hit.UntilEnd ? (attack.HeldSustain ? "技の間" : "走る間") : e.Hit.ActiveTicks.ToString(Invariant)),
                 RecoveryText(attack, entries, charge),
                 TotalText(attack, charge),
                 Join(entries, e => e.Hit.HitstunTicks.ToString(Invariant)),
@@ -182,7 +197,8 @@ namespace Airerage.Core.Tests.Docs
             {
                 if (attack.Uses(hit.Charge, charge))
                 {
-                    entries.Add(new Entry { Hit = hit, Label = hit.Critical ? "指先" : null, Startup = hit.StartTick + 1 });
+                    string label = hit.Critical ? "指先" : hit.FatalScale > 0f ? "砲塔の先" : null;
+                    entries.Add(new Entry { Hit = hit, Label = label, Startup = hit.StartTick + 1 });
                 }
             }
             if (TryEffectHit(attack, config, out AttackHit effectHit, out string effectLabel))
@@ -230,6 +246,19 @@ namespace Airerage.Core.Tests.Docs
                     hit = skills.Thief.SmokeHit;
                     label = "煙球の着弾";
                     return true;
+                case SkillEffect.Cannon:
+                    hit = skills.Juggernaut.CannonHit;
+                    label = "砲弾";
+                    return true;
+                case SkillEffect.Flak:
+                    hit = skills.Juggernaut.FlakHit;
+                    label = "砲弾の爆発";
+                    return true;
+                case SkillEffect.Mine:
+                    hit = skills.Juggernaut.MineHit;
+                    label = "地雷の爆発";
+                    return true;
+                case SkillEffect.Mayday:
                 case SkillEffect.TalentSnatch:
                 case SkillEffect.PlaceGimmick:
                 case SkillEffect.Misdirection:
@@ -285,6 +314,10 @@ namespace Airerage.Core.Tests.Docs
 
         private static string TotalText(AttackData attack, int charge)
         {
+            if (attack.HeldSustain)
+            {
+                return $"{attack.TotalTicksFor(charge)}〜{attack.SustainMaxTicks}";
+            }
             return attack.Run ? "走る間" : attack.TotalTicksFor(charge).ToString(Invariant);
         }
 
@@ -348,6 +381,24 @@ namespace Airerage.Core.Tests.Docs
             if (attack.ExclusiveHits)
             {
                 yield return "1 人には判定 1 つだけ当たる";
+            }
+            if (attack.RehitTicks > 0)
+            {
+                yield return $"同じ相手に {attack.RehitTicks}F に 1 回当たる";
+            }
+            if (attack.Mobile)
+            {
+                yield return "攻撃中も左右に動ける";
+            }
+            if (attack.HeldSustain)
+            {
+                yield return $"押し続けると最大 {attack.SustainMaxTicks}F 続き、{attack.SustainRiseFromTicks}F からは毎秒 {Num(attack.SustainRiseSpeed)}m で上がる（離すと終わる）";
+            }
+            AttackHit sweet = entries.Select(e => e.Hit).FirstOrDefault(h => h.FatalScale > 0f);
+            if (sweet != null)
+            {
+                string sweep = sweet.SweepTicks > 0 ? $"（{sweet.SweepTicks}F で 1 周して前と後ろを行き来する）" : string.Empty;
+                yield return $"砲塔の先{sweep}が当たると FATAL（威力と吹き飛び ×{Num(sweet.FatalScale)}）";
             }
             AttackHit lone = entries.Select(e => e.Hit).FirstOrDefault(h => h.LoneFatal);
             if (lone != null)
@@ -468,6 +519,25 @@ namespace Airerage.Core.Tests.Docs
                     return "奪ったギミック・仕掛けを照準の方向の目の前に置く";
                 case SkillEffect.Misdirection:
                     return $"分身を残して {Seconds(s.Thief.MisdirectionTicks)}透明になる（R 以外の行動・もう一度 E で解ける。分身は攻撃が当たると煙になって消える）";
+                case SkillEffect.Cannon:
+                    JuggernautTuning cannon = s.Juggernaut;
+                    return $"前へ重力を受けない砲弾（{Num(cannon.CannonSpeed)} m/s、{Num(cannon.CannonRange)}m。最初に当たった人に当たって消える）";
+                case SkillEffect.Flak:
+                {
+                    JuggernautTuning flak = s.Juggernaut;
+                    string[] names = { "弱", "中", "強", "弩" };
+                    IEnumerable<string> levels = flak.FlakSpeeds.Select((v, i) => $"{(i < names.Length ? names[i] : (i + 1).ToString(Invariant))} {Num(v)}");
+                    string first = flak.FlakDefaultLevel < names.Length ? names[flak.FlakDefaultLevel] : (flak.FlakDefaultLevel + 1).ToString(Invariant);
+                    return $"地上で Q を押すと構え（回数は使わない）、構えの間に Q で照準の方向へ重力のある砲弾を撃つ（{string.Join("・", levels)} m/s。上下で選び、" +
+                        $"初めは{first}。試合の間覚えておく）。触れると半径 {Num(flak.FlakExplosionRadius)}m の爆発。Q 以外の行動・左右の移動・空中・回数切れで構えが解ける";
+                }
+                case SkillEffect.Mine:
+                    JuggernautTuning mine = s.Juggernaut;
+                    return $"照準の方向へ地雷（{Num(mine.MineSpeed)} m/s、{Num(mine.MineRange)}m）。地形・キャラクターに張り付いて一緒に動き、もう一度 E で半径 " +
+                        $"{Num(mine.MineExplosionRadius)}m の爆発。クールタイムは爆発の後から";
+                case SkillEffect.Mayday:
+                    JuggernautTuning mayday = s.Juggernaut;
+                    return $"ジェット機で飛び去り、ステージ全体から空いた場所を選んで運ばれる（その間は無敵。{Seconds(mayday.MaydaySelectTicks)}選ばなければ元の場所へ）";
                 case SkillEffect.BankHeist:
                     ThiefTuning heist = s.Thief;
                     return $"拠点の中心から {Num(heist.HeistRange)}m 以内で、その場で詠唱。もう一度 R で止めると、1 秒 {heist.HeistCoinsPerSecond} 枚 ＋ 5 秒ごとに " +

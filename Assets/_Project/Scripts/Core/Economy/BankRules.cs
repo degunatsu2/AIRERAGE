@@ -146,7 +146,7 @@ namespace Airerage.Core.Economy
             for (int i = 0; i < states.Count; i++)
             {
                 CharacterState state = states[i];
-                if (state.Combat.IsWaitingToRespawn || state.Coins.Held <= 0
+                if (state.Combat.IsWaitingToRespawn || state.Combat.IsAway || state.Coins.Held <= 0
                     || !Touches(state.Position, configs[i].Movement.HalfExtents, bank, rules.BankRadius))
                 {
                     continue;

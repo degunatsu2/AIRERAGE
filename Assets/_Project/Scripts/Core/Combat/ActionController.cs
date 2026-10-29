@@ -50,6 +50,9 @@ namespace Airerage.Core.Combat
     /// - 効果中にもう一度出せる技（行動の速さの強化）は、効果中なら止めているクールタイムのままでも出せる（CanRecast）。
     /// - 続けて使える特殊攻撃（CombatTuning.Special1MaxCharges が 2 以上。ワープポータル）は、回数が残っていれば出せる。減っている間は
     ///   クールタイムごとに 1 つずつ戻る（C-6）。コズミックレイ（必殺技）は、自分のワープポータルが 2 つあるときだけ出せる。
+    /// - JUGGERNAUT（2026-10-29）: ガードを押し続けるとガードを延ばせ（CombatTuning.GuardHoldMaxTicks）、地上ならガードしながら歩ける
+    ///   （GuardWalk）。地上技は攻撃中も左右に動け（AttackData.Mobile）、押し続けている間は続き、長く押すとゆっくり上がる（HeldSustain）。
+    ///   フラック（Q）は、構えていなければ構えるだけ（回数を使わない。構えの間は JuggernautRules.UpdateStance）、構えていれば撃つ。
     /// </summary>
     public static class ActionController
     {
@@ -63,6 +66,7 @@ namespace Airerage.Core.Combat
             CombatTuning combat = config.Combat;
             RememberSkillAim(ref state, input, combat);
             UpdateTimers(ref state, input, combat, config.Movement.MoveDeadzone);
+            JuggernautRules.UpdateStance(ref state, input, config);
             if (state.Wire.Phase == WirePhase.Attached)
             {
                 state.Combat.AttackCancelUsed = false;
@@ -86,6 +90,7 @@ namespace Airerage.Core.Combat
 
                 case ActionKind.Attack:
                     AdvanceAttack(ref state, config);
+                    UpdateSustain(ref state, input, combat);
                     if (EndOnHit(ref state, config))
                     {
                         // 当たって攻撃を終えた。このティックから次の行動ができる。
@@ -112,7 +117,7 @@ namespace Airerage.Core.Combat
 
                 case ActionKind.Guard:
                     state.Action.Ticks++;
-                    if (state.Action.Ticks < state.Action.Duration)
+                    if (state.Action.Ticks < state.Action.Duration || HoldsGuard(state, input, combat))
                     {
                         if (state.Action.Ticks >= state.Action.CancelFromTick)
                         {
@@ -287,6 +292,11 @@ namespace Airerage.Core.Combat
             switch (slot)
             {
                 case AttackSlot.Special1:
+                    if (combat.Special1.Effect == SkillEffect.Flak && !JuggernautRules.CanFlak(state))
+                    {
+                        // フラックは地上でだけ（JUGGERNAUT の Q。構えている間も地上）。
+                        return false;
+                    }
                     return combat.Special1MaxCharges > 1 ? state.Combat.Special1Spent < combat.Special1MaxCharges
                         : state.Combat.Special1CooldownTicksLeft == 0 || CanRecast(state, slot, combat) || CanChain(state, combat);
                 case AttackSlot.Special2:
@@ -312,7 +322,29 @@ namespace Airerage.Core.Combat
                 SpeedBoostTuning boost = config.Skills.SpeedBoost;
                 return boost.GustWindupTicks + boost.GustRecoveryTicks;
             }
-            return config.Combat.Get(state.Action.Attack).TotalTicksFor(state.Action.Charge);
+            AttackData attack = config.Combat.Get(state.Action.Attack);
+            if (attack.HeldSustain && state.Action.Charge >= 0)
+            {
+                // 押し続けている間は続く（離したら Charge が -1 になり、TotalTicks で終わる）。
+                return Math.Max(attack.TotalTicks, attack.SustainMaxTicks);
+            }
+            return attack.TotalTicksFor(state.Action.Charge);
+        }
+
+        // 押し続けている間は続く技（AttackData.HeldSustain）: 押し続けた長さを Charge に数え、離したら -1 にする（もう続かない）。
+        private static void UpdateSustain(ref CharacterState state, in InputFrame input, CombatTuning combat)
+        {
+            if (!combat.Get(state.Action.Attack).HeldSustain || state.Action.Charge < 0)
+            {
+                return;
+            }
+            state.Action.Charge = input.IsHeld(InputButtons.Attack) ? state.Action.Charge + 1 : -1;
+        }
+
+        // ガードを押し続けて延ばしているか（CombatTuning.GuardHoldMaxTicks まで。JUGGERNAUT）。
+        private static bool HoldsGuard(in CharacterState state, in InputFrame input, CombatTuning combat)
+        {
+            return combat.GuardHoldMaxTicks > 0 && input.IsHeld(InputButtons.Guard) && state.Action.Ticks < combat.GuardHoldMaxTicks;
         }
 
         // 当たったら終える攻撃（AttackData.EndsOnHit。SOLDERER のストンピング）: 当たったときの動き（反動）を 1 回つけて、攻撃を終える。
@@ -382,13 +414,15 @@ namespace Airerage.Core.Combat
 
         /// <summary>
         /// アクション中にシミュレーションへ渡す入力。攻撃中・のけぞり中・その場でためている間は、移動・ジャンプ・ワイヤーの入力を
-        /// 無視する（空中では勢いのまま動く）。それ以外の Free ならそのまま。
+        /// 無視する（空中では勢いのまま動く）。それ以外の Free ならそのまま（フラックの構えの間は動かない）。動ける攻撃（AttackData.Mobile）と、地上の歩けるガード
+        /// （CombatTuning.GuardWalk。grounded は地上にいるか）は、左右の移動だけを残す（JUGGERNAUT）。
         /// </summary>
-        public static PlayerInput ControlInput(in CharacterState state, PlayerInput input, CombatTuning combat)
+        public static PlayerInput ControlInput(in CharacterState state, PlayerInput input, CombatTuning combat, bool grounded = false)
         {
             if (state.Action.IsFree && !IsRootedHold(state, combat))
             {
-                return input;
+                // フラックの構え（JUGGERNAUT の Q）の間は、その場から動かない（上下は弾道の段階を選ぶのに使う。JuggernautRules）。
+                return state.Combat.FlakStance ? new PlayerInput(0, 0, input.Buttons, input.AimX, input.AimY) : input;
             }
             if (state.Wire.Whip && state.Action.Kind != ActionKind.Hitstun)
             {
@@ -396,7 +430,9 @@ namespace Airerage.Core.Combat
                 // 残す。ユーザーの要望、2026-10-22）。のけぞったら回収する。
                 return new PlayerInput(0, 0, input.Buttons & ~InputButtons.Jump, input.AimX, input.AimY);
             }
-            return new PlayerInput(0, 0, input.Buttons & ~(InputButtons.Jump | InputButtons.Wire));
+            bool walk = (state.Action.Kind == ActionKind.Attack && combat.Get(state.Action.Attack).Mobile)
+                || (state.Action.Kind == ActionKind.Guard && combat.GuardWalk && grounded);
+            return new PlayerInput(walk ? input.MoveX : (sbyte)0, 0, input.Buttons & ~(InputButtons.Jump | InputButtons.Wire));
         }
 
         /// <summary>
@@ -476,6 +512,12 @@ namespace Airerage.Core.Combat
                     state.Velocity.X = motion.VelocityX * state.Facing * scale;
                     state.Velocity.Y = motion.VelocityY * scale;
                 }
+            }
+            if (attack.HeldSustain && attack.SustainRiseSpeed > 0f && state.Action.Charge >= attack.SustainRiseFromTicks)
+            {
+                // 押し続けて長押しになったら、回りながらゆっくり上がる（JUGGERNAUT の地上技。重力は受けない）。
+                state.Velocity.Y = attack.SustainRiseSpeed * scale;
+                state.Grounded = false;
             }
         }
 
@@ -580,8 +622,15 @@ namespace Airerage.Core.Combat
                     advance = percent > 0 ? 2 : 0;
                 }
             }
+            int before = state.Action.Ticks;
             state.Action.Ticks += advance;
             state.Action.Advance = advance;
+            int rehit = config.Combat.Get(state.Action.Attack).RehitTicks;
+            if (rehit > 0 && before / rehit != state.Action.Ticks / rehit)
+            {
+                // 当てた相手を忘れて、もう一度当たるようにする（AttackData.RehitTicks）。
+                state.Action.HitMask = 0;
+            }
         }
 
         // 走り続ける地上技（AttackData.Run。SkillTuning.Run）。走り続けるなら true。別の行動の入力があったら、走るのをやめて false
@@ -770,7 +819,7 @@ namespace Airerage.Core.Combat
         /// </summary>
         public static bool TracksAimNow(in CharacterState state, CombatTuning combat)
         {
-            return state.Action.Kind == ActionKind.Attack && combat.Get(state.Action.Attack).TracksAim;
+            return (state.Action.Kind == ActionKind.Attack && combat.Get(state.Action.Attack).TracksAim) || JuggernautRules.TracksAim(state);
         }
 
         private static void BufferAttack(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone, AttackSlot slot)
@@ -855,6 +904,12 @@ namespace Airerage.Core.Combat
             if (state.Combat.BufferedFacing != 0)
             {
                 state.Facing = state.Combat.BufferedFacing;
+            }
+            if (slot == AttackSlot.Special1 && combat.Special1.Effect == SkillEffect.Flak && !state.Combat.FlakStance)
+            {
+                // フラック: 構えていなければ構えるだけ（回数を使わない。撃つのは構えてから Q。JuggernautRules）。
+                JuggernautRules.EnterStance(ref state, input);
+                return;
             }
             bool recast = CanRecast(state, slot, combat);
             state.Action = new ActionState

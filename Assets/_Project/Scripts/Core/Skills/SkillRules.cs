@@ -55,6 +55,10 @@ namespace Airerage.Core.Skills
                 {
                     ThiefRules.Fire(attack.Effect, objects, states, i, config, tick, thief);
                 }
+                else if (JuggernautRules.Handles(attack.Effect))
+                {
+                    JuggernautRules.Fire(attack.Effect, objects, states, i, config, tick);
+                }
                 else
                 {
                     Fire(attack.Effect, objects, ledger, states, i, config, tick);
@@ -169,6 +173,10 @@ namespace Airerage.Core.Skills
                         break;
                     case WorldObjectKind.Beam:
                         SpaceRules.BankByBeam(item, ledger, states, configs, spots, rules, tick, playing);
+                        break;
+                    case WorldObjectKind.Mine:
+                        // 爆発せずに消えた地雷も、クールタイムを数え始める（JUGGERNAUT の E）。
+                        ReleaseCooldown(states, item.Owner, item.Slot, owner.Combat);
                         break;
                 }
                 objects.RemoveAt(o);
@@ -451,6 +459,9 @@ namespace Airerage.Core.Skills
                     return PastryRules.IsLaunched(item, tick);
                 case WorldObjectKind.BallLightning:
                     return item.Stored == 1;
+                case WorldObjectKind.Shell:
+                case WorldObjectKind.Mine:
+                    return JuggernautRules.IsFlying(item);
                 default:
                     return true;
             }

@@ -92,6 +92,23 @@ namespace Airerage.Core.Skills
 
         /// <summary>拠点の近くで詠唱を始める（THIEF の R。バンクハイスト。拠点の近くでないと出せない）。</summary>
         BankHeist,
+
+        /// <summary>前へ、重力を受けない砲弾を撃つ（JUGGERNAUT の空中横。JuggernautRules）。</summary>
+        Cannon,
+
+        /// <summary>
+        /// 対空砲（JUGGERNAUT の Q。フラック。地上でだけ）。構えていなければ構える（回数を使わない）。構えていれば、重力を受ける砲弾を
+        /// 照準の方向へ撃つ（弾道の強さは構えの間に上下で選ぶ。JuggernautRules）。
+        /// </summary>
+        Flak,
+
+        /// <summary>照準の方向へ地雷を撃つ（JUGGERNAUT の E。マイントラップ。地形かキャラクターに張り付き、もう一度 E で爆発する）。</summary>
+        Mine,
+
+        /// <summary>
+        /// ジェット機に吊られて飛び去り、選んだ空いた場所へ運ばれる（JUGGERNAUT の R。メーデー。その間は無敵。JuggernautRules）。
+        /// </summary>
+        Mayday,
     }
 
     /// <summary>
@@ -893,6 +910,7 @@ namespace Airerage.Core.Skills
         public InverterTuning Inverter = new InverterTuning();
         public BallLightningTuning BallLightning = new BallLightningTuning();
         public ThiefTuning Thief = new ThiefTuning();
+        public JuggernautTuning Juggernaut = new JuggernautTuning();
 
         public TuningValidator Validate()
         {
@@ -991,6 +1009,11 @@ namespace Airerage.Core.Skills
             if (Thief != null)
             {
                 v.Merge(Thief.Validate());
+            }
+            v.NotNull(nameof(Juggernaut), Juggernaut);
+            if (Juggernaut != null)
+            {
+                v.Merge(Juggernaut.Validate());
             }
             return v;
         }

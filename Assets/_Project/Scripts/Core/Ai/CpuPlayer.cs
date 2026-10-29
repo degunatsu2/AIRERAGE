@@ -6,6 +6,7 @@ using Airerage.Core.Common;
 using Airerage.Core.Economy;
 using Airerage.Core.Input;
 using Airerage.Core.Match;
+using Airerage.Core.Objects;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Core.Skills;
@@ -73,6 +74,17 @@ namespace Airerage.Core.Ai
         // 撃破技を優先する、相手と撃破の範囲の端との距離（m）。
         private const float KoEdgeDistance = 12f;
 
+        // フラックの構え（JUGGERNAUT の Q）: 撃つ間（ティック）、構えをやめるまで（ティック）、やめた後にまた構えるまで（ティック）、
+        // 狙う相手の距離（m）。
+        private const int FlakShotGapTicks = 30;
+        private const int StanceGiveUpTicks = 240;
+        private const int StanceRetryTicks = 300;
+        private const float FlakTargetRange = 30f;
+
+        // メーデー（JUGGERNAUT の R）: 場所を決めるまで待つティック（反応の遅れ）と、ステージの真ん中から上へずらす高さ（m）。
+        private const int MaydayDecideTicks = 20;
+        private const float MaydayCenterLift = 4f;
+
         private static readonly AttackSlot[] AirAttacks = { AttackSlot.AirSide, AttackSlot.AirUp, AttackSlot.AirNeutral, AttackSlot.AirDown };
         private static readonly AttackSlot[] Skills = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
 
@@ -100,6 +112,9 @@ namespace Airerage.Core.Ai
         private CpuSkillUse _skill;
         private bool _skillPlanned;
         private int _skillStartTick = -1;
+        private int _stanceSinceTick = -1;
+        private int _nextFlakTick;
+        private int _flakRetryTick;
 
         /// <param name="index">操作するキャラクターの番号。</param>
         /// <param name="salt">乱数を CPU ごとに変える値（同じ番号でも、試合ごとに変えたいときに）。</param>
@@ -160,6 +175,20 @@ namespace Airerage.Core.Ai
                 return default;
             }
 
+            if (self.Combat.IsAway)
+            {
+                // メーデーで吊られている（JUGGERNAUT の R）: 場所を選ぶ。
+                return MaydayInput(world, self, tick);
+            }
+            if (!self.Combat.FlakStance)
+            {
+                _stanceSinceTick = -1;
+            }
+            else if (HoldStance(world, self, tick, out PlayerInput stance))
+            {
+                return stance;
+            }
+
             if (self.Combat.HeistTicks > 0)
             {
                 // バンクハイストの詠唱中（動けない）: 相手が近づいたか、十分に詠唱したら、もう一度 R で止めてコインを得る。
@@ -202,6 +231,7 @@ namespace Airerage.Core.Ai
                     ConsiderGuard(world, self, tick, ref buttons);
                 }
                 PressSkill(world, self, tick, ref buttons, ref aim);
+                DetonateMine(world, ref buttons);
             }
 
             PlayerInput input = PlayerInput.FromAxes(Clamp(moveX), Clamp(moveY), buttons);
@@ -328,6 +358,11 @@ namespace Airerage.Core.Ai
             CharacterConfig config = world.GetConfig(_index);
             foreach (AttackSlot slot in Skills)
             {
+                if (slot == AttackSlot.Special1 && config.Combat.Special1.Effect == SkillEffect.Flak && tick < _flakRetryTick)
+                {
+                    // 構えても撃てなかった直後は、しばらく構えない。
+                    continue;
+                }
                 if (!ActionController.CanUse(self, slot, config.Combat) || !CpuSkills.Plan(world, _index, self, config, situation, slot, out CpuSkillUse use))
                 {
                     continue;
@@ -764,6 +799,110 @@ namespace Airerage.Core.Ai
                 x = Math.Clamp(x, bounds.MinX + EdgeMargin + 2f, bounds.MaxX - EdgeMargin - 2f);
             }
             return new Vector2(x, y);
+        }
+
+        // フラックの構えの間（JUGGERNAUT の Q）: 動かずに、相手に届く弾道の照準で Q を押し直して撃つ。届かなければ上下で弾道の段階を
+        // 変える。どの段階でも届かないか、構えてから StanceGiveUpTicks たったら、構えをやめる（false。ふだんの動きで構えが解ける）。
+        private bool HoldStance(SimWorld world, in CharacterState self, int tick, out PlayerInput input)
+        {
+            input = default;
+            if (_stanceSinceTick < 0)
+            {
+                _stanceSinceTick = tick;
+            }
+            CharacterConfig config = world.GetConfig(_index);
+            int opponent = NearestOpponent(world, Flat(self.Position), FlakTargetRange, out _);
+            if (tick - _stanceSinceTick > StanceGiveUpTicks || opponent < 0)
+            {
+                _flakRetryTick = tick + StanceRetryTicks;
+                return false;
+            }
+            JuggernautTuning tuning = config.Skills.Juggernaut;
+            int level = JuggernautRules.FlakLevel(self, tuning);
+            if (CpuSkills.TrySolveFlak(world, self, config, opponent, level, out Vector2 aim))
+            {
+                bool fire = tick >= _nextFlakTick && (_lastButtons & InputButtons.Special1) == 0
+                    && ActionController.CanUse(self, AttackSlot.Special1, config.Combat);
+                if (fire)
+                {
+                    _nextFlakTick = tick + FlakShotGapTicks;
+                    SkillsStarted++;
+                }
+                _lastButtons = fire ? InputButtons.Special1 : InputButtons.None;
+                input = PlayerInput.FromAxes(0f, 0f, _lastButtons).WithAim(aim);
+                return true;
+            }
+            for (int other = 0; other < tuning.FlakLevels; other++)
+            {
+                if (other != level && CpuSkills.TrySolveFlak(world, self, config, opponent, other, out _))
+                {
+                    // 届く段階へ、上下を 1 回ずつ押して変える（押す・離すをくり返す）。
+                    float y = tick % 2 == 0 ? (other > level ? 1f : -1f) : 0f;
+                    _lastButtons = InputButtons.None;
+                    input = PlayerInput.FromAxes(0f, y, InputButtons.None);
+                    return true;
+                }
+            }
+            _flakRetryTick = tick + StanceRetryTicks;
+            return false;
+        }
+
+        // 自分の地雷（JUGGERNAUT の E）の爆発の範囲に相手が入ったら、もう一度 E を押して爆発させる。
+        private void DetonateMine(SimWorld world, ref InputButtons buttons)
+        {
+            if ((_lastButtons & InputButtons.Special2) != 0)
+            {
+                return;
+            }
+            WorldObjects objects = world.Objects;
+            for (int o = 0; o < objects.Count; o++)
+            {
+                WorldObject item = objects[o];
+                if (item.Kind != WorldObjectKind.Mine || item.Owner != _index || item.Ended || JuggernautRules.IsBlast(item))
+                {
+                    continue;
+                }
+                float radius = world.GetConfig(_index).Skills.Juggernaut.MineExplosionRadius * 0.85f;
+                if (NearestOpponent(world, item.Position, radius, out _) >= 0)
+                {
+                    buttons |= InputButtons.Special2;
+                    return;
+                }
+            }
+        }
+
+        // メーデーで吊られている間（JUGGERNAUT の R）: 場所を選ぶ間に、拠点（コインを多く持っていれば）か、ステージの真ん中の少し上の、
+        // 空いた所を選んで決める（照準に場所を入れる。JuggernautRules.EncodeTarget）。
+        private PlayerInput MaydayInput(SimWorld world, in CharacterState self, int tick)
+        {
+            if (self.Combat.MaydayPhase != JuggernautRules.MaydaySelect || self.Combat.MaydayTicks < MaydayDecideTicks)
+            {
+                _lastButtons = InputButtons.None;
+                return default;
+            }
+            CharacterConfig config = world.GetConfig(_index);
+            JuggernautRules.TargetArea(world.Bounds, config.Skills.Juggernaut, out Vector2 center, out Vector2 half);
+            Vector2 desired = center + new Vector2(0f, MaydayCenterLift);
+            IReadOnlyList<BankSpot> banks = world.BankSpots;
+            if (banks.Count > 0 && self.Coins.Held >= _tuning.BankAtHeldCoins)
+            {
+                desired = banks[BankRules.SpotAt(world.Rules, banks.Count, tick)].Position;
+            }
+            var body = new Vector2(config.Movement.HalfWidth, config.Movement.HalfHeight);
+            Vector2 free = PlacementRules.FreePosition(world.Collision, desired, body, Vector2.Zero);
+            bool confirm = (_lastButtons & InputButtons.Attack) == 0;
+            _lastButtons = confirm ? InputButtons.Attack : InputButtons.None;
+            PlayerInput input = PlayerInput.FromAxes(0f, 0f, _lastButtons);
+            for (int step = 0; step <= 10; step++)
+            {
+                // 照準に入れると少し丸まるので、丸めた後の場所が空いているところまで上へずらす。
+                PlayerInput encoded = JuggernautRules.EncodeTarget(input, free + new Vector2(0f, 0.5f * step), center, half);
+                if (JuggernautRules.IsFreeTarget(world.Collision, JuggernautRules.DecodeTarget(encoded, center, half), body))
+                {
+                    return encoded;
+                }
+            }
+            return JuggernautRules.EncodeTarget(input, free, center, half);
         }
 
         // 透明の相手（THIEF の E）は見えないので、ねらわない。

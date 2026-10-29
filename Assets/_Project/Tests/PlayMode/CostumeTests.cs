@@ -47,8 +47,8 @@ namespace Airerage.PlayMode.Tests
             Assert.That(seen, Is.EquivalentTo(new[]
             {
                 CharacterCostume.Standard, CharacterCostume.RiskTaker, CharacterCostume.StormRunner, CharacterCostume.SpaceTraveler,
-                CharacterCostume.PastryChef, CharacterCostume.Solderer, CharacterCostume.Thief,
-            }), "7 体の衣装がそろっていない");
+                CharacterCostume.PastryChef, CharacterCostume.Solderer, CharacterCostume.Thief, CharacterCostume.Juggernaut,
+            }), "8 体の衣装がそろっていない");
         }
     }
 }

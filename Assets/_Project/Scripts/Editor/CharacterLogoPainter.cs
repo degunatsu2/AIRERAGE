@@ -16,6 +16,7 @@ namespace Airerage.Editor
     /// - PASTRY CHEF: クリーム色の、コック帽（ふくらんだ 3 つの山と帯）。
     /// - SOLDERER: 電気の水色の、稲妻（RISK TAKER の黄色・STORM RUNNER の黄緑と見分けられる色）。
     /// - THIEF: 茶色の巾着袋に、斜めの銀のナイフが重なる。
+    /// - JUGGERNAUT: 苔色の、車輪のついた大砲（ユーザーの案、2026-10-29）。
     /// 形は距離の関数（負なら中）で書き、縁はなめらかにする。形ごとに暗い縁取りをつける（どの背景でも読めるように）。
     /// 座標は 0〜1（左上が 0、下が 1）。
     /// </summary>
@@ -39,6 +40,7 @@ namespace Airerage.Editor
         private static readonly Color ThiefStringColor = new Color(0.9f, 0.7f, 0.42f);
         private static readonly Color KnifeColor = new Color(0.86f, 0.89f, 0.94f);
         private static readonly Color KnifeHandleColor = new Color(0.3f, 0.18f, 0.1f);
+        public static readonly Color JuggernautColor = new Color(0.5f, 0.64f, 0.3f);
 
         private delegate float Shape(Vector2 p);
 
@@ -154,6 +156,25 @@ namespace Airerage.Editor
             Fill(layers, p => Segment(p, new Vector2(0.245f, 0.665f), new Vector2(0.395f, 0.815f), 0.024f), KnifeColor);
             Fill(layers, p => Mathf.Min(Segment(p, new Vector2(0.3f, 0.76f), new Vector2(0.17f, 0.89f), 0.036f),
                 Circle(p, new Vector2(0.15f, 0.91f), 0.04f)), KnifeHandleColor);
+            return Rasterize(layers);
+        }
+
+        /// <summary>JUGGERNAUT: 左下の尾から右上の砲口へ斜めに向いた砲身と、砲口の輪、前に重なる車輪（苔色）。</summary>
+        public static Color[] Juggernaut()
+        {
+            var layers = new List<Layer>();
+            var wheel = new Vector2(0.42f, 0.71f);
+            // 砲身（尾は太く、砲口へ行くほど細い）と、丸い尾。
+            Fill(layers, p => Mathf.Min(Mathf.Min(Segment(p, new Vector2(0.2f, 0.66f), new Vector2(0.64f, 0.36f), 0.085f),
+                Segment(p, new Vector2(0.56f, 0.42f), new Vector2(0.8f, 0.25f), 0.06f)), Circle(p, new Vector2(0.17f, 0.68f), 0.1f)), JuggernautColor);
+            // 砲口の輪（砲身に垂直）。
+            Fill(layers, p => Segment(p, new Vector2(0.75f, 0.19f), new Vector2(0.85f, 0.32f), 0.045f), JuggernautColor);
+            // 車輪（外の輪・軸・4 本の輻）。砲身との間に縁取りの隙間をあける。
+            Cut(layers, p => Circle(p, wheel, 0.22f));
+            Fill(layers, p => Mathf.Max(Circle(p, wheel, 0.19f), -Circle(p, wheel, 0.12f)), JuggernautColor);
+            Fill(layers, p => Circle(p, wheel, 0.05f), JuggernautColor);
+            Fill(layers, p => Mathf.Min(Segment(p, wheel + new Vector2(0f, -0.15f), wheel + new Vector2(0f, 0.15f), 0.024f),
+                Segment(p, wheel + new Vector2(-0.15f, 0f), wheel + new Vector2(0.15f, 0f), 0.024f)), JuggernautColor);
             return Rasterize(layers);
         }
 

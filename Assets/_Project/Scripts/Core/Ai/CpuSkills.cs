@@ -78,6 +78,9 @@ namespace Airerage.Core.Ai
     ///   相手が線の近くにいるときに撃つ。金庫は、コインを多く持っていて、拠点が遠く相手もいないときに長押しで預ける。
     /// - クリーム: 少し離れた相手へ、長押しの間に攻撃を押して抹茶（遅くして張り付かせる）。
     /// - インバータ: 相手が近ければオン（ワイヤーで足場につなぐと雷が伝わる）、落ちそうなとき・相手が遠いときはオフ（射程を戻す）。
+    /// - JUGGERNAUT: フラックは、地上で離れた相手がいれば構え、構えの間は相手に届く弾道の照準で撃つ（届かなければ CpuPlayer が段階を変えるか、
+    ///   構えをやめる）。地雷は相手の方へ撃ち、相手が爆発の範囲に入ったら CpuPlayer がもう一度 E。メーデーは落ちそうなときと、拠点が遠くて
+    ///   コインを多く持っているときに使い、場所は CpuPlayer が選ぶ（拠点か、ステージの真ん中の上）。
     /// - THIEF: タレントスナッチは相手の方へ撃ち（コピーした Q は、その技の効果の種類で使い分ける）、奪ったギミックは落ちそうなら足もとへ・
     ///   相手が近ければ相手の方へ置く。ミスディレクションは相手が近いときに反対の方へ。バンクハイストは拠点の近くで相手がいないときに始め、
     ///   相手が近づくか 15 秒たったら止める（CpuPlayer）。透明の THIEF は、ほかの CPU からねらわれない。
@@ -94,6 +97,13 @@ namespace Airerage.Core.Ai
         private const float SnatchRange = 20f;
         private const float PlaceRange = 9f;
         private const float MisdirectionRange = 5f;
+
+        // フラックの構えに入る相手の距離（m。近すぎると撃つ前に殴られる）。
+        private const float FlakMinRange = 5f;
+        private const float FlakMaxRange = 28f;
+
+        // メーデーで拠点へ運ばれる、拠点までの距離（m）。
+        private const float MaydayFarBank = 25f;
 
         // 自分を強くする技: 相手がこの近さなら（m）、目的地がこの遠さなら（m）使う。
         private const float BoostNearOpponent = 8f;
@@ -240,6 +250,36 @@ namespace Airerage.Core.Ai
                     use.Aim = toOpponent.LengthSquared() > SimMath.Epsilon ? -Vector2.Normalize(toOpponent) : new Vector2(-self.Facing, 0f);
                     return true;
 
+                case SkillEffect.Flak:
+                {
+                    if (opponent < 0)
+                    {
+                        return false;
+                    }
+                    if (!self.Combat.FlakStance)
+                    {
+                        // 構える（回数は使わない）。撃つのは構えてから（CpuPlayer.HoldStance）。
+                        return distance >= FlakMinRange && distance <= FlakMaxRange;
+                    }
+                    if (!TrySolveFlak(world, self, config, opponent, JuggernautRules.FlakLevel(self, config.Skills.Juggernaut), out Vector2 aim))
+                    {
+                        return false;
+                    }
+                    use.Aim = aim;
+                    return true;
+                }
+
+                case SkillEffect.Mine:
+                    return AimedShot(world, self, opponent, distance, config.Skills.Juggernaut.MineRange * 0.8f, ref use);
+
+                case SkillEffect.Mayday:
+                {
+                    // 落ちそうなとき、または拠点が遠くてコインを多く持っているとき（場所は CpuPlayer が選ぶ）。
+                    use.Urgent = situation.Recovering && situation.OverVoid;
+                    bool farBank = situation.Goal == CpuGoalKind.Bank && Vector2.Distance(position, situation.Target) >= MaydayFarBank;
+                    return use.Urgent || farBank;
+                }
+
                 case SkillEffect.BankHeist:
                     // 拠点の近くで（ActionController.CanUse が調べる）、相手が近くにいないとき。止めるのは CpuPlayer。
                     return distance > QuietDistance;
@@ -257,6 +297,54 @@ namespace Airerage.Core.Ai
                     use.AimAt = opponent;
                     return opponent >= 0 && distance <= BoostNearOpponent;
             }
+        }
+
+        /// <summary>
+        /// フラックの砲弾を、弾道の段階 level で相手 opponent に当てる照準（低い弾道。相手の今の位置と、届くまでの動きを少し先読み）。
+        /// 届かなければ false。
+        /// </summary>
+        public static bool TrySolveFlak(SimWorld world, in CharacterState self, CharacterConfig config, int opponent, int level, out Vector2 aim)
+        {
+            aim = Vector2.Zero;
+            if (world == null || opponent < 0)
+            {
+                return false;
+            }
+            JuggernautTuning tuning = config.Skills.Juggernaut;
+            CharacterState target = world.GetState(opponent);
+            var origin = new Vector2(self.Position.X, self.Position.Y + tuning.FlakMuzzleHeight);
+            float speed = tuning.FlakSpeedAt(level);
+            Vector2 at = Flat(target.Position);
+            float lead = Vector2.Distance(origin, at) / Math.Max(1f, speed);
+            at += new Vector2(target.Velocity.X, target.Velocity.Y) * lead * 0.5f;
+            return SolveBallistic(origin, at, speed, tuning.FlakGravity, out aim);
+        }
+
+        // 速さ speed・重力 gravity で origin から target に当たる、低い弾道の向き（長さ 1）。届かなければ false。
+        private static bool SolveBallistic(Vector2 origin, Vector2 target, float speed, float gravity, out Vector2 aim)
+        {
+            aim = Vector2.Zero;
+            float dx = target.X - origin.X;
+            float dy = target.Y - origin.Y;
+            float x = MathF.Abs(dx);
+            if (x < 0.5f)
+            {
+                return false;
+            }
+            if (gravity <= SimMath.Epsilon)
+            {
+                aim = Vector2.Normalize(new Vector2(dx, dy));
+                return true;
+            }
+            float v2 = speed * speed;
+            float discriminant = v2 * v2 - gravity * (gravity * x * x + 2f * dy * v2);
+            if (discriminant < 0f)
+            {
+                return false;
+            }
+            float angle = MathF.Atan((v2 - MathF.Sqrt(discriminant)) / (gravity * x));
+            aim = new Vector2(MathF.Sign(dx) * MathF.Cos(angle), MathF.Sin(angle));
+            return true;
         }
 
         // 判定のある技: 技の動きで進んだ先で、判定が相手に届くか（短押しで届かなければ長押し）。

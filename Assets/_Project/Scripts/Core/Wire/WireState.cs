@@ -49,6 +49,9 @@ namespace Airerage.Core.Wire
 
         /// <summary>ワープポータルで移った（ロープがつながらなくなる。SPACE TRAVELER）。</summary>
         Warped,
+
+        /// <summary>メーデーでジェット機に吊られた（JUGGERNAUT の R）。</summary>
+        Lifted,
     }
 
     /// <summary>

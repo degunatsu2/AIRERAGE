@@ -288,6 +288,28 @@ namespace Airerage.Core.Combat
         public int HeistLastPayout;
 
         /// <summary>
+        /// フラック（JUGGERNAUT の Q）: 構えているか、弾道の段階（JuggernautTuning.FlakDefaultLevel からの差。その試合の間は撃破されても
+        /// 覚えておく。ユーザーの案、2026-10-29）、構えの間の上下の入力（-1・0・1。押した瞬間を調べる）、撃った数（表示と効果音）。
+        /// </summary>
+        public bool FlakStance;
+        public sbyte FlakLevelShift;
+        public sbyte FlakAxis;
+        public int FlakShotCount;
+
+        /// <summary>地雷（JUGGERNAUT の E）を爆発させた数（表示と効果音）。</summary>
+        public int MineBlastCount;
+
+        /// <summary>
+        /// メーデー（JUGGERNAUT の R）: 段階（JuggernautRules.MaydayLift・MaydaySelect・MaydayCarry。0 ならしていない）、その段階の
+        /// ティック数、出したときの位置（選ばなければここへ戻る）、運ばれる先、空いていない所を選んだ数（表示の「N/A」と効果音）。
+        /// </summary>
+        public byte MaydayPhase;
+        public int MaydayTicks;
+        public System.Numerics.Vector2 MaydayFrom;
+        public System.Numerics.Vector2 MaydayTarget;
+        public int MaydayRejectCount;
+
+        /// <summary>
         /// 試合から抜けた（ネットワーク対戦で切れた。入力の InputButtons.Leave で決まる。docs/15 T6-10）。抜けた人は見えず、その場から
         /// 動かず、何にも触れない（復帰を待つ間と同じ扱いが続く。IsWaitingToRespawn・IsUntouchable）。確定したコインは結果に残る。
         /// </summary>
@@ -309,7 +331,11 @@ namespace Airerage.Core.Combat
         /// 干渉されない（復帰を待つ間と、復帰した後の無干渉。MatchRules.InvincibleTicks）。攻撃・投射物・置かれた物・ステージの危険の影響を
         /// 受けず、自分の攻撃も相手に当たらない。
         /// </summary>
-        public bool IsUntouchable => RespawnTicksLeft > 0 || InvincibleTicksLeft > 0 || HasLeft || DrownTicks > 0 || CaptureTicks > 0;
+        public bool IsUntouchable => RespawnTicksLeft > 0 || InvincibleTicksLeft > 0 || HasLeft || DrownTicks > 0 || CaptureTicks > 0
+            || MaydayPhase != 0;
+
+        /// <summary>メーデーでジェット機に吊られている（その場にいない。コインも拠点も触れず、撃破されない）か。</summary>
+        public bool IsAway => MaydayPhase != 0;
 
         /// <summary>溺れているか（水。動けず、沈んで撃破される）。</summary>
         public bool IsDrowning => DrownTicks > 0;
@@ -374,7 +400,11 @@ namespace Airerage.Core.Combat
                 && StealCount == other.StealCount && InvisibleTicksLeft == other.InvisibleTicksLeft
                 && CloneTicksLeft == other.CloneTicksLeft && ClonePopCount == other.ClonePopCount && HeistTicks == other.HeistTicks
                 && HeistSpot == other.HeistSpot && NearBank == other.NearBank && HeistPayoutCount == other.HeistPayoutCount
-                && HeistLastPayout == other.HeistLastPayout;
+                && HeistLastPayout == other.HeistLastPayout
+                && FlakStance == other.FlakStance && FlakLevelShift == other.FlakLevelShift && FlakAxis == other.FlakAxis
+                && FlakShotCount == other.FlakShotCount && MineBlastCount == other.MineBlastCount && MaydayPhase == other.MaydayPhase
+                && MaydayTicks == other.MaydayTicks && MaydayFrom.Equals(other.MaydayFrom) && MaydayTarget.Equals(other.MaydayTarget)
+                && MaydayRejectCount == other.MaydayRejectCount;
         }
 
         public override bool Equals(object obj)
@@ -400,14 +430,16 @@ namespace Airerage.Core.Combat
                             HashCode.Combine(ShieldBlockCount, HasLeft, WaveCooldownTicks, HasStunKnockback, StunKnockbackX, StunKnockbackY,
                                 HashCode.Combine(WaterTicksLeft, WaterFloatTicks, DrownTicks, SplashCount, CaptureTicks, CaptureZone, CaptureCount,
                                     HashCode.Combine(StealKind, StealSource, StealUses, StealSerial, InvisibleTicksLeft, CloneTicksLeft, ClonePopCount,
-                                        HashCode.Combine(HeistTicks, HeistSpot, NearBank, HeistPayoutCount, HeistLastPayout, StealFromSerial, StealCount))))))));
+                                        HashCode.Combine(HeistTicks, HeistSpot, NearBank, HeistPayoutCount, HeistLastPayout, StealFromSerial, StealCount,
+                                            HashCode.Combine(FlakStance, FlakLevelShift, FlakAxis, FlakShotCount, MineBlastCount, MaydayPhase, MaydayTicks,
+                                                HashCode.Combine(MaydayFrom, MaydayTarget, MaydayRejectCount))))))))));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} capture={CaptureTicks}@{CaptureZone}({CaptureCount}) shield={ShieldBlockCount}{(HasLeft ? " left" : "")} steal={StealKind}:{StealSource}x{StealUses}@{StealSerial}/{StealFromSerial}({StealCount}) invisible={InvisibleTicksLeft} clone={CloneTicksLeft}({ClonePopCount}) heist={HeistTicks}@{HeistSpot}{(NearBank ? " nearBank" : "")}({HeistPayoutCount},{HeistLastPayout})";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} capture={CaptureTicks}@{CaptureZone}({CaptureCount}) shield={ShieldBlockCount}{(HasLeft ? " left" : "")} steal={StealKind}:{StealSource}x{StealUses}@{StealSerial}/{StealFromSerial}({StealCount}) invisible={InvisibleTicksLeft} clone={CloneTicksLeft}({ClonePopCount}) heist={HeistTicks}@{HeistSpot}{(NearBank ? " nearBank" : "")}({HeistPayoutCount},{HeistLastPayout}) flak={(FlakStance ? "stance" : "-")}{FlakLevelShift:+0;-0;0}({FlakShotCount}) mines={MineBlastCount} mayday={MaydayPhase}:{MaydayTicks} {MaydayFrom}->{MaydayTarget}({MaydayRejectCount})";
         }
     }
 }

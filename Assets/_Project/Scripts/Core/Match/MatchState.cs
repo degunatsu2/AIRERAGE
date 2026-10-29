@@ -168,7 +168,7 @@ namespace Airerage.Core.Match
                 for (int i = 0; i < states.Count; i++)
                 {
                     CharacterState s = states[i];
-                    if (s.Combat.IsWaitingToRespawn || !CanWinAtTheBank(states, i)
+                    if (s.Combat.IsWaitingToRespawn || s.Combat.IsAway || !CanWinAtTheBank(states, i)
                         || !BankRules.Touches(s.Position, configs[i].Movement.HalfExtents, bank, rules.BankRadius))
                     {
                         continue;

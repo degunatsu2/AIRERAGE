@@ -28,11 +28,16 @@ namespace Airerage.Runtime.Presentation
     /// </summary>
     public sealed class ThiefEffectsView : MonoBehaviour
     {
+        /// <summary>ここで出す最後の種類（これより後は JuggernautEffectsView）。</summary>
+        public const WorldObjectKind LastKind = WorldObjectKind.TrapBall;
+
         private const float Z = -0.5f;
         private const int SmokePuffs = 16;
         private const int PuffTextureSize = 128;
         private const float SmokeGrowSeconds = 0.3f;
         private const float SmokeFadeSeconds = 1.2f;
+        // 煙のかたまりの絵の濃さ（この枚数を重ねた濃さにする）。
+        private const int SmokeLayers = 3;
         private const float ShotTrailLength = 1.6f;
         private const float BlinkPerSecond = 6f;
         private const float ShadowAlpha = 0.28f;
@@ -180,7 +185,8 @@ namespace Airerage.Runtime.Presentation
             {
                 foreach (WorldObject item in objects.Items)
                 {
-                    if (item.Kind <= WorldObjectsView.LastKind || item.Ended)
+                    // THIEF の物だけ（JUGGERNAUT の砲弾と地雷は JuggernautEffectsView）。
+                    if (item.Kind <= WorldObjectsView.LastKind || item.Kind > LastKind || item.Ended)
                     {
                         continue;
                     }
@@ -324,7 +330,9 @@ namespace Airerage.Runtime.Presentation
                     float r = Mathf.Sqrt(u * u + v * v);
                     float noise = Fbm(u * 2.3f + 5.1f, v * 2.3f + 2.7f);
                     float edge = 1f - Mathf.SmoothStep(0.55f, 1f, r + (noise - 0.5f) * 0.3f);
-                    float alpha = Mathf.Clamp01(edge * (1.6f + (noise - 0.5f) * 0.4f));
+                    float single = Mathf.Clamp01(edge * (1.6f + (noise - 0.5f) * 0.4f));
+                    // 3 枚重ねた濃さ（ユーザーの確認、2026-10-29: 煙を 3 つ重ねるとちょうどよい）。
+                    float alpha = 1f - Mathf.Pow(1f - single, SmokeLayers);
                     float shade = Mathf.Lerp(0.8f, 1f, noise);
                     pixels[y * size + x] = new Color(shade, shade, shade, alpha);
                 }

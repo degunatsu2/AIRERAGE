@@ -213,6 +213,18 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>バンクハイストでコインを得た（THIEF の R。コインがざらざらと流れ込み、最後に高い音）。</summary>
         Heist,
+
+        /// <summary>砲弾を撃った（JUGGERNAUT の空中横・フラック。低く重い「ドン」）。</summary>
+        Cannon,
+
+        /// <summary>地雷を撃った・張り付いた（JUGGERNAUT の E。金属の「カチッ」）。</summary>
+        MineSet,
+
+        /// <summary>ジェット機が来て飛び去る（JUGGERNAUT の R。高い唸りと風の「ゴォー」）。</summary>
+        Jet,
+
+        /// <summary>選べない場所を選んだ（JUGGERNAUT の R の N/A。低い 2 回の「ブブッ」）。</summary>
+        Denied,
     }
 
     /// <summary>
@@ -854,6 +866,32 @@ namespace Airerage.Runtime.Audio
                     AddTone(b, r, 0.72f, 0.3f, top * 2f, top * 2f, Wave.Sine, 0.1f, 0.002f, 0.12f);
                     break;
                 }
+                case SoundId.Cannon:
+                    // ドン（低い正弦波の落ち込みと、短い爆風のノイズ）。
+                    b = new float[Samples(0.6f, r)];
+                    AddTone(b, r, 0f, 0.35f, 140f, 45f, Wave.Sine, 0.7f, 0.001f, 0.25f);
+                    AddNoise(b, r, rng, 0f, 0.4f, 0.8f, 0.001f, 0.2f, 1800f, 300f, 150f);
+                    break;
+                case SoundId.MineSet:
+                    // カチッ（高い 2 つの短い音）。
+                    b = new float[Samples(0.18f, r)];
+                    AddTone(b, r, 0f, 0.03f, 2600f, 2400f, Wave.Square, 0.25f, 0.0005f, 0.01f);
+                    AddTone(b, r, 0.05f, 0.04f, 1800f, 1700f, Wave.Square, 0.2f, 0.0005f, 0.015f);
+                    AddNoise(b, r, rng, 0f, 0.05f, 0.25f, 0.0005f, 0.02f, 5000f, 7000f, 2500f);
+                    break;
+                case SoundId.Jet:
+                    // ゴォー（上がって下がる高い唸りと、広い帯域の風）。
+                    b = new float[Samples(1.4f, r)];
+                    AddTone(b, r, 0f, 1.3f, 420f, 680f, Wave.Saw, 0.12f, 0.3f, 0.6f);
+                    AddTone(b, r, 0f, 1.3f, 840f, 1360f, Wave.Sine, 0.06f, 0.3f, 0.6f);
+                    AddNoise(b, r, rng, 0f, 1.35f, 0.5f, 0.35f, 0.7f, 1500f, 3500f, 800f);
+                    break;
+                case SoundId.Denied:
+                    // ブブッ（低い矩形波を 2 回）。
+                    b = new float[Samples(0.4f, r)];
+                    AddTone(b, r, 0f, 0.12f, 180f, 170f, Wave.Square, 0.3f, 0.002f, 0.03f);
+                    AddTone(b, r, 0.17f, 0.15f, 150f, 140f, Wave.Square, 0.3f, 0.002f, 0.04f);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");
             }

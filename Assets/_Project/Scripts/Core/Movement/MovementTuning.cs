@@ -14,6 +14,12 @@ namespace Airerage.Core.Movement
         /// <summary>走行の最高速（m/s）。</summary>
         public float RunSpeed = 8f;
 
+        /// <summary>
+        /// 空中での走行の最高速（m/s。0 なら RunSpeed と同じ）。地上と空中で速さの違うキャラクターに使う（JUGGERNAUT は地上 +50%・空中 −50%。
+        /// ユーザーの案、2026-10-29）。
+        /// </summary>
+        public float AirRunSpeed;
+
         /// <summary>地上での加速・減速（m/s²）。</summary>
         public float GroundAcceleration = 80f;
 
@@ -31,6 +37,12 @@ namespace Airerage.Core.Movement
 
         /// <summary>ジャンプの初速（m/s）。</summary>
         public float JumpSpeed = 12f;
+
+        /// <summary>
+        /// 地上のジャンプの発生（ティック。0 ならすぐ跳ぶ）。押してからこの長さだけ足場に残ってから跳ぶ（JUGGERNAUT。ユーザーの案、2026-10-29）。
+        /// 待っている間に攻撃・ガード・ワイヤーなどを始めたら跳ばない。空中ジャンプはすぐ跳ぶ。
+        /// </summary>
+        public int JumpStartupTicks;
 
         /// <summary>空中ジャンプの回数。</summary>
         public int AirJumps = 1;
@@ -78,6 +90,8 @@ namespace Airerage.Core.Movement
         {
             var v = new TuningValidator(nameof(MovementTuning));
             v.Positive(nameof(RunSpeed), RunSpeed);
+            v.NonNegative(nameof(AirRunSpeed), AirRunSpeed);
+            v.NonNegative(nameof(JumpStartupTicks), JumpStartupTicks);
             v.Positive(nameof(GroundAcceleration), GroundAcceleration);
             v.NonNegative(nameof(AirAcceleration), AirAcceleration);
             v.NonNegative(nameof(AirDrag), AirDrag);

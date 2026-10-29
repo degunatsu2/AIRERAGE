@@ -37,7 +37,7 @@ namespace Airerage.Net
     /// 使い、ロビー（待機所・キャラクター選択・ステージ選択）はメニューで済んでいる。読み込んだステージ（出現位置はステージの
     /// SpawnPointAuthoring）で、待っていた試合を始める（BeginPending）。接続の画面と待機所は出さない。Quit で接続を閉じてメニューへ。
     /// </summary>
-    public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls
+    public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls, ILocalAimSource
     {
         [Tooltip("一覧がないときのキャラクター")]
         [SerializeField] private CharacterConfigAsset _character;
@@ -94,6 +94,7 @@ namespace Airerage.Net
         private bool _showDetails;
         private bool _timedMatch = true;
         private InputSystemAdapter _input;
+        private CameraZoom _cameraZoom;
         private OnlineSession _session;
         private string _portText;
         private CorrectionSmoother _smoother;
@@ -120,6 +121,32 @@ namespace Airerage.Net
         // 表示と効果音の読み取り口（ISimulationFeed）。番号はプレイヤーの番号。
         int ISimulationFeed.CharacterCount => Running ? _session.PlayerCount : 0;
         int ISimulationFeed.LocalCharacter => Running ? _session.LocalPlayer : -1;
+
+        bool ILocalAimSource.TryPeekAim(int index, out System.Numerics.Vector2 aim)
+        {
+            aim = default;
+            if (!Running || _input == null || index != _session.LocalPlayer)
+            {
+                return false;
+            }
+            Airerage.Core.Input.PlayerInput shown = _input.Peek(_session.World.GetState(index).Position);
+            aim = shown.HasAim ? shown.Aim : shown.Move;
+            return true;
+        }
+
+        bool ILocalAimSource.TryGetTargetCursor(int index, out System.Numerics.Vector2 cursor)
+        {
+            cursor = default;
+            if (!Running || _input == null || index != _session.LocalPlayer || !_input.Targeting)
+            {
+                return false;
+            }
+            cursor = _input.TargetCursor;
+            return true;
+        }
+
+        Airerage.Core.Physics.ICollisionQuery ILocalAimSource.Collision => Running ? _session.World.Collision : null;
+        StageBounds? ILocalAimSource.Bounds => Running ? _session.World.Bounds : null;
         CharacterState ISimulationFeed.GetState(int index) => _session.World.GetState(index);
         CharacterConfig ISimulationFeed.GetConfig(int index) => _session.World.GetConfig(index);
         CharacterConfigAsset ISimulationFeed.CharacterOf(int index) => CharacterAsset(
@@ -377,7 +404,8 @@ namespace Airerage.Net
             }
             if (_session.State == OnlineSession.SessionState.Running)
             {
-                // 試合の前に押したボタンを、最初のティックに持ち込まない。
+                // 試合の前に押したボタンを、最初のティックに持ち込まない。メーデー（JUGGERNAUT の R）で場所を選んでいる間は、照準に場所を入れる。
+                _input.UpdateTargeting(_session.World.GetState(_session.LocalPlayer), _session.World.GetConfig(_session.LocalPlayer), _session.World.Bounds);
                 _input.Poll(_camera, _session.World.GetConfig(_session.LocalPlayer).Wire.AimDeadzone);
             }
             if (_connection != null)
@@ -528,13 +556,14 @@ namespace Airerage.Net
 
             float alpha = Mathf.Clamp01(_session.Alpha);
             WireTuning wire = _session.World.GetConfig(_session.LocalPlayer).Wire;
-            Vector3 halfExtents = _session.World.GetConfig(_session.LocalPlayer).Movement.HalfExtents.ToUnity();
             for (int p = 0; p < count; p++)
             {
+                // 体の大きさはキャラクターごと（JUGGERNAUT はふつうより大きい）。
+                Vector3 halfExtents = _session.World.GetConfig(p).Movement.HalfExtents.ToUnity();
                 DisplayedStates(p, out CharacterState previous, out CharacterState current);
                 _characterViews[p].Render(previous, current, alpha, halfExtents);
                 _characterViews[p].RenderAction(current, _session.World.GetConfig(p).Combat, _session.World.Rules.RespawnDelayTicks,
-                    _session.World.GetConfig(p).Movement);
+                    _session.World.GetConfig(p).Movement, _session.World.GetConfig(p).Skills);
                 _characterViews[p].SetCostume(((ISimulationFeed)this).CharacterOf(p));
                 _wireViews[p].Render(previous, current, alpha, wire);
                 bool cloned = SimWorldFeed.TryGetClone(_session.World, p, out CharacterState clone);
@@ -542,7 +571,13 @@ namespace Airerage.Net
             }
 
             Transform local = _characterViews[_session.LocalPlayer].transform;
-            if (_followCamera != null && _followCamera.Follow != local)
+            if (_followCamera != null && _cameraZoom == null)
+            {
+                _cameraZoom = _followCamera.GetComponent<CameraZoom>();
+            }
+            // ステージ全体を見せている間（JUGGERNAUT のフラックの構え・メーデーの場所選び。CameraZoom.SetOverview）は、追う相手を変えない。
+            bool overview = _cameraZoom != null && _cameraZoom.InOverview;
+            if (_followCamera != null && _followCamera.Follow != local && !overview)
             {
                 _followCamera.Follow = local;
             }

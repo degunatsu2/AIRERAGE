@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 30;
+        public const int FormatVersion = 31;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -373,12 +373,25 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.NearBank);
             writer.Write(combat.HeistPayoutCount);
             writer.Write(combat.HeistLastPayout);
+            writer.Write(combat.FlakStance);
+            writer.Write(combat.FlakLevelShift);
+            writer.Write(combat.FlakAxis);
+            writer.Write(combat.FlakShotCount);
+            writer.Write(combat.MineBlastCount);
+            writer.Write(combat.MaydayPhase);
+            writer.Write(combat.MaydayTicks);
+            writer.Write(combat.MaydayFrom.X);
+            writer.Write(combat.MaydayFrom.Y);
+            writer.Write(combat.MaydayTarget.X);
+            writer.Write(combat.MaydayTarget.Y);
+            writer.Write(combat.MaydayRejectCount);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
             writer.Write(state.WallSide);
             writer.Write(state.WallClingTicks);
             writer.Write(state.WallJumpCount);
+            writer.Write(state.JumpSquatTicksLeft);
             writer.Write(state.Coins.Held);
             writer.Write(state.Coins.Banked);
         }
@@ -534,12 +547,23 @@ namespace Airerage.Core.Simulation
                 NearBank = reader.ReadBoolean(),
                 HeistPayoutCount = reader.ReadInt32(),
                 HeistLastPayout = reader.ReadInt32(),
+                FlakStance = reader.ReadBoolean(),
+                FlakLevelShift = reader.ReadSByte(),
+                FlakAxis = reader.ReadSByte(),
+                FlakShotCount = reader.ReadInt32(),
+                MineBlastCount = reader.ReadInt32(),
+                MaydayPhase = reader.ReadByte(),
+                MaydayTicks = reader.ReadInt32(),
+                MaydayFrom = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                MaydayTarget = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                MaydayRejectCount = reader.ReadInt32(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();
             state.WallSide = reader.ReadInt32();
             state.WallClingTicks = reader.ReadInt32();
             state.WallJumpCount = reader.ReadInt32();
+            state.JumpSquatTicksLeft = reader.ReadInt32();
             state.Coins = new CoinPurse { Held = reader.ReadInt32(), Banked = reader.ReadInt32() };
             return state;
         }

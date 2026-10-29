@@ -26,7 +26,7 @@ namespace Airerage.Runtime.Simulation
     /// シーンにステージの範囲（KnockoutBounds）があれば、外に出たキャラクターは撃破されて出現位置に戻る（T3-3）。
     /// シーンにギミック（StageZoneAuthoring）、コインの出現地点（CoinSpawnAuthoring）、拠点の候補（BankSpotAuthoring）があれば、それも使う。
     /// </summary>
-    public sealed class SimulationRunner : MonoBehaviour, ISimulationFeed, IPauseTarget
+    public sealed class SimulationRunner : MonoBehaviour, ISimulationFeed, IPauseTarget, ILocalAimSource
     {
         // 1フレームで進める最大のティック数。処理が遅れたときに追いつこうとして、さらに遅れるのを防ぐ（技術的な上限）。
         private const int MaxTicksPerFrame = 5;
@@ -112,6 +112,32 @@ namespace Airerage.Runtime.Simulation
 
         // 表示と効果音の読み取り口（ISimulationFeed）。番号 0 が操作するキャラクター、1 からがダミー。
         int ISimulationFeed.CharacterCount => _world == null ? 0 : _world.CharacterCount;
+
+        bool ILocalAimSource.TryPeekAim(int index, out System.Numerics.Vector2 aim)
+        {
+            aim = default;
+            if (_world == null || _input == null || index != _player)
+            {
+                return false;
+            }
+            SimInput shown = InputOverride != null ? LastInput : _input.Peek(_world.GetState(_player).Position);
+            aim = shown.HasAim ? shown.Aim : shown.Move;
+            return true;
+        }
+
+        bool ILocalAimSource.TryGetTargetCursor(int index, out System.Numerics.Vector2 cursor)
+        {
+            cursor = default;
+            if (_input == null || index != _player || !_input.Targeting)
+            {
+                return false;
+            }
+            cursor = _input.TargetCursor;
+            return true;
+        }
+
+        Airerage.Core.Physics.ICollisionQuery ILocalAimSource.Collision => _world?.Collision;
+        StageBounds? ILocalAimSource.Bounds => _world?.Bounds;
         int ISimulationFeed.LocalCharacter => _world == null ? -1 : _player;
         CharacterState ISimulationFeed.GetState(int index) => _world.GetState(index);
         CharacterConfig ISimulationFeed.GetConfig(int index) => _world.GetConfig(index);
@@ -279,6 +305,8 @@ namespace Airerage.Runtime.Simulation
         {
             if (!_inputBlocked)
             {
+                // メーデー（JUGGERNAUT の R）で場所を選んでいる間は、照準に場所を入れる。
+                _input.UpdateTargeting(_world.GetState(_player), _world.GetConfig(_player), _world.Bounds);
                 _input.Poll(_camera, PlayerConfig.Wire.AimDeadzone);
                 if (_input.ResetRequested)
                 {
@@ -348,7 +376,7 @@ namespace Airerage.Runtime.Simulation
             if (_characterView != null)
             {
                 _characterView.Render(_previous, current, alpha, PlayerConfig.Movement.HalfExtents.ToUnity());
-                _characterView.RenderAction(current, PlayerConfig.Combat, _world.Rules.RespawnDelayTicks, PlayerConfig.Movement);
+                _characterView.RenderAction(current, PlayerConfig.Combat, _world.Rules.RespawnDelayTicks, PlayerConfig.Movement, PlayerConfig.Skills);
                 _characterView.SetCostume(_playerCharacter);
                 bool cloned = SimWorldFeed.TryGetClone(_world, _player, out CharacterState clone);
                 _characterView.RenderClone(cloned, clone, PlayerConfig.Movement.HalfExtents.ToUnity(), _world.Tick, _wireView);

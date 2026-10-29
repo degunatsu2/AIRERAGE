@@ -452,7 +452,8 @@ namespace Airerage.Core.Skills
         public static bool IsBlockable(WorldObjectKind kind)
         {
             return kind == WorldObjectKind.Projectile || kind == WorldObjectKind.Missile || kind == WorldObjectKind.Macaron
-                || kind == WorldObjectKind.CreamShot || kind == WorldObjectKind.Scale || kind == WorldObjectKind.BallLightning;
+                || kind == WorldObjectKind.CreamShot || kind == WorldObjectKind.Scale || kind == WorldObjectKind.BallLightning
+                || kind == WorldObjectKind.Shell || kind == WorldObjectKind.Mine;
         }
 
         /// <summary>

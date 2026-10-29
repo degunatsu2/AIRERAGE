@@ -55,7 +55,7 @@ namespace Airerage.Core.Movement
 
         private static float ComputeHorizontalVelocity(float vx, float inputX, bool grounded, MovementTuning tuning, float dt, float groundDrift)
         {
-            float target = inputX * tuning.RunSpeed;
+            float target = inputX * (grounded || tuning.AirRunSpeed <= 0f ? tuning.RunSpeed : tuning.AirRunSpeed);
             if (grounded)
             {
                 return SimMath.MoveTowards(vx, target + groundDrift, tuning.GroundAcceleration * dt);
@@ -80,6 +80,19 @@ namespace Airerage.Core.Movement
             bool pressed = input.WasPressed(InputButtons.Jump);
             bool canGroundJump = state.Grounded || state.CoyoteTicksLeft > 0;
 
+            if (state.JumpSquatTicksLeft > 0)
+            {
+                // 地上のジャンプの発生を待っている（JumpStartupTicks）。待ち終わったら、足場に残っていれば跳ぶ。
+                state.JumpSquatTicksLeft--;
+                if (state.JumpSquatTicksLeft == 0 && canGroundJump)
+                {
+                    state.CoyoteTicksLeft = 0;
+                    state.Grounded = false;
+                    state.Velocity.Y = tuning.JumpSpeed;
+                }
+                return;
+            }
+
             if (pressed && !canGroundJump && state.AirJumpsUsed < tuning.AirJumps)
             {
                 state.AirJumpsUsed++;
@@ -96,6 +109,11 @@ namespace Airerage.Core.Movement
             if (state.JumpBufferTicksLeft > 0 && canGroundJump)
             {
                 state.JumpBufferTicksLeft = 0;
+                if (tuning.JumpStartupTicks > 0)
+                {
+                    state.JumpSquatTicksLeft = tuning.JumpStartupTicks;
+                    return;
+                }
                 state.CoyoteTicksLeft = 0;
                 state.Grounded = false;
                 state.Velocity.Y = tuning.JumpSpeed;

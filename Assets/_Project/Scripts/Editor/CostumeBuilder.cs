@@ -16,10 +16,20 @@ namespace Airerage.Editor
     /// - PASTRY CHEF: クリーム色のコック帽（ふくらんだ上と帯）とコックコート（2 列のボタン、首のスカーフ）。
     /// - SOLDERER: 濃い紺の作業着と胸の稲妻の線（光る水色）、額のゴーグル、背中のバッテリーと端子。
     /// - THIEF: 黒い服とニット帽、目元の覆面、首の赤いスカーフ（後ろへなびく）、腰の茶色い巾着袋。
+    /// - JUGGERNAUT: 苔色の戦車（両側の履帯と転輪、車体、低い砲塔とハッチ、前へ突き出た短い砲身）。ふつうより大きい箱に合わせて、部品は
+    ///   JUGGERNAUT の箱の大きさ（TankBox）で割る。箱の形と違うので、箱そのものは見せない（CostumeView）。
     /// </summary>
     internal static class CostumeBuilder
     {
         private static readonly Vector3 Body = new Vector3(0.8f, 1.8f, 0.8f);
+
+        // JUGGERNAUT の箱の大きさ（m。CharacterPresets の体の大きさ）。
+        private static readonly Vector3 TankBox = ToUnity(Airerage.Core.Simulation.CharacterPresets.Juggernaut().Movement.HalfExtents) * 2f;
+
+        private static Vector3 ToUnity(System.Numerics.Vector3 value)
+        {
+            return new Vector3(value.X, value.Y, value.Z);
+        }
 
         public static void Add(CharacterView view, Transform facing)
         {
@@ -122,8 +132,43 @@ namespace Airerage.Editor
             facingSets[(int)CharacterCostume.Thief] = thiefFacing.gameObject;
             PartRotated(thiefFacing, PrimitiveType.Cube, "ScarfTail", new Vector3(-0.56f, 0.24f, 0f), new Vector3(0.42f, 0.08f, 0.2f), new Vector3(0f, 0f, 18f), scarf);
 
+            // JUGGERNAUT: 苔色の戦車（ユーザーの案、2026-10-29。砲身の先は地上技の砲塔の先の判定の位置）。
+            Transform tank = Set(view.transform, "CostumeJuggernaut");
+            bodySets[(int)CharacterCostume.Juggernaut] = tank.gameObject;
+            Material moss = Lit("CostumeTankMoss", new Color(0.33f, 0.42f, 0.2f));
+            Material mossDark = Lit("CostumeTankMossDark", new Color(0.24f, 0.31f, 0.15f));
+            Material track = Lit("CostumeTankTrack", new Color(0.12f, 0.12f, 0.11f));
+            Material wheel = Lit("CostumeTankWheel", new Color(0.3f, 0.3f, 0.28f));
+            float hw = TankBox.x * 0.5f;
+            float hh = TankBox.y * 0.5f;
+            float hd = TankBox.z * 0.5f;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                TankPart(tank, PrimitiveType.Cube, side < 0f ? "TrackFront" : "TrackBack", new Vector3(0f, -hh + 0.27f, side * (hd - 0.2f)),
+                    new Vector3(TankBox.x + 0.08f, 0.54f, 0.42f), track);
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                float x = -hw + 0.32f + i * (TankBox.x - 0.64f) / 3f;
+                TankPartRotated(tank, PrimitiveType.Cylinder, "Wheel" + i, new Vector3(x, -hh + 0.27f, -hd - 0.02f), new Vector3(0.36f, 0.03f, 0.36f),
+                    new Vector3(90f, 0f, 0f), wheel);
+            }
+            TankPart(tank, PrimitiveType.Cube, "Hull", new Vector3(0f, -hh + 0.78f, 0f), new Vector3(TankBox.x - 0.02f, 0.5f, TankBox.z - 0.5f), moss);
+            TankPart(tank, PrimitiveType.Cube, "HullTop", new Vector3(0f, -hh + 1.06f, 0f), new Vector3(TankBox.x - 0.2f, 0.08f, TankBox.z - 0.6f), mossDark);
+            TankPart(tank, PrimitiveType.Cube, "Turret", new Vector3(0f, 0.35f, 0f), new Vector3(0.95f, 0.45f, 0.9f), moss);
+            TankPart(tank, PrimitiveType.Cylinder, "Hatch", new Vector3(-0.12f, 0.62f, 0f), new Vector3(0.34f, 0.05f, 0.34f), mossDark);
+            Transform tankFacing = Set(facing, "CostumeJuggernautFacing");
+            facingSets[(int)CharacterCostume.Juggernaut] = tankFacing.gameObject;
+            float tip = Airerage.Core.Simulation.CharacterPresets.Juggernaut().Combat.Ground.Hits[0].OffsetX;
+            TankPart(tankFacing, PrimitiveType.Cube, "Barrel", new Vector3((0.45f + tip - 0.12f) * 0.5f, 0.35f, 0f),
+                new Vector3(tip - 0.12f - 0.45f, 0.17f, 0.17f), mossDark);
+            TankPart(tankFacing, PrimitiveType.Cube, "Muzzle", new Vector3(tip - 0.06f, 0.35f, 0f), new Vector3(0.18f, 0.26f, 0.26f), track);
+            TankPart(tankFacing, PrimitiveType.Cube, "Mantlet", new Vector3(0.5f, 0.35f, 0f), new Vector3(0.14f, 0.34f, 0.5f), mossDark);
+
+            var hides = new bool[count];
+            hides[(int)CharacterCostume.Juggernaut] = true;
             var costume = view.gameObject.AddComponent<CostumeView>();
-            costume.Configure(bodySets, facingSets, texts.ToArray(), view.GetComponent<Renderer>());
+            costume.Configure(bodySets, facingSets, texts.ToArray(), view.GetComponent<Renderer>(), hides);
             SandboxWireSceneBuilder.SetReference(view, "_costume", costume);
         }
 
@@ -188,6 +233,33 @@ namespace Airerage.Editor
         private static Vector3 Divide(Vector3 value)
         {
             return new Vector3(value.x / Body.x, value.y / Body.y, value.z / Body.z);
+        }
+
+        // JUGGERNAUT の部品 1 つ（center と size は、JUGGERNAUT の箱の真ん中からの m）。
+        private static void TankPart(Transform parent, PrimitiveType type, string name, Vector3 center, Vector3 size, Material material)
+        {
+            GameObject go = SandboxWireSceneBuilder.CreateVisual(type, name, material, OfTank(size));
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = OfTank(center);
+            go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        private static void TankPartRotated(Transform parent, PrimitiveType type, string name, Vector3 center, Vector3 size, Vector3 rotation,
+            Material material)
+        {
+            var holder = new GameObject(name);
+            holder.transform.SetParent(parent, false);
+            holder.transform.localPosition = OfTank(center);
+            holder.transform.localScale = OfTank(Vector3.one);
+            holder.transform.localEulerAngles = rotation;
+            GameObject go = SandboxWireSceneBuilder.CreateVisual(type, name + "Part", material, size);
+            go.transform.SetParent(holder.transform, false);
+            go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        private static Vector3 OfTank(Vector3 value)
+        {
+            return new Vector3(value.x / TankBox.x, value.y / TankBox.y, value.z / TankBox.z);
         }
     }
 }

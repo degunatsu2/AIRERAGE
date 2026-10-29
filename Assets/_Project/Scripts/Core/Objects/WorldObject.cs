@@ -108,6 +108,19 @@ namespace Airerage.Core.Objects
         /// 転がっている、ChargeMilli は止まったティック（0 は動いている）、Variant は元の仕掛けの番号の下位（表示用）。
         /// </summary>
         TrapBall = 21,
+
+        /// <summary>
+        /// 砲弾（JUGGERNAUT）。Variant は 0: 空中横の砲弾（重力を受けずにまっすぐ飛び、最初に当たった人に当たって消える）、1: フラック
+        /// （重力を受けて飛び、キャラクター・地形・物に触れると爆発する）。
+        /// </summary>
+        Shell = 22,
+
+        /// <summary>
+        /// 地雷（JUGGERNAUT の E）。照準の方向へまっすぐ飛び、地形かキャラクターに張り付く。持ち主がもう一度 E を押すと爆発する。
+        /// Variant は 0: 飛んでいる、1: 地形（動く足場を含む）に張り付いた、2: キャラクターに張り付いた。Stored は張り付いた相手の番号
+        /// （キャラクターの番号、動く足場の番号 + 1。地形は 0）、End は張り付いた相手の中心からの位置。
+        /// </summary>
+        Mine = 23,
     }
 
     /// <summary>クリームの味（PASTRY CHEF の E。WorldObject.Variant）。</summary>

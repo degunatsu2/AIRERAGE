@@ -42,6 +42,9 @@ namespace Airerage.Core.Combat
         /// 威力の置き換えと吹き飛びの倍率: 前の判定を外して最後の判定だけを当てた（THIEF の空中上。AttackHit.LoneFatal）。
         /// </summary>
         LoneFatal = 1 << 8,
+
+        /// <summary>倍率: 急所の判定（JUGGERNAUT の地上技の砲塔の先。AttackHit.FatalScale）。</summary>
+        SweetSpot = 1 << 9,
     }
 
     /// <summary>
@@ -92,6 +95,13 @@ namespace Airerage.Core.Combat
         public AttackPower WithCritical(float scale)
         {
             return new AttackPower(Multiplier * scale, BonusPercent, KnockbackBonusPercent, true, Jackpot, Sources | PowerSource.Critical,
+                DamageOverride);
+        }
+
+        /// <summary>急所の判定を当てた強さ（倍率に scale を掛け、FATAL にする。AttackHit.FatalScale）。</summary>
+        public AttackPower WithSweetSpot(float scale)
+        {
+            return new AttackPower(Multiplier * scale, BonusPercent, KnockbackBonusPercent, true, Jackpot, Sources | PowerSource.SweetSpot,
                 DamageOverride);
         }
 

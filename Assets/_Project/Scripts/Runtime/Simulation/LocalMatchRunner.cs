@@ -31,7 +31,7 @@ namespace Airerage.Runtime.Simulation
     /// - シングルモード（docs/16 T7-2）: CPU の人（LocalPlayerSetup.IsCpu）は、CpuPlayer が入力を作る（機器は読まない。照準の表示と技の札は出さない）。
     /// ステージの地形・範囲・ギミック・コインの出現地点・拠点・出現位置は、読み込んだステージのシーンから探す（D-66）。
     /// </summary>
-    public sealed class LocalMatchRunner : MonoBehaviour, ISimulationFeed, IMatchControls, IPauseTarget, ICpuRoster
+    public sealed class LocalMatchRunner : MonoBehaviour, ISimulationFeed, IMatchControls, IPauseTarget, ICpuRoster, ILocalAimSource
     {
         public const int MaxPlayers = 4;
 
@@ -122,6 +122,32 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>キャラクター index を CPU が操作しているか（ICpuRoster）。</summary>
         public bool IsCpu(int index) => index >= 0 && index < _players.Count && _players[index].IsCpu;
+
+        bool ILocalAimSource.TryPeekAim(int index, out System.Numerics.Vector2 aim)
+        {
+            aim = default;
+            if (_world == null || index < 0 || index >= _inputs.Count || index >= _world.CharacterCount || IsCpu(index))
+            {
+                return false;
+            }
+            SimInput shown = _inputs[index].Peek(_world.GetState(index).Position);
+            aim = shown.HasAim ? shown.Aim : shown.Move;
+            return true;
+        }
+
+        bool ILocalAimSource.TryGetTargetCursor(int index, out System.Numerics.Vector2 cursor)
+        {
+            cursor = default;
+            if (index < 0 || index >= _inputs.Count || IsCpu(index) || !_inputs[index].Targeting)
+            {
+                return false;
+            }
+            cursor = _inputs[index].TargetCursor;
+            return true;
+        }
+
+        Airerage.Core.Physics.ICollisionQuery ILocalAimSource.Collision => _world?.Collision;
+        StageBounds? ILocalAimSource.Bounds => _world?.Bounds;
 
         /// <summary>キャラクター index の CPU（人なら null。テスト用）。</summary>
         public CpuPlayer CpuOf(int index) => index >= 0 && index < _cpus.Length ? _cpus[index] : null;
@@ -367,6 +393,8 @@ namespace Airerage.Runtime.Simulation
         {
             for (int p = 0; p < _inputs.Count && !_inputBlocked; p++)
             {
+                // メーデー（JUGGERNAUT の R）で場所を選んでいる間は、照準に場所を入れる。
+                _inputs[p].UpdateTargeting(_world.GetState(p), IsCpu(p) ? null : _world.GetConfig(p), _world.Bounds);
                 _inputs[p].Poll(_camera, _world.GetConfig(p).Wire.AimDeadzone);
             }
             _accumulator += Time.deltaTime * SpeedScale;
@@ -407,7 +435,7 @@ namespace Airerage.Runtime.Simulation
                 CharacterState current = _world.GetState(p);
                 CharacterConfig config = _world.GetConfig(p);
                 _characterViews[p].Render(_previous[p], current, alpha, config.Movement.HalfExtents.ToUnity());
-                _characterViews[p].RenderAction(current, config.Combat, _world.Rules.RespawnDelayTicks, config.Movement);
+                _characterViews[p].RenderAction(current, config.Combat, _world.Rules.RespawnDelayTicks, config.Movement, config.Skills);
                 _characterViews[p].SetCostume(CharacterOf(p));
                 _wireViews[p].Render(_previous[p], current, alpha, config.Wire);
                 bool cloned = SimWorldFeed.TryGetClone(_world, p, out CharacterState clone);

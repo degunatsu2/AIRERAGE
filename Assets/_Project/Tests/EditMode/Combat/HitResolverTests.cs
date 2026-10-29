@@ -466,7 +466,7 @@ namespace Airerage.Core.Tests.Combat
             var configs = new[]
             {
                 CharacterPresets.Standard(), CharacterPresets.RiskTaker(), CharacterPresets.StormRunner(), CharacterPresets.SpaceTraveler(),
-                CharacterPresets.PastryChef(), CharacterPresets.Solderer(), CharacterPresets.Thief(),
+                CharacterPresets.PastryChef(), CharacterPresets.Solderer(), CharacterPresets.Thief(), CharacterPresets.Juggernaut(),
             };
             for (int c = 0; c < configs.Length; c++)
             {

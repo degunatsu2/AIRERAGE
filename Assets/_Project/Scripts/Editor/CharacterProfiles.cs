@@ -96,6 +96,16 @@ namespace Airerage.Editor
                             .English("BANK HEIST", "Only near the bank. Stand still and keep stealing, then press again to collect coins for how long you kept at it. The longer, the bigger the haul. Getting hit ruins it."));
                     character.SetCostume(CharacterCostume.Thief);
                     break;
+                case CharacterPresets.JuggernautName:
+                    character.SetProfile(new[] { "#地上戦", "#鈍重" }, new[] { "#GroundFighter", "#Heavy" },
+                        new SkillText("フラック", "地上で構え、構えている間にもう一度押すと、照準の方向へ重い砲弾を撃つ。当たると爆発する。上下で弾道の強さ（弱・中・強・弩）を選ぶ。続けて3回まで撃て、Q以外の行動で構えが解ける。")
+                            .English("FLAK", "Brace on the ground, then press again to fire a heavy shell toward your aim that explodes on impact. Use up and down to pick the trajectory power (weak, medium, strong, max). Fire up to three in a row; any action other than Q breaks the stance."),
+                        new SkillText("マイントラップ", "照準の方向へ地雷を撃つ。地形かキャラクターに張り付き、もう一度押すと爆発する。", "爆発してから")
+                            .English("MINE TRAP", "Fire a mine toward your aim. It sticks to terrain or a character; press again to detonate it.", "after it detonates"),
+                        new SkillText("メーデー", "ジェット機に吊られて飛び去り、ステージ全体から空いた場所を選んで運んでもらう。その間は攻撃を受けない。")
+                            .English("MAYDAY", "A jet lifts you away; pick any open spot on the whole stage and it carries you there. You can't be hit meanwhile."));
+                    character.SetCostume(CharacterCostume.Juggernaut);
+                    break;
             }
         }
     }

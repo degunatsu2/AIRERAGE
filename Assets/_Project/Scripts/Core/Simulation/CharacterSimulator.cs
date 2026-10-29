@@ -141,10 +141,12 @@ namespace Airerage.Core.Simulation
                 state.Combat.HazardImmunityTicks--;
             }
             ActionController.Update(ref state, frame, config);
-            if (!state.Action.IsFree || ActionController.IsRootedHold(state, config.Combat))
+            if (!state.Action.IsFree || ActionController.IsRootedHold(state, config.Combat) || state.Combat.FlakStance)
             {
-                frame = new InputFrame(ActionController.ControlInput(state, effectiveInput, config.Combat), state.PreviousButtons);
+                frame = new InputFrame(ActionController.ControlInput(state, effectiveInput, config.Combat, state.Grounded), state.PreviousButtons);
                 state.JumpBufferTicksLeft = 0;
+                // 攻撃・ガードなどを始めたら、ジャンプの発生を待つのをやめる（跳ばない）。
+                state.JumpSquatTicksLeft = 0;
             }
 
             _wire.UpdatePhase(ref state, frame, config.Wire);
@@ -161,6 +163,7 @@ namespace Airerage.Core.Simulation
             {
                 state.Velocity = _wire.ComputeAttachedVelocity(ref state, frame, config.Wire, movement.Gravity);
                 state.JumpBufferTicksLeft = 0;
+                state.JumpSquatTicksLeft = 0;
             }
             else if (state.WallSide != 0)
             {

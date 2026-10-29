@@ -95,6 +95,18 @@ namespace Airerage.Core.Combat
         /// </summary>
         public int StunTicks;
 
+        /// <summary>
+        /// 水平に回る砲塔の先の判定（JUGGERNAUT の地上技。ユーザーの案、2026-10-29）。0 より大きければ、判定の横の位置 OffsetX が
+        /// SweepTicks ティックで 1 周の回転に合わせて前と後ろを行き来する（OffsetX × cos。StartTick で前）。
+        /// </summary>
+        public int SweepTicks;
+
+        /// <summary>
+        /// 当てた所が急所の判定（JUGGERNAUT の砲塔の先。ユーザーの案、2026-10-29）。0 より大きければ、当たれば FATAL で、威力と吹き飛びに
+        /// FatalScale を掛ける（PowerSource.SweetSpot）。同じ攻撃の体の判定より先に並べ、AttackData.ExclusiveHits にする。
+        /// </summary>
+        public float FatalScale;
+
         public bool IsActiveAt(int ticks)
         {
             return ticks >= StartTick && (UntilEnd || ticks < StartTick + ActiveTicks);
@@ -119,6 +131,8 @@ namespace Airerage.Core.Combat
             v.Positive(nameof(CriticalScale), CriticalScale);
             v.NonNegative(nameof(LoneFatalDamage), LoneFatalDamage);
             v.Positive(nameof(LoneFatalKnockbackScale), LoneFatalKnockbackScale);
+            v.NonNegative(nameof(SweepTicks), SweepTicks);
+            v.NonNegative(nameof(FatalScale), FatalScale);
             return v;
         }
     }
@@ -224,6 +238,27 @@ namespace Airerage.Core.Combat
 
         /// <summary>前転する技（表示だけに使う。THIEF の空中 N）。最初の判定から最後の判定の終わりまでに、体を前へ 1 回転させる。</summary>
         public bool Flip;
+
+        /// <summary>
+        /// 攻撃中も、移動のスティックで左右に動ける（ふだんの走る速さ。ジャンプ・ワイヤーはできない。JUGGERNAUT の地上技。2026-10-29）。
+        /// </summary>
+        public bool Mobile;
+
+        /// <summary>
+        /// 攻撃ボタンを押し続けている間は技を続ける（TotalTicks で終わらず、離したら終わる。押し始めから SustainMaxTicks まで。JUGGERNAUT の
+        /// 地上技。ユーザーの案、2026-10-29）。押し続けた長さが SustainRiseFromTicks 以上なら、SustainRiseSpeed（m/s）でゆっくり上がる。
+        /// 押し続けた長さは ActionState.Charge（離したら -1）。判定は UntilEnd にする。
+        /// </summary>
+        public bool HeldSustain;
+        public int SustainRiseFromTicks;
+        public int SustainMaxTicks;
+        public float SustainRiseSpeed;
+
+        /// <summary>
+        /// 0 より大きければ、攻撃のティックが RehitTicks の倍数を越えるたびに当てた相手を忘れ、同じ相手にもう一度当たる（回り続ける
+        /// JUGGERNAUT の地上技。2026-10-29）。ExclusiveHits と合わせると、その間ごとに、先に並べた判定が 1 つだけ当たる。
+        /// </summary>
+        public int RehitTicks;
 
         /// <summary>
         /// ための段階（長押しの攻撃。FromTicks の小さい順。最初は 0）。空なら、ためても威力は変わらない。
@@ -392,6 +427,10 @@ namespace Airerage.Core.Combat
             v.NonNegative(nameof(ChargedTotalTicks), ChargedTotalTicks);
             v.NonNegative(nameof(ChainMax), ChainMax);
             v.NonNegative(nameof(ChainWindowTicks), ChainWindowTicks);
+            v.NonNegative(nameof(SustainRiseFromTicks), SustainRiseFromTicks);
+            v.NonNegative(nameof(SustainMaxTicks), SustainMaxTicks);
+            v.NonNegative(nameof(SustainRiseSpeed), SustainRiseSpeed);
+            v.NonNegative(nameof(RehitTicks), RehitTicks);
             v.NotNull(nameof(ChargeLevels), ChargeLevels);
             if (ChargeLevels != null)
             {
@@ -689,6 +728,15 @@ namespace Airerage.Core.Combat
         /// <summary>ガードが終わってから、次のガードができるまで（ティック。D-21: 2 秒）。ジャストガードに成功したら 0 に戻る（D-39）。</summary>
         public int GuardCooldownTicks = 120;
 
+        /// <summary>
+        /// 0 より大きければ、ガードボタンを押し続けている間はガードを延ばせる（押し始めからこの長さまで。JUGGERNAUT は 4 秒。ユーザーの案、
+        /// 2026-10-29）。ふつうのキャラクターは 0（GuardTicks で終わる）。
+        /// </summary>
+        public int GuardHoldMaxTicks;
+
+        /// <summary>ガードしながら地上を歩ける（ふだんの走る速さ。空中では動けない。JUGGERNAUT。ユーザーの回答、2026-10-29）。</summary>
+        public bool GuardWalk;
+
         /// <summary>ふつうのガードで攻撃を受けたとき、ガードが少なくともこの後まで続く（ガード硬直。ティック）。【仮】</summary>
         public int GuardStunTicks = 12;
 
@@ -842,6 +890,7 @@ namespace Airerage.Core.Combat
             v.NonNegative(nameof(JustGuardTicks), JustGuardTicks);
             v.AtMost(nameof(JustGuardTicks), JustGuardTicks, nameof(GuardTicks), GuardTicks);
             v.NonNegative(nameof(GuardCooldownTicks), GuardCooldownTicks);
+            v.NonNegative(nameof(GuardHoldMaxTicks), GuardHoldMaxTicks);
             v.NonNegative(nameof(GuardStunTicks), GuardStunTicks);
             v.InRange(nameof(GuardKnockbackScale), GuardKnockbackScale, 0f, 1f);
             v.NonNegative(nameof(ParriedStunTicks), ParriedStunTicks);

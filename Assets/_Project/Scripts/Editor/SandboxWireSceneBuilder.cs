@@ -36,6 +36,7 @@ namespace Airerage.Editor
         public const string PastryChefPath = "Assets/_Project/Data/Characters/PastryChef.asset";
         public const string SoldererPath = "Assets/_Project/Data/Characters/Solderer.asset";
         public const string ThiefPath = "Assets/_Project/Data/Characters/Thief.asset";
+        public const string JuggernautPath = "Assets/_Project/Data/Characters/Juggernaut.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
 
@@ -540,6 +541,7 @@ namespace Airerage.Editor
             SetReference(electric, "_source", source);
             SetReference(electric, "_lineTemplate", electricLine);
             CreateThiefEffects(source, audio);
+            CreateJuggernautEffects(source, audio);
             // 照準の方向の技を長押しで狙っている間の矢印（水色。ユーザーの要望、2026-10-29）。
             var aimArrow = new GameObject("SkillAim").AddComponent<SkillAimView>();
             LineRenderer aimLine = CreateIndicatorLine(aimArrow.transform, "AimLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
@@ -619,6 +621,107 @@ namespace Airerage.Editor
             {
                 SetReference(view, "_audio", audio);
             }
+        }
+
+        /// <summary>
+        /// JUGGERNAUT の技の表示（JuggernautEffectsView。docs/14 1.7）: 砲弾・爆発・地雷、フラックの弾道の段階と予測線、メーデーのジェット機と
+        /// 場所のカーソル・N/A。全体を見せるのは、シーンの追従カメラのズーム（あれば。ローカル対戦は SharedCamera）。見本は隠しておく。
+        /// </summary>
+        internal static void CreateJuggernautEffects(MonoBehaviour source, GameAudio audio)
+        {
+            var view = new GameObject("JuggernautEffects").AddComponent<JuggernautEffectsView>();
+            var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            LineRenderer line = CreateIndicatorLine(view.transform, "JuggernautLineTemplate", lineMaterial, 0.1f);
+            GameObject Template(PrimitiveType type, string templateName, Material material, Vector3 scale)
+            {
+                GameObject go = CreateVisual(type, templateName, material, scale);
+                go.transform.SetParent(view.transform, false);
+                go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                return go;
+            }
+            var tuning = new Airerage.Core.Skills.JuggernautTuning();
+            GameObject shell = Template(PrimitiveType.Sphere, "CannonShellTemplate", LoadOrCreateMaterial("JuggernautShell", new Color(0.2f, 0.2f, 0.22f)),
+                Vector3.one * tuning.CannonRadius * 2f);
+            GameObject flak = Template(PrimitiveType.Sphere, "FlakShellTemplate", LoadOrCreateMaterial("JuggernautFlak", new Color(0.36f, 0.45f, 0.2f)),
+                Vector3.one * tuning.FlakRadius * 2.4f);
+            GameObject blast = Template(PrimitiveType.Sphere, "BlastTemplate",
+                LoadOrCreateTransparentMaterial("JuggernautBlast", new Color(1f, 0.55f, 0.15f, 0.8f)), Vector3.one);
+            // 地雷（横から見ても見えるように、低い丸屋根と帯と、てっぺんの赤い灯。張り付いた面の外へ向ける）。
+            var mine = new GameObject("MineTemplate");
+            mine.transform.SetParent(view.transform, false);
+            float mineSize = tuning.MineRadius * 2f;
+            void MinePart(PrimitiveType type, string partName, Material material, Vector3 position, Vector3 scale)
+            {
+                GameObject go = CreateVisual(type, partName, material, scale);
+                go.transform.SetParent(mine.transform, false);
+                go.transform.localPosition = position;
+                go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            MinePart(PrimitiveType.Sphere, "Body", LoadOrCreateMaterial("JuggernautMine", new Color(0.16f, 0.17f, 0.15f)), Vector3.zero,
+                new Vector3(mineSize * 1.1f, mineSize * 0.7f, mineSize * 1.1f));
+            MinePart(PrimitiveType.Cylinder, "Band", LoadOrCreateMaterial("JuggernautMineBand", new Color(0.42f, 0.5f, 0.24f)), new Vector3(0f, 0.02f, 0f),
+                new Vector3(mineSize * 1.2f, 0.03f, mineSize * 1.2f));
+            MinePart(PrimitiveType.Sphere, "Lamp", LoadOrCreateMaterial("JuggernautMineLamp", new Color(1f, 0.15f, 0.1f), unlit: true),
+                new Vector3(0f, mineSize * 0.35f, 0f), Vector3.one * mineSize * 0.4f);
+            GameObject jet = CreateJet(view.transform);
+            var text = new GameObject("JuggernautTextTemplate").AddComponent<TextMesh>();
+            text.transform.SetParent(view.transform, false);
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.fontSize = 64;
+            text.fontStyle = FontStyle.Bold;
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = font;
+            text.GetComponent<MeshRenderer>().sharedMaterial = font.material;
+            foreach (GameObject template in new[] { line.gameObject, shell, flak, blast, mine, jet, text.gameObject })
+            {
+                template.SetActive(false);
+            }
+            SetReference(view, "_source", source);
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            CameraZoom zoom = Object.FindFirstObjectByType<CameraZoom>();
+            if (zoom != null)
+            {
+                SetReference(view, "_zoom", zoom);
+            }
+            SetReference(view, "_lineTemplate", line);
+            SetReference(view, "_shellTemplate", shell);
+            SetReference(view, "_flakTemplate", flak);
+            SetReference(view, "_blastTemplate", blast);
+            SetReference(view, "_mineTemplate", mine);
+            SetReference(view, "_jetTemplate", jet);
+            SetReference(view, "_textTemplate", text);
+            if (audio != null)
+            {
+                SetReference(view, "_audio", audio);
+            }
+        }
+
+        // メーデーのジェット機（右向き。胴体・主翼・尾翼・操縦席と、下に吊るケーブル）。
+        private static GameObject CreateJet(Transform parent)
+        {
+            var root = new GameObject("JetTemplate");
+            root.transform.SetParent(parent, false);
+            Material hull = LoadOrCreateMaterial("JuggernautJet", new Color(0.42f, 0.46f, 0.5f));
+            Material dark = LoadOrCreateMaterial("JuggernautJetDark", new Color(0.22f, 0.25f, 0.28f));
+            Material glass = LoadOrCreateMaterial("JuggernautJetGlass", new Color(0.45f, 0.8f, 1f), unlit: true);
+            Material cable = LoadOrCreateMaterial("JuggernautJetCable", new Color(0.1f, 0.1f, 0.1f));
+            void Part(PrimitiveType type, string partName, Material material, Vector3 position, Vector3 scale)
+            {
+                GameObject go = CreateVisual(type, partName, material, scale);
+                go.transform.SetParent(root.transform, false);
+                go.transform.localPosition = position;
+                go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            Part(PrimitiveType.Cube, "Fuselage", hull, new Vector3(0f, 1.1f, 0f), new Vector3(4.2f, 0.7f, 0.8f));
+            Part(PrimitiveType.Cube, "Nose", dark, new Vector3(2.35f, 1.05f, 0f), new Vector3(0.6f, 0.45f, 0.6f));
+            Part(PrimitiveType.Cube, "Cockpit", glass, new Vector3(1.4f, 1.5f, 0f), new Vector3(0.9f, 0.3f, 0.5f));
+            Part(PrimitiveType.Cube, "Wing", dark, new Vector3(-0.2f, 1.05f, 0f), new Vector3(1.4f, 0.12f, 3.6f));
+            Part(PrimitiveType.Cube, "Tail", dark, new Vector3(-1.9f, 1.75f, 0f), new Vector3(0.7f, 0.9f, 0.12f));
+            Part(PrimitiveType.Cube, "TailWing", dark, new Vector3(-1.9f, 1.25f, 0f), new Vector3(0.6f, 0.1f, 1.6f));
+            Part(PrimitiveType.Cube, "CableLeft", cable, new Vector3(-0.5f, 0.35f, 0f), new Vector3(0.05f, 1.2f, 0.05f));
+            Part(PrimitiveType.Cube, "CableRight", cable, new Vector3(0.5f, 0.35f, 0f), new Vector3(0.05f, 1.2f, 0.05f));
+            return root;
         }
 
         /// <summary>ためる技のオーラ（ChargeAuraView。見本の線と光は隠しておく）。</summary>
@@ -1240,7 +1343,7 @@ namespace Airerage.Editor
 
         /// <summary>
         /// 選べるキャラクターの一覧（docs/13 T5-5、T5-6）を作り直す: character（STANDARD）と、CharacterPresets から作るキャラクター
-        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER、PASTRY CHEF、SOLDERER、THIEF）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
+        /// （RISK TAKER、STORM RUNNER、SPACE TRAVELER、PASTRY CHEF、SOLDERER、THIEF、JUGGERNAUT）。キャラクターのアセットは、ビルドのたびに CharacterPresets の値で作り直す
         /// （値はコードの 1 か所で決める）。仮のロゴ（CharacterLogoPainter）も描き直して設定する（docs/13 T5-8）。
         /// </summary>
         internal static CharacterRoster LoadOrCreateCharacterRoster(CharacterConfigAsset character)
@@ -1258,6 +1361,8 @@ namespace Airerage.Editor
             AssignLogo(solderer, "Solderer", CharacterLogoPainter.Solderer());
             CharacterConfigAsset thief = WritePresetCharacter(ThiefPath, CharacterPresets.Thief(), CharacterPresets.ThiefName);
             AssignLogo(thief, "Thief", CharacterLogoPainter.Thief());
+            CharacterConfigAsset juggernaut = WritePresetCharacter(JuggernautPath, CharacterPresets.Juggernaut(), CharacterPresets.JuggernautName);
+            AssignLogo(juggernaut, "Juggernaut", CharacterLogoPainter.Juggernaut());
             var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(CharacterRosterPath);
             if (roster == null)
             {
@@ -1265,7 +1370,7 @@ namespace Airerage.Editor
                 roster = ScriptableObject.CreateInstance<CharacterRoster>();
                 AssetDatabase.CreateAsset(roster, CharacterRosterPath);
             }
-            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler, pastryChef, solderer, thief });
+            roster.Configure(new[] { character, riskTaker, stormRunner, spaceTraveler, pastryChef, solderer, thief, juggernaut });
             EditorUtility.SetDirty(roster);
             AssetDatabase.SaveAssets();
             return roster;

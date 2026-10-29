@@ -83,7 +83,7 @@ namespace Airerage.PlayMode.Tests
                 yield return WaitFor(() => music.Current == music.SelectMusic, 3f, "キャラクター選択で選択の曲に変わらない");
                 CharacterSelectScreen characters = menu.CharacterSelect;
                 Assert.That(characters.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Single));
-                Assert.That(characters.Count, Is.EqualTo(7), "7 体のアイコンがない");
+                Assert.That(characters.Count, Is.EqualTo(8), "8 体のアイコンがない");
                 Assert.That(characters.CharacterOf(0), Is.EqualTo(1), "前に選んだキャラクターから始まらない");
                 Assert.That(characters.ShownName(0), Is.EqualTo(CharacterPresets.RiskTakerName), "1P の枠にカーソルのキャラクターを出さない");
                 Assert.That(characters.ShownTags(0), Is.EqualTo("#コイン重視  #大器晩成"), "1P の枠にハッシュタグを出さない");

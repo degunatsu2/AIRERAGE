@@ -11,6 +11,8 @@ namespace Airerage.Runtime.Presentation
     /// 初期の距離（シーンで置いた距離）へは、マウスのホイールの押し込みか、ゲームパッドの十字キーの左か右で戻る（ResetZoom。
     /// ユーザーの要望、2026-10-15。十字キーの左右は【仮】）。
     /// アクションは AirerageControls.inputactions の "Camera" マップ（ScrollZoom / HoldZoom / ResetZoom）。
+    /// 全体を見せる間（SetOverview。JUGGERNAUT のフラックの構えとメーデーの場所選び。ユーザーの案、2026-10-29）は、追う点をステージの
+    /// 中心に替え、距離をステージ全体が入る距離にする（ホイールで変えた距離は覚えておき、終わったら戻る）。
     /// </summary>
     public sealed class CameraZoom : MonoBehaviour
     {
@@ -31,6 +33,11 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _sharpness = 12f;
 
         private InputActionMap _map;
+        private CinemachineCamera _virtualCamera;
+        private Transform _overviewTarget;
+        private Transform _followBefore;
+        private bool _overview;
+        private float _overviewDistance;
         private InputAction _scroll;
         private InputAction _hold;
         private InputAction _reset;
@@ -42,6 +49,9 @@ namespace Airerage.Runtime.Presentation
         public float DefaultDistance { get; private set; }
 
         public float MinDistance => _minDistance;
+
+        /// <summary>全体を見せているか。</summary>
+        public bool InOverview => _overview;
         public float MaxDistance => _maxDistance;
 
         private void Awake()
@@ -64,6 +74,47 @@ namespace Airerage.Runtime.Presentation
             _reset = _map.FindAction("ResetZoom", throwIfNotFound: true);
             DefaultDistance = Mathf.Clamp(_composer.CameraDistance, _minDistance, _maxDistance);
             TargetDistance = DefaultDistance;
+            _virtualCamera = _composer.GetComponent<CinemachineCamera>();
+        }
+
+        /// <summary>
+        /// 全体を見せる（on の間、カメラは center を追い、距離を distance（m）にする）。やめたら、元の追う相手と距離に戻る。
+        /// </summary>
+        public void SetOverview(bool on, Vector3 center, float distance)
+        {
+            if (_virtualCamera == null)
+            {
+                return;
+            }
+            if (on)
+            {
+                if (_overviewTarget == null)
+                {
+                    _overviewTarget = new GameObject("OverviewTarget").transform;
+                }
+                _overviewTarget.position = center;
+                if (!_overview)
+                {
+                    _followBefore = _virtualCamera.Follow;
+                    _virtualCamera.Follow = _overviewTarget;
+                }
+                _overviewDistance = Mathf.Max(distance, _minDistance);
+                _overview = true;
+                return;
+            }
+            if (_overview)
+            {
+                _virtualCamera.Follow = _followBefore;
+                _overview = false;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_overviewTarget != null)
+            {
+                Destroy(_overviewTarget.gameObject);
+            }
         }
 
         private void OnEnable()
@@ -89,7 +140,7 @@ namespace Airerage.Runtime.Presentation
             }
 
             float t = 1f - Mathf.Exp(-_sharpness * Time.unscaledDeltaTime);
-            _composer.CameraDistance = Mathf.Lerp(_composer.CameraDistance, TargetDistance, t);
+            _composer.CameraDistance = Mathf.Lerp(_composer.CameraDistance, _overview ? _overviewDistance : TargetDistance, t);
         }
 
         /// <summary>目標の距離を初期の距離に戻す。</summary>

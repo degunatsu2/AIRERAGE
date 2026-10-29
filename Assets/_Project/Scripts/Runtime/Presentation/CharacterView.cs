@@ -207,6 +207,9 @@ namespace Airerage.Runtime.Presentation
         /// <summary>透明（THIEF の E）なので、体と周りのゲージを見えなくしているか。</summary>
         public bool HiddenForInvisible { get; private set; }
 
+        /// <summary>メーデー（JUGGERNAUT の R）でジェット機に吊られて画面の外にいるので、見えなくしているか。</summary>
+        public bool HiddenForAway { get; private set; }
+
         /// <summary>分身（THIEF の E）を出しているか。</summary>
         public bool ShowingClone => _clone != null && _clone.activeSelf;
 
@@ -233,8 +236,10 @@ namespace Airerage.Runtime.Presentation
         /// respawnDelayTicks は復帰を待つ長さ（MatchRules.RespawnDelayTicks。復帰までのゲージの全体の長さに使う）。
         /// movement があれば、壁に張り付いている間に残りの時間を紫の円形ゲージで示す。
         /// </summary>
-        public void RenderAction(in CharacterState current, CombatTuning combat, int respawnDelayTicks = 0, MovementTuning movement = null)
+        public void RenderAction(in CharacterState current, CombatTuning combat, int respawnDelayTicks = 0, MovementTuning movement = null,
+            SkillTuning skills = null)
         {
+            RenderAway(current, skills);
             RenderWallCling(current, movement);
             RenderWater(current);
             RenderHitbox(current, combat);
@@ -248,7 +253,7 @@ namespace Airerage.Runtime.Presentation
             RenderCapture(current);
             RenderVisibility(current);
             RenderRespawn(current, respawnDelayTicks);
-            if (HiddenForInvisible)
+            if (HiddenForInvisible || current.Combat.IsAway)
             {
                 HideIndicators();
             }
@@ -346,6 +351,58 @@ namespace Airerage.Runtime.Presentation
             return 360f * Mathf.Clamp01((ticks - from) / Mathf.Max(1f, to - from));
         }
 
+        /// <summary>
+        /// 水平に回る砲塔の先の判定（AttackHit.SweepTicks）を持つ攻撃の、経過 ticks での回転（度。判定が前にあるとき 0、後ろにあるとき 180。
+        /// HitResolver.SweptOffsetX と同じ回り方）。そういう判定がなければ false。
+        /// </summary>
+        public static bool SweepAngle(AttackData attack, int ticks, out float degrees)
+        {
+            degrees = 0f;
+            foreach (AttackHit hit in attack.Hits)
+            {
+                if (hit.SweepTicks > 0)
+                {
+                    int t = Mathf.Max(0, ticks - hit.StartTick);
+                    degrees = 360f * (t % hit.SweepTicks) / hit.SweepTicks;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>メーデーで吊られて上がって見える高さ（m。表示だけ。シミュレーションの位置は吊られた場所・降りる場所のまま）。</summary>
+        public const float AwayLiftHeight = 26f;
+
+        /// <summary>
+        /// メーデー（JUGGERNAUT の R）の間の、表示の上へのずれ（m）: 吊られて上がる間は 0 → AwayLiftHeight（だんだん速く）、場所を選ぶ間は
+        /// 画面の外（AwayLiftHeight）、運ばれて降りる間は AwayLiftHeight → 0（だんだん遅く）。吊られていなければ 0。
+        /// </summary>
+        public static float AwayOffset(in CharacterState state, JuggernautTuning tuning)
+        {
+            if (!state.Combat.IsAway || tuning == null)
+            {
+                return 0f;
+            }
+            float p = JuggernautRules.MaydayProgress(state, tuning);
+            switch (state.Combat.MaydayPhase)
+            {
+                case JuggernautRules.MaydayLift: return AwayLiftHeight * p * p;
+                case JuggernautRules.MaydayCarry: return AwayLiftHeight * (1f - p) * (1f - p);
+                default: return AwayLiftHeight;
+            }
+        }
+
+        // メーデーの間: 吊られて上がる・降りる高さだけ上へずらして見せ、場所を選ぶ間（画面の外）は見せない。
+        private void RenderAway(in CharacterState state, SkillTuning skills)
+        {
+            HiddenForAway = state.Combat.MaydayPhase == JuggernautRules.MaydaySelect;
+            float offset = AwayOffset(state, skills?.Juggernaut);
+            if (offset > 0f)
+            {
+                transform.position += Vector3.up * offset;
+            }
+        }
+
         // 回る技（AttackData.SpinPerHit。つむじ風）: 判定 1 つにつき 1 回転し、終わったら元の向きで止まる（ユーザーの要望、2026-10-16）。
         private void RenderSpin(in CharacterState state, CombatTuning combat)
         {
@@ -357,6 +414,11 @@ namespace Airerage.Runtime.Presentation
                 if (attack.SpinPerHit)
                 {
                     degrees = Mathf.Repeat(BoostAuraView.SpinAngle(attack, state.Action.Ticks), 360f) * state.Facing;
+                }
+                else if (SweepAngle(attack, state.Action.Ticks, out float sweep))
+                {
+                    // 回る砲塔（JUGGERNAUT の地上技）: 砲塔の先の判定（AttackHit.SweepTicks）と同じ速さで、体ごと水平に回る。
+                    degrees = sweep;
                 }
                 else if (attack.Flip)
                 {
@@ -415,7 +477,7 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
-            _renderer.enabled = !HiddenForRespawn && !HiddenForCapture && !HiddenForInvisible
+            _renderer.enabled = !HiddenForRespawn && !HiddenForCapture && !HiddenForInvisible && !HiddenForAway
                 && !(Blinking && Mathf.Repeat(Time.time * BlinkPerSecond, 1f) >= 0.5f);
             if (_facingMarker != null)
             {

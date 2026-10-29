@@ -187,7 +187,8 @@ namespace Airerage.Core.Economy
             for (int i = 0; i < states.Count; i++)
             {
                 CharacterState state = states[i];
-                if (state.Combat.IsWaitingToRespawn)
+                // メーデーで吊られている人（JUGGERNAUT の R）は、その場にいないので拾わない。
+                if (state.Combat.IsWaitingToRespawn || state.Combat.IsAway)
                 {
                     continue;
                 }

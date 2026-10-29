@@ -29,6 +29,9 @@ namespace Airerage.Runtime.Data
 
         /// <summary>黒い服とニット帽、目元の覆面、赤いスカーフ、腰の茶色い巾着袋。</summary>
         Thief = 6,
+
+        /// <summary>苔色の戦車（履帯・車体・低い砲塔・短い砲身。箱そのものは見せない）。</summary>
+        Juggernaut = 7,
     }
 
     /// <summary>

@@ -9,6 +9,7 @@ namespace Airerage.Runtime.Presentation
     /// 部品を作っておき（向きで左右が変わらない部品は箱の子、変わる部品は向きの印の子）、選ばれているキャラクターの衣装だけを出す。
     /// 箱が隠れている間（復帰待ち・点滅）は、箱の子の部品も隠す（向きの印の子は CharacterView が隠す）。
     /// 文字（STORM RUNNER のゼッケンの「風」）は PC の日本語の字体で書く（JapaneseFont）。
+    /// 箱の形と違う衣装（JUGGERNAUT の戦車）は、箱そのものを見せない（影だけ落とす。箱の表示のオン・オフは、隠すかどうかの合図に使い続ける）。
     /// </summary>
     public sealed class CostumeView : MonoBehaviour
     {
@@ -20,6 +21,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private TextMesh[] _japaneseTexts = new TextMesh[0];
         [Tooltip("箱の表示（これが隠れていたら衣装も隠す）")]
         [SerializeField] private Renderer _body;
+        [Tooltip("衣装ごとに、箱そのものを見せない（影だけ）か（同じ順。なければ見せる）")]
+        [SerializeField] private bool[] _hidesBody = new bool[0];
 
         private Renderer[] _bodyRenderers = new Renderer[0];
         private Font _japanese;
@@ -29,12 +32,13 @@ namespace Airerage.Runtime.Presentation
         public CharacterCostume Current { get; private set; }
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(GameObject[] bodySets, GameObject[] facingSets, TextMesh[] japaneseTexts, Renderer body)
+        public void Configure(GameObject[] bodySets, GameObject[] facingSets, TextMesh[] japaneseTexts, Renderer body, bool[] hidesBody = null)
         {
             _bodySets = bodySets;
             _facingSets = facingSets;
             _japaneseTexts = japaneseTexts;
             _body = body;
+            _hidesBody = hidesBody ?? new bool[0];
         }
 
         private void Awake()
@@ -93,6 +97,11 @@ namespace Airerage.Runtime.Presentation
             _bodyRenderers = index < _bodySets.Length && _bodySets[index] != null
                 ? _bodySets[index].GetComponentsInChildren<Renderer>(true)
                 : new Renderer[0];
+            if (_body != null)
+            {
+                bool hide = index < _hidesBody.Length && _hidesBody[index];
+                _body.shadowCastingMode = hide ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : UnityEngine.Rendering.ShadowCastingMode.On;
+            }
             _shownVisible = !_shownVisible;
             SyncVisibility();
         }

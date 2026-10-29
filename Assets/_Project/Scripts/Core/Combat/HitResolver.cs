@@ -131,6 +131,11 @@ namespace Airerage.Core.Combat
                         if (touches)
                         {
                             AttackPower hitPower = hitData.Critical ? power.WithCritical(hitData.CriticalScale) : power;
+                            if (hitData.FatalScale > 0f)
+                            {
+                                // 急所の判定（JUGGERNAUT の砲塔の先）。
+                                hitPower = hitPower.WithSweetSpot(hitData.FatalScale);
+                            }
                             if (hitData.LoneFatal && !HitAny(attacker.Action.HitMask, h, v))
                             {
                                 // 前の判定をどれも当てずに、この判定だけを当てた（THIEF の空中上の 5 段目）。
@@ -205,9 +210,23 @@ namespace Airerage.Core.Combat
         public static void Hitbox(in CharacterState attacker, AttackHit hit, out Vector2 center, out Vector2 half)
         {
             center = new Vector2(
-                attacker.Position.X + hit.OffsetX * attacker.Facing,
+                attacker.Position.X + SweptOffsetX(hit, attacker.Action.Ticks) * attacker.Facing,
                 attacker.Position.Y + hit.OffsetY);
             half = new Vector2(hit.HalfWidth, hit.HalfHeight);
+        }
+
+        /// <summary>
+        /// 判定 hit の、攻撃を始めてから ticks ティック目の横の位置（向いている方向が正）。水平に回る判定（AttackHit.SweepTicks）は、
+        /// 回転に合わせて前と後ろを行き来する（StartTick で前）。
+        /// </summary>
+        public static float SweptOffsetX(AttackHit hit, int ticks)
+        {
+            if (hit.SweepTicks <= 0)
+            {
+                return hit.OffsetX;
+            }
+            float turn = (float)Math.Max(0, ticks - hit.StartTick) % hit.SweepTicks / hit.SweepTicks;
+            return hit.OffsetX * MathF.Cos(turn * 2f * MathF.PI);
         }
 
         /// <summary>判定 hit の傾き（ラジアン。左を向いていれば左右を反転する）。</summary>

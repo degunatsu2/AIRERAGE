@@ -1,4 +1,5 @@
 using Airerage.Core.Simulation;
+using Airerage.Core.Skills;
 using Airerage.Runtime.Simulation;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -51,14 +52,16 @@ namespace Airerage.Runtime.Presentation
 
         private void LateUpdate()
         {
-            if (!TryGetBounds(out Vector2 min, out Vector2 max))
+            bool overview = TryGetOverview(out Vector2 min, out Vector2 max);
+            if (!overview && !TryGetBounds(out min, out max))
             {
                 return;
             }
             Vector2 center = (min + max) * 0.5f;
             _target.position = new Vector3(center.x, center.y, 0f);
-            Vector2 half = (max - min) * 0.5f + _margin;
-            float wanted = Mathf.Clamp(RequiredDistance(half, _camera.fieldOfView, _camera.aspect), _minDistance, _maxDistance);
+            Vector2 half = (max - min) * 0.5f + (overview ? Vector2.zero : _margin);
+            float required = RequiredDistance(half, _camera.fieldOfView, _camera.aspect);
+            float wanted = overview ? Mathf.Max(required, _minDistance) : Mathf.Clamp(required, _minDistance, _maxDistance);
             float blend = _zoomSeconds > 0f ? 1f - Mathf.Exp(-Time.unscaledDeltaTime / _zoomSeconds) : 1f;
             _distance = Mathf.Lerp(_distance, wanted, blend);
             _composer.CameraDistance = _distance;
@@ -75,7 +78,28 @@ namespace Airerage.Runtime.Presentation
             return Mathf.Max(forHeight, forWidth);
         }
 
-        // 復帰を待っていない全員の位置の範囲（だれもいなければ false）。
+        // だれか（CPU 以外）がフラックで構えているか、メーデーで場所を選んでいれば（JUGGERNAUT）、ステージ全体を見せる範囲（なければ false）。
+        private bool TryGetOverview(out Vector2 min, out Vector2 max)
+        {
+            min = max = Vector2.zero;
+            for (int i = 0; i < _feed.CharacterCount; i++)
+            {
+                CharacterState state = _feed.GetState(i);
+                bool wants = state.Combat.FlakStance || state.Combat.MaydayPhase == JuggernautRules.MaydaySelect;
+                if (!wants || (_feed is ICpuRoster cpus && cpus.IsCpu(i)))
+                {
+                    continue;
+                }
+                StageBounds? bounds = _feed is ILocalAimSource local ? local.Bounds : null;
+                JuggernautRules.TargetArea(bounds, _feed.GetConfig(i).Skills.Juggernaut, out System.Numerics.Vector2 center, out System.Numerics.Vector2 half);
+                min = new Vector2(center.X - half.X, center.Y - half.Y);
+                max = new Vector2(center.X + half.X, center.Y + half.Y);
+                return true;
+            }
+            return false;
+        }
+
+        // 復帰を待っていない全員の位置の範囲（だれもいなければ false）。メーデーで吊られている人は入れない。
         private bool TryGetBounds(out Vector2 min, out Vector2 max)
         {
             min = new Vector2(float.MaxValue, float.MaxValue);
@@ -84,7 +108,7 @@ namespace Airerage.Runtime.Presentation
             for (int i = 0; i < _feed.CharacterCount; i++)
             {
                 CharacterState state = _feed.GetState(i);
-                if (state.Combat.IsWaitingToRespawn)
+                if (state.Combat.IsWaitingToRespawn || state.Combat.IsAway)
                 {
                     continue;
                 }

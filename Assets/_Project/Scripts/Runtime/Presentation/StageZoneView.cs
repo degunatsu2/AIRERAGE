@@ -142,6 +142,16 @@ namespace Airerage.Runtime.Presentation
         {
             _zone = GetComponent<StageZoneAuthoring>();
             _direction = _zone.Kind == StageZoneKind.Updraft || _zone.Direction == Vector2.zero ? Vector2.up : _zone.Direction.normalized;
+            try
+            {
+                _core = _zone.ToZone();
+            }
+            catch (ArgumentException e)
+            {
+                Debug.LogError($"{name}: ギミックの設定が不正です: {e.Message}", this);
+                enabled = false;
+                return;
+            }
             switch (_zone.Kind)
             {
                 case StageZoneKind.JumpPad:
@@ -151,11 +161,11 @@ namespace Airerage.Runtime.Presentation
                     }
                     break;
                 case StageZoneKind.Updraft:
-                    int streaks = Mathf.Clamp(Mathf.RoundToInt(_zone.Size.x / 0.8f), 2, 8);
-                    for (int i = 0; i < streaks * 2; i++)
-                    {
-                        _marks.Add(CreateLine($"Streak{i + 1}", 2, 0.07f));
-                    }
+                    CreateDraftStreaks();
+                    break;
+                case StageZoneKind.Gust when IsSteadyDraft:
+                    // いつも吹いている縦の風は、上昇気流と同じ見た目（ユーザーの要望、2026-10-29）。
+                    CreateDraftStreaks();
                     break;
                 case StageZoneKind.BoostRing:
                     _ring = CreateLine("Ring", RingSegments, 0.16f);
@@ -242,16 +252,6 @@ namespace Airerage.Runtime.Presentation
                         _marks.Add(CreateLine($"Snow{i + 1}", 2, 0.1f));
                     }
                     break;
-            }
-            try
-            {
-                _core = _zone.ToZone();
-            }
-            catch (ArgumentException e)
-            {
-                Debug.LogError($"{name}: ギミックの設定が不正です: {e.Message}", this);
-                enabled = false;
-                return;
             }
             if (_core.Period > 0 && _lineMaterial != null)
             {
@@ -470,6 +470,11 @@ namespace Airerage.Runtime.Presentation
                 WarnWholeZone(center, half);
             }
             ShowWarning(warning);
+            if (IsSteadyDraft)
+            {
+                RenderDraft(center, half, time);
+                return;
+            }
             Vector2 side = new Vector2(_direction.y, -_direction.x);
             float length = Extent(_direction);
             float across = Extent(side);
@@ -933,18 +938,40 @@ namespace Airerage.Runtime.Presentation
         // 下から上へ流れる筋（間隔をずらして並べる）。
         private void RenderUpdraft(Vector3 center, Vector2 half, float time)
         {
+            RenderDraft(center, half, time);
+        }
+
+        // いつも吹いている縦の風（上昇気流と、上下向きの周期のない風）か。同じ見た目にする。
+        private bool IsSteadyDraft => _zone.Kind == StageZoneKind.Updraft
+            || (_zone.Kind == StageZoneKind.Gust && _core.Period <= 0 && _look != ZoneLook.Flow && Mathf.Abs(_direction.y) > Mathf.Abs(_direction.x));
+
+        // 縦の風の筋（幅 0.8m ごとの列、2〜8 列。1 列に 2 本）。
+        private void CreateDraftStreaks()
+        {
+            int streaks = Mathf.Clamp(Mathf.RoundToInt(_zone.Size.x / 0.8f), 2, 8);
+            for (int i = 0; i < streaks * 2; i++)
+            {
+                _marks.Add(CreateLine($"Streak{i + 1}", 2, 0.07f));
+            }
+        }
+
+        // 縦の風: 列ごとに、風の向き（上か下）へ流れる短い筋。上向きと下向きで同じ速さ・本数・長さ・濃さ。
+        private void RenderDraft(Vector3 center, Vector2 half, float time)
+        {
             int columns = _marks.Count / 2;
             float height = half.y * 2f;
+            bool down = _direction.y < 0f;
             for (int i = 0; i < _marks.Count; i++)
             {
                 int column = i % columns;
                 float x = center.x - half.x + (column + 0.5f) / columns * half.x * 2f;
                 float phase = Mathf.Repeat(time * 0.6f + i * 0.37f, 1f);
-                float y = center.y - half.y + phase * height;
                 float length = Mathf.Min(1.4f, height * 0.25f);
+                float y = down ? center.y + half.y - phase * height : center.y - half.y + phase * height;
+                float end = down ? Mathf.Max(y - length, center.y - half.y) : Mathf.Min(y + length, center.y + half.y);
                 LineRenderer line = _marks[i];
                 line.SetPosition(0, new Vector3(x, y, 0f));
-                line.SetPosition(1, new Vector3(x, Mathf.Min(y + length, center.y + half.y), 0f));
+                line.SetPosition(1, new Vector3(x, end, 0f));
                 SetColor(line, Fade(phase) * 0.6f);
             }
         }

@@ -321,6 +321,14 @@ namespace Airerage.Core.Simulation
                     state = KnockoutResolver.Departed(state, _spawns[i]);
                 }
                 PlayerInput input = phase == MatchPhase.Countdown ? default : inputs[i];
+                if (state.Combat.IsAway)
+                {
+                    // メーデーで吊られている間（JUGGERNAUT の R）は、動かずに運ばれる先を選ぶ（JuggernautRules）。
+                    _pressed[i] = InputButtons.None;
+                    JuggernautRules.StepMayday(ref state, input, _tickConfigs[i], _collision, Bounds);
+                    _states[i] = state;
+                    continue;
+                }
                 // このティックに押したボタン（止まっている間は、押したことにしない）。
                 _pressed[i] = state.Combat.HitstopTicksLeft > 0 ? InputButtons.None : input.Buttons & ~state.PreviousButtons;
                 // 行動の速さの強化の間は、速さを上げた調整値で動かす（SpeedBoosts）。
@@ -338,6 +346,7 @@ namespace Airerage.Core.Simulation
             _projectileHits.Clear();
             SkillRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits);
             ThiefRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits, _thief, _stage);
+            JuggernautRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits, _platforms, _stage, _pressed);
             _hits.Resolve(_states, _tickConfigs, Tick, _objects, Rules.Seed, _projectileHits);
             ThiefRules.PopClones(_clones, _states, _tickConfigs, _objects, Tick);
             SkillRules.EndObjects(_objects, Coins, _states, _tickConfigs, Rules, Tick, BankSpots,

@@ -50,6 +50,9 @@ namespace Airerage.Core.Simulation
         /// <summary>壁ジャンプをした数（表示と音に使う）。</summary>
         public int WallJumpCount;
 
+        /// <summary>地上のジャンプの発生を待っている残り（ティック。MovementTuning.JumpStartupTicks。0 なら待っていない）。</summary>
+        public int JumpSquatTicksLeft;
+
         /// <summary>コイン（所持と確定。docs/12 T4-3）。増減は CoinLedger だけが行う。</summary>
         public CoinPurse Coins;
 
@@ -80,6 +83,7 @@ namespace Airerage.Core.Simulation
                 && WallSide == other.WallSide
                 && WallClingTicks == other.WallClingTicks
                 && WallJumpCount == other.WallJumpCount
+                && JumpSquatTicksLeft == other.JumpSquatTicksLeft
                 && Coins.Equals(other.Coins);
         }
 
@@ -107,6 +111,7 @@ namespace Airerage.Core.Simulation
             hash.Add(WallSide);
             hash.Add(WallClingTicks);
             hash.Add(WallJumpCount);
+            hash.Add(JumpSquatTicksLeft);
             hash.Add(Coins);
             return hash.ToHashCode();
         }
