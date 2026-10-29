@@ -426,6 +426,10 @@ namespace Airerage.Editor
             UnityEngine.UI.Text description = MenuUiBuilder.CreateText(panel, "Description", string.Empty, 28, FontStyle.Bold, TextAnchor.UpperLeft,
                 new Vector2(1f, 0.5f), new Vector2(-80f, 0f), new Vector2(900f, 200f), new Color(1f, 1f, 1f, 0.85f));
             description.horizontalOverflow = HorizontalWrapMode.Wrap;
+            // 説明は文なので、英語でも読みやすい日本語の字体（M PLUS 1。英字も入っている。D-77）。
+            description.font = GameFonts.JapaneseBold;
+            // 句読点を行の頭に置かずに折り返す（枠の幅が変わったら入れ直す）。
+            description.gameObject.AddComponent<LineBreakText>();
             UnityEngine.UI.Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 new Vector2(1f, 0.5f), new Vector2(-80f, -220f), new Vector2(900f, 50f), MenuUiBuilder.Accent);
             MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,

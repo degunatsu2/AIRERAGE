@@ -510,6 +510,11 @@ namespace Airerage.Editor
                     canvas.scaleFactor = Mathf.Pow(2f, log);
                 }
                 Canvas.ForceUpdateCanvases();
+                // 折り返しの決まりの改行を、この画面の大きさで入れ直す（実行中なら枠の大きさが変わったときに自分で入れ直す）。
+                foreach (LineBreakText text in canvas.GetComponentsInChildren<LineBreakText>(true))
+                {
+                    text.Refresh();
+                }
                 foreach (var group in canvas.GetComponentsInChildren<LayoutGroup>(true))
                 {
                     LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)group.transform);

@@ -42,7 +42,8 @@ namespace Airerage.Runtime.Presentation
 
         // この距離（m。ふだんのカメラの距離）より引いたら、文字・線・カーソルをその割合で大きくする（全体を見せている間も読めるように）。
         private const float BaseCameraDistance = 30f;
-        private const float LevelHeight = 1.1f;
+        // フラックの弾道の強さのダイアルの半径（m。ふだんのカメラの距離のとき）。
+        private const float DialRadius = 0.85f;
         private const float NoticeHeight = 1.6f;
         private const float DropWidth = 0.12f;
 
@@ -100,7 +101,7 @@ namespace Airerage.Runtime.Presentation
 
         private sealed class Character
         {
-            public TextMesh Level;
+            public FlakDial Dial;
             public LineRenderer TrajectoryBand;
             public LineRenderer TrajectoryShaft;
             public LineRenderer TrajectoryHead;
@@ -131,10 +132,13 @@ namespace Airerage.Runtime.Presentation
         public int MineCount => Count(WorldObjectKind.Mine, false);
 
         /// <summary>キャラクター index の弾道の段階を出しているか（テスト用）。</summary>
-        public bool ShowsLevel(int index) => index >= 0 && index < _characters.Count && _characters[index].Level.gameObject.activeSelf;
+        public bool ShowsLevel(int index) => index >= 0 && index < _characters.Count && _characters[index].Dial.Visible;
 
-        /// <summary>キャラクター index の弾道の段階の文字（テスト用）。</summary>
-        public string LevelText(int index) => index >= 0 && index < _characters.Count ? _characters[index].Level.text : string.Empty;
+        /// <summary>キャラクター index の弾道の段階の文字（ダイアルの指針の下の目。テスト用）。</summary>
+        public string LevelText(int index) => index >= 0 && index < _characters.Count ? _characters[index].Dial.SelectedLabel : string.Empty;
+
+        /// <summary>キャラクター index の弾道の強さのダイアル（テスト用）。</summary>
+        public FlakDial DialOf(int index) => index >= 0 && index < _characters.Count ? _characters[index].Dial : null;
 
         /// <summary>キャラクター index の弾道の予測線を出しているか（テスト用）。</summary>
         public bool ShowsTrajectory(int index) => index >= 0 && index < _characters.Count && _characters[index].TrajectoryBand.enabled;
@@ -167,6 +171,14 @@ namespace Airerage.Runtime.Presentation
             foreach (GameObject template in templates)
             {
                 template.SetActive(false);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            foreach (Character c in _characters)
+            {
+                c.Dial.Destroy();
             }
         }
 
@@ -374,20 +386,22 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        // フラックの構え: 斜め後ろの上に弾道の段階、操作している人には弾道の予測線と落ちる所の輪。
+        // フラックの構え: 斜め後ろの上に弾道の強さのダイアル、操作している人には弾道の予測線と落ちる所の輪。
         private void RenderStance(Character c, int index, in CharacterState state, CharacterConfig config, bool controlled)
         {
             bool stance = state.Combat.FlakStance && !state.Combat.IsWaitingToRespawn;
-            c.Level.gameObject.SetActive(stance);
             JuggernautTuning tuning = config.Skills.Juggernaut;
             if (stance)
             {
                 int level = JuggernautRules.FlakLevel(state, tuning);
-                c.Level.text = level < LevelNames.Length ? LevelNames[level] : (level + 1).ToString();
-                c.Level.color = LevelColors[Mathf.Clamp(level, 0, LevelColors.Length - 1)];
-                float back = -(state.Facing >= 0 ? 1f : -1f) * (config.Movement.HalfWidth + 0.55f);
-                c.Level.transform.position = new Vector3(state.Position.X + back * _scale, state.Position.Y + config.Movement.HalfHeight + 0.6f * _scale, Z - 0.2f);
-                c.Level.transform.localScale = Vector3.one * _scale;
+                float radius = DialRadius * _scale;
+                float back = -(state.Facing >= 0 ? 1f : -1f) * (config.Movement.HalfWidth + 0.15f * _scale + radius);
+                var center = new Vector3(state.Position.X + back, state.Position.Y + config.Movement.HalfHeight + 0.2f * _scale + radius, Z - 0.2f);
+                c.Dial.Show(center, radius, level);
+            }
+            else
+            {
+                c.Dial.Hide();
             }
             bool predict = stance && controlled && _local != null && _local.Collision != null && _local.TryPeekAim(index, out System.Numerics.Vector2 aim)
                 && Predict(c, state, config, aim);
@@ -645,7 +659,7 @@ namespace Airerage.Runtime.Presentation
         {
             var c = new Character
             {
-                Level = CreateText($"FlakLevelP{index + 1}", LevelHeight),
+                Dial = new FlakDial(transform, $"FlakDialP{index + 1}", _lineTemplate.sharedMaterial, _textTemplate, LevelNames, LevelColors),
                 Notice = CreateText($"MaydayDeniedP{index + 1}", NoticeHeight),
                 // 弾道の予測線（照準の方向の矢印と同じ見た目。帯は一定の太さ、芯は先ほど太く、矢じりは塗った三角形、縁は細い線）。
                 TrajectoryBand = CreateAimLine($"FlakTrajectoryP{index + 1}Band", AnimationCurve.Constant(0f, 1f, SkillAimView.BandWidth)),
@@ -671,7 +685,7 @@ namespace Airerage.Runtime.Presentation
 
         private static void HideAll(Character c)
         {
-            c.Level.gameObject.SetActive(false);
+            c.Dial.Hide();
             c.Notice.gameObject.SetActive(false);
             SetTrajectoryShown(c, false, false);
             c.Cursor.enabled = false;

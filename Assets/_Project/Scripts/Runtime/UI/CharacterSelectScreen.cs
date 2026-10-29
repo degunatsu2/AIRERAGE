@@ -146,8 +146,15 @@ namespace Airerage.Runtime.UI
         public bool DetailsOpen => _detailsSlot >= 0;
         public string ShownDetailName => _detailName.text;
         public string ShownSkillName(int index) => _skillNames[index].text;
-        public string ShownSkillDescription(int index) => _skillDescriptions[index].text;
+        public string ShownSkillDescription(int index) => DescriptionOf(_skillDescriptions[index]);
         public string ShownSkillCooldown(int index) => _skillCooldowns[index].text;
+
+        // 折り返しの決まりで出した文の、改行を入れる前の文（なければ出している文）。
+        private static string DescriptionOf(Text text)
+        {
+            LineBreakText wrapper = text.GetComponent<LineBreakText>();
+            return wrapper != null ? wrapper.Value : text.text;
+        }
 
         // 1 人分の枠。
         private sealed class Slot
@@ -196,8 +203,8 @@ namespace Airerage.Runtime.UI
             UseJapaneseFont();
         }
 
-        // ハッシュタグと技の文字を、日本語なら日本語の字体（M PLUS 1）で、英語なら英字の字体（Orbitron）で書く（太さはそのまま。
-        // 言語はオプションの LANGUAGE。2026-10-27）。
+        // ハッシュタグと技の名前・クールタイムを、日本語なら日本語の字体（M PLUS 1）で、英語なら英字の字体（Orbitron）で書く（太さは
+        // そのまま。言語はオプションの LANGUAGE。2026-10-27）。技の説明は文なので、どちらの言語でも M PLUS 1（ビルダーが設定する）。
         private void UseJapaneseFont()
         {
             _language = GameSettings.LoadLanguage();
@@ -210,7 +217,6 @@ namespace Airerage.Runtime.UI
             for (int i = 0; i < SkillSlots.Length; i++)
             {
                 _skillNames[i].font = GameFonts.Switch(_skillNames[i].font, ja);
-                _skillDescriptions[i].font = GameFonts.Switch(_skillDescriptions[i].font, ja);
                 _skillCooldowns[i].font = GameFonts.Switch(_skillCooldowns[i].font, ja);
             }
         }
@@ -840,7 +846,7 @@ namespace Airerage.Runtime.UI
                 for (int s = 0; s < _skillNames.Length; s++)
                 {
                     _skillNames[s].text = string.Empty;
-                    _skillDescriptions[s].text = string.Empty;
+                    LineBreakText.Set(_skillDescriptions[s], string.Empty);
                     _skillCooldowns[s].text = string.Empty;
                 }
                 return;
@@ -864,7 +870,8 @@ namespace Airerage.Runtime.UI
                 SkillText text = character.TextOf(slot);
                 string skillName = text != null ? text.NameIn(_language) : string.Empty;
                 _skillNames[i].text = !string.IsNullOrEmpty(skillName) ? skillName : combat.Get(slot).Name;
-                _skillDescriptions[i].text = text != null ? text.DescriptionIn(_language) : string.Empty;
+                // 説明は句読点を行の頭に置かずに折り返す（LineBreakText）。
+                LineBreakText.Set(_skillDescriptions[i], text != null ? text.DescriptionIn(_language) : string.Empty);
                 _skillCooldowns[i].text = CooldownText(combat, slot, text != null ? text.CooldownNoteIn(_language) : string.Empty, _language);
             }
         }

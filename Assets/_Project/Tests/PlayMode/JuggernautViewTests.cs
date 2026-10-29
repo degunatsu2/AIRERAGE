@@ -73,6 +73,11 @@ namespace Airerage.PlayMode.Tests
             Assert.That(feed.GetState(0).Combat.FlakStance, Is.True, "前提: Q で構える");
             Assert.That(effects.ShowsLevel(0), Is.True, "構えても弾道の段階を出さない");
             Assert.That(effects.LevelText(0), Is.EqualTo("強"), "初めの段階が強でない");
+            // 弾道の強さのダイアル: 出し始めは回らずに強を指し、指針の下の目（強）だけが大きい。
+            FlakDial dial = effects.DialOf(0);
+            Assert.That(dial.Offset, Is.EqualTo(-2f * FlakDial.StepDegrees).Within(0.01f), "出し始めのダイアルが強を指していない");
+            Assert.That(dial.LabelScale(2), Is.EqualTo(1f).Within(0.01f), "指針の下の目が大きくない");
+            Assert.That(dial.LabelScale(3), Is.LessThan(0.7f), "指針の下でない目が小さくない");
             Assert.That(effects.ShowsTrajectory(0), Is.True, "構えても弾道の予測線を出さない");
             Assert.That(zoom != null && zoom.InOverview, Is.True, "構えてもカメラがステージ全体を見せない");
 
@@ -82,6 +87,7 @@ namespace Airerage.PlayMode.Tests
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 127, InputButtons.None), aim, With(aim, InputButtons.Special1), aim });
             yield return WaitSeconds(0.2f);
             Assert.That(effects.LevelText(0), Is.EqualTo("弩"), "上で段階が変わらない");
+            Assert.That(dial.Offset, Is.LessThan(-2f * FlakDial.StepDegrees - 20f), "上でダイアルが次の目へ回らない");
             int shells = 0;
             int blasts = 0;
             start = Time.time;
@@ -99,6 +105,13 @@ namespace Airerage.PlayMode.Tests
             yield return WaitSeconds(0.8f);
             Assert.That(explosions.FlashingCount, Is.Zero, "閃光が一瞬で消えない");
             Assert.That(explosions.SmokeOnlyCount, Is.GreaterThan(0), "閃光と炎の後に煙が残らない");
+
+            // ダイアルは弩の目で止まり、弩だけが大きい。
+            Assert.That(dial.Offset, Is.EqualTo(-3f * FlakDial.StepDegrees).Within(0.5f), "ダイアルが弩の目で止まらない");
+            Assert.That(dial.LabelScale(3), Is.EqualTo(1f).Within(0.02f), "回った後に、指針の下の目（弩）が大きくない");
+            Assert.That(dial.LabelScale(2), Is.LessThan(0.7f), "回った後も、前の目（強）が大きいまま");
+            // 全体を映すカメラで大きくしたダイアルに、指針も合わせて大きくなる（指針が円盤に隠れない）。
+            Assert.That(dial.PointerRadius, Is.EqualTo(dial.Radius).Within(0.001f), "指針の大きさがダイアルと合っていない");
 
             // 左右の移動で構えが解け、カメラが戻る。
             runner.InputOverride = new Script(Repeat(new SimInput(127, 0, InputButtons.None), 3));

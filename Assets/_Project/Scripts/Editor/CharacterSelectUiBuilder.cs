@@ -300,14 +300,19 @@ namespace Airerage.Editor
                 Text skillName = MenuUiBuilder.CreateText(column, "Name", string.Empty, 32, FontStyle.Bold, TextAnchor.MiddleLeft,
                     new Vector2(0f, 1f), Vector2.zero, Vector2.zero, Color.white);
                 StretchTop(skillName, 80f, 20f, 12f, 48f);
-                // 説明は 4 行まで（細い字。クールタイムの行は列の下に固定する）。
-                Text description = MenuUiBuilder.CreateText(column, "Description", string.Empty, 22, FontStyle.Normal,
+                // 説明は 4 行まで（細い字。クールタイムの行は列の下に固定する）。文なので、英語でも読みやすい日本語の字体（M PLUS 1。
+                // 英字も入っている）で書き、行の間を少し詰める（字体の行の高さが大きいので。D-77）。
+                Text description = MenuUiBuilder.CreateText(column, "Description", string.Empty, 21, FontStyle.Normal,
                     TextAnchor.UpperLeft, new Vector2(0f, 1f), Vector2.zero, Vector2.zero, new Color(1f, 1f, 1f, 0.92f));
                 StretchTop(description, 26f, 30f, 68f, 120f);
                 description.horizontalOverflow = HorizontalWrapMode.Wrap;
+                description.font = GameFonts.Japanese;
+                description.lineSpacing = 0.95f;
+                // 句読点を行の頭に置かずに折り返す（枠の幅が変わったら入れ直す）。
+                description.gameObject.AddComponent<LineBreakText>();
                 Text cooldown = MenuUiBuilder.CreateText(column, "Cooldown", string.Empty, 22, FontStyle.Bold, TextAnchor.MiddleLeft,
                     new Vector2(0f, 1f), Vector2.zero, Vector2.zero, new Color(1f, 0.85f, 0.3f));
-                StretchTop(cooldown, 26f, 20f, 192f, 34f);
+                StretchTop(cooldown, 26f, 20f, 196f, 34f);
                 parts.SkillNames[i] = skillName;
                 parts.Descriptions[i] = description;
                 parts.Cooldowns[i] = cooldown;

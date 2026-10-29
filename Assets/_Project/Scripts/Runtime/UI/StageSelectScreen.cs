@@ -19,7 +19,7 @@ namespace Airerage.Runtime.UI
     /// RANDOM で選ぶのは、チェックを付けたステージだけ（RandomStagePool。ネットワーク対戦では全員が付けているステージだけ。
     /// ユーザーの要望、2026-10-26）。オプションから開く「RANDOM STAGES」（ShowRandomPool）では、札の左端のチェックを決定で付け外しし、
     /// 戻る操作で PoolClosed（RANDOM の札は出さない。最後の 1 つは外せない）。
-    /// 説明は、オプションの LANGUAGE（GameSettings.LoadLanguage）の言語で出す（日本語は日本語の字体 GameFonts.Japanese。2026-10-27）。
+    /// 説明は、オプションの LANGUAGE（GameSettings.LoadLanguage）の言語で出す（字体はどちらの言語でも日本語の字体 M PLUS 1。句読点を行の頭に置かずに折り返す。2026-10-27、2026-10-29）。
     /// </summary>
     public sealed class StageSelectScreen : MonoBehaviour
     {
@@ -369,9 +369,10 @@ namespace Airerage.Runtime.UI
         }
 
         /// <summary>今出している説明（テスト用）。</summary>
-        public string ShownDescription => _description != null ? _description.text : string.Empty;
+        public string ShownDescription => _description == null ? string.Empty
+            : _description.GetComponent<LineBreakText>() is LineBreakText wrapper ? wrapper.Value : _description.text;
 
-        // 説明を、オプションの言語で出す（日本語なら日本語の字体）。
+        // 説明を、オプションの言語で出す（字体はどちらの言語でも M PLUS 1。ビルダーが設定する）。
         private void ShowDescription(string english, string japanese)
         {
             if (_description == null)
@@ -379,8 +380,8 @@ namespace Airerage.Runtime.UI
                 return;
             }
             bool ja = GameSettings.LoadLanguage() == GameLanguage.Japanese && !string.IsNullOrEmpty(japanese);
-            _description.font = GameFonts.Switch(_description.font, ja);
-            _description.text = ja ? japanese : english;
+            // 句読点を行の頭に置かずに折り返す（LineBreakText）。
+            LineBreakText.Set(_description, ja ? japanese : english);
         }
 
         // 番号 index の札（RandomIndex なら RANDOM の札。範囲の外なら null）。

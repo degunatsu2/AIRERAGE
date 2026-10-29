@@ -1280,21 +1280,21 @@ MonoBehaviour:
   - '#Tricky'
   _special1Text:
     Name: "\u30BF\u30EC\u30F3\u30C8\u30B9\u30CA\u30C3\u30C1"
-    Description: "\u7167\u6E96\u306E\u65B9\u5411\u3078\u901F\u3044\u5F3E\u3092\u6483\u3064\u3002\u5F53\u305F\u3063\u305F\u76F8\u624B\u306EQ\u3092\u30B3\u30D4\u30FC\u3059\u308B\u304B\u3001\u30B9\u30C6\u30FC\u30B8\u306E\u30AE\u30DF\u30C3\u30AF\u3084\u4ED5\u639B\u3051\u3092\u596A\u3046\u3002\u3082\u3046\u4E00\u5EA6\u62BC\u3059\u3068\u3001\u30B3\u30D4\u30FC\u3057\u305F\u6280\u3092\u4F7F\u3046\u304B\u3001\u596A\u3063\u305F\u30AE\u30DF\u30C3\u30AF\u3092\u76EE\u306E\u524D\u306B\u7F6E\u304F\uFF082\u3064\u307E\u3067\uFF09\u3002"
+    Description: "\u7167\u6E96\u306E\u65B9\u5411\u3078\u901F\u3044\u5F3E\u3092\u6483\u3061\u3001\u5F53\u305F\u3063\u305F\u76F8\u624B\u306EQ\u3092\u30B3\u30D4\u30FC\u3059\u308B\u304B\u3001\u30B9\u30C6\u30FC\u30B8\u306E\u30AE\u30DF\u30C3\u30AF\u3084\u4ED5\u639B\u3051\u3092\u596A\u3046\u3002\u3082\u3046\u4E00\u5EA6\u62BC\u3059\u3068\u3001\u30B3\u30D4\u30FC\u3057\u305F\u6280\u3092\u4F7F\u3046\u304B\u3001\u596A\u3063\u305F\u7269\u3092\u76EE\u306E\u524D\u306B\u7F6E\u304F\uFF082\u3064\u307E\u3067\uFF09\u3002"
     CooldownNote: "\u4F7F\u3046\u304B\u5916\u308C\u3066\u304B\u3089"
     NameEn: TALENT SNATCH
-    DescriptionEn: Fire a fast shot toward your aim. Copy the Q of the opponent it
-      hits, or steal a stage gimmick or trap. Press again to use the copied skill,
-      or place the stolen gimmick right in front of you (up to two).
+    DescriptionEn: Fire a fast shot toward your aim to copy the Q of the opponent
+      it hits, or steal a gimmick or trap. Press again to use the copied skill or
+      place what you stole (up to two).
     CooldownNoteEn: after using it or missing
   _special2Text:
     Name: "\u30DF\u30B9\u30C7\u30A3\u30EC\u30AF\u30B7\u30E7\u30F3"
     Description: "\u305D\u306E\u5834\u306B\u5206\u8EAB\u3092\u6B8B\u3057\u3001\u900F\u660E\u306B\u306A\u3063\u3066\u7167\u6E96\u306E\u65B9\u5411\u3078\u77ED\u304F\u79FB\u52D5\u3059\u308B\u30023\u79D2\u305F\u3064\u304B\u3001R\u4EE5\u5916\u306E\u884C\u52D5\u3092\u3059\u308B\u304B\u3001\u3082\u3046\u4E00\u5EA6\u62BC\u3059\u3068\u89E3\u3051\u308B\u3002\u5206\u8EAB\u306F\u653B\u6483\u3092\u53D7\u3051\u308B\u3068\u7159\u306B\u306A\u3063\u3066\u6D88\u3048\u308B\u3002"
     CooldownNote: 
     NameEn: MISDIRECTION
-    DescriptionEn: Leave a decoy behind, turn invisible and slip a short way toward
-      your aim. Ends after 3 seconds, when you do anything but R, or when you press
-      again. The decoy vanishes in smoke when hit.
+    DescriptionEn: Leave a decoy, turn invisible and slip a short way toward your
+      aim. Ends after 3 seconds, on any action but R, or on another press. The decoy
+      vanishes in smoke when hit.
     CooldownNoteEn: 
   _superText:
     Name: "\u30D0\u30F3\u30AF\u30CF\u30A4\u30B9\u30C8"

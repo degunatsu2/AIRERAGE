@@ -55,6 +55,12 @@ namespace Airerage.PlayMode.Tests
             runner.InputOverride = new Script(stance);
             yield return Wait(1.5f);
             Capture(camera, "Juggernaut_FlakStance");
+            // 上で弾道の強さのダイアルを弩へ回す（止まった後）。
+            var turn = new List<SimInput> { new SimInput(0, 127, InputButtons.None).WithAim(new System.Numerics.Vector2(1f, 0.7f)) };
+            turn.AddRange(Enumerable.Repeat(aim, 90));
+            runner.InputOverride = new Script(turn);
+            yield return Wait(0.7f);
+            Capture(camera, "Juggernaut_FlakDialMax");
             runner.InputOverride = new Script(Repeat(new SimInput(127, 0, InputButtons.None), 3));
             yield return Wait(1.2f);
 
