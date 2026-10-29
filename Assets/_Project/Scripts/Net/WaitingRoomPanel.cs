@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Airerage.Runtime.Presentation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Net
@@ -175,14 +176,14 @@ namespace Airerage.Net
             {
                 return;
             }
-            _title = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            _title = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft });
             _count = new GUIStyle(_title) { fontSize = 24, alignment = TextAnchor.MiddleRight };
-            _subtitle = new GUIStyle(GUI.skin.label) { fontSize = 14, alignment = TextAnchor.MiddleLeft };
-            _name = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip };
-            _tag = new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _number = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _waiting = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            _character = new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip };
+            _subtitle = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 14, alignment = TextAnchor.MiddleLeft });
+            _name = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip });
+            _tag = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+            _number = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+            _waiting = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft });
+            _character = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip });
             foreach (GUIStyle style in new[] { _title, _count, _subtitle, _name, _tag, _number, _waiting, _character })
             {
                 style.normal.textColor = Color.white;

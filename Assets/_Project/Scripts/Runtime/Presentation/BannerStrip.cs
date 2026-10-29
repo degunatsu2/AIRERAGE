@@ -1,3 +1,4 @@
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -62,8 +63,8 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
-            _title = new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            _sub = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _title = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false });
+            _sub = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _title.normal.textColor = Color.white;
             _sub.normal.textColor = Color.white;
         }

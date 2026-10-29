@@ -85,8 +85,6 @@ namespace Airerage.Runtime.UI
         private bool _timed = true;
         private int _localSlot;
         private string _networkMessage = string.Empty;
-        private Font _japanese;
-        private Font _latin;
         private GameLanguage _language = GameLanguage.Japanese;
         private int _detailsSlot = -1;
         private float _detailsOpen;
@@ -198,38 +196,22 @@ namespace Airerage.Runtime.UI
             UseJapaneseFont();
         }
 
-        private void OnDestroy()
-        {
-            if (_japanese != null)
-            {
-                Destroy(_japanese);
-            }
-        }
-
-        // ハッシュタグと技の文字を、日本語なら PC の日本語の字体で、英語なら Unity に入っている字体で書く（日本語の字体がなければ
-        // Unity に入っている字体のまま。言語はオプションの LANGUAGE。2026-10-27）。
+        // ハッシュタグと技の文字を、日本語なら日本語の字体（M PLUS 1）で、英語なら英字の字体（Orbitron）で書く（太さはそのまま。
+        // 言語はオプションの LANGUAGE。2026-10-27）。
         private void UseJapaneseFont()
         {
-            if (_latin == null)
-            {
-                _latin = _detailTags.font;
-            }
-            if (_japanese == null)
-            {
-                _japanese = JapaneseFont.Create(32);
-            }
             _language = GameSettings.LoadLanguage();
-            Font font = _language == GameLanguage.Japanese && _japanese != null ? _japanese : _latin;
-            _detailTags.font = font;
+            bool ja = _language == GameLanguage.Japanese;
+            _detailTags.font = GameFonts.Switch(_detailTags.font, ja);
             foreach (Text tags in _cornerTags)
             {
-                tags.font = font;
+                tags.font = GameFonts.Switch(tags.font, ja);
             }
             for (int i = 0; i < SkillSlots.Length; i++)
             {
-                _skillNames[i].font = font;
-                _skillDescriptions[i].font = font;
-                _skillCooldowns[i].font = font;
+                _skillNames[i].font = GameFonts.Switch(_skillNames[i].font, ja);
+                _skillDescriptions[i].font = GameFonts.Switch(_skillDescriptions[i].font, ja);
+                _skillCooldowns[i].font = GameFonts.Switch(_skillCooldowns[i].font, ja);
             }
         }
 

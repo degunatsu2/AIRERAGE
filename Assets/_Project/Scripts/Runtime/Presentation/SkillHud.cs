@@ -5,6 +5,7 @@ using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -665,10 +666,10 @@ namespace Airerage.Runtime.Presentation
                 float center = (LineWidth - Slant) * 0.5f + Slant * (1f - (y + 0.5f) / SlotHeight);
                 return Mathf.Abs(x + 0.5f - center) <= 1.6f ? 1f : 0f;
             });
-            _key = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false };
-            _name = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            _number = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            _notice = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _key = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false });
+            _name = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false });
+            _number = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
+            _notice = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             foreach (GUIStyle style in new[] { _key, _name, _number, _notice })
             {
                 style.normal.textColor = Color.white;

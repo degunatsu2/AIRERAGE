@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Airerage.Core.Economy;
 using Airerage.Core.Match;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -202,8 +203,8 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
-            _label = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _digits = new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _label = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+            _digits = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
             _label.normal.textColor = Color.white;
             _digits.normal.textColor = Color.white;
         }

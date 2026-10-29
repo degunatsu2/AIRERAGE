@@ -5,6 +5,7 @@
         "Airerage.Core",
         "Airerage.Core.Tests",
         "Airerage.Runtime",
+        "UnityEngine.UI",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

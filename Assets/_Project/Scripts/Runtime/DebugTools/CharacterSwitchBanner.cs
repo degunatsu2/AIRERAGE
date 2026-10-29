@@ -1,6 +1,7 @@
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.DebugTools
@@ -54,11 +55,11 @@ namespace Airerage.Runtime.DebugTools
             {
                 return;
             }
-            _name = _name ?? new GUIStyle(GUI.skin.label)
+            _name = _name ?? GameFonts.Use(new GUIStyle(GUI.skin.label)
             {
                 fontSize = 30, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false,
                 normal = { textColor = Color.white },
-            };
+            });
             float elapsed = Time.time - _changedAt;
             float alpha = Mathf.Clamp01(Mathf.Min(elapsed / 0.12f, (ShowSeconds - elapsed) / FadeSeconds));
             float rise = (1f - Mathf.Clamp01(elapsed / 0.2f)) * 16f;

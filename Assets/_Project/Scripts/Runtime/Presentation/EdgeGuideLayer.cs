@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -106,7 +107,7 @@ namespace Airerage.Runtime.Presentation
             {
                 _plate = new GuidePlate(_plateWidth, _plateHeight);
                 _arrow = ScreenEdgeMarker.CreateArrowTexture(64);
-                _text = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Clip };
+                _text = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Clip });
             }
             Layout();
             float pulse = 1f + 0.1f * Mathf.Sin(Time.time * 6f);

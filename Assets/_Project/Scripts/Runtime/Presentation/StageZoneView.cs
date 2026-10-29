@@ -5,6 +5,7 @@ using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -763,12 +764,12 @@ namespace Airerage.Runtime.Presentation
             }
             if (_bannerStyle == null)
             {
-                _bannerStyle = new GUIStyle(GUI.skin.label)
+                _bannerStyle = GameFonts.Use(new GUIStyle(GUI.skin.label)
                 {
                     alignment = TextAnchor.MiddleCenter,
                     fontSize = Mathf.RoundToInt(Screen.height * 0.04f),
                     fontStyle = FontStyle.Bold,
-                };
+                });
             }
             string text = $"BLIZZARD IN {_blizzardCountdown} — TAKE COVER!";
             var rect = new Rect(0f, Screen.height * 0.2f, Screen.width, Screen.height * 0.08f);

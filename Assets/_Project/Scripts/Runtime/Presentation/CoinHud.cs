@@ -4,6 +4,7 @@ using Airerage.Core.Economy;
 using Airerage.Core.Match;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -225,8 +226,8 @@ namespace Airerage.Runtime.Presentation
         {
             if (_count == null)
             {
-                _count = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-                _popup = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+                _count = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft });
+                _popup = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
                 _dot = CreateDot(32);
             }
             Color previous = GUI.color;

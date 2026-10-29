@@ -1,3 +1,4 @@
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -28,7 +29,7 @@ namespace Airerage.Runtime.Presentation
         /// <summary>文字エフェクトの書体（どの状態でも文字は白、背景なし。色は GUI.color で決める）。</summary>
         public static GUIStyle Style(int fontSize, FontStyle fontStyle, TextAnchor alignment)
         {
-            var style = new GUIStyle(GUI.skin.label) { fontSize = fontSize, fontStyle = fontStyle, alignment = alignment, wordWrap = false };
+            var style = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = fontSize, fontStyle = fontStyle, alignment = alignment, wordWrap = false });
             foreach (GUIStyleState state in new[]
             {
                 style.normal, style.hover, style.active, style.focused, style.onNormal, style.onHover, style.onActive, style.onFocused,

@@ -7,6 +7,7 @@ using Airerage.Runtime.Data;
 using Airerage.Runtime.DebugTools;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -477,7 +478,7 @@ namespace Airerage.Editor
             // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。
             RingGaugeView respawn = CreateRingGauge(name + "RespawnGauge", parent, "RESPAWN", 2.6f,
                 new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f));
-            respawn.Configure("RESPAWN", 2.6f, new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f), 0.24f, 28);
+            respawn.Configure("RESPAWN", 2.6f, new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f), 0.32f, 28);
             SetReference(view, "_respawnGauge", respawn);
         }
 
@@ -681,8 +682,8 @@ namespace Airerage.Editor
             text.anchor = TextAnchor.MiddleCenter;
             text.alignment = TextAlignment.Center;
             text.fontSize = 64;
-            text.fontStyle = FontStyle.Bold;
-            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            // 弾道の強さ（弱・中・強・弩）は日本語の太字（M PLUS 1 ExtraBold）。
+            Font font = GameFonts.JapaneseBold;
             text.font = font;
             text.GetComponent<MeshRenderer>().sharedMaterial = font.material;
             foreach (GameObject template in new[] { line.gameObject, shell, flak, mine, jet, text.gameObject })
@@ -775,10 +776,7 @@ namespace Airerage.Editor
             dial.transform.SetParent(safe.transform, false);
             dial.transform.localPosition = new Vector3(0.15f, 0f, -0.52f);
             dial.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            // 次のチャージまでの円形のゲージ（下地と、伸びる弧）。
-            LineRenderer ringBack = CreateIndicatorLine(safe.transform, "ChargeRingBack", lineMaterial, 0.08f);
-            ringBack.loop = true;
-            ringBack.startColor = ringBack.endColor = new Color(1f, 0.85f, 0.3f, 0.22f);
+            // 次のチャージまでの円形のゲージ（描くのは WorldObjectsView の SlantedRingGauge。この線は材質を渡すだけ）。
             LineRenderer ring = CreateIndicatorLine(safe.transform, "ChargeRing", lineMaterial, 0.12f);
             ring.startColor = ring.endColor = new Color(1f, 0.82f, 0.2f, 0.95f);
 
@@ -1101,9 +1099,9 @@ namespace Airerage.Editor
         }
 
         /// <summary>
-        /// 円形のゲージ（薄い輪、残りの弧、先端の火花）。label が空でなければ、シーンのカメラで画面に写して上に出す（sceneCamera が
-        /// false なら、カメラのないステージのシーン用に参照を付けず、試合のシーンのメインカメラを使う）。
-        /// 大きさの影響を受けないように、キャラクターの子にしない。
+        /// 円形のゲージ（斜めの区切りの輪に光る先端の導火線。見た目は SlantedRingGauge。D-76）。label が空でなければ、シーンのカメラで
+        /// 画面に写して右上の斜めの札に出す（sceneCamera が false なら、カメラのないステージのシーン用に参照を付けず、試合のシーンの
+        /// メインカメラを使う）。大きさの影響を受けないように、キャラクターの子にしない。
         /// </summary>
         internal static RingGaugeView CreateRingGauge(string name, Transform parent, string label, float radius, Color? color = null,
             bool sceneCamera = true)
@@ -1113,9 +1111,7 @@ namespace Airerage.Editor
             root.transform.SetParent(parent, false);
             var view = root.AddComponent<RingGaugeView>();
             view.Configure(label, radius, color);
-            SetReference(view, "_track", CreateIndicatorLine(root.transform, "Track", material, 0.08f));
-            SetReference(view, "_fuse", CreateIndicatorLine(root.transform, "Fuse", material, 0.12f));
-            SetReference(view, "_spark", CreateIndicatorLine(root.transform, "Spark", material, 0.1f));
+            SetReference(view, "_material", material);
             if (sceneCamera)
             {
                 SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());

@@ -15,6 +15,7 @@ using Airerage.Runtime.Flow;
 using Airerage.Runtime.Input;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -605,7 +606,7 @@ namespace Airerage.Net
         {
             if (_style == null)
             {
-                _style = new GUIStyle(GUI.skin.label) { fontSize = 14 };
+                _style = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 14 });
                 _style.normal.textColor = Color.white;
             }
             if (_connection != null)
@@ -659,7 +660,7 @@ namespace Airerage.Net
             if (_waitingRoom == null)
             {
                 _waitingRoom = new WaitingRoomPanel();
-                _footer = new GUIStyle(GUI.skin.label) { fontSize = 16, alignment = TextAnchor.MiddleCenter };
+                _footer = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 16, alignment = TextAnchor.MiddleCenter });
                 _footer.normal.textColor = Color.white;
             }
             const float padding = 18f;

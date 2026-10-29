@@ -1,4 +1,5 @@
 using System.IO;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.DebugTools
@@ -84,7 +85,7 @@ namespace Airerage.Runtime.DebugTools
             {
                 return;
             }
-            _style = _style ?? new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.LowerRight, wordWrap = false };
+            _style = _style ?? GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.LowerRight, wordWrap = false });
             _style.normal.textColor = new Color(1f, 1f, 1f, 0.55f);
             GUI.Label(new Rect(Screen.width - 410f, Screen.height - 20f, 400f, 18f), Text, _style);
         }

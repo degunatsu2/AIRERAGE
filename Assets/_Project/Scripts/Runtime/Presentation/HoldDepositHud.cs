@@ -2,6 +2,7 @@ using Airerage.Core.Combat;
 using Airerage.Core.Simulation;
 using Airerage.Core.Skills;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -66,7 +67,7 @@ namespace Airerage.Runtime.Presentation
                 }
                 if (_style == null)
                 {
-                    _style = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+                    _style = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
                     _style.normal.textColor = Color.white;
                 }
                 CharacterState state = _feed.GetState(i);

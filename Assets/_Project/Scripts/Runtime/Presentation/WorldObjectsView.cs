@@ -40,7 +40,8 @@ namespace Airerage.Runtime.Presentation
         private const float BlinkSeconds = 1f;
         private const float FlashSeconds = 0.2f;
         private const int RaySegments = 16;
-        private const int RingPoints = 48;
+        private const float RingWidth = 0.16f;
+        private static readonly Color ChargeColor = new Color(1f, 0.82f, 0.2f, 0.95f);
         private const float RingRadius = 1.25f;
 
         // ミラーボールの光の筋の長さ（m。2026-10-16 の要望で、球と一緒に 1.6 倍に大きくした）。
@@ -103,7 +104,7 @@ namespace Airerage.Runtime.Presentation
             public SafeGlow Glow;
             public Vector3 Anchor;
             public LineRenderer Ring;
-            public LineRenderer RingBack;
+            public SlantedRingGauge ChargeGauge;
             public int Coins = -1;
             public float ChargeAt = -10f;
             public float ChargeSeconds = 0.3f;
@@ -114,8 +115,6 @@ namespace Airerage.Runtime.Presentation
             public LineRenderer Outline;
             public LineRenderer[] Streaks = new LineRenderer[0];
             public readonly List<WindShadow> Winds = new List<WindShadow>();
-            public LineRenderer RingBorder;
-            public LineRenderer RingRim;
             public int Owner;
             public LineRenderer PortalRing;
             public LineRenderer Swirl;
@@ -237,6 +236,14 @@ namespace Airerage.Runtime.Presentation
             return coins >= tuning.MaxCoins ? SafeGlow.Rainbow : coins >= tuning.GoldCoins ? SafeGlow.Gold : SafeGlow.None;
         }
 
+        private void OnDestroy()
+        {
+            foreach (Shown shown in _shown.Values)
+            {
+                shown.ChargeGauge?.Destroy();
+            }
+        }
+
         private void Awake()
         {
             _feed = _source as ISimulationFeed;
@@ -274,7 +281,7 @@ namespace Airerage.Runtime.Presentation
                     if (_shown.TryGetValue(item.Id, out Shown changed) && changed.Kind != item.Kind)
                     {
                         // 種類が変わった（飛んでいたクリームが張り付いた）: 見た目を作り直す。
-                        Destroy(changed.Visual);
+                        DestroyShown(changed);
                         _shown.Remove(item.Id);
                     }
                     if (!_shown.TryGetValue(item.Id, out Shown shown))
@@ -310,7 +317,7 @@ namespace Airerage.Runtime.Presentation
                 {
                     StartCoinFlight(shown.BeamStart);
                 }
-                Destroy(shown.Visual);
+                DestroyShown(shown);
                 _shown.Remove(id);
             }
             UpdateCoinFlights();
@@ -336,8 +343,6 @@ namespace Airerage.Runtime.Presentation
             shown.Rays = rays != null ? rays.GetComponent<LineRenderer>() : null;
             Transform ring = visual.transform.Find("ChargeRing");
             shown.Ring = ring != null ? ring.GetComponent<LineRenderer>() : null;
-            Transform ringBack = visual.transform.Find("ChargeRingBack");
-            shown.RingBack = ringBack != null ? ringBack.GetComponent<LineRenderer>() : null;
             shown.Owner = item.Owner;
             shown.Swirl = FindLine(visual, "Swirl");
             shown.Link = FindLine(visual, "Link");
@@ -381,8 +386,9 @@ namespace Airerage.Runtime.Presentation
                 shown.Coins = SkillRules.SafeCoins(item);
                 if (shown.Ring != null)
                 {
-                    // 円形のゲージの縁（ほかのゲージと同じ。ユーザーの要望、2026-10-16）。
-                    RingGaugeView.CreateFrame(shown.Ring, out shown.RingBorder, out shown.RingRim);
+                    // 次のチャージまでの円形のゲージ（ほかの円形ゲージと同じ見た目。D-76）。線は材質を借りるだけで描かない。
+                    shown.ChargeGauge = new SlantedRingGauge(this, $"SafeCharge#{item.Id}", shown.Ring.sharedMaterial, shown.Ring.sortingOrder);
+                    shown.Ring.enabled = false;
                 }
             }
             shown.BaseColor = shown.Renderers.Length > 0 ? shown.Renderers[0].sharedMaterial.GetColor(BaseColorId) : Color.white;
@@ -659,7 +665,7 @@ namespace Airerage.Runtime.Presentation
         /// <summary>番号 id の金庫のチャージのゲージに縁を描いているか（テスト用）。</summary>
         public bool SafeRingHasFrame(int id)
         {
-            return _shown.TryGetValue(id, out Shown shown) && shown.RingBorder != null && shown.RingBorder.enabled && shown.RingRim.enabled;
+            return _shown.TryGetValue(id, out Shown shown) && shown.ChargeGauge != null && shown.ChargeGauge.ShowsFrame;
         }
 
         // 突風: 進む向きに並んだ弧（「)」の形）。生まれてからの時間で薄くなる。
@@ -1006,36 +1012,24 @@ namespace Airerage.Runtime.Presentation
         {
             bool full = SkillRules.IsSafeFull(safe, tuning);
             shown.RingProgress = full ? -1f : SkillRules.SafeChargeProgress(safe, tuning, _feed.CurrentTick);
-            RingGaugeView.DrawFrame(shown.RingBorder, shown.RingRim, shown.Anchor, RingRadius, shown.Ring != null ? shown.Ring.widthMultiplier : 0.12f,
-                -0.7f, !full);
-            if (shown.RingBack != null)
-            {
-                shown.RingBack.enabled = !full;
-                if (!full)
-                {
-                    SetArc(shown.RingBack, shown.Anchor, 1f);
-                }
-            }
-            if (shown.Ring == null)
+            if (shown.ChargeGauge == null)
             {
                 return;
             }
-            shown.Ring.enabled = !full && shown.RingProgress > 0f;
-            if (shown.Ring.enabled)
+            if (full)
             {
-                SetArc(shown.Ring, shown.Anchor, shown.RingProgress);
+                shown.ChargeGauge.Hide();
+                shown.ChargeGauge.Advance();
+                return;
             }
+            // 伸びていくゲージなので、残りが少ないときの脈打ちはしない。
+            shown.ChargeGauge.Draw(shown.Anchor, RingRadius, RingWidth, Mathf.Max(0f, shown.RingProgress), ChargeColor, -0.7f, false);
         }
 
-        private static void SetArc(LineRenderer line, Vector3 center, float fraction)
+        private static void DestroyShown(Shown shown)
         {
-            int points = Mathf.Max(2, Mathf.CeilToInt(RingPoints * fraction) + 1);
-            line.positionCount = points;
-            for (int k = 0; k < points; k++)
-            {
-                float angle = Mathf.PI * 2f * fraction * k / (points - 1);
-                line.SetPosition(k, center + new Vector3(Mathf.Sin(angle) * RingRadius, Mathf.Cos(angle) * RingRadius, -0.7f));
-            }
+            shown.ChargeGauge?.Destroy();
+            Destroy(shown.Visual);
         }
 
         private void OnGUI()

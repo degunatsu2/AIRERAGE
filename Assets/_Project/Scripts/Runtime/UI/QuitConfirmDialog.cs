@@ -8,7 +8,7 @@ namespace Airerage.Runtime.UI
     /// ゲームを終了する前の確認（ユーザーの要望、2026-10-20）: 画面の真ん中に「ゲームを終了します。本当によろしいですか？」と
     /// 「はい」「いいえ」。最初は「いいえ」を選ぶ。はいで Confirmed、いいえか戻る操作（Esc・B）で閉じて、開いた側の続き（Show に渡した
     /// onCancel）へ。後ろは暗くし、クリックを通さない。開いた直後の少しの間は決定と戻るを受け付けない（開いたキーで閉じないように）。
-    /// 日本語は PC の日本語の字体で書く（JapaneseFont）。
+    /// 日本語は日本語の字体で書く（GameFonts.Japanese）。
     /// </summary>
     public sealed class QuitConfirmDialog : MonoBehaviour
     {
@@ -20,7 +20,6 @@ namespace Airerage.Runtime.UI
 
         private Action _onCancel;
         private float _shownAt;
-        private Font _japanese;
 
         /// <summary>「はい」を選んだ（ゲームを終える）。</summary>
         public event Action Confirmed;
@@ -51,20 +50,9 @@ namespace Airerage.Runtime.UI
             _no.Cancelled += Cancel;
             Link(_yes.Button, _no.Button);
             Link(_no.Button, _yes.Button);
-            _japanese = JapaneseFont.Create(40);
-            if (_japanese != null)
+            foreach (Text text in new[] { _message, _yes.LabelText, _no.LabelText })
             {
-                _message.font = _japanese;
-                _yes.LabelText.font = _japanese;
-                _no.LabelText.font = _japanese;
-            }
-        }
-
-        private void OnDestroy()
-        {
-            if (_japanese != null)
-            {
-                Destroy(_japanese);
+                text.font = GameFonts.Switch(text.font, japanese: true);
             }
         }
 

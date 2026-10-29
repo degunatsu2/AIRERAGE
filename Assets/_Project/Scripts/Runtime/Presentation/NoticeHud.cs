@@ -4,6 +4,7 @@ using Airerage.Core.Economy;
 using Airerage.Core.Match;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -399,8 +400,8 @@ namespace Airerage.Runtime.Presentation
             _chipFrame = TimerPlate.Create("NoticeChipFrame", ChipWidth, ChipHeight,
                 (x, y) => InsideChip(x, y, 0f) && !InsideChip(x, y, 2.5f) ? 1f : 0f);
             // 折り返さない（狭いと 2 行になって見切れていた。ユーザーの指摘、2026-10-14）。
-            _title = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false, clipping = TextClipping.Clip };
-            _seconds = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, wordWrap = false };
+            _title = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false, clipping = TextClipping.Clip });
+            _seconds = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, wordWrap = false });
             _title.normal.textColor = Color.white;
             _seconds.normal.textColor = Color.white;
         }

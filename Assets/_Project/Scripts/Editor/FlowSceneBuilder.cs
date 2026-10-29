@@ -318,8 +318,9 @@ namespace Airerage.Editor
             // タイトル: 大きな「AIRERAGE」と、点滅する「PRESS ANY BUTTON」。
             RectTransform title = MenuUiBuilder.CreateFull(canvas.transform, "Title");
             MenuUiBuilder.CreateFill(title, "Band", new Color(0f, 0f, 0f, 0.45f), new Vector2(0f, 0.46f), new Vector2(1f, 0.74f));
+            // ロゴはいちばん太い字（Orbitron Black）。
             MenuUiBuilder.CreateText(title, "Logo", "AIRERAGE", 150, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.6f), Vector2.zero, new Vector2(1600f, 200f), white);
+                new Vector2(0.5f, 0.6f), Vector2.zero, new Vector2(1600f, 200f), white).font = GameFonts.LatinBlack;
             UnityEngine.UI.Text press = MenuUiBuilder.CreateText(title, "PressAnyButton", "PRESS ANY BUTTON", 34, FontStyle.Bold,
                 TextAnchor.MiddleCenter, new Vector2(0.5f, 0.28f), Vector2.zero, new Vector2(800f, 60f), white);
 
@@ -327,7 +328,7 @@ namespace Airerage.Editor
             RectTransform main = MenuUiBuilder.CreateFull(canvas.transform, "Main");
             MenuUiBuilder.CreateFill(main, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.42f, 1f));
             MenuUiBuilder.CreateText(main, "Logo", "AIRERAGE", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(700f, 90f), white);
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(700f, 90f), white).font = GameFonts.LatinBlack;
             var anchor = new Vector2(0f, 1f);
             var size = new Vector2(560f, 72f);
             string[] labels = { "SINGLE", "LOCAL VS", "NETWORK VS", "TRAINING", "OPTIONS", "QUIT" };

@@ -152,6 +152,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions:
         - StartTick: 8
           Ticks: 8
@@ -222,6 +223,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions: []
       AirSide:
         Name: 
@@ -278,6 +280,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions: []
       AirUp:
         Name: COIN TOSS
@@ -367,6 +370,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions:
         - StartTick: 16
           Ticks: 12
@@ -558,6 +562,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         HeldCoinsPerBonusPercent: 3
         MaxHeldCoinBonusPercent: 100
       Run:
@@ -624,6 +629,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       Beam:
         HalfWidth: 0.75
         IntervalTicks: 10
@@ -652,6 +658,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       SlowFall:
         MaxFallSpeed: 3
       CottonCandy:
@@ -718,6 +725,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       Scale:
         OffsetY: -1.2
         Gravity: 32
@@ -753,6 +761,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       Inverter:
         RangeScale: 0.33333334
         WhipHalfThickness: 0.25
@@ -781,6 +790,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         WaveSpeed: 36
         WaveRadius: 0.5
         StunTicks: 60
@@ -818,6 +828,7 @@ MonoBehaviour:
           StunTicks: 60
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       Thief:
         SmokeBallSpeed: 26
         SmokeBallRadius: 0.3
@@ -847,6 +858,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         SmokeRadius: 2.6
         SmokeTicks: 300
         PuffRadius: 1.6
@@ -932,6 +944,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         FlakSpeeds:
         - 14
         - 20
@@ -968,10 +981,10 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
-        MineSpeed: 22
+          FatalTicks: 0
+        MineSpeed: 11
         MineGravity: 22
         MineRadius: 0.3
-        MineFlightTicks: 90
         MineLaunchOffset: 1.1
         MineExplosionRadius: 2.4
         MineHit:
@@ -998,6 +1011,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         BlastTicks: 20
         MaydayLiftTicks: 50
         MaydaySelectTicks: 600

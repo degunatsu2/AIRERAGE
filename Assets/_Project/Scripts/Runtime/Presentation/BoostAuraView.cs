@@ -23,7 +23,7 @@ namespace Airerage.Runtime.Presentation
         private const int TornadoLines = 3;
         private const int TornadoPoints = 40;
         private const float Z = -0.65f;
-        private const float ArcWidth = 0.09f;
+        private const float ArcWidth = 0.16f;
 
         /// <summary>ウインドクローク・走りの色（黄緑）とキャッスルインジエアーの色（空色）。</summary>
         public static readonly Color CloakColor = new Color(0.6f, 1f, 0.3f);
@@ -37,20 +37,13 @@ namespace Airerage.Runtime.Presentation
         private readonly List<Lines> _lines = new List<Lines>();
         private ISimulationFeed _feed;
 
-        private sealed class Gauge
-        {
-            public LineRenderer Arc;
-            public LineRenderer Border;
-            public LineRenderer Rim;
-        }
-
         private sealed class Lines
         {
             public readonly List<WindShadow> Winds = new List<WindShadow>();
             public LineRenderer[] Cloak;
-            public Gauge CloakGauge;
+            public SlantedRingGauge CloakGauge;
             public LineRenderer[] Castle;
-            public Gauge CastleGauge;
+            public SlantedRingGauge CastleGauge;
             public LineRenderer RunAura;
             public LineRenderer[] Streaks;
             public LineRenderer[] Tornado;
@@ -74,7 +67,7 @@ namespace Airerage.Runtime.Presentation
         public bool ShowsGustWindup(int index) => index >= 0 && index < _lines.Count && _lines[index].ShowingGather;
 
         /// <summary>キャラクター index のウインドクロークの残りのゲージに縁を描いているか（テスト用）。</summary>
-        public bool CloakGaugeHasFrame(int index) => ShowsCloak(index) && _lines[index].CloakGauge.Border.enabled && _lines[index].CloakGauge.Rim.enabled;
+        public bool CloakGaugeHasFrame(int index) => ShowsCloak(index) && _lines[index].CloakGauge.ShowsFrame;
 
         /// <summary>キャラクター index の風の線に影を付けているか（出している線がすべて影を持つ。テスト用）。</summary>
         public bool WindsHaveShadows(int index)
@@ -105,6 +98,15 @@ namespace Airerage.Runtime.Presentation
             _lineTemplate.gameObject.SetActive(false);
         }
 
+        private void OnDestroy()
+        {
+            foreach (Lines lines in _lines)
+            {
+                lines.CloakGauge.Destroy();
+                lines.CastleGauge.Destroy();
+            }
+        }
+
         private void LateUpdate()
         {
             int count = _feed.CharacterCount;
@@ -116,6 +118,9 @@ namespace Airerage.Runtime.Presentation
             for (int i = 0; i < _lines.Count; i++)
             {
                 Lines lines = _lines[i];
+                // 隠した後の、終わりの白い輪（ゲージを出している間は何もしない）。
+                lines.CloakGauge.Advance();
+                lines.CastleGauge.Advance();
                 if (i >= count)
                 {
                     Show(lines, false, false, false, false, false);
@@ -228,23 +233,10 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        // 残りの時間の円形のゲージ（上から時計回りに減る弧。暗い帯と明るい外の線の縁つき。オーラと見分けられるように）。
-        private static void DrawGauge(Gauge gauge, Vector3 center, float radius, float fraction, Color color)
+        // 残りの時間の円形のゲージ（ほかの円形ゲージと同じ見た目。SlantedRingGauge。D-76）。
+        private static void DrawGauge(SlantedRingGauge gauge, Vector3 center, float radius, float fraction, Color color)
         {
-            RingGaugeView.DrawFrame(gauge.Border, gauge.Rim, center, radius, ArcWidth, Z, true);
-            fraction = Mathf.Clamp01(fraction);
-            int points = Mathf.Max(2, Mathf.CeilToInt(48 * fraction) + 1);
-            LineRenderer line = gauge.Arc;
-            line.positionCount = points;
-            for (int k = 0; k < points; k++)
-            {
-                float a = Mathf.PI * 2f * fraction * k / (points - 1);
-                line.SetPosition(k, center + new Vector3(Mathf.Sin(a) * radius, Mathf.Cos(a) * radius, Z));
-            }
-            line.widthMultiplier = ArcWidth;
-            var c = new Color(color.r, color.g, color.b, 0.95f);
-            line.startColor = c;
-            line.endColor = c;
+            gauge.Draw(center, radius, ArcWidth, fraction, new Color(color.r, color.g, color.b, 0.95f), Z);
         }
 
         // 揺らめくオーラ（炎のように、上の側ほど大きく揺れて伸びる）。
@@ -356,11 +348,12 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        private static void SetGauge(Gauge gauge, bool enabled)
+        private static void SetGauge(SlantedRingGauge gauge, bool enabled)
         {
-            gauge.Arc.enabled = enabled;
-            gauge.Border.enabled = enabled;
-            gauge.Rim.enabled = enabled;
+            if (!enabled)
+            {
+                gauge.Hide();
+            }
         }
 
         private static void SetEnabled(LineRenderer[] lines, bool enabled)
@@ -400,12 +393,9 @@ namespace Airerage.Runtime.Presentation
             return line;
         }
 
-        private Gauge NewGauge(int index, string name)
+        private SlantedRingGauge NewGauge(int index, string name)
         {
-            var gauge = new Gauge { Arc = NewLine(index, name, ArcWidth, false) };
-            gauge.Arc.sortingOrder = 2;
-            RingGaugeView.CreateFrame(gauge.Arc, out gauge.Border, out gauge.Rim);
-            return gauge;
+            return new SlantedRingGauge(this, $"Boost{index}{name}", _lineTemplate.sharedMaterial, 2);
         }
 
         private LineRenderer NewLine(int index, string name, float width, bool loop)

@@ -9,17 +9,13 @@ namespace Airerage.Editor
 {
     /// <summary>
     /// メニューと一時停止の画面（uGUI。D-65、D-69）を作る部品（docs/15 T6-1）。基準の画面の大きさは 1920×1080。
-    /// 文字は Unity に入っている字体（LegacyRuntime）を使う（字体のファイルを足さない）。
+    /// 文字はゲームの字体（GameFonts。英字は Orbitron、足りない字は M PLUS 1。D-77）。
     /// </summary>
     internal static class MenuUiBuilder
     {
         public static readonly Color Accent = new Color(0.35f, 0.85f, 1f);
         private static readonly Color PlateFill = new Color(0.03f, 0.05f, 0.09f, 0.78f);
         private static readonly Color PlateBorder = new Color(1f, 1f, 1f, 0.35f);
-
-        private static Font _font;
-
-        private static Font BuiltinFont => _font != null ? _font : _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         /// <summary>画面いっぱいの Canvas（画面に重ねる。大きさは 1920×1080 を基準に合わせる）。</summary>
         public static Canvas CreateCanvas(string name, int sortingOrder)
@@ -74,10 +70,10 @@ namespace Airerage.Editor
             rect.anchoredPosition = position;
             rect.sizeDelta = boxSize;
             var label = go.AddComponent<Text>();
-            label.font = BuiltinFont;
             label.text = text;
             label.fontSize = size;
             label.fontStyle = style;
+            GameFonts.Use(label);
             label.alignment = alignment;
             label.color = color;
             label.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -257,8 +253,9 @@ namespace Airerage.Editor
             Canvas canvas = CreateCanvas("ResultsMenu", 15);
             RectTransform panel = CreateFull(canvas.transform, "Panel");
             var bottom = new Vector2(0.5f, 0f);
-            var size = new Vector2(420f, 72f);
-            const float gap = 30f;
+            // 札の幅は、横に広い字体（Orbitron）の「CHARACTER SELECT」が収まる大きさ（D-77）。
+            var size = new Vector2(520f, 72f);
+            const float gap = 24f;
             float left = -(size.x * 3f + gap * 2f) * 0.5f;
             MenuOption rematch = CreateMenuItem(panel, "Rematch", "REMATCH", bottom, new Vector2(left, 150f), size);
             MenuOption characters = CreateMenuItem(panel, "CharacterSelect", "CHARACTER SELECT", bottom, new Vector2(left + size.x + gap, 150f), size);

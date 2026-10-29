@@ -1,4 +1,5 @@
 using Airerage.Core.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -187,13 +188,13 @@ namespace Airerage.Runtime.Presentation
 
         private GUIStyle Style(int size, TextAnchor anchor)
         {
-            return new GUIStyle(GUI.skin.label)
+            return GameFonts.Use(new GUIStyle(GUI.skin.label)
             {
                 fontSize = Mathf.RoundToInt(size * _fontScale),
                 fontStyle = FontStyle.Bold,
                 alignment = anchor,
                 wordWrap = false,
-            };
+            });
         }
     }
 }

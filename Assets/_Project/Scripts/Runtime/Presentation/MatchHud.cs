@@ -4,6 +4,7 @@ using Airerage.Core.Match;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -284,9 +285,9 @@ namespace Airerage.Runtime.Presentation
         {
             if (_timer == null)
             {
-                _timer = new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                _plate = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-                _small = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+                _timer = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+                _plate = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft });
+                _small = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
             }
             Color previous = GUI.color;
             Matrix4x4 matrix = GUI.matrix;
@@ -418,7 +419,7 @@ namespace Airerage.Runtime.Presentation
             if (_resultPlate == null)
             {
                 _resultPlate = new PlayerStatusPlate(plateWidth, plateHeight, 1.3f);
-                _rank = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
+                _rank = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight });
             }
             float width = 640f;
             bool buttons = _matchControls != null;

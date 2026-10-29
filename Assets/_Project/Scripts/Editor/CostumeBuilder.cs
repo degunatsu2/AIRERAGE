@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Presentation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Editor
@@ -36,7 +36,6 @@ namespace Airerage.Editor
             int count = Enum.GetValues(typeof(CharacterCostume)).Length;
             var bodySets = new GameObject[count];
             var facingSets = new GameObject[count];
-            var texts = new List<TextMesh>();
             Material black = Lit("CostumeBlack", new Color(0.04f, 0.04f, 0.05f));
 
             // RISK TAKER: アフロ、金色の服、サングラス。
@@ -60,7 +59,7 @@ namespace Airerage.Editor
             Part(storm, PrimitiveType.Cube, "BladeFront", new Vector3(0f, -0.88f, -0.25f), new Vector3(1.05f, 0.04f, 0.06f), blade);
             Part(storm, PrimitiveType.Cube, "BladeRear", new Vector3(0f, -0.88f, 0.25f), new Vector3(1.05f, 0.04f, 0.06f), blade);
             Part(storm, PrimitiveType.Cube, "Bib", new Vector3(0f, -0.08f, -0.415f), new Vector3(0.56f, 0.5f, 0.02f), Lit("CostumeBib", Color.white));
-            texts.Add(Text(storm, "BibText", "風", new Vector3(0f, -0.08f, -0.432f), 0.4f, new Color(0.05f, 0.25f, 0.15f)));
+            Text(storm, "BibText", "風", new Vector3(0f, -0.08f, -0.432f), 0.4f, new Color(0.05f, 0.25f, 0.15f));
 
             // SPACE TRAVELER: 宇宙服と宇宙帽。
             Transform space = Set(view.transform, "CostumeSpaceTraveler");
@@ -168,7 +167,7 @@ namespace Airerage.Editor
             var hides = new bool[count];
             hides[(int)CharacterCostume.Juggernaut] = true;
             var costume = view.gameObject.AddComponent<CostumeView>();
-            costume.Configure(bodySets, facingSets, texts.ToArray(), view.GetComponent<Renderer>(), hides);
+            costume.Configure(bodySets, facingSets, view.GetComponent<Renderer>(), hides);
             SandboxWireSceneBuilder.SetReference(view, "_costume", costume);
         }
 
@@ -224,7 +223,8 @@ namespace Airerage.Editor
             // TextMesh の 1 行の高さは、およそ characterSize × fontSize / 10（m）。
             mesh.characterSize = height * 10f / 64f;
             mesh.color = color;
-            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            // 日本語の太字（M PLUS 1 ExtraBold）。
+            Font font = GameFonts.JapaneseBold;
             mesh.font = font;
             go.GetComponent<MeshRenderer>().sharedMaterial = font.material;
             return mesh;

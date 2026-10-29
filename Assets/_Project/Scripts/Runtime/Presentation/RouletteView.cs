@@ -3,6 +3,7 @@ using Airerage.Core.Combat;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -256,9 +257,9 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
-            _numberStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _numberStyle = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _resultStyle = TextFlash.Style(28, FontStyle.Bold, TextAnchor.MiddleCenter);
-            _pointerStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _pointerStyle = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _pointerStyle.normal.textColor = new Color(1f, 0.85f, 0.2f);
         }
 

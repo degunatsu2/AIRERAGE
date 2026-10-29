@@ -6,7 +6,6 @@ using Airerage.Core.Simulation;
 using Airerage.Core.Skills;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Simulation;
-using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -86,7 +85,6 @@ namespace Airerage.Runtime.Presentation
         private readonly List<Vector3> _points = new List<Vector3>();
         private ISimulationFeed _feed;
         private ILocalAimSource _local;
-        private Font _japanese;
         private bool _primed;
         private float _scale = 1f;
 
@@ -169,15 +167,6 @@ namespace Airerage.Runtime.Presentation
             foreach (GameObject template in templates)
             {
                 template.SetActive(false);
-            }
-            _japanese = JapaneseFont.Create(64);
-        }
-
-        private void OnDestroy()
-        {
-            if (_japanese != null)
-            {
-                Destroy(_japanese);
             }
         }
 
@@ -699,11 +688,6 @@ namespace Airerage.Runtime.Presentation
             text.gameObject.SetActive(true);
             // TextMesh の 1 行の高さは、およそ characterSize × fontSize / 10（m）。
             text.characterSize = height * 10f / Mathf.Max(1, text.fontSize);
-            if (_japanese != null)
-            {
-                text.font = _japanese;
-                text.GetComponent<MeshRenderer>().sharedMaterial = _japanese.material;
-            }
             return text;
         }
 

@@ -134,6 +134,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions: []
       AirNeutral:
         Name: WHIRLWIND
@@ -190,6 +191,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         - StartTick: 10
           ActiveTicks: 3
           UntilEnd: 0
@@ -213,6 +215,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         - StartTick: 16
           ActiveTicks: 4
           UntilEnd: 0
@@ -236,6 +239,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions: []
       AirSide:
         Name: GALE SLASH
@@ -292,6 +296,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions: []
       AirUp:
         Name: 
@@ -348,6 +353,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions: []
       AirDown:
         Name: DOWNBURST
@@ -404,6 +410,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         Motions:
         - StartTick: 12
           Ticks: 10
@@ -595,6 +602,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         HeldCoinsPerBonusPercent: 0
         MaxHeldCoinBonusPercent: 0
       Run:
@@ -661,6 +669,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       Beam:
         HalfWidth: 0.75
         IntervalTicks: 10
@@ -689,6 +698,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       SlowFall:
         MaxFallSpeed: 3
       CottonCandy:
@@ -755,6 +765,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       Scale:
         OffsetY: -1.2
         Gravity: 32
@@ -790,6 +801,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       Inverter:
         RangeScale: 0.33333334
         WhipHalfThickness: 0.25
@@ -818,6 +830,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         WaveSpeed: 36
         WaveRadius: 0.5
         StunTicks: 60
@@ -855,6 +868,7 @@ MonoBehaviour:
           StunTicks: 60
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
       Thief:
         SmokeBallSpeed: 26
         SmokeBallRadius: 0.3
@@ -884,6 +898,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         SmokeRadius: 2.6
         SmokeTicks: 300
         PuffRadius: 1.6
@@ -969,6 +984,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         FlakSpeeds:
         - 14
         - 20
@@ -1005,10 +1021,10 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
-        MineSpeed: 22
+          FatalTicks: 0
+        MineSpeed: 11
         MineGravity: 22
         MineRadius: 0.3
-        MineFlightTicks: 90
         MineLaunchOffset: 1.1
         MineExplosionRadius: 2.4
         MineHit:
@@ -1035,6 +1051,7 @@ MonoBehaviour:
           StunTicks: 0
           SweepTicks: 0
           FatalScale: 0
+          FatalTicks: 0
         BlastTicks: 20
         MaydayLiftTicks: 50
         MaydaySelectTicks: 600

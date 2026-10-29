@@ -75,8 +75,6 @@ namespace Airerage.Runtime.UI
         private float _navigationRestoreAt = -1f;
         private float _promptHideAt = -1f;
         private bool _wired;
-        private Font _japanese;
-        private Font _latin;
 
         /// <summary>閉じた（設定は保存してある）。</summary>
         public event Action Closed;
@@ -467,29 +465,13 @@ namespace Airerage.Runtime.UI
             ShowLanguage(_settings.Language);
         }
 
-        // 言語の値（「日本語」は PC の日本語の字体で書く。PC になければ Unity に入っている字体のまま）。
+        // 言語の値（「日本語」は日本語の字体で書く）。
         private void ShowLanguage(GameLanguage language)
         {
             Text value = _generalValues[(int)Row.Language];
-            if (_latin == null)
-            {
-                _latin = value.font;
-            }
             bool ja = language == GameLanguage.Japanese;
-            if (ja && _japanese == null)
-            {
-                _japanese = JapaneseFont.Create(32);
-            }
-            value.font = ja && _japanese != null ? _japanese : _latin;
+            value.font = GameFonts.Switch(value.font, ja);
             value.text = ja ? JapaneseLabel : EnglishLabel;
-        }
-
-        private void OnDestroy()
-        {
-            if (_japanese != null)
-            {
-                Destroy(_japanese);
-            }
         }
 
         private static string VolumeText(int volume)
@@ -549,7 +531,7 @@ namespace Airerage.Runtime.UI
                     if (swapped != null)
                     {
                         int other = Array.IndexOf(BindingSettings.Actions, swapped);
-                        message += $"   ({BindingSettings.Labels[other]} → {BindingSettings.Readable(previous)})";
+                        message += $"   ({BindingSettings.Labels[other]} -> {BindingSettings.Readable(previous)})";
                     }
                     SaveBindings();
                 }
