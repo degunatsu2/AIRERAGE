@@ -6,7 +6,7 @@ namespace Airerage.Runtime.Presentation
     /// <summary>
     /// 3 つの層を重ねた爆発の見た目（ユーザーの要望、2026-10-29。手本はスマブラの爆発の作り方）。手前から:
     /// 1. 青い縁の白い閃光と、長い光条（一瞬で消える）。
-    /// 2. オレンジ色の弾ける炎（外へ飛び散って、赤黒くなって消える）。
+    /// 2. オレンジ色の弾ける炎（外へ飛び散って、終わりぎわに赤黒くなって消える）。
     /// 3. 黒い煙（気体。ゆっくり上へ流れて広がり、長く残る）。
     /// 見た目だけ（当たりは Core が決める）。呼ぶ側が爆発を見つけたときに Spawn を呼び、その後は時間で進む（Core の爆発の印が
     /// 消えても、煙は残る）。予測が外れて巻き戻った爆発は Cancel で消す。乱れ方は key（物の番号）で決めるので、同じ爆発は同じ見た目。
@@ -319,9 +319,14 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
+        // 黄色からすぐオレンジになり、しばらくオレンジのまま弾けて、終わりぎわだけ赤黒くなる。
         private static Color FlameColor(float t)
         {
-            return t < 0.25f ? Color.Lerp(FlameHot, FlameOrange, t / 0.25f) : Color.Lerp(FlameOrange, FlameEmber, (t - 0.25f) / 0.75f);
+            if (t < 0.2f)
+            {
+                return Color.Lerp(FlameHot, FlameOrange, t / 0.2f);
+            }
+            return t < 0.65f ? FlameOrange : Color.Lerp(FlameOrange, FlameEmber, (t - 0.65f) / 0.35f);
         }
 
         private static Color WithAlpha(Color color, float alpha)
