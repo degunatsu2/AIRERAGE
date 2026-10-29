@@ -13,8 +13,9 @@ namespace Airerage.Runtime.Presentation
     /// <summary>
     /// THIEF の技の表示（docs/14 1.6。ユーザーの案、2026-10-28）。状態を読むだけで、書き換えない。
     /// - 煙球（地上技）: 落ちていく暗い灰色の玉。
-    /// - 煙（煙球の着弾、分身が消えたとき）: ふちのやわらかい半透明の煙のかたまり（コードで描いた絵の板）を重ねた、気体のような雲
-    ///   （ユーザーの要望、2026-10-29）。かたまりはゆっくり回って広がり、消える前に薄くなる。真ん中は重なって濃いので、中の物は見えない。
+    /// - 煙（煙球の着弾、分身が消えたとき）: ふちのやわらかい煙のかたまり（コードで描いた絵の板）を重ねた、気体のような雲
+    ///   （ユーザーの要望、2026-10-29）。かたまりはゆっくり回って広がり、消える前に薄くなる。かたまりの内側は不透明で、真ん中・内側の輪 5 つ・
+    ///   外側の輪 10 個をすき間なく並べるので、煙の円の中の物（後ろの物も）は見えない（2 回目の要望、2026-10-29）。
     ///   カメラの前（_smokeDepth）に、z = 0 の面の円と画面で重なる位置・大きさで出す。出た瞬間に音。
     /// - タレントスナッチの弾（Q）: こげ茶の小さな弾と短い尾。撃った瞬間に音。
     /// - 置いたギミック（Q で奪ったもの）: ステージの本物の見た目を写す（PlacedGimmickLooks。ユーザーの要望、2026-10-29）。本物が
@@ -28,7 +29,7 @@ namespace Airerage.Runtime.Presentation
     public sealed class ThiefEffectsView : MonoBehaviour
     {
         private const float Z = -0.5f;
-        private const int SmokePuffs = 14;
+        private const int SmokePuffs = 16;
         private const int PuffTextureSize = 128;
         private const float SmokeGrowSeconds = 0.3f;
         private const float SmokeFadeSeconds = 1.2f;
@@ -303,7 +304,7 @@ namespace Airerage.Runtime.Presentation
 
         // ---------------------------------------------------------------- 煙
 
-        // 煙のかたまりの絵: 真ん中は濃く、ふちはやわらかく、ゆらいだ形で薄くなる（明るさにもむら）。白で描き、色は板ごとに掛ける。
+        // 煙のかたまりの絵: 内側は不透明、ふちはやわらかく、ゆらいだ形で薄くなる（明るさにもむら）。白で描き、色は板ごとに掛ける。
         private static Sprite CreatePuffSprite()
         {
             const int size = PuffTextureSize;
@@ -322,8 +323,8 @@ namespace Airerage.Runtime.Presentation
                     float v = (y + 0.5f) / size * 2f - 1f;
                     float r = Mathf.Sqrt(u * u + v * v);
                     float noise = Fbm(u * 2.3f + 5.1f, v * 2.3f + 2.7f);
-                    float edge = 1f - Mathf.SmoothStep(0.42f, 1f, r + (noise - 0.5f) * 0.38f);
-                    float alpha = Mathf.Clamp01(edge * (0.82f + (noise - 0.5f) * 0.45f));
+                    float edge = 1f - Mathf.SmoothStep(0.55f, 1f, r + (noise - 0.5f) * 0.3f);
+                    float alpha = Mathf.Clamp01(edge * (1.6f + (noise - 0.5f) * 0.4f));
                     float shade = Mathf.Lerp(0.8f, 1f, noise);
                     pixels[y * size + x] = new Color(shade, shade, shade, alpha);
                 }
@@ -350,7 +351,8 @@ namespace Airerage.Runtime.Presentation
             return sum / total;
         }
 
-        // 煙: 真ん中の大きなかたまり、内側の輪、外側の輪（並べ方は物の番号で決める）。
+        // 煙: 真ん中の大きなかたまり、内側の輪（5 つ）、外側の輪（10 個）。輪の中は同じ間隔に少しずらして並べ、円の中にすき間を作らない
+        // （ずらし方は物の番号で決める）。
         private void CreatePuffs(Shown shown, int id)
         {
             var random = new System.Random(id * 7919 + 17);
@@ -359,14 +361,20 @@ namespace Airerage.Runtime.Presentation
             shown.PuffSizes = new float[SmokePuffs];
             shown.PuffSpins = new float[SmokePuffs];
             shown.PuffShades = new float[SmokePuffs];
+            const int innerCount = 5;
+            float innerBase = (float)random.NextDouble() * Mathf.PI * 2f;
+            float outerBase = (float)random.NextDouble() * Mathf.PI * 2f;
             for (int i = 0; i < SmokePuffs; i++)
             {
-                bool inner = i >= 1 && i <= 5;
-                float angle = (float)random.NextDouble() * Mathf.PI * 2f;
-                float distance = i == 0 ? 0f : inner ? 0.28f + (float)random.NextDouble() * 0.17f : 0.55f + (float)random.NextDouble() * 0.15f;
+                bool inner = i >= 1 && i <= innerCount;
+                int outerCount = SmokePuffs - 1 - innerCount;
+                float angle = inner
+                    ? innerBase + Mathf.PI * 2f * (i - 1) / innerCount + ((float)random.NextDouble() * 2f - 1f) * 0.3f
+                    : outerBase + Mathf.PI * 2f * (i - 1 - innerCount) / outerCount + ((float)random.NextDouble() * 2f - 1f) * 0.15f;
+                float distance = i == 0 ? 0f : inner ? 0.3f + (float)random.NextDouble() * 0.12f : 0.74f + (float)random.NextDouble() * 0.06f;
                 // 奥のかたまりほど少し後ろ（重なりの順）。
                 shown.PuffOffsets[i] = new Vector3(Mathf.Cos(angle) * distance, Mathf.Sin(angle) * distance, 0.02f * i);
-                shown.PuffSizes[i] = i == 0 ? 1.55f : inner ? 1.15f + (float)random.NextDouble() * 0.2f : 0.85f + (float)random.NextDouble() * 0.2f;
+                shown.PuffSizes[i] = i == 0 ? 1.55f : inner ? 1.2f + (float)random.NextDouble() * 0.15f : 1.1f + (float)random.NextDouble() * 0.15f;
                 shown.PuffSpins[i] = ((float)random.NextDouble() * 2f - 1f) * 25f;
                 // 上ほど明るく、下ほど少し暗い灰色。
                 shown.PuffShades[i] = Mathf.Lerp(0.66f, 0.86f, (shown.PuffOffsets[i].y + 0.7f) / 1.4f) + ((float)random.NextDouble() - 0.5f) * 0.06f;
@@ -409,7 +417,7 @@ namespace Airerage.Runtime.Presentation
                 puff.transform.localScale = Vector3.one * size * shown.PuffSizes[i] * billow;
                 puff.transform.Rotate(0f, 0f, shown.PuffSpins[i] * Time.deltaTime, Space.Self);
                 float shade = shown.PuffShades[i];
-                puff.color = new Color(shade, shade, shade + 0.02f, fade * (0.75f + 0.25f * grow));
+                puff.color = new Color(shade, shade, shade + 0.02f, fade);
             }
         }
 

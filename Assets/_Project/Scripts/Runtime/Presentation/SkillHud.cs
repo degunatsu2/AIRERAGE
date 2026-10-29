@@ -40,9 +40,10 @@ namespace Airerage.Runtime.Presentation
         private const int StackWidth = 5;
         private const int StackSpacing = 4;
         private const int StackGap = 2;
-        // バンクハイストのゲージの帯の太さと間（ピクセル）と、10 秒ごとの帯の色。
-        private const float HeistBarHeight = 5f;
-        private const float HeistBarGap = 3f;
+        // バンクハイストのゲージの帯（札の中の底の縁の上。2 本）の太さと間、縁の内側までの幅（ピクセル）と、10 秒ごとの帯の色。
+        private const int HeistBarHeight = 4;
+        private const int HeistBarGap = 1;
+        private const float HeistBarInset = 3f;
         private static readonly Color HeistTenColor = new Color(1f, 0.55f, 0.15f);
 
         /// <summary>頭上の通知を出している長さ（秒）。</summary>
@@ -75,6 +76,7 @@ namespace Airerage.Runtime.Presentation
         private Texture2D _fill;
         private Texture2D _frame;
         private Texture2D _line;
+        private readonly Texture2D[] _heistBands = new Texture2D[2];
         private GUIStyle _key;
         private GUIStyle _name;
         private GUIStyle _number;
@@ -436,13 +438,13 @@ namespace Airerage.Runtime.Presentation
                 GUI.color = slot.Ready ? accent : Idle;
             }
             GUI.DrawTexture(rect, _frame);
-            if (slot.HeistFive >= 0f)
+            bool heist = slot.HeistFive >= 0f;
+            if (heist)
             {
-                // バンクハイストの詠唱中: 札の上に、5 秒ごと（下）と 10 秒ごと（上）にいっぱいになる細い横の帯。
-                DrawHeistBar(new Rect(rect.x + Slant, rect.y - HeistBarHeight - HeistBarGap, rect.width - Slant, HeistBarHeight), slot.HeistFive,
-                    SuperColor);
-                DrawHeistBar(new Rect(rect.x + Slant, rect.y - (HeistBarHeight + HeistBarGap) * 2f, rect.width - Slant, HeistBarHeight), slot.HeistTen,
-                    HeistTenColor);
+                // バンクハイストの詠唱中: 札の中の底の縁の上に、5 秒ごと（下）と 10 秒ごと（上）にいっぱいになる細い横の帯
+                // （ユーザーの要望、2026-10-29）。
+                DrawHeistBar(rect, 0, slot.HeistFive, SuperColor);
+                DrawHeistBar(rect, 1, slot.HeistTen, HeistTenColor);
             }
             if (slot.MaxCharges > 1)
             {
@@ -455,7 +457,9 @@ namespace Airerage.Runtime.Presentation
 
             GuidePlate.DrawText(new Rect(rect.x + Slant + 6f, rect.y + 3f, rect.width - Slant - 10f, 16f), Keys[index], _key,
                 new Color(1f, 1f, 1f, 0.75f));
-            var center = new Rect(rect.x + 4f, rect.y + 18f, rect.width - 8f, 28f);
+            // 詠唱中のゲージの帯の分だけ、真ん中の文字と下の文字を上げる。
+            float lift = heist ? (HeistBarHeight + HeistBarGap) * 2f : 0f;
+            var center = new Rect(rect.x + 4f, rect.y + 18f - lift * 0.5f, rect.width - 8f, 28f);
             bool iconShown = slot.Icon != null && slot.Ready && !super;
             if (iconShown)
             {
@@ -471,17 +475,31 @@ namespace Airerage.Runtime.Presentation
                 Color labelColor = super && slot.Ready
                     ? Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f + 0.3f, 1f), 0.45f, 1f)
                     : new Color(1f, 1f, 1f, 0.55f);
-                GuidePlate.DrawText(new Rect(rect.x + 2f, rect.y + rect.height - 17f, rect.width - Slant - 8f, 14f), slot.Label, _key, labelColor);
+                GuidePlate.DrawText(new Rect(rect.x + 2f + lift * Slant / SlotHeight, rect.y + rect.height - 17f - lift, rect.width - Slant - 8f, 14f),
+                    slot.Label, _key, labelColor);
             }
         }
 
-        // 細い横の帯（暗い下地に、左からたまる色）。
-        private static void DrawHeistBar(Rect rect, float fill, Color color)
+        // 札 slot の中の、底の縁の上から bar 本目（0 が下）の細い帯（札と同じ傾き。暗い下地に、左からたまる色）。
+        private void DrawHeistBar(Rect slot, int bar, float fill, Color color)
         {
-            GUI.color = new Color(Fill.r, Fill.g, Fill.b, 0.85f);
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            int top = HeistBarTop(bar);
+            var rect = new Rect(slot.x, slot.y + top, SlotWidth, HeistBarHeight);
+            GUI.color = new Color(0f, 0f, 0f, 0.6f);
+            GUI.DrawTexture(rect, _heistBands[bar]);
+            // たまった分: 帯の左の端から、帯の長さ × fill までを切り取って描く。
+            float start = Slant * (1f - (top + HeistBarHeight * 0.5f) / SlotHeight) + HeistBarInset;
+            float length = SlotWidth - Slant - HeistBarInset * 2f;
+            GUI.BeginGroup(new Rect(rect.x, rect.y, start + length * Mathf.Clamp01(fill), rect.height));
             GUI.color = color;
-            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(fill), rect.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0f, 0f, SlotWidth, HeistBarHeight), _heistBands[bar]);
+            GUI.EndGroup();
+        }
+
+        // bar 本目（0 が下）の帯の上の端（札の上からのピクセル）。
+        private static int HeistBarTop(int bar)
+        {
+            return SlotHeight - Mathf.CeilToInt(HeistBarInset) - HeistBarHeight - bar * (HeistBarHeight + HeistBarGap);
         }
 
         // 頭上の通知: 自分のキャラクターの頭の上に、小さな札（技の名前か絵）が浮かび上がって消える。重なったら上へ積む。
@@ -604,6 +622,14 @@ namespace Airerage.Runtime.Presentation
             return _stack[index];
         }
 
+        // バンクハイストのゲージの帯の中か（札と同じ傾きで、左右の縁から HeistBarInset だけ内側）。
+        private static bool InsideHeistBand(int x, int yFromTop)
+        {
+            float px = x + 0.5f;
+            float left = Slant * (1f - (yFromTop + 0.5f) / SlotHeight);
+            return px >= left + HeistBarInset && px <= left + SlotWidth - Slant - HeistBarInset;
+        }
+
         // 札の形（右へ傾いた平行四辺形。上の辺が Slant だけ右）の中か。inset は内側へ縮める量（ピクセル）。
         private static bool InsideSlot(int x, int yFromTop, float inset)
         {
@@ -626,6 +652,13 @@ namespace Airerage.Runtime.Presentation
             _fill = TimerPlate.Create("SkillSlotFill", SlotWidth, SlotHeight, (x, y) => InsideSlot(x, y, 0f) ? 1f : 0f);
             _frame = TimerPlate.Create("SkillSlotFrame", SlotWidth, SlotHeight,
                 (x, y) => InsideSlot(x, y, 0f) && !InsideSlot(x, y, 2.5f) ? 1f : 0f);
+            // バンクハイストのゲージの帯の形（札の縁の内側の、底から bar 本目の行だけ）。
+            for (int bar = 0; bar < _heistBands.Length; bar++)
+            {
+                int top = HeistBarTop(bar);
+                _heistBands[bar] = TimerPlate.Create($"SkillSlotHeistBand{bar}", SlotWidth, HeistBarHeight,
+                    (x, y) => InsideHeistBand(x, top + y) ? 1f : 0f);
+            }
             // 縁と同じ傾きの細い線（幅 LineWidth の中で、上が右、下が左）。
             _line = TimerPlate.Create("SkillSlotLine", LineWidth, SlotHeight, (x, y) =>
             {

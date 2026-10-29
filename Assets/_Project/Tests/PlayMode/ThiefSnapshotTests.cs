@@ -17,8 +17,8 @@ using SimInput = Airerage.Core.Input.PlayerInput;
 namespace Airerage.PlayMode.Tests
 {
     /// <summary>
-    /// THIEF の表示の画像（見た目の確認用。名前で選んだときだけ動く）。煙・透明の影と分身・Q の長押しの矢印・置いたジャンプ台と赤外線を
-    /// Logs/Snapshots に PNG で保存する。
+    /// THIEF の表示の画像（見た目の確認用。名前で選んだときだけ動く）。煙・透明の影と分身・Q の長押しの矢印・置いたジャンプ台と赤外線と
+    /// 空中のベルトコンベアを Logs/Snapshots に PNG で保存する（技の札などの HUD は IMGUI なので写らない）。
     /// 画面を描くので、-nographics を付けずに仮想の画面で動かす（docs/08 4.2）:
     /// xvfb-run -a -s "-screen 0 1920x1080x24" Unity -batchmode -projectPath . -force-glcore -runTests -testPlatform PlayMode
     /// -testFilter Airerage.PlayMode.Tests.ThiefSnapshotTests
@@ -78,6 +78,7 @@ namespace Airerage.PlayMode.Tests
             Directory.CreateDirectory(Folder);
             yield return CapturePlaced(flow, "Stage_Athletic", StealKind.Zone, StageZoneKind.JumpPad, "Thief_PlacedJumpPad");
             yield return CapturePlaced(flow, "Stage_Lab", StealKind.Trap, StageZoneKind.JumpPad, "Thief_PlacedTripwire");
+            yield return CapturePlaced(flow, "Stage_Lab", StealKind.Zone, StageZoneKind.SpeedLane, "Thief_PlacedConveyor");
         }
 
         private static IEnumerator CapturePlaced(GameFlow flow, string scene, StealKind kind, StageZoneKind zoneKind, string name)

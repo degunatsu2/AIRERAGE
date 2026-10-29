@@ -89,7 +89,9 @@ namespace Airerage.Core.Tests.Skills
             List<WorldObject> candies = OfKind(world, WorldObjectKind.CottonCandy);
             Assert.That(candies.Count, Is.EqualTo(1), "わたがしの足場を置かない");
             Assert.That(candies[0].Velocity.Y, Is.EqualTo(1f).Within(1e-4f), "足元の足場が上を向いていない");
-            Assert.That(candies[0].Position.Y, Is.LessThan(0.1f), "足元に置かない");
+            // 足元（床の上）に置き、床には埋めない（地形に重なる設置物は、重ならない近くへ直す。PlacementRules）。
+            Assert.That(candies[0].Position.Y, Is.LessThan(GroundY), "足元に置かない");
+            Assert.That(candies[0].Position.Y - Chef.Skills.CottonCandy.HalfThickness, Is.GreaterThanOrEqualTo(-0.01f), "床に埋まった");
             Assert.That(candies[0].Position.X, Is.EqualTo(0f).Within(0.05f));
             Step(world, 2);
             Assert.That(world.GetState(0).Velocity.Y, Is.GreaterThan(Chef.Skills.CottonCandy.BouncePower * 0.8f), "上へ弾かない");

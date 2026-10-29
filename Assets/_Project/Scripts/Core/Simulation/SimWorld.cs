@@ -334,7 +334,7 @@ namespace Airerage.Core.Simulation
             StageTraps.Step(_traps, _stage, _states, _tickConfigs, Tick);
             // ステージの危険に当たった人が、威力に応じてコインを落とす。
             CoinDropRules.DropOnHazards(Coins, _states, Rules, Tick);
-            SkillRules.FireEffects(_objects, Coins, _states, _tickConfigs, Tick, _thief);
+            SkillRules.FireEffects(_objects, Coins, _states, _tickConfigs, Tick, _thief, _collision);
             _projectileHits.Clear();
             SkillRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits);
             ThiefRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits, _thief, _stage);

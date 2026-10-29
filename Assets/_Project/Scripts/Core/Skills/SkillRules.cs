@@ -26,9 +26,12 @@ namespace Airerage.Core.Skills
         // 置いた物の位置が同じとみなす距離（m。ワイヤーの接続点と比べる）。
         private const float SamePointTolerance = 0.01f;
 
-        /// <summary>1. 技の効果を起こす。tick は進めた後のティック。thief は THIEF の技が使うステージの情報（null なら置く技などは何もしない）。</summary>
+        /// <summary>
+        /// 1. 技の効果を起こす。tick は進めた後のティック。thief は THIEF の技が使うステージの情報（null なら置く技などは何もしない）。
+        /// collision は、置いた物を地形に埋めないための当たり（PlacementRules。null なら直さない）。
+        /// </summary>
         public static void FireEffects(WorldObjects objects, CoinLedger ledger, List<CharacterState> states,
-            IReadOnlyList<CharacterConfig> configs, int tick, ThiefContext thief = null)
+            IReadOnlyList<CharacterConfig> configs, int tick, ThiefContext thief = null, ICollisionQuery collision = null)
         {
             for (int i = 0; i < states.Count; i++)
             {
@@ -47,12 +50,17 @@ namespace Airerage.Core.Skills
                 }
                 state.Action.EffectDone = true;
                 states[i] = state;
+                int before = objects.Count;
                 if (ThiefRules.Handles(attack.Effect))
                 {
                     ThiefRules.Fire(attack.Effect, objects, states, i, config, tick, thief);
-                    continue;
                 }
-                Fire(attack.Effect, objects, ledger, states, i, config, tick);
+                else
+                {
+                    Fire(attack.Effect, objects, ledger, states, i, config, tick);
+                }
+                // 置いた物が地形に埋まるなら、埋まらないいちばん近い所へ（PlacementRules）。
+                PlacementRules.Settle(objects, before, collision, state, config, thief);
             }
         }
 

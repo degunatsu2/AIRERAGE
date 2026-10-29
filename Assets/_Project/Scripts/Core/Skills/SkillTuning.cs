@@ -249,6 +249,9 @@ namespace Airerage.Core.Skills
         /// <summary>置く位置（キャラクターの中心からの高さ。m。「自分の少し上」）。</summary>
         public float OffsetY = 2.2f;
 
+        /// <summary>球の半径（m。見た目の大きさ。置くときに地形に埋まらないようにする大きさ。PlacementRules）。</summary>
+        public float Radius = 0.75f;
+
         /// <summary>つないだ人のゲージがたまる間隔（ティック）と、1 回の量（0.1% 単位）。12 ティックごとに 1% で、1 秒に 5%。</summary>
         public int GaugeIntervalTicks = 12;
         public int GaugePerInterval = 10;
@@ -257,6 +260,7 @@ namespace Airerage.Core.Skills
         {
             var v = new TuningValidator(nameof(MirrorBallTuning));
             v.Positive(nameof(DurationTicks), DurationTicks);
+            v.Positive(nameof(Radius), Radius);
             v.Positive(nameof(GaugeIntervalTicks), GaugeIntervalTicks);
             v.NonNegative(nameof(GaugePerInterval), GaugePerInterval);
             return v;

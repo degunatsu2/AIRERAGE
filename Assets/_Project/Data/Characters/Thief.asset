@@ -661,6 +661,7 @@ MonoBehaviour:
       MirrorBall:
         DurationTicks: 300
         OffsetY: 2.2
+        Radius: 0.75
         GaugeIntervalTicks: 12
         GaugePerInterval: 10
       Safe:

@@ -101,8 +101,11 @@ namespace Airerage.Editor.Stages
                     ZoneSpec.OnFloor("PlazaPad", StageZoneKind.JumpPad, -1f, 1f, 0f, Vector2.up, 28f, 0.4f),
                     new ZoneSpec("PlazaRing", StageZoneKind.BoostRing, new Vector2(0f, 16f), new Vector2(3f, 3.5f), Vector2.up, 21f),
                     // 広い谷: 左は下向きの風（くりぬいた中へ速く降りる。中へ逃げないと谷の底へ）、右は上昇気流（屋上の高さまで押し上げる）。
-                    new ZoneSpec("CanyonDowndraftWest", StageZoneKind.Gust, new Vector2(-13.5f, -9f), new Vector2(9f, 26f), Vector2.down, 45f, 14f),
-                    new ZoneSpec("CanyonUpdraftEast", StageZoneKind.Updraft, new Vector2(13.5f, -9f), new Vector2(9f, 26f), Vector2.up, 60f, 13f),
+                    // 2 つの風は同じ速さ（ユーザーの要望、2026-10-29）: 重力（30 m/s²）を含めた加速と、目指す速さを、前の 2 つ（下は 30 ＋ 45 = 75 m/s²・
+                    // 落ちる上限 20 m/s、上は 60 − 30 = 30 m/s²・13 m/s）の中間の 52.5 m/s²・16.5 m/s にそろえる（下は、ふだんの落ちる上限 20 m/s までは
+                    // 重力で速くなる）。
+                    new ZoneSpec("CanyonDowndraftWest", StageZoneKind.Gust, new Vector2(-13.5f, -9f), new Vector2(9f, 26f), Vector2.down, 22.5f, 16.5f),
+                    new ZoneSpec("CanyonUpdraftEast", StageZoneKind.Updraft, new Vector2(13.5f, -9f), new Vector2(9f, 26f), Vector2.up, 82.5f, 16.5f),
                     // 狭い谷の上の加速リング（塔から跳ぶと中央へ飛ばす）。
                     new ZoneSpec("GapRingWest", StageZoneKind.BoostRing, new Vector2(-32f, 11f), new Vector2(2.4f, 3f), new Vector2(1f, 0.15f), 18f),
                     new ZoneSpec("GapRingEast", StageZoneKind.BoostRing, new Vector2(32f, 11f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.15f), 18f),

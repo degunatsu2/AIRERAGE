@@ -16,6 +16,8 @@ namespace Airerage.Core.Objects
     /// 同じように調べる（当たった物は CastHit.Body。足場の番号 + 1）。ロープの巻き付きの角は、動かない地形だけ。
     /// アンカーのある足場（StagePlatform.HasAnchor。埠頭の動くボラード）は、その位置の中心をアンカーポイントの最後に加える
     /// （AnchorBodyOf がその足場の番号 + 1。ほかのアンカーは 0）。
+    /// THIEF が空中に置いたベルトコンベア（PlacedZone の ChargeMilli = 1。ユーザーの要望、2026-10-29）は、ベルトの見た目どおりの足場の箱を
+    /// 動く足場と一緒に入れる（動かない地形と同じ扱い。CastHit.Body は 0、ワイヤーはつながらない。FootingBox）。
     /// </summary>
     public sealed class WorldCollision : ICollisionQuery
     {
@@ -25,8 +27,12 @@ namespace Airerage.Core.Objects
         private readonly List<int> _anchorBodies = new List<int>();
         private int _fixedAnchors;
         private readonly List<WorldObject> _hookObjects = new List<WorldObject>();
+        private readonly List<WorldObject> _footings = new List<WorldObject>();
         private readonly BoxTerrain _platforms = new BoxTerrain();
         private bool _hasPlatforms;
+
+        /// <summary>空中に置いたベルトコンベアの足場の厚さ（m。ステージのベルトの見た目の厚さ）。</summary>
+        public const float FootingThickness = 0.1f;
 
         // クリームの上の当たった点を、クリームの箱の中とみなす余裕（m）。
         private const float PatchTolerance = 0.05f;
@@ -52,7 +58,10 @@ namespace Airerage.Core.Objects
             return index >= 0 && index < _anchorBodies.Count ? _anchorBodies[index] : 0;
         }
 
-        /// <summary>アンカーポイントを、地形のものと、objects のうちアンカーになる物から作り直す。</summary>
+        /// <summary>
+        /// アンカーポイントを、地形のものと、objects のうちアンカーになる物から作り直す。空中に置いたベルトコンベアの足場を集める（当たりに
+        /// 入れるのは、続けて呼ぶ SetPlatforms）。
+        /// </summary>
         public void Refresh(WorldObjects objects)
         {
             _anchors.Clear();
@@ -60,6 +69,7 @@ namespace Airerage.Core.Objects
             _anchorRadii.Clear();
             _anchorRadii.AddRange(_terrain.AnchorRadii);
             _hookObjects.Clear();
+            _footings.Clear();
             _anchorBodies.Clear();
             for (int i = 0; i < _anchors.Count; i++)
             {
@@ -83,14 +93,22 @@ namespace Airerage.Core.Objects
                 {
                     _hookObjects.Add(item);
                 }
+                if (!item.Ended && item.Kind == WorldObjectKind.PlacedZone && item.ChargeMilli == 1)
+                {
+                    _footings.Add(item);
+                }
             }
         }
 
-        /// <summary>動く足場と扉の当たりを、ティック tick の位置で作り直す（ない足場は入れない）。足場のアンカーも作り直す。</summary>
+        /// <summary>
+        /// 動く足場と扉の当たりを、ティック tick の位置で作り直す（ない足場は入れない）。足場のアンカーも作り直す。空中に置いたベルトコンベアの
+        /// 足場（Refresh で集めたもの）も入れ直す。
+        /// </summary>
         public void SetPlatforms(IReadOnlyList<StagePlatform> platforms, StageState stage, int tick)
         {
             _platforms.Clear();
             _hasPlatforms = false;
+            AddFootings();
             if (_anchors.Count > _fixedAnchors)
             {
                 int extra = _anchors.Count - _fixedAnchors;
@@ -117,6 +135,24 @@ namespace Airerage.Core.Objects
                     _anchorRadii.Add(platforms[i].AnchorRadius);
                     _anchorBodies.Add(i + 1);
                 }
+            }
+        }
+
+        /// <summary>空中に置いたベルトコンベア item の足場の箱（ベルトの見た目どおり、範囲の下の端から FootingThickness の厚さ）。</summary>
+        public static void FootingBox(in WorldObject item, out Vector2 min, out Vector2 max)
+        {
+            min = new Vector2(item.Position.X - item.End.X, item.Position.Y - item.End.Y);
+            max = new Vector2(item.Position.X + item.End.X, item.Position.Y - item.End.Y + FootingThickness);
+        }
+
+        // 空中に置いたベルトコンベアの足場を、動く足場の箱と一緒に入れる（動かない地形と同じ扱い。つながらない）。
+        private void AddFootings()
+        {
+            foreach (WorldObject item in _footings)
+            {
+                FootingBox(item, out Vector2 min, out Vector2 max);
+                _platforms.AddBox(min.X, min.Y, max.X, max.Y, false, 0);
+                _hasPlatforms = true;
             }
         }
 

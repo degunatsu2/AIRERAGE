@@ -126,7 +126,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(view.ShowingClone, Is.False, "3 秒たっても分身を出している");
             Assert.That(thief.ShowsShadow(0), Is.False, "透明が解けても影を出している");
 
-            // R（BANK HEIST）の詠唱中: 札の上に 5 秒ごと・10 秒ごとにいっぱいになるゲージ（7 秒なら 0.4 と 0.7）。
+            // R（BANK HEIST）の詠唱中: 札の中の底に 5 秒ごと・10 秒ごとにいっぱいになるゲージ（7 秒なら 0.4 と 0.7）。
             Assert.That(feed.GetConfig(0).Combat.Super.Effect, Is.EqualTo(Airerage.Core.Skills.SkillEffect.BankHeist));
             state = runner.PlayerState;
             state.Combat.HeistTicks = 1 + 7 * 60;

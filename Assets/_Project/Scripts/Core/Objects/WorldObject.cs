@@ -91,6 +91,7 @@ namespace Airerage.Core.Objects
         /// <summary>
         /// 置いたギミック（THIEF が奪ったステージのギミックの写し）。Stored は元のギミックの番号（SimWorld.Zones）、Position は中心、End は
         /// 半分の大きさ、Variant は 1 なら向きを左右に反転、SpawnTick は置いたティック（周期のあるギミックは、ここで 1 回効き始める）。
+        /// ChargeMilli が 1 なら、空中に置いたベルトコンベアで、ベルトの見た目どおりの足場を持つ（WorldCollision.FootingBox。PlacementRules）。
         /// SimWorld が、ステージのギミックに加えて効かせる。
         /// </summary>
         PlacedZone = 19,
