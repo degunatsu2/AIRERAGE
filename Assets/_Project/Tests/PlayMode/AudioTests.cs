@@ -99,7 +99,8 @@ namespace Airerage.PlayMode.Tests
             for (int i = 0; i < flow.Stages.Count; i++)
             {
                 string scene = flow.Stages.Get(i).SceneName;
-                if (scene == "Stage_Lab" || scene == "Stage_Stadium" || scene == "Stage_CityNight" || scene == "Stage_CityDay")
+                if (scene == "Stage_Lab" || scene == "Stage_Stadium" || scene == "Stage_CityNight" || scene == "Stage_CityDay"
+                    || scene == "Stage_Volcano")
                 {
                     Assert.That(flow.Stages.Get(i).Music, Is.Not.Null, $"{scene} に曲が設定されていない");
                     Assert.That(flow.Stages.Get(i).Music.HasValidLoop, Is.True, $"{scene} の曲のループの位置が曲の中にない");

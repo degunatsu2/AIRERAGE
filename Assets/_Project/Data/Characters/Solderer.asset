@@ -1085,9 +1085,6 @@ MonoBehaviour:
           Hits: []
           Motions: []
         MisdirectionTicks: 180
-        CloneTurnIntervalTicks: 60
-        CloneTurnPercent: 25
-        CloneWireHoldTicks: 45
         HeistRange: 6
         HeistCoinsPerSecond: 1
         HeistBonusPerFive: 20

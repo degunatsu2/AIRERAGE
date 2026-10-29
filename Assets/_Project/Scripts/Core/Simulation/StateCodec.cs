@@ -71,7 +71,8 @@ namespace Airerage.Core.Simulation
         /// objects が null なら、置かれた物はない（空の一覧と同じ値）。
         /// </summary>
         public static ulong WorldChecksum(int tick, IReadOnlyList<CharacterState> states, CoinField coins, Match.MatchState match,
-            WorldObjects objects = null, StageState stage = null, IReadOnlyList<CharacterState> clones = null)
+            WorldObjects objects = null, StageState stage = null, IReadOnlyList<CharacterState> clones = null,
+            IReadOnlyList<Ai.CpuMotionMemory> cloneMinds = null)
         {
             ulong hash = Mix(FnvOffsetBasis, tick);
             for (int i = 0; i < states.Count; i++)
@@ -105,6 +106,10 @@ namespace Airerage.Core.Simulation
                     if (states[i].Combat.CloneTicksLeft > 0)
                     {
                         hash = Mix(hash, Checksum(clones[i]));
+                        if (cloneMinds != null && i < cloneMinds.Count)
+                        {
+                            hash = Mix(hash, Checksum(cloneMinds[i]));
+                        }
                     }
                 }
             }
@@ -112,6 +117,35 @@ namespace Airerage.Core.Simulation
         }
 
         /// <summary>ワールド全体のコイン（フィールドのコイン、次の番号、生成・破棄の枚数）のチェックサム。</summary>
+        /// <summary>分身の動きで覚えていること（THIEF の E。CpuMotionMemory）のチェックサム。</summary>
+        public static ulong Checksum(in Ai.CpuMotionMemory memory)
+        {
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write((byte)memory.Goal);
+                writer.Write(memory.Target.X);
+                writer.Write(memory.Target.Y);
+                writer.Write(memory.TargetCharacter);
+                writer.Write(memory.NextDecisionTick);
+                writer.Write((int)memory.LastButtons);
+                writer.Write(memory.WireAttachedTick);
+                writer.Write(memory.WireReadyTick);
+                writer.Write(memory.StuckFrom.X);
+                writer.Write(memory.StuckFrom.Y);
+                writer.Write(memory.StuckFrom.Z);
+                writer.Write(memory.StuckSinceTick);
+                writer.Write(memory.WanderUntilTick);
+                writer.Flush();
+                ulong hash = FnvOffsetBasis;
+                foreach (byte b in stream.ToArray())
+                {
+                    hash = MixByte(hash, b);
+                }
+                return hash;
+            }
+        }
+
         public static ulong Checksum(CoinField coins)
         {
             if (coins == null)

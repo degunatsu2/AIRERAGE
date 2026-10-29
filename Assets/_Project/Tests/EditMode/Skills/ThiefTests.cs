@@ -322,6 +322,47 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(world.HasClone(0), Is.False, "3 秒で分身が消えない");
         }
 
+        [Test]
+        public void Clone_MovesLikeAnEasyCpu_TowardAnOpponent_WithoutAttacking()
+        {
+            // 分身は EASY の CPU の動きのうち移動とワイヤーだけ: 持ち主は狙わず、右の相手へ走って近づく。攻撃・ガード・技は出さない。
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(14f, GroundY, 0f));
+            Step(world, 2);
+            Step(world, 1, Aimed(InputButtons.Special2, new Vector2(-1f, 0f)));
+            Step(world, 1);
+            Assert.That(world.HasClone(0), Is.True, "前提: 分身が出る");
+            float start = world.GetClone(0).Position.X;
+            for (int i = 0; i < 90; i++)
+            {
+                Step(world, 1);
+                CharacterState clone = world.GetClone(0);
+                Assert.That(clone.Action.Kind, Is.Not.EqualTo(ActionKind.Attack), "分身が攻撃や技を出した");
+                Assert.That((clone.PreviousButtons & (InputButtons.Attack | InputButtons.Guard | InputButtons.Special1 | InputButtons.Special2
+                    | InputButtons.Super)) == 0, Is.True, "分身が移動とワイヤーのほかのボタンを押した");
+            }
+            Assert.That(world.GetClone(0).Position.X, Is.GreaterThan(start + 5f), "分身が相手の方へ動かない（その場で止まる）");
+        }
+
+        [Test]
+        public void Clone_RestoredFromASnapshot_MovesTheSameWay()
+        {
+            // 分身の動きで覚えていること（目標など）も保存して巻き戻す（オンラインの巻き戻しで、分身の動きがずれない）。
+            SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(14f, GroundY, 0f));
+            Step(world, 2);
+            Step(world, 1, Aimed(InputButtons.Special2, new Vector2(-1f, 0f)));
+            Step(world, 20);
+            var snapshot = new WorldSnapshot();
+            world.SaveTo(snapshot);
+            Step(world, 60);
+            ulong first = world.Checksum();
+            Vector3 firstPosition = world.GetClone(0).Position;
+            world.LoadFrom(snapshot);
+            Assert.That(world.Checksum(), Is.EqualTo(snapshot.Checksum()), "巻き戻した直後の状態が保存した状態と違う（分身の覚えていることが戻らない）");
+            Step(world, 60);
+            Assert.That(world.GetClone(0).Position, Is.EqualTo(firstPosition), "巻き戻した後の分身の動きが違う");
+            Assert.That(world.Checksum(), Is.EqualTo(first));
+        }
+
         [TestCase(InputButtons.Attack, TestName = "攻撃すると透明が解ける")]
         [TestCase(InputButtons.Special2, TestName = "もう一度 E で透明が解ける")]
         [TestCase(InputButtons.Guard, TestName = "ガードすると透明が解ける")]

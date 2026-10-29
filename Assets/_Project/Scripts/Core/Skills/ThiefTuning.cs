@@ -77,11 +77,6 @@ namespace Airerage.Core.Skills
         /// <summary>透明と分身が続く長さ（ティック。3 秒）。</summary>
         public int MisdirectionTicks = 180;
 
-        /// <summary>分身の動き: 向きを変えるかを決める間（ティック）と、そのとき向きを変える割合（%）、ワイヤーにつないでいる長さの上限（ティック）。</summary>
-        public int CloneTurnIntervalTicks = 60;
-        public int CloneTurnPercent = 25;
-        public int CloneWireHoldTicks = 45;
-
         /// <summary>R を出せる、拠点の中心からの距離（m。「バンクの近く」）。</summary>
         public float HeistRange = 6f;
 
@@ -125,9 +120,6 @@ namespace Airerage.Core.Skills
                 v.Merge(PlaceAttack.Validate(nameof(PlaceAttack)));
             }
             v.Positive(nameof(MisdirectionTicks), MisdirectionTicks);
-            v.Positive(nameof(CloneTurnIntervalTicks), CloneTurnIntervalTicks);
-            v.InRange(nameof(CloneTurnPercent), CloneTurnPercent, 0f, 100f);
-            v.Positive(nameof(CloneWireHoldTicks), CloneWireHoldTicks);
             v.Positive(nameof(HeistRange), HeistRange);
             v.NonNegative(nameof(HeistCoinsPerSecond), HeistCoinsPerSecond);
             v.NonNegative(nameof(HeistBonusPerFive), HeistBonusPerFive);

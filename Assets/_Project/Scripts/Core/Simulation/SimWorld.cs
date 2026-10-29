@@ -36,6 +36,9 @@ namespace Airerage.Core.Simulation
         private readonly List<CharacterConfig> _tickConfigs = new List<CharacterConfig>();
         // 分身の状態（THIEF の E。キャラクターごと。持ち主の CombatState.CloneTicksLeft が 0 より大きい間だけ動く）。
         private readonly List<CharacterState> _clones = new List<CharacterState>();
+        // 分身の動き（EASY の CPU の、移動とワイヤーだけ）で覚えていること（分身と一緒に保存して巻き戻す）と、その考え方。
+        private readonly List<Ai.CpuMotionMemory> _cloneMinds = new List<Ai.CpuMotionMemory>();
+        private readonly Ai.CpuMotion _cloneMotion = new Ai.CpuMotion(Ai.CpuTuning.For(ThiefRules.CloneCpuLevel));
         // このティックに押したボタン（THIEF のもう一度の E・R）。
         private readonly List<InputButtons> _pressed = new List<InputButtons>();
         private readonly ThiefContext _thief;
@@ -96,7 +99,7 @@ namespace Airerage.Core.Simulation
             _collision = new WorldCollision(collision);
             _simulator = new CharacterSimulator(_collision, _zoneList);
             Bounds = bounds;
-            _thief = new ThiefContext(sorted, _traps, Rules, BankSpots, _clones);
+            _thief = new ThiefContext(sorted, _traps, Rules, BankSpots, _clones, _cloneMinds);
         }
 
         /// <summary>ワールドに置かれた物と投射物（docs/13 T5-6）。状態の一部（巻き戻しとチェックサムに乗る）。表示用に読むだけにする。</summary>
@@ -165,6 +168,7 @@ namespace Airerage.Core.Simulation
             _spawns.Add(spawn);
             _states.Add(spawn);
             _clones.Add(default);
+            _cloneMinds.Add(Ai.CpuMotionMemory.Initial);
             _pressed.Add(InputButtons.None);
             return _states.Count - 1;
         }
@@ -200,7 +204,7 @@ namespace Airerage.Core.Simulation
             {
                 throw new ArgumentNullException(nameof(snapshot));
             }
-            snapshot.Capture(Tick, _states, _coins, _match, _objects, _stage, _clones);
+            snapshot.Capture(Tick, _states, _coins, _match, _objects, _stage, _clones, _cloneMinds);
         }
 
         /// <summary>snapshot の全状態に戻す（ロールバックの巻き戻し）。キャラクターの数が違えば ArgumentException。</summary>
@@ -219,6 +223,7 @@ namespace Airerage.Core.Simulation
             {
                 _states[i] = snapshot.GetState(i);
                 _clones[i] = snapshot.GetClone(i);
+                _cloneMinds[i] = snapshot.GetCloneMind(i);
             }
             _coins.CopyFrom(snapshot.Coins);
             _objects.CopyFrom(snapshot.Objects);
@@ -235,7 +240,7 @@ namespace Airerage.Core.Simulation
         /// <summary>今の全状態のチェックサム（WorldSnapshot.Checksum と同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, _coins, _match, _objects, _stage, _clones);
+            return StateCodec.WorldChecksum(Tick, _states, _coins, _match, _objects, _stage, _clones, _cloneMinds);
         }
 
         /// <summary>
@@ -336,7 +341,7 @@ namespace Airerage.Core.Simulation
                 _states[i] = state;
             }
             // THIEF の分身（移動とワイヤーだけ）。
-            ThiefRules.StepClones(_clones, _states, _simulator, _configs, _collision, Bounds, Tick, Rules.Seed);
+            ThiefRules.StepClones(this, _clones, _cloneMinds, _cloneMotion, _states, _simulator, _configs, Bounds, Tick, Rules.Seed);
             Tick++;
             // ステージの仕掛け（赤外線とミサイル、ピッチャーマシンのボール）。
             StageTraps.Step(_traps, _stage, _states, _tickConfigs, Tick);

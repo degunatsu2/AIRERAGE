@@ -15,6 +15,7 @@ namespace Airerage.Core.Simulation
     {
         private CharacterState[] _states = new CharacterState[0];
         private CharacterState[] _clones = new CharacterState[0];
+        private Ai.CpuMotionMemory[] _cloneMinds = new Ai.CpuMotionMemory[0];
 
         /// <summary>このスナップショットのティック数（次に計算するティック）。</summary>
         public int Tick { get; private set; }
@@ -48,14 +49,20 @@ namespace Airerage.Core.Simulation
             return index >= 0 && index < _clones.Length ? _clones[index] : default;
         }
 
+        /// <summary>キャラクター index の分身の動きで覚えていること（写していなければ何も覚えていない状態）。</summary>
+        public Ai.CpuMotionMemory GetCloneMind(int index)
+        {
+            return index >= 0 && index < _cloneMinds.Length ? _cloneMinds[index] : Ai.CpuMotionMemory.Initial;
+        }
+
         /// <summary>全状態のチェックサム（ティック数と全キャラクターの状態。PC が違っても同じ値）。</summary>
         public ulong Checksum()
         {
-            return StateCodec.WorldChecksum(Tick, _states, Coins, Match, Objects, Stage, _clones);
+            return StateCodec.WorldChecksum(Tick, _states, Coins, Match, Objects, Stage, _clones, _cloneMinds);
         }
 
         internal void Capture(int tick, IReadOnlyList<CharacterState> states, CoinField coins, MatchState match, WorldObjects objects,
-            StageState stage = null, IReadOnlyList<CharacterState> clones = null)
+            StageState stage = null, IReadOnlyList<CharacterState> clones = null, IReadOnlyList<Ai.CpuMotionMemory> cloneMinds = null)
         {
             int cloneCount = clones != null ? clones.Count : 0;
             if (_clones.Length != cloneCount)
@@ -65,6 +72,15 @@ namespace Airerage.Core.Simulation
             for (int i = 0; i < cloneCount; i++)
             {
                 _clones[i] = clones[i];
+            }
+            int mindCount = cloneMinds != null ? cloneMinds.Count : 0;
+            if (_cloneMinds.Length != mindCount)
+            {
+                _cloneMinds = new Ai.CpuMotionMemory[mindCount];
+            }
+            for (int i = 0; i < mindCount; i++)
+            {
+                _cloneMinds[i] = cloneMinds[i];
             }
             if (stage != null)
             {

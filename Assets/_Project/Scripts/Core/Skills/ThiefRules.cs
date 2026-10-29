@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Airerage.Core.Ai;
 using Airerage.Core.Combat;
 using Airerage.Core.Common;
 using Airerage.Core.Economy;
@@ -18,17 +19,21 @@ namespace Airerage.Core.Skills
     public sealed class ThiefContext
     {
         public ThiefContext(IReadOnlyList<StageZone> zones, IReadOnlyList<StageTrap> traps, MatchRules rules, IReadOnlyList<BankSpot> bankSpots,
-            List<CharacterState> clones)
+            List<CharacterState> clones, List<CpuMotionMemory> cloneMinds = null)
         {
             Zones = zones ?? new StageZone[0];
             Traps = traps ?? new StageTrap[0];
             Rules = rules ?? throw new ArgumentNullException(nameof(rules));
             BankSpots = bankSpots ?? new BankSpot[0];
             Clones = clones ?? new List<CharacterState>();
+            CloneMinds = cloneMinds ?? new List<CpuMotionMemory>();
         }
 
         /// <summary>キャラクターごとの分身の状態（SimWorld のもの。持ち主の CombatState.CloneTicksLeft が 0 より大きい間だけ意味がある）。</summary>
         public List<CharacterState> Clones { get; }
+
+        /// <summary>キャラクターごとの分身の動きで覚えていること（Clones と同じ並び。SimWorld のもの）。</summary>
+        public List<CpuMotionMemory> CloneMinds { get; }
 
         /// <summary>ステージのギミック（並べた順。奪うときと、置いた写しの元に使う）。</summary>
         public IReadOnlyList<StageZone> Zones { get; }
@@ -58,7 +63,7 @@ namespace Airerage.Core.Skills
     ///   調整値を作る。相手はそのまま使える）。奪えるステージのギミック・仕掛けに当たれば、それを奪い、もう一度の Q（ThiefTuning.PlaceAttack）
     ///   で照準の方向の目の前に置く（PlacedZone・PlacedTrap。2 つまで）。置いたギミックは SimWorld がステージのギミックに加えて効かせ
     ///   （RefreshZones）、置いた仕掛けはここで動かす。コピーした技を使うか置き終えるか、弾が外れて消えたら、クールタイムを数える（AfterStep）。
-    /// - ミスディレクション（E）: 透明になり、分身（SimWorld の分身の状態）を残す。分身は移動とワイヤーだけをする簡単な動き（CloneInput）で、
+    /// - ミスディレクション（E）: 透明になり、分身（SimWorld の分身の状態）を残す。分身は EASY の CPU の動きのうち移動とワイヤーだけ（CloneInput）で、
     ///   ほかの人の攻撃の判定に触れると煙になって消える（PopClones）。透明と分身は時間・R 以外の行動・もう一度の E で解ける（AfterStep）。
     /// - バンクハイスト（R）: 拠点の近くでだけ出せる（CombatState.NearBank。ActionController.CanUse）。詠唱している間は動けず（CharacterSimulator）、
     ///   もう一度 R か拠点が移ったら、詠唱した長さのコインを得る（StepHeist。台帳の CoinEventKind.Heist）。のけぞると、得ずに止まる。
@@ -70,6 +75,9 @@ namespace Airerage.Core.Skills
 
         // 分身の動きの乱数を、ほかの選択と分けるための数。
         private const int CloneSalt = 9100;
+
+        /// <summary>分身の動きの強さ（CPU の EASY。ユーザーの指示、2026-10-29）。</summary>
+        public const CpuLevel CloneCpuLevel = CpuLevel.Easy;
 
         /// <summary>THIEF（Q がタレントスナッチ）か。</summary>
         public static bool IsThief(CharacterConfig config)
@@ -164,6 +172,11 @@ namespace Airerage.Core.Skills
                             context.Clones.Add(default);
                         }
                         context.Clones[index] = SpawnClone(state);
+                        while (context.CloneMinds.Count <= index)
+                        {
+                            context.CloneMinds.Add(CpuMotionMemory.Initial);
+                        }
+                        context.CloneMinds[index] = CpuMotionMemory.StartingAt(state.Position, tick);
                     }
                     break;
 
@@ -803,11 +816,12 @@ namespace Airerage.Core.Skills
         // ---------------------------------------------------------------- 分身（ミスディレクション）
 
         /// <summary>
-        /// 分身を進める（SimWorld が全員を進めた後に呼ぶ。分身は E を出したティックに Fire が作る）。分身は移動とワイヤーだけ（CloneInput）。
+        /// 分身を進める（SimWorld が全員を進めた後に呼ぶ。分身は E を出したティックに Fire が作る）。分身は EASY の CPU の、移動とワイヤーだけ
+        /// （CloneInput）。
         /// ステージの外に出たら消える。
         /// </summary>
-        public static void StepClones(List<CharacterState> clones, List<CharacterState> states, CharacterSimulator simulator,
-            IReadOnlyList<CharacterConfig> configs, ICollisionQuery collision, StageBounds? bounds, int tick, int seed)
+        public static void StepClones(SimWorld world, List<CharacterState> clones, List<CpuMotionMemory> minds, CpuMotion motion,
+            List<CharacterState> states, CharacterSimulator simulator, IReadOnlyList<CharacterConfig> configs, StageBounds? bounds, int tick, int seed)
         {
             for (int i = 0; i < states.Count && i < clones.Count; i++)
             {
@@ -818,7 +832,9 @@ namespace Airerage.Core.Skills
                 }
                 CharacterConfig config = configs[i];
                 CharacterState clone = clones[i];
-                PlayerInput input = CloneInput(clone, config, collision, bounds, i, tick, seed);
+                CpuMotionMemory mind = minds[i];
+                PlayerInput input = CloneInput(world, clone, i, config, motion, ref mind, tick, seed);
+                minds[i] = mind;
                 simulator.Step(ref clone, input, config, tick, seed);
                 clones[i] = clone;
                 if (bounds.HasValue && !bounds.Value.Contains(clone.Position))
@@ -841,73 +857,35 @@ namespace Airerage.Core.Skills
         }
 
         /// <summary>
-        /// 分身の入力（EASY の CPU のような、移動とワイヤーだけの簡単な動き。分身の状態とティックだけから決まる）: 向いている方向へ進み、
-        /// ときどき向きを変え、ステージの端の近くでは内側を向く。前がふさがっていたり足場が途切れたりしたら跳び、落ちていたら空中ジャンプ、
-        /// それも使い切っていたら斜め上へワイヤーを撃って、少しつないでから離す。
+        /// 分身の入力（ユーザーの指示、2026-10-29: CPU の EASY の動きのうち、移動とワイヤーだけ）: CPU と同じ考え方（CpuMotion）で目標を
+        /// 選び（コイン・相手。落ちそうなら戻る、行き詰まったら歩き回る）、走る・跳ぶ・ワイヤーで向かう。攻撃・ガード・技は押さない。
+        /// 持ち主は狙わない。覚えていること（mind）は分身と一緒に SimWorld が保存して巻き戻す。world は進めている途中のワールド
+        /// （全員を進めた後の状態）、tick は進めているティック。
         /// </summary>
-        public static PlayerInput CloneInput(in CharacterState clone, CharacterConfig config, ICollisionQuery collision, StageBounds? bounds, int owner,
-            int tick, int seed)
+        public static PlayerInput CloneInput(SimWorld world, in CharacterState clone, int owner, CharacterConfig config, CpuMotion motion,
+            ref CpuMotionMemory mind, int tick, int seed)
         {
-            ThiefTuning tuning = config.Skills.Thief;
-            MovementTuning movement = config.Movement;
-            float direction = clone.Facing >= 0 ? 1f : -1f;
-            if (tick % tuning.CloneTurnIntervalTicks == 0
-                && StableHash.Range(seed, CloneSalt + owner, tick / tuning.CloneTurnIntervalTicks, 100) < tuning.CloneTurnPercent)
+            MatchPhase phase = world.Phase;
+            if (phase != MatchPhase.Playing && phase != MatchPhase.Overtime)
             {
-                direction = -direction;
+                mind.LastButtons = InputButtons.None;
+                return default;
             }
-            if (bounds.HasValue)
+            int key = unchecked(seed * 7919 + CloneSalt + owner);
+            if (tick >= mind.NextDecisionTick)
             {
-                StageBounds b = bounds.Value;
-                if (clone.Position.X < b.MinX + 8f)
-                {
-                    direction = 1f;
-                }
-                else if (clone.Position.X > b.MaxX - 8f)
-                {
-                    direction = -1f;
-                }
+                motion.DecideGoal(world, clone, owner, key, tick, ref mind);
+                mind.NextDecisionTick = tick + motion.Tuning.DecideEveryTicks;
             }
+            CpuMotion.FollowTarget(world, tick, ref mind);
+            float moveX = 0f;
+            float moveY = 0f;
             InputButtons buttons = InputButtons.None;
             Vector2 aim = Vector2.Zero;
-            bool jumpHeld = (clone.PreviousButtons & InputButtons.Jump) != 0;
-            bool wireHeld = (clone.PreviousButtons & InputButtons.Wire) != 0;
-            var origin = clone.Position;
-            var ahead = new Vector3(direction, 0f, 0f);
-            bool blocked = collision.Raycast(origin, ahead, movement.HalfWidth + 0.8f, out _);
-            bool ledge = clone.Grounded
-                && !collision.Raycast(origin + ahead * (movement.HalfWidth + 1.2f), -Vector3.UnitY, movement.HalfHeight + 1.5f, out _);
-            bool wantJump = clone.Grounded ? blocked || ledge
-                : clone.Velocity.Y < -6f && clone.AirJumpsUsed < movement.AirJumps;
-            if (wantJump && !jumpHeld && clone.Wire.Phase != WirePhase.Attached)
-            {
-                buttons |= InputButtons.Jump;
-            }
-            switch (clone.Wire.Phase)
-            {
-                case WirePhase.Ready:
-                    if (!clone.Grounded && !wireHeld && clone.Velocity.Y < -8f && clone.AirJumpsUsed >= movement.AirJumps)
-                    {
-                        Vector2 up = Vector2.Normalize(new Vector2(direction * 0.55f, 0.85f));
-                        WireShotPreview preview = WireTargeting.PredictShot(origin, up, clone.Facing, config.Wire, collision);
-                        if (preview.Result == WireShotResult.Attach)
-                        {
-                            buttons |= InputButtons.Wire;
-                            aim = up;
-                        }
-                    }
-                    break;
-                case WirePhase.Firing:
-                    buttons |= InputButtons.Wire;
-                    break;
-                case WirePhase.Attached:
-                    if (clone.Wire.PhaseTicks < tuning.CloneWireHoldTicks && clone.Position.Y < clone.Wire.Anchor.Y - 1.2f)
-                    {
-                        buttons |= InputButtons.Wire;
-                    }
-                    break;
-            }
-            PlayerInput input = PlayerInput.FromAxes(direction, 0f, buttons);
+            motion.Steer(world, clone, config, key, tick, ref mind, ref moveX, ref moveY, ref buttons, ref aim);
+            buttons &= InputButtons.Jump | InputButtons.Wire;
+            mind.LastButtons = buttons;
+            PlayerInput input = PlayerInput.FromAxes(Math.Clamp(moveX, -1f, 1f), Math.Clamp(moveY, -1f, 1f), buttons);
             return aim != Vector2.Zero ? input.WithAim(aim) : input;
         }
 
