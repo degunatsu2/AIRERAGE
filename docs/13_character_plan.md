@@ -528,7 +528,7 @@
   （量子化した 2 つの値）に、ステージの範囲の中の位置として入れて送る（`EncodeTarget`・`DecodeTarget`。ネットワーク対戦でも全員で同じ
   場所になる）。物と重なる場所は選べない（`MaydayRejectCount` が増え、表示が N/A とエラーの音を出す）。10 秒選ばなければ元の場所へ。
   吊られた瞬間にワイヤーは外れる（`WireReleaseReason.Lifted`）。
-- **表示**（`JuggernautEffectsView`）: 砲弾・爆発・地雷（点滅するランプ）、構えの段階の文字（キャラクターの斜め後ろの上）と弾道の予測線と
+- **表示**（`JuggernautEffectsView`）: 砲弾・爆発・地雷（点滅するランプ。足もとや人に張り付いても隠れないように、体より手前に描く）、構えの段階の文字（キャラクターの斜め後ろの上）と弾道の予測線と
   着弾点の輪、メーデーのジェット機・場所のカーソル（緑・物の中は赤）と残り時間の弧・N/A・降りる場所の輪。全体を映すカメラは
   `CameraZoom.SetOverview`（ローカル対戦は `SharedCamera`）。カメラが引いても読めるように、文字・線・カーソルはカメラの距離に合わせて
   大きくする。操作している人の照準とカーソルは `ILocalAimSource`（`SimulationRunner`・`LocalMatchRunner`・`OnlineRunner`）から読む。

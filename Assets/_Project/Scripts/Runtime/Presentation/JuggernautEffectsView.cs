@@ -27,6 +27,8 @@ namespace Airerage.Runtime.Presentation
     public sealed class JuggernautEffectsView : MonoBehaviour
     {
         private const float Z = -0.3f;
+        // 地雷はキャラクターの体より手前に出す（足もとや人に張り付いた地雷が、戦車や体の中に隠れないように。戦車の手前の履帯は約 -0.76）。
+        private const float MineZ = -1f;
         private const int PredictTicks = 240;
         private const int RingSegments = 40;
         private const float CursorRadius = 2.4f;
@@ -282,6 +284,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (item.Kind == WorldObjectKind.Mine)
             {
+                visual.position = new Vector3(item.Position.X, item.Position.Y, MineZ);
                 // 張り付いた面に沿って向く（地形に張り付いた地雷の Velocity は面の法線）。
                 var normal = item.Variant == JuggernautRules.MineOnTerrain ? new Vector3(item.Velocity.X, item.Velocity.Y, 0f) : Vector3.up;
                 visual.rotation = normal.sqrMagnitude > 0.01f ? Quaternion.FromToRotation(Vector3.up, normal) : Quaternion.identity;
