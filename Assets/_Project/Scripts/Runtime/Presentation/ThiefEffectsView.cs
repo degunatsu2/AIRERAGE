@@ -33,10 +33,9 @@ namespace Airerage.Runtime.Presentation
 
         private const float Z = -0.5f;
         private const int SmokePuffs = 16;
-        private const int PuffTextureSize = 128;
         private const float SmokeGrowSeconds = 0.3f;
         private const float SmokeFadeSeconds = 1.2f;
-        // 煙のかたまりの絵の濃さ（この枚数を重ねた濃さにする）。
+        // 煙のかたまりの絵の濃さ（この枚数を重ねた濃さにする。ユーザーの確認、2026-10-29: 煙を 3 つ重ねるとちょうどよい）。
         private const int SmokeLayers = 3;
         private const float ShotTrailLength = 1.6f;
         private const float BlinkPerSecond = 6f;
@@ -156,16 +155,12 @@ namespace Airerage.Runtime.Presentation
                 template.SetActive(false);
             }
             _stealTemplate.gameObject.SetActive(false);
-            _puffSprite = CreatePuffSprite();
+            _puffSprite = SoftSprites.CreatePuff(SmokeLayers, "SmokePuff");
         }
 
         private void OnDestroy()
         {
-            if (_puffSprite != null)
-            {
-                Destroy(_puffSprite.texture);
-                Destroy(_puffSprite);
-            }
+            SoftSprites.Release(_puffSprite);
         }
 
         private void LateUpdate()
@@ -309,55 +304,6 @@ namespace Airerage.Runtime.Presentation
         }
 
         // ---------------------------------------------------------------- 煙
-
-        // 煙のかたまりの絵: 内側は不透明、ふちはやわらかく、ゆらいだ形で薄くなる（明るさにもむら）。白で描き、色は板ごとに掛ける。
-        private static Sprite CreatePuffSprite()
-        {
-            const int size = PuffTextureSize;
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
-            {
-                name = "SmokePuff",
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-            };
-            var pixels = new Color32[size * size];
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float u = (x + 0.5f) / size * 2f - 1f;
-                    float v = (y + 0.5f) / size * 2f - 1f;
-                    float r = Mathf.Sqrt(u * u + v * v);
-                    float noise = Fbm(u * 2.3f + 5.1f, v * 2.3f + 2.7f);
-                    float edge = 1f - Mathf.SmoothStep(0.55f, 1f, r + (noise - 0.5f) * 0.3f);
-                    float single = Mathf.Clamp01(edge * (1.6f + (noise - 0.5f) * 0.4f));
-                    // 3 枚重ねた濃さ（ユーザーの確認、2026-10-29: 煙を 3 つ重ねるとちょうどよい）。
-                    float alpha = 1f - Mathf.Pow(1f - single, SmokeLayers);
-                    float shade = Mathf.Lerp(0.8f, 1f, noise);
-                    pixels[y * size + x] = new Color(shade, shade, shade, alpha);
-                }
-            }
-            texture.SetPixels32(pixels);
-            texture.Apply(false);
-            return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
-        }
-
-        // 重ねたゆらぎ（0〜1）。
-        private static float Fbm(float x, float y)
-        {
-            float sum = 0f;
-            float amplitude = 0.5f;
-            float total = 0f;
-            for (int octave = 0; octave < 4; octave++)
-            {
-                sum += Mathf.PerlinNoise(x, y) * amplitude;
-                total += amplitude;
-                x = x * 2.03f + 1.7f;
-                y = y * 2.03f + 3.1f;
-                amplitude *= 0.5f;
-            }
-            return sum / total;
-        }
 
         // 煙: 真ん中の大きなかたまり、内側の輪（5 つ）、外側の輪（10 個）。輪の中は同じ間隔に少しずらして並べ、円の中にすき間を作らない
         // （ずらし方は物の番号で決める）。

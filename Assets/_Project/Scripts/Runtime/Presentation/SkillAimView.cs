@@ -21,13 +21,20 @@ namespace Airerage.Runtime.Presentation
         public const float MinLength = 2.5f;
         public const float MaxLength = 12f;
 
+        /// <summary>
+        /// 矢印の見た目（JUGGERNAUT のフラックの弾道の予測線も同じ見た目にする。ユーザーの要望、2026-10-29）: 帯の太さ、矢じりの根元の
+        /// 半分の幅と長さの上限（m）、芯の太さ（根もと・先）、縁の太さ、色。
+        /// </summary>
+        public const float BandWidth = 0.7f;
+        public const float HeadHalfWidth = 0.5f;
+        public const float MaxHeadLength = 1.6f;
+        public const float ShaftStartWidth = 0.06f;
+        public const float ShaftEndWidth = 0.2f;
+        public const float EdgeWidth = 0.07f;
+        public static readonly Color Cyan = new Color(0.35f, 0.9f, 1f);
+
         private const float Depth = -4.5f;
         private const float StartOffset = 0.6f;
-        private const float BandWidth = 0.7f;
-        private const float HeadHalfWidth = 0.5f;
-        private const float MaxHeadLength = 1.6f;
-
-        private static readonly Color Cyan = new Color(0.35f, 0.9f, 1f);
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
@@ -134,10 +141,39 @@ namespace Airerage.Runtime.Presentation
             return Mathf.Clamp(reach, MinLength, MaxLength);
         }
 
+        /// <summary>矢印の脈打ち（明るさに掛ける。0.7〜1）。</summary>
+        public static float Pulse => 0.85f + 0.15f * Mathf.Sin(Time.time * 8f);
+
+        /// <summary>
+        /// キャラクターの面（z = 0）で決めた点を、画面で同じ所に見えるまま、カメラの前（Depth。THIEF の煙や地形より手前）へ寄せる写し方。
+        /// 線の太さは Scale を掛けると、キャラクターの面での太さと同じに見える。カメラがなければ、面の少し手前（fallbackZ）に置く。
+        /// </summary>
+        public readonly struct TowardCamera
+        {
+            private readonly Vector3 _eye;
+            private readonly bool _projected;
+            private readonly float _fallbackZ;
+
+            public readonly float Scale;
+
+            public TowardCamera(Camera camera, float fallbackZ = -0.7f)
+            {
+                _projected = camera != null && !camera.orthographic && camera.transform.position.z < Depth;
+                _eye = _projected ? camera.transform.position : Vector3.zero;
+                Scale = _projected ? (Depth - _eye.z) / (0f - _eye.z) : 1f;
+                _fallbackZ = fallbackZ;
+            }
+
+            public Vector3 Place(Vector3 point)
+            {
+                return _projected ? _eye + (point - _eye) * Scale : new Vector3(point.x, point.y, _fallbackZ);
+            }
+        }
+
         // 太い帯・芯・矢じり（塗り）・矢じりの縁。少し脈打つ。点はキャラクターの面で決め、カメラの前へ寄せる（太さも同じ割合で細くする）。
         private static void Draw(Arrow arrow, Vector3 origin, Vector3 direction, float length, Camera camera)
         {
-            float pulse = 0.85f + 0.15f * Mathf.Sin(Time.time * 8f);
+            float pulse = Pulse;
             var side = new Vector3(-direction.y, direction.x, 0f);
             Vector3 start = origin + direction * StartOffset;
             Vector3 tip = start + direction * length;
@@ -145,25 +181,18 @@ namespace Airerage.Runtime.Presentation
             Vector3 headBase = tip - direction * headLength;
             arrow.Tip = tip;
 
-            Vector3 eye = Vector3.zero;
-            float scale = 1f;
-            float fallbackZ = -0.7f;
-            bool projected = camera != null && !camera.orthographic && camera.transform.position.z < Depth;
-            if (projected)
-            {
-                eye = camera.transform.position;
-                scale = (Depth - eye.z) / (0f - eye.z);
-            }
-            Vector3 Place(Vector3 point) => projected ? eye + (point - eye) * scale : new Vector3(point.x, point.y, fallbackZ);
+            var toward = new TowardCamera(camera);
+            float scale = toward.Scale;
+            Vector3 Place(Vector3 point) => toward.Place(point);
 
             SetLine(arrow.Band, Place(start), Place(headBase), scale);
-            Paint(arrow.Band, 0.16f * pulse, 0.28f * pulse);
+            Paint(arrow.Band, BandStartAlpha * pulse, BandEndAlpha * pulse);
 
             SetLine(arrow.Shaft, Place(start), Place(headBase + direction * 0.05f), scale);
-            Paint(arrow.Shaft, 0.25f * pulse, 0.85f * pulse);
+            Paint(arrow.Shaft, ShaftStartAlpha * pulse, ShaftEndAlpha * pulse);
 
             SetLine(arrow.Head, Place(headBase), Place(tip), scale);
-            Paint(arrow.Head, 0.45f * pulse, 0.65f * pulse);
+            Paint(arrow.Head, HeadStartAlpha * pulse, HeadEndAlpha * pulse);
 
             // 矢じりの縁（後ろへ流れる細長い形。翼の先は帯より外）。
             arrow.Edges.positionCount = 3;
@@ -171,7 +200,7 @@ namespace Airerage.Runtime.Presentation
             arrow.Edges.SetPosition(1, Place(tip));
             arrow.Edges.SetPosition(2, Place(headBase - side * HeadHalfWidth - direction * 0.25f));
             arrow.Edges.widthMultiplier = scale;
-            Paint(arrow.Edges, 0.9f * pulse, 0.9f * pulse);
+            Paint(arrow.Edges, EdgeAlpha * pulse, EdgeAlpha * pulse);
         }
 
         private static void SetLine(LineRenderer line, Vector3 from, Vector3 to, float widthScale)
@@ -182,7 +211,17 @@ namespace Airerage.Runtime.Presentation
             line.widthMultiplier = widthScale;
         }
 
-        private static void Paint(LineRenderer line, float startAlpha, float endAlpha)
+        /// <summary>帯・芯・矢じり・縁の濃さ（根もと・先。脈打ちを掛ける前）。</summary>
+        public const float BandStartAlpha = 0.16f;
+        public const float BandEndAlpha = 0.28f;
+        public const float ShaftStartAlpha = 0.25f;
+        public const float ShaftEndAlpha = 0.85f;
+        public const float HeadStartAlpha = 0.45f;
+        public const float HeadEndAlpha = 0.65f;
+        public const float EdgeAlpha = 0.9f;
+
+        /// <summary>線を水色で、根もとと先の濃さで塗る。</summary>
+        public static void Paint(LineRenderer line, float startAlpha, float endAlpha)
         {
             line.startColor = new Color(Cyan.r, Cyan.g, Cyan.b, startAlpha);
             line.endColor = new Color(Cyan.r, Cyan.g, Cyan.b, endAlpha);
@@ -203,9 +242,9 @@ namespace Airerage.Runtime.Presentation
             var arrow = new Arrow
             {
                 Band = NewLine(index, "Band", AnimationCurve.Constant(0f, 1f, BandWidth)),
-                Shaft = NewLine(index, "Shaft", new AnimationCurve(new Keyframe(0f, 0.06f), new Keyframe(1f, 0.2f))),
+                Shaft = NewLine(index, "Shaft", new AnimationCurve(new Keyframe(0f, ShaftStartWidth), new Keyframe(1f, ShaftEndWidth))),
                 Head = NewLine(index, "Head", new AnimationCurve(new Keyframe(0f, HeadHalfWidth * 2f), new Keyframe(1f, 0f))),
-                Edges = NewLine(index, "Edges", AnimationCurve.Constant(0f, 1f, 0.07f)),
+                Edges = NewLine(index, "Edges", AnimationCurve.Constant(0f, 1f, EdgeWidth)),
             };
             SetShown(arrow, false);
             return arrow;

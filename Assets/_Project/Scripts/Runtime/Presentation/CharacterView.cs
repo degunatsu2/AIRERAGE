@@ -102,6 +102,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private RingGaugeView _wallClingGauge;
         [Tooltip("水の中で溺れるまでの残り（水色。あれば。ユーザーの要望、2026-10-26）")]
         [SerializeField] private RingGaugeView _waterGauge;
+        [Tooltip("押し続けている間は続く技（JUGGERNAUT の地上技）を、続けられる限界までの残り（あれば。ユーザーの要望、2026-10-29）")]
+        [SerializeField] private RingGaugeView _sustainGauge;
         [Tooltip("水に飛び込んだ瞬間の水しぶき（あれば）")]
         [SerializeField] private BurstEffectView _splashBurst;
         [Tooltip("悪魔の手に握られた見た目（恐怖の館。ユーザーの要望、2026-10-26）")]
@@ -184,6 +186,7 @@ namespace Airerage.Runtime.Presentation
         public RingGaugeView RespawnGauge => _respawnGauge;
         public RingGaugeView WallClingGauge => _wallClingGauge;
         public RingGaugeView WaterGauge => _waterGauge;
+        public RingGaugeView SustainGauge => _sustainGauge;
         public BurstEffectView SplashBurst => _splashBurst;
         public CaptureEffectView CaptureEffect => _captureEffect;
 
@@ -244,6 +247,7 @@ namespace Airerage.Runtime.Presentation
             RenderWater(current);
             RenderHitbox(current, combat);
             RenderSpin(current, combat);
+            RenderSustain(current, combat);
             RenderFacing(current);
             Tint tint = TintOf(current, combat);
             RenderCharge(current, combat, tint == Tint.Charge);
@@ -324,6 +328,25 @@ namespace Airerage.Runtime.Presentation
             else if (_waterGauge.IsShowing)
             {
                 _waterGauge.Hide();
+            }
+        }
+
+        // 押し続けている間は続く技（AttackData.HeldSustain）を押し続けている間: 続けられる限界（SustainMaxTicks）までの残り。離したら隠す。
+        private void RenderSustain(in CharacterState state, CombatTuning combat)
+        {
+            if (_sustainGauge == null)
+            {
+                return;
+            }
+            AttackData attack = state.Action.Kind == ActionKind.Attack ? combat.Get(state.Action.Attack) : null;
+            bool holding = attack != null && attack.HeldSustain && attack.SustainMaxTicks > 0 && state.Action.Charge >= 0;
+            if (holding)
+            {
+                _sustainGauge.Show(transform.position, 1f - state.Action.Ticks / (float)attack.SustainMaxTicks);
+            }
+            else if (_sustainGauge.IsShowing)
+            {
+                _sustainGauge.Hide();
             }
         }
 
@@ -658,7 +681,7 @@ namespace Airerage.Runtime.Presentation
         // 透明の間: 体の周りのゲージと、ため・判定の表示を隠す。
         private void HideIndicators()
         {
-            foreach (RingGaugeView gauge in new[] { _wireCancelGauge, _guardGauge, _feverGauge, _waveGauge, _wallClingGauge, _waterGauge })
+            foreach (RingGaugeView gauge in new[] { _wireCancelGauge, _guardGauge, _feverGauge, _waveGauge, _wallClingGauge, _waterGauge, _sustainGauge })
             {
                 if (gauge != null && gauge.IsShowing)
                 {

@@ -21,7 +21,7 @@ namespace Airerage.Core.Skills
     ///   触れると爆発する。上下で弾道の段階（弱・中・強・弩）を選び、段階はその試合の間覚えておく（FlakLevelShift。撃破されても残す）。
     ///   回数がなくなるか、Q 以外の行動（ジャンプ・攻撃・ワイヤー・ガード・E・R・左右の移動）か、空中に出る・のけぞると、構えは解ける
     ///   （UpdateStance）。
-    /// - E MINE TRAP: 照準の方向へ地雷（Mine）を撃つ。地形（動く足場を含む）かキャラクターに張り付いて一緒に動き（ユーザーの回答、
+    /// - E MINE TRAP: 照準の方向へ地雷（Mine）を撃つ（重力で山なりに飛ぶ。2026-10-29）。地形（動く足場を含む）かキャラクターに張り付いて一緒に動き（ユーザーの回答、
     ///   2026-10-29）、もう一度 E で爆発する。クールタイムは、爆発した（消えた）後から数える。
     /// - R MAYDAY: ジェット機に吊られて飛び去り（MaydayLift）、ステージ全体から空いた場所を選び（MaydaySelect。入力の照準に場所を入れる。
     ///   EncodeTarget）、そこへ運ばれる（MaydayCarry）。その間は無敵で、その場にいない（CombatState.IsAway: 攻撃・コイン・拠点・撃破・
@@ -397,7 +397,8 @@ namespace Airerage.Core.Skills
                         mine.Ended = true;
                         return;
                     }
-                    Vector2 delta = mine.Velocity * SimTime.DeltaTime + TakeLead(ref mine);
+                    // 重力で山なりに飛ぶ（フラックの砲弾と同じ進め方）。
+                    Vector2 delta = FlakStep(ref mine.Velocity, tuning.MineGravity) + TakeLead(ref mine);
                     if (Cast(terrain, mine.Position, delta, out Vector2 point, out CastHit hit))
                     {
                         mine.Position = point;

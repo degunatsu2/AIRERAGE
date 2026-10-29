@@ -86,7 +86,7 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(Juggernaut.Wire.MaxLength, Is.EqualTo(standard.Wire.MaxLength * 1.5f).Within(0.001f), "ワイヤーの射程が 1.5 倍でない");
             Assert.That(Juggernaut.Wire.MaxAttachedSpeed, Is.EqualTo(standard.Wire.MaxAttachedSpeed * 0.5f).Within(0.001f), "ワイヤーの間の速さが -50% でない");
             Assert.That(Juggernaut.Combat.GuardCooldownTicks, Is.EqualTo(standard.Combat.GuardCooldownTicks * 2), "ガードのクールタイムが 2 倍でない");
-            Assert.That(Juggernaut.Combat.GuardHoldMaxTicks, Is.EqualTo(240), "ガードの延長が 4 秒でない");
+            Assert.That(Juggernaut.Combat.GuardHoldMaxTicks, Is.EqualTo(120), "ガードの延長が 2 秒でない");
             Assert.That(Juggernaut.Combat.KoAttack, Is.EqualTo(AttackSlot.Ground), "撃破技が地上技でない");
             Assert.That(Juggernaut.Combat.Special1.Effect, Is.EqualTo(SkillEffect.Flak));
             Assert.That(Juggernaut.Combat.Special1MaxCharges, Is.EqualTo(3), "フラックが 3 回まででない");
@@ -94,7 +94,8 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(Juggernaut.Combat.Special2CooldownTicks, Is.EqualTo(600), "地雷のクールタイムが 10 秒でない");
             Assert.That(Juggernaut.Combat.SuperGaugeCost, Is.EqualTo(100 * CombatTuning.GaugePerPercent), "メーデーが 100% でない");
             Assert.That(Juggernaut.Skills.Juggernaut.CannonHit.Damage, Is.EqualTo(10), "空中横の砲弾の威力が 10 でない");
-            Assert.That(Juggernaut.Skills.Juggernaut.FlakHit.Damage, Is.EqualTo(30), "フラックの威力が 30 でない");
+            Assert.That(Juggernaut.Skills.Juggernaut.FlakHit.Damage, Is.EqualTo(15), "フラックの威力が 15 でない");
+            Assert.That(Juggernaut.Skills.Juggernaut.MineGravity, Is.GreaterThan(0f), "地雷が重力を受けない");
             Assert.That(Juggernaut.Skills.Juggernaut.MineHit.Damage, Is.EqualTo(30), "地雷の威力が 30 でない");
             Assert.That(JuggernautRules.IsJuggernaut(Juggernaut), Is.True);
             Assert.That(JuggernautRules.IsJuggernaut(standard), Is.False);
@@ -151,24 +152,24 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
-        public void Guard_LastsWhileHeld_UpTo4Seconds_AndCanWalkOnTheGround()
+        public void Guard_LastsWhileHeld_UpTo2Seconds_AndCanWalkOnTheGround()
         {
             var world = new SimWorld(TestArenas.Ground());
             world.AddCharacter(Juggernaut, new Vector3(0f, GroundY, 0f));
             Step(world, 2);
-            Step(world, 100, Press(InputButtons.Guard));
+            Step(world, 50, Press(InputButtons.Guard));
             Assert.That(world.GetState(0).Action.Kind, Is.EqualTo(ActionKind.Guard), "押し続けてもガードが延びない");
 
             // ガードしながら歩ける（ふだんの地上の速さ。ユーザーの回答、2026-10-29）。
-            Step(world, 40, Press(InputButtons.Guard, 1f));
+            Step(world, 30, Press(InputButtons.Guard, 1f));
             CharacterState walking = world.GetState(0);
             Assert.That(walking.Action.Kind, Is.EqualTo(ActionKind.Guard));
             Assert.That(walking.Velocity.X, Is.EqualTo(Juggernaut.Movement.RunSpeed).Within(0.2f), "ガードしながらふだんの速さで歩けない");
 
-            // 4 秒を超えると終わり、クールタイム（2 倍）が始まる。
-            Step(world, 120, Press(InputButtons.Guard));
+            // 2 秒を超えると終わり、クールタイム（2 倍）が始まる（2026-10-29 に 4 秒から下方修正）。
+            Step(world, 60, Press(InputButtons.Guard));
             CharacterState ended = world.GetState(0);
-            Assert.That(ended.Action.Kind, Is.Not.EqualTo(ActionKind.Guard), "4 秒を超えてもガードが続く");
+            Assert.That(ended.Action.Kind, Is.Not.EqualTo(ActionKind.Guard), "2 秒を超えてもガードが続く");
             Assert.That(ended.Combat.GuardCooldownTicksLeft, Is.GreaterThan(Juggernaut.Combat.GuardCooldownTicks - 30));
         }
 
@@ -397,7 +398,7 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
-        public void FlakShell_ExplodesOnACharacter_ForThirtyDamage()
+        public void FlakShell_ExplodesOnACharacter_ForFifteenDamage()
         {
             var world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(8f, StandardGroundY, 0f));
             Step(world, 2);
@@ -407,7 +408,7 @@ namespace Airerage.Core.Tests.Skills
             Step(world, 1, Aimed(InputButtons.Special1, new Vector2(1f, 0.05f)));
             List<HitRecord> hits = Step(world, 40);
             HitRecord hit = hits.Single(h => h.Victim == 1);
-            Assert.That(hit.Damage, Is.EqualTo(30), "フラックの威力が 30 でない");
+            Assert.That(hit.Damage, Is.EqualTo(15), "フラックの威力が 15 でない");
             WorldObject blast = world.Objects.Items.SingleOrDefault(o => o.Kind == WorldObjectKind.Shell);
             Assert.That(blast.Variant == JuggernautRules.ShellBlast || world.Objects.Count == 0, Is.True, "爆発の印になっていない");
         }
@@ -481,6 +482,24 @@ namespace Airerage.Core.Tests.Skills
             WorldObject mine = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Mine);
             Assert.That(mine.Variant, Is.EqualTo(JuggernautRules.MineOnTerrain), "足もとへ撃った地雷が地面に張り付かない");
             Assert.That(mine.Position.Y, Is.EqualTo(0f).Within(0.01f), "地面の上に張り付いていない");
+        }
+
+        [Test]
+        public void Mine_FiredLevel_FallsUnderGravity_AndSticksToTheGroundAhead()
+        {
+            // 地雷は重力で山なりに飛ぶ（ユーザーの要望、2026-10-29）: 真横へ撃つと、前の地面に落ちて張り付く。
+            var world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f));
+            Step(world, 2);
+            Step(world, 1, Aimed(InputButtons.Special2, new Vector2(1f, 0f)));
+            Step(world, 1, Aimed(InputButtons.None, new Vector2(1f, 0f)));
+            Step(world, 8);
+            WorldObject flying = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Mine);
+            Assert.That(flying.Velocity.Y, Is.LessThan(-0.5f), "飛んでいる地雷が落ちていかない");
+            Step(world, 40);
+            WorldObject mine = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Mine);
+            Assert.That(mine.Variant, Is.EqualTo(JuggernautRules.MineOnTerrain), "真横へ撃った地雷が地面に落ちて張り付かない");
+            Assert.That(mine.Position.Y, Is.EqualTo(0f).Within(0.01f), "地面の上に張り付いていない");
+            Assert.That(mine.Position.X, Is.InRange(3f, 12f), "前の地面に落ちていない");
         }
 
         [Test]

@@ -16,8 +16,9 @@ using SimInput = Airerage.Core.Input.PlayerInput;
 namespace Airerage.PlayMode.Tests
 {
     /// <summary>
-    /// JUGGERNAUT の表示（ユーザーの案、2026-10-29。docs/14 1.7）: 一覧で選べる、戦車の衣装とロゴ、大きい体、地上技で体ごと回る、空中横の砲弾、
-    /// Q の構え（弾道の段階・予測線・全体を見せるカメラ）と砲弾と爆発、E の地雷ともう一度 E の爆発、R のジェット機と場所のカーソルと N/A。
+    /// JUGGERNAUT の表示（ユーザーの案、2026-10-29。docs/14 1.7）: 一覧で選べる、戦車の衣装とロゴ、大きい体、地上技で体ごと回る（押し続けて
+    /// いる間は限界までの円形ゲージ）、空中横の砲弾、Q の構え（弾道の段階・予測線・全体を見せるカメラ）と砲弾と爆発（閃光と炎はすぐ消え、
+    /// 煙は残る）、E の地雷ともう一度 E の爆発、R のジェット機と場所のカーソルと N/A。
     /// Sandbox_Wire で CycleCharacter を呼ぶ。
     /// </summary>
     public sealed class JuggernautViewTests
@@ -53,13 +54,16 @@ namespace Airerage.PlayMode.Tests
             yield return WaitUntil(() => feed.GetState(0).Grounded && feed.GetState(0).Action.IsFree, 2f);
             runner.InputOverride = new Script(Repeat(new SimInput(0, 0, InputButtons.Attack), 40));
             var angles = new HashSet<int>();
+            bool sustainGauge = false;
             float start = Time.time;
             while (Time.time - start < 0.5f)
             {
                 angles.Add(Mathf.RoundToInt(view.SpinDegrees / 30f));
+                sustainGauge |= view.SustainGauge != null && view.SustainGauge.IsShowing;
                 yield return null;
             }
             Assert.That(angles.Count, Is.GreaterThan(3), "回る地上技で体が回らない");
+            Assert.That(sustainGauge, Is.True, "押し続けている間に、限界までの円形ゲージを出さない");
             yield return WaitUntil(() => feed.GetState(0).Action.IsFree, 2f);
 
             // Q（FLAK）: 構えると、斜め後ろの上に「強」、操作している人には弾道の予測線、カメラはステージ全体。
@@ -89,6 +93,12 @@ namespace Airerage.PlayMode.Tests
             }
             Assert.That(shells, Is.GreaterThan(0), "フラックの砲弾を出さない");
             Assert.That(blasts, Is.GreaterThan(0), "砲弾が落ちても爆発を出さない");
+            // 爆発: 出た瞬間は閃光があり、少したつと閃光と炎は消えて煙だけが残り、しばらくすると煙も消える。
+            var explosions = Object.FindFirstObjectByType<LayeredExplosionView>();
+            Assert.That(explosions.FlashingCount, Is.GreaterThan(0), "爆発の瞬間に閃光を出さない");
+            yield return WaitSeconds(0.8f);
+            Assert.That(explosions.FlashingCount, Is.Zero, "閃光が一瞬で消えない");
+            Assert.That(explosions.SmokeOnlyCount, Is.GreaterThan(0), "閃光と炎の後に煙が残らない");
 
             // 左右の移動で構えが解け、カメラが戻る。
             runner.InputOverride = new Script(Repeat(new SimInput(127, 0, InputButtons.None), 3));
@@ -103,15 +113,10 @@ namespace Airerage.PlayMode.Tests
             runner.InputOverride = new Script(new List<SimInput> { down, default });
             yield return WaitSeconds(0.5f);
             Assert.That(effects.MineCount, Is.GreaterThan(0), "地雷を出さない");
+            int spawned = explosions.SpawnedCount;
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special2), default });
-            blasts = 0;
-            start = Time.time;
-            while (Time.time - start < 0.5f && blasts == 0)
-            {
-                blasts = effects.BlastCount;
-                yield return null;
-            }
-            Assert.That(blasts, Is.GreaterThan(0), "もう一度 E で地雷の爆発を出さない");
+            yield return WaitUntil(() => explosions.SpawnedCount > spawned, 0.5f);
+            Assert.That(explosions.SpawnedCount, Is.GreaterThan(spawned), "もう一度 E で地雷の爆発を出さない");
 
             // R（MAYDAY）: ジェット機が来て吊って上がり、場所を選ぶ間は体を隠してカーソルを出す。地面の中を選ぶと N/A。
             CharacterState state = runner.PlayerState;

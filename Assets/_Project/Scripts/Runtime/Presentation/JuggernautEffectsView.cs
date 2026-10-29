@@ -13,10 +13,12 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// JUGGERNAUT の技の表示（docs/14 1.7。ユーザーの案、2026-10-29）。状態を読むだけで、書き換えない。
-    /// - 砲弾: 空中横は暗い鉄の球、フラックは大きい苔色の球と短い尾。爆発（Core の爆発の印）は、オレンジの球が広がって薄れる。
+    /// - 砲弾: 空中横は暗い鉄の球、フラックは大きい苔色の球と短い尾。爆発（Core の爆発の印）は、閃光・炎・煙を重ねた爆発
+    ///   （LayeredExplosionView。ユーザーの要望、2026-10-29）。煙は Core の印が消えた後も残る。
     /// - 地雷: 暗い円盤と、赤く点滅する灯。張り付いたら、張り付いた面に沿って向く。
     /// - フラックの構え: 体の斜め後ろの上に、弾道の段階（弱・中・強・弩）。操作している人には、今の照準で撃ったときの弾道の予測線と、
-    ///   落ちる所の爆発の輪（JuggernautRules.PredictFlak。撃つときと同じ計算）。
+    ///   落ちる所の爆発の範囲（JuggernautRules.PredictFlak。撃つときと同じ計算）。予測線は、照準の方向に出す技の矢印（SkillAimView）と
+    ///   同じ見た目（水色の半透明の帯・芯・矢じり。ユーザーの要望、2026-10-29）で、着弾点まで曲がって伸びる。
     /// - メーデー: ジェット機（R を出すと降りてきて、吊って上がり、選んだ場所へ運んで去る）。操作している人が場所を選ぶ間は、大きな
     ///   カーソル（置ける所は緑、地形と重なる所は赤）と、残りの時間の輪。選べない所を選んだら、赤い N/A とエラーの音。運ばれる間は、降りる
     ///   場所に輪。
@@ -43,19 +45,15 @@ namespace Airerage.Runtime.Presentation
         private const float BaseCameraDistance = 30f;
         private const float LevelHeight = 1.1f;
         private const float NoticeHeight = 1.6f;
-        private const float TrajectoryWidth = 0.12f;
-        private const float RingWidth = 0.1f;
+        private const float DropWidth = 0.12f;
 
         private static readonly string[] LevelNames = { "弱", "中", "強", "弩" };
         private static readonly Color[] LevelColors =
         {
             new Color(0.55f, 0.85f, 1f), new Color(0.55f, 1f, 0.5f), new Color(1f, 0.7f, 0.25f), new Color(1f, 0.3f, 0.25f),
         };
-        private static readonly Color TrajectoryColor = new Color(1f, 0.75f, 0.3f, 0.75f);
         private static readonly Color FreeColor = new Color(0.3f, 1f, 0.45f, 0.95f);
         private static readonly Color BlockedColor = new Color(1f, 0.25f, 0.2f, 0.95f);
-        private static readonly Color BlastColor = new Color(1f, 0.55f, 0.15f, 0.8f);
-        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         [Tooltip("状態を読む相手（SimulationRunner・LocalMatchRunner・OnlineRunner。ISimulationFeed と ILocalAimSource）")]
         [SerializeField] private MonoBehaviour _source;
@@ -69,8 +67,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private GameObject _shellTemplate;
         [Tooltip("フラックの砲弾の見本（隠しておく）")]
         [SerializeField] private GameObject _flakTemplate;
-        [Tooltip("爆発の見本（半透明の球。隠しておく）")]
-        [SerializeField] private GameObject _blastTemplate;
+        [Tooltip("爆発の見た目（閃光・炎・煙を重ねる）")]
+        [SerializeField] private LayeredExplosionView _explosions;
         [Tooltip("地雷の見本（子に \"Lamp\" の灯。隠しておく）")]
         [SerializeField] private GameObject _mineTemplate;
         [Tooltip("ジェット機の見本（隠しておく）")]
@@ -85,9 +83,9 @@ namespace Airerage.Runtime.Presentation
         private readonly HashSet<int> _present = new HashSet<int>();
         private readonly List<Character> _characters = new List<Character>();
         private readonly System.Numerics.Vector2[] _path = new System.Numerics.Vector2[PredictTicks];
+        private readonly List<Vector3> _points = new List<Vector3>();
         private ISimulationFeed _feed;
         private ILocalAimSource _local;
-        private MaterialPropertyBlock _block;
         private Font _japanese;
         private bool _primed;
         private float _scale = 1f;
@@ -98,14 +96,19 @@ namespace Airerage.Runtime.Presentation
             public byte Variant;
             public GameObject Visual;
             public Renderer Lamp;
-            public Renderer[] Renderers;
+            // 爆発の印が消えるティック（それより前に消えたら、予測が外れた爆発なので、爆発の見た目も消す）。
+            public int ExpireTick;
         }
 
         private sealed class Character
         {
             public TextMesh Level;
-            public LineRenderer Trajectory;
-            public LineRenderer Landing;
+            public LineRenderer TrajectoryBand;
+            public LineRenderer TrajectoryShaft;
+            public LineRenderer TrajectoryHead;
+            public LineRenderer TrajectoryEdges;
+            public LineRenderer LandingFill;
+            public LineRenderer LandingRing;
             public LineRenderer Cursor;
             public LineRenderer CursorCross;
             public LineRenderer CursorTime;
@@ -123,8 +126,8 @@ namespace Airerage.Runtime.Presentation
         /// <summary>出している砲弾の数（爆発の印を除く。テスト用）。</summary>
         public int ShellCount => Count(WorldObjectKind.Shell, false);
 
-        /// <summary>出している爆発の数（テスト用）。</summary>
-        public int BlastCount => Count(WorldObjectKind.Shell, true) + Count(WorldObjectKind.Mine, true);
+        /// <summary>出している爆発の数（煙が残っている間を含む。テスト用）。</summary>
+        public int BlastCount => _explosions != null ? _explosions.ActiveCount : 0;
 
         /// <summary>出している地雷の数（爆発の印を除く。テスト用）。</summary>
         public int MineCount => Count(WorldObjectKind.Mine, false);
@@ -136,7 +139,10 @@ namespace Airerage.Runtime.Presentation
         public string LevelText(int index) => index >= 0 && index < _characters.Count ? _characters[index].Level.text : string.Empty;
 
         /// <summary>キャラクター index の弾道の予測線を出しているか（テスト用）。</summary>
-        public bool ShowsTrajectory(int index) => index >= 0 && index < _characters.Count && _characters[index].Trajectory.enabled;
+        public bool ShowsTrajectory(int index) => index >= 0 && index < _characters.Count && _characters[index].TrajectoryBand.enabled;
+
+        /// <summary>キャラクター index の着弾点の爆発の範囲を出しているか（テスト用）。</summary>
+        public bool ShowsLanding(int index) => index >= 0 && index < _characters.Count && _characters[index].LandingRing.enabled;
 
         /// <summary>キャラクター index のメーデーの場所のカーソルを出しているか（テスト用）。</summary>
         public bool ShowsCursor(int index) => index >= 0 && index < _characters.Count && _characters[index].Cursor.enabled;
@@ -151,8 +157,8 @@ namespace Airerage.Runtime.Presentation
         {
             _feed = _source as ISimulationFeed;
             _local = _source as ILocalAimSource;
-            GameObject[] templates = { _shellTemplate, _flakTemplate, _blastTemplate, _mineTemplate, _jetTemplate };
-            if (_feed == null || _lineTemplate == null || _textTemplate == null || System.Array.IndexOf(templates, null) >= 0)
+            GameObject[] templates = { _shellTemplate, _flakTemplate, _mineTemplate, _jetTemplate };
+            if (_feed == null || _lineTemplate == null || _textTemplate == null || _explosions == null || System.Array.IndexOf(templates, null) >= 0)
             {
                 Debug.LogError($"{name}: 状態を読む相手（ISimulationFeed）か、見本が設定されていません", this);
                 enabled = false;
@@ -164,7 +170,6 @@ namespace Airerage.Runtime.Presentation
             {
                 template.SetActive(false);
             }
-            _block = new MaterialPropertyBlock();
             _japanese = JapaneseFont.Create(64);
         }
 
@@ -191,7 +196,6 @@ namespace Airerage.Runtime.Presentation
             _present.Clear();
             if (objects != null)
             {
-                int tick = _feed.CurrentTick;
                 foreach (WorldObject item in objects.Items)
                 {
                     if ((item.Kind != WorldObjectKind.Shell && item.Kind != WorldObjectKind.Mine) || item.Ended)
@@ -202,8 +206,8 @@ namespace Airerage.Runtime.Presentation
                     bool blast = JuggernautRules.IsBlast(item);
                     if (_shown.TryGetValue(item.Id, out Shown shown) && (blast != IsBlast(shown)))
                     {
-                        // 爆発した（見た目を爆発に替える）。
-                        Destroy(shown.Visual);
+                        // 爆発した（砲弾・地雷の見た目を消して、爆発を出す）。
+                        DestroyVisual(shown);
                         _shown.Remove(item.Id);
                         shown = null;
                     }
@@ -212,13 +216,23 @@ namespace Airerage.Runtime.Presentation
                         shown = Create(item);
                         _shown.Add(item.Id, shown);
                         PlaySpawn(item, blast);
+                        if (blast)
+                        {
+                            // 半径は Core の爆発の半径（End.X）。煙は印が消えた後も残る。
+                            _explosions.Spawn(item.Id, new Vector3(item.Position.X, item.Position.Y, Z), item.End.X);
+                        }
+                    }
+                    if (blast)
+                    {
+                        shown.Variant = item.Variant;
+                        continue;
                     }
                     else if (shown.Kind == WorldObjectKind.Mine && shown.Variant == JuggernautRules.MineFlying && item.Variant != JuggernautRules.MineFlying)
                     {
                         Play(SoundId.MineSet, 0.8f);
                     }
                     shown.Variant = item.Variant;
-                    Place(shown, item, tick);
+                    Place(shown, item);
                 }
             }
             _gone.Clear();
@@ -229,10 +243,25 @@ namespace Airerage.Runtime.Presentation
                     _gone.Add(pair.Key);
                 }
             }
+            int now = _feed.CurrentTick;
             foreach (int id in _gone)
             {
-                Destroy(_shown[id].Visual);
+                Shown shown = _shown[id];
+                if (IsBlast(shown) && now < shown.ExpireTick - 1)
+                {
+                    // 印が時間より前に消えた: 予測が外れて巻き戻った爆発なので、煙も残さない。
+                    _explosions.Cancel(id);
+                }
+                DestroyVisual(shown);
                 _shown.Remove(id);
+            }
+        }
+
+        private static void DestroyVisual(Shown shown)
+        {
+            if (shown.Visual != null)
+            {
+                Destroy(shown.Visual);
             }
         }
 
@@ -244,8 +273,12 @@ namespace Airerage.Runtime.Presentation
 
         private Shown Create(in WorldObject item)
         {
-            GameObject template = JuggernautRules.IsBlast(item) ? _blastTemplate
-                : item.Kind == WorldObjectKind.Mine ? _mineTemplate
+            if (JuggernautRules.IsBlast(item))
+            {
+                // 爆発は LayeredExplosionView が描く（ここでは印の消えるティックだけ覚える）。
+                return new Shown { Kind = item.Kind, Variant = item.Variant, ExpireTick = item.ExpireTick };
+            }
+            GameObject template = item.Kind == WorldObjectKind.Mine ? _mineTemplate
                 : item.Variant == JuggernautRules.FlakShell ? _flakTemplate
                 : _shellTemplate;
             GameObject visual = Instantiate(template, transform);
@@ -258,30 +291,13 @@ namespace Airerage.Runtime.Presentation
                 Variant = item.Variant,
                 Visual = visual,
                 Lamp = lamp != null ? lamp.GetComponent<Renderer>() : null,
-                Renderers = visual.GetComponentsInChildren<Renderer>(),
             };
         }
 
-        private void Place(Shown shown, in WorldObject item, int tick)
+        private void Place(Shown shown, in WorldObject item)
         {
             Transform visual = shown.Visual.transform;
             visual.position = new Vector3(item.Position.X, item.Position.Y, Z);
-            if (JuggernautRules.IsBlast(item))
-            {
-                // 広がって薄れる（半径は Core の爆発の半径）。
-                float life = Mathf.Max(1f, item.ExpireTick - item.SpawnTick);
-                float t = Mathf.Clamp01((tick - item.SpawnTick) / life);
-                float size = item.End.X * 2f * (0.45f + 0.55f * (1f - (1f - t) * (1f - t)));
-                visual.localScale = Vector3.one * size;
-                Color color = BlastColor;
-                color.a *= 1f - t;
-                _block.SetColor(BaseColorId, color);
-                foreach (Renderer renderer in shown.Renderers)
-                {
-                    renderer.SetPropertyBlock(_block);
-                }
-                return;
-            }
             if (item.Kind == WorldObjectKind.Mine)
             {
                 visual.position = new Vector3(item.Position.X, item.Position.Y, MineZ);
@@ -386,14 +402,14 @@ namespace Airerage.Runtime.Presentation
             }
             bool predict = stance && controlled && _local != null && _local.Collision != null && _local.TryPeekAim(index, out System.Numerics.Vector2 aim)
                 && Predict(c, state, config, aim);
-            c.Trajectory.enabled = predict;
             if (!predict)
             {
-                c.Landing.enabled = false;
+                SetTrajectoryShown(c, false, false);
             }
         }
 
-        // 今の照準で撃ったときの弾道（撃つときと同じ計算）を線にし、地形に落ちる所に爆発の輪を出す。
+        // 今の照準で撃ったときの弾道（撃つときと同じ計算）を、照準の方向の矢印（SkillAimView）と同じ見た目で描く: 水色の半透明の帯と芯が
+        // 弾道に沿って曲がり、着弾点に矢じり。地形に落ちる所には、爆発の範囲（薄い塗りと縁）。点はカメラの前へ寄せて、地形に隠れないようにする。
         private bool Predict(Character c, in CharacterState state, CharacterConfig config, System.Numerics.Vector2 aim)
         {
             JuggernautTuning tuning = config.Skills.Juggernaut;
@@ -404,23 +420,97 @@ namespace Airerage.Runtime.Presentation
             {
                 return false;
             }
-            int shown = (count + 1) / 2 + 1;
-            c.Trajectory.positionCount = shown;
-            c.Trajectory.widthMultiplier = TrajectoryWidth * _scale;
-            c.Landing.widthMultiplier = RingWidth * _scale;
-            for (int k = 0; k < shown - 1; k++)
+            _points.Clear();
+            for (int k = 0; k < count; k += 2)
             {
-                System.Numerics.Vector2 p = _path[Mathf.Min(k * 2, count - 1)];
-                c.Trajectory.SetPosition(k, new Vector3(p.X, p.Y, Z));
+                _points.Add(new Vector3(_path[k].X, _path[k].Y, 0f));
             }
-            System.Numerics.Vector2 end = _path[count - 1];
-            c.Trajectory.SetPosition(shown - 1, new Vector3(end.X, end.Y, Z));
-            c.Landing.enabled = hit;
+            var tip = new Vector3(_path[count - 1].X, _path[count - 1].Y, 0f);
+            if (_points[_points.Count - 1] != tip)
+            {
+                _points.Add(tip);
+            }
+
+            // 矢じりの根元: 先から道のりに沿って矢じりの長さだけ戻った所。
+            float total = 0f;
+            for (int k = 1; k < _points.Count; k++)
+            {
+                total += Vector3.Distance(_points[k - 1], _points[k]);
+            }
+            float headLength = Mathf.Min(SkillAimView.MaxHeadLength * _scale, total * 0.35f);
+            float remain = headLength;
+            int bodyEnd = _points.Count - 1;
+            Vector3 headBase = tip;
+            for (int k = _points.Count - 1; k > 0; k--)
+            {
+                float segment = Vector3.Distance(_points[k - 1], _points[k]);
+                bodyEnd = k - 1;
+                if (segment >= remain)
+                {
+                    headBase = Vector3.Lerp(_points[k], _points[k - 1], segment > 0f ? remain / segment : 0f);
+                    break;
+                }
+                remain -= segment;
+                headBase = _points[k - 1];
+            }
+            Vector3 direction = (tip - headBase).sqrMagnitude > 1e-6f ? (tip - headBase).normalized : Vector3.right;
+            var side = new Vector3(-direction.y, direction.x, 0f);
+
+            var toward = new SkillAimView.TowardCamera(_camera != null ? _camera : Camera.main);
+            float width = _scale * toward.Scale;
+            float pulse = SkillAimView.Pulse;
+            int bodyCount = bodyEnd + 2;
+            c.TrajectoryBand.positionCount = bodyCount;
+            c.TrajectoryShaft.positionCount = bodyCount;
+            for (int k = 0; k <= bodyEnd; k++)
+            {
+                Vector3 p = toward.Place(_points[k]);
+                c.TrajectoryBand.SetPosition(k, p);
+                c.TrajectoryShaft.SetPosition(k, p);
+            }
+            c.TrajectoryBand.SetPosition(bodyCount - 1, toward.Place(headBase));
+            c.TrajectoryShaft.SetPosition(bodyCount - 1, toward.Place(headBase + direction * 0.05f * _scale));
+            c.TrajectoryBand.widthMultiplier = width;
+            c.TrajectoryShaft.widthMultiplier = width;
+            SkillAimView.Paint(c.TrajectoryBand, SkillAimView.BandStartAlpha * pulse, SkillAimView.BandEndAlpha * pulse);
+            SkillAimView.Paint(c.TrajectoryShaft, SkillAimView.ShaftStartAlpha * pulse, SkillAimView.ShaftEndAlpha * pulse);
+
+            c.TrajectoryHead.positionCount = 2;
+            c.TrajectoryHead.SetPosition(0, toward.Place(headBase));
+            c.TrajectoryHead.SetPosition(1, toward.Place(tip));
+            c.TrajectoryHead.widthMultiplier = width;
+            SkillAimView.Paint(c.TrajectoryHead, SkillAimView.HeadStartAlpha * pulse, SkillAimView.HeadEndAlpha * pulse);
+            c.TrajectoryEdges.positionCount = 3;
+            float wing = SkillAimView.HeadHalfWidth * _scale;
+            c.TrajectoryEdges.SetPosition(0, toward.Place(headBase + side * wing - direction * 0.25f * _scale));
+            c.TrajectoryEdges.SetPosition(1, toward.Place(tip));
+            c.TrajectoryEdges.SetPosition(2, toward.Place(headBase - side * wing - direction * 0.25f * _scale));
+            c.TrajectoryEdges.widthMultiplier = width;
+            SkillAimView.Paint(c.TrajectoryEdges, SkillAimView.EdgeAlpha * pulse, SkillAimView.EdgeAlpha * pulse);
+
             if (hit)
             {
-                DrawCircle(c.Landing, new Vector3(end.X, end.Y, Z), tuning.FlakExplosionRadius);
+                // 爆発の範囲: 半径の半分の輪を半径の太さで描いて塗り、外側に縁。
+                float radius = tuning.FlakExplosionRadius;
+                DrawCircle(c.LandingFill, tip, radius * 0.5f, toward);
+                c.LandingFill.widthMultiplier = radius * toward.Scale;
+                SkillAimView.Paint(c.LandingFill, SkillAimView.BandStartAlpha * pulse, SkillAimView.BandStartAlpha * pulse);
+                DrawCircle(c.LandingRing, tip, radius, toward);
+                c.LandingRing.widthMultiplier = SkillAimView.EdgeWidth * width;
+                SkillAimView.Paint(c.LandingRing, SkillAimView.EdgeAlpha * pulse, SkillAimView.EdgeAlpha * pulse);
             }
+            SetTrajectoryShown(c, true, hit);
             return true;
+        }
+
+        private static void SetTrajectoryShown(Character c, bool shown, bool landing)
+        {
+            c.TrajectoryBand.enabled = shown;
+            c.TrajectoryShaft.enabled = shown;
+            c.TrajectoryHead.enabled = shown;
+            c.TrajectoryEdges.enabled = shown;
+            c.LandingFill.enabled = shown && landing;
+            c.LandingRing.enabled = shown && landing;
         }
 
         // メーデー: ジェット機、操作している人の場所のカーソルと N/A、運ばれる間の降りる場所の輪。
@@ -489,7 +579,7 @@ namespace Airerage.Runtime.Presentation
             c.Drop.enabled = phase == JuggernautRules.MaydayCarry;
             if (c.Drop.enabled)
             {
-                c.Drop.widthMultiplier = TrajectoryWidth * _scale;
+                c.Drop.widthMultiplier = DropWidth * _scale;
                 DrawCircle(c.Drop, new Vector3(state.Combat.MaydayTarget.X, state.Combat.MaydayTarget.Y, Z),
                     Mathf.Max(config.Movement.HalfWidth, config.Movement.HalfHeight) + 0.4f);
             }
@@ -568,8 +658,15 @@ namespace Airerage.Runtime.Presentation
             {
                 Level = CreateText($"FlakLevelP{index + 1}", LevelHeight),
                 Notice = CreateText($"MaydayDeniedP{index + 1}", NoticeHeight),
-                Trajectory = CreateLine($"FlakTrajectoryP{index + 1}", TrajectoryWidth, TrajectoryColor),
-                Landing = CreateLine($"FlakLandingP{index + 1}", RingWidth, TrajectoryColor),
+                // 弾道の予測線（照準の方向の矢印と同じ見た目。帯は一定の太さ、芯は先ほど太く、矢じりは塗った三角形、縁は細い線）。
+                TrajectoryBand = CreateAimLine($"FlakTrajectoryP{index + 1}Band", AnimationCurve.Constant(0f, 1f, SkillAimView.BandWidth)),
+                TrajectoryShaft = CreateAimLine($"FlakTrajectoryP{index + 1}Shaft",
+                    new AnimationCurve(new Keyframe(0f, SkillAimView.ShaftStartWidth), new Keyframe(1f, SkillAimView.ShaftEndWidth))),
+                TrajectoryHead = CreateAimLine($"FlakTrajectoryP{index + 1}Head",
+                    new AnimationCurve(new Keyframe(0f, SkillAimView.HeadHalfWidth * 2f), new Keyframe(1f, 0f))),
+                TrajectoryEdges = CreateAimLine($"FlakTrajectoryP{index + 1}Edges", AnimationCurve.Constant(0f, 1f, SkillAimView.EdgeWidth)),
+                LandingFill = CreateAimLine($"FlakLandingP{index + 1}Fill", AnimationCurve.Constant(0f, 1f, 1f)),
+                LandingRing = CreateAimLine($"FlakLandingP{index + 1}Ring", AnimationCurve.Constant(0f, 1f, 1f)),
                 Cursor = CreateLine($"MaydayCursorP{index + 1}", CursorWidth, FreeColor),
                 CursorCross = CreateLine($"MaydayCrossP{index + 1}", CursorWidth * 0.6f, FreeColor),
                 CursorTime = CreateLine($"MaydayTimeP{index + 1}", CursorWidth * 0.4f, Color.white),
@@ -587,8 +684,7 @@ namespace Airerage.Runtime.Presentation
         {
             c.Level.gameObject.SetActive(false);
             c.Notice.gameObject.SetActive(false);
-            c.Trajectory.enabled = false;
-            c.Landing.enabled = false;
+            SetTrajectoryShown(c, false, false);
             c.Cursor.enabled = false;
             c.CursorCross.enabled = false;
             c.CursorTime.enabled = false;
@@ -622,6 +718,16 @@ namespace Airerage.Runtime.Presentation
             return line;
         }
 
+        private LineRenderer CreateAimLine(string name, AnimationCurve width)
+        {
+            LineRenderer line = CreateLine(name, 1f, SkillAimView.Cyan);
+            line.numCapVertices = 0;
+            line.numCornerVertices = 2;
+            line.widthCurve = width;
+            line.enabled = false;
+            return line;
+        }
+
         private static void SetColor(LineRenderer line, Color color)
         {
             line.startColor = color;
@@ -636,6 +742,18 @@ namespace Airerage.Runtime.Presentation
             {
                 float angle = k * Mathf.PI * 2f / RingSegments;
                 line.SetPosition(k, center + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * radius);
+            }
+        }
+
+        // カメラの前へ寄せた円（toward。点はキャラクターの面で決める）。
+        private static void DrawCircle(LineRenderer line, Vector3 center, float radius, SkillAimView.TowardCamera toward)
+        {
+            line.loop = true;
+            line.positionCount = RingSegments;
+            for (int k = 0; k < RingSegments; k++)
+            {
+                float angle = k * Mathf.PI * 2f / RingSegments;
+                line.SetPosition(k, toward.Place(center + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * radius));
             }
         }
 

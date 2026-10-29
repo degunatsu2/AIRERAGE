@@ -470,6 +470,8 @@ namespace Airerage.Editor
             captureView.Configure(LoadOrCreateMaterial("DemonClaw", new Color(0.12f, 0.05f, 0.12f)),
                 AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), new Color(0.7f, 0.3f, 1f, 0.9f));
             SetReference(view, "_captureEffect", captureView);
+            // 押し続けている間は続く技（JUGGERNAUT の地上技）を続けられる限界までの残り（オレンジ。回る砲塔の外。ユーザーの要望、2026-10-29）。
+            SetReference(view, "_sustainGauge", CreateRingGauge(name + "SustainGauge", parent, "SPIN", 2.1f, new Color(1f, 0.6f, 0.2f, 0.85f)));
             // 壁に張り付いていられる残り（紫。ユーザーの要望、2026-10-20）。
             SetReference(view, "_wallClingGauge", CreateRingGauge(name + "WallClingGauge", parent, "WALL", 1.15f, new Color(0.72f, 0.4f, 1f, 0.8f)));
             // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。
@@ -644,8 +646,18 @@ namespace Airerage.Editor
                 Vector3.one * tuning.CannonRadius * 2f);
             GameObject flak = Template(PrimitiveType.Sphere, "FlakShellTemplate", LoadOrCreateMaterial("JuggernautFlak", new Color(0.36f, 0.45f, 0.2f)),
                 Vector3.one * tuning.FlakRadius * 2.4f);
-            GameObject blast = Template(PrimitiveType.Sphere, "BlastTemplate",
-                LoadOrCreateTransparentMaterial("JuggernautBlast", new Color(1f, 0.55f, 0.15f, 0.8f)), Vector3.one);
+            // 爆発（閃光・炎・煙を重ねる。板の絵は起動時に描く。ユーザーの要望、2026-10-29）。
+            var explosions = new GameObject("Explosions").AddComponent<LayeredExplosionView>();
+            explosions.transform.SetParent(view.transform, false);
+            var explosionSprite = new GameObject("ExplosionSpriteTemplate").AddComponent<SpriteRenderer>();
+            explosionSprite.transform.SetParent(explosions.transform, false);
+            explosionSprite.sharedMaterial = lineMaterial;
+            explosionSprite.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            LineRenderer explosionLine = CreateIndicatorLine(explosions.transform, "ExplosionRayTemplate", lineMaterial, 0.1f);
+            explosionSprite.gameObject.SetActive(false);
+            explosionLine.gameObject.SetActive(false);
+            SetReference(explosions, "_spriteTemplate", explosionSprite);
+            SetReference(explosions, "_lineTemplate", explosionLine);
             // 地雷（横から見ても見えるように、低い丸屋根と帯と、てっぺんの赤い灯。張り付いた面の外へ向ける）。
             var mine = new GameObject("MineTemplate");
             mine.transform.SetParent(view.transform, false);
@@ -673,7 +685,7 @@ namespace Airerage.Editor
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.font = font;
             text.GetComponent<MeshRenderer>().sharedMaterial = font.material;
-            foreach (GameObject template in new[] { line.gameObject, shell, flak, blast, mine, jet, text.gameObject })
+            foreach (GameObject template in new[] { line.gameObject, shell, flak, mine, jet, text.gameObject })
             {
                 template.SetActive(false);
             }
@@ -687,7 +699,7 @@ namespace Airerage.Editor
             SetReference(view, "_lineTemplate", line);
             SetReference(view, "_shellTemplate", shell);
             SetReference(view, "_flakTemplate", flak);
-            SetReference(view, "_blastTemplate", blast);
+            SetReference(view, "_explosions", explosions);
             SetReference(view, "_mineTemplate", mine);
             SetReference(view, "_jetTemplate", jet);
             SetReference(view, "_textTemplate", text);

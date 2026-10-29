@@ -58,6 +58,18 @@ namespace Airerage.PlayMode.Tests
             runner.InputOverride = new Script(Repeat(new SimInput(127, 0, InputButtons.None), 3));
             yield return Wait(1.2f);
 
+            // 爆発の 3 つの層（閃光と光条 → 炎 → 煙）。見た目だけを、体の右上に出して撮る。
+            var explosions = Object.FindFirstObjectByType<Airerage.Runtime.Presentation.LayeredExplosionView>();
+            Vector3 body = runner.PlayerView.transform.position;
+            explosions.Spawn(990001, body + new Vector3(5f, 2f, 0f), 2f);
+            yield return Wait(0.04f);
+            Capture(camera, "Juggernaut_Blast1_Flash");
+            yield return Wait(0.2f);
+            Capture(camera, "Juggernaut_Blast2_Flame");
+            yield return Wait(0.9f);
+            Capture(camera, "Juggernaut_Blast3_Smoke");
+            yield return Wait(1.6f);
+
             // 地雷を足もとの前に撃って張り付ける。
             var down = new SimInput(0, 0, InputButtons.Special2).WithAim(new System.Numerics.Vector2(0.5f, -1f));
             runner.InputOverride = new Script(new List<SimInput> { down, default });

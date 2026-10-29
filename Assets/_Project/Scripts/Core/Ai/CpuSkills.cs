@@ -270,7 +270,21 @@ namespace Airerage.Core.Ai
                 }
 
                 case SkillEffect.Mine:
-                    return AimedShot(world, self, opponent, distance, config.Skills.Juggernaut.MineRange * 0.8f, ref use);
+                {
+                    // 地雷は重力で山なりに飛ぶので、届く低い弾道で相手の方へ撃つ（届かなければ撃たない）。
+                    if (!AimedShot(world, self, opponent, distance, config.Skills.Juggernaut.MineRange * 0.8f, ref use))
+                    {
+                        return false;
+                    }
+                    JuggernautTuning tuning = config.Skills.Juggernaut;
+                    if (!SolveBallistic(position, Flat(world.GetState(opponent).Position), tuning.MineSpeed, tuning.MineGravity, out Vector2 aim))
+                    {
+                        return false;
+                    }
+                    use.AimAt = -1;
+                    use.Aim = aim;
+                    return true;
+                }
 
                 case SkillEffect.Mayday:
                 {

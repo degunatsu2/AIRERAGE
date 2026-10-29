@@ -533,7 +533,8 @@ namespace Airerage.Core.Tests.Docs
                 }
                 case SkillEffect.Mine:
                     JuggernautTuning mine = s.Juggernaut;
-                    return $"照準の方向へ地雷（{Num(mine.MineSpeed)} m/s、{Num(mine.MineRange)}m）。地形・キャラクターに張り付いて一緒に動き、もう一度 E で半径 " +
+                    return $"照準の方向へ地雷（{Num(mine.MineSpeed)} m/s、重力 {Num(mine.MineGravity)} m/s² で山なりに飛び、{Seconds(mine.MineFlightTicks)}で消える）。" +
+                        "地形・キャラクターに張り付いて一緒に動き、もう一度 E で半径 " +
                         $"{Num(mine.MineExplosionRadius)}m の爆発。クールタイムは爆発の後から";
                 case SkillEffect.Mayday:
                     JuggernautTuning mayday = s.Juggernaut;

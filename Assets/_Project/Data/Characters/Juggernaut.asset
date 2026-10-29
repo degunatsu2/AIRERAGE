@@ -504,7 +504,7 @@ MonoBehaviour:
       GuardTicks: 30
       JustGuardTicks: 6
       GuardCooldownTicks: 240
-      GuardHoldMaxTicks: 240
+      GuardHoldMaxTicks: 120
       GuardWalk: 1
       GuardStunTicks: 12
       GuardKnockbackScale: 0.4
@@ -964,7 +964,7 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 0.6
           HalfHeight: 0.6
-          Damage: 30
+          Damage: 15
           Gauge: 100
           HitstopTicks: 14
           HitstunTicks: 34
@@ -981,6 +981,7 @@ MonoBehaviour:
           SweepTicks: 0
           FatalScale: 0
         MineSpeed: 22
+        MineGravity: 22
         MineRadius: 0.3
         MineFlightTicks: 90
         MineLaunchOffset: 1.1
