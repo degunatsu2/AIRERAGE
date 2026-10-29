@@ -30,6 +30,7 @@ namespace Airerage.PlayMode.Tests
             yield return null;
             var runner = Object.FindFirstObjectByType<SimulationRunner>();
             var space = Object.FindFirstObjectByType<SpaceEffectsView>();
+            var aimArrow = Object.FindFirstObjectByType<SkillAimView>();
             var objectsView = Object.FindFirstObjectByType<WorldObjectsView>();
             var hud = Object.FindFirstObjectByType<SkillHud>();
             var audio = Object.FindFirstObjectByType<GameAudio>();
@@ -76,7 +77,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(feed.Objects.Items.Count(o => o.Kind == WorldObjectKind.Portal), Is.EqualTo(2), "前提: ポータルを 2 つ置いた");
             Assert.That(audio.History.Contains(SoundId.PortalPlace), Is.True, "ポータルの音が鳴らない");
 
-            // E を長押しで狙いの線、離して撃つ。
+            // E を長押しで狙いの矢印（ほかの照準の方向の技と同じ水色の矢印。2026-10-29）、離して撃つ。
             var aim = Enumerable.Repeat(new SimInput(0, 0, InputButtons.Special2, 127, 40), 20).ToList();
             aim.Add(new SimInput(0, 0, InputButtons.None, 127, 40));
             runner.InputOverride = new Script(aim);
@@ -85,11 +86,11 @@ namespace Airerage.PlayMode.Tests
             start = Time.time;
             while (Time.time - start < 1f)
             {
-                aiming |= space.ShowsAim(0);
+                aiming |= aimArrow.ShowsArrow(0);
                 flying |= feed.Objects.Items.Any(o => o.Kind == WorldObjectKind.Missile);
                 yield return null;
             }
-            Assert.That(aiming, Is.True, "長押しで狙いの線を出さない");
+            Assert.That(aiming, Is.True, "長押しで狙いの矢印を出さない");
             Assert.That(flying, Is.True, "前提: ミサイルを撃った");
             Assert.That(audio.History.Contains(SoundId.MissileFire), Is.True, "ミサイルの音が鳴らない");
 

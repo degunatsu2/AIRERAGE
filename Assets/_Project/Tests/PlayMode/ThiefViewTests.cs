@@ -15,8 +15,8 @@ using SimInput = Airerage.Core.Input.PlayerInput;
 namespace Airerage.PlayMode.Tests
 {
     /// <summary>
-    /// THIEF の表示（ユーザーの案、2026-10-28。docs/14 1.6）: 一覧で選べる、衣装とロゴ、地上技の煙、空中 N の前転、Q の弾と奪った技の札、
-    /// E の透明（体を隠して足元に影）と分身、R でコインを得たときの HEIST!。THIEF の物があっても、ほかの物の表示（WorldObjectsView）は
+    /// THIEF の表示（ユーザーの案、2026-10-28。docs/14 1.6）: 一覧で選べる、衣装とロゴ、地上技の煙、空中 N の前転、Q の長押しの矢印と弾と
+    /// 奪った技の札、E の透明（体を隠して足元に影）と分身、R の詠唱中の 5 秒・10 秒のゲージとコインを得たときの虹色の光。THIEF の物があっても、ほかの物の表示（WorldObjectsView）は
     /// 止まらない。Sandbox_Wire で CycleCharacter を呼ぶ。
     /// </summary>
     public sealed class ThiefViewTests
@@ -30,6 +30,7 @@ namespace Airerage.PlayMode.Tests
             var thief = Object.FindFirstObjectByType<ThiefEffectsView>();
             var objects = Object.FindFirstObjectByType<WorldObjectsView>();
             var hud = Object.FindFirstObjectByType<SkillHud>();
+            var aimArrow = Object.FindFirstObjectByType<SkillAimView>();
             Assert.That(thief, Is.Not.Null, "THIEF の表示がない");
             Assert.That(thief.enabled, Is.True, "THIEF の表示の見本が足りない");
             Assert.That(objects.enabled, Is.True, "置かれた物の表示が止まっている（見本の数）");
@@ -71,15 +72,29 @@ namespace Airerage.PlayMode.Tests
             yield return WaitUntil(() => feed.GetState(0).Grounded && feed.GetState(0).Action.IsFree, 3f);
 
             // Q（TALENT SNATCH）: こげ茶の弾を出す。
-            runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special1), default });
-            int shots = 0;
-            start = Time.time;
-            while (Time.time - start < 0.5f)
+            // 長押しの間は照準の方向に水色の矢印を出し（弾はまだ出ない）、離すと撃つ（ユーザーの要望、2026-10-29）。
+            var hold = new List<SimInput>();
+            for (int i = 0; i < 20; i++)
             {
+                hold.Add(new SimInput(0, 0, InputButtons.Special1));
+            }
+            hold.Add(default);
+            runner.InputOverride = new Script(hold);
+            int shots = 0;
+            bool arrow = false;
+            bool shotWhileHolding = false;
+            start = Time.time;
+            while (Time.time - start < 0.8f)
+            {
+                bool aiming = aimArrow.ShowsArrow(0);
+                arrow |= aiming;
+                shotWhileHolding |= aiming && thief.ShotCount > 0;
                 shots = Mathf.Max(shots, thief.ShotCount);
                 yield return null;
             }
-            Assert.That(shots, Is.GreaterThan(0), "タレントスナッチの弾を出さない");
+            Assert.That(arrow, Is.True, "長押しの間に狙いの矢印を出さない");
+            Assert.That(shotWhileHolding, Is.False, "長押しの間に弾を撃った");
+            Assert.That(shots, Is.GreaterThan(0), "離してもタレントスナッチの弾を出さない");
             yield return WaitSeconds(0.6f);
 
             // 奪った技（ダミーの Q。STANDARD の DASH）は、札にその名前と STOLEN。
@@ -111,16 +126,28 @@ namespace Airerage.PlayMode.Tests
             Assert.That(view.ShowingClone, Is.False, "3 秒たっても分身を出している");
             Assert.That(thief.ShowsShadow(0), Is.False, "透明が解けても影を出している");
 
-            // R（BANK HEIST）でコインを得た: 金色の光と HEIST! +枚数。
+            // R（BANK HEIST）の詠唱中: 札の上に 5 秒ごと・10 秒ごとにいっぱいになるゲージ（7 秒なら 0.4 と 0.7）。
+            Assert.That(feed.GetConfig(0).Combat.Super.Effect, Is.EqualTo(Airerage.Core.Skills.SkillEffect.BankHeist));
             state = runner.PlayerState;
+            state.Combat.HeistTicks = 1 + 7 * 60;
+            state.Combat.HeistSpot = -1;
+            runner.SetPlayerState(state);
+            yield return null;
+            yield return null;
+            Assert.That(feed.GetState(0).Combat.HeistTicks, Is.GreaterThan(0), "前提: 詠唱している");
+            Assert.That(hud.SlotOf(2).HeistFive, Is.EqualTo(0.4f).Within(0.05f), "5 秒ごとのゲージを出さない");
+            Assert.That(hud.SlotOf(2).HeistTen, Is.EqualTo(0.7f).Within(0.05f), "10 秒ごとのゲージを出さない");
+
+            // コインを得た: ほかのキャラクターの必殺技と同じ虹色の光（ユーザーの要望、2026-10-29）。
+            state = runner.PlayerState;
+            state.Combat.HeistTicks = 0;
             state.Combat.HeistPayoutCount++;
             state.Combat.HeistLastPayout = 25;
             runner.SetPlayerState(state);
             yield return null;
             yield return null;
-            Assert.That(thief.HeistBursts, Is.GreaterThan(0), "コインを得ても HEIST! を出さない");
-            Assert.That(thief.LastHeistLabel, Is.EqualTo("HEIST! +25"));
-            Assert.That(feed.GetConfig(0).Combat.Super.Effect, Is.EqualTo(Airerage.Core.Skills.SkillEffect.BankHeist));
+            Assert.That(view.SuperBurst.IsPlaying, Is.True, "コインを得ても必殺技の虹色の光を出さない");
+            Assert.That(hud.SlotOf(2).HeistFive, Is.LessThan(0f), "詠唱が終わってもゲージを出している");
         }
 
         private static IEnumerator WaitSeconds(float seconds)

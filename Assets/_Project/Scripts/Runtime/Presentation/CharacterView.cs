@@ -27,7 +27,7 @@ namespace Airerage.Runtime.Presentation
     /// 最後の判定の終わりまでに前へ 1 回転させる。
     /// 透明の間（THIEF の E）は、体と、体の周りのゲージ・光を見せない（足元の影は ThiefEffectsView）。分身（RenderClone）は、体の見た目
     /// （箱・衣装・向きの印）の写しを、分身の位置に出す（分身のワイヤーも線で描く）。必殺技がバンクハイスト（THIEF の R）なら、出した瞬間の
-    /// 光を出さない（ユーザーの案。光は詠唱を止めてコインを得たとき。ThiefEffectsView）。
+    /// 光を出さず、詠唱を止めてコインを得たときに必殺技の虹色の光を出す（ユーザーの案）。
     /// 向いている方向は、箱の前の面の目の帯と、横へ突き出た印（_facingMarker。あれば）で示す（向きで左右を反転する。ユーザーの要望、2026-10-16）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
@@ -130,6 +130,7 @@ namespace Airerage.Runtime.Presentation
         private int _shownSpecial2Cooldown;
         private int _shownGauge;
         private int _shownJackpots;
+        private int _shownHeistPayouts;
         private int _feverTicks;
         private int _waveTicks;
         private Renderer[] _facingRenderers;
@@ -511,6 +512,12 @@ namespace Airerage.Runtime.Presentation
             {
                 _superBurst.Play(center);
             }
+            // バンクハイストは、詠唱を止めてコインを得たときに、ほかのキャラクターの必殺技と同じ虹色の光（ユーザーの要望、2026-10-29）。
+            if (c.HeistPayoutCount > _shownHeistPayouts && shown && _superBurst != null)
+            {
+                _superBurst.Play(center);
+            }
+            _shownHeistPayouts = c.HeistPayoutCount;
             if (c.JackpotHitCount > _shownJackpots && shown && _jackpotBurst != null)
             {
                 _jackpotBurst.Play(center);

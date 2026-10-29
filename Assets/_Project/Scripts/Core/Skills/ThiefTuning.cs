@@ -70,6 +70,7 @@ namespace Airerage.Core.Skills
             WireCancelFromTick = 4,
             Effect = SkillEffect.PlaceGimmick,
             EffectTick = 2,
+            AimHold = true,
             Hits = new AttackHit[0],
         };
 

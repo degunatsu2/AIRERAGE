@@ -285,6 +285,17 @@ namespace Airerage.Core.Combat
         public bool AimTurnsFacing;
 
         /// <summary>
+        /// 照準（マウスポインター）の方向に出す技を、長押しで狙えるようにする: 押している間は出さずにためる形で待ち（動ける。
+        /// CombatState.Holding）、離した瞬間の照準の方向に出す。短く押せば、離したティックに出る。狙っている間は、照準の方向に
+        /// 水色の矢印を出す（表示。SkillAimView）。ためても強くならない（HoldMaxTicks は 0 でよい）。長押しで別の効果になる技には
+        /// 使わない（ユーザーの要望、2026-10-29。これから作る照準の方向の技も同じ）。
+        /// </summary>
+        public bool AimHold;
+
+        /// <summary>長押しで待つ技か（ためる技 HoldMaxTicks か、狙う技 AimHold）。</summary>
+        public bool HoldsBeforeFiring => HoldMaxTicks > 0 || AimHold;
+
+        /// <summary>
         /// 続けて出せる回数（2 以上なら連続技。特殊攻撃 1 だけ）。出すたびに ChainWindowTicks の間、次を出せる。回数を使い切るか、
         /// 長押しで出すか、時間が切れたら終わり、出した回数 × クールタイムを数える（SOLDERER のイナズマステップ。2026-10-21）。
         /// </summary>

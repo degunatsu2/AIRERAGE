@@ -40,6 +40,10 @@ namespace Airerage.Runtime.Presentation
         private const int StackWidth = 5;
         private const int StackSpacing = 4;
         private const int StackGap = 2;
+        // バンクハイストのゲージの帯の太さと間（ピクセル）と、10 秒ごとの帯の色。
+        private const float HeistBarHeight = 5f;
+        private const float HeistBarGap = 3f;
+        private static readonly Color HeistTenColor = new Color(1f, 0.55f, 0.15f);
 
         /// <summary>頭上の通知を出している長さ（秒）。</summary>
         public const float HeadNoticeSeconds = 1.4f;
@@ -114,6 +118,13 @@ namespace Airerage.Runtime.Presentation
 
             /// <summary>たまっているスタック（使える回数 ＋ 次の 1 つのたまった割合。0〜MaxCharges）。</summary>
             public float Stacks;
+
+            /// <summary>
+            /// バンクハイスト（THIEF の R）の詠唱中の、5 秒ごとにいっぱいになるゲージと 10 秒ごとにいっぱいになるゲージ（0〜1。詠唱して
+            /// いなければ負。札の上に細い横の帯で出す。ユーザーの要望、2026-10-29）。
+            /// </summary>
+            public float HeistFive = -1f;
+            public float HeistTen = -1f;
 
             /// <summary>スタックのゲージのたまった割合（0〜1。2 スタックで 1 つたまっていれば 0.5）。</summary>
             public float StackFill => MaxCharges > 1 ? Mathf.Clamp01(Stacks / MaxCharges) : 0f;
@@ -222,6 +233,8 @@ namespace Airerage.Runtime.Presentation
                 slot.InUse = state.Action.Kind == ActionKind.Attack && state.Action.Attack == move;
                 slot.MaxCharges = move == AttackSlot.Super ? 1 : combat.MaxChargesOf(move);
                 slot.Stacks = 0f;
+                slot.HeistFive = -1f;
+                slot.HeistTen = -1f;
                 if (move == AttackSlot.Super)
                 {
                     slot.Fill = Mathf.Clamp01(state.Combat.Gauge / (float)CombatTuning.MaxGauge);
@@ -240,6 +253,9 @@ namespace Airerage.Runtime.Presentation
                         int chanted = state.Combat.HeistTicks - 1;
                         slot.Text = $"+{_feed.GetConfig(local).Skills.Thief.HeistCoins(chanted)}";
                         slot.Label = $"HEIST {chanted * SimTime.DeltaTime:0.0}s";
+                        int five = 5 * SimTime.TicksPerSecond;
+                        slot.HeistFive = chanted % five / (float)five;
+                        slot.HeistTen = chanted % (five * 2) / (float)(five * 2);
                     }
                 }
                 else
@@ -253,9 +269,9 @@ namespace Airerage.Runtime.Presentation
                         int deposit = HoldDepositHud.DepositOf(state, _feed.GetConfig(local));
                         int max = Mathf.Max(1, combat.Get(move).HoldMaxTicks);
                         slot.Fill = Mathf.Clamp01(state.Combat.HoldTicks / (float)max);
-                        bool aiming = combat.Get(move).Effect == Airerage.Core.Skills.SkillEffect.Missile;
+                        bool aiming = combat.Get(move).AimHold;
                         slot.Text = deposit >= 0 ? $"-{deposit}" : aiming ? "AIM" : "HOLD";
-                        slot.Label = "HOLD";
+                        slot.Label = aiming ? slot.Name : "HOLD";
                     }
                     else if (chaining)
                     {
@@ -420,6 +436,14 @@ namespace Airerage.Runtime.Presentation
                 GUI.color = slot.Ready ? accent : Idle;
             }
             GUI.DrawTexture(rect, _frame);
+            if (slot.HeistFive >= 0f)
+            {
+                // バンクハイストの詠唱中: 札の上に、5 秒ごと（下）と 10 秒ごと（上）にいっぱいになる細い横の帯。
+                DrawHeistBar(new Rect(rect.x + Slant, rect.y - HeistBarHeight - HeistBarGap, rect.width - Slant, HeistBarHeight), slot.HeistFive,
+                    SuperColor);
+                DrawHeistBar(new Rect(rect.x + Slant, rect.y - (HeistBarHeight + HeistBarGap) * 2f, rect.width - Slant, HeistBarHeight), slot.HeistTen,
+                    HeistTenColor);
+            }
             if (slot.MaxCharges > 1)
             {
                 // 札の左の縁に沿った、スタックの数だけ縦に分けたゲージ（下からたまる）。
@@ -449,6 +473,15 @@ namespace Airerage.Runtime.Presentation
                     : new Color(1f, 1f, 1f, 0.55f);
                 GuidePlate.DrawText(new Rect(rect.x + 2f, rect.y + rect.height - 17f, rect.width - Slant - 8f, 14f), slot.Label, _key, labelColor);
             }
+        }
+
+        // 細い横の帯（暗い下地に、左からたまる色）。
+        private static void DrawHeistBar(Rect rect, float fill, Color color)
+        {
+            GUI.color = new Color(Fill.r, Fill.g, Fill.b, 0.85f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = color;
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(fill), rect.height), Texture2D.whiteTexture);
         }
 
         // 頭上の通知: 自分のキャラクターの頭の上に、小さな札（技の名前か絵）が浮かび上がって消える。重なったら上へ積む。

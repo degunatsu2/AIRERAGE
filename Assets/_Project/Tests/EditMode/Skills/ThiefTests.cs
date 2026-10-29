@@ -310,6 +310,8 @@ namespace Airerage.Core.Tests.Skills
             SimWorld world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f));
             Step(world, 2);
             Step(world, 1, Aimed(InputButtons.Special2, new Vector2(-1f, 0f)));
+            // 長押しで狙える技（AimHold）なので、離したティックに出る。
+            Step(world, 1);
             Assert.That(world.GetState(0).Combat.InvisibleTicksLeft, Is.GreaterThan(170), "透明にならない");
             Assert.That(world.HasClone(0), Is.True, "分身が出ない");
             Assert.That(world.GetClone(0).Position.X, Is.EqualTo(0f).Within(0.2f), "分身がその場に残らない");
@@ -459,6 +461,7 @@ namespace Airerage.Core.Tests.Skills
             Step(world, 1, Aimed(InputButtons.Special1, Vector2.UnitX));
             Step(world, 20);
             Step(world, 1, Aimed(InputButtons.Special2, new Vector2(-1f, 0.2f)));
+            Step(world, 1);
             var snapshot = new WorldSnapshot();
             world.SaveTo(snapshot);
             ulong saved = world.Checksum();

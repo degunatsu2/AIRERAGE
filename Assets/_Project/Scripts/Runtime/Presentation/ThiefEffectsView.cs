@@ -13,28 +13,31 @@ namespace Airerage.Runtime.Presentation
     /// <summary>
     /// THIEF の技の表示（docs/14 1.6。ユーザーの案、2026-10-28）。状態を読むだけで、書き換えない。
     /// - 煙球（地上技）: 落ちていく暗い灰色の玉。
-    /// - 煙（煙球の着弾、分身が消えたとき）: 不透明な灰色の雲。中の物を見えなくするので、カメラの前（_smokeDepth）に、z = 0 の面の円と
-    ///   画面で重なる位置・大きさで出す。広がってから、消える前の 1 秒で縮む。出た瞬間に音。
+    /// - 煙（煙球の着弾、分身が消えたとき）: ふちのやわらかい半透明の煙のかたまり（コードで描いた絵の板）を重ねた、気体のような雲
+    ///   （ユーザーの要望、2026-10-29）。かたまりはゆっくり回って広がり、消える前に薄くなる。真ん中は重なって濃いので、中の物は見えない。
+    ///   カメラの前（_smokeDepth）に、z = 0 の面の円と画面で重なる位置・大きさで出す。出た瞬間に音。
     /// - タレントスナッチの弾（Q）: こげ茶の小さな弾と短い尾。撃った瞬間に音。
-    /// - 置いたギミック（Q で奪ったもの）: 範囲の枠と、向きへ流れる印（種類ごとの色。効いていない間は薄く、予告の間は点滅）。
-    /// - 置いた仕掛け: 発射装置の箱。赤外線は半透明の赤い板（触れられたら予告の点滅と警報、撃ったらミサイル、待ちの間は消える）。
-    ///   ピッチャーマシンはボールを道のりの位置に出し、止まったら点滅させる（打ち出した瞬間に音）。
+    /// - 置いたギミック（Q で奪ったもの）: ステージの本物の見た目を写す（PlacedGimmickLooks。ユーザーの要望、2026-10-29）。本物が
+    ///   見つからなければ、範囲の枠と流れる印。
+    /// - 置いた仕掛け: 本物の見た目（発射装置・赤外線・ランプ・ミサイル、ピッチャーマシン・ボール）を写し、本物と同じように動かす（赤外線は
+    ///   ゆっくり明滅し、触れられたら予告の斜線と警報、撃ったらミサイル、待ちの間は消えて RELOAD のゲージ。ボールは止まったら点滅）。
     /// - 透明（E）: 足元に薄い影だけを出す（体と周りの表示は CharacterView が隠す。分身は CharacterView.RenderClone）。
-    /// - 技・ギミックを奪った瞬間に、こげ茶の光と「STEAL!」。バンクハイスト（R）でコインを得た瞬間に、金色の光と「HEIST! +枚数」。
+    /// - 技・ギミックを奪った瞬間に、こげ茶の光と「STEAL!」。バンクハイスト（R）でコインを得た瞬間の光は、ほかのキャラクターの必殺技と
+    ///   同じ虹色の光（CharacterView）。
     /// </summary>
     public sealed class ThiefEffectsView : MonoBehaviour
     {
         private const float Z = -0.5f;
-        private const int SmokePuffs = 9;
-        private const float SmokeGrowSeconds = 0.25f;
-        private const float SmokeFadeSeconds = 1f;
+        private const int SmokePuffs = 14;
+        private const int PuffTextureSize = 128;
+        private const float SmokeGrowSeconds = 0.3f;
+        private const float SmokeFadeSeconds = 1.2f;
         private const float ShotTrailLength = 1.6f;
         private const float BlinkPerSecond = 6f;
         private const float ShadowAlpha = 0.28f;
 
         private static readonly Color ShotColor = new Color(0.36f, 0.2f, 0.1f);
         private static readonly Color StealColor = new Color(0.62f, 0.4f, 0.2f);
-        private static readonly Color BeamColor = new Color(1f, 0.15f, 0.15f, 0.3f);
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
@@ -42,26 +45,16 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private Camera _camera;
         [Tooltip("線の見本（隠しておく）")]
         [SerializeField] private LineRenderer _lineTemplate;
-        [Tooltip("煙のひとかたまりの見本（直径 1 の球。隠しておく）")]
-        [SerializeField] private GameObject _puffTemplate;
+        [Tooltip("煙のひとかたまりの見本（SpriteRenderer。絵は起動時に描く。隠しておく）")]
+        [SerializeField] private SpriteRenderer _puffTemplate;
         [Tooltip("煙球の見本（隠しておく）")]
         [SerializeField] private GameObject _ballTemplate;
         [Tooltip("タレントスナッチの弾の見本（隠しておく）")]
         [SerializeField] private GameObject _shotTemplate;
-        [Tooltip("置いた仕掛けの発射装置の見本（隠しておく）")]
-        [SerializeField] private GameObject _launcherTemplate;
-        [Tooltip("置いた赤外線の見本（直径 1 の半透明の板。隠しておく）")]
-        [SerializeField] private GameObject _beamTemplate;
-        [Tooltip("置いた赤外線のミサイルの見本（隠しておく）")]
-        [SerializeField] private GameObject _missileTemplate;
-        [Tooltip("置いたピッチャーマシンのボールの見本（直径 1。隠しておく）")]
-        [SerializeField] private GameObject _trapBallTemplate;
         [Tooltip("透明の間の足元の影の見本（隠しておく）")]
         [SerializeField] private GameObject _shadowTemplate;
         [Tooltip("奪った瞬間の光の見本（隠しておく。キャラクターごとに複製する）")]
         [SerializeField] private BurstEffectView _stealTemplate;
-        [Tooltip("バンクハイストでコインを得た瞬間の光の見本（隠しておく。キャラクターごとに複製する）")]
-        [SerializeField] private BurstEffectView _heistTemplate;
         [Tooltip("音（なくてもよい）")]
         [SerializeField] private GameAudio _audio;
         [Tooltip("煙を出すカメラの前の深さ（z。地形の手前の面より前）")]
@@ -71,7 +64,11 @@ namespace Airerage.Runtime.Presentation
         private readonly List<int> _gone = new List<int>();
         private readonly HashSet<int> _present = new HashSet<int>();
         private readonly List<Character> _characters = new List<Character>();
+        private readonly PlacedGimmickLooks _looks = new PlacedGimmickLooks();
+        private readonly List<Rect> _areas = new List<Rect>();
+        private readonly List<Vector2> _icons = new List<Vector2>();
         private ISimulationFeed _feed;
+        private Sprite _puffSprite;
         private bool _primed;
 
         private sealed class Shown
@@ -79,14 +76,23 @@ namespace Airerage.Runtime.Presentation
             public WorldObjectKind Kind;
             public GameObject Visual;
             public float BornAt;
-            public Transform[] Puffs;
+            public bool Copied;
+            public SpriteRenderer[] Puffs;
             public Vector3[] PuffOffsets;
             public float[] PuffSizes;
+            public float[] PuffSpins;
+            public float[] PuffShades;
             public LineRenderer Trail;
             public LineRenderer Frame;
             public LineRenderer Marks;
-            public GameObject Beam;
-            public GameObject Missile;
+            public Transform Beam;
+            public Renderer BeamRenderer;
+            public Renderer Lamp;
+            public Transform Missile;
+            public Transform Launcher;
+            public RingGaugeView Reload;
+            public WarningOverlay Overlay;
+            public Vector2 BeamSize;
             public bool Arming;
             public bool Flying;
         }
@@ -95,9 +101,7 @@ namespace Airerage.Runtime.Presentation
         {
             public GameObject Shadow;
             public BurstEffectView Steal;
-            public BurstEffectView Heist;
             public int Steals = -1;
-            public int Payouts = -1;
         }
 
         /// <summary>出している煙の数（テスト用）。</summary>
@@ -106,36 +110,56 @@ namespace Airerage.Runtime.Presentation
         /// <summary>出している置いたギミックと仕掛けの数（テスト用）。</summary>
         public int PlacedCount => CountOf(WorldObjectKind.PlacedZone) + CountOf(WorldObjectKind.PlacedTrap);
 
+        /// <summary>置いたギミックと仕掛けのうち、ステージの本物の見た目を写して出している数（テスト用）。</summary>
+        public int CopiedCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (Shown shown in _shown.Values)
+                {
+                    count += shown.Copied ? 1 : 0;
+                }
+                return count;
+            }
+        }
+
         /// <summary>出しているタレントスナッチの弾の数（テスト用）。</summary>
         public int ShotCount => CountOf(WorldObjectKind.SnatchShot);
 
         /// <summary>キャラクター index の足元に、透明の影を出しているか（テスト用）。</summary>
         public bool ShowsShadow(int index) => index >= 0 && index < _characters.Count && _characters[index].Shadow.activeSelf;
 
-        /// <summary>キャラクター index が奪って STEAL! を出した回数と、バンクハイストで HEIST! を出した回数（テスト用）。</summary>
+        /// <summary>奪って STEAL! を出した回数（テスト用）。</summary>
         public int StealBursts { get; private set; }
-        public int HeistBursts { get; private set; }
-
-        /// <summary>最後に出した HEIST! の文字（テスト用）。</summary>
-        public string LastHeistLabel { get; private set; } = string.Empty;
 
         private void Awake()
         {
             _feed = _source as ISimulationFeed;
-            GameObject[] templates = { _puffTemplate, _ballTemplate, _shotTemplate, _launcherTemplate, _beamTemplate, _missileTemplate, _trapBallTemplate, _shadowTemplate };
-            if (_feed == null || _lineTemplate == null || System.Array.IndexOf(templates, null) >= 0 || _stealTemplate == null || _heistTemplate == null)
+            GameObject[] templates = { _ballTemplate, _shotTemplate, _shadowTemplate };
+            if (_feed == null || _lineTemplate == null || _puffTemplate == null || System.Array.IndexOf(templates, null) >= 0 || _stealTemplate == null)
             {
                 Debug.LogError($"{name}: 状態を読む相手（ISimulationFeed）か、見本が設定されていません", this);
                 enabled = false;
                 return;
             }
             _lineTemplate.gameObject.SetActive(false);
+            _puffTemplate.gameObject.SetActive(false);
             foreach (GameObject template in templates)
             {
                 template.SetActive(false);
             }
             _stealTemplate.gameObject.SetActive(false);
-            _heistTemplate.gameObject.SetActive(false);
+            _puffSprite = CreatePuffSprite();
+        }
+
+        private void OnDestroy()
+        {
+            if (_puffSprite != null)
+            {
+                Destroy(_puffSprite.texture);
+                Destroy(_puffSprite);
+            }
         }
 
         private void LateUpdate()
@@ -168,9 +192,12 @@ namespace Airerage.Runtime.Presentation
                         }
                         shown = Create(item);
                         _shown[item.Id] = shown;
-                        PlaySpawn(item.Kind, item);
+                        PlaySpawn(item.Kind);
                     }
-                    UpdateShown(shown, item);
+                    if (shown.Visual != null)
+                    {
+                        UpdateShown(shown, item);
+                    }
                 }
             }
             _gone.Clear();
@@ -191,37 +218,44 @@ namespace Airerage.Runtime.Presentation
         private Shown Create(in WorldObject item)
         {
             var shown = new Shown { Kind = item.Kind, BornAt = Time.time };
-            var root = new GameObject($"Thief{item.Kind}{item.Id}");
-            root.transform.SetParent(transform, false);
-            shown.Visual = root;
             switch (item.Kind)
             {
                 case WorldObjectKind.SmokeBall:
-                    Child(_ballTemplate, root.transform);
+                    shown.Visual = Root(item);
+                    Child(_ballTemplate, shown.Visual.transform);
                     break;
                 case WorldObjectKind.Smoke:
+                    shown.Visual = Root(item);
                     CreatePuffs(shown, item.Id);
                     break;
                 case WorldObjectKind.SnatchShot:
-                    Child(_shotTemplate, root.transform);
-                    shown.Trail = Line(root.transform, "Trail", ShotColor, 0.12f);
+                    shown.Visual = Root(item);
+                    Child(_shotTemplate, shown.Visual.transform);
+                    shown.Trail = Line(shown.Visual.transform, "Trail", ShotColor, 0.12f);
                     break;
                 case WorldObjectKind.PlacedZone:
-                    shown.Frame = Line(root.transform, "Frame", Color.white, 0.08f);
-                    shown.Frame.loop = true;
-                    shown.Marks = Line(root.transform, "Marks", Color.white, 0.1f);
+                    CreatePlacedZone(shown, item);
                     break;
                 case WorldObjectKind.PlacedTrap:
-                    Child(_launcherTemplate, root.transform);
-                    shown.Beam = Child(_beamTemplate, root.transform);
-                    shown.Missile = Child(_missileTemplate, root.transform);
-                    shown.Frame = Line(root.transform, "Aim", new Color(1f, 1f, 1f, 0.5f), 0.05f);
+                    CreatePlacedTrap(shown, item);
                     break;
                 case WorldObjectKind.TrapBall:
-                    Child(_trapBallTemplate, root.transform);
+                    shown.Visual = PlacedGimmickLooks.CopyBall(_looks.TrapSource(_feed.Traps, item.Variant), transform);
+                    shown.Copied = shown.Visual != null;
+                    if (shown.Visual == null)
+                    {
+                        Debug.LogWarning($"{name}: 置いたピッチャーマシン（仕掛け {item.Variant}）のボールの見た目が見つかりません", this);
+                    }
                     break;
             }
             return shown;
+        }
+
+        private GameObject Root(in WorldObject item)
+        {
+            var root = new GameObject($"Thief{item.Kind}{item.Id}");
+            root.transform.SetParent(transform, false);
+            return root;
         }
 
         private void UpdateShown(Shown shown, in WorldObject item)
@@ -243,14 +277,22 @@ namespace Airerage.Runtime.Presentation
                     UpdateShot(shown, item, position);
                     break;
                 case WorldObjectKind.PlacedZone:
-                    UpdatePlacedZone(shown, item);
+                    if (!shown.Copied)
+                    {
+                        UpdateZoneFrame(shown, item);
+                    }
                     break;
                 case WorldObjectKind.PlacedTrap:
-                    UpdatePlacedTrap(shown, item, position);
+                    UpdatePlacedTrap(shown, item);
                     break;
                 case WorldObjectKind.TrapBall:
-                    UpdateTrapBall(shown, item, position);
+                {
+                    Transform ball = shown.Visual.transform;
+                    ball.position = new Vector3(item.Position.X, item.Position.Y, ball.position.z);
+                    bool visible = !ThiefRules.IsBlinking(item) || Mathf.Repeat(Time.time * BlinkPerSecond, 1f) < 0.6f;
+                    shown.Visual.SetActive(visible);
                     break;
+                }
             }
         }
 
@@ -259,25 +301,85 @@ namespace Airerage.Runtime.Presentation
             return owner >= 0 && owner < _feed.CharacterCount ? _feed.GetConfig(owner).Skills.Thief.SmokeBallRadius : 0.3f;
         }
 
-        // 煙: 大きさの違う球を、中心の周りに重ねる（並べ方は物の番号で決める）。
+        // ---------------------------------------------------------------- 煙
+
+        // 煙のかたまりの絵: 真ん中は濃く、ふちはやわらかく、ゆらいだ形で薄くなる（明るさにもむら）。白で描き、色は板ごとに掛ける。
+        private static Sprite CreatePuffSprite()
+        {
+            const int size = PuffTextureSize;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "SmokePuff",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size * 2f - 1f;
+                    float v = (y + 0.5f) / size * 2f - 1f;
+                    float r = Mathf.Sqrt(u * u + v * v);
+                    float noise = Fbm(u * 2.3f + 5.1f, v * 2.3f + 2.7f);
+                    float edge = 1f - Mathf.SmoothStep(0.42f, 1f, r + (noise - 0.5f) * 0.38f);
+                    float alpha = Mathf.Clamp01(edge * (0.82f + (noise - 0.5f) * 0.45f));
+                    float shade = Mathf.Lerp(0.8f, 1f, noise);
+                    pixels[y * size + x] = new Color(shade, shade, shade, alpha);
+                }
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply(false);
+            return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
+        }
+
+        // 重ねたゆらぎ（0〜1）。
+        private static float Fbm(float x, float y)
+        {
+            float sum = 0f;
+            float amplitude = 0.5f;
+            float total = 0f;
+            for (int octave = 0; octave < 4; octave++)
+            {
+                sum += Mathf.PerlinNoise(x, y) * amplitude;
+                total += amplitude;
+                x = x * 2.03f + 1.7f;
+                y = y * 2.03f + 3.1f;
+                amplitude *= 0.5f;
+            }
+            return sum / total;
+        }
+
+        // 煙: 真ん中の大きなかたまり、内側の輪、外側の輪（並べ方は物の番号で決める）。
         private void CreatePuffs(Shown shown, int id)
         {
             var random = new System.Random(id * 7919 + 17);
-            shown.Puffs = new Transform[SmokePuffs];
+            shown.Puffs = new SpriteRenderer[SmokePuffs];
             shown.PuffOffsets = new Vector3[SmokePuffs];
             shown.PuffSizes = new float[SmokePuffs];
+            shown.PuffSpins = new float[SmokePuffs];
+            shown.PuffShades = new float[SmokePuffs];
             for (int i = 0; i < SmokePuffs; i++)
             {
-                float angle = (i - 1) * Mathf.PI * 2f / (SmokePuffs - 1) + (float)random.NextDouble() * 0.5f;
-                // 中心の大きな球と、周りの球で、半径の円をすき間なく覆う（周りの球の外の縁は半径の 1.1〜1.2 倍）。
-                float distance = i == 0 ? 0f : 0.5f + (float)random.NextDouble() * 0.12f;
-                shown.PuffOffsets[i] = new Vector3(Mathf.Cos(angle) * distance, Mathf.Sin(angle) * distance, (float)random.NextDouble() * 0.2f);
-                shown.PuffSizes[i] = i == 0 ? 1.45f : 1.0f + (float)random.NextDouble() * 0.15f;
-                shown.Puffs[i] = Child(_puffTemplate, shown.Visual.transform).transform;
+                bool inner = i >= 1 && i <= 5;
+                float angle = (float)random.NextDouble() * Mathf.PI * 2f;
+                float distance = i == 0 ? 0f : inner ? 0.28f + (float)random.NextDouble() * 0.17f : 0.55f + (float)random.NextDouble() * 0.15f;
+                // 奥のかたまりほど少し後ろ（重なりの順）。
+                shown.PuffOffsets[i] = new Vector3(Mathf.Cos(angle) * distance, Mathf.Sin(angle) * distance, 0.02f * i);
+                shown.PuffSizes[i] = i == 0 ? 1.55f : inner ? 1.15f + (float)random.NextDouble() * 0.2f : 0.85f + (float)random.NextDouble() * 0.2f;
+                shown.PuffSpins[i] = ((float)random.NextDouble() * 2f - 1f) * 25f;
+                // 上ほど明るく、下ほど少し暗い灰色。
+                shown.PuffShades[i] = Mathf.Lerp(0.66f, 0.86f, (shown.PuffOffsets[i].y + 0.7f) / 1.4f) + ((float)random.NextDouble() - 0.5f) * 0.06f;
+                SpriteRenderer puff = Instantiate(_puffTemplate, shown.Visual.transform);
+                puff.gameObject.SetActive(true);
+                puff.sprite = _puffSprite;
+                puff.transform.localRotation = Quaternion.Euler(0f, 0f, (float)random.NextDouble() * 360f);
+                shown.Puffs[i] = puff;
             }
         }
 
         // 煙の位置: z = 0 の面の円（中心 center、半径 radius）と画面で重なるように、カメラの前（_smokeDepth）へ寄せて縮める。
+        // 出た瞬間に広がり、ゆっくり回って少しずつ外へふくらみ、消える前の SmokeFadeSeconds で薄くなる。
         private void UpdateSmoke(Shown shown, in WorldObject smoke)
         {
             var center = new Vector3(smoke.Position.X, smoke.Position.Y, 0f);
@@ -292,16 +394,22 @@ namespace Airerage.Runtime.Presentation
             }
             float age = Time.time - shown.BornAt;
             float left = (smoke.ExpireTick - _feed.CurrentTick) * SimTime.DeltaTime;
-            float grow = Mathf.Clamp01(age / SmokeGrowSeconds);
+            float life = Mathf.Max(0.1f, (smoke.ExpireTick - smoke.SpawnTick) * SimTime.DeltaTime);
+            float grow = 1f - Mathf.Pow(1f - Mathf.Clamp01(age / SmokeGrowSeconds), 3f);
             float fade = Mathf.Clamp01(left / SmokeFadeSeconds);
-            float size = radius * scale * (0.4f + 0.6f * grow) * Mathf.Lerp(0.2f, 1f, fade);
+            float spread = 1f + 0.12f * Mathf.Clamp01(age / life) + 0.1f * (1f - fade);
+            float size = radius * scale * (0.35f + 0.65f * grow);
             shown.Visual.transform.position = placed;
             for (int i = 0; i < shown.Puffs.Length; i++)
             {
-                float wobble = 1f + 0.06f * Mathf.Sin(Time.time * 2.3f + i * 1.7f);
+                SpriteRenderer puff = shown.Puffs[i];
+                float billow = 1f + 0.05f * Mathf.Sin(Time.time * 1.7f + i * 1.3f);
                 Vector3 offset = shown.PuffOffsets[i];
-                shown.Puffs[i].localPosition = new Vector3(offset.x * size, offset.y * size, offset.z * size);
-                shown.Puffs[i].localScale = Vector3.one * size * shown.PuffSizes[i] * wobble;
+                puff.transform.localPosition = new Vector3(offset.x * size * spread, offset.y * size * spread, offset.z);
+                puff.transform.localScale = Vector3.one * size * shown.PuffSizes[i] * billow;
+                puff.transform.Rotate(0f, 0f, shown.PuffSpins[i] * Time.deltaTime, Space.Self);
+                float shade = shown.PuffShades[i];
+                puff.color = new Color(shade, shade, shade + 0.02f, fade * (0.75f + 0.25f * grow));
             }
         }
 
@@ -318,8 +426,30 @@ namespace Airerage.Runtime.Presentation
             shown.Trail.SetPosition(1, position - back * length);
         }
 
-        // 置いたギミック: 範囲の枠と、向きへ流れる 3 つの山形（効いていない間は薄く、予告の間は点滅）。
-        private void UpdatePlacedZone(Shown shown, in WorldObject item)
+        // ---------------------------------------------------------------- 置いたギミック
+
+        // 本物の見た目を写す（見つからなければ、範囲の枠と流れる印）。
+        private void CreatePlacedZone(Shown shown, in WorldObject item)
+        {
+            IReadOnlyList<StageZone> zones = _feed.Zones;
+            StageZoneAuthoring source = _looks.ZoneSource(zones, item.Stored);
+            if (source != null)
+            {
+                StageZone placed = ThiefRules.PlacedZone(zones[item.Stored], item);
+                shown.Visual = PlacedGimmickLooks.CopyZone(source, placed, item.Variant == 1, transform);
+                shown.Copied = shown.Visual != null;
+            }
+            if (shown.Visual == null)
+            {
+                shown.Visual = Root(item);
+                shown.Frame = Line(shown.Visual.transform, "Frame", Color.white, 0.08f);
+                shown.Frame.loop = true;
+                shown.Marks = Line(shown.Visual.transform, "Marks", Color.white, 0.1f);
+            }
+        }
+
+        // 本物の見た目が見つからないとき: 範囲の枠と、向きへ流れる 3 つの山形（効いていない間は薄く、予告の間は点滅）。
+        private void UpdateZoneFrame(Shown shown, in WorldObject item)
         {
             IReadOnlyList<StageZone> zones = _feed.Zones;
             if (zones == null || item.Stored < 0 || item.Stored >= zones.Count)
@@ -331,10 +461,8 @@ namespace Airerage.Runtime.Presentation
             int tick = _feed.CurrentTick;
             int seed = _feed.Rules != null ? _feed.Rules.Seed : 0;
             bool active = zone.IsActive(tick, seed);
-            bool warning = !active && InWarning(zone, tick, seed);
-            float alpha = active ? 0.95f : warning ? (Mathf.Repeat(Time.time * BlinkPerSecond, 1f) < 0.5f ? 0.9f : 0.2f) : 0.3f;
-            Color color = ZoneColor(zone.Kind);
-            color.a = alpha;
+            float alpha = active ? 0.95f : Mathf.Repeat(Time.time * BlinkPerSecond, 1f) < 0.5f ? 0.6f : 0.25f;
+            var color = new Color(1f, 1f, 1f, alpha);
             SetColor(shown.Frame, color);
             SetColor(shown.Marks, color);
             float z = Z + 0.1f;
@@ -343,14 +471,12 @@ namespace Airerage.Runtime.Presentation
             shown.Frame.SetPosition(1, new Vector3(zone.MaxX, zone.MinY, z));
             shown.Frame.SetPosition(2, new Vector3(zone.MaxX, zone.MaxY, z));
             shown.Frame.SetPosition(3, new Vector3(zone.MinX, zone.MaxY, z));
-
-            // 向き（周りから中心へ集まるもの・向きのないものは上向き）。
             NVector2 direction = zone.Direction.LengthSquared() > 1e-4f ? NVector2.Normalize(zone.Direction) : new NVector2(0f, 1f);
             var along = new Vector3(direction.X, direction.Y, 0f);
             var side = new Vector3(-direction.Y, direction.X, 0f);
             var center = new Vector3((zone.MinX + zone.MaxX) * 0.5f, (zone.MinY + zone.MaxY) * 0.5f, z);
             float reach = Mathf.Abs(along.x) * (zone.MaxX - zone.MinX) * 0.5f + Mathf.Abs(along.y) * (zone.MaxY - zone.MinY) * 0.5f;
-            float width = Mathf.Min(0.6f, Mathf.Abs(side.x) * (zone.MaxX - zone.MinX) * 0.3f + Mathf.Abs(side.y) * (zone.MaxY - zone.MinY) * 0.3f + 0.2f);
+            const float width = 0.5f;
             float flow = Mathf.Repeat(Time.time * (active ? 1.2f : 0.3f), 1f);
             const int chevrons = 3;
             shown.Marks.positionCount = chevrons * 3;
@@ -365,75 +491,127 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        private static bool InWarning(in StageZone zone, int tick, int seed)
+        // ---------------------------------------------------------------- 置いた仕掛け
+
+        // 本物の見た目を写し、発射口が置いた位置に来るように動かす（左右の反転は写すときに当てる）。
+        private void CreatePlacedTrap(Shown shown, in WorldObject item)
         {
-            if (zone.Timing.Period <= 0 || zone.Timing.WarningTicks <= 0)
+            IReadOnlyList<StageTrap> traps = _feed.Traps;
+            StageTrapAuthoring source = _looks.TrapSource(traps, item.Stored);
+            if (source == null)
             {
-                return false;
+                Debug.LogWarning($"{name}: 置いた仕掛け（仕掛け {item.Stored}）の見た目が見つかりません", this);
+                return;
             }
-            zone.Cycle(tick, seed, out _, out _, out int next);
-            return next - tick <= zone.Timing.WarningTicks;
+            bool mirrored = item.Variant == 1;
+            shown.Visual = PlacedGimmickLooks.CopyTrap(source, mirrored, transform);
+            shown.Copied = true;
+            Transform root = shown.Visual.transform;
+            StageTrap trap = traps[item.Stored];
+            Vector3 origin = source.transform.position;
+            var toMuzzle = new Vector3(trap.Muzzle.X - origin.x, trap.Muzzle.Y - origin.y, 0f);
+            if (mirrored)
+            {
+                toMuzzle.x = -toMuzzle.x;
+            }
+            root.position = new Vector3(item.Position.X, item.Position.Y, origin.z) - toMuzzle;
+            shown.Beam = root.Find("Beam");
+            shown.BeamRenderer = shown.Beam != null ? shown.Beam.GetComponent<Renderer>() : null;
+            shown.BeamSize = shown.Beam != null ? (Vector2)shown.Beam.localScale : Vector2.one;
+            Transform lamp = root.Find("Lamp");
+            shown.Lamp = lamp != null ? lamp.GetComponent<Renderer>() : null;
+            shown.Missile = root.Find("Missile");
+            shown.Launcher = root.Find("Launcher");
+            Transform reload = root.Find("ReloadGauge");
+            shown.Reload = reload != null ? reload.GetComponent<RingGaugeView>() : null;
+            Transform ball = root.Find("Ball");
+            if (ball != null)
+            {
+                // ピッチャーマシンのボールは、打ち出したボール（TrapBall）ごとに写す。
+                ball.gameObject.SetActive(false);
+            }
+            if (shown.Missile != null)
+            {
+                shown.Missile.gameObject.SetActive(false);
+            }
+            if (trap.Kind == StageTrapKind.Tripwire)
+            {
+                var overlay = new GameObject("Warning");
+                overlay.transform.SetParent(root, false);
+                shown.Overlay = overlay.AddComponent<WarningOverlay>();
+                shown.Overlay.Initialize(_lineTemplate.sharedMaterial, -0.7f);
+            }
         }
 
-        private static Color ZoneColor(StageZoneKind kind)
-        {
-            switch (kind)
-            {
-                case StageZoneKind.JumpPad: return new Color(0.3f, 1f, 0.45f);
-                case StageZoneKind.Updraft: return new Color(0.55f, 0.85f, 1f);
-                case StageZoneKind.BoostRing: return new Color(1f, 0.85f, 0.25f);
-                case StageZoneKind.SpeedLane: return new Color(0.3f, 1f, 0.95f);
-                case StageZoneKind.Launcher: return new Color(1f, 0.6f, 0.2f);
-                case StageZoneKind.Bumper: return new Color(1f, 0.45f, 0.8f);
-                case StageZoneKind.Gust: return new Color(0.85f, 0.95f, 1f);
-                case StageZoneKind.Hazard: return new Color(1f, 0.3f, 0.1f);
-                default: return Color.white;
-            }
-        }
-
-        // 置いた仕掛け: 赤外線は板・予告・ミサイル、ピッチャーマシンは打ち出す向きの線。
-        private void UpdatePlacedTrap(Shown shown, in WorldObject item, Vector3 position)
+        // 置いた赤外線: ゆっくり明滅し、触れられたら予告（斜線と警告の記号、ランプの点滅、警報）、撃ったらミサイル、当たったら爆発の音、
+        // 待ちの間は赤外線を消して RELOAD のゲージ（StageTrapView と同じ見せ方）。
+        private void UpdatePlacedTrap(Shown shown, in WorldObject item)
         {
             IReadOnlyList<StageTrap> traps = _feed.Traps;
             if (traps == null || item.Stored < 0 || item.Stored >= traps.Count)
             {
-                shown.Visual.SetActive(false);
                 return;
             }
-            StageTrap source = traps[item.Stored];
-            Transform launcher = shown.Visual.transform.GetChild(0);
-            launcher.position = position;
-            NVector2 aim = ThiefRules.PlacedTrapAim(source, item);
-            launcher.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(aim.Y, aim.X) * Mathf.Rad2Deg);
-            if (source.Kind == StageTrapKind.Pitcher)
+            StageTrap trap = traps[item.Stored];
+            if (trap.Kind != StageTrapKind.Tripwire)
             {
-                shown.Beam.SetActive(false);
-                shown.Missile.SetActive(false);
-                Vector3 direction = new Vector3(aim.X, aim.Y, 0f).normalized;
-                shown.Frame.positionCount = 2;
-                shown.Frame.SetPosition(0, position);
-                shown.Frame.SetPosition(1, position + direction * 1.2f);
                 return;
             }
-            shown.Frame.positionCount = 0;
-            bool flying = ThiefRules.TryGetPlacedMissile(source, item, _feed.CurrentTick, out bool arming, out NVector2 missile);
+            int tick = _feed.CurrentTick;
+            bool flying = ThiefRules.TryGetPlacedMissile(trap, item, tick, out bool arming, out NVector2 missile);
+            flying &= !arming;
             bool waiting = item.ChargeMilli == 0;
-            // 赤外線: 待っている間は明滅し、予告の間は速く点滅する。撃った後（飛んでいる・待ちの間）は消す。
-            shown.Beam.SetActive(waiting || arming);
-            if (shown.Beam.activeSelf)
+            bool reloading = !waiting && !arming && !flying;
+            ThiefRules.PlacedBeam(trap, item, out NVector2 min, out NVector2 max);
+            var beamCenter = new Vector3((min.X + max.X) * 0.5f, (min.Y + max.Y) * 0.5f, 0f);
+            if (shown.Beam != null)
             {
-                ThiefRules.PlacedBeam(source, item, out NVector2 min, out NVector2 max);
-                shown.Beam.transform.position = new Vector3((min.X + max.X) * 0.5f, (min.Y + max.Y) * 0.5f, Z + 0.2f);
-                shown.Beam.transform.localScale = new Vector3(Mathf.Max(0.05f, max.X - min.X), Mathf.Max(0.05f, max.Y - min.Y), 0.05f);
-                shown.Beam.SetActive(!arming || Mathf.Repeat(Time.time * BlinkPerSecond, 1f) < 0.5f);
+                shown.Beam.position = new Vector3(beamCenter.x, beamCenter.y, shown.Beam.position.z);
+                float speed = arming ? 8f : 1.2f;
+                shown.BeamRenderer.enabled = !reloading && Mathf.Repeat(Time.time * speed, 1f) < (arming ? 0.5f : 0.92f);
             }
-            bool missileShown = flying && !arming;
-            shown.Missile.SetActive(missileShown);
-            if (missileShown)
+            if (shown.Lamp != null)
             {
-                shown.Missile.transform.position = new Vector3(missile.X, missile.Y, Z);
-                // カプセルは縦向きなので、上を飛ぶ向きへ回す。
-                shown.Missile.transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(aim.Y, aim.X) * Mathf.Rad2Deg - 90f);
+                shown.Lamp.enabled = !arming || Mathf.Repeat(Time.time * BlinkPerSecond, 1f) < 0.5f;
+            }
+            if (shown.Missile != null)
+            {
+                shown.Missile.gameObject.SetActive(flying);
+                if (flying)
+                {
+                    NVector2 aim = ThiefRules.PlacedTrapAim(trap, item);
+                    shown.Missile.position = new Vector3(missile.X, missile.Y, shown.Missile.position.z);
+                    shown.Missile.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(aim.Y, aim.X) * Mathf.Rad2Deg);
+                }
+            }
+            if (shown.Reload != null)
+            {
+                int start = (int)item.ChargeMilli + trap.ArmTicks + trap.FlightTicks;
+                float leftFraction = trap.CooldownTicks > 0 ? Mathf.Clamp01((start + trap.CooldownTicks - tick) / (float)trap.CooldownTicks) : 0f;
+                if (reloading && leftFraction > 0f)
+                {
+                    shown.Reload.Show(shown.Launcher != null ? shown.Launcher.position : shown.Visual.transform.position, leftFraction);
+                }
+                else if (shown.Reload.IsShowing)
+                {
+                    shown.Reload.Hide();
+                }
+            }
+            if (shown.Overlay != null)
+            {
+                if (arming)
+                {
+                    _areas.Clear();
+                    _icons.Clear();
+                    float halfHeight = Mathf.Max(0.6f, (max.Y - min.Y) * 0.5f);
+                    _areas.Add(new Rect(min.X, beamCenter.y - halfHeight, max.X - min.X, halfHeight * 2f));
+                    _icons.Add(new Vector2(beamCenter.x, beamCenter.y + 1.6f));
+                    shown.Overlay.Show(_areas, _icons, 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f)));
+                }
+                else
+                {
+                    shown.Overlay.Hide();
+                }
             }
             if (_primed && _audio != null)
             {
@@ -441,26 +619,20 @@ namespace Airerage.Runtime.Presentation
                 {
                     _audio.Play(SoundId.Alarm, 0.8f);
                 }
-                if (missileShown && !shown.Flying)
+                if (flying && !shown.Flying)
                 {
                     _audio.Play(SoundId.MissileFire, 0.9f);
                 }
+                if (shown.Flying && !flying && item.HitMask != 0)
+                {
+                    _audio.Play(SoundId.MissileExplode, 0.9f);
+                }
             }
             shown.Arming = arming;
-            shown.Flying = missileShown;
+            shown.Flying = flying;
         }
 
-        private void UpdateTrapBall(Shown shown, in WorldObject ball, Vector3 position)
-        {
-            IReadOnlyList<StageTrap> traps = _feed.Traps;
-            float size = traps != null && ball.Variant < traps.Count ? traps[ball.Variant].HalfSize.X * 2f : 0.6f;
-            shown.Visual.transform.position = position;
-            shown.Visual.transform.localScale = Vector3.one * size;
-            bool visible = !ThiefRules.IsBlinking(ball) || Mathf.Repeat(Time.time * BlinkPerSecond, 1f) < 0.6f;
-            shown.Visual.SetActive(visible);
-        }
-
-        private void PlaySpawn(WorldObjectKind kind, in WorldObject item)
+        private void PlaySpawn(WorldObjectKind kind)
         {
             if (!_primed || _audio == null)
             {
@@ -510,7 +682,6 @@ namespace Airerage.Runtime.Presentation
                 {
                     character.Shadow.SetActive(false);
                     character.Steals = -1;
-                    character.Payouts = -1;
                     continue;
                 }
                 CharacterState state = _feed.GetState(i);
@@ -531,13 +702,6 @@ namespace Airerage.Runtime.Presentation
                     StealBursts++;
                 }
                 character.Steals = state.Combat.StealCount;
-                if (character.Payouts >= 0 && state.Combat.HeistPayoutCount > character.Payouts)
-                {
-                    LastHeistLabel = $"HEIST! +{state.Combat.HeistLastPayout}";
-                    character.Heist.Play(center, LastHeistLabel);
-                    HeistBursts++;
-                }
-                character.Payouts = state.Combat.HeistPayoutCount;
             }
         }
 
@@ -547,14 +711,11 @@ namespace Airerage.Runtime.Presentation
             {
                 Shadow = Child(_shadowTemplate, transform),
                 Steal = Instantiate(_stealTemplate, transform),
-                Heist = Instantiate(_heistTemplate, transform),
             };
             character.Shadow.name = $"InvisibleShadowP{index + 1}";
             character.Shadow.SetActive(false);
             character.Steal.name = $"StealBurstP{index + 1}";
             character.Steal.gameObject.SetActive(true);
-            character.Heist.name = $"HeistBurstP{index + 1}";
-            character.Heist.gameObject.SetActive(true);
             return character;
         }
 
@@ -590,8 +751,5 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>奪った瞬間の光の色（シーンのビルダーが使う）。</summary>
         public static Color StealBurstColor => StealColor;
-
-        /// <summary>置いた赤外線の板の色（シーンのビルダーが使う）。</summary>
-        public static Color PlacedBeamColor => BeamColor;
     }
 }

@@ -245,6 +245,7 @@ namespace Airerage.Core.Simulation
                 WireCancelFromTick = 4,
                 Effect = SkillEffect.WindZone,
                 EffectTick = 2,
+                AimHold = true,
                 Hits = new AttackHit[0],
             };
             combat.Special2CooldownTicks = 900;
@@ -390,6 +391,7 @@ namespace Airerage.Core.Simulation
                 Effect = SkillEffect.Missile,
                 EffectTick = 2,
                 HoldMaxTicks = 600,
+                AimHold = true,
                 Hits = new AttackHit[0],
             };
             combat.Special2CooldownTicks = 360;
@@ -903,6 +905,7 @@ namespace Airerage.Core.Simulation
                 WireCancelFromTick = 4,
                 Effect = SkillEffect.TalentSnatch,
                 EffectTick = 3,
+                AimHold = true,
                 Hits = new AttackHit[0],
             };
             combat.Special1CooldownTicks = 720;
@@ -915,6 +918,7 @@ namespace Airerage.Core.Simulation
                 Effect = SkillEffect.Misdirection,
                 EffectTick = 0,
                 AimTurnsFacing = true,
+                AimHold = true,
                 Hits = new AttackHit[0],
                 Motions = new[]
                 {

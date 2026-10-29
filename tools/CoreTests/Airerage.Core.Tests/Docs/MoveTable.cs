@@ -310,6 +310,10 @@ namespace Airerage.Core.Tests.Docs
                 IEnumerable<string> levels = attack.ChargeLevels.Select(l => $"{l.FromTicks}F +{l.BonusPercent}%/+{l.KnockbackPercent}%");
                 yield return $"長押しでため（最大 {attack.HoldMaxTicks}F。威力/吹き飛びの上乗せ: {string.Join("、", levels)}。最後で JACKPOT）";
             }
+            else if (attack.AimHold)
+            {
+                yield return "長押しの間は照準の方向に矢印を出して狙い、離すと出る";
+            }
             else if (attack.HoldMaxTicks > 0 && attack.ChargedFromTicks == 0)
             {
                 yield return $"長押しできる（最大 {attack.HoldMaxTicks}F）";

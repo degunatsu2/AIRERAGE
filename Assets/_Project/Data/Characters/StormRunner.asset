@@ -93,6 +93,7 @@ MonoBehaviour:
         FiresWhenCharged: 0
         TracksAim: 0
         AimTurnsFacing: 0
+        AimHold: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
@@ -140,6 +141,7 @@ MonoBehaviour:
         FiresWhenCharged: 0
         TracksAim: 0
         AimTurnsFacing: 0
+        AimHold: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
@@ -229,6 +231,7 @@ MonoBehaviour:
         FiresWhenCharged: 0
         TracksAim: 0
         AimTurnsFacing: 0
+        AimHold: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
@@ -276,6 +279,7 @@ MonoBehaviour:
         FiresWhenCharged: 0
         TracksAim: 0
         AimTurnsFacing: 0
+        AimHold: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
@@ -323,6 +327,7 @@ MonoBehaviour:
         FiresWhenCharged: 0
         TracksAim: 0
         AimTurnsFacing: 0
+        AimHold: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
@@ -377,6 +382,7 @@ MonoBehaviour:
         FiresWhenCharged: 0
         TracksAim: 0
         AimTurnsFacing: 0
+        AimHold: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
@@ -406,6 +412,7 @@ MonoBehaviour:
         FiresWhenCharged: 0
         TracksAim: 0
         AimTurnsFacing: 0
+        AimHold: 1
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
@@ -433,6 +440,7 @@ MonoBehaviour:
         FiresWhenCharged: 0
         TracksAim: 0
         AimTurnsFacing: 0
+        AimHold: 0
         ChainMax: 0
         ChainWindowTicks: 0
         ExclusiveHits: 0
@@ -823,6 +831,7 @@ MonoBehaviour:
           FiresWhenCharged: 0
           TracksAim: 0
           AimTurnsFacing: 0
+          AimHold: 1
           ChainMax: 0
           ChainWindowTicks: 0
           ExclusiveHits: 0

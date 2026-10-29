@@ -42,6 +42,9 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private float _travelSeconds;
 
         public StageZoneKind Kind => _kind;
+
+        /// <summary>THIEF が置いたギミックの見た目の写しか（ConfigureCopy。シミュレーションのギミックとしては集めない）。</summary>
+        public bool IsCopy { get; private set; }
         public Vector2 Size => _size;
         public Vector2 Direction => _direction;
         public Vector2 Target => _target;
@@ -80,6 +83,30 @@ namespace Airerage.Runtime.Simulation
             _target = target;
         }
 
+        /// <summary>
+        /// Core のギミック zone と同じ範囲・向き・強さ・周期にする（THIEF が置いたギミックの見た目の写し用。ThiefEffectsView。動かない形にし、
+        /// IsCopy にして Collect で集めないようにする）。
+        /// </summary>
+        public void ConfigureCopy(StageZone zone)
+        {
+            IsCopy = true;
+            transform.position = new Vector3((zone.MinX + zone.MaxX) * 0.5f, (zone.MinY + zone.MaxY) * 0.5f, transform.position.z);
+            _kind = zone.Kind;
+            _size = new Vector2(zone.MaxX - zone.MinX, zone.MaxY - zone.MinY);
+            _direction = new Vector2(zone.Direction.X, zone.Direction.Y);
+            _power = zone.Power;
+            _limit = zone.Limit;
+            _periodSeconds = SimTime.TicksToSeconds(zone.Timing.Period);
+            _activeSeconds = SimTime.TicksToSeconds(zone.Timing.ActiveTicks);
+            _phaseSeconds = SimTime.TicksToSeconds(zone.Timing.PhaseTicks);
+            _jitterSeconds = SimTime.TicksToSeconds(zone.Timing.JitterTicks);
+            _warningSeconds = SimTime.TicksToSeconds(zone.Timing.WarningTicks);
+            _target = new Vector2(zone.Target.X, zone.Target.Y);
+            _width = zone.Width;
+            _travel = Vector2.zero;
+            _travelSeconds = 0f;
+        }
+
         /// <summary>Core のギミックにする。値が不正なら ArgumentException。</summary>
         public StageZone ToZone()
         {
@@ -102,6 +129,10 @@ namespace Airerage.Runtime.Simulation
             var zones = new List<StageZone>();
             foreach (StageZoneAuthoring authoring in FindObjectsByType<StageZoneAuthoring>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
             {
+                if (authoring.IsCopy)
+                {
+                    continue;
+                }
                 try
                 {
                     zones.Add(authoring.ToZone());

@@ -40,7 +40,8 @@ namespace Airerage.Core.Combat
     /// - 長押しの技（AttackData.HoldMaxTicks。docs/13 T5-6）: 出せるときにボタンを押したままなら、技を出さずにためる（Free のまま
     ///   動ける。CombatState.Holding）。離したときに技を出し、ためた長さを ActionState.Charge に入れる。ためている間に攻撃を受けたり、
     ///   ほかの行動を始めたりしたら、ためるのをやめる（何も出ない）。AttackData.HoldRooted の技は、ためている間その場から動かない
-    ///   （向きは変えられる。RISK TAKER のオールイン）。
+    ///   （向きは変えられる。RISK TAKER のオールイン）。照準の方向に出す技（AttackData.AimHold）も同じ形で待ち、離した瞬間の照準の方向に
+    ///   出す（ためても強くならない。2026-10-29）。
     /// - 攻撃を始めるたびに CombatState.AttackSerial を 1 増やす（攻撃 1 回ごとの番号）。
     /// - 走り続ける地上技（AttackData.Run。STORM RUNNER）: TotalTicks で終わらず、別の行動（ジャンプ・ワイヤー・ガード・空中の攻撃・
     ///   技）の入力で終わって、そのティックにその行動を始める（当たっていなくてもよい）。地上技の入力は無視する。だんだん加速し、
@@ -168,7 +169,7 @@ namespace Airerage.Core.Combat
         // 長押しの技で、ボタンを押したままなら、ためるのを始める（先行入力は使い切る）。始めたら true。
         private static bool TryBeginHold(ref CharacterState state, AttackSlot slot, in InputFrame input, CombatTuning combat)
         {
-            if (combat.Get(slot).HoldMaxTicks <= 0 || !input.IsHeld(ButtonOf(slot)))
+            if (!combat.Get(slot).HoldsBeforeFiring || !input.IsHeld(ButtonOf(slot)))
             {
                 return false;
             }
