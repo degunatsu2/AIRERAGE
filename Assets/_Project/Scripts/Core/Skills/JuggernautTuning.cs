@@ -10,7 +10,7 @@ namespace Airerage.Core.Skills
     /// - Q FLAK: 地上で構え、構えている間に Q を押すと、重力を受ける砲弾を照準の方向へ撃つ。キャラクター・地形・物に触れると爆発する
     ///   （威力 15・強い吹き飛び。ユーザーの案。2026-10-29 に 30 から下方修正）。弾道（撃ち出す速さ）は弱・中・強・弩の 4 段階で、初めは強。構えの間に上下で選び、
     ///   その試合の間は覚えておく。3 回まで続けて撃て、1 回分は 4 秒で戻る。
-    /// - E MINE TRAP: 照準の方向へ地雷を撃つ（重力で山なりに飛ぶ。2026-10-29）。地形かキャラクターに張り付き（ユーザーの回答、2026-10-29）、もう一度 E で爆発する（威力 30）。
+    /// - E MINE TRAP: 照準の方向へ地雷を撃つ（重力で山なりに飛び、張り付くかステージの外に出るまで消えない。2026-10-29）。地形かキャラクターに張り付き（ユーザーの回答、2026-10-29）、もう一度 E で爆発する（威力 30）。
     ///   クールタイム 10 秒は、爆発した（消えた）後から数える。
     /// - R MAYDAY: ジェット機に吊られて飛び去り、ステージ全体から空いた場所を選ぶと、そこへ運ばれる。その間は無敵で、選ぶ時間は 10 秒
     ///   （選ばなければ元の場所へ戻る。ユーザーの回答、2026-10-29）。
@@ -54,13 +54,13 @@ namespace Airerage.Core.Skills
         };
 
         /// <summary>
-        /// 地雷の速さ（m/s）、かかる重力（m/s²。山なりに飛ぶ。ユーザーの要望、2026-10-29。フラックと同じ）、当たりの半径（m）、
-        /// 張り付かずに飛んでいられる長さ（ティック）、出す距離（m）。
+        /// 地雷の撃ち出す速さ（m/s。2026-10-29 に 22 から半分に）、かかる重力（m/s²。山なりに飛ぶ。ユーザーの要望、2026-10-29。フラックと
+        /// 同じ）、当たりの半径（m）、出す距離（m）。飛んでいる地雷は、何かに張り付くかステージの外に出るまで消えない（ユーザーの要望、
+        /// 2026-10-29）。
         /// </summary>
-        public float MineSpeed = 22f;
+        public float MineSpeed = 11f;
         public float MineGravity = 22f;
         public float MineRadius = 0.3f;
-        public int MineFlightTicks = 90;
         public float MineLaunchOffset = 1.1f;
 
         /// <summary>地雷の爆発の半径（m）と攻撃（威力 30。ユーザーの案）。</summary>
@@ -94,8 +94,11 @@ namespace Airerage.Core.Skills
             return FlakSpeeds[Math.Max(0, Math.Min(level, FlakSpeeds.Length - 1))];
         }
 
-        /// <summary>地雷が張り付かずに飛ぶ道のりの長さ（m。重力で曲がる前の、まっすぐ飛んだときの長さ。照準の矢印の長さに使う）。</summary>
-        public float MineRange => MineSpeed * MineFlightTicks * SimTime.DeltaTime;
+        /// <summary>
+        /// 地雷が届く距離の目安（m）: 平らな所へ 45 度で撃ったときの距離（速さ² ÷ 重力）。照準の矢印の長さと、CPU が使う距離に使う。
+        /// 重力がなければ、どこまでも飛ぶ（無限大）。
+        /// </summary>
+        public float MineRange => MineGravity > 0f ? MineSpeed * MineSpeed / MineGravity : float.PositiveInfinity;
 
         public TuningValidator Validate()
         {
@@ -126,7 +129,6 @@ namespace Airerage.Core.Skills
             v.Positive(nameof(MineSpeed), MineSpeed);
             v.NonNegative(nameof(MineGravity), MineGravity);
             v.Positive(nameof(MineRadius), MineRadius);
-            v.Positive(nameof(MineFlightTicks), MineFlightTicks);
             v.NonNegative(nameof(MineLaunchOffset), MineLaunchOffset);
             v.Positive(nameof(MineExplosionRadius), MineExplosionRadius);
             v.NotNull(nameof(MineHit), MineHit);

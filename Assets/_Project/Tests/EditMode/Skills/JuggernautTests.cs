@@ -17,7 +17,7 @@ namespace Airerage.Core.Tests.Skills
 {
     /// <summary>
     /// JUGGERNAUT（docs/14 1.7。ユーザーの案、2026-10-29）: 体（大きい・地上で速く空中で遅い・跳ぶのが遅く低い・ガードの延長と歩き）、
-    /// 回る地上技（押し続けると続いて上がる・砲塔の先で FATAL）、空中横の砲弾、Q フラック（構え・弾道の段階・爆発）、E 地雷（張り付き・
+    /// 回る地上技（押し続けると続いて上がる・砲塔の先で出始めの一瞬だけ FATAL）、空中横の砲弾、Q フラック（構え・弾道の段階・爆発）、E 地雷（張り付き・
     /// もう一度 E で爆発）、R メーデー（吊られて飛び去り、選んだ空いた場所へ運ばれる。その間は無敵）。
     /// </summary>
     public class JuggernautTests
@@ -224,6 +224,24 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(first.IsFatalHit, Is.True, "砲塔の先が当たっても FATAL にならない");
             Assert.That(first.Damage, Is.EqualTo(tip.Damage * 2), "威力が 2 倍でない");
             Assert.That(first.Knockback.Length(), Is.EqualTo(new Vector2(tip.KnockbackX, tip.KnockbackY).Length() * 2f).Within(0.01f), "吹き飛びが 2 倍でない");
+        }
+
+        [Test]
+        public void Spin_TurretTip_AfterTheFirstMoment_IsANormalHit()
+        {
+            // 後ろの、砲塔の先だけが届く距離に相手を置く: 先が後ろへ回ってくるのは出始めの一瞬（FatalTicks）より後なので、ふつうのヒット
+            // （ユーザーの要望、2026-10-29）。
+            AttackHit tip = Juggernaut.Combat.Ground.Hits[0];
+            AttackHit body = Juggernaut.Combat.Ground.Hits[1];
+            Assert.That(tip.FatalTicks, Is.GreaterThan(0), "前提: FATAL は出始めの一瞬だけ");
+            float distance = (body.HalfWidth + 0.4f + tip.OffsetX + tip.HalfWidth + 0.4f) * 0.5f;
+            var world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(-distance, StandardGroundY, 0f));
+            Step(world, 2);
+            List<HitRecord> hits = Step(world, 30, Press(InputButtons.Attack));
+            HitRecord first = hits.First(h => h.Victim == 1);
+            Assert.That(first.HitIndex, Is.EqualTo(0), "砲塔の先で当たっていない");
+            Assert.That(first.IsFatalHit, Is.False, "出始めの一瞬より後なのに FATAL になった");
+            Assert.That(first.Damage, Is.EqualTo(tip.Damage), "ふつうの威力でない");
         }
 
         [Test]
@@ -445,21 +463,22 @@ namespace Airerage.Core.Tests.Skills
         [Test]
         public void Mine_SticksToAWall_AndExplodesOnTheSecondPress()
         {
-            BoxTerrain terrain = TestArenas.Ground().AddBox(8f, 0f, 9f, 10f);
+            // 地雷は山なりに飛ぶ（撃ち出す速さ 11 m/s）ので、壁は近くに置く。
+            BoxTerrain terrain = TestArenas.Ground().AddBox(4f, 0f, 5f, 10f);
             // 相手は、地雷が飛ぶ間は後ろにいて、張り付いてから壁の近くへ来る。
             var world = World(terrain, new Vector3(0f, GroundY, 0f), new Vector3(-6f, StandardGroundY, 0f));
             Step(world, 2);
-            Step(world, 1, Aimed(InputButtons.Special2, new Vector2(1f, 0.1f)));
-            Step(world, 1, Aimed(InputButtons.None, new Vector2(1f, 0.1f)));
+            Step(world, 1, Aimed(InputButtons.Special2, new Vector2(1f, 0.3f)));
+            Step(world, 1, Aimed(InputButtons.None, new Vector2(1f, 0.3f)));
             Step(world, 30);
             WorldObject mine = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Mine);
             Assert.That(mine.Variant, Is.EqualTo(JuggernautRules.MineOnTerrain), "壁に張り付かない");
-            Assert.That(mine.Position.X, Is.EqualTo(8f).Within(0.05f));
+            Assert.That(mine.Position.X, Is.EqualTo(4f).Within(0.05f));
             Assert.That(world.GetState(0).Combat.Special2CooldownTicksLeft, Is.EqualTo(CombatState.CooldownWhileActive), "爆発の前にクールタイムが始まった");
 
             Edit(world, 1, s =>
             {
-                s.Position = new Vector3(7f, StandardGroundY, 0f);
+                s.Position = new Vector3(3f, StandardGroundY, 0f);
                 return s;
             });
             List<HitRecord> hits = Step(world, 1, Press(InputButtons.Special2));
@@ -519,7 +538,7 @@ namespace Airerage.Core.Tests.Skills
         [Test]
         public void Mine_SticksToACharacter_AndMovesWithThem()
         {
-            var world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(5f, StandardGroundY, 0f));
+            var world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f), new Vector3(3f, StandardGroundY, 0f));
             Step(world, 2);
             Step(world, 1, Aimed(InputButtons.Special2, new Vector2(1f, 0f)));
             Step(world, 1, Aimed(InputButtons.None, new Vector2(1f, 0f)));
@@ -532,22 +551,40 @@ namespace Airerage.Core.Tests.Skills
             Step(world, 30, default, Press(InputButtons.None, 1f));
             CharacterState carrier = world.GetState(1);
             WorldObject moved = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Mine);
-            Assert.That(carrier.Position.X, Is.GreaterThan(6f), "前提: 張り付かれた人が動いた");
+            Assert.That(carrier.Position.X, Is.GreaterThan(4.5f), "前提: 張り付かれた人が動いた");
             Assert.That(Vector2.Distance(moved.Position, new Vector2(carrier.Position.X, carrier.Position.Y) + offset), Is.LessThan(0.01f),
                 "張り付いた人と一緒に動かない");
         }
 
         [Test]
-        public void Mine_ThatFliesOutWithoutSticking_StartsTheCooldown()
+        public void Mine_FallingALongWay_DoesNotVanish_UntilItSticks()
         {
-            var world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f));
+            // 高い足場から真横へ撃つと、地面まで長く落ちる（2 秒ほど）。途中で消えずに、地面に張り付く（ユーザーの要望、2026-10-29）。
+            var terrain = new BoxTerrain().AddBox(-4f, 40f, 2f, 41f).AddBox(-60f, -1f, 60f, 0f);
+            var world = World(terrain, new Vector3(0f, 41f + GroundY, 0f));
+            Step(world, 2);
+            Step(world, 1, Aimed(InputButtons.Special2, new Vector2(1f, 0f)));
+            Step(world, 1, Aimed(InputButtons.None, new Vector2(1f, 0f)));
+            Step(world, 90);
+            WorldObject flying = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Mine);
+            Assert.That(flying.Variant, Is.EqualTo(JuggernautRules.MineFlying), "前提: まだ落ちている");
+            Step(world, 90);
+            WorldObject mine = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.Mine);
+            Assert.That(mine.Variant, Is.EqualTo(JuggernautRules.MineOnTerrain), "長く落ちた地雷が地面に張り付かない");
+            Assert.That(mine.Position.Y, Is.EqualTo(0f).Within(0.01f));
+        }
+
+        [Test]
+        public void Mine_LeavingTheStage_Disappears_AndStartsTheCooldown()
+        {
+            // 真上へ撃って、ステージの上の端より高く飛ぶと消え、クールタイムが始まる。
+            var world = World(new SimWorld(TestArenas.Ground(), new StageBounds(-40f, -20f, 40f, 3f)), new Vector3(0f, GroundY, 0f));
             Step(world, 2);
             Step(world, 1, Aimed(InputButtons.Special2, new Vector2(0f, 1f)));
             Step(world, 1, Aimed(InputButtons.None, new Vector2(0f, 1f)));
-            Step(world, Juggernaut.Skills.Juggernaut.MineFlightTicks + 10);
-            Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Mine), Is.False, "張り付かずに飛び切っても消えない");
-            int cooldown = world.GetState(0).Combat.Special2CooldownTicksLeft;
-            Assert.That(cooldown, Is.GreaterThan(0), "消えた後にクールタイムが始まらない");
+            Step(world, 60);
+            Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Mine), Is.False, "ステージの外に出ても消えない");
+            Assert.That(world.GetState(0).Combat.Special2CooldownTicksLeft, Is.GreaterThan(0), "消えた後にクールタイムが始まらない");
         }
 
         // ---------------------------------------------------------------- R メーデー
@@ -582,8 +619,12 @@ namespace Airerage.Core.Tests.Skills
             return JuggernautRules.EncodeTarget(Press(buttons), target, center, half);
         }
 
-        [Test]
-        public void Mayday_CarriesTheTankToTheChosenFreeSpot_AndIsUntouchableMeanwhile()
+        // 場所を決めるボタン: 攻撃・ジャンプ・R・ワイヤー（ワイヤーはユーザーの要望、2026-10-29）。
+        [TestCase(InputButtons.Attack)]
+        [TestCase(InputButtons.Jump)]
+        [TestCase(InputButtons.Super)]
+        [TestCase(InputButtons.Wire)]
+        public void Mayday_CarriesTheTankToTheChosenFreeSpot_AndIsUntouchableMeanwhile(InputButtons confirm)
         {
             var world = MaydayWorld(out _);
             LiftOff(world);
@@ -593,7 +634,7 @@ namespace Airerage.Core.Tests.Skills
 
             var target = new Vector2(20f, 8f);
             Step(world, 1, Target(world, target, InputButtons.None));
-            Step(world, 1, Target(world, target, InputButtons.Attack));
+            Step(world, 1, Target(world, target, confirm));
             CharacterState carried = world.GetState(0);
             Assert.That(carried.Combat.MaydayPhase, Is.EqualTo(JuggernautRules.MaydayCarry), "空いた場所を選んでも運ばれない");
             Assert.That(carried.Position.X, Is.EqualTo(target.X).Within(0.4f));

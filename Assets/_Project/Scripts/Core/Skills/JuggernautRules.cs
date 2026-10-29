@@ -38,8 +38,8 @@ namespace Airerage.Core.Skills
         public const byte MaydaySelect = 2;
         public const byte MaydayCarry = 3;
 
-        /// <summary>メーデーで場所を決めるボタン（攻撃・ジャンプ・R）。</summary>
-        public const InputButtons MaydayConfirmButtons = InputButtons.Attack | InputButtons.Jump | InputButtons.Super;
+        /// <summary>メーデーで場所を決めるボタン（攻撃・ジャンプ・R・ワイヤー。ワイヤーはユーザーの要望、2026-10-29）。</summary>
+        public const InputButtons MaydayConfirmButtons = InputButtons.Attack | InputButtons.Jump | InputButtons.Super | InputButtons.Wire;
 
         /// <summary>砲弾（WorldObjectKind.Shell）の Variant。</summary>
         public const byte CannonShell = 0;
@@ -392,11 +392,6 @@ namespace Airerage.Core.Skills
             {
                 case MineFlying:
                 {
-                    if (tick - mine.SpawnTick > tuning.MineFlightTicks)
-                    {
-                        mine.Ended = true;
-                        return;
-                    }
                     // 重力で山なりに飛ぶ（フラックの砲弾と同じ進め方）。
                     Vector2 delta = FlakStep(ref mine.Velocity, tuning.MineGravity) + TakeLead(ref mine);
                     if (Cast(terrain, mine.Position, delta, out Vector2 point, out CastHit hit))

@@ -398,7 +398,9 @@ namespace Airerage.Core.Tests.Docs
             if (sweet != null)
             {
                 string sweep = sweet.SweepTicks > 0 ? $"（{sweet.SweepTicks}F で 1 周して前と後ろを行き来する）" : string.Empty;
-                yield return $"砲塔の先{sweep}が当たると FATAL（威力と吹き飛び ×{Num(sweet.FatalScale)}）";
+                string window = sweet.FatalTicks > 0 ? $"出始めの {sweet.FatalTicks}F だけ" : string.Empty;
+                string after = sweet.FatalTicks > 0 ? "。その後はふつうのヒット" : string.Empty;
+                yield return $"砲塔の先{sweep}が{window}当たると FATAL（威力と吹き飛び ×{Num(sweet.FatalScale)}）{after}";
             }
             AttackHit lone = entries.Select(e => e.Hit).FirstOrDefault(h => h.LoneFatal);
             if (lone != null)
@@ -533,7 +535,7 @@ namespace Airerage.Core.Tests.Docs
                 }
                 case SkillEffect.Mine:
                     JuggernautTuning mine = s.Juggernaut;
-                    return $"照準の方向へ地雷（{Num(mine.MineSpeed)} m/s、重力 {Num(mine.MineGravity)} m/s² で山なりに飛び、{Seconds(mine.MineFlightTicks)}で消える）。" +
+                    return $"照準の方向へ地雷（{Num(mine.MineSpeed)} m/s、重力 {Num(mine.MineGravity)} m/s² で山なりに飛び、張り付くかステージの外に出るまで消えない）。" +
                         "地形・キャラクターに張り付いて一緒に動き、もう一度 E で半径 " +
                         $"{Num(mine.MineExplosionRadius)}m の爆発。クールタイムは爆発の後から";
                 case SkillEffect.Mayday:

@@ -131,9 +131,9 @@ namespace Airerage.Core.Combat
                         if (touches)
                         {
                             AttackPower hitPower = hitData.Critical ? power.WithCritical(hitData.CriticalScale) : power;
-                            if (hitData.FatalScale > 0f)
+                            if (hitData.IsFatalAt(attacker.Action.Ticks))
                             {
-                                // 急所の判定（JUGGERNAUT の砲塔の先）。
+                                // 急所の判定（JUGGERNAUT の砲塔の先。出始めの一瞬だけ）。
                                 hitPower = hitPower.WithSweetSpot(hitData.FatalScale);
                             }
                             if (hitData.LoneFatal && !HitAny(attacker.Action.HitMask, h, v))

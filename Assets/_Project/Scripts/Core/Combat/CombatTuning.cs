@@ -107,6 +107,18 @@ namespace Airerage.Core.Combat
         /// </summary>
         public float FatalScale;
 
+        /// <summary>
+        /// 急所（FatalScale）が効くのは、判定が出てから（StartTick から）この長さ（ティック）の間だけ。0 なら判定が出ている間ずっと。
+        /// それより後に当たったら、ふつうのヒット（JUGGERNAUT の砲塔の先は出始めの一瞬だけ FATAL。ユーザーの要望、2026-10-29）。
+        /// </summary>
+        public int FatalTicks;
+
+        /// <summary>攻撃を始めてから ticks ティック目に当たったら、急所の判定（FATAL）になるか。</summary>
+        public bool IsFatalAt(int ticks)
+        {
+            return FatalScale > 0f && (FatalTicks <= 0 || ticks - StartTick < FatalTicks);
+        }
+
         public bool IsActiveAt(int ticks)
         {
             return ticks >= StartTick && (UntilEnd || ticks < StartTick + ActiveTicks);
@@ -133,6 +145,7 @@ namespace Airerage.Core.Combat
             v.Positive(nameof(LoneFatalKnockbackScale), LoneFatalKnockbackScale);
             v.NonNegative(nameof(SweepTicks), SweepTicks);
             v.NonNegative(nameof(FatalScale), FatalScale);
+            v.NonNegative(nameof(FatalTicks), FatalTicks);
             return v;
         }
     }

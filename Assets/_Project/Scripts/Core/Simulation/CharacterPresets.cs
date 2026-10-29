@@ -954,7 +954,7 @@ namespace Airerage.Core.Simulation
         ///   発生が遅く、跳ぶ高さが半分（速さ 1/√2。ユーザーの回答、2026-10-29）。ガードのクールタイム 2 倍、押し続けると 2 秒まで延び、
         ///   地上ならガードしながらふだんの速さで歩ける（ユーザーの回答）。
         /// - 地上技（撃破技）TURRET SPIN: 回って、体に判定。回りながら左右に動ける。押し続けると回り続け、とてもゆっくり上がる（離すと
-        ///   終わる）。回る砲塔の先が当たると FATAL で、威力と吹き飛びが 2 倍。
+        ///   終わる）。回る砲塔の先が出始めの一瞬に当たると FATAL で、威力と吹き飛びが 2 倍（その後はふつうのヒット）。
         /// - 空中 N HULL ROLL: ゆっくり縦に回り、体に判定。空中上 SKY BURST: 頭上で爆発（上向きの判定。反動で少し下がる）。空中横 CANNON SHOT:
         ///   前へ重力を受けない砲弾（威力 10）を撃ち、反動で後ろへ下がる。空中下 GROUND BURST: 足もとで爆発（下向きの判定。反動で少し
         ///   上がる）。どれも発生が遅く、後隙が長い。
@@ -1012,11 +1012,12 @@ namespace Airerage.Core.Simulation
                 RehitTicks = 20,
                 Hits = new[]
                 {
-                    // 砲塔の先（1 周 20 ティックで前と後ろを行き来する）。当たれば FATAL で 2 倍。体の判定より先に並べる。
+                    // 砲塔の先（1 周 20 ティックで前と後ろを行き来する）。出始めの一瞬（4 ティック。前を向いている間）に当たれば FATAL で 2 倍、
+                    // その後はふつうのヒット（ユーザーの要望、2026-10-29）。体の判定より先に並べる。
                     new AttackHit
                     {
                         StartTick = 4, UntilEnd = true, OffsetX = side + 0.8f, OffsetY = 0.35f, HalfWidth = 0.35f, HalfHeight = 0.35f,
-                        SweepTicks = 20, FatalScale = 2f,
+                        SweepTicks = 20, FatalScale = 2f, FatalTicks = 4,
                         Damage = 6, Gauge = 120, HitstopTicks = 12, HitstunTicks = 30, KnockbackX = 12f, KnockbackY = 10f,
                     },
                     // 回っている体。
