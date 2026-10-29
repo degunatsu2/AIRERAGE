@@ -64,3 +64,7 @@ crashlytics-build.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Unity のテストの実行中にできる一時的なシーン
+/Assets/InitTestScene*.unity
+/Assets/InitTestScene*.unity.meta
