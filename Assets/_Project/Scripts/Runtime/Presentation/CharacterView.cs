@@ -22,6 +22,8 @@ namespace Airerage.Runtime.Presentation
     /// 特殊攻撃を出した瞬間は _specialBurst、必殺技を出した瞬間は虹色の光と「SUPER!」（_superBurst）を出す（docs/13 T5-4。あれば）。
     /// ルーレットの最大（JACKPOT）を受けた瞬間は _jackpotBurst、コインの効率が上がっている間（フィーバータイム）は周りに金色のゲージ
     /// （_feverGauge）を出す（RISK TAKER。docs/14。あれば）。雷の波動のクールタイムの間は、水色のゲージ（_waveGauge。SOLDERER。あれば）。
+    /// ウインドクローク・キャッスルインジエアー（STORM RUNNER）の残りは、黄緑と空色のゲージ（_cloakGauge・_skyGauge。あれば。周りの風は BoostAuraView）。
+    /// 体の周りのゲージは RingGaugeStack にまとめて、重ならないように並べる（古いゲージほど外側、文字は上へ積む。ユーザーの要望、2026-10-30）。
     /// 撃破されて復帰を待っている間は見えなくし、復帰した後の無敵の間は点滅させる（docs/12 T4-2）。
     /// 回る技（AttackData.SpinPerHit）の間は、判定 1 つにつき 1 回転させる。前転する技（AttackData.Flip。THIEF の空中 N）は、最初の判定から
     /// 最後の判定の終わりまでに前へ 1 回転させる。
@@ -35,11 +37,6 @@ namespace Airerage.Runtime.Presentation
     {
         // 無敵の間の点滅の速さ（回/秒）。
         private const float BlinkPerSecond = 10f;
-
-        // ワイヤーキャンセルとガードのクールタイムのゲージを同時に出すときの半径（m）。内側の文字は下、外側の文字は上に出す
-        // （ゲージと文字が重ならないように。ユーザーの指摘、2026-10-13）。
-        private const float StackedInnerRadius = 1.2f;
-        private const float StackedOuterRadius = 2.3f;
 
         private enum Tint
         {
@@ -104,6 +101,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private RingGaugeView _waterGauge;
         [Tooltip("押し続けている間は続く技（JUGGERNAUT の地上技）を、続けられる限界までの残り（あれば。ユーザーの要望、2026-10-29）")]
         [SerializeField] private RingGaugeView _sustainGauge;
+        [Tooltip("ウインドクローク（STORM RUNNER の Q）の残り（黄緑。あれば）")]
+        [SerializeField] private RingGaugeView _cloakGauge;
+        [Tooltip("キャッスルインジエアー（STORM RUNNER の R）の残り（空色。あれば）")]
+        [SerializeField] private RingGaugeView _skyGauge;
         [Tooltip("水に飛び込んだ瞬間の水しぶき（あれば）")]
         [SerializeField] private BurstEffectView _splashBurst;
         [Tooltip("悪魔の手に握られた見た目（恐怖の館。ユーザーの要望、2026-10-26）")]
@@ -136,6 +137,7 @@ namespace Airerage.Runtime.Presentation
         private int _feverTicks;
         private int _waveTicks;
         private Renderer[] _facingRenderers;
+        private RingGaugeStack _gaugeStack;
 
         /// <summary>今表示している攻撃の段階（攻撃中でなければ null）。</summary>
         public AttackPhase? ShownPhase
@@ -187,6 +189,11 @@ namespace Airerage.Runtime.Presentation
         public RingGaugeView WallClingGauge => _wallClingGauge;
         public RingGaugeView WaterGauge => _waterGauge;
         public RingGaugeView SustainGauge => _sustainGauge;
+        public RingGaugeView CloakGauge => _cloakGauge;
+        public RingGaugeView SkyGauge => _skyGauge;
+
+        /// <summary>体の周りのゲージの並べ方（重ならないように、古いゲージほど外側に）。</summary>
+        public RingGaugeStack GaugeStack => _gaugeStack ??= new RingGaugeStack(AroundGauges());
         public BurstEffectView SplashBurst => _splashBurst;
         public CaptureEffectView CaptureEffect => _captureEffect;
 
@@ -254,6 +261,7 @@ namespace Airerage.Runtime.Presentation
             RenderCooldownGauges(current, combat);
             RenderGuard(current);
             RenderBursts(current, combat);
+            RenderBoostGauges(current, skills);
             RenderCapture(current);
             RenderVisibility(current);
             RenderRespawn(current, respawnDelayTicks);
@@ -261,6 +269,8 @@ namespace Airerage.Runtime.Presentation
             {
                 HideIndicators();
             }
+            // 出しているゲージを、重ならないように並べて描く。
+            GaugeStack.Arrange();
             if (tint == _shown)
             {
                 return;
@@ -660,28 +670,43 @@ namespace Airerage.Runtime.Presentation
             _shownGuarded = state.Combat.GuardedCount;
         }
 
-        // ワイヤーキャンセルとガードのクールタイムのゲージ。両方を出すときは、半径を離し、文字を上と下に分ける。
+        // ワイヤーキャンセルとガードのクールタイムのゲージ（両方を出すときの並べ方は RingGaugeStack）。
         private void RenderCooldownGauges(in CharacterState state, CombatTuning combat)
         {
-            float wire = Fraction(state.Combat.WireCancelCooldownTicksLeft, combat.WireCancelCooldownTicks);
-            float guard = Fraction(state.Combat.GuardCooldownTicksLeft, combat.GuardCooldownTicks);
-            bool both = wire > 0f && guard > 0f && _wireCancelGauge != null && _guardGauge != null;
             if (_wireCancelGauge != null)
             {
-                _wireCancelGauge.SetLayout(both ? StackedInnerRadius : (float?)null, both);
-                ShowOrHide(_wireCancelGauge, wire);
+                ShowOrHide(_wireCancelGauge, Fraction(state.Combat.WireCancelCooldownTicksLeft, combat.WireCancelCooldownTicks));
             }
             if (_guardGauge != null)
             {
-                _guardGauge.SetLayout(both ? StackedOuterRadius : (float?)null, false);
-                ShowOrHide(_guardGauge, guard);
+                ShowOrHide(_guardGauge, Fraction(state.Combat.GuardCooldownTicksLeft, combat.GuardCooldownTicks));
             }
+        }
+
+        // ウインドクロークとキャッスルインジエアー（STORM RUNNER）の残り。技の調整値がなければ出さない（ダミー）。
+        private void RenderBoostGauges(in CharacterState state, SkillTuning skills)
+        {
+            bool alive = !state.Combat.IsWaitingToRespawn;
+            if (_cloakGauge != null)
+            {
+                ShowOrHide(_cloakGauge, alive && skills != null ? Fraction(state.Combat.SpeedBoostTicksLeft, skills.SpeedBoost.DurationTicks) : 0f);
+            }
+            if (_skyGauge != null)
+            {
+                ShowOrHide(_skyGauge, alive && skills != null ? Fraction(state.Combat.SkyBoostTicksLeft, skills.SkyBoost.DurationTicks) : 0f);
+            }
+        }
+
+        // 体の周りに出すゲージ（並べる順は、同じフレームに出たときの内から外）。
+        private RingGaugeView[] AroundGauges()
+        {
+            return new[] { _wallClingGauge, _wireCancelGauge, _guardGauge, _waterGauge, _cloakGauge, _feverGauge, _sustainGauge, _waveGauge, _skyGauge };
         }
 
         // 透明の間: 体の周りのゲージと、ため・判定の表示を隠す。
         private void HideIndicators()
         {
-            foreach (RingGaugeView gauge in new[] { _wireCancelGauge, _guardGauge, _feverGauge, _waveGauge, _wallClingGauge, _waterGauge, _sustainGauge })
+            foreach (RingGaugeView gauge in AroundGauges())
             {
                 if (gauge != null && gauge.IsShowing)
                 {

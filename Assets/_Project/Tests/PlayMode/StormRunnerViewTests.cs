@@ -76,7 +76,8 @@ namespace Airerage.PlayMode.Tests
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special1), default });
             yield return WaitSeconds(0.3f);
             Assert.That(boost.ShowsCloak(0), Is.True, "ウインドクロークの風を出さない");
-            Assert.That(boost.CloakGaugeHasFrame(0), Is.True, "残りのゲージに縁がない");
+            Assert.That(runner.PlayerView.CloakGauge.IsShowing, Is.True, "ウインドクロークの残りのゲージを出さない");
+            Assert.That(runner.PlayerView.CloakGauge.ShowsFrame, Is.True, "残りのゲージに縁がない");
             Assert.That(hud.SlotOf(0).Text, Is.EqualTo("GUST"), "効果中の札が GUST でない");
             runner.InputOverride = new Script(new List<SimInput> { new SimInput(0, 0, InputButtons.Special1, 0, 127), default });
             bool sawGust = false;

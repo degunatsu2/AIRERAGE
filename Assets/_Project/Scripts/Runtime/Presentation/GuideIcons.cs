@@ -116,6 +116,68 @@ namespace Airerage.Runtime.Presentation
             });
         }
 
+        /// <summary>撃破の衝撃（キルログ。ユーザーの要望、2026-10-30）: ぎざぎざの赤い衝撃波と、真ん中の橙から黄色の光。</summary>
+        public static Texture2D Burst(int size)
+        {
+            var red = new Color(1f, 0.18f, 0.12f, 1f);
+            var orange = new Color(1f, 0.55f, 0.15f, 1f);
+            var yellow = new Color(1f, 0.92f, 0.45f, 1f);
+            return Draw("IconBurst", size, (u, v) =>
+            {
+                float dx = u - 0.5f;
+                float dy = v - 0.5f;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                // 10 本のとげ（長いとげと短いとげが交互）。
+                float angle = Mathf.Repeat(Mathf.Atan2(dy, dx) / (Mathf.PI * 2f) + 0.025f, 1f) * 10f;
+                float spike = 1f - Mathf.Abs(Mathf.Repeat(angle, 1f) - 0.5f) * 2f;
+                float tip = Mathf.FloorToInt(angle) % 2 == 0 ? 0.49f : 0.4f;
+                float edge = Mathf.Lerp(0.27f, tip, spike);
+                if (r > edge)
+                {
+                    return Color.clear;
+                }
+                return r < edge * 0.42f ? yellow : r < edge * 0.68f ? orange : red;
+            });
+        }
+
+        /// <summary>倒れた人（キルログ。撃破された人）: 仰向けに倒れた人の形（左に頭、右へ体と曲げた脚、上へ伸びた腕）と、下の地面の線。</summary>
+        public static Texture2D Fallen(int size, Color color)
+        {
+            return Draw("IconFallen", size, (u, v) =>
+            {
+                float dx = u - 0.17f;
+                float dy = v - 0.6f;
+                bool head = dx * dx + dy * dy < 0.0105f;
+                bool body = Segment(u, v, 0.3f, 0.63f, 0.62f, 0.63f, 0.065f);
+                bool arm = Segment(u, v, 0.4f, 0.6f, 0.5f, 0.36f, 0.045f);
+                bool thigh = Segment(u, v, 0.62f, 0.63f, 0.76f, 0.47f, 0.05f);
+                bool shin = Segment(u, v, 0.76f, 0.47f, 0.92f, 0.62f, 0.05f);
+                bool ground = v > 0.8f && v < 0.86f && u > 0.04f && u < 0.96f;
+                return head || body || arm || thigh || shin || ground ? color : Color.clear;
+            });
+        }
+
+        /// <summary>右向きの矢印（キルログの「撃破した人 → 撃破された人」）。</summary>
+        public static Texture2D Arrow(int size, Color color)
+        {
+            return Draw("IconArrow", size, (u, v) =>
+            {
+                bool shaft = u > 0.08f && u < 0.6f && Mathf.Abs(v - 0.5f) < 0.09f;
+                bool head = u >= 0.5f && u < 0.94f && Mathf.Abs(v - 0.5f) < 0.34f * (0.94f - u) / 0.44f;
+                return shaft || head ? color : Color.clear;
+            });
+        }
+
+        // 点 (u, v) が、(x0, y0) から (x1, y1) への太さ radius × 2 の線の中か。
+        private static bool Segment(float u, float v, float x0, float y0, float x1, float y1, float radius)
+        {
+            var p = new Vector2(u, v);
+            var a = new Vector2(x0, y0);
+            Vector2 ab = new Vector2(x1, y1) - a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+            return (p - (a + ab * t)).sqrMagnitude < radius * radius;
+        }
+
         /// <summary>
         /// ひび割れ（白い線。札の上に重ねる）。中心の近くから枝分かれして広がる線を、種を決めた乱数で描く（毎回同じ形）。
         /// </summary>

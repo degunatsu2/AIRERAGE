@@ -54,9 +54,10 @@ namespace Airerage.PlayMode.Tests
         }
 
         [UnityTest]
-        public IEnumerator TwoCooldownGauges_AreSpacedApart_WithLabelsAboveAndBelow()
+        public IEnumerator TwoCooldownGauges_AreSpacedApart_WithLabelsStacked()
         {
-            // ワイヤーキャンセルとガードのクールタイムが同時に出ると、半径を離し、文字を上と下に分ける（ユーザーの指摘、2026-10-13）。
+            // ワイヤーキャンセルとガードのクールタイムが同時に出ると、古いゲージ（ワイヤーキャンセル）が外へずれ、文字は新しいゲージの上に積む
+            // （ユーザーの指摘、2026-10-13・2026-10-30）。
             SceneManager.LoadScene("Sandbox_Wire");
             yield return null;
             var runner = Object.FindFirstObjectByType<SimulationRunner>();
@@ -66,22 +67,87 @@ namespace Airerage.PlayMode.Tests
 
             var state = runner.PlayerState;
             state.Combat.WireCancelCooldownTicksLeft = 150;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.2f);
+            state = runner.PlayerState;
             state.Combat.GuardCooldownTicksLeft = 100;
             runner.SetPlayerState(state);
-            yield return null;
-            yield return null;
+            yield return WaitSeconds(0.5f);
 
             Assert.That(wire.IsShowing && guard.IsShowing, Is.True, "前提: 両方のゲージが出ている");
-            Assert.That(guard.Radius - wire.Radius, Is.GreaterThanOrEqualTo(1f), "半径が近く、ゲージどうしが重なる");
-            Assert.That(wire.LabelBelow, Is.True, "内側の文字が下に出ていない");
-            Assert.That(guard.LabelBelow, Is.False);
+            Assert.That(guard.Radius, Is.EqualTo(guard.BaseRadius).Within(1e-3f), "新しいゲージ（ガード）は元の半径");
+            Assert.That(wire.Radius - guard.Radius, Is.GreaterThanOrEqualTo((wire.Width + guard.Width) * 0.5f + RingGaugeStack.Gap - 1e-3f),
+                "古いゲージ（ワイヤーキャンセル）が外へずれていない");
+            Assert.That(guard.LabelOffset, Is.EqualTo(0f), "新しいゲージの文字がいちばん下にない");
+            Assert.That(wire.LabelOffset, Is.GreaterThanOrEqualTo(guard.LabelHeight), "古いゲージの文字が上に積まれていない");
 
             yield return WaitUntil(() => runner.PlayerState.Combat.GuardCooldownTicksLeft == 0, 3f);
-            yield return null;
+            yield return WaitSeconds(0.5f);
             Assert.That(guard.IsShowing, Is.False);
             Assert.That(wire.IsShowing, Is.True, "前提: ワイヤーキャンセルのゲージだけが残っている");
-            Assert.That(wire.LabelBelow, Is.False, "1つだけのときは文字を上に戻す");
-            Assert.That(wire.Radius, Is.EqualTo(1.3f).Within(1e-4f), "1つだけのときは元の半径に戻す");
+            Assert.That(wire.LabelOffset, Is.EqualTo(0f), "1つだけのときは文字を元の高さに戻す");
+            Assert.That(wire.Radius, Is.EqualTo(1.3f).Within(1e-3f), "1つだけのときは元の半径に戻す");
+        }
+
+        [UnityTest]
+        public IEnumerator ManyGaugesAroundACharacter_NeverOverlap_OlderOnesOutside()
+        {
+            // 体の周りのゲージを 1 つずつ増やすと、どの 2 つも重ならず、古いゲージほど外にある（ユーザーの指摘、2026-10-30: 一部が重なっていた）。
+            SceneManager.LoadScene("Sandbox_Wire");
+            yield return null;
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            CharacterView view = runner.PlayerView;
+            yield return WaitSeconds(0.3f);
+
+            // 感電の残り（WALL のゲージ）・フィーバー（FEVER）・ワイヤーキャンセル・ガードの順に出す（WALL はワイヤーキャンセルと半径が近い）。
+            var state = runner.PlayerState;
+            state.Combat.StunTicksLeft = 600;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.15f);
+            state = runner.PlayerState;
+            state.Combat.CoinBoostTicksLeft = 600;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.15f);
+            state = runner.PlayerState;
+            state.Combat.WireCancelCooldownTicksLeft = 150;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.15f);
+            state = runner.PlayerState;
+            state.Combat.GuardCooldownTicksLeft = 100;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.5f);
+
+            var gauges = new[] { view.WallClingGauge, view.FeverGauge, view.WireCancelGauge, view.GuardGauge };
+            foreach (RingGaugeView gauge in gauges)
+            {
+                Assert.That(gauge.IsShowing, Is.True, $"前提: {gauge.Label} が出ている");
+            }
+            Assert.That(view.GaugeStack.Shown, Is.EqualTo(gauges), "古い順に並んでいない");
+            for (int i = 0; i + 1 < gauges.Length; i++)
+            {
+                RingGaugeView older = gauges[i];
+                RingGaugeView newer = gauges[i + 1];
+                Assert.That(older.Radius - newer.Radius, Is.GreaterThanOrEqualTo((older.Width + newer.Width) * 0.5f + RingGaugeStack.Gap - 1e-3f),
+                    $"{older.Label} が {newer.Label} の外にない（重なる）");
+                Assert.That(older.LabelOffset, Is.GreaterThanOrEqualTo(newer.LabelOffset + newer.LabelHeight), $"{older.Label} の文字が {newer.Label} の文字の上にない");
+            }
+            Assert.That(view.GuardGauge.Radius, Is.EqualTo(view.GuardGauge.BaseRadius).Within(1e-3f), "いちばん新しいゲージは元の半径");
+            // 文字の起点は、いちばん外の輪の右上（どの輪にもかからない）。
+            RingGaugeView outer = gauges[0];
+            foreach (RingGaugeView gauge in gauges)
+            {
+                Assert.That(gauge.LabelAnchor.y - gauge.Center.y, Is.GreaterThanOrEqualTo(outer.Radius + outer.Width * 0.5f - 1e-3f), $"{gauge.Label} の文字が輪にかかる");
+            }
+
+            // 間のゲージ（フィーバー）が消えたら、外のゲージは内へ詰める。
+            state = runner.PlayerState;
+            state.Combat.CoinBoostTicksLeft = 0;
+            runner.SetPlayerState(state);
+            yield return WaitSeconds(0.5f);
+            Assert.That(view.FeverGauge.IsShowing, Is.False);
+            RingGaugeView wall = view.WallClingGauge;
+            RingGaugeView wire = view.WireCancelGauge;
+            Assert.That(wall.Radius - wire.Radius, Is.EqualTo((wall.Width + wire.Width) * 0.5f + RingGaugeStack.Gap).Within(0.02f), "消えた後に詰めていない");
         }
 
         [UnityTest]

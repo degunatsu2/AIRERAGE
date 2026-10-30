@@ -475,6 +475,13 @@ namespace Airerage.Editor
             SetReference(view, "_sustainGauge", CreateRingGauge(name + "SustainGauge", parent, "SPIN", 2.1f, new Color(1f, 0.6f, 0.2f, 0.85f)));
             // 壁に張り付いていられる残り（紫。ユーザーの要望、2026-10-20）。
             SetReference(view, "_wallClingGauge", CreateRingGauge(name + "WallClingGauge", parent, "WALL", 1.15f, new Color(0.72f, 0.4f, 1f, 0.8f)));
+            // ウインドクローク・キャッスルインジエアー（STORM RUNNER の Q・R）の残り（黄緑・空色。文字なし。周りの風は BoostAuraView）。
+            RingGaugeView cloak = CreateRingGauge(name + "CloakGauge", parent, string.Empty, 1.85f);
+            cloak.Configure(string.Empty, 1.85f, new Color(BoostAuraView.CloakColor.r, BoostAuraView.CloakColor.g, BoostAuraView.CloakColor.b, 0.95f), 0.16f);
+            SetReference(view, "_cloakGauge", cloak);
+            RingGaugeView sky = CreateRingGauge(name + "SkyGauge", parent, string.Empty, 2.45f);
+            sky.Configure(string.Empty, 2.45f, new Color(BoostAuraView.CastleColor.r, BoostAuraView.CastleColor.g, BoostAuraView.CastleColor.b, 0.95f), 0.16f);
+            SetReference(view, "_skyGauge", sky);
             // 復帰までの残り（出現位置の周りに大きく。クールタイムのゲージの大きい版。ユーザーの要望、2026-10-13）。
             RingGaugeView respawn = CreateRingGauge(name + "RespawnGauge", parent, "RESPAWN", 2.6f,
                 new Color(playerColor.r, playerColor.g, playerColor.b, 0.7f));

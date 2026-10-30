@@ -146,6 +146,140 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        // 状態を手で書き換える読み取り口（撃破の数と最後に攻撃した人を、テストが決める）。
+        private sealed class ManualFeed : MonoBehaviour, ISimulationFeed
+        {
+            public CharacterState[] States = new CharacterState[0];
+            public MatchRules MatchRules = new MatchRules();
+            public int Tick;
+            public BankSpot[] Banks = new BankSpot[0];
+
+            public int CharacterCount => States.Length;
+            public int LocalCharacter => 0;
+            public CharacterState GetState(int index) => States[index];
+            public CharacterConfig GetConfig(int index) => new CharacterConfig();
+            public CharacterConfigAsset CharacterOf(int index) => null;
+            public string LabelOf(int index) => $"CPU{index + 1}";
+            public Color ColorOf(int index) => Color.white;
+            public int CurrentTick => Tick;
+            public MatchRules Rules => MatchRules;
+            public MatchState Match => MatchState.None;
+            public CoinField Coins => null;
+            public Airerage.Core.Objects.WorldObjects Objects => null;
+            public IReadOnlyList<StagePlatform> Platforms => null;
+            public IReadOnlyList<StageTrap> Traps => null;
+            public StageState Stage => null;
+            public IReadOnlyList<StageZone> Zones => null;
+            public bool TryGetClone(int index, out CharacterState clone)
+            {
+                clone = default;
+                return false;
+            }
+            public IReadOnlyList<CoinSpawnPoint> CoinSpawns => new CoinSpawnPoint[0];
+            public IReadOnlyList<BankSpot> BankSpots => Banks;
+#pragma warning disable 67
+            public event Action Ticked;
+#pragma warning restore 67
+        }
+
+        [UnityTest]
+        public IEnumerator KillLog_ShowsWhoKnockedOutWhom_NewestOnTop_ThenRetractsAfterFiveSeconds()
+        {
+            // 撃破が起きると、タイマーの右に「撃破した人 → 撃破された人」を出す（ユーザーの要望、2026-10-30）。
+            var root = new GameObject("KillLogTest");
+            root.SetActive(false);
+            var feed = root.AddComponent<ManualFeed>();
+            feed.States = new CharacterState[3];
+            var notices = root.AddComponent<NoticeHud>();
+            typeof(NoticeHud).GetField("_source", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(notices, feed);
+            root.SetActive(true);
+            try
+            {
+                // CPU2 が CPU3 を攻撃している。
+                feed.States[2].Combat.HasLastAttacker = true;
+                feed.States[2].Combat.LastAttacker = 1;
+                yield return null;
+                yield return null;
+                Assert.That(notices.KillLog, Is.Empty, "前提: まだ撃破はない");
+
+                // CPU3 がステージの外へ（撃破された数が増え、CPU2 の撃破の数が増える。戻ると最後に攻撃した人は消える）。
+                feed.States[2].Combat.Falls = 1;
+                feed.States[2].Combat.HasLastAttacker = false;
+                feed.States[1].Combat.Knockouts = 1;
+                yield return null;
+                Assert.That(notices.KillLog.Count, Is.EqualTo(1), "キルログが出ない");
+                Assert.That(notices.KillLog[0].Killer, Is.EqualTo("CPU2"));
+                Assert.That(notices.KillLog[0].Victim, Is.EqualTo("CPU3"));
+
+                // 少し後に、CPU1 がだれにも攻撃されずに落ちる（撃破した人の名前はない）。新しい札がいちばん上。
+                float first = Time.time;
+                while (Time.time - first < 1f)
+                {
+                    yield return null;
+                }
+                feed.States[0].Combat.Falls = 1;
+                yield return null;
+                Assert.That(notices.KillLog.Count, Is.EqualTo(2));
+                Assert.That(notices.KillLog[0].Killer, Is.Empty, "自分で落ちたのに、撃破した人がいる");
+                Assert.That(notices.KillLog[0].Victim, Is.EqualTo("CPU1"));
+                Assert.That(notices.KillLog[1].Victim, Is.EqualTo("CPU3"), "前からの札が下にない");
+                Assert.That(notices.KillsShown, Is.EqualTo(2));
+
+                // 出てから 5 秒で引っ込む（先に出た札から）。
+                while (Time.time - first < NoticeHud.NoticeSeconds + 0.2f)
+                {
+                    yield return null;
+                }
+                Assert.That(notices.KillLog.Count, Is.EqualTo(1), "5 秒で引っ込まない");
+                Assert.That(notices.KillLog[0].Victim, Is.EqualTo("CPU1"));
+                while (Time.time - first < NoticeHud.NoticeSeconds + 1.4f)
+                {
+                    yield return null;
+                }
+                Assert.That(notices.KillLog, Is.Empty);
+                Assert.That(notices.ChipTitles, Is.Empty);
+            }
+            finally
+            {
+                Object.Destroy(root);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator CountdownNotices_StayUntilTheirTime_PastFiveSeconds()
+        {
+            // 秒を数える告知（拠点の移動の予告）は、5 秒で引っ込む決まりから外す（ユーザーの要望、2026-10-30）。ティックを止めて、予告の間に留める。
+            var root = new GameObject("CountdownNoticeTest");
+            root.SetActive(false);
+            var feed = root.AddComponent<ManualFeed>();
+            feed.States = new CharacterState[1];
+            feed.MatchRules = new MatchRules { CountdownTicks = 0, DurationTicks = 6000, BankMoveIntervalTicks = 1200, BankNoticeTicks = 1200 };
+            feed.Tick = 600;
+            feed.Banks = new[]
+            {
+                new BankSpot(new System.Numerics.Vector2(0f, 6f), true),
+                new BankSpot(new System.Numerics.Vector2(-10f, 6f), false),
+            };
+            var notices = root.AddComponent<NoticeHud>();
+            typeof(NoticeHud).GetField("_source", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(notices, feed);
+            root.SetActive(true);
+            try
+            {
+                yield return null;
+                Assert.That(notices.ChipTitles, Does.Contain("BANK MOVES"), "前提: 拠点の移動の予告が出ている");
+                float start = Time.time;
+                while (Time.time - start < NoticeHud.NoticeSeconds + 1f)
+                {
+                    yield return null;
+                }
+                Assert.That(notices.ChipTitles, Does.Contain("BANK MOVES"), "秒を数える告知が 5 秒で引っ込んだ");
+            }
+            finally
+            {
+                Object.Destroy(root);
+            }
+        }
+
         [UnityTest]
         public IEnumerator TakingTheJackpot_MakesTheTakersPlateGlowRainbow_ThenReturnsToNormal()
         {

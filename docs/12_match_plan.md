@@ -170,6 +170,7 @@
 | 帯（`BannerStrip`。案 B） | 大きな出来事だけ、斜めの黒い帯が開いて文字が走り抜ける: 100 枚のコインの予告の始まり「JACKPOT INCOMING」（虹色）、COIN RUSH の始まり（金色、短いファンファーレ `SoundId.CoinRush`）。アディショナルタイムの始まり「OVERTIME」（橙色、REACH THE BANK TO WIN）と試合の終わり「FINISH!」（金色、TIME UP）・「名前 WINS!」（勝った人の色）も同じ帯にした（2026-10-14、ユーザーの要望） |
 | 置き換えたもの | 画面中央の「BANK MOVES IN n」（`BankView`）、「JACKPOT INCOMING」「100 COINS IN n」「JACKPOT 100」（`CoinHud`）、タイマーの下の「LAST 30 SECONDS! COIN RUSH」（`MatchHud`）。ステージの中の表示（拠点の「MOVE n」「NEXT n」、出る地点の「100 IN n」）と音（呼び鈴、警報）は今までどおり |
 | 決まり方 | 出来事の時刻はティック数とルールだけから決まる（`BankRules`、`FieldCoinRules`、`MatchRules`）。巻き戻しでもずれない。動き（出る、消える、帯）は表示の時間（Time.time） |
+| 後の変更（2026-10-30） | 札の並べ方をタイムラインの形にした（新しい札がタイマーの右の上の端に出て、前の札は下へ）。キルログを加えた。告知は 5 秒で引っ込む（秒を数える告知を除く。「JACKPOT 100」は 2 → 5 秒）。これからの告知もすべてタイマーの右に出す。詳しくは [13](13_character_plan.md) 3.32 |
 
 ### 3.12 4 回目の要望（2026-10-15）
 

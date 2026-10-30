@@ -9,8 +9,9 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// STORM RUNNER の風の表示（docs/14 1.2）。風の線には濃い緑の影を付ける（WindShadow。ユーザーの要望、2026-10-16）。
-    /// - ウインドクローク（CombatState.SpeedBoostTicksLeft）: 体の周りを回る黄緑の風と、残りの時間の円形のゲージ（縁つき）。
-    /// - キャッスルインジエアー（SkyBoostTicksLeft）: 体の周りを大きく回る空色の風と、残りの時間の円形のゲージ（縁つき。外側）。
+    /// - ウインドクローク（CombatState.SpeedBoostTicksLeft）: 体の周りを回る黄緑の風。
+    /// - キャッスルインジエアー（SkyBoostTicksLeft）: 体の周りを大きく回る空色の風。
+    ///   どちらも残りの時間の円形のゲージは CharacterView（ほかのゲージと重ならないように並べる。RingGaugeStack）。
     /// - 走り続ける地上技（AttackData.Run）: 黄緑のオーラと、後ろへ流れる黄緑の風の線（速いほど長い）。
     /// - 風のキャラクター（STORM RUNNER）の回る技（AttackData.SpinPerHit。つむじ風）: 体を包む竜巻（キャラクターの回転は CharacterView）。
     /// - 突風の溜め（ActionState.Recast）: 体に集まってくる風の輪。
@@ -23,7 +24,6 @@ namespace Airerage.Runtime.Presentation
         private const int TornadoLines = 3;
         private const int TornadoPoints = 40;
         private const float Z = -0.65f;
-        private const float ArcWidth = 0.16f;
 
         /// <summary>ウインドクローク・走りの色（黄緑）とキャッスルインジエアーの色（空色）。</summary>
         public static readonly Color CloakColor = new Color(0.6f, 1f, 0.3f);
@@ -41,9 +41,7 @@ namespace Airerage.Runtime.Presentation
         {
             public readonly List<WindShadow> Winds = new List<WindShadow>();
             public LineRenderer[] Cloak;
-            public SlantedRingGauge CloakGauge;
             public LineRenderer[] Castle;
-            public SlantedRingGauge CastleGauge;
             public LineRenderer RunAura;
             public LineRenderer[] Streaks;
             public LineRenderer[] Tornado;
@@ -65,9 +63,6 @@ namespace Airerage.Runtime.Presentation
         public bool ShowsTornado(int index) => index >= 0 && index < _lines.Count && _lines[index].ShowingTornado;
 
         public bool ShowsGustWindup(int index) => index >= 0 && index < _lines.Count && _lines[index].ShowingGather;
-
-        /// <summary>キャラクター index のウインドクロークの残りのゲージに縁を描いているか（テスト用）。</summary>
-        public bool CloakGaugeHasFrame(int index) => ShowsCloak(index) && _lines[index].CloakGauge.ShowsFrame;
 
         /// <summary>キャラクター index の風の線に影を付けているか（出している線がすべて影を持つ。テスト用）。</summary>
         public bool WindsHaveShadows(int index)
@@ -98,15 +93,6 @@ namespace Airerage.Runtime.Presentation
             _lineTemplate.gameObject.SetActive(false);
         }
 
-        private void OnDestroy()
-        {
-            foreach (Lines lines in _lines)
-            {
-                lines.CloakGauge.Destroy();
-                lines.CastleGauge.Destroy();
-            }
-        }
-
         private void LateUpdate()
         {
             int count = _feed.CharacterCount;
@@ -118,9 +104,6 @@ namespace Airerage.Runtime.Presentation
             for (int i = 0; i < _lines.Count; i++)
             {
                 Lines lines = _lines[i];
-                // 隠した後の、終わりの白い輪（ゲージを出している間は何もしない）。
-                lines.CloakGauge.Advance();
-                lines.CastleGauge.Advance();
                 if (i >= count)
                 {
                     Show(lines, false, false, false, false, false);
@@ -147,12 +130,10 @@ namespace Airerage.Runtime.Presentation
                 if (cloak)
                 {
                     DrawSwirl(lines.Cloak, center, 1.1f, 1.5f, time * 7f, CloakColor);
-                    DrawGauge(lines.CloakGauge, center, 1.85f, state.Combat.SpeedBoostTicksLeft / (float)boost.DurationTicks, CloakColor);
                 }
                 if (castle)
                 {
                     DrawSwirl(lines.Castle, center, 1.6f, 2f, -time * 4f, CastleColor);
-                    DrawGauge(lines.CastleGauge, center, 2.45f, state.Combat.SkyBoostTicksLeft / (float)config.Skills.SkyBoost.DurationTicks, CastleColor);
                 }
                 if (run)
                 {
@@ -231,12 +212,6 @@ namespace Airerage.Runtime.Presentation
                 line.startColor = new Color(color.r, color.g, color.b, 0.1f);
                 line.endColor = new Color(color.r, color.g, color.b, 0.8f);
             }
-        }
-
-        // 残りの時間の円形のゲージ（ほかの円形ゲージと同じ見た目。SlantedRingGauge。D-76）。
-        private static void DrawGauge(SlantedRingGauge gauge, Vector3 center, float radius, float fraction, Color color)
-        {
-            gauge.Draw(center, radius, ArcWidth, fraction, new Color(color.r, color.g, color.b, 0.95f), Z);
         }
 
         // 揺らめくオーラ（炎のように、上の側ほど大きく揺れて伸びる）。
@@ -321,13 +296,11 @@ namespace Airerage.Runtime.Presentation
             if (lines.ShowingCloak != cloak)
             {
                 SetEnabled(lines.Cloak, cloak);
-                SetGauge(lines.CloakGauge, cloak);
                 lines.ShowingCloak = cloak;
             }
             if (lines.ShowingCastle != castle)
             {
                 SetEnabled(lines.Castle, castle);
-                SetGauge(lines.CastleGauge, castle);
                 lines.ShowingCastle = castle;
             }
             if (lines.ShowingRun != run)
@@ -348,14 +321,6 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        private static void SetGauge(SlantedRingGauge gauge, bool enabled)
-        {
-            if (!enabled)
-            {
-                gauge.Hide();
-            }
-        }
-
         private static void SetEnabled(LineRenderer[] lines, bool enabled)
         {
             foreach (LineRenderer line in lines)
@@ -368,9 +333,7 @@ namespace Airerage.Runtime.Presentation
         {
             var lines = new Lines();
             lines.Cloak = new[] { NewWind(lines, index, "Cloak0", 0.07f, true), NewWind(lines, index, "Cloak1", 0.07f, true) };
-            lines.CloakGauge = NewGauge(index, "CloakGauge");
             lines.Castle = new[] { NewWind(lines, index, "Castle0", 0.1f, true), NewWind(lines, index, "Castle1", 0.1f, true) };
-            lines.CastleGauge = NewGauge(index, "CastleGauge");
             lines.RunAura = NewWind(lines, index, "RunAura", 0.09f, true);
             lines.Streaks = new LineRenderer[StreakCount];
             for (int s = 0; s < StreakCount; s++)
@@ -393,10 +356,6 @@ namespace Airerage.Runtime.Presentation
             return line;
         }
 
-        private SlantedRingGauge NewGauge(int index, string name)
-        {
-            return new SlantedRingGauge(this, $"Boost{index}{name}", _lineTemplate.sharedMaterial, 2);
-        }
 
         private LineRenderer NewLine(int index, string name, float width, bool loop)
         {

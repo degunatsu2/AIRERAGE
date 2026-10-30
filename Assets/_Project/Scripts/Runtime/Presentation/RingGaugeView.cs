@@ -8,8 +8,9 @@ namespace Airerage.Runtime.Presentation
     /// 光る先端とグラデーションの導火線。D-76、2026-10-29）。上（12 時）から時計回りに残りの分だけ光り、減っていく。
     /// ワイヤーキャンセルのクールタイム（キャラクターの周り。「WIRE CANCEL」）、ワイヤーの接続の残り時間（接続点の周り）、
     /// 撃破された後の復帰までの残り（出現位置の周りに大きく。「RESPAWN」。docs/12 T4-2）などに使う。
-    /// 名前は、ゲージの右上（文字を下に出すときは右下）の斜めの札に出す（右上の札と同じ形）。
-    /// 呼ぶ側が毎フレーム Show（出すとき）か Hide を呼ぶ。状態は読むだけ。
+    /// 名前は、ゲージの右上の斜めの札に出す（右上の札と同じ形）。
+    /// 呼ぶ側が毎フレーム Show（出すとき）か Hide を呼ぶ。同じキャラクターの周りのゲージは RingGaugeStack にまとめ、重ならないように
+    /// 並べる（古いゲージほど外側、文字は上。その場合は Show で描かず、RingGaugeStack.Arrange で描く）。状態は読むだけ。
     /// </summary>
     public sealed class RingGaugeView : MonoBehaviour
     {
@@ -18,6 +19,8 @@ namespace Airerage.Runtime.Presentation
         // 札の斜め（高さに対する横のずれの割合）と、文字の周りの余白（画面の点）。
         private const float PlateShear = 0.35f;
         private const float PlatePadding = 6f;
+        // 並べ直したときに、輪の半径と文字の高さが目標へ寄る速さ（1/秒。0.15 秒ほどで寄る）。
+        private const float LayoutSharpness = 20f;
 
         [Tooltip("ゲージを描く材質（頂点の色で塗る。Sprites-Default）")]
         [SerializeField] private Material _material;
@@ -36,8 +39,16 @@ namespace Airerage.Runtime.Presentation
         private SlantedRingGauge _gauge;
         private GUIStyle _style;
         private Vector3 _center;
-        private float _layoutRadius = -1f;
-        private bool _labelBelow;
+
+        // 並べ方（RingGaugeStack）。目標の半径・文字の高さと、今描いている値（滑らかに目標へ寄る。出た瞬間は目標から）。
+        private RingGaugeStack _stack;
+        private float _targetRadius = -1f;
+        private float _shownRadius = -1f;
+        private float _targetLabelOffset;
+        private float _shownLabelOffset = -1f;
+        private float _anchorRadius = -1f;
+        private float _anchorWidth;
+        private float _labelHeight = -1f;
 
         /// <summary>今表示しているか。</summary>
         public bool IsShowing { get; private set; }
@@ -53,20 +64,65 @@ namespace Airerage.Runtime.Presentation
         /// <summary>最後に描いたゲージの中心。</summary>
         public Vector3 Center => _center;
 
-        /// <summary>今の半径（SetLayout で変えていなければ、設定した半径）。</summary>
-        public float Radius => _layoutRadius > 0f ? _layoutRadius : _radius;
+        /// <summary>今描いている半径（並べ直している間は、目標へ動いている途中の値）。</summary>
+        public float Radius => _shownRadius > 0f ? _shownRadius : TargetRadius;
 
-        /// <summary>文字をゲージの下に出しているか（ふつうは上）。</summary>
-        public bool LabelBelow => _labelBelow;
+        /// <summary>並べ方で決まった目標の半径（並べていなければ、設定した半径）。</summary>
+        public float TargetRadius => _targetRadius > 0f ? _targetRadius : _radius;
 
-        /// <summary>
-        /// 同じキャラクターの周りに複数のゲージを出すときの配置（ユーザーの指摘: 重なって見にくい）。radius が null なら設定した半径に戻す。
-        /// labelBelow なら文字をゲージの下に出す。
-        /// </summary>
-        public void SetLayout(float? radius, bool labelBelow)
+        /// <summary>設定した半径（ほかのゲージがなければ、この半径に出す）。</summary>
+        public float BaseRadius => _radius;
+
+        /// <summary>輪の太さ（m）。</summary>
+        public float Width => _width;
+
+        /// <summary>名前の札を出すか。</summary>
+        public bool HasLabel => !string.IsNullOrEmpty(_label);
+
+        /// <summary>名前の札の高さ（画面の点。描く前は文字の大きさからの見積もり）。</summary>
+        public float LabelHeight => _labelHeight > 0f ? _labelHeight : _fontSize * 1.3f + PlatePadding * 0.6f;
+
+        /// <summary>名前の札を、起点からどれだけ上に積んでいるか（画面の点。目標。いちばん新しいゲージは 0）。</summary>
+        public float LabelOffset => _targetLabelOffset;
+
+        /// <summary>同じキャラクターの周りのゲージとして並べているか。</summary>
+        public bool InStack => _stack != null;
+
+        /// <summary>名前の札の起点（世界の座標。いちばん外の輪の右上）。</summary>
+        public Vector3 LabelAnchor
         {
-            _layoutRadius = radius ?? -1f;
-            _labelBelow = labelBelow;
+            get
+            {
+                float radius = _anchorRadius > 0f ? _anchorRadius : Radius;
+                float width = _anchorRadius > 0f ? _anchorWidth : _width;
+                return _center + new Vector3(radius * 0.35f, radius + width, 0f);
+            }
+        }
+
+        internal void JoinStack(RingGaugeStack stack)
+        {
+            _stack = stack;
+        }
+
+        internal void SetStackTarget(float radius, float labelOffset)
+        {
+            _targetRadius = radius;
+            _targetLabelOffset = labelOffset;
+        }
+
+        // 並べたゲージを描く（半径と文字の高さを目標へ寄せる）。
+        internal void DrawInStack()
+        {
+            float blend = 1f - Mathf.Exp(-LayoutSharpness * Time.deltaTime);
+            _shownRadius = _shownRadius > 0f ? Mathf.Lerp(_shownRadius, TargetRadius, blend) : TargetRadius;
+            _shownLabelOffset = _shownLabelOffset >= 0f ? Mathf.Lerp(_shownLabelOffset, _targetLabelOffset, blend) : _targetLabelOffset;
+            _gauge?.Draw(_center, _shownRadius, _width, Fraction, _color, Z);
+        }
+
+        internal void SetLabelAnchor(float radius, float width)
+        {
+            _anchorRadius = radius;
+            _anchorWidth = width;
         }
 
         private void Awake()
@@ -126,7 +182,10 @@ namespace Airerage.Runtime.Presentation
             IsShowing = true;
             Fraction = Mathf.Min(fraction, 1f);
             _center = center;
-            _gauge.Draw(center, Radius, _width, Fraction, _color, Z);
+            if (_stack == null)
+            {
+                _gauge.Draw(center, Radius, _width, Fraction, _color, Z);
+            }
         }
 
         public void Hide()
@@ -134,6 +193,12 @@ namespace Airerage.Runtime.Presentation
             IsShowing = false;
             Fraction = 0f;
             _gauge?.Hide();
+            // 次に出るときは、その時の目標の半径から（前の位置から動き出さない）。
+            _shownRadius = -1f;
+            _shownLabelOffset = -1f;
+            _targetRadius = -1f;
+            _targetLabelOffset = 0f;
+            _anchorRadius = -1f;
         }
 
         private void OnGUI()
@@ -151,9 +216,8 @@ namespace Airerage.Runtime.Presentation
                     return;
                 }
             }
-            // 札の左下（文字を下に出すときは左上）を、輪の右上（右下）に付ける。
-            float offsetY = _labelBelow ? -(Radius + _width) : Radius + _width;
-            Vector3 screen = _camera.WorldToScreenPoint(_center + new Vector3(Radius * 0.35f, offsetY, 0f));
+            // 札の左下を、輪の右上（並べているときは、いちばん外の輪の右上から、新しいゲージの札の上に積んだ所）に付ける。
+            Vector3 screen = _camera.WorldToScreenPoint(LabelAnchor);
             if (screen.z <= 0f)
             {
                 return;
@@ -169,8 +233,9 @@ namespace Airerage.Runtime.Presentation
             Vector2 size = _style.CalcSize(content);
             float width = size.x + PlatePadding * 2f + size.y * PlateShear;
             float height = size.y + PlatePadding * 0.6f;
+            _labelHeight = height;
             float x = screen.x;
-            float y = Screen.height - screen.y - (_labelBelow ? 0f : height);
+            float y = Screen.height - screen.y - height - Mathf.Max(0f, _shownLabelOffset);
             var plate = new Rect(x, y, width, height);
             Color text = Color.Lerp(_color, Color.white, 0.35f);
             text.a = 0.95f;
