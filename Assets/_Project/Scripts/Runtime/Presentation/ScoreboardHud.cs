@@ -30,6 +30,9 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private int _width = 300;
         [SerializeField] private int _rowHeight = 52;
         [SerializeField] private float _rowGap = 6f;
+
+        // キャラクターと重なった札を透かす（HudOcclusion）。
+        private readonly HudOcclusion.Link _occlusion = new HudOcclusion.Link();
         [Tooltip("画面の右上からの余白（ピクセル）")]
         [SerializeField] private Vector2 _margin = new Vector2(12f, 10f);
         [Tooltip("順位が変わったときに、札が新しい位置へ滑る速さ（1 秒あたりの割合）")]
@@ -267,8 +270,12 @@ namespace Airerage.Runtime.Presentation
             foreach (int index in _order)
             {
                 var rect = new Rect(x, _rowY[index], _width, _rowHeight);
+                // キャラクターと重なったら透かす（王冠の分を含めて調べる。HudOcclusion）。
+                var area = new Rect(rect.x - _plate.CrownWidth, rect.y, rect.width + _plate.CrownWidth, rect.height);
+                HudFade.Begin(_occlusion.AlphaFor(this, index, area));
                 _plate.Draw(rect, index + 1, _feed.LabelOf(index), _feed.ColorOf(index), _feed.GetState(index),
                     IsLeader(_feed, index), CurrentLook(index), _bankColor, LogoOf(_feed, index));
+                HudFade.End();
             }
         }
     }

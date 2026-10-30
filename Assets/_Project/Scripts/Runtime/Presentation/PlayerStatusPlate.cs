@@ -90,15 +90,15 @@ namespace Airerage.Runtime.Presentation
             const float logoGap = 3f;
             float pair = logo != null ? size * 2f + logoGap : size;
             var icon = new Rect(area.center.x - pair * 0.5f, area.y, size, size);
-            GUI.color = Color.Lerp(Color.Lerp(color, Color.black, 0.45f), Gray * 0.6f, look.Gray);
+            GUI.color = HudFade.Apply(Color.Lerp(Color.Lerp(color, Color.black, 0.45f), Gray * 0.6f, look.Gray));
             GUI.DrawTexture(icon, Texture2D.whiteTexture);
-            GUI.color = Color.Lerp(color, Gray, look.Gray);
+            GUI.color = HudFade.Apply(Color.Lerp(color, Gray, look.Gray));
             GUI.DrawTexture(new Rect(icon.x + 2f, icon.y + 2f, icon.width - 4f, icon.height - 4f), Texture2D.whiteTexture);
             GUI.color = previous;
             GuidePlate.DrawText(icon, number.ToString(), _iconText, Color.white);
             if (logo != null)
             {
-                GUI.color = Color.Lerp(Color.white, Gray, look.Gray);
+                GUI.color = HudFade.Apply(Color.Lerp(Color.white, Gray, look.Gray));
                 GUI.DrawTexture(new Rect(icon.xMax + logoGap, icon.y, size, size), logo, ScaleMode.ScaleToFit);
                 GUI.color = previous;
             }
@@ -124,7 +124,7 @@ namespace Airerage.Runtime.Presentation
                 GuidePlate.DrawText(cellRect, values[c].ToString(), _number, textColor);
                 if (c > 0)
                 {
-                    GUI.color = new Color(1f, 1f, 1f, 0.18f);
+                    GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.18f));
                     GUI.DrawTexture(new Rect(cellRect.x, cellRect.y + 4f, 1f, cellRect.height - 8f), Texture2D.whiteTexture);
                     GUI.color = previous;
                 }
@@ -132,13 +132,13 @@ namespace Airerage.Runtime.Presentation
 
             if (look.Crack > 0f)
             {
-                GUI.color = new Color(1f, 1f, 1f, 0.85f * look.Crack);
+                GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.85f * look.Crack));
                 GUI.DrawTexture(rect, _crack);
                 GUI.color = previous;
             }
             if (look.Gray > 0f && !string.IsNullOrEmpty(look.Overlay))
             {
-                GUI.color = new Color(0f, 0f, 0f, 0.55f * look.Gray);
+                GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.55f * look.Gray));
                 GUI.DrawTexture(new Rect(right.x, right.y + right.height * 0.2f, right.width, right.height * 0.6f), Texture2D.whiteTexture);
                 GUI.color = previous;
                 GuidePlate.DrawText(right, look.Overlay, _overlay, new Color(1f, 1f, 1f, look.Gray));
@@ -155,7 +155,7 @@ namespace Airerage.Runtime.Presentation
                 _plate.DrawFill(rect, new Color(hue.r, hue.g, hue.b, (0.25f + 0.2f * Mathf.Sin(time * 14f)) * look.Jackpot));
                 _plate.DrawRainbowFrame(rect, time, look.Jackpot);
                 Rect jackpotArea = _plate.RightRect(rect);
-                GUI.color = new Color(0f, 0f, 0f, 0.6f * look.Jackpot);
+                GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.6f * look.Jackpot));
                 GUI.DrawTexture(new Rect(jackpotArea.x, jackpotArea.y + jackpotArea.height * 0.15f, jackpotArea.width, jackpotArea.height * 0.7f), Texture2D.whiteTexture);
                 GUI.color = previous;
                 Color text = Color.HSVToRGB(Mathf.Repeat(time / 0.9f + 0.5f, 1f), 0.45f, 1f);

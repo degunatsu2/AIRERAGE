@@ -176,8 +176,9 @@ namespace Airerage.Runtime.Presentation
             }
 
             // 画面の外なら、誘導表示の札（左に拠点の絵、右に「BANK」。予告中は次の地点も「NEXT」で）。
-            BankOffscreen = _guides != null && _guides.Add(_bankCenter, _color, _bankIcon, "BANK");
-            _nextOffscreen = NextSpot >= 0 && _guides != null && _guides.Add(_nextCenter, _color, _bankIcon, "NEXT", 0.7f);
+            // 拠点が移ったとき（札が離れた所に出る）と、予告が出たときは、札を軽く目立たせる（EdgeGuideLayer の announce）。
+            BankOffscreen = _guides != null && _guides.Add(_bankCenter, _color, _bankIcon, "BANK", announce: "bank");
+            _nextOffscreen = NextSpot >= 0 && _guides != null && _guides.Add(_nextCenter, _color, _bankIcon, "NEXT", 0.7f, announce: "next");
         }
 
         // 確定した数が増えた人を探し、「+n BANKED」を出して輪を光らせる（巻き戻しで減ったときは何も出さない）。

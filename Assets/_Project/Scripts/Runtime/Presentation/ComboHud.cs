@@ -151,10 +151,14 @@ namespace Airerage.Runtime.Presentation
             }
             Color previous = GUI.color;
             float y = 140f;
+            int part = 0;
             foreach (Entry entry in _entries)
             {
                 float alpha = entry.Active ? 1f : Mathf.Clamp01(1f - (Time.time - entry.EndedAt) / _lingerSeconds);
+                // キャラクターと重なったら透かす（HudOcclusion）。
+                HudFade.Begin(_occlusion.AlphaFor(this, part++, new Rect(20f, y, 300f, 126f)));
                 DrawEntry(entry, 20f, y, alpha);
+                HudFade.End();
                 y += 140f;
             }
             GUI.color = previous;
@@ -172,22 +176,25 @@ namespace Airerage.Runtime.Presentation
 
             // のけぞりの残り。
             var back = new Rect(x, y + 112f, 240f, 12f);
-            GUI.color = new Color(0f, 0f, 0f, 0.6f * alpha);
+            GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.6f * alpha));
             GUI.DrawTexture(back, Texture2D.whiteTexture);
             Color fill = _gaugeColor;
             fill.a = alpha;
-            GUI.color = fill;
+            GUI.color = HudFade.Apply(fill);
             GUI.DrawTexture(new Rect(back.x + 2f, back.y + 2f, (back.width - 4f) * entry.HitstunLeft, back.height - 4f), Texture2D.whiteTexture);
         }
+
+        // キャラクターと重なった表示を透かす（HudOcclusion）。
+        private readonly HudOcclusion.Link _occlusion = new HudOcclusion.Link();
 
         private static void Shadowed(Rect rect, string text, GUIStyle style, Color color, float alpha, float scale = 1f)
         {
             int size = style.fontSize;
             style.fontSize = Mathf.RoundToInt(size * scale);
-            GUI.color = new Color(0f, 0f, 0f, 0.8f * alpha);
+            GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.8f * alpha));
             GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width, rect.height), text, style);
             color.a *= alpha;
-            GUI.color = color;
+            GUI.color = HudFade.Apply(color);
             GUI.Label(rect, text, style);
             style.fontSize = size;
         }

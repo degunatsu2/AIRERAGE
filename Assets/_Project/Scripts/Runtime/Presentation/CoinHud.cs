@@ -173,7 +173,8 @@ namespace Airerage.Runtime.Presentation
             }
             foreach (Cluster cluster in _clusters)
             {
-                cluster.Offscreen = _guides != null && _guides.Add(cluster.Center, _color, _pileIcon, $"COIN {cluster.Value}");
+                // 撃破で新しく出たかたまりは、札を軽く目立たせる（EdgeGuideLayer の announce）。
+                cluster.Offscreen = _guides != null && _guides.Add(cluster.Center, _color, _pileIcon, $"COIN {cluster.Value}", announce: "ko");
                 OffscreenKoDropClusters += cluster.Offscreen ? 1 : 0;
             }
         }

@@ -56,6 +56,7 @@ namespace Airerage.Runtime.Presentation
         private int _lastWarningSecond = -1;
         private readonly List<float> _bankMoves = new List<float>();
         private TimerPlate _timerPlate;
+        private readonly HudOcclusion.Link _occlusion = new HudOcclusion.Link();
         private readonly BannerStrip _strip = new BannerStrip();
         private string _centerSub = string.Empty;
         private Color _centerColor = Color.white;
@@ -331,7 +332,12 @@ namespace Airerage.Runtime.Presentation
             float scale = warning ? 1f + 0.08f * Mathf.Abs(Mathf.Sin(Time.time * Mathf.PI)) : 1f;
             float remaining = phase == MatchPhase.Playing && _rules.DurationTicks > 0 ? (float)left / _rules.DurationTicks : phase == MatchPhase.Overtime ? 0f : -1f;
             TimerPlate.Timeline timeline = TimerPlate.TimelineOf(_rules, tick, _bankMoves);
+            // キャラクターと重なったら、タイマーと流れのバーを透かす（HudOcclusion）。
+            float wide = Mathf.Max(TimerPlate.Width, TimerPlate.TimelineWidth);
+            var area = new Rect(Screen.width * 0.5f - wide * 0.5f, 0f, wide, TimerPlate.Height + 22f);
+            HudFade.Begin(_occlusion.AlphaFor(this, 0, area));
             float bottom = _timerPlate.Draw(Screen.width * 0.5f, TimerLabel, TimerDigits, color, remaining, scale, timeline);
+            HudFade.End();
             if (ChallengersText.Length > 0)
             {
                 Shadowed(new Rect(Screen.width * 0.5f - 300f, bottom + 4f, 600f, 30f), $"BANK = WIN:  {ChallengersText}", _small, new Color(1f, 0.85f, 0.4f));

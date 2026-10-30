@@ -67,6 +67,7 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private int _player = -1;
 
         private readonly Slot[] _slots = { new Slot(), new Slot(), new Slot() };
+        private readonly HudOcclusion.Link _occlusion = new HudOcclusion.Link();
         private readonly List<HeadNotice> _notices = new List<HeadNotice>();
         private readonly Texture2D[] _partial = new Texture2D[SlotCount];
         private readonly int[] _partialWidth = { -1, -1, -1 };
@@ -384,6 +385,10 @@ namespace Airerage.Runtime.Presentation
             }
             float x = center - total * 0.5f;
             float y = Screen.height - BottomMargin - SlotHeight;
+            // キャラクターと重なったら、札を透かす（HudOcclusion。名前とスタックのゲージを含めた範囲を、画面の座標で調べる）。
+            float side = StackSpacing + StackWidth;
+            var area = new Rect(x - side, y - 24f, total + side * 2f, SlotHeight + 24f);
+            HudFade.Begin(_occlusion.AlphaFor(this, 0, ToScreen(GUI.matrix, area)));
             for (int i = 0; i < SlotCount; i++)
             {
                 DrawSlot(_slots[i], i, new Rect(x + i * (SlotWidth + SlotGap), y, SlotWidth, SlotHeight));
@@ -392,8 +397,17 @@ namespace Airerage.Runtime.Presentation
             {
                 GuidePlate.DrawText(new Rect(x, y - 24f, total, 22f), _feed.LabelOf(_player), _name, _feed.ColorOf(_player));
             }
+            HudFade.End();
             GUI.matrix = matrix;
             DrawHeadNotices();
+        }
+
+        // GUI.matrix の下の四角を、画面の四角にする（拡大と移動だけ）。
+        private static Rect ToScreen(Matrix4x4 matrix, Rect rect)
+        {
+            Vector3 min = matrix.MultiplyPoint3x4(new Vector3(rect.xMin, rect.yMin, 0f));
+            Vector3 max = matrix.MultiplyPoint3x4(new Vector3(rect.xMax, rect.yMax, 0f));
+            return Rect.MinMaxRect(Mathf.Min(min.x, max.x), Mathf.Min(min.y, max.y), Mathf.Max(min.x, max.x), Mathf.Max(min.y, max.y));
         }
 
         private void DrawSlot(Slot slot, int index, Rect rect)
@@ -401,20 +415,20 @@ namespace Airerage.Runtime.Presentation
             bool super = Slots[index] == AttackSlot.Super;
             Color accent = super ? SuperColor : SpecialColor;
             Color previous = GUI.color;
-            GUI.color = Fill;
+            GUI.color = HudFade.Apply(Fill);
             GUI.DrawTexture(rect, _fill);
 
             // たまった分（左から。縁と同じ傾きで切る）。使えるときは薄く、たまっている途中は少し濃く。
             if (slot.Fill > 0f)
             {
-                GUI.color = new Color(accent.r, accent.g, accent.b, slot.Ready ? 0.28f : 0.45f);
+                GUI.color = HudFade.Apply(new Color(accent.r, accent.g, accent.b, slot.Ready ? 0.28f : 0.45f));
                 GUI.DrawTexture(rect, PartialFill(index, slot.Fill));
             }
 
             float flash = 1f - (Time.time - slot.ReadyAt) / ReadyFlashSeconds;
             if (flash > 0f)
             {
-                GUI.color = new Color(1f, 1f, 1f, 0.7f * flash);
+                GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.7f * flash));
                 GUI.DrawTexture(rect, _fill);
             }
 
@@ -422,21 +436,21 @@ namespace Airerage.Runtime.Presentation
             if (slot.Line >= 0f)
             {
                 float lineX = rect.x + slot.Line * (SlotWidth - Slant) - (LineWidth - Slant) * 0.5f;
-                GUI.color = Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f, 1f), 0.7f, 1f);
+                GUI.color = HudFade.Apply(Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f, 1f), 0.7f, 1f));
                 GUI.DrawTexture(new Rect(lineX, rect.y, LineWidth, rect.height), _line);
             }
 
             if (slot.InUse)
             {
-                GUI.color = Color.white;
+                GUI.color = HudFade.Apply(Color.white);
             }
             else if (super && slot.Ready)
             {
-                GUI.color = Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f, 1f), 0.6f, 1f);
+                GUI.color = HudFade.Apply(Color.HSVToRGB(Mathf.Repeat(Time.time / 1.2f, 1f), 0.6f, 1f));
             }
             else
             {
-                GUI.color = slot.Ready ? accent : Idle;
+                GUI.color = HudFade.Apply(slot.Ready ? accent : Idle);
             }
             GUI.DrawTexture(rect, _frame);
             bool heist = slot.HeistFive >= 0f;
@@ -450,7 +464,7 @@ namespace Airerage.Runtime.Presentation
             if (slot.MaxCharges > 1)
             {
                 // 札の左の縁に沿った、スタックの数だけ縦に分けたゲージ（下からたまる）。
-                GUI.color = Color.white;
+                GUI.color = HudFade.Apply(Color.white);
                 GUI.DrawTexture(new Rect(rect.x - StackSpacing - StackWidth, rect.y, StackWidth + Slant + 1, SlotHeight),
                     StackGauge(index, slot.MaxCharges, slot.Stacks, accent));
             }
@@ -486,13 +500,13 @@ namespace Airerage.Runtime.Presentation
         {
             int top = HeistBarTop(bar);
             var rect = new Rect(slot.x, slot.y + top, SlotWidth, HeistBarHeight);
-            GUI.color = new Color(0f, 0f, 0f, 0.6f);
+            GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.6f));
             GUI.DrawTexture(rect, _heistBands[bar]);
             // たまった分: 帯の左の端から、帯の長さ × fill までを切り取って描く。
             float start = Slant * (1f - (top + HeistBarHeight * 0.5f) / SlotHeight) + HeistBarInset;
             float length = SlotWidth - Slant - HeistBarInset * 2f;
             GUI.BeginGroup(new Rect(rect.x, rect.y, start + length * Mathf.Clamp01(fill), rect.height));
-            GUI.color = color;
+            GUI.color = HudFade.Apply(color);
             GUI.DrawTexture(new Rect(0f, 0f, SlotWidth, HeistBarHeight), _heistBands[bar]);
             GUI.EndGroup();
         }
@@ -534,13 +548,13 @@ namespace Airerage.Runtime.Presentation
                 const float height = 24f;
                 float y = Screen.height - p.y - height - rise - (_notices.Count - 1 - i) * (height + 4f);
                 var rect = new Rect(p.x - width * 0.5f, y, width, height);
-                GUI.color = new Color(0.03f, 0.05f, 0.09f, 0.8f * alpha);
+                GUI.color = HudFade.Apply(new Color(0.03f, 0.05f, 0.09f, 0.8f * alpha));
                 GUI.DrawTexture(rect, Texture2D.whiteTexture);
-                GUI.color = new Color(notice.Color.r, notice.Color.g, notice.Color.b, alpha);
+                GUI.color = HudFade.Apply(new Color(notice.Color.r, notice.Color.g, notice.Color.b, alpha));
                 GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2f, rect.width, 2f), Texture2D.whiteTexture);
                 if (notice.Icon != null)
                 {
-                    GUI.color = new Color(1f, 1f, 1f, alpha);
+                    GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
                     GUI.DrawTexture(new Rect(rect.x + 3f, rect.y + 1f, 24f, 20f), notice.Icon, ScaleMode.ScaleToFit);
                 }
                 else

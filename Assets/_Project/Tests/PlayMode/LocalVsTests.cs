@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Airerage.Core.Simulation;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
@@ -116,6 +117,7 @@ namespace Airerage.PlayMode.Tests
                     "試合が始まらないか、地面に立たない");
                 float p1 = runner.GetState(0).Position.X;
                 float p2 = runner.GetState(1).Position.X;
+                Vector3 cameraAt = view.transform.position;
                 InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.D));
                 yield return WaitSeconds(0.4f);
                 InputSystem.QueueStateEvent(keyboard, new KeyboardState());
@@ -134,10 +136,13 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(runner.GetState(1).Position.X - p2, Is.LessThan(-1f), "ゲームパッドで P2 が動かない");
                 Assert.That(Mathf.Abs(runner.GetState(0).Position.X - p1), Is.LessThan(0.1f), "ゲームパッドで P1 も動いた");
 
-                // 全員が入るカメラと、人ごとの技の札（参加した 2 人分だけ）。
+                // ステージ全体を映して動かないカメラ（ユーザーの要望、2026-10-30: 全員を追うと画面がぶれて照準がずれる）と、人ごとの技の札
+                // （参加した 2 人分だけ）。
                 var camera = UnityEngine.Object.FindFirstObjectByType<SharedCamera>();
-                Assert.That(camera, Is.Not.Null, "全員が入るカメラがない");
-                Assert.That(camera.Distance, Is.GreaterThanOrEqualTo(30f - 0.01f));
+                Assert.That(camera, Is.Not.Null, "共通のカメラがない");
+                StageBounds bounds = ((ILocalAimSource)runner).Bounds.Value;
+                Assert.That(camera.HalfSize.x * 2f, Is.GreaterThan((bounds.MaxX - bounds.MinX) * 0.9f), "ステージ全体を映していない");
+                Assert.That(Vector3.Distance(view.transform.position, cameraAt), Is.LessThan(1e-3f), "人が動いたらカメラが動いた");
                 int shown = 0;
                 foreach (SkillHud hud in UnityEngine.Object.FindObjectsByType<SkillHud>(FindObjectsSortMode.None))
                 {
@@ -170,6 +175,18 @@ namespace Airerage.PlayMode.Tests
                 InputSystem.settings.editorInputBehaviorInPlayMode = savedBehavior;
                 InputSystem.settings.backgroundBehavior = savedBackground;
             }
+        }
+
+        [Test]
+        public void SharedCamera_FramesTheWholeStage()
+        {
+            // 撃破の範囲から 1m 内側を映す。範囲がなければ原点の周りの決めた範囲。
+            SharedCamera.WholeStage(new StageBounds(-60f, -22f, 60f, 46f), 1f, new Vector2(64f, 40f), out Vector2 center, out Vector2 half);
+            Assert.That(center, Is.EqualTo(new Vector2(0f, 12f)));
+            Assert.That(half, Is.EqualTo(new Vector2(59f, 33f)));
+            SharedCamera.WholeStage(null, 1f, new Vector2(64f, 40f), out center, out half);
+            Assert.That(center, Is.EqualTo(Vector2.zero));
+            Assert.That(half, Is.EqualTo(new Vector2(64f, 40f)));
         }
 
         [Test]

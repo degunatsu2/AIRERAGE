@@ -246,6 +246,107 @@ namespace Airerage.PlayMode.Tests
         }
 
         [UnityTest]
+        public IEnumerator HudOverACharacter_FadesWhileTheyOverlap()
+        {
+            // キャラクターと重なった HUD を透かす（HudOcclusion。ユーザーの要望、2026-10-30）。原点のキャラクターを正面から映す。
+            var root = new GameObject("HudOcclusionTest");
+            root.SetActive(false);
+            var camera = new GameObject("TestCamera").AddComponent<Camera>();
+            camera.transform.position = new Vector3(0f, 0f, -30f);
+            var feed = root.AddComponent<ManualFeed>();
+            feed.States = new CharacterState[1];
+            var occlusion = root.AddComponent<HudOcclusion>();
+            typeof(HudOcclusion).GetField("_source", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(occlusion, feed);
+            typeof(HudOcclusion).GetField("_camera", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(occlusion, camera);
+            root.SetActive(true);
+            try
+            {
+                yield return null;
+                Assert.That(occlusion.Bodies.Count, Is.EqualTo(1), "キャラクターの体の四角がない");
+                Rect body = occlusion.Bodies[0];
+                Assert.That(body.center.x, Is.EqualTo(Screen.width * 0.5f).Within(2f), "体が画面の中央にない");
+                var over = new Rect(body.center.x - 20f, body.center.y - 20f, 40f, 40f);
+                var away = new Rect(4f, 4f, 40f, 40f);
+                Assert.That(occlusion.Overlaps(over), Is.True);
+                Assert.That(occlusion.Overlaps(away), Is.False);
+                float start = Time.time;
+                float overAlpha = 1f;
+                float awayAlpha = 1f;
+                while (Time.time - start < HudOcclusion.FadeSeconds * 3f)
+                {
+                    overAlpha = occlusion.AlphaFor(root, 0, over);
+                    awayAlpha = occlusion.AlphaFor(root, 1, away);
+                    yield return null;
+                }
+                Assert.That(overAlpha, Is.EqualTo(HudOcclusion.FadedAlpha).Within(0.01f), "重なった HUD が透けない");
+                Assert.That(awayAlpha, Is.EqualTo(1f), "重なっていない HUD が透けた");
+
+                // 復帰を待っている人（見えない）とは重ならない。
+                feed.States[0].Combat.RespawnTicksLeft = 60;
+                yield return null;
+                Assert.That(occlusion.Bodies, Is.Empty, "見えない人の体で透かす");
+            }
+            finally
+            {
+                Object.Destroy(root);
+                Object.Destroy(camera.gameObject);
+            }
+        }
+
+        // 毎フレーム、画面の外の物の誘導表示を出す（EdgeGuideLayer がそのフレームの分を消した後に）。
+        private sealed class GuideSource : MonoBehaviour
+        {
+            public EdgeGuideLayer Layer;
+            public Vector3 World;
+
+            private void Update()
+            {
+                Layer.Add(World, Color.yellow, null, "COIN 20", announce: "ko");
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator EdgeGuides_FlashWhenTheyAppear_AndAgainWhenTheyMove()
+        {
+            // 撃破ドロップのかたまりや拠点の移動の誘導表示は、出てきたときに軽く目立たせる（ユーザーの要望、2026-10-30）。
+            var camera = new GameObject("TestCamera").AddComponent<Camera>();
+            camera.transform.position = new Vector3(0f, 0f, -30f);
+            var layerObject = new GameObject("EdgeGuides");
+            layerObject.SetActive(false);
+            var layer = layerObject.AddComponent<EdgeGuideLayer>();
+            layer.Configure(camera);
+            layerObject.SetActive(true);
+            var source = new GameObject("GuideSource").AddComponent<GuideSource>();
+            source.Layer = layer;
+            source.World = new Vector3(200f, 0f, 0f);
+            try
+            {
+                yield return null;
+                yield return null;
+                Assert.That(layer.Count, Is.EqualTo(1), "画面の外の物の誘導表示がない");
+                Assert.That(layer.AppearingCount, Is.EqualTo(1), "出てきたときに目立たせない");
+                float start = Time.time;
+                while (Time.time - start < EdgeGuideLayer.AppearSeconds + 0.2f)
+                {
+                    yield return null;
+                }
+                Assert.That(layer.AppearingCount, Is.Zero, "目立たせるのが終わらない");
+
+                // 別の所（反対の端）へ移ったら、もう一度目立たせる（拠点が移ったとき）。
+                source.World = new Vector3(-200f, 0f, 0f);
+                yield return null;
+                yield return null;
+                Assert.That(layer.AppearingCount, Is.EqualTo(1), "移った札を目立たせない");
+            }
+            finally
+            {
+                Object.Destroy(source.gameObject);
+                Object.Destroy(layer.gameObject);
+                Object.Destroy(camera.gameObject);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator CountdownNotices_StayUntilTheirTime_PastFiveSeconds()
         {
             // 秒を数える告知（拠点の移動の予告）は、5 秒で引っ込む決まりから外す（ユーザーの要望、2026-10-30）。ティックを止めて、予告の間に留める。

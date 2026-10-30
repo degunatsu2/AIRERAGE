@@ -39,6 +39,17 @@ namespace Airerage.PlayMode.Tests
             Assert.That(trail.PointCount, Is.GreaterThan(10), "軌跡が記録されていない");
             Assert.That(hud.Stats.MaxSpeed, Is.GreaterThan(0f), "出現後の落下の速さが計測されていない");
 
+            // トレーニングの表示（右下の 6 つ。ユーザーの要望、2026-10-30）: まだ当てていない・出していないときは「—」。F4 で隠して、もう一度で出す。
+            Assert.That(hud.Visible, Is.True);
+            string[] values = hud.Values;
+            Assert.That(values.Length, Is.EqualTo(DebugHud.Labels.Length));
+            Assert.That(values[0], Is.EqualTo("—"), "当てていないのにダメージがある");
+            Assert.That(values[2], Does.EndWith("m/s"), "速度に単位がない");
+            hud.Toggle();
+            Assert.That(hud.Visible, Is.False, "隠せない");
+            hud.Toggle();
+            Assert.That(hud.Visible, Is.True);
+
             // 速さ: 1 → 1/2 → 1/4 → 一時停止
             controls.CycleSpeed();
             Assert.That(runner.SpeedScale, Is.EqualTo(0.5f));

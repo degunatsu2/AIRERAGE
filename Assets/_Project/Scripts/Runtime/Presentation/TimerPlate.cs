@@ -107,9 +107,9 @@ namespace Airerage.Runtime.Presentation
             EnsureStyles();
             Color previous = GUI.color;
             var rect = new Rect(centerX - Width * 0.5f, 0f, Width, Height);
-            GUI.color = Fill;
+            GUI.color = HudFade.Apply(Fill);
             GUI.DrawTexture(rect, _fill);
-            GUI.color = Frame;
+            GUI.color = HudFade.Apply(Frame);
             GUI.DrawTexture(rect, _frame);
             GUI.color = previous;
 
@@ -126,9 +126,9 @@ namespace Airerage.Runtime.Presentation
             if (remaining >= 0f)
             {
                 var bar = new Rect(centerX - 70f, rect.y + 62f, 140f, 4f);
-                GUI.color = new Color(1f, 1f, 1f, 0.18f);
+                GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.18f));
                 GUI.DrawTexture(bar, Texture2D.whiteTexture);
-                GUI.color = digitsColor;
+                GUI.color = HudFade.Apply(digitsColor);
                 GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(remaining), bar.height), Texture2D.whiteTexture);
                 GUI.color = previous;
             }
@@ -154,31 +154,31 @@ namespace Airerage.Runtime.Presentation
         {
             Color previous = GUI.color;
             float midY = area.center.y;
-            GUI.color = new Color(0.02f, 0.04f, 0.08f, 0.6f);
+            GUI.color = HudFade.Apply(new Color(0.02f, 0.04f, 0.08f, 0.6f));
             GUI.DrawTexture(new Rect(area.x, midY - 2f, area.width, 4f), Texture2D.whiteTexture);
             if (timeline.RushStart >= 0f)
             {
-                GUI.color = RushZone;
+                GUI.color = HudFade.Apply(RushZone);
                 float x = area.x + area.width * timeline.RushStart;
                 GUI.DrawTexture(new Rect(x, midY - 4f, area.xMax - x, 8f), Texture2D.whiteTexture);
             }
-            GUI.color = new Color(1f, 1f, 1f, 0.9f);
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.9f));
             GUI.DrawTexture(new Rect(area.x, midY - 2f, area.width * timeline.Progress, 4f), Texture2D.whiteTexture);
 
             if (timeline.BankMoves != null)
             {
                 foreach (float move in timeline.BankMoves)
                 {
-                    GUI.color = move <= timeline.Progress ? new Color(BankMark.r, BankMark.g, BankMark.b, 0.45f) : BankMark;
+                    GUI.color = HudFade.Apply(move <= timeline.Progress ? new Color(BankMark.r, BankMark.g, BankMark.b, 0.45f) : BankMark);
                     GUI.DrawTexture(new Rect(area.x + area.width * move - 6f, midY - 6f, 12f, 12f), _diamond);
                 }
             }
             if (timeline.Jackpot >= 0f)
             {
-                GUI.color = Color.HSVToRGB(Mathf.Repeat(Time.time / 1.6f, 1f), 0.7f, 1f);
+                GUI.color = HudFade.Apply(Color.HSVToRGB(Mathf.Repeat(Time.time / 1.6f, 1f), 0.7f, 1f));
                 GUI.DrawTexture(new Rect(area.x + area.width * timeline.Jackpot - 7f, midY - 7f, 14f, 14f), _dot);
             }
-            GUI.color = Color.white;
+            GUI.color = HudFade.Apply(Color.white);
             GUI.DrawTexture(new Rect(area.x + area.width * timeline.Progress - 2f, midY - 9f, 4f, 18f), Texture2D.whiteTexture);
             GUI.color = previous;
             return area.yMax;

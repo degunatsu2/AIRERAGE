@@ -914,6 +914,10 @@ namespace Airerage.Editor
             {
                 SetReference(hud, "_controls", controls);
             }
+            // キャラクターと重なった HUD を透かす仕組み（試合の HUD のあるシーンに 1 つ。ユーザーの要望、2026-10-30）。
+            var occlusion = new GameObject("HudOcclusion").AddComponent<HudOcclusion>();
+            SetReference(occlusion, "_source", source);
+            SetReference(occlusion, "_camera", Object.FindFirstObjectByType<Camera>());
             return hud;
         }
 
@@ -1236,8 +1240,10 @@ namespace Airerage.Editor
             SetReference(controls, "_runner", runner);
             SetReference(controls, "_inputActions", inputActions);
             SetReference(controls, "_audio", audio);
+            // 右下のトレーニングの表示（F4 で出す・隠す。ユーザーの要望、2026-10-30）。
             var hud = root.AddComponent<DebugHud>();
             SetReference(hud, "_runner", runner);
+            SetReference(controls, "_hud", hud);
             var replay = root.AddComponent<ReplayControls>();
             SetReference(replay, "_runner", runner);
             SetReference(replay, "_inputActions", inputActions);

@@ -104,6 +104,8 @@ namespace Airerage.Runtime.Presentation
         private Texture2D _fallenIcon;
         private Texture2D _arrowIcon;
         private readonly BannerStrip _strip = new BannerStrip();
+        private readonly HudOcclusion.Link _occlusion = new HudOcclusion.Link();
+        private int _chipSerial;
         private Band _band;
         private int _timedSerial;
 
@@ -127,6 +129,9 @@ namespace Airerage.Runtime.Presentation
             public float ExpiresAt = -1f;
 
             // キルログ（撃破した人の名前は、いなければ空）。
+            // 出した順の番号（透かす具合を札ごとに覚える）。
+            public int Serial;
+
             public bool Kill;
             public string Killer;
             public string Victim;
@@ -437,7 +442,7 @@ namespace Airerage.Runtime.Presentation
         private Chip AddTimed(string key, string title, Color color)
         {
             _timedSerial++;
-            var chip = new Chip { Key = key, Title = title, Color = color, AppearedAt = Time.time, ExpiresAt = Time.time + NoticeSeconds };
+            var chip = new Chip { Key = key, Title = title, Color = color, AppearedAt = Time.time, ExpiresAt = Time.time + NoticeSeconds, Serial = ++_chipSerial };
             _chips.Add(chip);
             return chip;
         }
@@ -457,7 +462,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (chip == null)
             {
-                chip = new Chip { Key = key, AppearedAt = Time.time };
+                chip = new Chip { Key = key, AppearedAt = Time.time, Serial = ++_chipSerial };
                 _chips.Add(chip);
             }
             chip.Title = title;
@@ -576,7 +581,10 @@ namespace Airerage.Runtime.Presentation
                 Chip chip = _chips[_chips.Count - 1 - k];
                 Rect rect = _rects[k];
                 GUI.matrix = matrix * Matrix4x4.TRS(new Vector3(rect.x, rect.y, 0f), Quaternion.identity, new Vector3(scale, scale, 1f));
+                // キャラクターと重なったら透かす（HudOcclusion。札ごとに、出した順の番号で覚える）。
+                HudFade.Begin(_occlusion.AlphaFor(this, chip.Serial, rect));
                 DrawChip(chip, Extend(chip, now));
+                HudFade.End();
             }
             GUI.matrix = matrix;
         }
@@ -641,9 +649,9 @@ namespace Airerage.Runtime.Presentation
             Color previous = GUI.color;
             GUI.BeginGroup(new Rect(0f, 0f, chip.Width, ChipHeight));
             var local = new Rect(0f, 0f, shape[0].width, ChipHeight);
-            GUI.color = new Color(0.03f, 0.05f, 0.09f, 0.82f);
+            GUI.color = HudFade.Apply(new Color(0.03f, 0.05f, 0.09f, 0.82f));
             GUI.DrawTexture(local, shape[0]);
-            GUI.color = chip.Rainbow ? Color.HSVToRGB(Mathf.Repeat(Time.time / 1.6f, 1f), 0.65f, 1f) : chip.Color;
+            GUI.color = HudFade.Apply(chip.Rainbow ? Color.HSVToRGB(Mathf.Repeat(Time.time / 1.6f, 1f), 0.65f, 1f) : chip.Color);
             GUI.DrawTexture(local, shape[1]);
             GUI.color = previous;
             if (chip.Kill)

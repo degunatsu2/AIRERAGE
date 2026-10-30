@@ -54,7 +54,7 @@ namespace Airerage.Runtime.Presentation
         {
             DrawBackground(rect, alpha);
             Color previous = GUI.color;
-            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
             GUI.DrawTexture(rect, RainbowFrame(time));
             GUI.color = previous;
             DrawIcon(rect, icon, alpha);
@@ -68,7 +68,7 @@ namespace Airerage.Runtime.Presentation
         public void DrawRainbowFrame(Rect rect, float time, float alpha = 1f)
         {
             Color previous = GUI.color;
-            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
             GUI.DrawTexture(rect, RainbowFrame(time));
             GUI.color = previous;
         }
@@ -77,9 +77,9 @@ namespace Airerage.Runtime.Presentation
         public void DrawBackground(Rect rect, float alpha = 1f)
         {
             Color previous = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.35f * alpha);
+            GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.35f * alpha));
             GUI.DrawTexture(rect, _left);
-            GUI.color = new Color(0f, 0f, 0f, 0.6f * alpha);
+            GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.6f * alpha));
             GUI.DrawTexture(rect, _right);
             GUI.color = previous;
         }
@@ -89,7 +89,7 @@ namespace Airerage.Runtime.Presentation
         {
             Color previous = GUI.color;
             color.a *= alpha;
-            GUI.color = color;
+            GUI.color = HudFade.Apply(color);
             GUI.DrawTexture(rect, _frame);
             GUI.color = previous;
         }
@@ -102,7 +102,7 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             Color previous = GUI.color;
-            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
             GUI.DrawTexture(IconRect(rect), icon, ScaleMode.ScaleToFit);
             GUI.color = previous;
         }
@@ -129,7 +129,7 @@ namespace Airerage.Runtime.Presentation
         public void DrawFill(Rect rect, Color color)
         {
             Color previous = GUI.color;
-            GUI.color = color;
+            GUI.color = HudFade.Apply(color);
             GUI.DrawTexture(rect, _left);
             GUI.DrawTexture(rect, _right);
             GUI.color = previous;
@@ -159,9 +159,9 @@ namespace Airerage.Runtime.Presentation
         public static void DrawText(Rect rect, string text, GUIStyle style, Color color)
         {
             Color previous = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.7f * color.a);
+            GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.7f * color.a));
             GUI.Label(new Rect(rect.x + 1.5f, rect.y + 1.5f, rect.width, rect.height), text, style);
-            GUI.color = color;
+            GUI.color = HudFade.Apply(color);
             GUI.Label(rect, text, style);
             GUI.color = previous;
         }

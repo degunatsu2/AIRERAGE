@@ -588,6 +588,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleTrainingInfo",
+                    "type": "Button",
+                    "id": "e4ea03d6-0a41-4704-b32a-4d37baf3251d",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -698,6 +707,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "CycleCharacter",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "62f1c387-ec07-4a44-9eb9-fccb6328013f",
+                    "path": "<Keyboard>/f4",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleTrainingInfo",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

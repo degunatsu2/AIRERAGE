@@ -15,6 +15,7 @@ namespace Airerage.Runtime.DebugTools
     /// - ToggleDummyWalk（F7）: ダミーを向いている方向へ歩かせる／止める（足場から落として撃破の手柄を確かめる）
     /// - ToggleDummyAttack（F8）: ダミーに一定の間隔で攻撃させる／止める（ガードとジャストガードを試す）
     /// - ToggleBgm（F9）: 仮の BGM を止める／鳴らす（_audio があれば）
+    /// - ToggleTrainingInfo（F4）: トレーニングの表示（DebugHud。右下のダメージ・フレームなど）を出す／隠す（_hud があれば）
     /// 同じマップの SaveRecording（F5）と PlayRecording（F6）は ReplayControls が読む。
     /// </summary>
     public sealed class DebugControls : MonoBehaviour
@@ -28,6 +29,8 @@ namespace Airerage.Runtime.DebugTools
         [SerializeField] private InputActionAsset _inputActions;
         [Tooltip("BGM の切り替えに使う（なくてもよい）")]
         [SerializeField] private GameAudio _audio;
+        [Tooltip("F4 で出す・隠すトレーニングの表示（なくてもよい）")]
+        [SerializeField] private DebugHud _hud;
 
         private InputActionMap _map;
         private InputAction _toggleWireType;
@@ -37,6 +40,7 @@ namespace Airerage.Runtime.DebugTools
         private InputAction _toggleDummyAttack;
         private InputAction _toggleBgm;
         private InputAction _cycleCharacter;
+        private InputAction _toggleInfo;
         private int _speedIndex;
 
         private void Awake()
@@ -55,6 +59,7 @@ namespace Airerage.Runtime.DebugTools
             _toggleDummyAttack = _map.FindAction("ToggleDummyAttack", throwIfNotFound: true);
             _toggleBgm = _map.FindAction("ToggleBgm", throwIfNotFound: true);
             _cycleCharacter = _map.FindAction("CycleCharacter", throwIfNotFound: true);
+            _toggleInfo = _map.FindAction("ToggleTrainingInfo", throwIfNotFound: true);
         }
 
         private void OnEnable()
@@ -96,6 +101,10 @@ namespace Airerage.Runtime.DebugTools
             if (_toggleBgm.WasPressedThisFrame() && _audio != null)
             {
                 _audio.BgmOn = !_audio.BgmEnabled;
+            }
+            if (_toggleInfo.WasPressedThisFrame() && _hud != null)
+            {
+                _hud.Toggle();
             }
         }
 
