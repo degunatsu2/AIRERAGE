@@ -61,6 +61,19 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
+        public void Chips_SlideOutFromBehindTheTimer_AndKeepTheirWholeFrame()
+        {
+            // 札は文字ごと、タイマーの後ろから右へせり出す（ずれは出ている割合で決まり、出始めは札の幅だけ左に隠れている。ユーザーの要望、2026-10-30）。
+            Assert.That(NoticeHud.SlideOffset(300f, 0f), Is.EqualTo(-300f));
+            Assert.That(NoticeHud.SlideOffset(300f, 0.5f), Is.EqualTo(-150f));
+            Assert.That(NoticeHud.SlideOffset(300f, 1f), Is.EqualTo(0f));
+            // 札の幅は、形の絵と同じ 10 ピクセルごとの幅（絵より狭く切ると、右上の斜めの角が切れていた。ユーザーの指摘、2026-10-30）。
+            Assert.That(NoticeHud.ShapeWidth(263.2f), Is.EqualTo(270f));
+            Assert.That(NoticeHud.ShapeWidth(260f), Is.EqualTo(260f));
+            Assert.That(NoticeHud.ShapeWidth(NoticeHud.CountdownChipWidth), Is.EqualTo(NoticeHud.CountdownChipWidth));
+        }
+
+        [Test]
         public void NarrowScreen_PutsTheChipsUnderTheTimer()
         {
             var rects = new List<Rect>();

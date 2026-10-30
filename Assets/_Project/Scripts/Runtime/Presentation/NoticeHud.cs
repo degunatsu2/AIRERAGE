@@ -13,7 +13,8 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// 試合中のお知らせ（ユーザーの選択、2026-10-14。案 C ＋ 大きな出来事だけ案 B。告知の並べ方は 2026-10-30 の要望）。
-    /// - タイマーの右の告知（札）: タイマーの台形の後ろから右へせり出し、終わるとタイマーの中へ引っ込むように縮んで消える。タイムラインの
+    /// - タイマーの右の告知（札）: 札が文字ごとタイマーの台形の後ろから右へせり出し、終わると同じように左へ動いてタイマーの中へ引っ込む
+    ///   （札の本来の左の斜めの縁より左は切り落とすので、タイマーの側にははみ出さない。2026-10-30 の要望）。タイムラインの
     ///   ように、新しい告知がいちばん上（タイマーの右の上の端）に出て、前からの告知は下へずれる。札は平行四辺形で、左の縁をタイマーの
     ///   斜めの縁に合わせる（誘導表示の札と紛らわしくないように絵はなく、縁の色で種類を分ける）。告知はこれからもすべてここに出す。
     ///   - キルログ: 「撃破した人（緑の文字）・赤い衝撃波の印 → 撃破された人（赤い文字）・倒れた人の印」（例: CPU2💥→CPU3🤸）。
@@ -62,6 +63,9 @@ namespace Airerage.Runtime.Presentation
         // せり出す・引っ込む時間と、その前後に場所を空ける・詰める時間（ほかの札とすれ違って重ならないように）。
         private const float SlideSeconds = 0.3f;
         private const float SpaceSeconds = 0.15f;
+
+        // せり出す途中の札を、本来の左の斜めの縁で切り落とすための横の切り分けの数（縁が斜めなので、細い帯ごとに切る）。
+        private const int SlideStrips = 6;
         private const float IconSize = 24f;
         private const float ArrowSize = 18f;
         private const float KillPadding = 10f;
@@ -552,7 +556,8 @@ namespace Airerage.Runtime.Presentation
                 Chip chip = _chips[i];
                 if (chip.Width <= 0f)
                 {
-                    chip.Width = chip.Kill ? KillWidth(chip) : CountdownChipWidth;
+                    // 札の形の絵と同じ幅（10 ピクセルごとに切り上げ）にする（狭いと、右上の斜めの角が切れる。ユーザーの指摘、2026-10-30）。
+                    chip.Width = ShapeWidth(chip.Kill ? KillWidth(chip) : CountdownChipWidth);
                 }
                 _widths.Add(chip.Width);
                 _presences.Add(Space(chip, now));
@@ -592,16 +597,49 @@ namespace Airerage.Runtime.Presentation
                 : 1f - Ease((now - chip.LeftAt - SlideSeconds) / SpaceSeconds);
         }
 
-        // 札を、左の端から右へ extend（0〜1）の割合まで伸ばして描く（見えている部分だけを切り出す。座標は札の左上が原点）。
+        /// <summary>
+        /// せり出している割合 extend（0〜1）の札の、本来の場所からの横のずれ（札の左上が原点の座標。0 で本来の場所、-幅 でタイマーの後ろに
+        /// 隠れきる）。
+        /// </summary>
+        public static float SlideOffset(float width, float extend)
+        {
+            return -(1f - Mathf.Clamp01(extend)) * width;
+        }
+
+        // 札を、文字ごとタイマーの後ろから右へせり出す形で描く（ユーザーの要望、2026-10-30: その場に現れたり消えたりしない）。札を左へずらして描き、
+        // 本来の左の斜めの縁（タイマーの右の縁に沿う線）より左は切り落とす。座標は、札の本来の場所の左上が原点。
         private void DrawChip(Chip chip, float extend)
         {
             if (extend <= 0f)
             {
                 return;
             }
-            Texture2D[] shape = Shape(Mathf.CeilToInt(chip.Width));
+            if (extend >= 1f)
+            {
+                DrawChipBody(chip);
+                return;
+            }
+            float offset = SlideOffset(chip.Width, extend);
+            float strip = ChipHeight / (float)SlideStrips;
+            for (int k = 0; k < SlideStrips; k++)
+            {
+                float top = k * strip;
+                // 帯の下の端での本来の左の縁（斜めの縁は下ほど左なので、帯の中では最も左。本来の場所の札は切れない）。
+                float left = ChipSlant * (1f - (top + strip) / ChipHeight);
+                GUI.BeginGroup(new Rect(left, top, chip.Width - left, strip));
+                GUI.BeginGroup(new Rect(offset - left, -top, chip.Width, ChipHeight));
+                DrawChipBody(chip);
+                GUI.EndGroup();
+                GUI.EndGroup();
+            }
+        }
+
+        // 札の中身と縁と文字（座標は札の左上が原点）。
+        private void DrawChipBody(Chip chip)
+        {
+            Texture2D[] shape = Shape(Mathf.RoundToInt(chip.Width));
             Color previous = GUI.color;
-            GUI.BeginGroup(new Rect(0f, 0f, chip.Width * extend, ChipHeight));
+            GUI.BeginGroup(new Rect(0f, 0f, chip.Width, ChipHeight));
             var local = new Rect(0f, 0f, shape[0].width, ChipHeight);
             GUI.color = new Color(0.03f, 0.05f, 0.09f, 0.82f);
             GUI.DrawTexture(local, shape[0]);
@@ -657,10 +695,17 @@ namespace Airerage.Runtime.Presentation
             return width + KillPadding + ChipSlant;
         }
 
-        // 幅 width の札の形（中身と縁）。幅は 10 ピクセルごとに切り上げて作り、使い回す。
+        /// <summary>札の幅（中身の幅を 10 ピクセルごとに切り上げる。札の形の絵はこの幅ごとに作って使い回す）。</summary>
+        public static float ShapeWidth(float width)
+        {
+            int pixels = Mathf.CeilToInt(width - 0.01f);
+            return (pixels + 9) / 10 * 10;
+        }
+
+        // 幅 width の札の形（中身と縁）。width は ShapeWidth で切り上げた幅。
         private Texture2D[] Shape(int width)
         {
-            int key = (width + 9) / 10 * 10;
+            int key = (int)ShapeWidth(width);
             if (!_shapes.TryGetValue(key, out Texture2D[] shape))
             {
                 shape = new[]

@@ -423,7 +423,7 @@ namespace Airerage.Runtime.Presentation
             }
             float width = 640f;
             bool buttons = _matchControls != null;
-            float height = 110f + Ranking.Count * (plateHeight + rowGap) + (buttons ? 64f : 0f);
+            float height = 82f + Ranking.Count * (plateHeight + rowGap) + (buttons ? 64f : 0f);
             var area = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUI.color = new Color(0f, 0f, 0f, 0.55f);
             GUI.DrawTexture(area, Texture2D.whiteTexture);
@@ -441,10 +441,7 @@ namespace Airerage.Runtime.Presentation
                 _resultPlate.Draw(new Rect(plateX, y, plateWidth, plateHeight), index + 1, _feed.LabelOf(index), _feed.ColorOf(index),
                     _feed.GetState(index), crown, default, new Color(1f, 0.85f, 0.2f), ScoreboardHud.LogoOf(_feed, index));
             }
-            // 順位は確定コインの数（D-25）。アディショナルタイムで勝った人はいちばん上。同じなら仮に撃破の数。
-            GUI.color = new Color(0.8f, 0.8f, 0.85f);
-            float noteY = area.y + 62f + Ranking.Count * (plateHeight + rowGap);
-            GUI.Label(new Rect(area.x + 20f, noteY, width - 40f, 28f), "Ranked by banked coins (overtime winner first; ties: KO, then fewer falls)");
+            // 順位の決め方（確定コインの数。D-25）の説明の行は出さない（ユーザーの要望、2026-10-30）。
             if (!buttons)
             {
                 return;
