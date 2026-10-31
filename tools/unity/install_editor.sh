@@ -12,8 +12,9 @@
 # 必要なネットワーク許可: *.unity3d.com、*.unity.com
 set -euo pipefail
 
-# Unity 6.3 LTS（D-01）。ProjectVersion.txt ができたら、そちらが優先される
-DEFAULT_VERSION="6000.3.26f1"
+# Unity 6.3 LTS（D-01）。ProjectVersion.txt ができたら、そちらが優先される。
+# 6000.3.27f2 は Unity のセキュリティ情報（2026-10。eMudhra の認証局の侵害と Brotli の脆弱性）の修正版（docs/08）
+DEFAULT_VERSION="6000.3.27f2"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 INSTALL_ROOT="${UNITY_INSTALL_ROOT:-/opt/unity}"

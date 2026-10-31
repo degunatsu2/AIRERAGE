@@ -2,6 +2,8 @@
 
 > ステータス（2026-10-12）: **使える状態**。ネットワーク（3.1）とライセンス情報（3.2）は設定済み。エディタ（6000.3.26f1）の導入、ライセンスの有効化、
 > テンプレートからのプロジェクトの作成、バッチモードでのコンパイルと EditMode テストの実行を確認した（6章）。セットアップスクリプト（3.3）は任意。
+> **2026-10-31**: Unity のセキュリティ情報（7 章）の修正版 **6000.3.27f2** に上げた。セットアップスクリプト（3.3）を登録している場合は、
+> 下の新しい内容（`V` と `URL`）に書き換えること。
 
 ---
 
@@ -80,8 +82,8 @@ lfs.github.com
 # AIRERAGE: Unity 6.3 LTS（Linux 版）を /opt/unity に入れる（docs/08_cloud_unity_setup.md 3.3）。
 # 失敗してもセッションは起動させる（Unity を使わない作業はできるため。セッションの中で tools/unity/install_editor.sh を実行し直せる）
 set -o pipefail
-V=6000.3.26f1
-URL=https://download.unity3d.com/download_unity/de8167e7440c/LinuxEditorInstaller/Unity-$V.tar.xz
+V=6000.3.27f2
+URL=https://download.unity3d.com/download_unity/22188f149405/LinuxEditorInstaller/Unity-$V.tar.xz
 D=/opt/unity/$V
 if [ ! -x "$D/Editor/Unity" ]; then
   rm -rf "$D.tmp" && mkdir -p "$D.tmp" &&
@@ -161,3 +163,30 @@ exit 0
 | プロジェクトの作成（`-createProject -cloneFromTemplate`） | 成功（約310秒）。コンパイルエラー 0。音声デバイスがないため ALSA / FMOD のエラーが出るが、動作には影響しない |
 | Git LFS へのアップロード（`git lfs push`） | 初めは `lfs.github.com` が環境のネットワークポリシーで遮断された（403）。ユーザーが Allowed domains に `lfs.github.com` を追加した後は、アップロードできた（24KB の画像で確認）。リポジトリには `git lfs install --local --skip-smudge` で pre-push フックを入れてある（クラウドのセッションごとに必要） |
 | リポジトリのプロジェクトを開いて EditMode テスト（`-runTests -testPlatform EditMode`） | **49件すべて成功**（`Airerage.Core.Tests`、8つのテストクラス）。コンパイルエラー 0、警告 0。初回は約125秒（インポートを含む）、2回目は約26秒。既存の `.meta` は書き換えられなかった |
+
+## 7. エディタの更新（2026-10-31、セキュリティ情報への対応）
+
+ユーザーのもとに Unity から「脆弱性が見つかったので 6.3 LTS を更新するように」というメールが届いた。Unity の公式のセキュリティのページ
+（https://unity.com/security）で、本当のお知らせであることを確かめた（メールの中のリンクは使わず、Unity のサイトと Unity Hub から操作する）。
+2026 年 10 月のお知らせは 2 つで、どちらも 6000.3 は **6000.3.0a1〜6000.3.27f1 が影響あり、6000.3.27f2 で修正**（版の表は 2026-10-30 更新）。
+
+| お知らせ | 内容 | このプロジェクトへの影響 |
+|---|---|---|
+| eMudhra の認証局の侵害（CVE-2026-114406、10 月 20 日） | 侵害された中間証明書を、Unity の通信（UnityTLS）とエディタが信頼してしまう | エディタ（Package Manager を含む）は影響あり → 更新で直る。Windows のゲームは Microsoft の 10 月 20 日の証明書の更新で守られる（作ったビルドの作り直しは基本的に不要） |
+| Brotli の展開の脆弱性（CVE-2026-111497、CVSS 9.2、10 月 21 日） | .NET の `BrotliStream`・`BrotliDecoder`、Brotli の自動展開を使う `HttpClient` に、信頼できないデータを渡すとバッファの溢れ | ゲームのコードと使っているパッケージは、これらを使っていない（検索で確かめた。Multiplayer Services の HTTP は UnityWebRequest の自前の部品）。エディタの Package Manager は影響あり → 更新で直る。Unity Hub 3.x は 3.22.5 以降（または Hub 4.x）へ |
+
+行ったこと:
+- クラウドのエディタを 6000.3.27f2（リビジョン 22188f149405）に入れ替えた（`tools/unity/install_editor.sh 6000.3.27f2`。約 3 分、MD5 一致）。
+  ディスクの空きが足りないので、前の 6000.3.26f1 は消した。
+- `ProjectSettings/ProjectVersion.txt`・`VirtualProjectsConfig.json`（Multiplayer Play Mode）・`install_editor.sh` の既定の版を 6000.3.27f2 に。
+- 新しいエディタが、使っているパッケージの依存（Transport・Multiplayer Services などが使う Burst 1.8.30 → 1.8.31、Collections 2.6.8 → 2.7.1）を
+  上げた（`Packages/packages-lock.json`。`manifest.json` は変わっていない）。
+- EditMode・PlayMode のテストは、新しいエディタで通った。
+
+ユーザーの PC で行うこと:
+1. Unity Hub で 6000.3.27f2 を入れる（Hub の Installs → Install Editor、または Unity のセキュリティのページの Hub のリンク）。Windows Build Support など、
+   前の版に入れていたモジュールも選ぶ。
+2. `git pull` してから、Hub でこのプロジェクトを 6000.3.27f2 で開く（ProjectVersion.txt が 6000.3.27f2 になっている）。
+3. Unity Hub 3.x を使っている場合は 3.22.5 以降へ（または Hub 4.x）。
+4. クラウドの環境のセットアップスクリプト（3.3）を登録している場合は、`V` と `URL` を上の新しい内容に書き換える。
+
