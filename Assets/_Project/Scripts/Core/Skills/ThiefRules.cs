@@ -256,7 +256,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == ball.Owner || target.Combat.IsUntouchable)
+                if (TeamRules.Allies(states, v, ball.Owner) || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -306,7 +306,7 @@ namespace Airerage.Core.Skills
                     return true;
                 }
                 item.Position += direction * step;
-                victim = TouchingCharacter(item, states, configs, radius);
+                victim = TouchingCharacter(item, states, configs, radius, includeAllies: false);
                 if (victim >= 0)
                 {
                     reached = true;
@@ -316,13 +316,15 @@ namespace Airerage.Core.Skills
             return false;
         }
 
-        // 物 item に触れている、持ち主以外のいちばん番号の小さいキャラクター（いなければ -1）。
-        private static int TouchingCharacter(in WorldObject item, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, float radius)
+        // 物 item に触れている、持ち主以外のいちばん番号の小さいキャラクター（いなければ -1）。includeAllies でなければ、持ち主の味方
+        // （チーム対戦）も除く。タレントスナッチの弾は味方にも当たる（味方の Q をコピーする。ダメージはない。D-82）。
+        private static int TouchingCharacter(in WorldObject item, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, float radius,
+            bool includeAllies)
         {
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == item.Owner || target.Combat.IsUntouchable)
+                if (v == item.Owner || (!includeAllies && TeamRules.Allies(states, v, item.Owner)) || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -356,7 +358,7 @@ namespace Airerage.Core.Skills
                 }
                 shot.Position += direction * step;
                 shot.ChargeMilli += (long)MathF.Round(step * 1000f);
-                int victim = TouchingCharacter(shot, states, configs, tuning.SnatchRadius);
+                int victim = TouchingCharacter(shot, states, configs, tuning.SnatchRadius, includeAllies: true);
                 if (victim >= 0)
                 {
                     // ほかの THIEF の Q（タレントスナッチ）はコピーしない（外れたのと同じ）。

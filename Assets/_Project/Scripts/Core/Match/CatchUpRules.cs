@@ -22,23 +22,17 @@ namespace Airerage.Core.Match
             return rules != null && held >= rules.WantedHeldCoins;
         }
 
-        /// <summary>キャラクター index の確定コインの順位（1 位から。抜けた人は数えない。index が抜けていれば 0）。</summary>
+        /// <summary>
+        /// キャラクター index の確定コインの順位（1 位から。抜けた人は数えない。index が抜けていれば 0）。チーム対戦ならチームの確定の合計で
+        /// 比べ、チームの全員が同じ順位になる（恩恵もチームの全員が受ける。D-83）。
+        /// </summary>
         public static int RankOf(IReadOnlyList<CharacterState> states, int index)
         {
             if (states[index].Combat.HasLeft)
             {
                 return 0;
             }
-            int banked = states[index].Coins.Banked;
-            int rank = 1;
-            for (int i = 0; i < states.Count; i++)
-            {
-                if (i != index && !states[i].Combat.HasLeft && states[i].Coins.Banked > banked)
-                {
-                    rank++;
-                }
-            }
-            return rank;
+            return TeamRules.RankOf(states, index, skipLeft: true);
         }
 
         /// <summary>順位 rank の人が 1 秒ごとに得るゲージ（0.1% 単位。1 位と、順位のない人は 0）。</summary>

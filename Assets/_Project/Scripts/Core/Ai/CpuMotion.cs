@@ -174,7 +174,7 @@ namespace Airerage.Core.Ai
             // 相手: 攻める欲しさ ÷ 距離。コインを多く持っている相手ほど狙う。
             for (int other = 0; other < world.CharacterCount; other++)
             {
-                if (other == selfIndex)
+                if (other == selfIndex || TeamRules.Allies(world.GetState(other), world.GetState(selfIndex)))
                 {
                     continue;
                 }

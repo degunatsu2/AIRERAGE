@@ -7,6 +7,7 @@ using Airerage.Core.Objects;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Core.Wire;
+using Airerage.Core.Match;
 
 namespace Airerage.Core.Skills
 {
@@ -91,7 +92,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == ball.Owner || target.Combat.IsUntouchable)
+                if (TeamRules.Allies(states, v, ball.Owner) || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -277,7 +278,7 @@ namespace Airerage.Core.Skills
             Vector2 backward = PointAlong(wave, -travel);
             for (int v = 0; v < states.Count; v++)
             {
-                if (v == wave.Owner || (wave.HitMask & (1u << v)) != 0)
+                if (TeamRules.Allies(states, v, wave.Owner) || (wave.HitMask & (1u << v)) != 0)
                 {
                     continue;
                 }

@@ -10,7 +10,10 @@ namespace Airerage.Core.Match
     /// </summary>
     public static class MatchResults
     {
-        /// <summary>順位の順に並べた、キャラクターの番号。winner（アディショナルタイムで勝った人。なければ -1）がいれば、いちばん上。</summary>
+        /// <summary>
+        /// 順位の順に並べた、キャラクターの番号。winner（アディショナルタイムで勝った人。なければ -1）がいれば、いちばん上（チーム対戦なら
+        /// そのチームの全員が上）。チーム対戦ならチームの確定の合計の順で、同じチームの人は並べてまとめる（TeamRules.ScoreOf）。
+        /// </summary>
         public static int[] Rank(IReadOnlyList<CharacterState> states, int winner = -1)
         {
             var order = new int[states.Count];
@@ -18,12 +21,12 @@ namespace Airerage.Core.Match
             {
                 order[i] = i;
             }
-            // 挿入ソート（人数は 4 人まで。並べ方を言語の実装に任せず、同じ順になるようにする）。
+            // 挿入ソート（人数は 8 人まで。並べ方を言語の実装に任せず、同じ順になるようにする）。
             for (int i = 1; i < order.Length; i++)
             {
                 int current = order[i];
                 int j = i - 1;
-                while (j >= 0 && (current == winner || (order[j] != winner && Before(states[current], current, states[order[j]], order[j]))))
+                while (j >= 0 && Before(states, current, order[j], winner))
                 {
                     order[j + 1] = order[j];
                     j--;
@@ -34,21 +37,42 @@ namespace Airerage.Core.Match
         }
 
         /// <summary>a が b より上の順位か。</summary>
-        private static bool Before(in CharacterState a, int aIndex, in CharacterState b, int bIndex)
+        private static bool Before(IReadOnlyList<CharacterState> states, int a, int b, int winner)
         {
-            if (a.Coins.Banked != b.Coins.Banked)
+            bool aWins = winner >= 0 && TeamRules.Allies(states, a, winner);
+            bool bWins = winner >= 0 && TeamRules.Allies(states, b, winner);
+            if (aWins != bWins)
             {
-                return a.Coins.Banked > b.Coins.Banked;
+                return aWins;
             }
-            if (a.Combat.Knockouts != b.Combat.Knockouts)
+            int aScore = TeamRules.ScoreOf(states, a);
+            int bScore = TeamRules.ScoreOf(states, b);
+            if (aScore != bScore)
             {
-                return a.Combat.Knockouts > b.Combat.Knockouts;
+                return aScore > bScore;
             }
-            if (a.Combat.Falls != b.Combat.Falls)
+            byte aTeam = states[a].Combat.Team;
+            byte bTeam = states[b].Combat.Team;
+            if (aTeam != bTeam)
             {
-                return a.Combat.Falls < b.Combat.Falls;
+                // 同じ合計のチームどうしは、チームの番号の順（同じチームの人を並べてまとめる）。
+                return aTeam < bTeam;
             }
-            return aIndex < bIndex;
+            CharacterState sa = states[a];
+            CharacterState sb = states[b];
+            if (sa.Coins.Banked != sb.Coins.Banked)
+            {
+                return sa.Coins.Banked > sb.Coins.Banked;
+            }
+            if (sa.Combat.Knockouts != sb.Combat.Knockouts)
+            {
+                return sa.Combat.Knockouts > sb.Combat.Knockouts;
+            }
+            if (sa.Combat.Falls != sb.Combat.Falls)
+            {
+                return sa.Combat.Falls < sb.Combat.Falls;
+            }
+            return a < b;
         }
     }
 }

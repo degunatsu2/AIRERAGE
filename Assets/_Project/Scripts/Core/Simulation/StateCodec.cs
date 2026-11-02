@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 31;
+        public const int FormatVersion = 32;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -420,6 +420,7 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.MaydayTarget.X);
             writer.Write(combat.MaydayTarget.Y);
             writer.Write(combat.MaydayRejectCount);
+            writer.Write(combat.Team);
 
             writer.Write(state.JumpPadCount);
             writer.Write(state.BoostRingCount);
@@ -592,6 +593,7 @@ namespace Airerage.Core.Simulation
                 MaydayFrom = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
                 MaydayTarget = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
                 MaydayRejectCount = reader.ReadInt32(),
+                Team = reader.ReadByte(),
             };
             state.JumpPadCount = reader.ReadInt32();
             state.BoostRingCount = reader.ReadInt32();

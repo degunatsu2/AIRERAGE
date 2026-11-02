@@ -41,6 +41,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _spinDegreesPerSecond = 160f;
         [SerializeField] private float _bobHeight = 0.12f;
         [SerializeField] private float _popSeconds = 0.25f;
+        [Tooltip("100 枚のコインが出たときに、弾んで大きくなる秒数（ほかのコインより長く目立たせる。2026-11-02）")]
+        [SerializeField] private float _jackpotAppearSeconds = 0.8f;
         [Tooltip("赤いコインの出現地点の、次に出るまでのゲージの見本（シーンでは隠しておく。なくてもよい）")]
         [SerializeField] private RingGaugeView _respawnGauge;
         [Tooltip("ドロップしたコインが消える前に点滅する時間（ティック）")]
@@ -169,7 +171,10 @@ namespace Airerage.Runtime.Presentation
                     shown.FlyFrom = shown.Flies ? BatchCenter(field, coin) : Vector3.zero;
                     _shown.Add(coin.Id, shown);
                 }
-                float pop = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((time - shown.BornAt) / _popSeconds));
+                // 出たときは小さくから大きくなる。100 枚のコインは、長めに弾んで大きく行き過ぎてから戻る。
+                float pop = shown.Look == CoinLook.Rainbow
+                    ? EaseOutBack(Mathf.Clamp01((time - shown.BornAt) / _jackpotAppearSeconds))
+                    : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((time - shown.BornAt) / _popSeconds));
                 float bob = Mathf.Sin(time * 2.5f + coin.Id) * _bobHeight;
                 Transform t = shown.Visual.transform;
                 var target = new Vector3(coin.Position.X, coin.Position.Y + bob, 0f);
@@ -201,6 +206,14 @@ namespace Airerage.Runtime.Presentation
             BlinkHiddenCount = hidden;
             UpdatePreview(time);
             UpdateGauges(field, tick);
+        }
+
+        // 0 から大きく行き過ぎて 1 に戻る（約 1.3 倍まで）。
+        private static float EaseOutBack(float t)
+        {
+            const float overshoot = 2.6f;
+            t -= 1f;
+            return 1f + t * t * ((overshoot + 1f) * t + overshoot);
         }
 
         // 被弾ドロップを落とした位置: 同じときに落ちたコイン（同じ拾えるティック）の真ん中から、並べ方の平均のずれを引く。

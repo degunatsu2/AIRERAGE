@@ -414,7 +414,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == shot.Owner || (shot.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
+                if (TeamRules.Allies(states, v, shot.Owner) || (shot.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -498,7 +498,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == gust.Owner || (gust.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
+                if (TeamRules.Allies(states, v, gust.Owner) || (gust.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
                 {
                     continue;
                 }

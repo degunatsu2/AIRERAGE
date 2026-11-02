@@ -305,10 +305,55 @@ namespace Airerage.PlayMode.Tests
         {
             public EdgeGuideLayer Layer;
             public Vector3 World;
+            public bool Pulse;
+            public bool OnScreen;
+            public bool LastOffscreen;
 
             private void Update()
             {
-                Layer.Add(World, Color.yellow, null, "COIN 20", announce: "ko");
+                LastOffscreen = Layer.Add(World, Color.yellow, null, "COIN 20", announce: "ko", pulse: Pulse, onScreen: OnScreen, lift: 1f);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ImportantGuides_PulseEverySecond_AndStayOnScreen()
+        {
+            // 重要な出来事の札（ホットエリア・拠点の移動・100 枚のコイン・WANTED）は 1 秒ごとに光り、ホットエリアと 100 枚のコインは画面の中でも
+            // 物の上に札を出す（ユーザーの要望、2026-11-02）。
+            var camera = new GameObject("TestCamera").AddComponent<Camera>();
+            camera.transform.position = new Vector3(0f, 0f, -30f);
+            var layerObject = new GameObject("EdgeGuides");
+            layerObject.SetActive(false);
+            var layer = layerObject.AddComponent<EdgeGuideLayer>();
+            layer.Configure(camera);
+            layerObject.SetActive(true);
+            var source = new GameObject("GuideSource").AddComponent<GuideSource>();
+            source.Layer = layer;
+            source.World = Vector3.zero;
+            try
+            {
+                yield return null;
+                yield return null;
+                Assert.That(layer.Count, Is.Zero, "画面の中なのに札を出した（onScreen でない）");
+                source.OnScreen = true;
+                source.Pulse = true;
+                yield return null;
+                yield return null;
+                Assert.That(layer.Count, Is.EqualTo(1), "画面の中の物の上に札を出さない");
+                Assert.That(layer.OnScreenCount, Is.EqualTo(1));
+                Assert.That(layer.PulsingCount, Is.EqualTo(1), "くり返し光らない");
+                Assert.That(source.LastOffscreen, Is.False, "画面の中なのに画面の外と答えた");
+                source.World = new Vector3(200f, 0f, 0f);
+                yield return null;
+                yield return null;
+                Assert.That(source.LastOffscreen, Is.True);
+                Assert.That(layer.OnScreenCount, Is.Zero, "画面の外の札を画面の中の札と数えた");
+            }
+            finally
+            {
+                Object.Destroy(source.gameObject);
+                Object.Destroy(layer.gameObject);
+                Object.Destroy(camera.gameObject);
             }
         }
 
@@ -481,6 +526,7 @@ namespace Airerage.PlayMode.Tests
             {
                 bool sawAnnounce = false;
                 bool sawFruit = false;
+                bool sawAppearing = false;
                 while (world.Tick < 200 && view.PickupCount == 0)
                 {
                     yield return null;
@@ -493,6 +539,7 @@ namespace Airerage.PlayMode.Tests
                     if (view.FruitRound == 1)
                     {
                         sawFruit = true;
+                        sawAppearing |= view.Appearing;
                         Assert.That(fruit.gameObject.activeSelf, Is.True, "フルーツが見えない");
                         Assert.That(Vector3.Distance(fruit.position, new Vector3(spot.X, spot.Y, 0f)), Is.LessThan(0.5f), "フルーツの場所が違う");
                         // 取りに行く。
@@ -503,7 +550,9 @@ namespace Airerage.PlayMode.Tests
                     }
                 }
                 Assert.That(sawAnnounce, Is.True, "予告しない");
+                Assert.That(view.NoticeSoundCount, Is.EqualTo(1), "予告の告知音を鳴らさない（または 2 回以上）");
                 Assert.That(sawFruit, Is.True, "フルーツが出ない");
+                Assert.That(sawAppearing, Is.True, "出たときに弾んで大きくならない");
                 Assert.That(view.PickupCount, Is.EqualTo(1), "取ったのに気づかない");
                 Assert.That(world.GetState(0).Combat.Gauge, Is.GreaterThanOrEqualTo(rules.HotAreaFruitGauge), "ゲージが回復していない");
                 yield return null;
@@ -553,11 +602,13 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(board.IsWanted(0), Is.True, "100 枚以上なのに WANTED にならない");
                 Assert.That(board.WantedStamps, Is.EqualTo(1), "印を押していない");
                 Assert.That(board.LookOf(0).Wanted, Is.True);
+                Assert.That(board.LookOf(0).WantedEmphasis, Is.EqualTo(1f), "WANTED の赤い強調がない");
                 Edit(world, 0, s => { s.Coins.Held = 60; return s; });
                 yield return null;
                 Assert.That(board.IsWanted(0), Is.False, "減ったのに WANTED のまま");
                 Assert.That(board.WantedDissolves, Is.EqualTo(1), "印を消していない");
                 Assert.That(board.LookOf(0).WantedDissolve, Is.GreaterThan(0f), "光の粒になって消える動きがない");
+                Assert.That(board.LookOf(0).WantedEmphasis, Is.GreaterThan(0f).And.LessThan(1f), "赤い強調が薄くなって消えない");
             }
             finally
             {

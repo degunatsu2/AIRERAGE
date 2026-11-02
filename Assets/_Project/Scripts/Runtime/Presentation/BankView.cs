@@ -19,12 +19,17 @@ namespace Airerage.Runtime.Presentation
     /// - 画面の外にあるときは、画面の端の矢印と誘導表示の札（GuidePlate。左に拠点の絵、右に「BANK」。縁は水色）で場所を示す
     ///   （予告中は次の地点も「NEXT」の札で）。
     /// - だれかが確定したら、その人の位置から「+n BANKED」が浮かび、輪がその人の色で光る（確定した数を前のフレームと比べる）。
+    /// - 拠点が出た・移ったときは、輪が大きくから縮みながら現れ、光の柱が伸びる（AppearSeconds。ユーザーの要望、2026-11-02）。
+    /// - 誘導表示の札は、予告中の「NEXT」と、移ってから 10 秒の「BANK」を 1 秒ごとに光らせる（EdgeGuideLayer の pulse）。
     /// 線の動きは Time.time で決める（巻き戻しとは関係ない）。
     /// </summary>
     public sealed class BankView : MonoBehaviour
     {
         private const int RingSegments = 56;
         private const int SweepSegments = 14;
+
+        /// <summary>拠点が出た・移ったときに現れる秒数。</summary>
+        public const float AppearSeconds = 0.6f;
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
@@ -60,6 +65,8 @@ namespace Airerage.Runtime.Presentation
         private float _radius;
         private int _secondsUntilMove;
         private bool _nextOffscreen;
+        private int _shownSpot = -1;
+        private float _appearedAt = float.NegativeInfinity;
 
         /// <summary>今の拠点の地点の番号（なければ -1）と、予告している次の地点の番号（予告していなければ -1）。テスト用。</summary>
         public int CurrentSpot { get; private set; } = -1;
@@ -71,6 +78,10 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>予告が始まった回数（テスト用）。</summary>
         public int NoticeCount { get; private set; }
+
+        /// <summary>拠点が出た・移った回数と、現れている途中か（テスト用）。</summary>
+        public int AppearCount { get; private set; }
+        public bool Appearing => Time.time - _appearedAt < AppearSeconds;
 
         /// <summary>浮かんでいる「+n BANKED」の数と、最後に確定した枚数（テスト用）。</summary>
         public int PopupCount => _popups.Count;
@@ -131,6 +142,13 @@ namespace Airerage.Runtime.Presentation
             }
             int tick = _feed.CurrentTick;
             CurrentSpot = BankRules.SpotAt(rules, spots.Count, tick);
+            if (CurrentSpot != _shownSpot)
+            {
+                // 出た・移った（試合の始まりも）。
+                _shownSpot = CurrentSpot;
+                _appearedAt = Time.time;
+                AppearCount++;
+            }
             int next = BankRules.NextSpotAt(rules, spots.Count, tick, out int ticksUntilMove);
             int previousNext = NextSpot;
             NextSpot = next >= 0 && ticksUntilMove <= rules.BankNoticeTicks ? next : -1;
@@ -151,8 +169,12 @@ namespace Airerage.Runtime.Presentation
             float time = Time.time;
             float flash = Mathf.Clamp01(1f - (time - _flashStartedAt) / _flashSeconds);
             Color ringColor = Color.Lerp(_color, _flashColor, flash);
-            float pulse = 1f + 0.05f * Mathf.Sin(time * 4f) + 0.15f * flash;
-            DrawRing(_ring, _bankCenter, _radius * pulse, ringColor, 0.95f);
+            // 出た・移ったときは、輪が大きくから縮みながら現れ、白く光り、光の柱が伸びる。
+            float appear = Mathf.Clamp01((time - _appearedAt) / AppearSeconds);
+            float eased = 1f - (1f - appear) * (1f - appear) * (1f - appear);
+            ringColor = Color.Lerp(Color.white, ringColor, appear);
+            float pulse = (1f + 0.05f * Mathf.Sin(time * 4f) + 0.15f * flash) * Mathf.Lerp(1.9f, 1f, eased);
+            DrawRing(_ring, _bankCenter, _radius * pulse, ringColor, 0.95f * eased);
 
             // 輪の内側を回る弧。
             float start = time * 2.2f;
@@ -161,12 +183,12 @@ namespace Airerage.Runtime.Presentation
                 float angle = start + i / (float)(SweepSegments - 1) * Mathf.PI * 0.6f;
                 _sweep.SetPosition(i, _bankCenter + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * _radius * 0.78f);
             }
-            SetGradient(_sweep, ringColor, 0f, 0.8f);
+            SetGradient(_sweep, ringColor, 0f, 0.8f * eased);
 
             // 上へ伸びて薄くなる光の柱。
             _beam.SetPosition(0, _bankCenter + new Vector3(0f, -_radius * 0.6f, 0f));
-            _beam.SetPosition(1, _bankCenter + new Vector3(0f, _beamHeight, 0f));
-            SetGradient(_beam, ringColor, 0.35f + 0.25f * flash, 0f);
+            _beam.SetPosition(1, _bankCenter + new Vector3(0f, _beamHeight * eased, 0f));
+            SetGradient(_beam, ringColor, (0.35f + 0.25f * flash + 0.4f * (1f - appear)) * eased, 0f);
 
             if (NextSpot >= 0)
             {
@@ -177,8 +199,11 @@ namespace Airerage.Runtime.Presentation
 
             // 画面の外なら、誘導表示の札（左に拠点の絵、右に「BANK」。予告中は次の地点も「NEXT」で）。
             // 拠点が移ったとき（札が離れた所に出る）と、予告が出たときは、札を軽く目立たせる（EdgeGuideLayer の announce）。
-            BankOffscreen = _guides != null && _guides.Add(_bankCenter, _color, _bankIcon, "BANK", announce: "bank");
-            _nextOffscreen = NextSpot >= 0 && _guides != null && _guides.Add(_nextCenter, _color, _bankIcon, "NEXT", 0.7f, announce: "next");
+            // 移ってから 10 秒（予告と同じ長さ）は、BANK の札も 1 秒ごとに光らせる（予告中の NEXT はいつも）。
+            int elapsed = tick - rules.CountdownTicks;
+            bool justMoved = spots.Count >= 2 && elapsed >= rules.BankMoveIntervalTicks && elapsed % rules.BankMoveIntervalTicks < rules.BankNoticeTicks;
+            BankOffscreen = _guides != null && _guides.Add(_bankCenter, _color, _bankIcon, "BANK", announce: "bank", pulse: justMoved);
+            _nextOffscreen = NextSpot >= 0 && _guides != null && _guides.Add(_nextCenter, _color, _bankIcon, "NEXT", 0.7f, announce: "next", pulse: true);
         }
 
         // 確定した数が増えた人を探し、「+n BANKED」を出して輪を光らせる（巻き戻しで減ったときは何も出さない）。

@@ -7,6 +7,7 @@ using Airerage.Core.Objects;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Core.Wire;
+using Airerage.Core.Match;
 
 namespace Airerage.Core.Skills
 {
@@ -357,7 +358,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == macaron.Owner || (macaron.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
+                if (TeamRules.Allies(states, v, macaron.Owner) || (macaron.HitMask & (1u << v)) != 0 || target.Combat.IsUntouchable)
                 {
                     continue;
                 }
@@ -429,7 +430,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == scale.Owner || target.Combat.IsUntouchable)
+                if (TeamRules.Allies(states, v, scale.Owner) || target.Combat.IsUntouchable)
                 {
                     continue;
                 }

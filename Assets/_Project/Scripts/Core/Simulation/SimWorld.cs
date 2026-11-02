@@ -173,6 +173,24 @@ namespace Airerage.Core.Simulation
             return _states.Count - 1;
         }
 
+        /// <summary>
+        /// キャラクター index のチームを決める（チーム対戦。1〜TeamRules.MaxTeams、0 ならチームなし。試合を始める前に全員分を呼ぶ）。
+        /// 撃破されて戻っても、抜けても変わらない（出現したときの状態にも書く）。
+        /// </summary>
+        public void SetTeam(int index, byte team)
+        {
+            if (team > TeamRules.MaxTeams)
+            {
+                throw new ArgumentOutOfRangeException(nameof(team), team, $"チームの番号は 0〜{TeamRules.MaxTeams}");
+            }
+            CharacterState state = _states[index];
+            state.Combat.Team = team;
+            _states[index] = state;
+            CharacterState spawn = _spawns[index];
+            spawn.Combat.Team = team;
+            _spawns[index] = spawn;
+        }
+
         public CharacterState GetState(int index)
         {
             return _states[index];

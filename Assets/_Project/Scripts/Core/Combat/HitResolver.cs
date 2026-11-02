@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Airerage.Core.Common;
+using Airerage.Core.Match;
 using Airerage.Core.Objects;
 using Airerage.Core.Simulation;
 using Airerage.Core.Skills;
@@ -113,8 +114,8 @@ namespace Airerage.Core.Combat
                     }
                     for (int v = 0; v < states.Count; v++)
                     {
-                        // 干渉されない相手（復帰を待つ間と、復帰した後の無干渉。docs/12 T4-2）には当たらない。
-                        if (v == a || (attacker.Action.HitMask & HitBit(h, v)) != 0 || states[v].Combat.IsUntouchable)
+                        // 干渉されない相手（復帰を待つ間と、復帰した後の無干渉。docs/12 T4-2）と、味方（チーム対戦。TeamRules）には当たらない。
+                        if (TeamRules.Allies(states, a, v) || (attacker.Action.HitMask & HitBit(h, v)) != 0 || states[v].Combat.IsUntouchable)
                         {
                             continue;
                         }
@@ -152,8 +153,8 @@ namespace Airerage.Core.Combat
             {
                 foreach (HitRecord extra in extraHits)
                 {
-                    // 無敵の相手には当たらない（集めた後に復帰や無敵が変わることはないが、念のため当てる直前にも調べる）。
-                    if (!states[extra.Victim].Combat.IsUntouchable)
+                    // 無敵の相手と味方には当たらない（集めた後に復帰や無敵が変わることはないが、念のため当てる直前にも調べる）。
+                    if (!states[extra.Victim].Combat.IsUntouchable && !TeamRules.Allies(states, extra.Attacker, extra.Victim))
                     {
                         _hits.Add(extra);
                     }

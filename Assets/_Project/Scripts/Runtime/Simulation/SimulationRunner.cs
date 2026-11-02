@@ -404,7 +404,9 @@ namespace Airerage.Runtime.Simulation
                 WireTuning wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, PlayerConfig).Wire;
                 // 置かれた物のアンカー（ミラーボール）も含めて予測する。
                 WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _world.Collision);
-                _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, current.Combat.InvisibleTicksLeft > 0);
+                // 結果の画面（試合が終わった後）では出さない。始まる前のカウントダウンでは出す（動き出しの計画を立てやすい）。
+                bool hidden = current.Combat.InvisibleTicksLeft > 0 || _world.Phase == Airerage.Core.Match.MatchPhase.Finished;
+                _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, hidden);
             }
         }
 

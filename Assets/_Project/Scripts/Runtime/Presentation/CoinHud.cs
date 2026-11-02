@@ -220,7 +220,9 @@ namespace Airerage.Runtime.Presentation
                 _jackpotPosition = new Vector3(position.X, position.Y, 0f);
             }
             string text = JackpotIncoming ? $"JACKPOT {_secondsUntilJackpot}" : "JACKPOT";
-            JackpotOffscreen = _guides != null && _guides.Add(_jackpotPosition, Color.white, _jackpotIcon, text, JackpotIncoming ? 0.85f : 1f, rainbow: true);
+            // 重要な出来事なので、画面の中でもコインの上に札を出し、1 秒ごとに光らせる（ユーザーの要望、2026-11-02）。
+            JackpotOffscreen = _guides != null && _guides.Add(_jackpotPosition, Color.white, _jackpotIcon, text, JackpotIncoming ? 0.85f : 1f, rainbow: true,
+                announce: "jackpot", pulse: true, onScreen: true, lift: 1.1f);
         }
 
         private void OnGUI()

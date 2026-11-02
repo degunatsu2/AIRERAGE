@@ -54,10 +54,10 @@ namespace Airerage.Runtime.Presentation
         /// <summary>頭上の通知を出している長さ（秒）。</summary>
         public const float HeadNoticeSeconds = 1.4f;
 
-        // 逆転の恩恵の印（必殺技の札の真上。幅と高さ、札との間、現れる・消える秒数）。
-        private const float BuffWidth = 62f;
+        // 逆転の恩恵の印（必殺技の札の真上のすぐ上。幅と高さ、札との間、現れる・消える秒数。文字が枠に収まるよう横長に。2026-11-02 の指摘）。
+        private const float BuffWidth = 92f;
         private const float BuffHeight = 30f;
-        private const float BuffGap = 6f;
+        private const float BuffGap = 3f;
         private const float BuffInSeconds = 0.4f;
         private const float BuffOutSeconds = 0.35f;
         private static readonly Color BuffColor = new Color(0.55f, 1f, 0.55f);
@@ -450,7 +450,7 @@ namespace Airerage.Runtime.Presentation
             // キャラクターと重なったら、札を透かす（HudOcclusion。名前とスタックのゲージを含めた範囲を、画面の座標で調べる）。
             float side = StackSpacing + StackWidth;
             // 上は、ローカル対戦の名前と逆転の恩恵の印の分も含める。
-            float above = 24f + BuffGap + BuffHeight;
+            float above = Mathf.Max(24f, BuffGap + BuffHeight);
             var area = new Rect(x - side, y - above, total + side * 2f, SlotHeight + above);
             HudFade.Begin(_occlusion.AlphaFor(this, 0, ToScreen(GUI.matrix, area)));
             for (int i = 0; i < SlotCount; i++)
@@ -461,9 +461,9 @@ namespace Airerage.Runtime.Presentation
             {
                 GuidePlate.DrawText(new Rect(x, y - 24f, total, 22f), _feed.LabelOf(_player), _name, _feed.ColorOf(_player));
             }
-            // 逆転の恩恵の印（必殺技の札の真上。ローカル対戦では名前の上）。
+            // 逆転の恩恵の印（必殺技の札の真上のすぐ上。ローカル対戦の名前は札の全体の真ん中なので、重ならない）。
             float superCenter = x + 2 * (SlotWidth + SlotGap) + SlotWidth * 0.5f;
-            float buffBottom = y - BuffGap - (_player >= 0 ? 24f : 0f);
+            float buffBottom = y - BuffGap;
             DrawBuff(new Vector2(superCenter, buffBottom - BuffHeight * 0.5f));
             HudFade.End();
             GUI.matrix = matrix;
@@ -508,13 +508,13 @@ namespace Airerage.Runtime.Presentation
             // 上向きの矢印（右向きの矢印を回す）と順位。
             Color accent = Color.Lerp(BuffColor, Color.white, flash);
             accent.a = alpha;
-            var arrow = new Rect(rect.x + 5f, rect.y + 4f, BuffHeight - 8f, BuffHeight - 8f);
+            var arrow = new Rect(rect.x + 8f, rect.y + 4f, BuffHeight - 8f, BuffHeight - 8f);
             Matrix4x4 beforeArrow = GUI.matrix;
             GUIUtility.RotateAroundPivot(-90f, arrow.center);
             GUI.color = HudFade.Apply(accent);
             GUI.DrawTexture(arrow, _upArrow);
             GUI.matrix = beforeArrow;
-            GuidePlate.DrawText(new Rect(arrow.xMax, rect.y, rect.xMax - arrow.xMax - 3f, rect.height), RankText(rank), _buff, accent);
+            GuidePlate.DrawText(new Rect(arrow.xMax + 4f, rect.y, rect.xMax - arrow.xMax - 12f, rect.height), RankText(rank), _buff, accent);
             if (flash > 0f)
             {
                 GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.6f * flash * alpha));
@@ -806,7 +806,7 @@ namespace Airerage.Runtime.Presentation
             _name = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _number = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _notice = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
-            _buff = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
+            _buff = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false, clipping = TextClipping.Overflow });
             _upArrow = GuideIcons.Arrow(32, Color.white);
             foreach (GUIStyle style in new[] { _key, _name, _number, _notice, _buff })
             {

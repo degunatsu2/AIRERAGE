@@ -10,7 +10,8 @@ namespace Airerage.Runtime.Presentation
     /// ロゴ（docs/13 T5-8。あれば）、下にプレイヤーネーム、右を 4 つに分けて BANK / COIN / K / F（BANK の文字と数だけ黄色）。
     /// 王冠は札の左に出す。WANTED（所持コインが 100 枚以上。ユーザーの要望、2026-11-02）の人は、キャラクターのロゴの所に手配書の印を押す
     /// （その間はロゴを隠す）: 出るときは大きく傾いた印が印鑑を押すように落ちてきて、押した瞬間に朱色の輪が広がって札が揺れる。外れるときは
-    /// 光の粒になって散って消え、ロゴが戻る。
+    /// 光の粒になって散って消え、ロゴが戻る。WANTED の間は札が赤く脈打ち、縁が赤くなり、斜めに大きな「WANTED!」の赤いスタンプを押す
+    /// （Look.WantedEmphasis。外れると薄くなって消える。2026-11-02 の要望）。
     /// 撃破されたときの見た目（Look）: ひび割れ、灰色に暗く、文字（「RESPAWN n」）、白く光る。
     /// OnGUI の中で描く。使い終わったら Dispose でテクスチャを消す。
     /// </summary>
@@ -30,6 +31,7 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _name;
         private GUIStyle _overlay;
         private GUIStyle _wanted;
+        private GUIStyle _stampText;
 
         /// <summary>撃破されたときなどの見た目（すべて 0 なら、ふつうの見た目）。</summary>
         public struct Look
@@ -60,6 +62,12 @@ namespace Airerage.Runtime.Presentation
 
             /// <summary>印が光の粒になって消える進み（0〜1。0 なら消えていない。1 で消え終わり）。</summary>
             public float WantedDissolve;
+
+            /// <summary>
+            /// WANTED の赤い強調の強さ（0〜1）: 札が赤く脈打ち、縁が赤くなり、斜めに大きな「WANTED!」の赤いスタンプ。WANTED の間は 1、外れると
+            /// 0 へ下がる（フェードアウト）。
+            /// </summary>
+            public float WantedEmphasis;
         }
 
         /// <summary>手配書の印の幅と高さ（ロゴの四角の大きさに対する割合）。</summary>
@@ -173,6 +181,10 @@ namespace Airerage.Runtime.Presentation
             {
                 _plate.DrawFill(rect, new Color(1f, 1f, 1f, 0.85f * look.Flash));
             }
+            if (look.WantedEmphasis > 0f)
+            {
+                DrawWantedEmphasis(rect, look);
+            }
             if (wantedMark)
             {
                 DrawWanted(logoRect, look);
@@ -193,6 +205,46 @@ namespace Airerage.Runtime.Presentation
                 GuidePlate.DrawText(jackpotArea, "JACKPOT!", _overlay, text);
             }
             GUI.color = previous;
+        }
+
+        // WANTED の赤い強調: 札が赤く脈打ち、縁が赤くなり、札の上に斜めの「WANTED!」のスタンプ（二重の枠と文字。押すときは大きくから縮む）。
+        private void DrawWantedEmphasis(Rect rect, Look look)
+        {
+            float strength = Mathf.Clamp01(look.WantedEmphasis);
+            float time = Time.time;
+            var red = new Color(0.95f, 0.12f, 0.08f);
+            _plate.DrawFill(rect, new Color(red.r, red.g, red.b, (0.16f + 0.1f * (0.5f + 0.5f * Mathf.Sin(time * 5f))) * strength));
+            _plate.DrawFrame(rect, red, strength);
+            // スタンプ: 押す動きの初め（WantedStamp が 0.35 まで）は大きくから縮み、外れて消えるときは少しふくらみながら薄くなる。
+            float stamp = Mathf.Clamp01(look.WantedStamp);
+            float fall = look.Wanted ? Mathf.Clamp01(stamp / 0.35f) : 1f;
+            float scale = Mathf.Lerp(2.6f, 1f, fall * fall) * (look.Wanted ? 1f : 1f + 0.15f * (1f - strength));
+            float alpha = strength * Mathf.Lerp(0.2f, 1f, fall);
+            Vector2 center = rect.center + new Vector2(rect.width * 0.08f, 0f);
+            Matrix4x4 matrix = GUI.matrix;
+            Color previous = GUI.color;
+            GUIUtility.RotateAroundPivot(-11f, center);
+            GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), center);
+            var box = new Rect(center.x - rect.width * 0.36f, center.y - rect.height * 0.36f, rect.width * 0.72f, rect.height * 0.72f);
+            var ink = new Color(0.92f, 0.08f, 0.06f, 0.78f * alpha);
+            GUI.color = HudFade.Apply(ink);
+            DrawOutline(box, 2.5f);
+            DrawOutline(new Rect(box.x + 4f, box.y + 4f, box.width - 8f, box.height - 8f), 1.2f);
+            Color text = ink;
+            text.a = 0.9f * alpha;
+            GUI.color = HudFade.Apply(text);
+            GUI.Label(box, "WANTED!", _stampText);
+            GUI.matrix = matrix;
+            GUI.color = previous;
+        }
+
+        // 四角の縁（太さ thickness）。色は GUI.color。
+        private static void DrawOutline(Rect rect, float thickness)
+        {
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, thickness), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, thickness, rect.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), Texture2D.whiteTexture);
         }
 
         // WANTED の手配書の印（ロゴの四角 slot の所。押す動き・押した瞬間の朱色の輪・光の粒になって消える動き）。
@@ -302,6 +354,8 @@ namespace Airerage.Runtime.Presentation
             _name.clipping = TextClipping.Clip;
             _overlay = Style(16, TextAnchor.MiddleCenter);
             _wanted = Style(7, TextAnchor.MiddleCenter);
+            _stampText = Style(24, TextAnchor.MiddleCenter);
+            _stampText.fontStyle = FontStyle.BoldAndItalic;
         }
 
         private GUIStyle Style(int size, TextAnchor anchor)

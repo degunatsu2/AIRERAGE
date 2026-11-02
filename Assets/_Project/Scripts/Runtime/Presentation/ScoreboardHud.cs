@@ -22,7 +22,8 @@ namespace Airerage.Runtime.Presentation
     /// 2026-10-15）。取った人は、100 枚のコインが前のフレームにあった（または、この間に出た）のに今はなく、確定＋所持が 100 枚以上
     /// 増えた人（出たティックにその場にいれば、出たのと同じティックに拾うので、出ている間を見られないことがある）。
     /// WANTED（所持コインが MatchRules.WantedHeldCoins 以上。CatchUpRules。ユーザーの要望、2026-11-02）の人は、札のロゴの所に手配書の印を押す
-    /// （印鑑を押すように落ちてきて、朱色の輪が広がり、札が揺れる）。所持コインが減って外れたら、印が光の粒になって消える。
+    /// （印鑑を押すように落ちてきて、朱色の輪が広がり、札が揺れる）、札を赤く強調して斜めに大きな「WANTED!」のスタンプを押し、低めの
+    /// サイレンを鳴らす。所持コインが減って外れたら、印が光の粒になって消え、赤い強調とスタンプは薄くなって消える。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class ScoreboardHud : MonoBehaviour
@@ -112,16 +113,28 @@ namespace Airerage.Runtime.Presentation
             return index < _waiting.Length ? CurrentLook(index) : default;
         }
 
-        /// <summary>確定コインが最も多い人（1 枚以上。同じ数なら全員）か。結果の画面でも使う。</summary>
+        /// <summary>
+        /// 確定コインが最も多い人（1 枚以上。同じ数なら全員。チーム対戦なら確定の合計が最も多いチームの全員。TeamRules.ScoreOf）か。
+        /// 結果の画面でも使う。
+        /// </summary>
         public static bool IsLeader(ISimulationFeed feed, int index)
         {
-            int best = 0;
             int count = feed.CharacterCount;
+            if (index < 0 || index >= count)
+            {
+                return false;
+            }
+            var states = new CharacterState[count];
             for (int i = 0; i < count; i++)
             {
-                best = Mathf.Max(best, feed.GetState(i).Coins.Banked);
+                states[i] = feed.GetState(i);
             }
-            return best > 0 && index < count && feed.GetState(index).Coins.Banked == best;
+            int best = 0;
+            for (int i = 0; i < count; i++)
+            {
+                best = Mathf.Max(best, TeamRules.ScoreOf(states, i));
+            }
+            return best > 0 && TeamRules.ScoreOf(states, index) == best;
         }
 
         private void Awake()
@@ -265,6 +278,11 @@ namespace Airerage.Runtime.Presentation
                 {
                     _wantedAt[i] = Time.time;
                     WantedStamps++;
+                    // 警戒させる低めのサイレン（2026-11-02 の要望）。
+                    if (_audio != null)
+                    {
+                        _audio.Play(SoundId.WantedSiren);
+                    }
                 }
                 else if (!wanted && _wanted[i])
                 {
@@ -316,12 +334,15 @@ namespace Airerage.Runtime.Presentation
                     // 押した瞬間に札が少し揺れる。
                     float impact = look.WantedStamp >= 0.35f ? Mathf.Clamp01(1f - (look.WantedStamp - 0.35f) / 0.3f) : 0f;
                     look.Shake += new Vector2(Mathf.Sin(Time.time * 80f), Mathf.Cos(Time.time * 95f)) * 3f * impact;
+                    look.WantedEmphasis = 1f;
                 }
                 else
                 {
                     float since = Time.time - _unwantedAt[index];
                     float t = float.IsInfinity(since) ? 1f : since / Mathf.Max(0.01f, _dissolveSeconds);
                     look.WantedDissolve = t < 1f ? Mathf.Max(0.001f, t) : 0f;
+                    // 赤い強調とスタンプは、印が消えるのと同じ間に薄くなって消える（フェードアウト）。
+                    look.WantedEmphasis = t < 1f ? 1f - Mathf.Max(0.001f, t) : 0f;
                 }
             }
             return look;

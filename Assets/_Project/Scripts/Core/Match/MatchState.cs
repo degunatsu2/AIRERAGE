@@ -104,17 +104,19 @@ namespace Airerage.Core.Match
             }
         }
 
-        /// <summary>キャラクター index が、拠点にたどり着けば勝てるか（確定＋所持が、ほかの人の確定の最大以上）。</summary>
+        /// <summary>
+        /// キャラクター index が、拠点にたどり着けば勝てるか（確定＋所持が、ほかの人の確定の最大以上）。チーム対戦なら、チームの確定＋所持の
+        /// 合計とほかのチームの確定の合計で比べる（D-86。TeamRules）。
+        /// </summary>
         public static bool CanWinAtTheBank(IReadOnlyList<CharacterState> states, int index)
         {
-            int total = states[index].Coins.Banked + states[index].Coins.Held;
-            return total >= BestOtherBanked(states, index);
+            return TeamRules.PotentialOf(states, index) >= TeamRules.BestRivalScore(states, index);
         }
 
-        /// <summary>ただ一人の首位（確定がほかの全員より多い）か。</summary>
+        /// <summary>ただ一人の首位（確定がほかの全員より多い。チーム対戦ならチームの確定の合計がほかのチームより多い）か。</summary>
         public static bool IsSoleLeader(IReadOnlyList<CharacterState> states, int index)
         {
-            return states.Count == 1 || states[index].Coins.Banked > BestOtherBanked(states, index);
+            return states.Count == 1 || TeamRules.ScoreOf(states, index) > TeamRules.BestRivalScore(states, index);
         }
 
         /// <summary>逆転できる人（ただ一人の首位を除いて、拠点にたどり着けば勝てる人）がいるか。</summary>
@@ -173,7 +175,7 @@ namespace Airerage.Core.Match
                     {
                         continue;
                     }
-                    int total = s.Coins.Banked + s.Coins.Held;
+                    int total = TeamRules.PotentialOf(states, i);
                     if (total > best)
                     {
                         best = total;
@@ -190,19 +192,6 @@ namespace Airerage.Core.Match
             {
                 state.EndTick = tick;
             }
-        }
-
-        private static int BestOtherBanked(IReadOnlyList<CharacterState> states, int index)
-        {
-            int best = 0;
-            for (int i = 0; i < states.Count; i++)
-            {
-                if (i != index)
-                {
-                    best = Math.Max(best, states[i].Coins.Banked);
-                }
-            }
-            return best;
         }
     }
 }

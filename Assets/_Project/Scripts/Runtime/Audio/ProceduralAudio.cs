@@ -228,6 +228,14 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>選べない場所を選んだ（JUGGERNAUT の R の N/A。低い 2 回の「ブブッ」）。</summary>
         Denied,
+
+        /// <summary>
+        /// ホットエリアの予告が始まった（拠点の呼び鈴とは別の、高く弾む上がっていく音: 駆け上がる 4 音ときらめき。ユーザーの要望、2026-11-02）。
+        /// </summary>
+        HotAreaNotice,
+
+        /// <summary>だれかが WANTED になった（警戒させる低めのサイレン: 上下する 2 音のうなり。ユーザーの要望、2026-11-02）。</summary>
+        WantedSiren,
     }
 
     /// <summary>
@@ -886,6 +894,35 @@ namespace Airerage.Runtime.Audio
                     b = new float[Samples(0.4f, r)];
                     AddTone(b, r, 0f, 0.12f, 180f, 170f, Wave.Square, 0.3f, 0.002f, 0.03f);
                     AddTone(b, r, 0.17f, 0.15f, 150f, 140f, Wave.Square, 0.3f, 0.002f, 0.04f);
+                    break;
+                case SoundId.HotAreaNotice:
+                    // G5・C6・E6・G6 を跳ねるように駆け上がり（矩形波と三角波）、最後に C7 のきらめきを伸ばす。
+                    b = new float[Samples(1.0f, r)];
+                    int[] hop = { 79, 84, 88, 91 };
+                    for (int i = 0; i < hop.Length; i++)
+                    {
+                        float f = NoteFrequency(hop[i]);
+                        float start = i * 0.075f;
+                        AddTone(b, r, start, 0.14f, f * 0.98f, f, Wave.Pulse25, 0.2f, 0.002f, 0.07f);
+                        AddTone(b, r, start, 0.16f, f, f, Wave.Triangle, 0.28f, 0.002f, 0.09f);
+                    }
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float f = NoteFrequency(96 + i * 4);
+                        AddTone(b, r, 0.3f + i * 0.06f, 0.5f, f, f, Wave.Sine, 0.14f, 0.002f, 0.32f);
+                    }
+                    break;
+                case SoundId.WantedSiren:
+                    // 低めのサイレン: 330 Hz と 247 Hz を 0.3 秒ずつ 2 回往復する（のこぎり波を少しこもらせる）。
+                    b = new float[Samples(1.35f, r)];
+                    for (int i = 0; i < 4; i++)
+                    {
+                        bool high = i % 2 == 0;
+                        float from = high ? 247f : 330f;
+                        float to = high ? 330f : 247f;
+                        AddTone(b, r, i * 0.3f, 0.34f, from, to, Wave.Saw, 0.22f, 0.02f, 0.06f);
+                        AddTone(b, r, i * 0.3f, 0.34f, from * 0.5f, to * 0.5f, Wave.Triangle, 0.3f, 0.02f, 0.06f);
+                    }
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

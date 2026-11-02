@@ -125,7 +125,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == missile.Owner || !CanBeHit(target))
+                if (TeamRules.Allies(states, v, missile.Owner) || !CanBeHit(target))
                 {
                     continue;
                 }
@@ -163,7 +163,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == beam.Owner || !CanBeHit(target))
+                if (TeamRules.Allies(states, v, beam.Owner) || !CanBeHit(target))
                 {
                     continue;
                 }
@@ -380,7 +380,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == missile.Owner || !CanBeHit(target))
+                if (TeamRules.Allies(states, v, missile.Owner) || !CanBeHit(target))
                 {
                     continue;
                 }

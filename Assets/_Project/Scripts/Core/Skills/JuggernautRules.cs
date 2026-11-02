@@ -9,6 +9,7 @@ using Airerage.Core.Objects;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
 using Airerage.Core.Wire;
+using Airerage.Core.Match;
 
 namespace Airerage.Core.Skills
 {
@@ -331,7 +332,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == shell.Owner || target.Combat.IsUntouchable || !Overlaps(target, configs[v], shell.Position, radius))
+                if (TeamRules.Allies(states, v, shell.Owner) || target.Combat.IsUntouchable || !Overlaps(target, configs[v], shell.Position, radius))
                 {
                     continue;
                 }
@@ -419,7 +420,7 @@ namespace Airerage.Core.Skills
                     for (int v = 0; v < states.Count; v++)
                     {
                         CharacterState target = states[v];
-                        if (v == mine.Owner || target.Combat.IsUntouchable || !Overlaps(target, configs[v], mine.Position, tuning.MineRadius))
+                        if (TeamRules.Allies(states, v, mine.Owner) || target.Combat.IsUntouchable || !Overlaps(target, configs[v], mine.Position, tuning.MineRadius))
                         {
                             continue;
                         }
@@ -469,7 +470,7 @@ namespace Airerage.Core.Skills
             for (int v = 0; v < states.Count; v++)
             {
                 CharacterState target = states[v];
-                if (v == item.Owner || target.Combat.IsUntouchable
+                if (TeamRules.Allies(states, v, item.Owner) || target.Combat.IsUntouchable
                     || !BankRules.Touches(target.Position, configs[v].Movement.HalfExtents, item.Position, radius))
                 {
                     continue;

@@ -314,7 +314,7 @@ namespace Airerage.Core.Ai
             AttackSlot slot = AttackSlot.Ground;
             for (int other = 0; other < world.CharacterCount && targetIndex < 0; other++)
             {
-                if (other == _index)
+                if (other == _index || TeamRules.Allies(world.GetState(other), world.GetState(_index)))
                 {
                     continue;
                 }
@@ -402,7 +402,7 @@ namespace Airerage.Core.Ai
             }
             for (int other = 0; other < world.CharacterCount; other++)
             {
-                if (other == _index)
+                if (other == _index || TeamRules.Allies(world.GetState(other), world.GetState(_index)))
                 {
                     continue;
                 }
@@ -587,7 +587,7 @@ namespace Airerage.Core.Ai
             float best = range;
             for (int other = 0; other < world.CharacterCount; other++)
             {
-                if (other == _index)
+                if (other == _index || TeamRules.Allies(world.GetState(other), world.GetState(_index)))
                 {
                     continue;
                 }

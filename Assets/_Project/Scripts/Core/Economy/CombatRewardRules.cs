@@ -29,19 +29,13 @@ namespace Airerage.Core.Economy
             return Math.Max(1, damage * rules.DamageRewardPercent / 100);
         }
 
-        /// <summary>キャラクター index の順位（1 から。確定コインがより多い人の数 + 1。同じ数なら同じ順位）。</summary>
+        /// <summary>
+        /// キャラクター index の順位（1 から。確定コインがより多い人の数 + 1。同じ数なら同じ順位）。チーム対戦ならチームの確定の合計で比べる
+        /// （D-86。TeamRules.RankOf）。
+        /// </summary>
         public static int RankOf(IReadOnlyList<CharacterState> states, int index)
         {
-            int banked = states[index].Coins.Banked;
-            int rank = 1;
-            for (int i = 0; i < states.Count; i++)
-            {
-                if (states[i].Coins.Banked > banked)
-                {
-                    rank++;
-                }
-            }
-            return rank;
+            return TeamRules.RankOf(states, index, skipLeft: false);
         }
 
         /// <summary>attacker が victim を撃破したときの撃破報酬（枚。自分自身なら 0）。順位は今の確定コインで決める。</summary>

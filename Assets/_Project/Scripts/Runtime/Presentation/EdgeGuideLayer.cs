@@ -12,6 +12,10 @@ namespace Airerage.Runtime.Presentation
     /// 知らせたい誘導表示（撃破ドロップのかたまり、拠点の移動。Add の announce）は、出てきたときに軽く目立たせる（ユーザーの要望、2026-10-30）:
     /// 札が少し大きく出て縮み、白く光り、札の周りに縁の色の枠が広がって消える（AppearSeconds）。同じ種類の前のフレームの札と画面の上で近ければ
     /// 同じ札とみなし（かたまりのコインが拾われて少し動いた、カメラが動いた）、出直さない。拠点が移ると札が離れた所に出るので、出直す。
+    /// 重要な出来事の札（ホットエリア・拠点の移動・100 枚のコイン・WANTED の人。Add の pulse）は、出てきた後も PulseSeconds ごとに白く光って
+    /// 枠が広がる（目につかせるため。ユーザーの要望、2026-11-02）。
+    /// 画面の中の物にも札を出せる（Add の onScreen。ホットエリアと 100 枚のコイン）: 物の上に下向きの矢印と札を出す（画面の外のときの札を
+    /// そのまま出し続ける形）。
     /// </summary>
     [DefaultExecutionOrder(-50)]
     public sealed class EdgeGuideLayer : MonoBehaviour
@@ -28,6 +32,9 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>出てきたときに目立たせる時間（秒）【仮】。</summary>
         public const float AppearSeconds = 0.6f;
+
+        /// <summary>重要な出来事の札が、出てきた後にくり返し光る間隔（秒）。</summary>
+        public const float PulseSeconds = 1f;
 
         // 前のフレームの同じ種類の札と同じとみなす、画面の上の距離（ピクセル）。
         private const float SameGuideDistance = 160f;
@@ -52,6 +59,10 @@ namespace Airerage.Runtime.Presentation
             // 出てきたときに目立たせる種類（null なら目立たせない）と、出てきた時刻。
             public string Announce;
             public float AppearedAt;
+
+            // 出てきた後も PulseSeconds ごとに光るか。画面の中の物の上に出した札か。
+            public bool Pulse;
+            public bool OnScreen;
         }
 
         /// <summary>このフレームに描く誘導表示の数（テスト用）。</summary>
@@ -66,6 +77,33 @@ namespace Airerage.Runtime.Presentation
                 foreach (Entry entry in _entries)
                 {
                     count += Appear(entry) < 1f ? 1 : 0;
+                }
+                return count;
+            }
+        }
+
+        /// <summary>このフレームに描く誘導表示のうち、くり返し光る札の数と、画面の中の物の上に出した札の数（テスト用）。</summary>
+        public int PulsingCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (Entry entry in _entries)
+                {
+                    count += entry.Pulse ? 1 : 0;
+                }
+                return count;
+            }
+        }
+
+        public int OnScreenCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (Entry entry in _entries)
+                {
+                    count += entry.OnScreen ? 1 : 0;
                 }
                 return count;
             }
@@ -91,20 +129,39 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>
         /// world が画面の外なら、このフレームに誘導表示（矢印と札。左に icon、右に text、縁と斜めの線は frame の色。rainbow なら虹色）
-        /// を出し、true を返す。画面の中なら何もせず false。announce を渡すと、その種類の札が新しく出てきたときに目立たせる。
+        /// を出し、true を返す。画面の中なら false（onScreen なら、world から lift（m）だけ上に下向きの矢印と札を出す）。
+        /// announce を渡すと、その種類の札が新しく出てきたときに目立たせ、pulse なら出てきた後も PulseSeconds ごとに光らせる。
         /// </summary>
-        public bool Add(Vector3 world, Color frame, Texture2D icon, string text, float alpha = 1f, bool rainbow = false, string announce = null)
+        public bool Add(Vector3 world, Color frame, Texture2D icon, string text, float alpha = 1f, bool rainbow = false, string announce = null,
+            bool pulse = false, bool onScreen = false, float lift = 0f)
         {
-            if (_camera == null || !ScreenEdgeMarker.Locate(_camera, world, _edgeMargin, out Vector2 edge, out float angle))
+            if (_camera == null)
             {
                 return false;
+            }
+            bool offscreen = ScreenEdgeMarker.Locate(_camera, world, _edgeMargin, out Vector2 edge, out float angle);
+            if (!offscreen)
+            {
+                if (!onScreen)
+                {
+                    return false;
+                }
+                // 画面の中: 物の上に、下向きの矢印（その上に札）。
+                Vector3 p = _camera.WorldToScreenPoint(world + Vector3.up * lift);
+                if (p.z <= 0f)
+                {
+                    return false;
+                }
+                edge = new Vector2(p.x, Screen.height - p.y - _arrowSize * 0.5f);
+                angle = 90f;
             }
             _entries.Add(new Entry
             {
                 Edge = edge, Angle = angle, Frame = frame, Rainbow = rainbow, Icon = icon, Text = text, Alpha = alpha,
                 Announce = announce, AppearedAt = announce != null ? AppearedAt(announce, edge) : float.NegativeInfinity,
+                Pulse = pulse && announce != null, OnScreen = !offscreen,
             });
-            return true;
+            return offscreen;
         }
 
         // 種類 announce の札が出てきた時刻（前のフレームに、同じ種類の札が近くにあれば、その時刻を引き継ぐ。なければ今）。
@@ -139,6 +196,18 @@ namespace Airerage.Runtime.Presentation
         private static float Appear(Entry entry)
         {
             return entry.Announce == null ? 1f : Mathf.Clamp01((Time.time - entry.AppearedAt) / AppearSeconds);
+        }
+
+        // 白く光って枠が広がる動きの進み（0〜1。光っていなければ 1）。出てきたとき（Appear）と、くり返し光る札は PulseSeconds ごと。
+        private static float Flash(Entry entry)
+        {
+            float appear = Appear(entry);
+            if (appear < 1f || !entry.Pulse)
+            {
+                return appear;
+            }
+            float cycle = Mathf.Repeat(Time.time - entry.AppearedAt, PulseSeconds);
+            return Mathf.Clamp01(cycle / AppearSeconds);
         }
 
         private void Awake()
@@ -203,15 +272,17 @@ namespace Airerage.Runtime.Presentation
                 {
                     _plate.Draw(_rects[i], entry.Frame, entry.Icon, entry.Text, _text, entry.Alpha);
                 }
-                if (appear < 1f)
+                float flash = Flash(entry);
+                if (flash < 1f)
                 {
-                    // 白く光ってから、本来の札に戻る。
-                    _plate.DrawFill(_rects[i], new Color(1f, 1f, 1f, 0.75f * Mathf.Clamp01(1f - appear / 0.5f) * entry.Alpha));
+                    // 白く光ってから、本来の札に戻る（くり返しの光は少し弱く）。
+                    float strength = appear < 1f ? 0.75f : 0.55f;
+                    _plate.DrawFill(_rects[i], new Color(1f, 1f, 1f, strength * Mathf.Clamp01(1f - flash / 0.5f) * entry.Alpha));
                 }
                 GUI.matrix = matrix;
-                if (appear < 1f)
+                if (flash < 1f)
                 {
-                    DrawSpreadingFrame(_rects[i], entry.Frame, appear, entry.Alpha);
+                    DrawSpreadingFrame(_rects[i], entry.Rainbow ? Color.white : entry.Frame, flash, entry.Alpha);
                 }
             }
         }

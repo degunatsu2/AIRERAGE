@@ -599,7 +599,9 @@ namespace Airerage.Net
             // 強化（キャッスルインジエアーの空中への接続など）も含めた調整値で予測する。
             wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, _session.World.GetConfig(_session.LocalPlayer)).Wire;
             WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _session.World.Collision);
-            _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, current.Combat.InvisibleTicksLeft > 0);
+            // 結果の画面（試合が終わった後）では出さない。始まる前のカウントダウンでは出す。
+            bool hidden = current.Combat.InvisibleTicksLeft > 0 || _session.World.Phase == Airerage.Core.Match.MatchPhase.Finished;
+            _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, hidden);
         }
 
         private void OnGUI()
