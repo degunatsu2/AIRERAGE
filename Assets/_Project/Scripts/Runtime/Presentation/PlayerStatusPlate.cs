@@ -11,7 +11,7 @@ namespace Airerage.Runtime.Presentation
     /// 王冠は札の左に出す。WANTED（所持コインが 100 枚以上。ユーザーの要望、2026-11-02）の人は、キャラクターのロゴの所に手配書の印を押す
     /// （その間はロゴを隠す）: 出るときは大きく傾いた印が印鑑を押すように落ちてきて、押した瞬間に朱色の輪が広がって札が揺れる。外れるときは
     /// 光の粒になって散って消え、ロゴが戻る。WANTED の間は札が赤く脈打ち、縁が赤くなり、斜めに大きな「WANTED!」の赤いスタンプを押す
-    /// （Look.WantedEmphasis。外れると薄くなって消える。2026-11-02 の要望）。
+    /// （Look.WantedEmphasis。1 秒たつか外れると、少しふくらみながら薄くなって消え、印だけが残る。2026-11-02 の要望）。
     /// 撃破されたときの見た目（Look）: ひび割れ、灰色に暗く、文字（「RESPAWN n」）、白く光る。
     /// OnGUI の中で描く。使い終わったら Dispose でテクスチャを消す。
     /// </summary>
@@ -64,8 +64,8 @@ namespace Airerage.Runtime.Presentation
             public float WantedDissolve;
 
             /// <summary>
-            /// WANTED の赤い強調の強さ（0〜1）: 札が赤く脈打ち、縁が赤くなり、斜めに大きな「WANTED!」の赤いスタンプ。WANTED の間は 1、外れると
-            /// 0 へ下がる（フェードアウト）。
+            /// WANTED の赤い強調の強さ（0〜1）: 札が赤く脈打ち、縁が赤くなり、斜めに大きな「WANTED!」の赤いスタンプ。WANTED になってから
+            /// 1 秒は 1、その後と外れたときは 0 へ下がる（フェードアウト。印 Wanted は残る）。
             /// </summary>
             public float WantedEmphasis;
         }
@@ -215,10 +215,10 @@ namespace Airerage.Runtime.Presentation
             var red = new Color(0.95f, 0.12f, 0.08f);
             _plate.DrawFill(rect, new Color(red.r, red.g, red.b, (0.16f + 0.1f * (0.5f + 0.5f * Mathf.Sin(time * 5f))) * strength));
             _plate.DrawFrame(rect, red, strength);
-            // スタンプ: 押す動きの初め（WantedStamp が 0.35 まで）は大きくから縮み、外れて消えるときは少しふくらみながら薄くなる。
+            // スタンプ: 押す動きの初め（WantedStamp が 0.35 まで）は大きくから縮み、消えるとき（強さが 1 より下がる）は少しふくらみながら薄くなる。
             float stamp = Mathf.Clamp01(look.WantedStamp);
             float fall = look.Wanted ? Mathf.Clamp01(stamp / 0.35f) : 1f;
-            float scale = Mathf.Lerp(2.6f, 1f, fall * fall) * (look.Wanted ? 1f : 1f + 0.15f * (1f - strength));
+            float scale = Mathf.Lerp(2.6f, 1f, fall * fall) * (1f + 0.15f * (1f - strength));
             float alpha = strength * Mathf.Lerp(0.2f, 1f, fall);
             Vector2 center = rect.center + new Vector2(rect.width * 0.08f, 0f);
             Matrix4x4 matrix = GUI.matrix;

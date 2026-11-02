@@ -20,7 +20,7 @@ namespace Airerage.Runtime.Presentation
     ///   （予告中は次の地点も「NEXT」の札で）。
     /// - だれかが確定したら、その人の位置から「+n BANKED」が浮かび、輪がその人の色で光る（確定した数を前のフレームと比べる）。
     /// - 拠点が出た・移ったときは、輪が大きくから縮みながら現れ、光の柱が伸びる（AppearSeconds。ユーザーの要望、2026-11-02）。
-    /// - 誘導表示の札は、予告中の「NEXT」と、移ってから 10 秒の「BANK」を 1 秒ごとに光らせる（EdgeGuideLayer の pulse）。
+    /// - 誘導表示の札は、予告中の「NEXT」だけを 1 秒ごとに光らせる（EdgeGuideLayer の pulse。移り終わったら止める）。
     /// 線の動きは Time.time で決める（巻き戻しとは関係ない）。
     /// </summary>
     public sealed class BankView : MonoBehaviour
@@ -199,10 +199,9 @@ namespace Airerage.Runtime.Presentation
 
             // 画面の外なら、誘導表示の札（左に拠点の絵、右に「BANK」。予告中は次の地点も「NEXT」で）。
             // 拠点が移ったとき（札が離れた所に出る）と、予告が出たときは、札を軽く目立たせる（EdgeGuideLayer の announce）。
-            // 移ってから 10 秒（予告と同じ長さ）は、BANK の札も 1 秒ごとに光らせる（予告中の NEXT はいつも）。
-            int elapsed = tick - rules.CountdownTicks;
-            bool justMoved = spots.Count >= 2 && elapsed >= rules.BankMoveIntervalTicks && elapsed % rules.BankMoveIntervalTicks < rules.BankNoticeTicks;
-            BankOffscreen = _guides != null && _guides.Add(_bankCenter, _color, _bankIcon, "BANK", announce: "bank", pulse: justMoved);
+            // 1 秒ごとに光らせるのは、移る前の予告（NEXT）の間だけ。移り終わったら止める（移った後の BANK は、出てきたときに 1 回だけ光る。
+            // ユーザーの指摘、2026-11-02）。
+            BankOffscreen = _guides != null && _guides.Add(_bankCenter, _color, _bankIcon, "BANK", announce: "bank");
             _nextOffscreen = NextSpot >= 0 && _guides != null && _guides.Add(_nextCenter, _color, _bankIcon, "NEXT", 0.7f, announce: "next", pulse: true);
         }
 

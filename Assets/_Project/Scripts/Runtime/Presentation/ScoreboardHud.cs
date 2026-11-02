@@ -23,7 +23,8 @@ namespace Airerage.Runtime.Presentation
     /// 増えた人（出たティックにその場にいれば、出たのと同じティックに拾うので、出ている間を見られないことがある）。
     /// WANTED（所持コインが MatchRules.WantedHeldCoins 以上。CatchUpRules。ユーザーの要望、2026-11-02）の人は、札のロゴの所に手配書の印を押す
     /// （印鑑を押すように落ちてきて、朱色の輪が広がり、札が揺れる）、札を赤く強調して斜めに大きな「WANTED!」のスタンプを押し、低めの
-    /// サイレンを鳴らす。所持コインが減って外れたら、印が光の粒になって消え、赤い強調とスタンプは薄くなって消える。
+    /// サイレンを鳴らす。赤い強調とスタンプは 1 秒たつと薄くなって消え、手配書の印だけが残る（下の数を隠さないように。ユーザーの指摘、
+    /// 2026-11-02）。所持コインが減って外れたら、印が光の粒になって消える（赤い強調がまだ残っていれば、それも一緒に薄くなる）。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class ScoreboardHud : MonoBehaviour
@@ -55,6 +56,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _stampSeconds = 0.6f;
         [Tooltip("WANTED の印が光の粒になって消える秒数")]
         [SerializeField] private float _dissolveSeconds = 0.9f;
+        [Tooltip("WANTED になってから、赤い強調と「WANTED!」のスタンプを出し続ける秒数（その後は薄くなって消え、手配書の印だけが残る）")]
+        [SerializeField] private float _emphasisSeconds = 1f;
+        [Tooltip("赤い強調と「WANTED!」のスタンプが薄くなって消える秒数")]
+        [SerializeField] private float _emphasisFadeSeconds = 0.5f;
 
         private readonly List<float> _rowY = new List<float>();
         private ISimulationFeed _feed;
@@ -293,6 +298,21 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
+        // WANTED になってから since 秒の、赤い強調とスタンプの強さ: 初めの _emphasisSeconds は 1、その後 _emphasisFadeSeconds で 0 へ
+        // （表示を始める前から WANTED だった人は 0。印だけを出す）。
+        private float EmphasisAfter(float since)
+        {
+            if (float.IsInfinity(since) || float.IsNaN(since))
+            {
+                return 0f;
+            }
+            if (since <= _emphasisSeconds)
+            {
+                return 1f;
+            }
+            return Mathf.Clamp01(1f - (since - _emphasisSeconds) / Mathf.Max(0.01f, _emphasisFadeSeconds));
+        }
+
         private PlayerStatusPlate.Look CurrentLook(int index)
         {
             var look = new PlayerStatusPlate.Look();
@@ -334,15 +354,16 @@ namespace Airerage.Runtime.Presentation
                     // 押した瞬間に札が少し揺れる。
                     float impact = look.WantedStamp >= 0.35f ? Mathf.Clamp01(1f - (look.WantedStamp - 0.35f) / 0.3f) : 0f;
                     look.Shake += new Vector2(Mathf.Sin(Time.time * 80f), Mathf.Cos(Time.time * 95f)) * 3f * impact;
-                    look.WantedEmphasis = 1f;
+                    look.WantedEmphasis = EmphasisAfter(since);
                 }
                 else
                 {
                     float since = Time.time - _unwantedAt[index];
                     float t = float.IsInfinity(since) ? 1f : since / Mathf.Max(0.01f, _dissolveSeconds);
                     look.WantedDissolve = t < 1f ? Mathf.Max(0.001f, t) : 0f;
-                    // 赤い強調とスタンプは、印が消えるのと同じ間に薄くなって消える（フェードアウト）。
-                    look.WantedEmphasis = t < 1f ? 1f - Mathf.Max(0.001f, t) : 0f;
+                    // 赤い強調とスタンプがまだ残っていれば、印が消えるのと同じ間に薄くなって消える（フェードアウト）。
+                    float left = EmphasisAfter(_unwantedAt[index] - _wantedAt[index]);
+                    look.WantedEmphasis = t < 1f ? Mathf.Min(left, 1f - Mathf.Max(0.001f, t)) : 0f;
                 }
             }
             return look;

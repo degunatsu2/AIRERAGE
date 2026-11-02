@@ -609,6 +609,18 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(board.WantedDissolves, Is.EqualTo(1), "印を消していない");
                 Assert.That(board.LookOf(0).WantedDissolve, Is.GreaterThan(0f), "光の粒になって消える動きがない");
                 Assert.That(board.LookOf(0).WantedEmphasis, Is.GreaterThan(0f).And.LessThan(1f), "赤い強調が薄くなって消えない");
+
+                // 赤い強調とスタンプは、出し続ける秒数がたつと薄くなって消え、手配書の印だけが残る（待ち時間を短くした設定で確かめる）。
+                Set(board, "_emphasisSeconds", 0.1f);
+                Set(board, "_emphasisFadeSeconds", 0.1f);
+                Edit(world, 0, s => { s.Coins.Held = 120; return s; });
+                yield return null;
+                Assert.That(board.WantedStamps, Is.EqualTo(2), "もう一度 WANTED になったのに印を押していない");
+                Assert.That(board.LookOf(0).WantedEmphasis, Is.EqualTo(1f), "出し始めに赤い強調がない");
+                yield return new WaitForSeconds(0.35f);
+                Assert.That(board.IsWanted(0), Is.True);
+                Assert.That(board.LookOf(0).Wanted, Is.True, "手配書の印まで消えた");
+                Assert.That(board.LookOf(0).WantedEmphasis, Is.Zero, "赤い強調とスタンプが残り続けている");
             }
             finally
             {
