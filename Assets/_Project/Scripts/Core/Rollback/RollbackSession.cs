@@ -40,6 +40,10 @@ namespace Airerage.Core.Rollback
         // 抜けた人の、確定とみなすティック（ConfirmedTick などの最小を求める計算で、その人が足を引っ張らないように）。
         private const int LeftContiguous = int.MaxValue - 1;
 
+        // TickConfirmed で知らせた最後のティックと、知らせる入力（使い回す）。
+        private int _reportedThrough;
+        private readonly PlayerInput[] _reportInputs;
+
         /// <param name="world">キャラクターをプレイヤーの数だけ追加したワールド。今のティックから始める。</param>
         public RollbackSession(SimWorld world, int localPlayer, RollbackSettings settings)
         {
@@ -69,11 +73,13 @@ namespace Airerage.Core.Rollback
             _contiguous = new int[players];
             _oldestKept = new int[players];
             _stepInputs = new PlayerInput[players];
+            _reportInputs = new PlayerInput[players];
             _leftFrom = new int[players];
 
             // 入力遅延の分の最初のティックは、誰も入力していない（全員の空の入力が確定している）。
             int start = world.Tick;
             _firstInputTick = start + settings.InputDelayTicks;
+            _reportedThrough = start - 1;
             for (int p = 0; p < players; p++)
             {
                 _inputs[p] = new Dictionary<int, PlayerInput>();
@@ -94,6 +100,13 @@ namespace Airerage.Core.Rollback
         }
 
         public int PlayerCount => _inputs.Length;
+
+        /// <summary>
+        /// 全員の入力が確定し、計算も済んだティックの、全員の入力（ティック、プレイヤーの番号の順の入力）。始めたティックから順に、1 ティックに
+        /// 1 回ずつ知らせる（抜けた人は PlayerInput.Departed）。同じ入力で同じワールドを進めれば同じ結果になるので、観戦（SpectatorSession）に
+        /// 送る（docs/19。ユーザーの要望、2026-11-02）。配列は使い回すので、残すなら写す。
+        /// </summary>
+        public event Action<int, PlayerInput[]> TickConfirmed;
 
         public int LocalPlayer => _localPlayer;
 
@@ -268,6 +281,13 @@ namespace Airerage.Core.Rollback
         /// <summary>届いた入力で予測が外れていたら、そのティックまで巻き戻し、今のティックまで計算し直す。</summary>
         public void Reconcile()
         {
+            ReconcilePending();
+            // 進めないフレーム（相手を待つ・止めた）でも、確定したティックを知らせる（観戦が止まらないように）。
+            ReportConfirmedTicks();
+        }
+
+        private void ReconcilePending()
+        {
             if (_pendingRollbackTick == int.MaxValue)
             {
                 return;
@@ -384,11 +404,33 @@ namespace Airerage.Core.Rollback
             return true;
         }
 
+        // 確定して計算も済んだ（今のティックより前の）ティックの全員の入力を、まだ知らせていなければ順に知らせる（TickConfirmed）。
+        // 入力を捨てるのはこのティックより前だけなので、知らせる入力はまだ残っている。
+        private void ReportConfirmedTicks()
+        {
+            int through = Math.Min(ConfirmedTick, CurrentTick) - 1;
+            while (_reportedThrough < through)
+            {
+                int tick = _reportedThrough + 1;
+                if (TickConfirmed != null)
+                {
+                    for (int p = 0; p < PlayerCount; p++)
+                    {
+                        _reportInputs[p] = InputFor(p, tick);
+                    }
+                }
+                _reportedThrough = tick;
+                TickConfirmed?.Invoke(tick, _reportInputs);
+            }
+        }
+
         // 確定ティックより古く、計算も済んだティックの入力は、予測にも巻き戻しにも使わないので捨てる。
         // 相手の入力が先のティックまで届いていると、確定ティックが今のティックより先になる（遅れて始めた側）ので、今のティックでも制限する。
         private void DiscardOldInputs()
         {
             int discardBefore = Math.Min(ConfirmedTick, CurrentTick);
+            // 捨てる前に、確定したティックの入力を知らせる（観戦）。
+            ReportConfirmedTicks();
             for (int p = 0; p < PlayerCount; p++)
             {
                 while (_oldestKept[p] < discardBefore)

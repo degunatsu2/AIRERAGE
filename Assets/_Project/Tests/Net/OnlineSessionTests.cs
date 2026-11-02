@@ -781,7 +781,7 @@ namespace Airerage.Net.Tests
         [Test]
         public void LobbyMessage_RoundTrips_AndRejectsBrokenData()
         {
-            var slots = new[] { new LobbySlot(true, "ボブ", 2, true, 3), new LobbySlot(false, string.Empty) };
+            var slots = new[] { new LobbySlot(true, "ボブ", 2, true, 3), new LobbySlot(true, "Eve", 1, false, 0, spectator: true), new LobbySlot(false, string.Empty) };
             byte[] data = NetMessages.Lobby(slots, LobbyPhase.StageSelect, 4, teamMode: true);
             Assert.That(NetMessages.ReadLobby(data, out LobbyPhase phase, out int stage, out bool teamMode), Is.EqualTo(slots));
             Assert.That(phase, Is.EqualTo(LobbyPhase.StageSelect));
@@ -902,6 +902,107 @@ namespace Airerage.Net.Tests
                 Assert.That(client.World.Checksum(), Is.EqualTo(host.World.Checksum()), "チーム対戦で不一致");
             }
             Assert.That(host.Desyncs, Is.Empty);
+        }
+
+        [Test]
+        public void Spectators_WatchWithoutPlaying_AndStayInSync_AndTheirLeavingDoesNotEndTheMatch()
+        {
+            // 観戦の待機所（docs/19。ユーザーの要望、2026-11-02）: 観戦の人は準備完了を待たず、試合の人数に入らず、確定した入力で同じ試合を見る。
+            OnlineSession host = Host();
+            OnlineSession watcher = Join(host);
+            OnlineSession player = Join(host);
+            OnlineSession second = Join(host);
+            PumpUntil(() => host.LobbyPlayerCount == 4 && second.LocalPlayer >= 0);
+            Assert.Throws<InvalidOperationException>(() => host.LocalSpectator = true, "ホストが観戦になった");
+
+            watcher.LocalSpectator = true;
+            PumpUntil(() => host.Roster[1].Spectator && player.Roster[1].Spectator);
+            Assert.That(watcher.LocalSpectator, Is.True);
+            Assert.That(host.LobbyParticipantCount, Is.EqualTo(3), "観戦の人を参加者に数えている");
+            // 観戦の人を待たずに、参加する 3 人の準備完了でキャラクター選択へ。参加する人が前の番号に詰まる（観戦の人は最後）。
+            host.LocalReady = true;
+            player.LocalReady = true;
+            second.LocalReady = true;
+            PumpUntil(() => player.Phase == LobbyPhase.CharacterSelect && watcher.Phase == LobbyPhase.CharacterSelect);
+            PumpUntil(() => watcher.LocalPlayer == 3 && player.LocalPlayer == 1 && second.LocalPlayer == 2);
+            Assert.That(watcher.LocalSpectator, Is.True, "番号を詰めたら観戦が外れた");
+
+            host.StartMatch(MatchRules.FreePlay());
+            PumpUntil(() => watcher.State == OnlineSession.SessionState.Running && second.State == OnlineSession.SessionState.Running);
+            Assert.That(watcher.IsSpectating, Is.True, "観戦の人が観戦になっていない");
+            Assert.That(player.IsSpectating, Is.False);
+            Assert.That(host.PlayerCount, Is.EqualTo(3), "観戦の人が試合の人数に入った");
+            Assert.That(watcher.PlayerCount, Is.EqualTo(3));
+            Assert.That(watcher.Session, Is.Null, "観戦の人が巻き戻しのセッションを持っている");
+
+            // 参加する人を 180 ティックで止め、観戦の人がそこまで追いつくと、同じ状態になる。
+            const int ticks = 180;
+            host.TickLimit = ticks;
+            player.TickLimit = ticks;
+            second.TickLimit = ticks;
+            PumpUntil(() => watcher.World.Tick == ticks);
+            Assert.That(watcher.World.Checksum(), Is.EqualTo(host.World.Checksum()), "観戦の人の試合がずれた");
+            Assert.That(host.Desyncs, Is.Empty);
+
+            // 観戦の人が抜けても、試合は続く。
+            watcher.Dispose();
+            _sessions.Remove(watcher);
+            host.TickLimit = int.MaxValue;
+            player.TickLimit = int.MaxValue;
+            second.TickLimit = int.MaxValue;
+            PumpUntil(() => host.Session.CurrentTick > ticks + 60 && host.LobbyPlayerCount == 3);
+            Assert.That(host.State, Is.EqualTo(OnlineSession.SessionState.Running), "観戦の人が抜けたら試合が終わった");
+            Assert.That(host.HasDeparted(1) || host.HasDeparted(2), Is.False, "参加している人が抜けたことになった");
+        }
+
+        [Test]
+        public void Spectator_WatchesTheRematch_AndCanJoinTheNextMatchFromTheWaitingRoom()
+        {
+            OnlineSession host = Host();
+            OnlineSession player = Join(host);
+            OnlineSession watcher = Join(host);
+            PumpUntil(() => watcher.LocalPlayer == 2 && host.LobbyPlayerCount == 3);
+            watcher.LocalSpectator = true;
+            PumpUntil(() => host.Roster[2].Spectator);
+            host.StartMatch(MatchRules.FreePlay());
+            PumpUntil(() => watcher.IsSpectating && watcher.World.Tick > 30);
+
+            // 再戦: 観戦の人も新しい試合を見る。
+            host.RestartMatch(MatchRules.FreePlay());
+            PumpUntil(() => watcher.IsSpectating && watcher.MatchNumber == host.MatchNumber && watcher.World.Tick > 30);
+            Assert.That(host.PlayerCount, Is.EqualTo(2));
+
+            // 待機所に戻ってから参加に戻ると、次の試合では 3 人で遊ぶ。
+            host.ReturnToLobby(LobbyPhase.Waiting);
+            PumpUntil(() => watcher.State == OnlineSession.SessionState.Lobby);
+            Assert.That(watcher.IsSpectating, Is.False);
+            watcher.LocalSpectator = false;
+            PumpUntil(() => !host.Roster[2].Spectator);
+            host.StartMatch(MatchRules.FreePlay());
+            PumpUntil(() => watcher.State == OnlineSession.SessionState.Running);
+            Assert.That(watcher.IsSpectating, Is.False, "参加に戻ったのに観戦のまま");
+            Assert.That(host.PlayerCount, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void TeamMode_ASpectatorJoinsATeam_AndTheHostCanSendSomeoneToWatch()
+        {
+            OnlineSession host = Host();
+            OnlineSession first = Join(host);
+            OnlineSession second = Join(host);
+            PumpUntil(() => second.LocalPlayer >= 0 && host.LobbyPlayerCount == 3);
+            host.TeamMode = true;
+            PumpUntil(() => second.TeamMode);
+            host.SetSpectatorOf(2, true);
+            PumpUntil(() => second.LocalSpectator);
+            Assert.That(second.Roster[2].Team, Is.Zero, "観戦の人にチームがある");
+            Assert.That(host.WaitingProblem, Is.Null, "観戦の人を除いた 2 人は 2 チームに分かれている");
+            // 観戦の待機所から、見出しを選んでチームに入る（LocalTeam）。
+            second.LocalTeam = 4;
+            PumpUntil(() => !host.Roster[2].Spectator && host.Roster[2].Team == 4);
+            Assert.That(second.LocalSpectator, Is.False);
+            host.SetSpectatorOf(0, true);
+            Assert.That(host.Roster[0].Spectator, Is.False, "ホストが観戦になった");
         }
 
         private static int[] TeamsOf(IReadOnlyList<LobbySlot> roster, int count)

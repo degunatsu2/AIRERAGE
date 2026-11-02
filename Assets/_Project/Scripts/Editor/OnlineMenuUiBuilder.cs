@@ -95,27 +95,26 @@ namespace Airerage.Editor
                 ((Text)names[p]).resizeTextMinSize = 14;
                 ((Text)names[p]).resizeTextMaxSize = 28;
             }
-            // チーム対戦の列の見出し（4 色。チームの名前と人数）。
+            // 列の見出し（チーム対戦は 4 色のチームの名前と人数。個人戦は 1 つ目を「PLAYERS」に広げる）。選んで決定（クリック）すると、
+            // 自分がそのチームに入る（観戦の待機所からも。ユーザーの要望、2026-11-02）。位置と色は実行中に OnlineMenu が決める。
             var headers = new Object[Airerage.Core.Match.TeamRules.MaxTeams];
+            var headerPlates = new Object[Airerage.Core.Match.TeamRules.MaxTeams];
+            var headerButtons = new Object[Airerage.Core.Match.TeamRules.MaxTeams];
             var headerTexts = new Object[Airerage.Core.Match.TeamRules.MaxTeams];
             for (int t = 0; t < headers.Length; t++)
             {
-                var header = new GameObject($"Team{t + 1}", typeof(RectTransform));
-                header.transform.SetParent(waiting, false);
-                var rect = (RectTransform)header.transform;
-                rect.anchorMin = rect.anchorMax = top;
-                rect.pivot = top;
-                rect.anchoredPosition = new Vector2(110f + t * 198f, -200f);
-                rect.sizeDelta = new Vector2(190f, 50f);
-                var plate = header.AddComponent<SlantedPlate>();
                 Color teamColor = Airerage.Runtime.Presentation.TeamColors.Of(t + 1);
-                plate.Configure(0.2f, 3f, new Color(teamColor.r * 0.35f, teamColor.g * 0.35f, teamColor.b * 0.35f, 0.9f), teamColor);
-                plate.raycastTarget = false;
+                GameObject header = CreateHeader(waiting, $"Team{t + 1}", new Vector2(110f + t * 198f, -200f), new Vector2(190f, 50f), teamColor,
+                    Airerage.Runtime.Presentation.TeamColors.NameOf(t + 1), out SlantedPlate plate, out PlateButton button, out Text label);
                 headers[t] = header;
-                headerTexts[t] = MenuUiBuilder.CreateText(header.transform, "Label", Airerage.Runtime.Presentation.TeamColors.NameOf(t + 1), 26,
-                    FontStyle.BoldAndItalic, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(170f, 46f), teamColor);
-                header.SetActive(false);
+                headerPlates[t] = plate;
+                headerButtons[t] = button;
+                headerTexts[t] = label;
             }
+            // 観戦の待機所（右の端の列。個人戦でもチーム対戦でも。選んで決定すると、自分がそこへ移る。ホストは移れない）。
+            GameObject spectators = CreateHeader(waiting, "Spectators", new Vector2(1600f, -200f), new Vector2(280f, 50f), new Color(0.75f, 0.75f, 0.8f),
+                "SPECTATORS", out SlantedPlate spectatorPlate, out PlateButton spectatorButton, out Text spectatorText);
+            spectators.SetActive(true);
             // 右の列: READY、自分のチーム、チーム対戦か（ホスト）、人数配分と均等に分ける（ホスト、チーム対戦）、時間の制限（ホスト）、
             // 参加コードのコピー、LEAVE。左のプレイヤーの札へも動けるように、上下左右で動く。
             var row = new Vector2(560f, 64f);
@@ -165,7 +164,11 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotNames", names);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotStates", states);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaders", headers);
+            SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaderPlates", headerPlates);
+            SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaderButtons", headerButtons);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaderTexts", headerTexts);
+            SandboxWireSceneBuilder.SetReference(menu, "_spectatorHeader", spectatorButton);
+            SandboxWireSceneBuilder.SetReference(menu, "_spectatorHeaderText", spectatorText);
             SandboxWireSceneBuilder.SetReference(menu, "_ready", ready);
             SandboxWireSceneBuilder.SetReference(menu, "_team", team);
             SandboxWireSceneBuilder.SetReference(menu, "_mode", mode);
@@ -178,6 +181,33 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(menu, "_loadingPanel", loading.gameObject);
             SandboxOnlineSceneBuilder.SetColors(menu, "_colors", colors);
             return menu;
+        }
+
+        // 待機所の列の見出し 1 つ（斜めの札と名前。選んで決定できる。上下左右で動く）。初めは隠す。
+        private static GameObject CreateHeader(Transform parent, string name, Vector2 position, Vector2 size, Color color, string text,
+            out SlantedPlate plate, out PlateButton button, out Text label)
+        {
+            var header = new GameObject(name, typeof(RectTransform));
+            header.transform.SetParent(parent, false);
+            var rect = (RectTransform)header.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+            plate = header.AddComponent<SlantedPlate>();
+            plate.Configure(0.2f, 3f, new Color(color.r * 0.35f, color.g * 0.35f, color.b * 0.35f, 0.9f), color);
+            var selectable = header.AddComponent<Button>();
+            selectable.transition = Selectable.Transition.None;
+            selectable.targetGraphic = plate;
+            selectable.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+            button = header.AddComponent<PlateButton>();
+            label = MenuUiBuilder.CreateText(header.transform, "Label", text, 26, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size.x - 20f, size.y - 4f), color);
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 14;
+            label.resizeTextMaxSize = 26;
+            header.SetActive(false);
+            return header;
         }
 
         // 待機所の右の列の項目 1 つ（上から順に y を進める。上下左右で動く）。

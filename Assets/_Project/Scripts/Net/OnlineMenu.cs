@@ -60,9 +60,14 @@ namespace Airerage.Net
         [SerializeField] private Text[] _slotNumbers = new Text[0];
         [SerializeField] private Text[] _slotNames = new Text[0];
         [SerializeField] private Text[] _slotStates = new Text[0];
-        [Tooltip("チーム対戦の列の見出し（RED・BLUE・GREEN・YELLOW）")]
+        [Tooltip("列の見出し（チーム対戦は RED・BLUE・GREEN・YELLOW。個人戦は 1 つ目を PLAYERS に。決定でそこに入る）")]
         [SerializeField] private GameObject[] _teamHeaders = new GameObject[0];
+        [SerializeField] private SlantedPlate[] _teamHeaderPlates = new SlantedPlate[0];
+        [SerializeField] private PlateButton[] _teamHeaderButtons = new PlateButton[0];
         [SerializeField] private Text[] _teamHeaderTexts = new Text[0];
+        [Tooltip("観戦の待機所の見出し（右の端の列。決定でそこへ移る）")]
+        [SerializeField] private PlateButton _spectatorHeader;
+        [SerializeField] private Text _spectatorHeaderText;
         [SerializeField] private MenuOption _ready;
         [SerializeField] private MenuOption _team;
         [SerializeField] private MenuOption _mode;
@@ -90,6 +95,8 @@ namespace Airerage.Net
         private int _splitIndex;
         private bool _shownTeamMode;
         private bool _shownHost;
+        private bool _shownSpectator;
+        private LobbyPhase _shownPhase;
 
         // 待機所の札の並べ方（個人戦は 1 列、チーム対戦は 4 色の列。基準の画面 1920×1080 の座標）。
         private const float SlotLeft = 110f;
@@ -98,6 +105,10 @@ namespace Airerage.Net
         private const float LaneGap = 8f;
         private const float LaneHeaderHeight = 50f;
         private const float LaneSlotHeight = 58f;
+        private const float SpectatorLaneLeft = 1600f;
+        private const float SpectatorLaneWidth = 280f;
+        private static readonly Color PlayersColor = new Color(0.35f, 0.85f, 1f);
+        private static readonly Color SpectatorColor = new Color(0.75f, 0.75f, 0.8f);
 
         /// <summary>開いているか（テスト用）。</summary>
         public bool IsOpen => _open;
@@ -128,6 +139,10 @@ namespace Airerage.Net
         public MenuOption SplitButton => _split;
         public MenuOption ShuffleButton => _shuffle;
 
+        /// <summary>列の見出し（t 番目。決定でそのチームに入る。個人戦は 0 番が PLAYERS。テスト用）と、観戦の待機所の見出し。</summary>
+        public PlateButton TeamHeader(int t) => _teamHeaderButtons[t];
+        public PlateButton SpectatorHeader => _spectatorHeader;
+
         /// <summary>待機所の p 番の札（チーム対戦で選んで決定すると次のチームへ。テスト用）。</summary>
         public PlateButton SlotButton(int p) => _slotButtons[p];
 
@@ -152,7 +167,9 @@ namespace Airerage.Net
                 || _slotPlates.Length != OnlineSession.MaxPlayers || _slotNames.Length != OnlineSession.MaxPlayers
                 || _slotStates.Length != OnlineSession.MaxPlayers || _slotButtons.Length != OnlineSession.MaxPlayers
                 || _slotNumbers.Length != OnlineSession.MaxPlayers
-                || _teamHeaders.Length != Airerage.Core.Match.TeamRules.MaxTeams || _teamHeaderTexts.Length != _teamHeaders.Length)
+                || _teamHeaders.Length != Airerage.Core.Match.TeamRules.MaxTeams || _teamHeaderTexts.Length != _teamHeaders.Length
+                || _teamHeaderPlates.Length != _teamHeaders.Length || _teamHeaderButtons.Length != _teamHeaders.Length
+                || _spectatorHeader == null || _spectatorHeaderText == null)
             {
                 Debug.LogError($"{name}: ネットワーク対戦のメニューの部品がそろっていません", this);
                 enabled = false;
@@ -210,7 +227,7 @@ namespace Airerage.Net
             {
                 if (Session != null && Session.IsHost)
                 {
-                    int count = Airerage.Core.Match.TeamRules.SizePatterns(Session.LobbyPlayerCount).Count;
+                    int count = Airerage.Core.Match.TeamRules.SizePatterns(Session.LobbyParticipantCount).Count;
                     _splitIndex = count > 0 ? (_splitIndex + 1) % count : 0;
                 }
             });
@@ -237,6 +254,20 @@ namespace Airerage.Net
                 _slotButtons[p].Cancelled += cancel;
                 _slotButtons[p].Clicked.AddListener(() => MoveToNextTeam(player));
             }
+            for (int t = 0; t < _teamHeaderButtons.Length; t++)
+            {
+                int team = t + 1;
+                _teamHeaderButtons[t].Cancelled += cancel;
+                _teamHeaderButtons[t].Clicked.AddListener(() => JoinFromHeader(team));
+            }
+            _spectatorHeader.Cancelled += cancel;
+            _spectatorHeader.Clicked.AddListener(() =>
+            {
+                if (Session != null && !Session.IsHost && Session.Phase == LobbyPhase.Waiting)
+                {
+                    Session.LocalSpectator = true;
+                }
+            });
             _characterSelect.NetworkHovered += character =>
             {
                 if (_open && Session != null)
@@ -479,6 +510,11 @@ namespace Airerage.Net
             {
                 return Panel.Loading;
             }
+            if (session.LocalSpectator)
+            {
+                // 観戦の人は、キャラクター選択とステージ選択の間も待機所で待つ（docs/19）。
+                return Panel.Waiting;
+            }
             switch (session.Phase)
             {
                 case LobbyPhase.CharacterSelect:
@@ -502,11 +538,10 @@ namespace Airerage.Net
                     break;
                 case Panel.Waiting:
                     _waitingPanel.SetActive(true);
-                    _copyCode.gameObject.SetActive(session.JoinCode.Length > 0);
                     _copiedCode = string.Empty;
                     _splitIndex = 0;
                     ShowWaitingOptions(session);
-                    Focus(_ready);
+                    Focus(_ready.gameObject.activeSelf ? _ready : _leave);
                     break;
                 case Panel.CharacterSelect:
                     _characterSelect.ShowNetwork(session.LocalPlayer, session.LocalCharacter);
@@ -552,17 +587,24 @@ namespace Airerage.Net
             _selectAtFrame = Time.frameCount + 1;
         }
 
-        // 待機所の右の列の、ホストだけ・チーム対戦だけの項目を出し入れする（選んでいた項目が消えたら READY を選ぶ）。
+        // 待機所の右の列の、ホストだけ・チーム対戦だけ・参加する人だけの項目を出し入れする（選んでいた項目が消えたら READY を選ぶ）。
+        // 待機所の段階でなければ（観戦の人が、キャラクター選択の間に見ている）、LEAVE だけ。
         private void ShowWaitingOptions(OnlineSession session)
         {
             bool team = session.TeamMode;
+            bool waiting = session.Phase == LobbyPhase.Waiting;
+            bool spectator = session.LocalSpectator;
             _shownTeamMode = team;
             _shownHost = session.IsHost;
-            _team.gameObject.SetActive(team);
-            _mode.gameObject.SetActive(session.IsHost);
-            _split.gameObject.SetActive(session.IsHost && team);
-            _shuffle.gameObject.SetActive(session.IsHost && team);
-            _timeLimit.gameObject.SetActive(session.IsHost);
+            _shownSpectator = spectator;
+            _shownPhase = session.Phase;
+            _ready.gameObject.SetActive(waiting && !spectator);
+            _team.gameObject.SetActive(waiting && team);
+            _mode.gameObject.SetActive(waiting && session.IsHost);
+            _split.gameObject.SetActive(waiting && session.IsHost && team);
+            _shuffle.gameObject.SetActive(waiting && session.IsHost && team);
+            _timeLimit.gameObject.SetActive(waiting && session.IsHost);
+            _copyCode.gameObject.SetActive(session.JoinCode.Length > 0);
             // 出ている項目だけを上から詰めて並べる（項目の位置は MenuOption が覚えているので、作り直さずに y だけ変える）。
             float y = SlotTop;
             foreach (MenuOption option in new[] { _ready, _team, _mode, _split, _shuffle, _timeLimit, _copyCode, _leave })
@@ -577,35 +619,91 @@ namespace Airerage.Net
             GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             if (selected == null || !selected.activeInHierarchy)
             {
-                Focus(_ready);
+                Focus(_ready.gameObject.activeSelf ? _ready : _leave);
             }
         }
 
-        // 札を決定した: チーム対戦なら、その人を次のチームへ（ホストはだれでも、ほかの人は自分だけ。D-78）。
+        // 札を決定した: その人を次の席へ（ホストはだれでも、ほかの人は自分だけ。D-78）。チーム対戦は RED → BLUE → GREEN → YELLOW →
+        // 観戦 → RED、個人戦は参加 ↔ 観戦（ホスト自身は観戦にできないので、チームだけを回す）。
         private void MoveToNextTeam(int player)
         {
             OnlineSession session = Session;
-            if (session == null || !session.TeamMode || session.Phase != LobbyPhase.Waiting)
+            if (session == null || session.Phase != LobbyPhase.Waiting)
             {
                 return;
             }
             IReadOnlyList<LobbySlot> roster = session.Roster;
-            if (player >= roster.Count || !roster[player].Connected)
+            if (player >= roster.Count || !roster[player].Connected || (!session.IsHost && player != session.LocalPlayer))
             {
                 return;
             }
-            int next = NextTeam(roster[player].Team);
-            if (session.IsHost)
+            LobbySlot slot = roster[player];
+            bool canSpectate = player != 0;
+            if (!session.TeamMode)
             {
-                session.SetTeamOf(player, next);
+                if (canSpectate)
+                {
+                    SetSpectator(session, player, !slot.Spectator);
+                }
+                return;
             }
-            else if (player == session.LocalPlayer)
+            if (slot.Spectator)
             {
-                session.LocalTeam = next;
+                SetTeam(session, player, 1);
+            }
+            else if (slot.Team >= Airerage.Core.Match.TeamRules.MaxTeams && canSpectate)
+            {
+                SetSpectator(session, player, true);
+            }
+            else
+            {
+                SetTeam(session, player, NextTeam(slot.Team));
             }
         }
 
-        // ホスト: 選んだ人数配分のとおりに、ランダムに分ける（D-78）。
+        // 見出しを決定した: 自分がそのチームに入る（個人戦の PLAYERS なら、観戦から参加へ）。
+        private void JoinFromHeader(int team)
+        {
+            OnlineSession session = Session;
+            if (session == null || session.Phase != LobbyPhase.Waiting)
+            {
+                return;
+            }
+            if (session.TeamMode)
+            {
+                session.LocalTeam = team;
+            }
+            else if (team == 1)
+            {
+                session.LocalSpectator = false;
+            }
+        }
+
+        private static void SetTeam(OnlineSession session, int player, int team)
+        {
+            if (session.IsHost)
+            {
+                session.SetTeamOf(player, team);
+            }
+            else
+            {
+                session.LocalTeam = team;
+            }
+        }
+
+        private static void SetSpectator(OnlineSession session, int player, bool spectate)
+        {
+            if (session.IsHost)
+            {
+                session.SetSpectatorOf(player, spectate);
+            }
+            else
+            {
+                session.LocalSpectator = spectate;
+            }
+        }
+
+        // ホスト: 選んだ人数配分のとおりに、ランダムに分ける（D-78。観戦の人は分けない）。
         private void ShuffleTeams()
         {
             OnlineSession session = Session;
@@ -613,7 +711,7 @@ namespace Airerage.Net
             {
                 return;
             }
-            List<int[]> patterns = Airerage.Core.Match.TeamRules.SizePatterns(session.LobbyPlayerCount);
+            List<int[]> patterns = Airerage.Core.Match.TeamRules.SizePatterns(session.LobbyParticipantCount);
             if (patterns.Count == 0)
             {
                 return;
@@ -631,85 +729,106 @@ namespace Airerage.Net
         {
             IReadOnlyList<LobbySlot> roster = session.Roster;
             bool teamMode = session.TeamMode;
-            if (teamMode != _shownTeamMode || session.IsHost != _shownHost)
+            bool waiting = session.Phase == LobbyPhase.Waiting;
+            if (teamMode != _shownTeamMode || session.IsHost != _shownHost || session.LocalSpectator != _shownSpectator
+                || session.Phase != _shownPhase)
             {
                 ShowWaitingOptions(session);
             }
             int connected = 0;
+            int players = 0;
+            int spectators = 0;
             var laneCounts = new int[Airerage.Core.Match.TeamRules.MaxTeams + 1];
+            var emptySlots = new List<int>();
             for (int p = 0; p < OnlineSession.MaxPlayers; p++)
             {
                 LobbySlot slot = p < roster.Count ? roster[p] : default;
                 connected += slot.Connected ? 1 : 0;
                 Color color = p < _colors.Length ? _colors[p] : Color.white;
-                bool movable = teamMode && slot.Connected && (session.IsHost || p == session.LocalPlayer);
+                bool movable = waiting && slot.Connected && (session.IsHost || p == session.LocalPlayer) && (teamMode || p != 0);
                 if (_slotButtons[p].Button.interactable != movable)
                 {
                     _slotButtons[p].Button.interactable = movable;
                 }
                 bool selected = _slotButtons[p].IsSelected;
-                if (teamMode)
+                if (!slot.Connected)
                 {
-                    // チーム対戦: その人のチームの列に、番号の順に並べる（いない番号は出さない）。
-                    bool shown = slot.Connected && slot.Team >= 1 && slot.Team <= Airerage.Core.Match.TeamRules.MaxTeams;
-                    _slotPlates[p].gameObject.SetActive(shown);
-                    if (!shown)
-                    {
-                        continue;
-                    }
-                    int lane = slot.Team - 1;
-                    int row = laneCounts[slot.Team]++;
-                    LayoutSlot(p, new Vector2(SlotLeft + lane * (LaneWidth + LaneGap), SlotTop - LaneHeaderHeight - 8f - row * (LaneSlotHeight + 6f)),
-                        new Vector2(LaneWidth, LaneSlotHeight), true);
-                    Color teamColor = Airerage.Runtime.Presentation.TeamColors.Of(slot.Team);
-                    _slotPlates[p].color = JoinedFill;
-                    _slotPlates[p].BorderColor = selected ? Color.white : slot.Ready ? teamColor : new Color(teamColor.r, teamColor.g, teamColor.b, 0.5f);
-                    _slotNames[p].text = SlotLabel(session, slot, p, compact: true);
-                    _slotNames[p].color = Color.white;
-                    _slotStates[p].text = slot.Ready ? "READY!" : string.Empty;
-                    _slotStates[p].color = teamColor;
+                    _slotPlates[p].gameObject.SetActive(false);
+                    emptySlots.Add(p);
                     continue;
                 }
                 _slotPlates[p].gameObject.SetActive(true);
-                LayoutSlot(p, new Vector2(SlotLeft, SlotTop - p * 72f), new Vector2(780f, 64f), false);
-                if (!slot.Connected)
+                _slotPlates[p].color = JoinedFill;
+                _slotNames[p].color = Color.white;
+                if (slot.Spectator)
                 {
+                    // 観戦の待機所（右の端の列）。
+                    LayoutSlot(p, new Vector2(SpectatorLaneLeft, SlotTop - LaneHeaderHeight - 8f - spectators * (LaneSlotHeight + 6f)),
+                        new Vector2(SpectatorLaneWidth, LaneSlotHeight), true);
+                    spectators++;
+                    _slotPlates[p].BorderColor = selected ? Color.white : new Color(SpectatorColor.r, SpectatorColor.g, SpectatorColor.b, 0.6f);
+                    _slotNames[p].text = SlotLabel(session, slot, p, compact: true);
+                    _slotStates[p].text = "WATCHING";
+                    _slotStates[p].color = SpectatorColor;
+                    continue;
+                }
+                if (teamMode)
+                {
+                    // チーム対戦: その人のチームの列に、番号の順に並べる。
+                    int team = Mathf.Clamp(slot.Team, 1, Airerage.Core.Match.TeamRules.MaxTeams);
+                    int row = laneCounts[team]++;
+                    LayoutSlot(p, new Vector2(SlotLeft + (team - 1) * (LaneWidth + LaneGap), SlotTop - LaneHeaderHeight - 8f - row * (LaneSlotHeight + 6f)),
+                        new Vector2(LaneWidth, LaneSlotHeight), true);
+                    Color teamColor = Airerage.Runtime.Presentation.TeamColors.Of(team);
+                    _slotPlates[p].BorderColor = selected ? Color.white : slot.Ready ? teamColor : new Color(teamColor.r, teamColor.g, teamColor.b, 0.5f);
+                    _slotNames[p].text = SlotLabel(session, slot, p, compact: true);
+                    _slotStates[p].text = slot.Ready ? "READY!" : string.Empty;
+                    _slotStates[p].color = teamColor;
+                    players++;
+                    continue;
+                }
+                // 個人戦: PLAYERS の見出しの下に 1 列。
+                LayoutSlot(p, new Vector2(SlotLeft, SlotTop - LaneHeaderHeight - 8f - players * (LaneSlotHeight + 8f)), new Vector2(780f, LaneSlotHeight), false);
+                players++;
+                _slotPlates[p].BorderColor = selected ? Color.white : slot.Ready ? color : new Color(color.r, color.g, color.b, 0.5f);
+                _slotNames[p].text = SlotLabel(session, slot, p, compact: false);
+                _slotStates[p].text = slot.Ready ? "READY!" : "NOT READY";
+                _slotStates[p].color = slot.Ready ? color : new Color(1f, 1f, 1f, 0.6f);
+            }
+            if (!teamMode)
+            {
+                // 個人戦は 4 人の枠まで、空いた番号の札で「WAITING...」を出す。
+                for (int i = 0; i < emptySlots.Count && players + i < OnlineSession.MaxFreeForAllPlayers; i++)
+                {
+                    int p = emptySlots[i];
+                    _slotPlates[p].gameObject.SetActive(true);
+                    LayoutSlot(p, new Vector2(SlotLeft, SlotTop - LaneHeaderHeight - 8f - (players + i) * (LaneSlotHeight + 8f)),
+                        new Vector2(780f, LaneSlotHeight), false);
                     _slotPlates[p].color = EmptyFill;
                     _slotPlates[p].BorderColor = EmptyBorder;
                     _slotNames[p].text = "WAITING...";
                     _slotNames[p].color = new Color(1f, 1f, 1f, 0.45f);
                     _slotStates[p].text = string.Empty;
-                    continue;
                 }
-                _slotPlates[p].color = JoinedFill;
-                _slotPlates[p].BorderColor = slot.Ready ? color : new Color(color.r, color.g, color.b, 0.5f);
-                _slotNames[p].text = SlotLabel(session, slot, p, compact: false);
-                _slotNames[p].color = Color.white;
-                _slotStates[p].text = slot.Ready ? "READY!" : "NOT READY";
-                _slotStates[p].color = slot.Ready ? color : new Color(1f, 1f, 1f, 0.6f);
             }
             // 選んでいた札が消えた（その人が抜けた）ら、READY を選び直す（ゲームパッドで操作できなくならないように）。
             GameObject current = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
-            if (current != null && !current.activeInHierarchy && _selectAtFrame < 0)
+            if ((current == null || !current.activeInHierarchy) && _selectAtFrame < 0)
             {
-                Focus(_ready);
+                Focus(_ready.gameObject.activeSelf ? _ready : _leave);
             }
-            for (int t = 0; t < _teamHeaders.Length; t++)
-            {
-                _teamHeaders[t].SetActive(teamMode);
-                if (teamMode)
-                {
-                    _teamHeaderTexts[t].text = $"{Airerage.Runtime.Presentation.TeamColors.NameOf(t + 1)}  {laneCounts[t + 1]}";
-                }
-            }
+            RefreshHeaders(session, teamMode, waiting, laneCounts, players, spectators);
             _ready.SetLabel(session.LocalReady ? "CANCEL READY" : "READY");
-            _team.SetLabel($"MY TEAM: {Airerage.Runtime.Presentation.TeamColors.NameOf(session.LocalTeam)}");
+            _team.SetLabel(session.LocalSpectator ? "MY TEAM: - (WATCHING)" : $"MY TEAM: {Airerage.Runtime.Presentation.TeamColors.NameOf(session.LocalTeam)}");
             _mode.SetLabel(teamMode ? "MODE: TEAM (UP TO 8)" : "MODE: FREE FOR ALL (UP TO 4)");
-            List<int[]> patterns = Airerage.Core.Match.TeamRules.SizePatterns(connected);
+            List<int[]> patterns = Airerage.Core.Match.TeamRules.SizePatterns(players);
             if (patterns.Count == 0)
             {
                 _split.SetLabel("SPLIT: -");
-                _shuffle.SetAvailable(false, "2+ PLAYERS");
+                if (_shuffle.Button.interactable)
+                {
+                    _shuffle.SetAvailable(false, "2+ PLAYERS");
+                }
             }
             else
             {
@@ -735,19 +854,77 @@ namespace Airerage.Net
                     : $"CONNECTED AS {session.LocalPlayer + 1}P.";
             }
             string problem = session.WaitingProblem;
-            if (problem != null)
+            _waitingMessage.color = Color.white;
+            if (!waiting)
+            {
+                // 観戦の人が、キャラクター選択・ステージ選択の間に見ている。
+                _waitingMessage.text = session.Phase == LobbyPhase.CharacterSelect
+                    ? "SPECTATING: THE PLAYERS ARE CHOOSING CHARACTERS"
+                    : "SPECTATING: THE HOST IS CHOOSING THE STAGE";
+            }
+            else if (problem != null)
             {
                 _waitingMessage.text = problem;
                 _waitingMessage.color = new Color(1f, 0.85f, 0.3f);
             }
+            else if (players < 2)
+            {
+                _waitingMessage.text = teamMode
+                    ? $"WAITING FOR PLAYERS (2-{OnlineSession.MaxPlayers})"
+                    : $"WAITING FOR PLAYERS (2-{OnlineSession.MaxFreeForAllPlayers})";
+            }
             else
             {
-                _waitingMessage.color = Color.white;
-                _waitingMessage.text = connected < 2
-                    ? (teamMode ? $"WAITING FOR PLAYERS (2-{OnlineSession.MaxPlayers})" : $"WAITING FOR PLAYERS (2-{OnlineSession.MaxFreeForAllPlayers})")
+                _waitingMessage.text = session.LocalSpectator
+                    ? "YOU ARE SPECTATING. SELECT A TEAM (OR PLAYERS) TO PLAY"
                     : teamMode && session.IsHost
-                        ? "WHEN EVERYONE IS READY, CHARACTER SELECT STARTS.  SELECT A PLAYER TO MOVE THEM TO THE NEXT TEAM"
-                        : "WHEN EVERYONE IS READY, CHARACTER SELECT STARTS";
+                        ? "WHEN EVERYONE IS READY, CHARACTER SELECT STARTS.  SELECT A PLAYER TO MOVE THEM"
+                        : "WHEN EVERYONE IS READY, CHARACTER SELECT STARTS.  SELECT A TEAM TO JOIN IT";
+            }
+        }
+
+        // 列の見出し: チーム対戦は 4 色（名前と人数）、個人戦は 1 つ目を広げて「PLAYERS n / 4」。右の端に観戦（ホストは入れない）。
+        private void RefreshHeaders(OnlineSession session, bool teamMode, bool waiting, int[] laneCounts, int players, int spectators)
+        {
+            for (int t = 0; t < _teamHeaders.Length; t++)
+            {
+                bool shown = teamMode || t == 0;
+                _teamHeaders[t].SetActive(shown);
+                if (!shown)
+                {
+                    continue;
+                }
+                var rect = (RectTransform)_teamHeaders[t].transform;
+                Color color = teamMode ? Airerage.Runtime.Presentation.TeamColors.Of(t + 1) : PlayersColor;
+                rect.anchoredPosition = new Vector2(SlotLeft + (teamMode ? t * (LaneWidth + LaneGap) : 0f), SlotTop);
+                rect.sizeDelta = new Vector2(teamMode ? LaneWidth : 780f, LaneHeaderHeight);
+                bool selected = _teamHeaderButtons[t].IsSelected;
+                _teamHeaderPlates[t].color = new Color(color.r * 0.35f, color.g * 0.35f, color.b * 0.35f, selected ? 1f : 0.9f);
+                _teamHeaderPlates[t].BorderColor = selected ? Color.white : color;
+                _teamHeaderTexts[t].color = color;
+                ((RectTransform)_teamHeaderTexts[t].transform).sizeDelta = new Vector2(rect.sizeDelta.x - 20f, LaneHeaderHeight - 4f);
+                _teamHeaderTexts[t].text = teamMode
+                    ? $"{Airerage.Runtime.Presentation.TeamColors.NameOf(t + 1)}  {laneCounts[t + 1]}"
+                    : $"PLAYERS  {players} / {OnlineSession.MaxFreeForAllPlayers}";
+                // 自分が入れる見出しだけ選べる（今いるチーム・参加している個人戦の PLAYERS は選べない）。
+                bool here = teamMode ? !session.LocalSpectator && session.LocalTeam == t + 1 : !session.LocalSpectator;
+                bool usable = waiting && !here;
+                if (_teamHeaderButtons[t].Button.interactable != usable)
+                {
+                    _teamHeaderButtons[t].Button.interactable = usable;
+                }
+            }
+            bool spectatorSelected = _spectatorHeader.IsSelected;
+            var spectatorPlate = _spectatorHeader.GetComponent<SlantedPlate>();
+            if (spectatorPlate != null)
+            {
+                spectatorPlate.BorderColor = spectatorSelected ? Color.white : SpectatorColor;
+            }
+            _spectatorHeaderText.text = session.IsHost && waiting ? $"SPECTATORS  {spectators}  (HOST PLAYS)" : $"SPECTATORS  {spectators}";
+            bool canWatch = waiting && !session.IsHost && !session.LocalSpectator;
+            if (_spectatorHeader.Button.interactable != canWatch)
+            {
+                _spectatorHeader.Button.interactable = canWatch;
             }
         }
 
@@ -792,13 +969,13 @@ namespace Airerage.Net
             {
                 _slotNumbers[p].fontSize = 34;
                 number.anchoredPosition = new Vector2(34f, 0f);
-                number.sizeDelta = new Vector2(90f, 56f);
+                number.sizeDelta = new Vector2(90f, 54f);
                 name.anchoredPosition = new Vector2(130f, 0f);
-                name.sizeDelta = new Vector2(420f, 56f);
+                name.sizeDelta = new Vector2(420f, 54f);
                 _slotNames[p].resizeTextMaxSize = 28;
                 _slotStates[p].fontSize = 26;
                 state.anchoredPosition = new Vector2(-40f, 0f);
-                state.sizeDelta = new Vector2(240f, 56f);
+                state.sizeDelta = new Vector2(240f, 54f);
             }
         }
 
@@ -809,8 +986,9 @@ namespace Airerage.Net
             for (int p = 0; p < OnlineSession.MaxPlayers && p < roster.Count; p++)
             {
                 LobbySlot slot = roster[p];
-                _characterSelect.SetRemote(p, slot.Connected, slot.Name, slot.Character, slot.Ready);
-                if (slot.Connected && !slot.Ready)
+                // 観戦の人は、キャラクター選択の枠に出さない。
+                _characterSelect.SetRemote(p, slot.Plays, slot.Name, slot.Character, slot.Ready);
+                if (slot.Plays && !slot.Ready)
                 {
                     waiting.Add(string.IsNullOrEmpty(slot.Name) ? $"{p + 1}P" : slot.Name);
                 }

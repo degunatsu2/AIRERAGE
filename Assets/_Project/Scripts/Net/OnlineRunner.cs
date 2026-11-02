@@ -119,9 +119,18 @@ namespace Airerage.Net
 
         private bool Running => _session != null && _session.World != null;
 
+        // 観戦（docs/19）で見ているプレイヤーの番号（←→ ／ 十字キー・LB RB で切り替える）。
+        private int _viewed;
+        private GUIStyle _spectatorStyle;
+
+        /// <summary>
+        /// 画面の中心にするプレイヤー（参加していれば自分。観戦なら見ているプレイヤー）。カメラ・技の札・照準などは、この人について出す。
+        /// </summary>
+        public int ViewedPlayer => !Running ? -1 : _session.IsSpectating ? Mathf.Clamp(_viewed, 0, _session.PlayerCount - 1) : _session.LocalPlayer;
+
         // 表示と効果音の読み取り口（ISimulationFeed）。番号はプレイヤーの番号。
         int ISimulationFeed.CharacterCount => Running ? _session.PlayerCount : 0;
-        int ISimulationFeed.LocalCharacter => Running ? _session.LocalPlayer : -1;
+        int ISimulationFeed.LocalCharacter => ViewedPlayer;
 
         bool ILocalAimSource.TryPeekAim(int index, out System.Numerics.Vector2 aim)
         {
@@ -403,7 +412,12 @@ namespace Airerage.Net
             {
                 return;
             }
-            if (_session.State == OnlineSession.SessionState.Running)
+            if (_session.State == OnlineSession.SessionState.Running && _session.IsSpectating)
+            {
+                // 観戦: 入力は送らない。見るプレイヤーを切り替える。
+                SwitchViewed();
+            }
+            else if (_session.State == OnlineSession.SessionState.Running)
             {
                 // 試合の前に押したボタンを、最初のティックに持ち込まない。メーデー（JUGGERNAUT の R）で場所を選んでいる間は、照準に場所を入れる。
                 _input.UpdateTargeting(_session.World.GetState(_session.LocalPlayer), _session.World.GetConfig(_session.LocalPlayer), _session.World.Bounds);
@@ -424,6 +438,40 @@ namespace Airerage.Net
                 _notifiedTick = _session.World.Tick;
                 Ticked?.Invoke();
             }
+        }
+
+        // 観戦: ← → ／ A D（キーボード）、十字キーの左右・LB RB（ゲームパッド）で、見るプレイヤーを順に切り替える（抜けた人は飛ばす）。
+        private void SwitchViewed()
+        {
+            int step = 0;
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard != null)
+            {
+                step += keyboard.rightArrowKey.wasPressedThisFrame || keyboard.dKey.wasPressedThisFrame ? 1 : 0;
+                step -= keyboard.leftArrowKey.wasPressedThisFrame || keyboard.aKey.wasPressedThisFrame ? 1 : 0;
+            }
+            foreach (Gamepad gamepad in Gamepad.all)
+            {
+                step += gamepad.dpad.right.wasPressedThisFrame || gamepad.rightShoulder.wasPressedThisFrame ? 1 : 0;
+                step -= gamepad.dpad.left.wasPressedThisFrame || gamepad.leftShoulder.wasPressedThisFrame ? 1 : 0;
+            }
+            int count = _session.PlayerCount;
+            if (step == 0 || count <= 0)
+            {
+                _viewed = Mathf.Clamp(_viewed, 0, Mathf.Max(0, count - 1));
+                return;
+            }
+            int viewed = Mathf.Clamp(_viewed, 0, count - 1);
+            for (int i = 0; i < count; i++)
+            {
+                viewed = ((viewed + (step > 0 ? 1 : -1)) % count + count) % count;
+                if (!_session.HasDeparted(viewed))
+                {
+                    break;
+                }
+            }
+            _viewed = viewed;
+            UiSounds.Find().Play(SoundId.UiMove);
         }
 
         private static bool BackPressed()
@@ -542,9 +590,11 @@ namespace Airerage.Net
                 _characterViews[p].gameObject.SetActive(shown);
                 _wireViews[p].gameObject.SetActive(shown);
             }
+            bool spectating = running && _session.IsSpectating;
             if (_aimIndicator != null)
             {
-                _aimIndicator.gameObject.SetActive(running);
+                // 観戦では照準を出さない（操作していない）。
+                _aimIndicator.gameObject.SetActive(running && !spectating);
             }
             if (!running)
             {
@@ -556,7 +606,8 @@ namespace Airerage.Net
             }
 
             float alpha = Mathf.Clamp01(_session.Alpha);
-            WireTuning wire = _session.World.GetConfig(_session.LocalPlayer).Wire;
+            int viewed = ViewedPlayer;
+            WireTuning wire = _session.World.GetConfig(viewed).Wire;
             for (int p = 0; p < count; p++)
             {
                 // 体の大きさはキャラクターごと（JUGGERNAUT はふつうより大きい）。
@@ -571,7 +622,7 @@ namespace Airerage.Net
                 _characterViews[p].RenderClone(cloned, clone, halfExtents, _session.World.Tick, _wireViews[p]);
             }
 
-            Transform local = _characterViews[_session.LocalPlayer].transform;
+            Transform local = _characterViews[viewed].transform;
             if (_followCamera != null && _cameraZoom == null)
             {
                 _cameraZoom = _followCamera.GetComponent<CameraZoom>();
@@ -582,7 +633,10 @@ namespace Airerage.Net
             {
                 _followCamera.Follow = local;
             }
-            RenderAim(alpha, wire);
+            if (!spectating)
+            {
+                RenderAim(alpha, wire);
+            }
         }
 
         private void RenderAim(float alpha, WireTuning wire)
@@ -611,6 +665,7 @@ namespace Airerage.Net
                 _style = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 14 });
                 _style.normal.textColor = Color.white;
             }
+            DrawSpectatorBanner();
             if (_connection != null)
             {
                 DrawConnectionState();
@@ -637,6 +692,32 @@ namespace Airerage.Net
         }
 
         // 接続を使うとき: 試合中は何も出さない（HUD だけ）。切れたら、理由とメニューへ戻るボタン。
+        // 観戦の間は、画面の下の真ん中に「SPECTATING: 見ている人」と切り替えの案内（docs/19）。
+        private void DrawSpectatorBanner()
+        {
+            if (!Running || !_session.IsSpectating)
+            {
+                return;
+            }
+            if (_spectatorStyle == null)
+            {
+                _spectatorStyle = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+                _spectatorStyle.normal.textColor = Color.white;
+            }
+            int viewed = ViewedPlayer;
+            IReadOnlyList<string> names = _session.PlayerNames;
+            string name = viewed < names.Count && !string.IsNullOrEmpty(names[viewed]) ? names[viewed] : $"P{viewed + 1}";
+            Color color = viewed < _playerColors.Length ? _playerColors[viewed] : Color.white;
+            var rect = new Rect((Screen.width - 520f) * 0.5f, Screen.height - 96f, 520f, 30f);
+            Color previous = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(new Rect(rect.x, rect.y - 4f, rect.width, rect.height + 26f), Texture2D.whiteTexture);
+            GUI.color = previous;
+            GuidePlate.DrawText(rect, $"SPECTATING: {name}", _spectatorStyle, color);
+            GuidePlate.DrawText(new Rect(rect.x, rect.y + 24f, rect.width, 20f), "< >  /  LB RB: SWITCH PLAYER", _spectatorStyle,
+                new Color(1f, 1f, 1f, 0.7f));
+        }
+
         private void DrawConnectionState()
         {
             if (_session != null && _session.State != OnlineSession.SessionState.Ended)

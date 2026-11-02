@@ -96,6 +96,18 @@ namespace Airerage.PlayMode.Tests
                 online.ShuffleButton.Button.onClick.Invoke();
                 yield return null;
                 Assert.That(host.Roster[0].Team != host.Roster[1].Team, Is.True, "2 人を 1 対 1 に分けていない");
+                // チームの見出し（YELLOW）を決定すると、そのチームに入る（ユーザーの要望、2026-11-02）。
+                online.TeamHeader(3).Button.onClick.Invoke();
+                Assert.That(host.LocalTeam, Is.EqualTo(4), "見出しを決定してもそのチームに入らない");
+                // 観戦の待機所: 相手が入ると、右の端の列に札が並ぶ。ホストは入れない。
+                Assert.That(online.SpectatorHeader.Button.interactable, Is.False, "ホストが観戦の見出しを選べる");
+                bot.LocalSpectator = true;
+                yield return WaitFor(() => host.Roster[1].Spectator, 10f, "相手が観戦の待機所に入らない");
+                yield return null;
+                Assert.That(online.SlotPosition(1).x, Is.GreaterThan(1500f), "観戦の人の札が観戦の列にない");
+                Assert.That(online.WaitingMessage, Does.Contain("WAITING FOR PLAYERS"), "参加者が 1 人なのに進めそうな案内");
+                bot.LocalTeam = 1;
+                yield return WaitFor(() => !host.Roster[1].Spectator && host.Roster[1].Team == 1, 10f, "観戦から見出しのチームに戻れない");
                 online.ModeButton.Button.onClick.Invoke();
                 yield return WaitFor(() => !bot.TeamMode, 10f, "個人戦に戻らない");
 

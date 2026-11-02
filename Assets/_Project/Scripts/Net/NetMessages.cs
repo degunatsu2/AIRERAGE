@@ -53,6 +53,18 @@ namespace Airerage.Net
         /// 変えられる（D-78）。
         /// </summary>
         Team = 12,
+
+        /// <summary>
+        /// クライアント → ホスト: 観戦の待機所に入るか（1）、出て試合に参加するか（0）。待機所で。観戦の人は試合に参加せず、見るだけ
+        /// （docs/19。ユーザーの要望、2026-11-02）。ホストは観戦にできない。
+        /// </summary>
+        Spectate = 13,
+
+        /// <summary>観戦の人 → ホスト: 試合（番号）を見始めた（ホストは確定した入力を送り始める。開始のメッセージの送り直しも止める）。</summary>
+        Watching = 14,
+
+        /// <summary>ホスト → 観戦の人: 確定したティックの全員の入力（試合の番号、最初のティック、人数、ティックごとの全員の入力）。</summary>
+        SpectateInputs = 15,
     }
 
     /// <summary>
@@ -83,19 +95,26 @@ namespace Airerage.Net
         /// <summary>チームの番号（1〜4。チーム対戦でなければ 0。docs/19 T9-5）。</summary>
         public readonly byte Team;
 
-        public LobbySlot(bool connected, string name, int character = 0, bool ready = false, byte team = 0)
+        /// <summary>観戦の待機所にいるか（試合に参加せず、見るだけ。docs/19）。</summary>
+        public readonly bool Spectator;
+
+        public LobbySlot(bool connected, string name, int character = 0, bool ready = false, byte team = 0, bool spectator = false)
         {
             Connected = connected;
             Name = name ?? string.Empty;
             Character = character;
             Ready = ready;
             Team = team;
+            Spectator = spectator;
         }
+
+        /// <summary>試合に参加する人か（つながっていて、観戦ではない）。</summary>
+        public bool Plays => Connected && !Spectator;
 
         public bool Equals(LobbySlot other)
         {
             return Connected == other.Connected && Name == other.Name && Character == other.Character && Ready == other.Ready
-                && Team == other.Team;
+                && Team == other.Team && Spectator == other.Spectator;
         }
 
         public override bool Equals(object obj)
@@ -105,12 +124,14 @@ namespace Airerage.Net
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Connected, Name, Character, Ready, Team);
+            return HashCode.Combine(Connected, Name, Character, Ready, Team, Spectator);
         }
 
         public override string ToString()
         {
-            return Connected ? $"[{Name} #{Character}{(Team != 0 ? $" team {Team}" : string.Empty)}{(Ready ? " ready" : string.Empty)}]" : "[-]";
+            return Connected
+                ? $"[{Name} #{Character}{(Team != 0 ? $" team {Team}" : string.Empty)}{(Spectator ? " spectator" : string.Empty)}{(Ready ? " ready" : string.Empty)}]"
+                : "[-]";
         }
     }
 
@@ -198,7 +219,7 @@ namespace Airerage.Net
 
         /// <summary>
         /// ロビーの顔ぶれと段階（段階、ホストが選んでいるステージの番号、チーム対戦か、番号の順に つながっているか・キャラクターの番号・
-        /// 準備完了か・チームの番号・プレイヤーネームの UTF-8）。
+        /// 準備完了か・チームの番号・観戦か・プレイヤーネームの UTF-8）。
         /// </summary>
         public static byte[] Lobby(IReadOnlyList<LobbySlot> slots, LobbyPhase phase = LobbyPhase.Waiting, int stage = 0, bool teamMode = false)
         {
@@ -217,6 +238,7 @@ namespace Airerage.Net
                     writer.Write((byte)Math.Max(0, Math.Min(byte.MaxValue, slot.Character)));
                     writer.Write(slot.Ready);
                     writer.Write(slot.Team);
+                    writer.Write(slot.Spectator);
                     writer.Write((byte)Math.Min(name.Length, byte.MaxValue));
                     writer.Write(name, 0, Math.Min(name.Length, byte.MaxValue));
                 }
@@ -238,7 +260,7 @@ namespace Airerage.Net
         public static LobbySlot[] ReadLobby(byte[] data, out LobbyPhase phase, out int stage, out bool teamMode)
         {
             const int header = 5;
-            const int slotHeader = 5;
+            const int slotHeader = 6;
             Expect(data, NetKind.Lobby, header);
             int count = data[1];
             if (data[2] > (byte)LobbyPhase.StageSelect)
@@ -264,8 +286,9 @@ namespace Airerage.Net
                 {
                     throw new FormatException($"チームの番号が不正です（{team}）");
                 }
-                int length = data[offset + 4];
-                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + slotHeader, length), character, ready, team);
+                bool spectator = data[offset + 4] != 0;
+                int length = data[offset + 5];
+                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + slotHeader, length), character, ready, team, spectator);
                 offset += slotHeader + length;
             }
             return slots;
@@ -281,6 +304,102 @@ namespace Airerage.Net
         {
             Expect(data, NetKind.Team, 2);
             return data[1];
+        }
+
+        /// <summary>観戦の待機所に入るか（クライアント → ホスト）。</summary>
+        public static byte[] Spectate(bool spectate)
+        {
+            return new[] { (byte)NetKind.Spectate, (byte)(spectate ? 1 : 0) };
+        }
+
+        public static bool ReadSpectate(byte[] data)
+        {
+            Expect(data, NetKind.Spectate, 2);
+            return data[1] != 0;
+        }
+
+        /// <summary>試合 match を見始めた（観戦の人 → ホスト）。</summary>
+        public static byte[] Watching(int match)
+        {
+            return new[] { (byte)NetKind.Watching, (byte)match };
+        }
+
+        public static int ReadWatching(byte[] data)
+        {
+            Expect(data, NetKind.Watching, 2);
+            return data[1];
+        }
+
+        /// <summary>1 つの観戦の入力のメッセージに入れるティックの最大の数（8 人で約 6 KB。確実に届ける経路の大きさ 16 KB に収める）。</summary>
+        public const int MaxSpectateTicks = 120;
+
+        /// <summary>
+        /// 確定したティックの全員の入力（ホスト → 観戦の人）。ticks[i] はティック startTick + i の、プレイヤーの番号の順の入力（人数 players）。
+        /// </summary>
+        public static byte[] SpectateInputs(int match, int startTick, int players, IReadOnlyList<PlayerInput[]> ticks)
+        {
+            if (ticks.Count > MaxSpectateTicks)
+            {
+                throw new ArgumentException($"ティックは {MaxSpectateTicks} 個まで（{ticks.Count} 個）", nameof(ticks));
+            }
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write((byte)NetKind.SpectateInputs);
+                writer.Write((byte)match);
+                writer.Write(startTick);
+                writer.Write((byte)players);
+                writer.Write((ushort)ticks.Count);
+                foreach (PlayerInput[] inputs in ticks)
+                {
+                    if (inputs.Length != players)
+                    {
+                        throw new ArgumentException($"入力の数（{inputs.Length}）が人数（{players}）と違う", nameof(ticks));
+                    }
+                    foreach (PlayerInput input in inputs)
+                    {
+                        writer.Write(input.MoveX);
+                        writer.Write(input.MoveY);
+                        writer.Write(input.AimX);
+                        writer.Write(input.AimY);
+                        writer.Write((ushort)input.Buttons);
+                    }
+                }
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        public static void ReadSpectateInputs(byte[] data, out int match, out int startTick, out PlayerInput[][] ticks)
+        {
+            const int header = 1 + 1 + 4 + 1 + 2;
+            Expect(data, NetKind.SpectateInputs, header);
+            using (var reader = new BinaryReader(new MemoryStream(data)))
+            {
+                reader.ReadByte();
+                match = reader.ReadByte();
+                startTick = reader.ReadInt32();
+                int players = reader.ReadByte();
+                int count = reader.ReadUInt16();
+                if (players < 1 || data.Length != header + count * players * 6)
+                {
+                    throw new FormatException($"観戦の入力のメッセージの長さが合いません（{count} ティック、{players} 人、{data.Length} バイト）");
+                }
+                ticks = new PlayerInput[count][];
+                for (int i = 0; i < count; i++)
+                {
+                    ticks[i] = new PlayerInput[players];
+                    for (int p = 0; p < players; p++)
+                    {
+                        sbyte moveX = reader.ReadSByte();
+                        sbyte moveY = reader.ReadSByte();
+                        sbyte aimX = reader.ReadSByte();
+                        sbyte aimY = reader.ReadSByte();
+                        var buttons = (InputButtons)reader.ReadUInt16();
+                        ticks[i][p] = new PlayerInput(moveX, moveY, buttons, aimX, aimY);
+                    }
+                }
+            }
         }
 
         /// <summary>準備完了か（クライアント → ホスト）。</summary>
