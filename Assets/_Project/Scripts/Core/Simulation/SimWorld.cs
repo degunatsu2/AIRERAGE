@@ -365,11 +365,15 @@ namespace Airerage.Core.Simulation
             CombatRewardRules.Step(Coins, _states, _hits.LastEndedCombos, _knockouts, Rules, Tick, _tickConfigs);
             bool active = phase == MatchPhase.Playing || phase == MatchPhase.Overtime;
             FieldCoinRules.Step(Coins, _states, _tickConfigs, CoinSpawns, Rules, Tick, active);
+            // ホットエリア（30 秒ごとのフルーツとコイン）。
+            HotAreaRules.Step(Coins, ref _match, _states, _tickConfigs, CoinSpawns, Rules, _collision, Bounds, Tick, active);
             if (phase == MatchPhase.Overtime)
             {
                 MatchFlow.StepOvertime(ref _match, _states, _tickConfigs, BankSpots, Rules, Tick);
             }
             BankRules.Step(Coins, _states, _tickConfigs, BankSpots, Rules, Tick, active);
+            // 順位の低い人ほど、1 秒ごとにゲージを得る（逆転の要素）。
+            CatchUpRules.Step(_states, _tickConfigs, Rules, Tick, active);
             ThiefRules.StepHeist(Coins, _states, _tickConfigs, _thief, Tick, active, _pressed);
             ThiefRules.AfterStep(_states, _tickConfigs, _configs, _pressed, _thief, Tick, active);
             CoinBonusRules.Mint(Coins, _states, Tick);

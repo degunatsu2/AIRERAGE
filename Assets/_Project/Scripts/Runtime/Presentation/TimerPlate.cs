@@ -9,7 +9,7 @@ namespace Airerage.Runtime.Presentation
     /// <summary>
     /// 上の中央のタイマー（ユーザーの選択、2026-10-14。案 T1 ＋ 細い流れのバー）: 画面の上の辺に付いた台形の札（黒い中身と縁）に、
     /// 小さな見出し（TIME / OVERTIME）と大きな数字、その下に試合全体の残りを示す細い線。札の下には試合の流れのバー（試合の 3 分を
-    /// 1 本の線にして、今の位置、拠点が移る時刻の ◆、100 枚のコインが出る時刻の虹色の点、COIN RUSH の金色の区間）。
+    /// 1 本の線にして、今の位置、拠点が移る時刻の ◆、100 枚のコインが出る時刻の虹色の点。COIN RUSH の金色の区間はなくした。2026-11-02）。
     /// 形のテクスチャは大きさごとに1回だけ作り、色は描くときに GUI.color でつける。座標は OnGUI の座標。Dispose でテクスチャを消す。
     /// </summary>
     public sealed class TimerPlate : System.IDisposable
@@ -27,7 +27,6 @@ namespace Airerage.Runtime.Presentation
         private static readonly Color Frame = new Color(0.62f, 0.68f, 0.8f, 0.9f);
         private static readonly Color Fill = new Color(0.03f, 0.05f, 0.09f, 0.82f);
         private static readonly Color BankMark = new Color(0.31f, 0.84f, 1f);
-        private static readonly Color RushZone = new Color(1f, 0.8f, 0.2f, 0.65f);
 
         private readonly Texture2D _fill;
         private readonly Texture2D _frame;
@@ -55,9 +54,6 @@ namespace Airerage.Runtime.Presentation
             /// <summary>今の位置（0〜1。負なら流れのバーを出さない）。</summary>
             public float Progress;
 
-            /// <summary>COIN RUSH の区間の始まり（0〜1。負ならない）。</summary>
-            public float RushStart;
-
             /// <summary>100 枚のコインが出る位置（0〜1。負ならない）。</summary>
             public float Jackpot;
 
@@ -69,17 +65,13 @@ namespace Airerage.Runtime.Presentation
         public static Timeline TimelineOf(MatchRules rules, int tick, List<float> bankMoves)
         {
             bankMoves.Clear();
-            var timeline = new Timeline { Progress = -1f, RushStart = -1f, Jackpot = -1f, BankMoves = bankMoves };
+            var timeline = new Timeline { Progress = -1f, Jackpot = -1f, BankMoves = bankMoves };
             if (rules == null || !rules.HasTimeLimit)
             {
                 return timeline;
             }
             float duration = rules.DurationTicks;
             timeline.Progress = Mathf.Clamp01((tick - rules.CountdownTicks) / duration);
-            if (rules.LateGameTicks > 0)
-            {
-                timeline.RushStart = Mathf.Clamp01(1f - rules.LateGameTicks / duration);
-            }
             int jackpot = FieldCoinRules.JackpotSpawnTick(rules);
             if (jackpot >= 0)
             {
@@ -156,12 +148,6 @@ namespace Airerage.Runtime.Presentation
             float midY = area.center.y;
             GUI.color = HudFade.Apply(new Color(0.02f, 0.04f, 0.08f, 0.6f));
             GUI.DrawTexture(new Rect(area.x, midY - 2f, area.width, 4f), Texture2D.whiteTexture);
-            if (timeline.RushStart >= 0f)
-            {
-                GUI.color = HudFade.Apply(RushZone);
-                float x = area.x + area.width * timeline.RushStart;
-                GUI.DrawTexture(new Rect(x, midY - 4f, area.xMax - x, 8f), Texture2D.whiteTexture);
-            }
             GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.9f));
             GUI.DrawTexture(new Rect(area.x, midY - 2f, area.width * timeline.Progress, 4f), Texture2D.whiteTexture);
 

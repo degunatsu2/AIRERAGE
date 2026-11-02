@@ -46,6 +46,7 @@ namespace Airerage.Core.Economy
 
         /// <summary>
         /// 出現（生成）。フィールドにコインを1つ出し、その番号を返す（拒否したら -1）。source は出現地点の番号（なければ -1）。
+        /// id の種類が HotArea なら、コインの出どころ（FieldCoin.Origin）も HotArea にする（ほかは Spawn）。
         /// </summary>
         public int Spawn(CoinEventId id, Vector2 position, int value, int pickableFromTick, int expireTick, int source = -1)
         {
@@ -54,7 +55,8 @@ namespace Airerage.Core.Economy
                 return -1;
             }
             int coinId = Field.NextCoinId++;
-            Field.Add(new FieldCoin(coinId, position, value, pickableFromTick, expireTick, source));
+            CoinEventKind origin = id.Kind == CoinEventKind.HotArea ? CoinEventKind.HotArea : CoinEventKind.Spawn;
+            Field.Add(new FieldCoin(coinId, position, value, pickableFromTick, expireTick, source, origin));
             Field.Generated += value;
             Record(id, -1, coinId, value, position);
             return coinId;

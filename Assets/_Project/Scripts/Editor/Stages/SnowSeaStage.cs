@@ -50,6 +50,7 @@ namespace Airerage.Editor.Stages
             return new StageLayout
             {
                 Id = "SnowSea",
+                Music = "SnowSea",
                 DisplayName = "FROST COAST",
                 Description = "Slippery ice floes on a freezing sea. Ski-jump off the ridge, ride the waves, hide from the blizzard.",
                 DescriptionJa = "凍てつく海に浮かぶ、滑りやすい氷。尾根からスキージャンプ、波に乗り、吹雪から身を隠せ。",

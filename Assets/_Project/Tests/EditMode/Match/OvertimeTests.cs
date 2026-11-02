@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace Airerage.Core.Tests.Match
 {
     /// <summary>
-    /// アディショナルタイム（docs/12_match_plan.md 4.2、T4-8。D-25、D-45 とその細部の決定）と、終盤のコインの出現の増加。
+    /// アディショナルタイム（docs/12_match_plan.md 4.2、T4-8。D-25、D-45 とその細部の決定）。
     /// 0 番と 1 番が、拠点（x = 0）から離れた地面（x = ∓5）に立つ。
     /// </summary>
     public class OvertimeTests
@@ -218,38 +218,10 @@ namespace Airerage.Core.Tests.Match
         }
 
         [Test]
-        public void InTheLateGame_CoinsComeBackFaster()
-        {
-            var rules = new MatchRules
-            {
-                CountdownTicks = 0,
-                DurationTicks = 1000,
-                CoinSpawnIntervalTicks = 600,
-                LateGameTicks = 300,
-                LateGameSpawnIntervalTicks = 200,
-                BankMoveIntervalTicks = 100000,
-            };
-            var coin = new CoinSpawnPoint(new Vector2(5f, 1f), 1);
-            SimWorld world = World(rules, coin);
-            Step(world, 1);
-            int pickedAt = world.Tick;
-            Assert.That(world.GetState(1).Coins.Held, Is.EqualTo(1), "前提: 拾った");
-            Assert.That(FieldCoinRules.EffectiveReadyTick(world.Coins.Field, 0, rules, 650), Is.EqualTo(pickedAt + 600), "終盤の前は、ふつうの間隔");
-            Assert.That(FieldCoinRules.EffectiveReadyTick(world.Coins.Field, 0, rules, 750), Is.EqualTo(pickedAt + 200), "終盤は短い間隔");
-
-            // 1 番を離してから、終盤に入るまで進める。終盤に入ったら、ふつうの間隔より早く出直す。
-            CharacterState away = world.GetState(1);
-            away.Position = new Vector3(-5f, GroundY, 0f);
-            world.SetState(1, away);
-            Step(world, 700 - world.Tick);
-            Assert.That(world.Coins.Field.Coins.Count, Is.GreaterThanOrEqualTo(1), "終盤なのに出直さない");
-        }
-
-        [Test]
         public void InvalidOvertimeRules_AreRejected()
         {
             Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => World(new MatchRules { OvertimeTicks = -1 }));
-            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => World(new MatchRules { LateGameSpawnIntervalTicks = 0 }));
+            Assert.Throws<Airerage.Core.Common.InvalidTuningException>(() => World(new MatchRules { HotAreaLifetimeTicks = 1801 }));
         }
     }
 }

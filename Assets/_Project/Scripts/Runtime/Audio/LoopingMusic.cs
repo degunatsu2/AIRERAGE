@@ -10,7 +10,7 @@ namespace Airerage.Runtime.Audio
     /// 2 つの AudioSource を交互に PlayScheduled で予約して、サンプルの単位でつなぐ。毎フレーム Update を呼ぶと、鳴り終えたほうを
     /// 次のくり返しに予約し直す。メニューの曲（MusicPlayer）と試合のステージの曲（GameAudio）が使う。
     /// 速さ（Speed。AudioSource.pitch なので、テープを速く回したように音の高さも上がる）を変えると、鳴っている途中の位置から、もう片方の
-    /// AudioSource が新しい速さで引き継ぐ（docs/18 4.12。COIN RUSH で 1.2 倍）。鳴っている位置は、予約した時刻と速さから計算で求める
+    /// AudioSource が新しい速さで引き継ぐ（docs/18 4.12。100 枚のコインの予告から 1.2 倍）。鳴っている位置は、予約した時刻と速さから計算で求める
     /// （音の処理から位置を読まないので、つなぎ目がずれない）。次のつなぎ目が近いときは、つなぎ目から新しい速さにする。
     /// </summary>
     public sealed class LoopingMusic

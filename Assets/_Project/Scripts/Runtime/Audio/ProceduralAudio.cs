@@ -76,8 +76,11 @@ namespace Airerage.Runtime.Audio
         /// <summary>アディショナルタイムに入った（短く2回鳴る笛）。</summary>
         Overtime,
 
-        /// <summary>COIN RUSH の始まり（残り 30 秒。短いファンファーレ。ユーザーの選択、2026-10-14）。</summary>
-        CoinRush,
+        /// <summary>
+        /// ホットエリアのフルーツを取った（みずみずしい「ポン」と、上がっていく 2 音のきらめき。ユーザーの要望、2026-11-02）。前は COIN RUSH の
+        /// ファンファーレだった（COIN RUSH はなくした）。
+        /// </summary>
+        HotFruit,
 
         /// <summary>残り 10 秒の、1 秒ごとの短い音（ユーザーの選択、2026-10-14）。</summary>
         CountdownTick,
@@ -459,22 +462,14 @@ namespace Airerage.Runtime.Audio
                     AddTone(b, r, 0.44f, 0.5f, NoteFrequency(62), NoteFrequency(62), Wave.Saw, 0.25f, 0.005f, 0.3f);
                     AddTone(b, r, 0.44f, 0.5f, NoteFrequency(69), NoteFrequency(69), Wave.Saw, 0.2f, 0.005f, 0.3f);
                     break;
-                case SoundId.CoinRush:
-                    // G5 C6 E6 を速く上がり、最後の G6 を伸ばす（ファンファーレ）。下にコインのきらめき。
-                    b = new float[Samples(1.2f, r)];
-                    int[] fanfare = { 79, 84, 88, 91 };
-                    for (int i = 0; i < fanfare.Length; i++)
-                    {
-                        float f = NoteFrequency(fanfare[i]);
-                        float length = i == fanfare.Length - 1 ? 0.75f : 0.12f;
-                        AddTone(b, r, i * 0.1f, length, f, f, Wave.Pulse25, 0.22f, 0.003f, i == fanfare.Length - 1 ? 0.45f : 0.06f);
-                        AddTone(b, r, i * 0.1f, length, f * 0.5f, f * 0.5f, Wave.Triangle, 0.3f, 0.003f, i == fanfare.Length - 1 ? 0.45f : 0.06f);
-                    }
-                    for (int i = 0; i < 4; i++)
-                    {
-                        float f = NoteFrequency(100 + i * 2);
-                        AddTone(b, r, 0.3f + i * 0.08f, 0.2f, f, f, Wave.Sine, 0.1f, 0.001f, 0.08f);
-                    }
+                case SoundId.HotFruit:
+                    // 弾けて上がる「ポン」（はじける実）、上がっていく E6・B6 のきらめき、短い水しぶき。
+                    b = new float[Samples(0.6f, r)];
+                    AddTone(b, r, 0f, 0.12f, 520f, 1250f, Wave.Sine, 0.45f, 0.002f, 0.08f);
+                    AddTone(b, r, 0f, 0.12f, 260f, 620f, Wave.Triangle, 0.2f, 0.002f, 0.07f);
+                    AddNoise(b, r, rng, 0f, 0.1f, 0.12f, 0.002f, 0.06f, 7000f, 3000f, 1500f);
+                    AddTone(b, r, 0.08f, 0.25f, NoteFrequency(88), NoteFrequency(88), Wave.Sine, 0.2f, 0.002f, 0.18f);
+                    AddTone(b, r, 0.16f, 0.4f, NoteFrequency(95), NoteFrequency(95), Wave.Sine, 0.18f, 0.002f, 0.3f);
                     break;
                 case SoundId.CountdownTick:
                     // 短く高い「ピッ」。

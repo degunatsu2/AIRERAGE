@@ -182,6 +182,30 @@ namespace Airerage.Runtime.Tests
         }
 
         [TestCaseSource(nameof(Stages))]
+        public void HotAreas_AroundEveryJackpotSpot_StayInTheOpen_InsideTheStage(string stage)
+        {
+            // ホットエリア（2026-11-02。HotAreaRules）: 100 枚のコインの候補の地点の周りの 2 つの輪に 30 個のコインを並べる。範囲の外や地形に
+            // かかるコインは中心へ寄せるので、置く位置はどれもステージの中で地形に埋まらない。寄せるのは 4 分の 3 まで（ほとんどの地点は 11 個
+            // 以下。FROST COAST の氷の下の洞窟の 4 地点だけが狭く、15〜22 個を寄せる。2026-11-02 に数えた）。
+            Open(stage);
+            var rules = new Airerage.Core.Match.MatchRules();
+            foreach (CoinSpawnPoint spot in _coins.Where(c => c.Kind == CoinSpawnKind.Jackpot))
+            {
+                int moved = 0;
+                for (int i = 0; i < rules.HotAreaCoins; i++)
+                {
+                    NVector2 ring = spot.Position + HotAreaRules.CoinOffset(rules, i);
+                    NVector2 p = HotAreaRules.CoinPosition(rules, _terrain, _bounds, spot.Position, i);
+                    var position = new NVector3(p.X, p.Y, 0f);
+                    Assert.That(_bounds.Contains(position), Is.True, $"{spot.Position} のホットエリアのコイン {p} がステージの外");
+                    Assert.That(_terrain.IsOverlapping(position, CoinHalf), Is.False, $"{spot.Position} のホットエリアのコイン {p} が地形に埋まる");
+                    moved += NVector2.Distance(ring, p) > 0.01f ? 1 : 0;
+                }
+                Assert.That(moved, Is.LessThanOrEqualTo(rules.HotAreaCoins * 3 / 4), $"{spot.Position} のホットエリアのコインの {moved} 個を寄せた");
+            }
+        }
+
+        [TestCaseSource(nameof(Stages))]
         public void FloorGimmicks_SitOnTheFloor_AndWarpExitsAreOpen(string stage)
         {
             Open(stage);

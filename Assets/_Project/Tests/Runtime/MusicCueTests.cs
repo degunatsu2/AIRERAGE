@@ -87,6 +87,7 @@ namespace Airerage.Runtime.Tests
         [TestCase("Assets/_Project/Audio/Music/CityNight.ogg", "Assets/_Project/Data/Audio/CityNightMusic.asset", 697662, 3387776)]
         [TestCase("Assets/_Project/Audio/Music/CityDay.ogg", "Assets/_Project/Data/Audio/CityDayMusic.asset", 695898, 2709504)]
         [TestCase("Assets/_Project/Audio/Music/Volcano.ogg", "Assets/_Project/Data/Audio/VolcanoMusic.asset", 1035468, 2935946)]
+        [TestCase("Assets/_Project/Audio/Music/SnowSea.ogg", "Assets/_Project/Data/Audio/SnowSeaMusic.asset", 815850, 2758800)]
         public void StageMusic_LoopTags_AndCue(string musicPath, string cuePath, long loopStart, long loopLength)
         {
             Dictionary<string, string> tags = OggLoopTags.Read(musicPath);

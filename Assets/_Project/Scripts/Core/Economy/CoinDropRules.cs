@@ -11,7 +11,8 @@ namespace Airerage.Core.Economy
     /// <summary>
     /// コインのドロップ（docs/12_match_plan.md T4-6、docs/01_game_design.md 3.3）。増減はすべて CoinLedger.Drop を通す。
     /// - 被弾ドロップ: 当たって新しいコンボの最初の命中になったら（HitRecord.StartsCombo）、所持コインの MatchRules.HitDropPercent
-    ///   （少なくとも 1 枚、上限 HitDropMax）を、当たった人の位置に落とす。同じコンボの間は落とさない。ガードされたら落とさない。
+    ///   （少なくとも 1 枚、上限 HitDropMax。WANTED の人はその WantedHitDropMultiplier 倍）を、当たった人の位置に落とす。同じコンボの間は
+    ///   落とさない。ガードされたら落とさない。
     ///   同じティックに同じ人が何回当たっても、落とすのは1回。
     /// - 撃破ドロップ: 撃破されたら（自滅も。D-44）、所持コインの KoDropPercent（端数は切り上げ）を落とす。落とす場所は、
     ///   ステージのどこか（コインの出現地点のどれか1つを、試合の種・ティック・撃破された人で選ぶ）に固めて置く（D-49。
@@ -89,7 +90,10 @@ namespace Airerage.Core.Economy
             return sum / count;
         }
 
-        /// <summary>被弾ドロップで落とす枚数（所持 held 枚のとき）。</summary>
+        /// <summary>
+        /// 被弾ドロップで落とす枚数（所持 held 枚のとき）。WANTED（所持が MatchRules.WantedHeldCoins 以上。CatchUpRules.IsWanted）なら
+        /// WantedHitDropMultiplier 倍（ユーザーの要望、2026-11-02）。所持より多くは落とさない。
+        /// </summary>
         public static int HitDropAmount(MatchRules rules, int held)
         {
             if (held <= 0 || rules.HitDropPercent == 0 || rules.HitDropMax == 0)
@@ -97,6 +101,10 @@ namespace Airerage.Core.Economy
                 return 0;
             }
             int amount = Math.Min(rules.HitDropMax, Math.Max(1, held * rules.HitDropPercent / 100));
+            if (CatchUpRules.IsWanted(rules, held))
+            {
+                amount *= rules.WantedHitDropMultiplier;
+            }
             return Math.Min(amount, held);
         }
 

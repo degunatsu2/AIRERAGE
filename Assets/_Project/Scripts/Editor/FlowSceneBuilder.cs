@@ -161,7 +161,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateSkillHud(runner, audio);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
-            SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
+            SandboxWireSceneBuilder.CreateNoticeHud(runner);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
             SandboxWireSceneBuilder.CreateBankView(runner, audio, guides);
@@ -213,7 +213,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(tags, "_views", characterViews);
             SandboxWireSceneBuilder.SetReference(tags, "_camera", camera);
             MatchHud matchHud = SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
-            SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
+            SandboxWireSceneBuilder.CreateNoticeHud(runner);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
             SandboxWireSceneBuilder.CreateBankView(runner, audio, guides);
@@ -252,7 +252,8 @@ namespace Airerage.Editor
                 wireViews[p] = SandboxWireSceneBuilder.CreateWireView($"Player{p + 1}Wire", playersRoot, wireMaterial, attachedAnchorMaterial);
                 if (withAim)
                 {
-                    AimIndicatorView aim = SandboxWireSceneBuilder.CreateAimIndicator();
+                    // ローカル対戦の照準は、射程の弧と導線の根元をプレイヤーの色にする（4 人の照準を見分ける）。
+                    AimIndicatorView aim = SandboxWireSceneBuilder.CreateAimIndicator(color);
                     aim.name = $"Player{p + 1}Aim";
                     aimIndicators[p] = aim;
                 }
@@ -293,7 +294,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateMissIndicator(runner, camera);
             SandboxWireSceneBuilder.CreateSkillHud(runner, audio);
             MatchHud matchHud = SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
-            SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
+            SandboxWireSceneBuilder.CreateNoticeHud(runner);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
             SandboxWireSceneBuilder.CreateBankView(runner, audio, guides);

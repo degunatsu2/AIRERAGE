@@ -21,6 +21,8 @@ namespace Airerage.Runtime.Presentation
     /// 100 枚のコインを取った人の札は、派手な音とともに虹色に光り「JACKPOT!」を出し、少しの後にふつうの見た目に戻る（ユーザーの要望、
     /// 2026-10-15）。取った人は、100 枚のコインが前のフレームにあった（または、この間に出た）のに今はなく、確定＋所持が 100 枚以上
     /// 増えた人（出たティックにその場にいれば、出たのと同じティックに拾うので、出ている間を見られないことがある）。
+    /// WANTED（所持コインが MatchRules.WantedHeldCoins 以上。CatchUpRules。ユーザーの要望、2026-11-02）の人は、札のロゴの所に手配書の印を押す
+    /// （印鑑を押すように落ちてきて、朱色の輪が広がり、札が揺れる）。所持コインが減って外れたら、印が光の粒になって消える。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class ScoreboardHud : MonoBehaviour
@@ -48,6 +50,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _jackpotSeconds = 3f;
         [Tooltip("100 枚のコインを取ったときの音（なくてもよい）")]
         [SerializeField] private GameAudio _audio;
+        [Tooltip("WANTED の印を押す動きの秒数")]
+        [SerializeField] private float _stampSeconds = 0.6f;
+        [Tooltip("WANTED の印が光の粒になって消える秒数")]
+        [SerializeField] private float _dissolveSeconds = 0.9f;
 
         private readonly List<float> _rowY = new List<float>();
         private ISimulationFeed _feed;
@@ -58,11 +64,24 @@ namespace Airerage.Runtime.Presentation
         private float[] _backAt = new float[0];
         private float[] _jackpotAt = new float[0];
         private int[] _coinsTotal = new int[0];
+        private bool[] _wanted = new bool[0];
+        private float[] _wantedAt = new float[0];
+        private float[] _unwantedAt = new float[0];
         private bool _jackpotWasPresent;
         private int _lastTick = -1;
 
         /// <summary>100 枚のコインを取って虹色に光った回数（テスト用）。</summary>
         public int JackpotCelebrations { get; private set; }
+
+        /// <summary>WANTED の印を押した回数と、消した回数（テスト用）。</summary>
+        public int WantedStamps { get; private set; }
+        public int WantedDissolves { get; private set; }
+
+        /// <summary>キャラクター index の札に WANTED の印を出しているか（テスト用）。</summary>
+        public bool IsWanted(int index)
+        {
+            return index < _wanted.Length && _wanted[index];
+        }
 
         /// <summary>キャラクター index の札が、100 枚のコインを取って虹色に光っているか（テスト用）。</summary>
         public bool IsCelebrating(int index)
@@ -131,6 +150,7 @@ namespace Airerage.Runtime.Presentation
             _order = MatchResults.Rank(states, _feed.Match.Winner);
             TrackFalls(states);
             TrackJackpot(states);
+            TrackWanted(states);
 
             while (_rowY.Count < count)
             {
@@ -221,6 +241,40 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
+        // WANTED になった瞬間と、外れた瞬間を覚える（人数が変わったら、今の様子から数え直す。最初から WANTED なら押す動きは出さない）。
+        private void TrackWanted(CharacterState[] states)
+        {
+            MatchRules rules = _feed.Rules;
+            if (_wanted.Length != states.Length)
+            {
+                _wanted = new bool[states.Length];
+                _wantedAt = new float[states.Length];
+                _unwantedAt = new float[states.Length];
+                for (int i = 0; i < states.Length; i++)
+                {
+                    _wanted[i] = CatchUpRules.IsWanted(rules, states[i].Coins.Held) && !states[i].Combat.HasLeft;
+                    _wantedAt[i] = float.NegativeInfinity;
+                    _unwantedAt[i] = float.NegativeInfinity;
+                }
+                return;
+            }
+            for (int i = 0; i < states.Length; i++)
+            {
+                bool wanted = CatchUpRules.IsWanted(rules, states[i].Coins.Held) && !states[i].Combat.HasLeft;
+                if (wanted && !_wanted[i])
+                {
+                    _wantedAt[i] = Time.time;
+                    WantedStamps++;
+                }
+                else if (!wanted && _wanted[i])
+                {
+                    _unwantedAt[i] = Time.time;
+                    WantedDissolves++;
+                }
+                _wanted[i] = wanted;
+            }
+        }
+
         private PlayerStatusPlate.Look CurrentLook(int index)
         {
             var look = new PlayerStatusPlate.Look();
@@ -251,6 +305,24 @@ namespace Airerage.Runtime.Presentation
             if (index < _jackpotAt.Length)
             {
                 look.Jackpot = Mathf.Clamp01((_jackpotSeconds - (Time.time - _jackpotAt[index])) / 0.5f);
+            }
+            if (index < _wanted.Length)
+            {
+                if (_wanted[index])
+                {
+                    look.Wanted = true;
+                    float since = Time.time - _wantedAt[index];
+                    look.WantedStamp = float.IsInfinity(since) ? 1f : Mathf.Clamp01(since / Mathf.Max(0.01f, _stampSeconds));
+                    // 押した瞬間に札が少し揺れる。
+                    float impact = look.WantedStamp >= 0.35f ? Mathf.Clamp01(1f - (look.WantedStamp - 0.35f) / 0.3f) : 0f;
+                    look.Shake += new Vector2(Mathf.Sin(Time.time * 80f), Mathf.Cos(Time.time * 95f)) * 3f * impact;
+                }
+                else
+                {
+                    float since = Time.time - _unwantedAt[index];
+                    float t = float.IsInfinity(since) ? 1f : since / Mathf.Max(0.01f, _dissolveSeconds);
+                    look.WantedDissolve = t < 1f ? Mathf.Max(0.001f, t) : 0f;
+                }
             }
             return look;
         }

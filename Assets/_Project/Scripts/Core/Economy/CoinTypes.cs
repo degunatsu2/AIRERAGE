@@ -56,7 +56,7 @@ namespace Airerage.Core.Economy
         /// <summary>出した出現地点の番号（ドロップなら -1）。同じ地点からは、前のコインが拾われるまで出さない。</summary>
         public readonly int Source;
 
-        /// <summary>どうやってフィールドに出たか（Spawn、HitDrop、KoDrop）。表示が、撃破ドロップのかたまりを示すのに使う。</summary>
+        /// <summary>どうやってフィールドに出たか（Spawn、HotArea、HitDrop、KoDrop など）。表示が、撃破ドロップのかたまりを示すのに使う。</summary>
         public readonly CoinEventKind Origin;
 
         public FieldCoin(int id, Vector2 position, int value, int pickableFromTick, int expireTick, int source = -1,
@@ -138,6 +138,9 @@ namespace Airerage.Core.Economy
 
         /// <summary>バンクハイストの詠唱で得たコイン（生成。→ 所持。THIEF の R）。</summary>
         Heist = 13,
+
+        /// <summary>ホットエリアのコインの出現（生成。フィールド＋。寿命がある。HotAreaRules）。</summary>
+        HotArea = 14,
     }
 
     /// <summary>

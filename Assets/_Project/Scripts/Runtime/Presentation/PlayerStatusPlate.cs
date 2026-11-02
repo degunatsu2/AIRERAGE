@@ -8,7 +8,9 @@ namespace Airerage.Runtime.Presentation
     /// 1 人分の情報の札（右上の表 ScoreboardHud と、結果の画面 MatchHud で同じ見た目にする。ユーザーの要望、2026-10-14）。
     /// 誘導表示の札（GuidePlate）と同じ形で、縁と斜めの線はプレイヤーの色。左にプレイヤーの色の四角と番号、その右にキャラクターの
     /// ロゴ（docs/13 T5-8。あれば）、下にプレイヤーネーム、右を 4 つに分けて BANK / COIN / K / F（BANK の文字と数だけ黄色）。
-    /// 王冠は札の左に出す。
+    /// 王冠は札の左に出す。WANTED（所持コインが 100 枚以上。ユーザーの要望、2026-11-02）の人は、キャラクターのロゴの所に手配書の印を押す
+    /// （その間はロゴを隠す）: 出るときは大きく傾いた印が印鑑を押すように落ちてきて、押した瞬間に朱色の輪が広がって札が揺れる。外れるときは
+    /// 光の粒になって散って消え、ロゴが戻る。
     /// 撃破されたときの見た目（Look）: ひび割れ、灰色に暗く、文字（「RESPAWN n」）、白く光る。
     /// OnGUI の中で描く。使い終わったら Dispose でテクスチャを消す。
     /// </summary>
@@ -20,12 +22,14 @@ namespace Airerage.Runtime.Presentation
         private readonly GuidePlate _plate;
         private readonly Texture2D _crown;
         private readonly Texture2D _crack;
+        private readonly Texture2D _poster;
         private readonly float _fontScale;
         private GUIStyle _label;
         private GUIStyle _number;
         private GUIStyle _iconText;
         private GUIStyle _name;
         private GUIStyle _overlay;
+        private GUIStyle _wanted;
 
         /// <summary>撃破されたときなどの見た目（すべて 0 なら、ふつうの見た目）。</summary>
         public struct Look
@@ -47,7 +51,21 @@ namespace Airerage.Runtime.Presentation
 
             /// <summary>100 枚のコインを取ったときの虹色の光の強さ（0〜1）。縁が虹色になり、右に「JACKPOT!」。</summary>
             public float Jackpot;
+
+            /// <summary>WANTED の手配書の印を出すか。</summary>
+            public bool Wanted;
+
+            /// <summary>印を押す動きの進み（0〜1。1 で押し終わり）。</summary>
+            public float WantedStamp;
+
+            /// <summary>印が光の粒になって消える進み（0〜1。0 なら消えていない。1 で消え終わり）。</summary>
+            public float WantedDissolve;
         }
+
+        /// <summary>手配書の印の幅と高さ（ロゴの四角の大きさに対する割合）。</summary>
+        private const float PosterWidth = 1.45f;
+        private const float PosterHeight = 1.2f;
+        private const int DissolveParticles = 22;
 
         public PlayerStatusPlate(int width, int height, float fontScale = 1f, int crackSeed = 7)
         {
@@ -56,6 +74,7 @@ namespace Airerage.Runtime.Presentation
             _fontScale = fontScale;
             _plate = new GuidePlate(width, height);
             _crown = GuideIcons.Crown(64);
+            _poster = GuideIcons.WantedPoster(48, 64);
             _crack = GuideIcons.Crack(width, height, crackSeed);
         }
 
@@ -88,7 +107,8 @@ namespace Airerage.Runtime.Presentation
             Rect area = _plate.IconRect(rect);
             float size = area.height * 0.66f;
             const float logoGap = 3f;
-            float pair = logo != null ? size * 2f + logoGap : size;
+            bool wantedMark = look.Wanted || look.WantedDissolve > 0f;
+            float pair = logo != null || wantedMark ? size * 2f + logoGap : size;
             var icon = new Rect(area.center.x - pair * 0.5f, area.y, size, size);
             GUI.color = HudFade.Apply(Color.Lerp(Color.Lerp(color, Color.black, 0.45f), Gray * 0.6f, look.Gray));
             GUI.DrawTexture(icon, Texture2D.whiteTexture);
@@ -96,10 +116,15 @@ namespace Airerage.Runtime.Presentation
             GUI.DrawTexture(new Rect(icon.x + 2f, icon.y + 2f, icon.width - 4f, icon.height - 4f), Texture2D.whiteTexture);
             GUI.color = previous;
             GuidePlate.DrawText(icon, number.ToString(), _iconText, Color.white);
-            if (logo != null)
+            var logoRect = new Rect(icon.xMax + logoGap, icon.y, size, size);
+            // WANTED の間はロゴの代わりに手配書の印（消えていく間は、ロゴが戻ってくる）。
+            float logoAlpha = look.Wanted ? 0f : look.WantedDissolve > 0f ? Mathf.Clamp01(look.WantedDissolve * 1.5f - 0.3f) : 1f;
+            if (logo != null && logoAlpha > 0f)
             {
-                GUI.color = HudFade.Apply(Color.Lerp(Color.white, Gray, look.Gray));
-                GUI.DrawTexture(new Rect(icon.xMax + logoGap, icon.y, size, size), logo, ScaleMode.ScaleToFit);
+                Color logoColor = Color.Lerp(Color.white, Gray, look.Gray);
+                logoColor.a = logoAlpha;
+                GUI.color = HudFade.Apply(logoColor);
+                GUI.DrawTexture(logoRect, logo, ScaleMode.ScaleToFit);
                 GUI.color = previous;
             }
             float nameWidth = (area.center.x - rect.x) * 2f - 4f;
@@ -111,6 +136,7 @@ namespace Airerage.Runtime.Presentation
                 float crownSize = rect.height * 0.8f;
                 GUI.DrawTexture(new Rect(rect.x - crownSize - 4f, rect.y + (rect.height - crownSize) * 0.5f, crownSize, crownSize), _crown, ScaleMode.ScaleToFit);
             }
+
 
             // 右: 4 つに分けて BANK / COIN / K / F。
             Rect right = _plate.RightRect(rect);
@@ -147,6 +173,10 @@ namespace Airerage.Runtime.Presentation
             {
                 _plate.DrawFill(rect, new Color(1f, 1f, 1f, 0.85f * look.Flash));
             }
+            if (wantedMark)
+            {
+                DrawWanted(logoRect, look);
+            }
             if (look.Jackpot > 0f)
             {
                 // 虹色に光る（中が虹色に脈打ち、縁が虹色になり、右の部分に「JACKPOT!」。ユーザーの要望、2026-10-15）。
@@ -165,10 +195,97 @@ namespace Airerage.Runtime.Presentation
             GUI.color = previous;
         }
 
+        // WANTED の手配書の印（ロゴの四角 slot の所。押す動き・押した瞬間の朱色の輪・光の粒になって消える動き）。
+        private void DrawWanted(Rect slot, Look look)
+        {
+            float width = slot.height * PosterWidth;
+            float height = slot.height * PosterHeight;
+            var center = slot.center;
+            var poster = new Rect(center.x - width * 0.5f, center.y - height * 0.5f, width, height);
+            Color previous = GUI.color;
+            Matrix4x4 matrix = GUI.matrix;
+            if (look.WantedDissolve > 0f)
+            {
+                float t = Mathf.Clamp01(look.WantedDissolve);
+                // 印は薄くなりながら少しふくらみ、光の粒が上と外へ散る。
+                float fade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t * 1.6f));
+                if (fade > 0f)
+                {
+                    GUIUtility.RotateAroundPivot(-6f, center);
+                    GUIUtility.ScaleAroundPivot(Vector2.one * (1f + 0.25f * t), center);
+                    DrawPoster(poster, fade);
+                    GUI.matrix = matrix;
+                }
+                for (int i = 0; i < DissolveParticles; i++)
+                {
+                    float a = Hash(i * 3 + 1);
+                    float b = Hash(i * 3 + 2);
+                    float c = Hash(i * 3 + 3);
+                    var start = new Vector2(center.x + (a - 0.5f) * width, center.y + (b - 0.5f) * height);
+                    var velocity = new Vector2((a - 0.5f) * 90f, -40f - 90f * c);
+                    Vector2 position = start + velocity * t - new Vector2(0f, 30f * t * t);
+                    float size = Mathf.Lerp(3.5f, 1f, t) * (0.7f + 0.6f * c);
+                    float sparkle = 0.6f + 0.4f * Mathf.Sin(t * 30f + i);
+                    GUI.color = HudFade.Apply(new Color(1f, 0.95f, 0.7f, (1f - t) * sparkle));
+                    GUI.DrawTexture(new Rect(position.x - size * 0.5f, position.y - size * 0.5f, size, size), Texture2D.whiteTexture);
+                }
+                GUI.color = previous;
+                return;
+            }
+            // 押す動き: 大きく傾いて浮いた印が、落ちてきて押される。押した後に朱色の輪が広がる。
+            float stamp = Mathf.Clamp01(look.WantedStamp);
+            float fall = Mathf.Clamp01(stamp / 0.35f);
+            float eased = fall * fall;
+            if (fall >= 1f)
+            {
+                float ring = Mathf.Clamp01((stamp - 0.35f) / 0.65f);
+                float radius = Mathf.Lerp(width * 0.5f, width * 1.4f, ring);
+                GUI.color = HudFade.Apply(new Color(0.9f, 0.15f, 0.1f, 0.55f * (1f - ring)));
+                DrawRingOutline(center, radius, 2f);
+            }
+            GUIUtility.RotateAroundPivot(Mathf.Lerp(-24f, -6f, eased), center);
+            GUIUtility.ScaleAroundPivot(Vector2.one * Mathf.Lerp(2.4f, 1f, eased), center);
+            DrawPoster(poster, Mathf.Lerp(0.15f, 1f, fall));
+            GUI.matrix = matrix;
+            GUI.color = previous;
+        }
+
+        // 手配書の絵と、朱色の帯の上の「WANTED」の文字。
+        private void DrawPoster(Rect poster, float alpha)
+        {
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
+            GUI.DrawTexture(poster, _poster);
+            var band = new Rect(poster.x, poster.y + poster.height * 0.06f, poster.width, poster.height * 0.26f);
+            GuidePlate.DrawText(band, "WANTED", _wanted, new Color(1f, 0.95f, 0.85f, alpha));
+        }
+
+        // 中心 center・半径 radius の輪の外周を、小さな四角で描く（IMGUI に円がないので）。
+        private static void DrawRingOutline(Vector2 center, float radius, float thickness)
+        {
+            const int Dots = 28;
+            for (int i = 0; i < Dots; i++)
+            {
+                float angle = i * Mathf.PI * 2f / Dots;
+                var p = new Vector2(center.x + Mathf.Cos(angle) * radius, center.y + Mathf.Sin(angle) * radius);
+                GUI.DrawTexture(new Rect(p.x - thickness, p.y - thickness, thickness * 2f, thickness * 2f), Texture2D.whiteTexture);
+            }
+        }
+
+        // 粒ごとに決まった 0〜1 の値（乱数を使わない。毎フレーム同じ）。
+        private static float Hash(int n)
+        {
+            uint h = (uint)n * 2654435761u;
+            h ^= h >> 15;
+            h *= 2246822519u;
+            h ^= h >> 13;
+            return (h & 0xFFFF) / 65535f;
+        }
+
         public void Dispose()
         {
             _plate.Dispose();
             Object.Destroy(_crown);
+            Object.Destroy(_poster);
             Object.Destroy(_crack);
         }
 
@@ -184,6 +301,7 @@ namespace Airerage.Runtime.Presentation
             _name = Style(11, TextAnchor.MiddleCenter);
             _name.clipping = TextClipping.Clip;
             _overlay = Style(16, TextAnchor.MiddleCenter);
+            _wanted = Style(7, TextAnchor.MiddleCenter);
         }
 
         private GUIStyle Style(int size, TextAnchor anchor)

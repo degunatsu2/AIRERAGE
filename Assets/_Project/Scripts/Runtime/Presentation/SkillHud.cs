@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Airerage.Core.Combat;
 using Airerage.Core.Common;
+using Airerage.Core.Match;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
@@ -25,6 +26,9 @@ namespace Airerage.Runtime.Presentation
     /// （絵は出さない）。バンクハイストの詠唱中は、得られる枚数と詠唱した秒数。拠点から遠くて出せないときは「NEAR BANK」。
     /// ローカル対戦（docs/15 T6-5）では人ごとに 1 つ置く（_player）。画面の下を人数で等分して、自分の番号の場所に札と名前（P1 など）を出す
     /// （狭ければ縮める）。頭上の通知も、その人のキャラクターに出す。
+    /// 逆転の恩恵（確定コインの順位が 2 位以下で、毎秒ゲージを得ている。CatchUpRules。ユーザーの要望、2026-11-02）を受けている間は、
+    /// 必殺技の札の真上に白い縁の四角の印（上向きの矢印と順位）を出す。順位が変わると、前の印が大きくなりながら消え、新しい印が白く
+    /// 光りながら縮んで現れる。
     /// オフライン（SimulationRunner）とオンライン（OnlineRunner）のどちらでも使う（ISimulationFeed）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class SkillHud : MonoBehaviour
@@ -49,6 +53,14 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>頭上の通知を出している長さ（秒）。</summary>
         public const float HeadNoticeSeconds = 1.4f;
+
+        // 逆転の恩恵の印（必殺技の札の真上。幅と高さ、札との間、現れる・消える秒数）。
+        private const float BuffWidth = 62f;
+        private const float BuffHeight = 30f;
+        private const float BuffGap = 6f;
+        private const float BuffInSeconds = 0.4f;
+        private const float BuffOutSeconds = 0.35f;
+        private static readonly Color BuffColor = new Color(0.55f, 1f, 0.55f);
 
         private static readonly AttackSlot[] Slots = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
         private static readonly string[] Keys = { "Q / LB", "E / RB", "R / R3" };
@@ -83,6 +95,12 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _name;
         private GUIStyle _number;
         private GUIStyle _notice;
+        private GUIStyle _buff;
+        private Texture2D _upArrow;
+        private readonly List<CharacterState> _states = new List<CharacterState>();
+        private int _buffRank;
+        private int _fadingRank;
+        private float _buffChangedAt = -10f;
 
         /// <summary>札 1 枚の今の表示（テスト用）。</summary>
         public sealed class Slot
@@ -155,6 +173,18 @@ namespace Airerage.Runtime.Presentation
         /// <summary>これまでに出した頭上の通知の数（テスト用）。</summary>
         public int HeadNoticeCount { get; private set; }
 
+        /// <summary>逆転の恩恵の印に出している順位（恩恵がなければ 0）と、印が変わった回数（テスト用）。</summary>
+        public int BuffRank => _buffRank;
+        public int BuffChangeCount { get; private set; }
+
+        /// <summary>英語の順位の書き方（2ND、3RD、4TH など）。</summary>
+        public static string RankText(int rank)
+        {
+            int tens = rank % 100;
+            string suffix = tens >= 11 && tens <= 13 ? "TH" : (rank % 10) switch { 1 => "ST", 2 => "ND", 3 => "RD", _ => "TH" };
+            return rank + suffix;
+        }
+
         /// <summary>ゲージ（0.1% 単位）を「64.3%」の形にする（小数第 1 位まで。ユーザーの要望、2026-10-15）。</summary>
         public static string PercentText(int gauge)
         {
@@ -175,7 +205,7 @@ namespace Airerage.Runtime.Presentation
 
         private void OnDestroy()
         {
-            foreach (Texture2D texture in new[] { _fill, _frame, _line, _partial[0], _partial[1], _partial[2], _stack[0], _stack[1], _stack[2] })
+            foreach (Texture2D texture in new[] { _fill, _frame, _line, _upArrow, _partial[0], _partial[1], _partial[2], _stack[0], _stack[1], _stack[2] })
             {
                 if (texture != null)
                 {
@@ -313,6 +343,38 @@ namespace Airerage.Runtime.Presentation
                 }
             }
             _notices.RemoveAll(n => Time.time - n.At >= HeadNoticeSeconds);
+            UpdateBuff(shown ? local : -1);
+        }
+
+        // 逆転の恩恵を受けているか（試合中かアディショナルタイムで、順位の恩恵が 0 より多い）。順位が変わったら、印を入れ替える。
+        private void UpdateBuff(int local)
+        {
+            int rank = 0;
+            MatchRules rules = _feed.Rules;
+            if (local >= 0 && rules != null)
+            {
+                MatchPhase phase = MatchFlow.PhaseAt(rules, _feed.Match, _feed.CurrentTick);
+                if (phase == MatchPhase.Playing || phase == MatchPhase.Overtime)
+                {
+                    _states.Clear();
+                    for (int i = 0; i < _feed.CharacterCount; i++)
+                    {
+                        _states.Add(_feed.GetState(i));
+                    }
+                    rank = CatchUpRules.RankOf(_states, local);
+                    if (CatchUpRules.GaugePerSecond(rules, rank) <= 0)
+                    {
+                        rank = 0;
+                    }
+                }
+            }
+            if (rank != _buffRank)
+            {
+                _fadingRank = _buffRank;
+                _buffRank = rank;
+                _buffChangedAt = Time.time;
+                BuffChangeCount++;
+            }
         }
 
         // タレントスナッチで奪ったものの、札の下の文字（奪っていなければ null）。
@@ -387,7 +449,9 @@ namespace Airerage.Runtime.Presentation
             float y = Screen.height - BottomMargin - SlotHeight;
             // キャラクターと重なったら、札を透かす（HudOcclusion。名前とスタックのゲージを含めた範囲を、画面の座標で調べる）。
             float side = StackSpacing + StackWidth;
-            var area = new Rect(x - side, y - 24f, total + side * 2f, SlotHeight + 24f);
+            // 上は、ローカル対戦の名前と逆転の恩恵の印の分も含める。
+            float above = 24f + BuffGap + BuffHeight;
+            var area = new Rect(x - side, y - above, total + side * 2f, SlotHeight + above);
             HudFade.Begin(_occlusion.AlphaFor(this, 0, ToScreen(GUI.matrix, area)));
             for (int i = 0; i < SlotCount; i++)
             {
@@ -397,9 +461,67 @@ namespace Airerage.Runtime.Presentation
             {
                 GuidePlate.DrawText(new Rect(x, y - 24f, total, 22f), _feed.LabelOf(_player), _name, _feed.ColorOf(_player));
             }
+            // 逆転の恩恵の印（必殺技の札の真上。ローカル対戦では名前の上）。
+            float superCenter = x + 2 * (SlotWidth + SlotGap) + SlotWidth * 0.5f;
+            float buffBottom = y - BuffGap - (_player >= 0 ? 24f : 0f);
+            DrawBuff(new Vector2(superCenter, buffBottom - BuffHeight * 0.5f));
             HudFade.End();
             GUI.matrix = matrix;
             DrawHeadNotices();
+        }
+
+        // 逆転の恩恵の印を中心 center に描く（新しい印は白く光りながら縮んで現れ、前の印は大きくなりながら消える）。
+        private void DrawBuff(Vector2 center)
+        {
+            float since = Time.time - _buffChangedAt;
+            if (_fadingRank > 0 && since < BuffOutSeconds)
+            {
+                float t = since / BuffOutSeconds;
+                DrawBuffBadge(center, _fadingRank, 1f - t, 1f + 0.5f * t, 0f);
+            }
+            if (_buffRank > 0)
+            {
+                float t = Mathf.Clamp01(since / BuffInSeconds);
+                float eased = 1f - (1f - t) * (1f - t);
+                DrawBuffBadge(center, _buffRank, Mathf.Clamp01(t * 2.5f), Mathf.Lerp(1.6f, 1f, eased), 1f - t);
+            }
+        }
+
+        private void DrawBuffBadge(Vector2 center, int rank, float alpha, float scale, float flash)
+        {
+            if (alpha <= 0f)
+            {
+                return;
+            }
+            Matrix4x4 matrix = GUI.matrix;
+            GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), center);
+            var rect = new Rect(center.x - BuffWidth * 0.5f, center.y - BuffHeight * 0.5f, BuffWidth, BuffHeight);
+            Color previous = GUI.color;
+            GUI.color = HudFade.Apply(new Color(0.03f, 0.05f, 0.09f, 0.85f * alpha));
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            // 白い縁（2 ピクセル）。
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2f, rect.width, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, 2f, rect.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.xMax - 2f, rect.y, 2f, rect.height), Texture2D.whiteTexture);
+            // 上向きの矢印（右向きの矢印を回す）と順位。
+            Color accent = Color.Lerp(BuffColor, Color.white, flash);
+            accent.a = alpha;
+            var arrow = new Rect(rect.x + 5f, rect.y + 4f, BuffHeight - 8f, BuffHeight - 8f);
+            Matrix4x4 beforeArrow = GUI.matrix;
+            GUIUtility.RotateAroundPivot(-90f, arrow.center);
+            GUI.color = HudFade.Apply(accent);
+            GUI.DrawTexture(arrow, _upArrow);
+            GUI.matrix = beforeArrow;
+            GuidePlate.DrawText(new Rect(arrow.xMax, rect.y, rect.xMax - arrow.xMax - 3f, rect.height), RankText(rank), _buff, accent);
+            if (flash > 0f)
+            {
+                GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.6f * flash * alpha));
+                GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            }
+            GUI.color = previous;
+            GUI.matrix = matrix;
         }
 
         // GUI.matrix の下の四角を、画面の四角にする（拡大と移動だけ）。
@@ -684,7 +806,9 @@ namespace Airerage.Runtime.Presentation
             _name = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _number = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _notice = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
-            foreach (GUIStyle style in new[] { _key, _name, _number, _notice })
+            _buff = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
+            _upArrow = GuideIcons.Arrow(32, Color.white);
+            foreach (GUIStyle style in new[] { _key, _name, _number, _notice, _buff })
             {
                 style.normal.textColor = Color.white;
             }

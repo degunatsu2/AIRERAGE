@@ -93,6 +93,89 @@ namespace Airerage.Runtime.Presentation
             });
         }
 
+        /// <summary>ホットエリアのフルーツ（ユーザーの要望、2026-11-02）: 橙色の丸い実に、白いつやと茶色のへた、緑の葉。</summary>
+        public static Texture2D Fruit(int size)
+        {
+            var body = new Color(1f, 0.5f, 0.12f, 1f);
+            var shade = new Color(0.86f, 0.32f, 0.08f, 1f);
+            var shine = new Color(1f, 0.92f, 0.75f, 1f);
+            var stem = new Color(0.42f, 0.26f, 0.12f, 1f);
+            var leaf = new Color(0.35f, 0.85f, 0.3f, 1f);
+            return Draw("IconFruit", size, (u, v) =>
+            {
+                // 葉（右上へ伸びる楕円）。
+                float lx = (u - 0.64f) * 0.8f + (v - 0.2f) * 0.6f;
+                float ly = -(u - 0.64f) * 0.6f + (v - 0.2f) * 0.8f;
+                if ((lx / 0.17f) * (lx / 0.17f) + (ly / 0.08f) * (ly / 0.08f) < 1f)
+                {
+                    return leaf;
+                }
+                // へた。
+                if (u > 0.47f && u < 0.54f && v > 0.12f && v < 0.3f)
+                {
+                    return stem;
+                }
+                float dx = u - 0.5f;
+                float dy = v - 0.6f;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                if (r > 0.36f)
+                {
+                    return Color.clear;
+                }
+                float sx = u - 0.38f;
+                float sy = v - 0.48f;
+                if (sx * sx + sy * sy < 0.006f)
+                {
+                    return shine;
+                }
+                return r > 0.3f ? shade : body;
+            });
+        }
+
+        /// <summary>
+        /// WANTED の手配書（ユーザーの要望、2026-11-02）: 古い紙（焼けた縁）の上に、朱色の「WANTED」の帯（文字は描く側が重ねる）、
+        /// 茶色の人の影、下に賞金の線。幅 width・高さ height。
+        /// </summary>
+        public static Texture2D WantedPoster(int width, int height)
+        {
+            var paper = new Color(0.95f, 0.87f, 0.66f, 1f);
+            var burnt = new Color(0.62f, 0.42f, 0.2f, 1f);
+            var band = new Color(0.78f, 0.12f, 0.08f, 1f);
+            var ink = new Color(0.36f, 0.22f, 0.12f, 1f);
+            return Draw("IconWantedPoster", width, height, (u, v) =>
+            {
+                if (u < 0.03f || u > 0.97f || v < 0.02f || v > 0.98f)
+                {
+                    return Color.clear;
+                }
+                float edge = Mathf.Min(Mathf.Min(u - 0.03f, 0.97f - u) * 1.3f, Mathf.Min(v - 0.02f, 0.98f - v));
+                if (edge < 0.05f)
+                {
+                    return burnt;
+                }
+                if (v > 0.08f && v < 0.3f && u > 0.1f && u < 0.9f)
+                {
+                    return band;
+                }
+                // 人の影（頭と肩）。
+                float hx = (u - 0.5f) / 0.15f;
+                float hy = (v - 0.47f) / 0.11f;
+                bool head = hx * hx + hy * hy < 1f;
+                float sx = (u - 0.5f) / 0.32f;
+                float sy = (v - 0.76f) / 0.17f;
+                bool shoulders = v < 0.76f && sx * sx + sy * sy < 1f && v > 0.6f;
+                if (head || shoulders)
+                {
+                    return ink;
+                }
+                if (v > 0.83f && v < 0.88f && u > 0.2f && u < 0.8f)
+                {
+                    return ink;
+                }
+                return Color.Lerp(paper, burnt, Mathf.Clamp01((0.12f - edge) / 0.12f) * 0.35f);
+            });
+        }
+
         /// <summary>撃破ドロップのかたまり: 金色のコインが 3 枚重なった山。</summary>
         public static Texture2D CoinPile(int size)
         {
@@ -243,26 +326,33 @@ namespace Airerage.Runtime.Presentation
         // 1 ピクセルずつ色を決めて描く（縁は 4 点の平均で少しなめらかにする）。
         private static Texture2D Draw(string name, int size, System.Func<float, float, Color> color)
         {
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            return Draw(name, size, size, color);
+        }
+
+        // 幅 width・高さ height の絵（u, v は 0〜1。v は上が 0）。
+        private static Texture2D Draw(string name, int width, int height, System.Func<float, float, Color> color)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
                 name = name,
                 hideFlags = HideFlags.HideAndDontSave,
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp,
             };
-            var pixels = new Color[size * size];
-            float step = 1f / size;
-            for (int y = 0; y < size; y++)
+            var pixels = new Color[width * height];
+            float stepX = 1f / width;
+            float stepY = 1f / height;
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < size; x++)
+                for (int x = 0; x < width; x++)
                 {
                     // 色は不透明さで重みをつけて平均する（縁が黒ずまないように）。
                     Color sum = Color.clear;
                     float alpha = 0f;
                     for (int s = 0; s < 4; s++)
                     {
-                        float u = (x + 0.25f + 0.5f * (s % 2)) * step;
-                        float v = (y + 0.25f + 0.5f * (s / 2)) * step;
+                        float u = (x + 0.25f + 0.5f * (s % 2)) * stepX;
+                        float v = (y + 0.25f + 0.5f * (s / 2)) * stepY;
                         Color c = color(u, v);
                         sum += c * c.a;
                         alpha += c.a;
@@ -270,7 +360,7 @@ namespace Airerage.Runtime.Presentation
                     Color pixel = alpha > 0f ? sum / alpha : Color.clear;
                     pixel.a = alpha * 0.25f;
                     // テクスチャは下の行から並ぶので、上下を反転する。
-                    pixels[(size - 1 - y) * size + x] = pixel;
+                    pixels[(height - 1 - y) * width + x] = pixel;
                 }
             }
             texture.SetPixels(pixels);

@@ -58,19 +58,20 @@ namespace Airerage.PlayMode.Tests
             Assert.That(courseTimer, Is.Not.Null, "CourseTimerHud がない");
             Assert.That(courseTimer.Timer.Phase, Is.EqualTo(CourseTimer.TimerPhase.Ready));
 
-            // 照準のインジケーター: 射出できる状態なので照準の線が出ていて、射程の円はキャラクターを中心に射程の半径。
+            // 照準のインジケーター: 射出できる状態なので導線（四角い点線）と照準器と結果の文字が出ていて、射程の弧はキャラクターを中心に
+            // 射程の半径。太さは画面の大きさで決まる（1 ピクセルの大きさを、カメラの距離から求めている）。
             var aim = Object.FindFirstObjectByType<AimIndicatorView>();
             Assert.That(aim, Is.Not.Null, "AimIndicatorView がない");
-            LineRenderer aimLine = aim.transform.Find("AimLine").GetComponent<LineRenderer>();
-            LineRenderer ring = aim.transform.Find("RangeRing").GetComponent<LineRenderer>();
-            Assert.That(aimLine.enabled, Is.True, "照準の線が出ていない");
-            Assert.That(aimLine.startColor.a, Is.GreaterThan(0f).And.LessThan(1f), "照準の線が半透明でない");
-            float maxLength = runner.PlayerConfig.Wire.MaxLength;
-            for (int i = 0; i < ring.positionCount; i += ring.positionCount / 4)
-            {
-                float radius = Vector3.Distance(ring.GetPosition(i), view.transform.position);
-                Assert.That(radius, Is.EqualTo(maxLength).Within(0.05f), "射程の円の半径が射程と違う");
-            }
+            Assert.That(aim.Aiming, Is.True, "照準が出ていない");
+            Assert.That(aim.RangeShown, Is.True, "射程の弧が出ていない");
+            Assert.That(aim.DashCount, Is.GreaterThan(0), "導線の点線がない");
+            Assert.That(aim.ResultLabel, Is.EqualTo("LOCK").Or.EqualTo("BLOCK").Or.EqualTo("OUT"), "結果の文字がない");
+            Assert.That(aim.ResultColor.a, Is.GreaterThan(0f).And.LessThan(1f), "照準が半透明でない");
+            Assert.That(aim.RangeRadius, Is.EqualTo(runner.PlayerConfig.Wire.MaxLength).Within(0.001f), "射程の半径が射程と違う");
+            Assert.That(Vector3.Distance(aim.Origin, view.transform.position), Is.LessThan(1f), "射程の中心がキャラクターにない");
+            float expected = 2f * composer.CameraDistance * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad) / 1080f;
+            Assert.That(aim.MetersPerPixel, Is.EqualTo(expected).Within(expected * 0.1f), "太さが画面の大きさに合っていない");
+            Assert.That(aim.GetComponent<MeshFilter>().sharedMesh.vertexCount, Is.GreaterThan(0), "照準の形がない");
         }
     }
 }

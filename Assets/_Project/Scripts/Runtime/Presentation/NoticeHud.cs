@@ -20,13 +20,12 @@ namespace Airerage.Runtime.Presentation
     ///   - キルログ: 「撃破した人（緑の文字）・赤い衝撃波の印 → 撃破された人（赤い文字）・倒れた人の印」（例: CPU2💥→CPU3🤸）。
     ///     最後にダメージを与えた人がいなければ（自分で落ちた）、撃破した人の名前は出さない。
     ///   - 拠点の移動の予告「BANK MOVES」（水色。移るまでの秒）、100 枚のコインの予告「JACKPOT」（虹色。出るまでの秒）と、出た後の
-    ///     「JACKPOT 100」。
+    ///     「JACKPOT 100」、ホットエリアの予告「HOT AREA」（橙色。出るまでの秒。拠点の移動と同じく札だけで、帯と音はない。2026-11-02）。
     ///   - 試合から抜けた人（ネットワーク対戦。docs/15 T6-10）: 「P3 LEFT」（灰色）。
-    ///   秒を数える告知（拠点の移動・100 枚のコインの予告）は、その時が来るまで出す。ほかの告知は NoticeSeconds 秒で引っ込む。
+    ///   秒を数える告知（拠点の移動・100 枚のコイン・ホットエリアの予告）は、その時が来るまで出す。ほかの告知は NoticeSeconds 秒で引っ込む。
     ///   画面が狭くて右の表と重なるときは札を小さくし、それでも入らなければタイマーの下に出す。
-    /// - 画面を横切る帯（BannerStrip）: 100 枚のコインの予告の始まり「JACKPOT INCOMING」（虹色）と、COIN RUSH の始まり
-    ///   （金色。短いファンファーレ）。
-    /// 拠点と 100 枚のコインの時刻は、ティック数とルールだけから決まる（BankRules、FieldCoinRules、MatchRules）。巻き戻しでもずれない。
+    /// - 画面を横切る帯（BannerStrip）: 100 枚のコインの予告の始まり「JACKPOT INCOMING」（虹色）。COIN RUSH の帯はなくした（2026-11-02）。
+    /// 拠点・100 枚のコイン・ホットエリアの時刻は、ティック数とルールだけから決まる（BankRules、FieldCoinRules、HotAreaRules）。巻き戻しでもずれない。
     /// 撃破は、撃破された数（CombatState.Falls）が増えた人と、撃破の数（Knockouts）が増えた人から見つける（同じフレームに複数なら、
     /// 前のフレームの最後に攻撃した人 LastAttacker で組にする）。
     /// 拠点の予告の呼び鈴は BankView、100 枚のコインの警報は MatchAtmosphere が鳴らす。状態を読むだけで、書き換えない。
@@ -78,14 +77,12 @@ namespace Airerage.Runtime.Presentation
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
-        [Tooltip("COIN RUSH のファンファーレ（なくてもよい）")]
-        [SerializeField] private GameAudio _audio;
         [Tooltip("画面が狭くてタイマーの右に札が入らないとき、札を積み始める高さ（ピクセル。タイマーの札と流れのバーの下）")]
         [SerializeField] private float _fallbackTop = 106f;
         [Tooltip("帯を出す秒数")]
         [SerializeField] private float _bandSeconds = 2.6f;
         [SerializeField] private Color _bankColor = new Color(0.31f, 0.84f, 1f);
-        [SerializeField] private Color _rushColor = new Color(1f, 0.8f, 0.2f);
+        [SerializeField] private Color _hotColor = new Color(1f, 0.55f, 0.15f);
 
         // 出した順（新しい札が後ろ）。
         private readonly List<Chip> _chips = new List<Chip>();
@@ -253,6 +250,7 @@ namespace Airerage.Runtime.Presentation
                 {
                     UpdateBankChip(rules, tick);
                     UpdateJackpotChip(rules, tick);
+                    UpdateHotAreaChip(rules, tick);
                 }
                 WatchCharacters();
                 _lastTick = tick;
@@ -297,18 +295,6 @@ namespace Airerage.Runtime.Presentation
             {
                 StartBand("JACKPOT INCOMING", $"{CoinView.RainbowValue} COINS IN {Seconds(rules.JackpotNoticeTicks)} SECONDS", true, Color.white);
             }
-            if (rules.HasTimeLimit && rules.LateGameTicks > 0 && phase == MatchPhase.Playing)
-            {
-                int rush = rules.CountdownTicks + rules.DurationTicks - rules.LateGameTicks;
-                if (_lastTick < rush && tick >= rush)
-                {
-                    StartBand("COIN RUSH", $"LAST {Seconds(rules.LateGameTicks)} SECONDS  -  MORE COINS", false, _rushColor);
-                    if (_audio != null)
-                    {
-                        _audio.Play(SoundId.CoinRush);
-                    }
-                }
-            }
         }
 
         private void StartBand(string title, string sub, bool rainbow, Color color)
@@ -350,6 +336,18 @@ namespace Airerage.Runtime.Presentation
                 Chip chip = Show("jackpot", $"JACKPOT {CoinView.RainbowValue}", true, Color.white);
                 chip.Seconds = -1;
             }
+        }
+
+        // ホットエリアの予告（場所を見せている間。出たら引っ込む。候補の地点がないステージでは出さない）。
+        private void UpdateHotAreaChip(MatchRules rules, int tick)
+        {
+            int round = HotAreaRules.AnnouncedRound(rules, tick, out int ticksUntil);
+            if (round <= 0 || HotAreaRules.Spot(rules, _feed.CoinSpawns, round) < 0)
+            {
+                return;
+            }
+            Chip chip = Show("hot", "HOT AREA", false, _hotColor);
+            chip.Seconds = Seconds(ticksUntil);
         }
 
         // 前のフレームの様子を、今の様子で取り直す（試合が変わった・人数が変わったとき。前からの撃破や抜けた人は出さない）。

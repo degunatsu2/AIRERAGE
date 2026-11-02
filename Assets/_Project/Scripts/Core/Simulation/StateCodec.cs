@@ -84,6 +84,7 @@ namespace Airerage.Core.Simulation
             hash = Mix(hash, match.OvertimeStartTick);
             hash = Mix(hash, match.EndTick);
             hash = Mix(hash, match.Winner);
+            hash = Mix(hash, match.HotFruitTaken);
             if (stage != null)
             {
                 // 扉の開き具合と、仕掛けの触れた時刻（扉と仕掛けのないステージでは何も足さない）。

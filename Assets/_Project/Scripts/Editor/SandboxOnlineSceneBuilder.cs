@@ -295,7 +295,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateMissIndicator(runner, Object.FindFirstObjectByType<Camera>());
             SandboxWireSceneBuilder.CreateSkillHud(runner, audio);
             SandboxWireSceneBuilder.CreateMatchHud(runner, audio, runner);
-            SandboxWireSceneBuilder.CreateNoticeHud(runner, audio);
+            SandboxWireSceneBuilder.CreateNoticeHud(runner);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoins(CoinSpawns, JackpotSpots, runner, guides);
             SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio, guides);

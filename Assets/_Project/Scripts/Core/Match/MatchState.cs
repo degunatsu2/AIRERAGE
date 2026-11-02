@@ -20,15 +20,22 @@ namespace Airerage.Core.Match
         /// <summary>アディショナルタイムで拠点にたどり着いて勝った人（なければ -1。順位は確定コインで決める）。</summary>
         public int Winner;
 
+        /// <summary>
+        /// フルーツを最後に取られたホットエリアの回（HotAreaRules。1 回目が 1。まだなければ -1）。同時に出ているホットエリアは 1 つまでなので、
+        /// 今のホットエリアの回と同じならフルーツはもうない。
+        /// </summary>
+        public int HotFruitTaken;
+
         /// <summary>始まったときの状態（どれもまだない）。</summary>
-        public static MatchState None => new MatchState { OvertimeStartTick = -1, EndTick = -1, Winner = -1 };
+        public static MatchState None => new MatchState { OvertimeStartTick = -1, EndTick = -1, Winner = -1, HotFruitTaken = -1 };
 
         public bool HasOvertime => OvertimeStartTick >= 0;
         public bool HasEnded => EndTick >= 0;
 
         public bool Equals(MatchState other)
         {
-            return OvertimeStartTick == other.OvertimeStartTick && EndTick == other.EndTick && Winner == other.Winner;
+            return OvertimeStartTick == other.OvertimeStartTick && EndTick == other.EndTick && Winner == other.Winner
+                && HotFruitTaken == other.HotFruitTaken;
         }
 
         public override bool Equals(object obj)
@@ -38,12 +45,12 @@ namespace Airerage.Core.Match
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(OvertimeStartTick, EndTick, Winner);
+            return HashCode.Combine(OvertimeStartTick, EndTick, Winner, HotFruitTaken);
         }
 
         public override string ToString()
         {
-            return $"overtime={OvertimeStartTick} end={EndTick} winner={Winner}";
+            return $"overtime={OvertimeStartTick} end={EndTick} winner={Winner} fruit={HotFruitTaken}";
         }
     }
 
@@ -95,13 +102,6 @@ namespace Airerage.Core.Match
                 default:
                     return 0;
             }
-        }
-
-        /// <summary>コインの出現が増える終盤か（試合の残りが MatchRules.LateGameTicks 以下、またはアディショナルタイム）。</summary>
-        public static bool IsLateGame(MatchRules rules, int tick)
-        {
-            return rules.HasTimeLimit && rules.LateGameTicks > 0
-                && tick >= rules.CountdownTicks + rules.DurationTicks - rules.LateGameTicks;
         }
 
         /// <summary>キャラクター index が、拠点にたどり着けば勝てるか（確定＋所持が、ほかの人の確定の最大以上）。</summary>

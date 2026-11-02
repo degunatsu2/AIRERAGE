@@ -292,7 +292,8 @@ namespace Airerage.Core.Tests.Economy
             Assert.That(CoinDropRules.HitDropAmount(rules, 1), Is.EqualTo(1), "少なくとも 1 枚");
             Assert.That(CoinDropRules.HitDropAmount(rules, 9), Is.EqualTo(1));
             Assert.That(CoinDropRules.HitDropAmount(rules, 57), Is.EqualTo(5));
-            Assert.That(CoinDropRules.HitDropAmount(rules, 1000), Is.EqualTo(10), "上限");
+            Assert.That(CoinDropRules.HitDropAmount(rules, 99), Is.EqualTo(9));
+            Assert.That(CoinDropRules.HitDropAmount(rules, 1000), Is.EqualTo(20), "上限（100 枚以上は WANTED で 2 倍。CatchUpTests）");
             Assert.That(CoinDropRules.KoDropAmount(rules, 0), Is.EqualTo(0));
             Assert.That(CoinDropRules.KoDropAmount(rules, 1), Is.EqualTo(1), "切り上げ");
             Assert.That(CoinDropRules.KoDropAmount(rules, 3), Is.EqualTo(2));

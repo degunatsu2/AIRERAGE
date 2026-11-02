@@ -20,7 +20,7 @@ namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// 試合中のお知らせとタイマー（ユーザーの選択、2026-10-14）: タイマーの下の札（拠点の移動、100 枚のコイン）、画面を横切る帯
-    /// （JACKPOT INCOMING、COIN RUSH）、タイマーの札の見出しと数字、残り 10 秒の音。
+    /// （JACKPOT INCOMING）、ホットエリアの予告の札、タイマーの札の見出しと数字、残り 10 秒の音。
     /// </summary>
     public sealed class NoticeHudTests
     {
@@ -62,12 +62,15 @@ namespace Airerage.PlayMode.Tests
         [UnityTest]
         public IEnumerator Notices_ChipsAndBands_FollowTheMatchTimeline()
         {
-            // 15 秒の試合。拠点は 2 秒ごとに移り 1 秒前に予告、COIN RUSH は 1 秒後から、100 枚のコインは 2.5 秒後に予告して 0.5 秒後に出る。
+            // 15 秒の試合。拠点は 2 秒ごとに移り 1 秒前に予告、ホットエリアは 3 秒ごとに 1 秒前から予告、100 枚のコインは 2.5 秒後に予告して
+            // 0.5 秒後に出る。
             var rules = new MatchRules
             {
                 CountdownTicks = 0,
                 DurationTicks = 900,
-                LateGameTicks = 840,
+                HotAreaIntervalTicks = 180,
+                HotAreaNoticeTicks = 60,
+                HotAreaLifetimeTicks = 180,
                 BankMoveIntervalTicks = 120,
                 BankNoticeTicks = 60,
                 JackpotTicksBeforeEnd = 750,
@@ -95,7 +98,7 @@ namespace Airerage.PlayMode.Tests
             try
             {
                 bool sawBankChip = false;
-                bool sawRushBand = false;
+                bool sawHotChip = false;
                 bool sawJackpotBand = false;
                 bool sawJackpotChip = false;
                 bool sawJackpotAppeared = false;
@@ -104,7 +107,11 @@ namespace Airerage.PlayMode.Tests
                     yield return null;
                     IReadOnlyList<string> chips = notices.ChipTitles;
                     sawBankChip |= chips.Contains("BANK MOVES");
-                    sawRushBand |= notices.BandTitle == "COIN RUSH";
+                    sawHotChip |= chips.Contains("HOT AREA");
+                    if (world.Tick > 190 && world.Tick < 230)
+                    {
+                        Assert.That(chips.Contains("HOT AREA"), Is.False, $"ティック {world.Tick}: ホットエリアが出た後も予告の札が残っている");
+                    }
                     sawJackpotBand |= notices.BandTitle == "JACKPOT INCOMING";
                     sawJackpotChip |= chips.Contains("JACKPOT");
                     sawJackpotAppeared |= chips.Contains("JACKPOT 100");
@@ -118,11 +125,11 @@ namespace Airerage.PlayMode.Tests
                     }
                 }
                 Assert.That(sawBankChip, Is.True, "拠点の移動の予告の札が出ない");
-                Assert.That(sawRushBand, Is.True, "COIN RUSH の帯が出ない");
+                Assert.That(sawHotChip, Is.True, "ホットエリアの予告の札が出ない");
                 Assert.That(sawJackpotBand, Is.True, "JACKPOT INCOMING の帯が出ない");
                 Assert.That(sawJackpotChip, Is.True, "100 枚のコインの予告の札が出ない");
                 Assert.That(sawJackpotAppeared, Is.True, "100 枚のコインが出た後の札が出ない");
-                Assert.That(notices.BandsShown, Is.EqualTo(2), "帯の数が違う（COIN RUSH と JACKPOT INCOMING の 1 回ずつ）");
+                Assert.That(notices.BandsShown, Is.EqualTo(1), "帯の数が違う（JACKPOT INCOMING の 1 回だけ。ホットエリアは札だけ）");
 
                 Assert.That(hud.TimerLabel, Is.EqualTo("TIME"));
                 Assert.That(hud.TimerDigits, Is.EqualTo(hud.TimerText));
@@ -431,6 +438,141 @@ namespace Airerage.PlayMode.Tests
             {
                 Object.Destroy(root);
             }
+        }
+
+        [UnityTest]
+        public IEnumerator HotArea_ShowsTheSpotBeforehand_ThenTheFruit_AndReactsWhenItIsTaken()
+        {
+            // 10 秒の試合。ホットエリアは 1 秒ごとに、0.5 秒前から予告して 1 秒残る。
+            var rules = new MatchRules
+            {
+                CountdownTicks = 0,
+                DurationTicks = 600,
+                HotAreaIntervalTicks = 60,
+                HotAreaNoticeTicks = 30,
+                HotAreaLifetimeTicks = 60,
+                BankMoveIntervalTicks = 100000,
+            };
+            var terrain = new BoxTerrain().AddBox(-30f, -1f, 30f, 0f);
+            var spot = new System.Numerics.Vector2(10f, 8f);
+            var spawns = new[] { new CoinSpawnPoint(spot, 100, CoinSpawnKind.Jackpot) };
+            var world = new SimWorld(terrain, null, null, rules, spawns);
+            world.AddCharacter(new CharacterConfig(), new System.Numerics.Vector3(-5f, GroundY, 0f));
+
+            var root = new GameObject("HotAreaTest");
+            root.SetActive(false);
+            var camera = new GameObject("Camera").AddComponent<Camera>();
+            camera.transform.SetParent(root.transform, false);
+            camera.transform.position = new Vector3(0f, 5f, -30f);
+            var feed = root.AddComponent<TestFeed>();
+            feed.World = world;
+            var fruit = new GameObject("Fruit").transform;
+            fruit.SetParent(root.transform, false);
+            var ring = new GameObject("Ring").AddComponent<LineRenderer>();
+            ring.transform.SetParent(root.transform, false);
+            var view = root.AddComponent<HotAreaView>();
+            Set(view, "_source", feed);
+            Set(view, "_camera", camera);
+            Set(view, "_fruit", fruit);
+            Set(view, "_ring", ring);
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("誘導表示の層"));
+            root.SetActive(true);
+            try
+            {
+                bool sawAnnounce = false;
+                bool sawFruit = false;
+                while (world.Tick < 200 && view.PickupCount == 0)
+                {
+                    yield return null;
+                    if (view.AnnouncedRound == 1)
+                    {
+                        sawAnnounce = true;
+                        Assert.That(ring.enabled, Is.True, "予告の輪が出ない");
+                        Assert.That(fruit.gameObject.activeSelf, Is.False, $"ティック {world.Tick}: 出る前にフルーツが見える");
+                    }
+                    if (view.FruitRound == 1)
+                    {
+                        sawFruit = true;
+                        Assert.That(fruit.gameObject.activeSelf, Is.True, "フルーツが見えない");
+                        Assert.That(Vector3.Distance(fruit.position, new Vector3(spot.X, spot.Y, 0f)), Is.LessThan(0.5f), "フルーツの場所が違う");
+                        // 取りに行く。
+                        CharacterState state = world.GetState(0);
+                        state.Position = new System.Numerics.Vector3(spot.X, spot.Y, 0f);
+                        state.Velocity = System.Numerics.Vector3.Zero;
+                        world.SetState(0, state);
+                    }
+                }
+                Assert.That(sawAnnounce, Is.True, "予告しない");
+                Assert.That(sawFruit, Is.True, "フルーツが出ない");
+                Assert.That(view.PickupCount, Is.EqualTo(1), "取ったのに気づかない");
+                Assert.That(world.GetState(0).Combat.Gauge, Is.GreaterThanOrEqualTo(rules.HotAreaFruitGauge), "ゲージが回復していない");
+                yield return null;
+                Assert.That(fruit.gameObject.activeSelf, Is.False, "取った後もフルーツが見える");
+            }
+            finally
+            {
+                Object.Destroy(root);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator CatchUpBadge_AndWantedMark_FollowTheCoins()
+        {
+            // 2 人の試合。0 番（自分）が 2 位なら、必殺技の札の上に順位の印。所持コインが 100 枚以上なら、右上の札に WANTED の印。
+            var rules = new MatchRules { CountdownTicks = 0, DurationTicks = 6000, BankMoveIntervalTicks = 100000 };
+            var world = new SimWorld(new BoxTerrain().AddBox(-30f, -1f, 30f, 0f), null, null, rules);
+            world.AddCharacter(new CharacterConfig(), new System.Numerics.Vector3(-5f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new System.Numerics.Vector3(5f, GroundY, 0f));
+            var root = new GameObject("CatchUpTest");
+            root.SetActive(false);
+            var feed = root.AddComponent<TestFeed>();
+            feed.World = world;
+            var skills = root.AddComponent<SkillHud>();
+            Set(skills, "_source", feed);
+            var board = root.AddComponent<ScoreboardHud>();
+            Set(board, "_source", feed);
+            root.SetActive(true);
+            try
+            {
+                yield return null;
+                Assert.That(skills.BuffRank, Is.Zero, "同じ確定コインなのに順位の印が出た");
+                Edit(world, 1, s => { s.Coins.Banked = 30; return s; });
+                yield return null;
+                yield return null;
+                Assert.That(skills.BuffRank, Is.EqualTo(2), "2 位なのに順位の印が出ない");
+                Assert.That(SkillHud.RankText(2), Is.EqualTo("2ND"));
+                Edit(world, 0, s => { s.Coins.Banked = 50; return s; });
+                yield return null;
+                yield return null;
+                Assert.That(skills.BuffRank, Is.Zero, "1 位になったのに順位の印が残っている");
+                Assert.That(skills.BuffChangeCount, Is.EqualTo(2), "印の入れ替わりの数が違う");
+
+                Assert.That(board.IsWanted(0), Is.False);
+                Edit(world, 0, s => { s.Coins.Held = 120; return s; });
+                yield return null;
+                Assert.That(board.IsWanted(0), Is.True, "100 枚以上なのに WANTED にならない");
+                Assert.That(board.WantedStamps, Is.EqualTo(1), "印を押していない");
+                Assert.That(board.LookOf(0).Wanted, Is.True);
+                Edit(world, 0, s => { s.Coins.Held = 60; return s; });
+                yield return null;
+                Assert.That(board.IsWanted(0), Is.False, "減ったのに WANTED のまま");
+                Assert.That(board.WantedDissolves, Is.EqualTo(1), "印を消していない");
+                Assert.That(board.LookOf(0).WantedDissolve, Is.GreaterThan(0f), "光の粒になって消える動きがない");
+            }
+            finally
+            {
+                Object.Destroy(root);
+            }
+        }
+
+        private static void Edit(SimWorld world, int index, Func<CharacterState, CharacterState> change)
+        {
+            world.SetState(index, change(world.GetState(index)));
+        }
+
+        private static void Set(object target, string field, object value)
+        {
+            target.GetType().GetField(field, BindingFlags.NonPublic | BindingFlags.Instance).SetValue(target, value);
         }
     }
 }

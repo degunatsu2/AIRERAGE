@@ -922,11 +922,10 @@ namespace Airerage.Editor
         }
 
         /// <summary>試合中のお知らせ（タイマーの下の札と、画面を横切る帯。ユーザーの選択、2026-10-14）。source は ISimulationFeed。</summary>
-        internal static void CreateNoticeHud(MonoBehaviour source, GameAudio audio)
+        internal static void CreateNoticeHud(MonoBehaviour source)
         {
             var hud = new GameObject("NoticeHud").AddComponent<NoticeHud>();
             SetReference(hud, "_source", source);
-            SetReference(hud, "_audio", audio);
         }
 
         // 100 枚のコインの枚数（ユーザーの要望、2026-10-13）。
@@ -980,11 +979,6 @@ namespace Airerage.Editor
             GameObject redCoin = CreateCoinTemplate("CoinRed", view.transform, red, redInner, 0.75f, new[] { Vector2.zero });
             GameObject jackpot = CreateCoinTemplate("CoinRainbow", view.transform, rainbow, null, 1.1f, new[] { Vector2.zero });
             var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
-            // COIN RUSH のときにコインの周りに出す金色の輪（CoinView が名前で探して使う。ふだんは出さない）。
-            foreach (GameObject template in new[] { single, triple, redCoin })
-            {
-                CreateIndicatorLine(template.transform, "RushHalo", lineMaterial, 0.07f).enabled = false;
-            }
             jackpot.AddComponent<RainbowCoinGlow>().Configure(
                 jackpot.GetComponentsInChildren<MeshRenderer>(),
                 CreateIndicatorLine(jackpot.transform, "Halo", lineMaterial, 0.14f),
@@ -1051,6 +1045,41 @@ namespace Airerage.Editor
             SetReference(view, "_sweep", CreateIndicatorLine(view.transform, "Sweep", material, 0.14f));
             SetReference(view, "_beam", CreateIndicatorLine(view.transform, "Beam", material, 1.6f));
             SetReference(view, "_next", CreateIndicatorLine(view.transform, "Next", material, 0.14f));
+            SetReference(view, "_audio", audio);
+            SetReference(view, "_guides", guides);
+            // ホットエリア（30 秒ごとのフルーツとコイン。拠点と同じく試合の仕組みのシーンに置く。2026-11-02）。
+            CreateHotAreaView(source, audio, guides);
+        }
+
+        /// <summary>
+        /// ホットエリアの表示（HotAreaView。ユーザーの要望、2026-11-02）: フルーツの見た目（光の影響を受けない橙色の実、茶色のへた、緑の葉）、
+        /// 予告の輪、取ったときの光と「+30%」。
+        /// </summary>
+        internal static void CreateHotAreaView(MonoBehaviour source, GameAudio audio, EdgeGuideLayer guides)
+        {
+            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            var view = new GameObject("HotArea").AddComponent<HotAreaView>();
+            var fruit = new GameObject("Fruit");
+            fruit.transform.SetParent(view.transform, false);
+            CreateVisual(PrimitiveType.Sphere, "Body", LoadOrCreateMaterial("HotFruitUnlit", new Color(1f, 0.5f, 0.12f), unlit: true),
+                new Vector3(0.95f, 0.9f, 0.95f)).transform.SetParent(fruit.transform, false);
+            GameObject stem = CreateVisual(PrimitiveType.Cylinder, "Stem", LoadOrCreateMaterial("HotFruitStemUnlit", new Color(0.42f, 0.26f, 0.12f), unlit: true),
+                new Vector3(0.07f, 0.14f, 0.07f));
+            stem.transform.SetParent(fruit.transform, false);
+            stem.transform.localPosition = new Vector3(0f, 0.5f, 0f);
+            GameObject leaf = CreateVisual(PrimitiveType.Sphere, "Leaf", LoadOrCreateMaterial("HotFruitLeafUnlit", new Color(0.35f, 0.85f, 0.3f), unlit: true),
+                new Vector3(0.42f, 0.08f, 0.2f));
+            leaf.transform.SetParent(fruit.transform, false);
+            leaf.transform.localPosition = new Vector3(0.2f, 0.55f, 0f);
+            leaf.transform.localRotation = Quaternion.Euler(0f, 0f, 28f);
+            fruit.SetActive(false);
+            BurstEffectView burst = CreateBurst("HotFruitBurst", view.transform);
+            burst.Configure(new Color(1f, 0.7f, 0.25f, 1f), false, 0.6f, 0.4f, 3f, 10, 1.6f, 0.14f, "+30%", 40, 0f);
+            SetReference(view, "_source", source);
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            SetReference(view, "_fruit", fruit.transform);
+            SetReference(view, "_ring", CreateIndicatorLine(view.transform, "Ring", material, 0.12f));
+            SetReference(view, "_burst", burst);
             SetReference(view, "_audio", audio);
             SetReference(view, "_guides", guides);
         }
@@ -1264,8 +1293,12 @@ namespace Airerage.Editor
             new GameObject("VersionLabel").AddComponent<VersionLabel>();
         }
 
-        /// <summary>照準のインジケーター（照準の線、終点の印、射程の円）。半透明にするため Sprites-Default を使う。</summary>
-        internal static AimIndicatorView CreateAimIndicator()
+        /// <summary>
+        /// 照準のインジケーター（四角い点線の導線、照準器と結果の文字、波紋、射程の弧。ユーザーの選択、2026-11-02）。毎フレーム作り直す
+        /// 頂点の色つきのメッシュで描く。半透明にするため Sprites-Default を使う。baseColor は射程の弧と導線の根元の色（ローカル対戦は
+        /// プレイヤーの色。なければワイヤーの紫）。
+        /// </summary>
+        internal static AimIndicatorView CreateAimIndicator(Color? baseColor = null)
         {
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             if (material == null)
@@ -1274,14 +1307,21 @@ namespace Airerage.Editor
             }
 
             var root = new GameObject("AimIndicator");
-            LineRenderer aimLine = CreateIndicatorLine(root.transform, "AimLine", material, 0.07f);
-            LineRenderer marker = CreateIndicatorLine(root.transform, "TargetMarker", material, 0.06f);
-            LineRenderer ring = CreateIndicatorLine(root.transform, "RangeRing", material, 0.08f);
-
+            root.AddComponent<MeshFilter>();
+            var renderer = root.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
             var view = root.AddComponent<AimIndicatorView>();
-            SetReference(view, "_aimLine", aimLine);
-            SetReference(view, "_targetMarker", marker);
-            SetReference(view, "_rangeRing", ring);
+            SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());
+            if (baseColor.HasValue)
+            {
+                Color color = baseColor.Value;
+                color.a = 0.95f;
+                var serialized = new SerializedObject(view);
+                serialized.FindProperty("_baseColor").colorValue = color;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
             return view;
         }
 

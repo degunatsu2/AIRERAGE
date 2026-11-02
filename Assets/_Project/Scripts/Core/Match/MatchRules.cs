@@ -36,12 +36,6 @@ namespace Airerage.Core.Match
         /// <summary>アディショナルタイムの長さ（ティック。5 秒。20 秒から短くした。ユーザーの決定、2026-10-14）。</summary>
         public int OvertimeTicks = 300;
 
-        /// <summary>コインの出現が増える終盤（試合の残り。ティック。30 秒）【仮】。アディショナルタイムも含む。</summary>
-        public int LateGameTicks = 1800;
-
-        /// <summary>終盤に、コインが拾われてから同じ地点にまた出るまで（ティック。5 秒。ふだんの半分）【仮】。</summary>
-        public int LateGameSpawnIntervalTicks = 300;
-
         /// <summary>撃破されてから復帰するまで（ティック）。この間は出現位置で待ち、動かず、攻撃も受けない。</summary>
         public int RespawnDelayTicks = 180;
 
@@ -59,19 +53,64 @@ namespace Airerage.Core.Match
         public int CoinSpawnIntervalTicks = 600;
 
         /// <summary>
-        /// 100 枚のコイン（候補の地点の1つ）を予告する、試合の残り（ティック。残り 1 分。ユーザーの要望）。時間の制限がなければ出ない。
-        /// 予告してから JackpotNoticeTicks の後に出る。
+        /// 100 枚のコイン（候補の地点の1つ）を予告する、試合の残り（ティック。残り 1 分 10 秒で予告して、残り 1 分に出す。ユーザーの要望、
+        /// 2026-11-02。前は残り 1 分で予告して残り 50 秒に出していた）。時間の制限がなければ出ない。予告してから JackpotNoticeTicks の後に出る。
         /// </summary>
-        public int JackpotTicksBeforeEnd = 3600;
+        public int JackpotTicksBeforeEnd = 4200;
 
         /// <summary>100 枚のコインを予告してから、出るまで（ティック。10 秒。ユーザーの要望、2026-10-14）。</summary>
         public int JackpotNoticeTicks = 600;
+
+        /// <summary>
+        /// ホットエリア（ユーザーの要望、2026-11-02。COIN RUSH の代わり。HotAreaRules）: 試合が始まってからこの間隔（ティック。30 秒）ごとに、
+        /// 100 枚のコインの候補の地点のどれかに、ゲージを回復するフルーツと、その周りのコインを出す。時間の制限がなければ出ない。
+        /// </summary>
+        public int HotAreaIntervalTicks = 1800;
+
+        /// <summary>ホットエリアの場所を予告してから、出るまで（ティック。10 秒。表示だけに使う）。</summary>
+        public int HotAreaNoticeTicks = 600;
+
+        /// <summary>
+        /// ホットエリアが残る長さ（ティック。30 秒）【仮】。過ぎると、拾われていないフルーツとコインは消える（コインは消える前に点滅する）。
+        /// HotAreaIntervalTicks より長くできない（同時に出ているホットエリアは 1 つまで）。
+        /// </summary>
+        public int HotAreaLifetimeTicks = 1800;
+
+        /// <summary>ホットエリアのコインの数（1 つずつが HotAreaCoinValue 枚。ユーザーの要望で 30 枚の通常コイン）。</summary>
+        public int HotAreaCoins = 30;
+
+        /// <summary>ホットエリアのコイン 1 つの枚数（通常のコイン）。</summary>
+        public int HotAreaCoinValue = 1;
+
+        /// <summary>フルーツで回復するゲージ（0.1% 単位。300 で 30%。ユーザーの要望）。</summary>
+        public int HotAreaFruitGauge = 300;
+
+        /// <summary>ホットエリアのコインを並べる 2 つの輪の半径（m。内側・外側）【仮】。内側に 2/5、外側に残りを並べる。</summary>
+        public float HotAreaInnerRadius = 1.4f;
+        public float HotAreaOuterRadius = 2.4f;
 
         /// <summary>被弾ドロップ（docs/12 T4-6）: コンボの最初の被弾で落とす、所持コインの割合（%）【仮】。少なくとも 1 枚。</summary>
         public int HitDropPercent = 10;
 
         /// <summary>被弾ドロップの上限（枚）【仮】。</summary>
         public int HitDropMax = 10;
+
+        /// <summary>
+        /// WANTED（ユーザーの要望、2026-11-02。CatchUpRules）: 所持コインがこの枚数以上の人は WANTED（指名手配）で、攻撃されたときの被弾ドロップが
+        /// WantedHitDropMultiplier 倍になる（拠点に入れずに持ち歩くのを不利にする）。所持コインがこれより少なくなったら外れる。
+        /// </summary>
+        public int WantedHeldCoins = 100;
+
+        /// <summary>WANTED の人の被弾ドロップの倍率（所持コインより多くは落とさない）。撃破ドロップとギミックのドロップは変えない【仮】。</summary>
+        public int WantedHitDropMultiplier = 2;
+
+        /// <summary>
+        /// 逆転の恩恵（ユーザーの要望、2026-11-02。CatchUpRules）: 確定コインの順位が 2 位・3 位・4 位以下の人が、1 秒ごとに得るゲージ（0.1% 単位。
+        /// 5 で 0.5%）。1 位は 0。同じ確定コインの人は同じ順位（上に何人いるかで決める）。
+        /// </summary>
+        public int CatchUpGaugeRank2 = 5;
+        public int CatchUpGaugeRank3 = 10;
+        public int CatchUpGaugeRank4 = 20;
 
         /// <summary>撃破ドロップ: 撃破されたときに落とす、所持コインの割合（%。端数は切り上げ）【仮】。自滅も同じ（D-44）。</summary>
         public int KoDropPercent = 50;
@@ -110,7 +149,7 @@ namespace Airerage.Core.Match
         /// <summary>拠点の円の半径（m）【仮】。キャラクターの箱が触れていれば、所持コインを確定する（2m から少し小さくした。ユーザーの要望、2026-10-14）。</summary>
         public float BankRadius = 1.7f;
 
-        /// <summary>試合ごとの乱数の種（100 枚のコインの場所、拠点の移動先を選ぶ。ホストが試合を始めるたびに決めて全員へ送る）。</summary>
+        /// <summary>試合ごとの乱数の種（100 枚のコインとホットエリアの場所、拠点の移動先を選ぶ。ホストが試合を始めるたびに決めて全員へ送る）。</summary>
         public int Seed;
 
         /// <summary>コインを拾える距離（m。キャラクターの箱をこれだけ広げて、コインの中心が入れば拾う）。</summary>
@@ -178,11 +217,22 @@ namespace Airerage.Core.Match
             v.InRange(nameof(HitDropPercent), HitDropPercent, 0f, 100f);
             v.NonNegative(nameof(HitDropMax), HitDropMax);
             v.InRange(nameof(KoDropPercent), KoDropPercent, 0f, 100f);
+            v.Positive(nameof(WantedHeldCoins), WantedHeldCoins);
+            v.Positive(nameof(WantedHitDropMultiplier), WantedHitDropMultiplier);
+            v.NonNegative(nameof(CatchUpGaugeRank2), CatchUpGaugeRank2);
+            v.NonNegative(nameof(CatchUpGaugeRank3), CatchUpGaugeRank3);
+            v.NonNegative(nameof(CatchUpGaugeRank4), CatchUpGaugeRank4);
             v.NonNegative(nameof(DropPickableDelayTicks), DropPickableDelayTicks);
             v.Positive(nameof(DropLifetimeTicks), DropLifetimeTicks);
             v.NonNegative(nameof(OvertimeTicks), OvertimeTicks);
-            v.NonNegative(nameof(LateGameTicks), LateGameTicks);
-            v.Positive(nameof(LateGameSpawnIntervalTicks), LateGameSpawnIntervalTicks);
+            v.Positive(nameof(HotAreaIntervalTicks), HotAreaIntervalTicks);
+            v.NonNegative(nameof(HotAreaNoticeTicks), HotAreaNoticeTicks);
+            v.InRange(nameof(HotAreaLifetimeTicks), HotAreaLifetimeTicks, 1f, HotAreaIntervalTicks);
+            v.NonNegative(nameof(HotAreaCoins), HotAreaCoins);
+            v.Positive(nameof(HotAreaCoinValue), HotAreaCoinValue);
+            v.NonNegative(nameof(HotAreaFruitGauge), HotAreaFruitGauge);
+            v.NonNegative(nameof(HotAreaInnerRadius), HotAreaInnerRadius);
+            v.NonNegative(nameof(HotAreaOuterRadius), HotAreaOuterRadius);
             v.NonNegative(nameof(KoDropInset), KoDropInset);
             v.InRange(nameof(DamageRewardPercent), DamageRewardPercent, 0f, 1000f);
             v.NonNegative(nameof(KoRewardBase), KoRewardBase);
