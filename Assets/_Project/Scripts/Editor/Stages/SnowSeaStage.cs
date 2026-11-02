@@ -180,7 +180,9 @@ namespace Airerage.Editor.Stages
                     // 雪原の下の洞窟の奥（ユーザーの要望、2026-10-19）。
                     new Vector2(-36f, -1f),
                 },
-                Spawns = new[] { new Vector3(-3f, 2f, 0f), new Vector3(3f, 2f, 0f), new Vector3(-33f, 7f, 0f), new Vector3(29f, 3f, 0f) },
+                Spawns = new[] { new Vector3(-3f, 2f, 0f), new Vector3(3f, 2f, 0f), new Vector3(-33f, 7f, 0f), new Vector3(29f, 3f, 0f),
+                    // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
+                    new Vector3(-14.5f, 1.5f, 0f), new Vector3(44.5f, 4f, 0f), new Vector3(-13f, 15.6f, 0f), new Vector3(27f, 17.6f, 0f) },
                 Decorate = Decorate,
             };
         }

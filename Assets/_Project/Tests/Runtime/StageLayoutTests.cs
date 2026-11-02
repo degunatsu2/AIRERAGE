@@ -140,7 +140,16 @@ namespace Airerage.Runtime.Tests
         public void Spawns_AreInsideTheStage_StandingOnTheGround_AwayFromMovingGimmicks(string stage)
         {
             Open(stage);
-            Assert.That(_spawns.Count, Is.EqualTo(4), "出現位置が 4 人分ない");
+            // チーム対戦は 8 人まで（docs/19 T9-4）。出現位置は散らして置く（D-84）。4 人までは最初の 4 つを使う。
+            Assert.That(_spawns.Count, Is.EqualTo(8), "出現位置が 8 人分ない");
+            for (int i = 0; i < _spawns.Count; i++)
+            {
+                for (int j = i + 1; j < _spawns.Count; j++)
+                {
+                    Assert.That(NVector3.Distance(_spawns[i], _spawns[j]), Is.GreaterThanOrEqualTo(3.5f),
+                        $"出現位置 {i + 1} と {j + 1} が近すぎる（{_spawns[i]}、{_spawns[j]}）");
+                }
+            }
             foreach (NVector3 spawn in _spawns)
             {
                 Assert.That(_bounds.Contains(spawn), Is.True, $"出現位置 {spawn} がステージの外");

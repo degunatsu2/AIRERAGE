@@ -173,7 +173,9 @@ namespace Airerage.Editor.Stages
                     new Vector2(0f, 7f), new Vector2(-13.5f, 9.5f), new Vector2(13.5f, 9.5f), new Vector2(-39f, 22f), new Vector2(39f, 22f),
                     new Vector2(-28f, 26.5f), new Vector2(28f, 26.5f), HollowBank,
                 },
-                Spawns = new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f), new Vector3(-25.5f, 5f, 0f), new Vector3(25.5f, 5f, 0f) },
+                Spawns = new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f), new Vector3(-25.5f, 5f, 0f), new Vector3(25.5f, 5f, 0f),
+                    // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
+                    new Vector3(-17.5f, 13.5f, 0f), new Vector3(17.5f, 13.5f, 0f), new Vector3(-36.25f, 16f, 0f), new Vector3(36.25f, 16f, 0f) },
                 Decorate = decor => DecorateCity(decor, night: false),
             };
         }
@@ -293,7 +295,9 @@ namespace Airerage.Editor.Stages
                     new Vector2(0f, 7.5f), new Vector2(-21f, 8.5f), new Vector2(21f, 8.5f), new Vector2(-38f, 21f), new Vector2(38f, 21f),
                     new Vector2(-28f, 25f), new Vector2(28f, 25f), HollowBank,
                 },
-                Spawns = new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f), new Vector3(-22f, 5f, 0f), new Vector3(22f, 5f, 0f) },
+                Spawns = new[] { new Vector3(-4f, 1f, 0f), new Vector3(4f, 1f, 0f), new Vector3(-22f, 5f, 0f), new Vector3(22f, 5f, 0f),
+                    // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
+                    new Vector3(-17.5f, 13.5f, 0f), new Vector3(17.5f, 13.5f, 0f), new Vector3(-38.75f, 16f, 0f), new Vector3(38.75f, 16f, 0f) },
                 Decorate = decor => DecorateCity(decor, night: true),
             };
         }

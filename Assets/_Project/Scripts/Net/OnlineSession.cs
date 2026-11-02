@@ -57,7 +57,11 @@ namespace Airerage.Net
             Ended,
         }
 
-        public const int MaxPlayers = 4;
+        /// <summary>1 つのセッションに入れる人数（チーム対戦は 8 人まで。docs/19 T9-4）。</summary>
+        public const int MaxPlayers = 8;
+
+        /// <summary>個人戦（チームなし）で始められる人数の上限（今までと同じ 4 人。docs/19）。</summary>
+        public const int MaxFreeForAllPlayers = 4;
 
         /// <summary>プレイヤーネームの最大の文字数。</summary>
         public const int MaxNameLength = 12;
@@ -88,7 +92,7 @@ namespace Airerage.Net
         private readonly int[] _lobbyCharacters = new int[MaxPlayers];
 
         // ホスト: プレイヤーの番号 → RANDOM で選んでよいステージの番号のビット（NetKind.StagePool。届くまではすべて）。
-        private readonly ulong[] _lobbyStagePools = { ulong.MaxValue, ulong.MaxValue, ulong.MaxValue, ulong.MaxValue };
+        private readonly ulong[] _lobbyStagePools = new ulong[MaxPlayers];
         private ulong _localStagePool = ulong.MaxValue;
 
         // ホスト: プレイヤーの番号 → そのクライアントから最後に届いた入力の試合の番号（まだなら -1）。
@@ -96,6 +100,13 @@ namespace Airerage.Net
 
         // ホスト: プレイヤーの番号 → 準備完了か（docs/15 T6-7）。
         private readonly bool[] _lobbyReady = new bool[MaxPlayers];
+
+        // ホスト: チーム対戦か（待機所でホストが決める）と、プレイヤーの番号 → チームの番号（1〜4。チーム対戦でなければ 0。docs/19 T9-5）。
+        private bool _teamMode;
+        private readonly byte[] _lobbyTeams = new byte[MaxPlayers];
+
+        // クライアント: ホストから届いた、チーム対戦か。
+        private bool _clientTeamMode;
         private LobbyPhase _phase = LobbyPhase.Waiting;
         private int _stageCursor;
 
@@ -152,6 +163,7 @@ namespace Airerage.Net
             {
                 _playerPeer[p] = -1;
                 _seenInputs[p] = new Dictionary<int, PlayerInput>();
+                _lobbyStagePools[p] = ulong.MaxValue;
             }
         }
 
@@ -169,6 +181,9 @@ namespace Airerage.Net
 
         /// <summary>試合で各プレイヤーが使うキャラクターの番号（番号の順。CharacterRoster の番号。始まるまで空の配列。表示に使う）。</summary>
         public IReadOnlyList<int> PlayerCharacters { get; private set; } = Array.Empty<int>();
+
+        /// <summary>試合の各プレイヤーのチーム（番号の順。1〜4。個人戦なら 0。始まるまで空の配列。docs/19）。</summary>
+        public IReadOnlyList<byte> PlayerTeams { get; private set; } = Array.Empty<byte>();
 
         /// <summary>
         /// 自分が選んだキャラクターの番号（CharacterRoster の番号。docs/13 T5-5）。クライアントは、ロビーにいればすぐにホストへ送る。
@@ -341,6 +356,179 @@ namespace Airerage.Net
             }
         }
 
+        /// <summary>
+        /// チーム対戦か（docs/19。待機所でホストが決める。クライアントはホストから最後に届いた値）。ホストが変えると全員の準備完了を外し、
+        /// チーム対戦にするときは、チームのない人を人数の少ないチームへ順に入れる。待機所でだけ変えられる。
+        /// </summary>
+        public bool TeamMode
+        {
+            get => IsHost ? _teamMode : _clientTeamMode;
+            set
+            {
+                if (!IsHost)
+                {
+                    throw new InvalidOperationException("チーム対戦にするかを決められるのはホストだけです");
+                }
+                if (State != SessionState.Lobby || _phase != LobbyPhase.Waiting || value == _teamMode)
+                {
+                    return;
+                }
+                _teamMode = value;
+                for (int p = 0; p < MaxPlayers; p++)
+                {
+                    _lobbyTeams[p] = 0;
+                }
+                if (value)
+                {
+                    for (int p = 0; p < MaxPlayers; p++)
+                    {
+                        if (IsPresent(p))
+                        {
+                            _lobbyTeams[p] = SmallestTeam();
+                        }
+                    }
+                }
+                SetPhase(LobbyPhase.Waiting);
+                BroadcastLobby();
+            }
+        }
+
+        /// <summary>自分のチーム（1〜4。チーム対戦でなければ 0）。クライアントはホストへ送る（待機所でだけ変えられる）。</summary>
+        public int LocalTeam
+        {
+            get
+            {
+                IReadOnlyList<LobbySlot> roster = Roster;
+                return LocalPlayer >= 0 && LocalPlayer < roster.Count ? roster[LocalPlayer].Team : 0;
+            }
+            set
+            {
+                if (IsHost)
+                {
+                    SetTeamOf(0, value);
+                }
+                else if (LocalPlayer >= 0 && TeamMode && Phase == LobbyPhase.Waiting)
+                {
+                    _link.Send(0, NetMessages.Team(value), reliable: true);
+                }
+            }
+        }
+
+        /// <summary>ホスト: プレイヤー player をチーム team（1〜4）へ移す（D-78。待機所で、チーム対戦のときだけ）。</summary>
+        public void SetTeamOf(int player, int team)
+        {
+            if (!IsHost)
+            {
+                throw new InvalidOperationException("ほかの人のチームを変えられるのはホストだけです");
+            }
+            if (State != SessionState.Lobby || _phase != LobbyPhase.Waiting || !_teamMode || !IsPresent(player)
+                || team < 1 || team > TeamRules.MaxTeams || _lobbyTeams[player] == team)
+            {
+                return;
+            }
+            _lobbyTeams[player] = (byte)team;
+            BroadcastLobby();
+        }
+
+        /// <summary>
+        /// ホスト: 均等に分けるボタン（D-78。ユーザーの決定、2026-11-02）。今いる人を、人数配分 sizes（チームごとの人数。合計が人数と同じ。
+        /// TeamRules.SizePatterns から選ぶ）のとおりに、種 seed でランダムにチームへ分ける。配分が合わなければ ArgumentException。
+        /// </summary>
+        public void SplitTeams(IReadOnlyList<int> sizes, int seed)
+        {
+            if (!IsHost)
+            {
+                throw new InvalidOperationException("チームを分けられるのはホストだけです");
+            }
+            if (State != SessionState.Lobby || _phase != LobbyPhase.Waiting || !_teamMode)
+            {
+                return;
+            }
+            var present = new List<int>();
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                if (IsPresent(p))
+                {
+                    present.Add(p);
+                }
+            }
+            byte[] teams = TeamRules.Distribute(present.Count, sizes, seed);
+            for (int i = 0; i < present.Count; i++)
+            {
+                _lobbyTeams[present[i]] = teams[i];
+            }
+            BroadcastLobby();
+        }
+
+        /// <summary>
+        /// 待機所から進めない理由（なければ null。2 人に足りないときは null）: 個人戦で MaxFreeForAllPlayers 人より多い、チーム対戦で
+        /// チームが 2 つに満たない（全員が同じチーム。D-78）。
+        /// </summary>
+        public string WaitingProblem => WaitingProblemOf(Roster, TeamMode);
+
+        /// <summary>WaitingProblem の決まり（顔ぶれ roster と、チーム対戦か）。</summary>
+        public static string WaitingProblemOf(IReadOnlyList<LobbySlot> roster, bool teamMode)
+        {
+            int players = 0;
+            uint teams = 0;
+            bool missing = false;
+            foreach (LobbySlot slot in roster)
+            {
+                if (!slot.Connected)
+                {
+                    continue;
+                }
+                players++;
+                if (slot.Team == 0)
+                {
+                    missing = true;
+                }
+                else
+                {
+                    teams |= 1u << slot.Team;
+                }
+            }
+            if (players < 2)
+            {
+                return null;
+            }
+            if (!teamMode && players > MaxFreeForAllPlayers)
+            {
+                return $"FREE FOR ALL IS UP TO {MaxFreeForAllPlayers} PLAYERS. SWITCH TO TEAM MODE";
+            }
+            int teamCount = 0;
+            for (uint bits = teams; bits != 0; bits &= bits - 1)
+            {
+                teamCount++;
+            }
+            if (teamMode && (missing || teamCount < 2))
+            {
+                return "MAKE AT LEAST 2 TEAMS";
+            }
+            return null;
+        }
+
+        // ホスト: 番号 p の人がロビーにいるか（0 はホスト自身）。
+        private bool IsPresent(int p)
+        {
+            return p == 0 || (p > 0 && p < MaxPlayers && _playerPeer[p] >= 0);
+        }
+
+        // ホスト: 人数のいちばん少ないチーム（同じなら番号の小さいほう。新しく入った人や、チーム対戦にしたとき）。
+        private byte SmallestTeam()
+        {
+            var counts = new int[TeamRules.MaxTeams + 1];
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                if (IsPresent(p) && _lobbyTeams[p] != 0)
+                {
+                    counts[_lobbyTeams[p]]++;
+                }
+            }
+            // 自動では 2 チームに分ける（3・4 チーム目は、各自かホストが選ぶか、均等に分けるボタンで使う）。
+            return counts[2] < counts[1] ? (byte)2 : (byte)1;
+        }
+
         /// <summary>今のステージの番号（StageCatalog の番号。ステージを選ぶ流れでなければ -1）。</summary>
         public int StageIndex { get; private set; } = -1;
 
@@ -384,12 +572,12 @@ namespace Airerage.Net
                     return _clientRoster;
                 }
                 var slots = new LobbySlot[MaxPlayers];
-                slots[0] = new LobbySlot(true, _localName, _lobbyCharacters[0], _lobbyReady[0]);
+                slots[0] = new LobbySlot(true, _localName, _lobbyCharacters[0], _lobbyReady[0], _teamMode ? _lobbyTeams[0] : (byte)0);
                 for (int p = 1; p < MaxPlayers; p++)
                 {
                     bool connected = _playerPeer[p] >= 0;
                     slots[p] = new LobbySlot(connected, connected ? _lobbyNames[p] : string.Empty, connected ? _lobbyCharacters[p] : 0,
-                        connected && _lobbyReady[p]);
+                        connected && _lobbyReady[p], connected && _teamMode ? _lobbyTeams[p] : (byte)0);
                 }
                 return slots;
             }
@@ -593,6 +781,12 @@ namespace Airerage.Net
             {
                 throw new InvalidOperationException("試合を始められるのは、ロビーにいるホストだけです");
             }
+            string problem = WaitingProblem;
+            if (problem != null)
+            {
+                // 個人戦で 5 人以上、チーム対戦でチームが 1 つだけ（待機所の画面はこのときは進めない）。
+                throw new InvalidOperationException($"この顔ぶれでは始められません: {problem}");
+            }
             CloseUpPlayers();
             SendStartAndBegin(LobbyPlayerCount, rules, stage);
         }
@@ -655,12 +849,13 @@ namespace Airerage.Net
                 return;
             }
             int players = LobbyPlayerCount;
-            if (_phase != LobbyPhase.Waiting && players < 2)
+            // 2 人を下回ったか、抜けた人がいてチームが 1 つだけになったら、待機所へ戻す。
+            if (_phase != LobbyPhase.Waiting && (players < 2 || WaitingProblem != null))
             {
                 SetPhase(LobbyPhase.Waiting);
                 return;
             }
-            if (players < 2 || _phase == LobbyPhase.StageSelect)
+            if (players < 2 || _phase == LobbyPhase.StageSelect || (_phase == LobbyPhase.Waiting && WaitingProblem != null))
             {
                 return;
             }
@@ -692,11 +887,13 @@ namespace Airerage.Net
                     _lobbyCharacters[next] = _lobbyCharacters[p];
                     _lobbyStagePools[next] = _lobbyStagePools[p];
                     _lobbyReady[next] = _lobbyReady[p];
+                    _lobbyTeams[next] = _lobbyTeams[p];
                     _playerPeer[p] = -1;
                     _lobbyNames[p] = string.Empty;
                     _lobbyCharacters[p] = 0;
                     _lobbyStagePools[p] = ulong.MaxValue;
                     _lobbyReady[p] = false;
+                    _lobbyTeams[p] = 0;
                     _link.Send(_playerPeer[next], NetMessages.Welcome(next), reliable: true);
                 }
                 next++;
@@ -710,7 +907,7 @@ namespace Airerage.Net
             {
                 return;
             }
-            byte[] message = NetMessages.Lobby(Roster, _phase, _stageCursor);
+            byte[] message = NetMessages.Lobby(Roster, _phase, _stageCursor, _teamMode);
             for (int p = 1; p < MaxPlayers; p++)
             {
                 if (_playerPeer[p] >= 0)
@@ -742,6 +939,12 @@ namespace Airerage.Net
             }
             // 試合中に抜けた人がいれば、番号を詰めて、今いる人で始め直す。
             CloseUpPlayers();
+            if (WaitingProblem != null)
+            {
+                // 抜けた人がいて、チームが 1 つだけになった（チーム対戦）: 再戦はできないので、全員で待機所へ戻ってチームを分け直す。
+                ReturnToLobby(LobbyPhase.Waiting);
+                return;
+            }
             SendStartAndBegin(LobbyPlayerCount, rules, StageIndex);
         }
 
@@ -776,9 +979,15 @@ namespace Airerage.Net
             {
                 configs[i] = _characters[used[i]];
             }
+            // チーム対戦なら人ごとのチームの番号（docs/19 T9-5。全員が試合の初めに SimWorld.SetTeam で同じ値を入れる）。
+            var teams = new int[count];
+            for (int p = 0; p < count; p++)
+            {
+                teams[p] = _teamMode ? _lobbyTeams[p] : 0;
+            }
             string json = JsonUtility.ToJson(new StartSettings
             {
-                Characters = configs, Picks = picks, CharacterIds = ids, Match = rules, Names = names, Stage = stage,
+                Characters = configs, Picks = picks, CharacterIds = ids, Match = rules, Names = names, Stage = stage, Teams = teams,
             });
             byte[] start = NetMessages.Start(count, match, json);
             for (int p = 1; p < MaxPlayers; p++)
@@ -1061,6 +1270,11 @@ namespace Airerage.Net
             {
                 World.AddCharacter(settings.Characters[settings.Picks[p]], _stage.SpawnPosition(p, playerCount), _stage.SpawnFacing(p, playerCount));
             }
+            PlayerTeams = TeamsOf(settings, playerCount);
+            for (int p = 0; p < playerCount; p++)
+            {
+                World.SetTeam(p, PlayerTeams[p]);
+            }
             Session = new RollbackSession(World, LocalPlayer, _settings);
             Exchange = new InputExchange(Session, _settings);
             for (int p = 0; p < MaxPlayers; p++)
@@ -1148,6 +1362,11 @@ namespace Airerage.Net
                     _lobbyCharacters[player] = 0;
                     _lobbyStagePools[player] = ulong.MaxValue;
                     _lobbyReady[player] = false;
+                    _lobbyTeams[player] = 0;
+                    if (_teamMode)
+                    {
+                        _lobbyTeams[player] = SmallestTeam();
+                    }
                     _link.Send(e.Peer, NetMessages.Welcome(player), reliable: true);
                     Status = $"{HostingLabel}: {LobbyPlayerCount} player(s)";
                     BroadcastLobby();
@@ -1163,6 +1382,7 @@ namespace Airerage.Net
                             _lobbyCharacters[p] = 0;
                             _lobbyStagePools[p] = ulong.MaxValue;
                             _lobbyReady[p] = false;
+                            _lobbyTeams[p] = 0;
                             CheckLobbyProgress();
                             BroadcastLobby();
                             // 試合中に抜けた人は外して、残りの 2 人以上で続ける（docs/15 T6-10）。
@@ -1243,6 +1463,14 @@ namespace Airerage.Net
                     }
                     break;
 
+                case NetKind.Team:
+                    int mover = PlayerOfPeer(e.Peer);
+                    if (mover > 0)
+                    {
+                        SetTeamOf(mover, NetMessages.ReadTeam(e.Data));
+                    }
+                    break;
+
                 case NetKind.Ready:
                     int readier = PlayerOfPeer(e.Peer);
                     if (readier > 0 && State == SessionState.Lobby)
@@ -1297,13 +1525,14 @@ namespace Airerage.Net
                             Status = $"Joined as player {LocalPlayer + 1}. Waiting for the host to start";
                             break;
                         case NetKind.Lobby:
-                            LobbySlot[] roster = NetMessages.ReadLobby(e.Data, out LobbyPhase phase, out int stage);
+                            LobbySlot[] roster = NetMessages.ReadLobby(e.Data, out LobbyPhase phase, out int stage, out bool teamMode);
                             _clientRoster = EmptyRoster();
                             for (int p = 0; p < MaxPlayers && p < roster.Length; p++)
                             {
                                 _clientRoster[p] = new LobbySlot(roster[p].Connected, SanitizeName(roster[p].Name), roster[p].Character,
-                                    roster[p].Ready);
+                                    roster[p].Ready, roster[p].Team);
                             }
+                            _clientTeamMode = teamMode;
                             _clientPhase = phase;
                             _clientStage = stage;
                             if (LocalPlayer >= 0 && LocalPlayer < MaxPlayers)
@@ -1481,6 +1710,8 @@ namespace Airerage.Net
                 }
             }
             settings.Match.Validate().ThrowIfInvalid();
+            // チームの番号も、受け取ったときに確かめる（試合を始めるときに失敗しないように）。
+            TeamsOf(settings, playerCount);
             return settings;
         }
 
@@ -1504,6 +1735,29 @@ namespace Airerage.Net
 
             /// <summary>ステージの番号（StageCatalog の番号。ステージを選ぶ流れでなければ -1）。</summary>
             public int Stage = -1;
+
+            /// <summary>プレイヤーごとのチームの番号（1〜4。個人戦なら 0 か、なし）。</summary>
+            public int[] Teams;
+        }
+
+        // 開始の設定のチームの番号（なければ、すべて 0。範囲の外なら FormatException。違うビルドどうしなど）。
+        private static byte[] TeamsOf(StartSettings settings, int count)
+        {
+            var teams = new byte[count];
+            if (settings.Teams == null)
+            {
+                return teams;
+            }
+            for (int p = 0; p < count && p < settings.Teams.Length; p++)
+            {
+                int team = settings.Teams[p];
+                if (team < 0 || team > TeamRules.MaxTeams)
+                {
+                    throw new FormatException($"開始の設定のチームの番号が不正です（プレイヤー {p + 1}: {team}）");
+                }
+                teams[p] = (byte)team;
+            }
+            return teams;
         }
 
         // ステージを読み込んでから始める試合。

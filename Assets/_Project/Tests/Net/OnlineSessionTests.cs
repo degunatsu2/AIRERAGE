@@ -592,10 +592,15 @@ namespace Airerage.Net.Tests
             PumpUntil(() => first.LocalPlayer >= 0 && second.LocalPlayer >= 0);
             PumpUntil(() => second.Roster[1].Name == "Alice");
 
-            var expected = new[]
+            // 8 人分の番号（チーム対戦は 8 人まで。docs/19 T9-4）。いない番号は空。
+            var expected = new LobbySlot[OnlineSession.MaxPlayers];
+            expected[0] = new LobbySlot(true, "Bob");
+            expected[1] = new LobbySlot(true, "Alice");
+            expected[2] = new LobbySlot(true, string.Empty);
+            for (int p = 3; p < expected.Length; p++)
             {
-                new LobbySlot(true, "Bob"), new LobbySlot(true, "Alice"), new LobbySlot(true, string.Empty), new LobbySlot(false, string.Empty),
-            };
+                expected[p] = new LobbySlot(false, string.Empty);
+            }
             Assert.That(host.Roster, Is.EqualTo(expected), "ホストの待機所");
             Assert.That(first.Roster, Is.EqualTo(expected), "クライアントの待機所");
             Assert.That(second.Roster, Is.EqualTo(expected), "あとから来たクライアントの待機所");
@@ -776,13 +781,147 @@ namespace Airerage.Net.Tests
         [Test]
         public void LobbyMessage_RoundTrips_AndRejectsBrokenData()
         {
-            var slots = new[] { new LobbySlot(true, "ボブ", 2, true), new LobbySlot(false, string.Empty) };
-            byte[] data = NetMessages.Lobby(slots, LobbyPhase.StageSelect, 4);
-            Assert.That(NetMessages.ReadLobby(data, out LobbyPhase phase, out int stage), Is.EqualTo(slots));
+            var slots = new[] { new LobbySlot(true, "ボブ", 2, true, 3), new LobbySlot(false, string.Empty) };
+            byte[] data = NetMessages.Lobby(slots, LobbyPhase.StageSelect, 4, teamMode: true);
+            Assert.That(NetMessages.ReadLobby(data, out LobbyPhase phase, out int stage, out bool teamMode), Is.EqualTo(slots));
             Assert.That(phase, Is.EqualTo(LobbyPhase.StageSelect));
             Assert.That(stage, Is.EqualTo(4));
+            Assert.That(teamMode, Is.True);
             Assert.That(NetMessages.ReadReady(NetMessages.Ready(true)), Is.True);
+            Assert.That(NetMessages.ReadTeam(NetMessages.Team(4)), Is.EqualTo(4));
             Assert.Throws<FormatException>(() => NetMessages.ReadLobby(new[] { (byte)NetKind.Lobby, (byte)2, (byte)1, (byte)9 }));
+            // チームの番号が 4 より大きい。
+            byte[] broken = NetMessages.Lobby(new[] { new LobbySlot(true, "A", 0, false, 1) }, LobbyPhase.Waiting, 0, true);
+            broken[5 + 3] = 9;
+            Assert.Throws<FormatException>(() => NetMessages.ReadLobby(broken));
+        }
+
+        [Test]
+        public void EightPlayers_CanJoin_TheNinthIsRefused_AndFreeForAllStaysUpToFour()
+        {
+            // セッションは 8 人まで（docs/19 T9-4）。個人戦は今までどおり 4 人まで: 5 人以上は全員が READY でも進まない。
+            OnlineSession host = Host();
+            var clients = new List<OnlineSession>();
+            for (int i = 0; i < OnlineSession.MaxPlayers - 1; i++)
+            {
+                clients.Add(Join(host));
+            }
+            PumpUntil(() => clients.TrueForAll(c => c.LocalPlayer >= 0) && host.LobbyPlayerCount == OnlineSession.MaxPlayers);
+            Assert.That(clients.ConvertAll(c => c.LocalPlayer), Is.EqualTo(new[] { 1, 2, 3, 4, 5, 6, 7 }));
+            OnlineSession ninth = Join(host);
+            PumpUntil(() => ninth.State == OnlineSession.SessionState.Ended);
+            Assert.That(host.LobbyPlayerCount, Is.EqualTo(OnlineSession.MaxPlayers));
+
+            Assert.That(host.WaitingProblem, Is.Not.Null, "個人戦の 8 人で進めてしまう");
+            Assert.Throws<InvalidOperationException>(() => host.StartMatch(MatchRules.FreePlay()), "個人戦の 8 人で始まった");
+            host.LocalReady = true;
+            foreach (OnlineSession client in clients)
+            {
+                client.LocalReady = true;
+            }
+            PumpUntil(() => clients.TrueForAll(c => c.Roster[c.LocalPlayer].Ready));
+            PumpFrames(5);
+            Assert.That(host.Phase, Is.EqualTo(LobbyPhase.Waiting), "個人戦の 8 人でキャラクター選択へ進んだ");
+            Assert.That(clients[0].WaitingProblem, Is.Not.Null, "クライアントに進めない理由が出ない");
+
+            // チーム対戦にすると、2 チームに分かれて進める（準備完了は外れるので、もう一度）。
+            host.TeamMode = true;
+            PumpUntil(() => clients.TrueForAll(c => c.TeamMode && c.LocalTeam != 0));
+            Assert.That(host.WaitingProblem, Is.Null);
+            host.LocalReady = true;
+            foreach (OnlineSession client in clients)
+            {
+                client.LocalReady = true;
+            }
+            PumpUntil(() => clients.TrueForAll(c => c.Phase == LobbyPhase.CharacterSelect));
+        }
+
+        [Test]
+        public void TeamMode_PlayersPickTeams_TheHostMovesAndSplits_AndTheMatchUsesTheTeams()
+        {
+            // 待機所のチーム分け（docs/19 T9-5。D-78）: 各自が選ぶ・ホストが動かす・均等に分けるボタン。開始のメッセージでチームが全員に届き、
+            // 全員のワールドの CombatState.Team が同じになる。
+            OnlineSession host = Host();
+            var clients = new List<OnlineSession> { Join(host), Join(host), Join(host), Join(host) };
+            PumpUntil(() => clients.TrueForAll(c => c.LocalPlayer >= 0) && host.LobbyPlayerCount == 5);
+
+            Assert.That(host.WaitingProblem, Does.Contain("4"), "個人戦の 5 人で始められる");
+            Assert.That(host.LocalTeam, Is.Zero, "個人戦なのにチームがある");
+            host.TeamMode = true;
+            PumpUntil(() => clients.TrueForAll(c => c.TeamMode));
+            // チーム対戦にしたら、2 チームに交互に入る。
+            Assert.That(TeamsOf(host.Roster, 5), Is.EqualTo(new[] { 1, 2, 1, 2, 1 }));
+            PumpUntil(() => TeamsOf(clients[3].Roster, 5)[4] == 1);
+            Assert.That(TeamsOf(clients[3].Roster, 5), Is.EqualTo(TeamsOf(host.Roster, 5)), "クライアントの待機所のチームが違う");
+
+            // 各自が自分のチームを選ぶ。ホストはだれでも動かせる。クライアントはほかの人を動かせない。
+            clients[0].LocalTeam = 3;
+            PumpUntil(() => host.Roster[1].Team == 3);
+            host.SetTeamOf(4, 4);
+            PumpUntil(() => clients[3].Roster[4].Team == 4);
+            Assert.Throws<InvalidOperationException>(() => clients[1].SetTeamOf(0, 2));
+
+            // 全員が同じチームでは始められない。
+            for (int p = 0; p < 5; p++)
+            {
+                host.SetTeamOf(p, 2);
+            }
+            PumpUntil(() => clients[0].Roster[4].Team == 2 && clients[0].Roster[1].Team == 2);
+            Assert.That(host.WaitingProblem, Is.Not.Null, "全員が同じチームで進める");
+            Assert.That(clients[0].WaitingProblem, Is.Not.Null);
+
+            // 均等に分けるボタン: 3 人と 2 人。
+            host.SplitTeams(new[] { 3, 2 }, 7);
+            PumpUntil(() => CountOf(TeamsOf(clients[2].Roster, 5), 1) == 3);
+            int[] teams = TeamsOf(host.Roster, 5);
+            Assert.That(CountOf(teams, 1), Is.EqualTo(3));
+            Assert.That(CountOf(teams, 2), Is.EqualTo(2));
+            Assert.That(TeamsOf(clients[2].Roster, 5), Is.EqualTo(teams));
+            Assert.Throws<ArgumentException>(() => host.SplitTeams(new[] { 4, 4 }, 0), "人数と違う配分で分けた");
+
+            host.StartMatch(MatchRules.FreePlay());
+            PumpUntil(() => clients.TrueForAll(c => c.State == OnlineSession.SessionState.Running));
+            for (int p = 0; p < 5; p++)
+            {
+                Assert.That(host.World.GetState(p).Combat.Team, Is.EqualTo(teams[p]), $"ホストのワールドの {p + 1}P のチーム");
+                foreach (OnlineSession client in clients)
+                {
+                    Assert.That(client.World.GetState(p).Combat.Team, Is.EqualTo(teams[p]), $"クライアントのワールドの {p + 1}P のチーム");
+                    Assert.That(client.PlayerTeams[p], Is.EqualTo(teams[p]));
+                }
+            }
+            host.TickLimit = 120;
+            foreach (OnlineSession client in clients)
+            {
+                client.TickLimit = 120;
+            }
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == 120 && s.Session.ConfirmedTick >= 119));
+            PumpFrames(2);
+            foreach (OnlineSession client in clients)
+            {
+                Assert.That(client.World.Checksum(), Is.EqualTo(host.World.Checksum()), "チーム対戦で不一致");
+            }
+            Assert.That(host.Desyncs, Is.Empty);
+        }
+
+        private static int[] TeamsOf(IReadOnlyList<LobbySlot> roster, int count)
+        {
+            var teams = new int[count];
+            for (int p = 0; p < count; p++)
+            {
+                teams[p] = roster[p].Team;
+            }
+            return teams;
+        }
+
+        private static int CountOf(int[] values, int value)
+        {
+            int count = 0;
+            foreach (int v in values)
+            {
+                count += v == value ? 1 : 0;
+            }
+            return count;
         }
 
         [Test]

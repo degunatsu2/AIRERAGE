@@ -10,7 +10,9 @@ namespace Airerage.Editor
     /// キャラクター選択の画面（アイコンを選ぶ形。docs/15 6.9）を作る。基準の画面の大きさは 1920×1080（横に長い画面で高さが 1000 まで
     /// 縮んでも重ならない）:
     /// - 真ん中にキャラクターのアイコン（横に 4 つずつ。四隅は空ける）と人ごとのカーソル（色の枠と「1P」などの札）。
-    /// - 四隅に 1P（左上）・2P（右上）・3P（左下）・4P（右下）の枠（ロゴ、名前、ハッシュタグ、機器か名前、状態）。
+    /// - 四隅に 1P（左上）・2P（右上）・3P（左下）・4P（右下）の枠（ロゴ、名前、ハッシュタグ、機器か名前、状態）。5P〜8P の枠は、
+    ///   それぞれ 1P〜4P の内側（上の隅なら下、下の隅なら上）に置き、5 人以上のときだけ全部を縮めて出す（ネットワーク対戦のチーム対戦。
+    ///   docs/19 T9-4。CharacterSelectScreen.CompactCornerScale）。
     /// - 下からせり出す技の説明（ロゴ、名前、ハッシュタグ、Q・E・R の技の名前・説明・クールタイム）。ふだんは隠す。
     /// </summary>
     internal static class CharacterSelectUiBuilder
@@ -79,10 +81,13 @@ namespace Airerage.Editor
             var tags = new Object[CharacterSelectScreen.MaxPlayers];
             var states = new Object[CharacterSelectScreen.MaxPlayers];
             Vector2[] anchors = { new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(1f, 0f) };
+            // 5P〜8P は、縮めた 1P〜4P の枠のすぐ内側（縮めたときの位置。縮めるのは実行中）。
+            float inner = CornerMargin + CornerSize.y * CharacterSelectScreen.CompactCornerScale + 12f;
             for (int p = 0; p < CharacterSelectScreen.MaxPlayers; p++)
             {
-                Vector2 anchor = anchors[p];
-                var position = new Vector2(anchor.x == 0f ? CornerMargin : -CornerMargin, anchor.y == 0f ? CornerMargin : -CornerMargin);
+                Vector2 anchor = anchors[p % anchors.Length];
+                float edge = p < anchors.Length ? CornerMargin : inner;
+                var position = new Vector2(anchor.x == 0f ? CornerMargin : -CornerMargin, anchor.y == 0f ? edge : -edge);
                 GameObject corner = CreateCorner(panel, p, anchor, position, colors[p], out SlantedPlate plate, out Text device,
                     out RawImage logo, out Text name, out Text tag, out Text state);
                 corners[p] = corner;
@@ -172,11 +177,17 @@ namespace Airerage.Editor
             var frame = go.AddComponent<SlantedPlate>();
             frame.Configure(0.1f, 4f, new Color(0f, 0f, 0f, 0f), color);
             frame.raycastTarget = false;
-            Vector2[] corners = { new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(1f, 0f) };
+            // 1P〜4P はアイコンの四隅、5P〜8P は上下左右の辺の真ん中。
+            Vector2[] corners =
+            {
+                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 0f), new Vector2(0f, 0.5f), new Vector2(1f, 0.5f),
+            };
             Vector2 corner = corners[player];
-            var offset = new Vector2(corner.x == 0f ? -4f : 4f, corner.y == 0f ? -4f : 4f);
+            var offset = new Vector2(corner.x == 0f ? -4f : corner.x == 1f ? 4f : 0f, corner.y == 0f ? -4f : corner.y == 1f ? 4f : 0f);
+            TextAnchor alignment = corner.x == 0f ? TextAnchor.MiddleLeft : corner.x == 1f ? TextAnchor.MiddleRight : TextAnchor.MiddleCenter;
             tag = MenuUiBuilder.CreateText(go.transform, "Tag", $"{player + 1}P", 24, FontStyle.BoldAndItalic,
-                corner.x == 0f ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight, corner, offset, new Vector2(60f, 30f), color);
+                alignment, corner, offset, new Vector2(60f, 30f), color);
             go.SetActive(false);
         }
 

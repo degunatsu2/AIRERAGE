@@ -38,7 +38,14 @@ namespace Airerage.Runtime.UI
             Network,
         }
 
-        public const int MaxPlayers = 4;
+        /// <summary>枠の数（ネットワーク対戦のチーム対戦は 8 人まで。docs/19 T9-4）。</summary>
+        public const int MaxPlayers = 8;
+
+        /// <summary>ローカル対戦で機器ごとに参加できる人数（D-85。CPU は別）。</summary>
+        public const int MaxLocalPlayers = 4;
+
+        /// <summary>5 人以上のときの枠の縮め方（四隅に 2 枚ずつ重ねて並べる。5P〜8P の枠は、この大きさで 1P〜4P の内側に置く）。</summary>
+        public const float CompactCornerScale = 0.6f;
 
         /// <summary>技の説明に出す技の枠（左から Q、E、R）。</summary>
         public static readonly AttackSlot[] SkillSlots = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
@@ -80,7 +87,7 @@ namespace Airerage.Runtime.UI
         private static readonly Color JoinedFill = new Color(0.03f, 0.05f, 0.09f, 0.85f);
         private static readonly Color EmptyBorder = new Color(1f, 1f, 1f, 0.2f);
 
-        private Slot[] _slots = { new Slot(), new Slot(), new Slot(), new Slot() };
+        private Slot[] _slots = NewSlots();
         private int _activeFromFrame = int.MaxValue;
         private bool _timed = true;
         private int _localSlot;
@@ -264,7 +271,7 @@ namespace Airerage.Runtime.UI
             int index = 0;
             foreach (LocalPlayerSetup player in players)
             {
-                if (index >= MaxPlayers || player.Devices.Length == 0 || !player.Devices[0].added)
+                if (index >= MaxLocalPlayers || player.Devices.Length == 0 || !player.Devices[0].added)
                 {
                     continue;
                 }
@@ -507,7 +514,7 @@ namespace Airerage.Runtime.UI
         private void Join(InputDevice key)
         {
             int free = Array.FindIndex(_slots, s => !s.Joined);
-            if (free < 0)
+            if (free < 0 || free >= MaxLocalPlayers)
             {
                 return;
             }
@@ -701,8 +708,10 @@ namespace Airerage.Runtime.UI
 
         private void Refresh()
         {
+            bool compact = Compact;
             for (int i = 0; i < MaxPlayers; i++)
             {
+                _corners[i].transform.localScale = Vector3.one * (compact ? CompactCornerScale : 1f);
                 RefreshCorner(i);
                 RefreshCursor(i);
             }
@@ -735,10 +744,43 @@ namespace Airerage.Runtime.UI
             }
         }
 
+        /// <summary>
+        /// 5 人以上の枠を出しているか（ネットワーク対戦で 5P〜8P のだれかがいる）。そのときは四隅の枠を縮めて 2 枚ずつ並べる
+        /// （1P〜4P の内側に 5P〜8P）。4 人までは今までと同じ 4 枚。
+        /// </summary>
+        public bool Compact
+        {
+            get
+            {
+                if (Mode != SelectMode.Network)
+                {
+                    return false;
+                }
+                for (int i = MaxLocalPlayers; i < MaxPlayers; i++)
+                {
+                    if (_slots[i].Joined)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        private static Slot[] NewSlots()
+        {
+            var slots = new Slot[MaxPlayers];
+            for (int i = 0; i < slots.Length; i++)
+            {
+                slots[i] = new Slot();
+            }
+            return slots;
+        }
+
         private void RefreshCorner(int i)
         {
             Slot slot = _slots[i];
-            bool shown = Mode != SelectMode.Single || i == 0;
+            bool shown = (Mode != SelectMode.Single || i == 0) && (i < MaxLocalPlayers || Compact);
             _corners[i].SetActive(shown);
             if (!shown)
             {

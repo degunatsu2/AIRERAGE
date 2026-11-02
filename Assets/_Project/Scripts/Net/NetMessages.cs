@@ -47,6 +47,12 @@ namespace Airerage.Net
         /// 送る。ユーザーの要望、2026-10-26）。ホストは全員が選んでよいステージだけから RANDOM で選ぶ。
         /// </summary>
         StagePool = 11,
+
+        /// <summary>
+        /// クライアント → ホスト: 自分が入りたいチーム（1〜4。待機所で。チーム対戦のときだけ。docs/19 T9-5）。ホストはだれのチームでも
+        /// 変えられる（D-78）。
+        /// </summary>
+        Team = 12,
     }
 
     /// <summary>
@@ -74,17 +80,22 @@ namespace Airerage.Net
         /// <summary>準備完了か（待機所の READY、キャラクター選択の決定）。</summary>
         public readonly bool Ready;
 
-        public LobbySlot(bool connected, string name, int character = 0, bool ready = false)
+        /// <summary>チームの番号（1〜4。チーム対戦でなければ 0。docs/19 T9-5）。</summary>
+        public readonly byte Team;
+
+        public LobbySlot(bool connected, string name, int character = 0, bool ready = false, byte team = 0)
         {
             Connected = connected;
             Name = name ?? string.Empty;
             Character = character;
             Ready = ready;
+            Team = team;
         }
 
         public bool Equals(LobbySlot other)
         {
-            return Connected == other.Connected && Name == other.Name && Character == other.Character && Ready == other.Ready;
+            return Connected == other.Connected && Name == other.Name && Character == other.Character && Ready == other.Ready
+                && Team == other.Team;
         }
 
         public override bool Equals(object obj)
@@ -94,12 +105,12 @@ namespace Airerage.Net
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Connected, Name, Character, Ready);
+            return HashCode.Combine(Connected, Name, Character, Ready, Team);
         }
 
         public override string ToString()
         {
-            return Connected ? $"[{Name} #{Character}{(Ready ? " ready" : string.Empty)}]" : "[-]";
+            return Connected ? $"[{Name} #{Character}{(Team != 0 ? $" team {Team}" : string.Empty)}{(Ready ? " ready" : string.Empty)}]" : "[-]";
         }
     }
 
@@ -186,10 +197,10 @@ namespace Airerage.Net
         }
 
         /// <summary>
-        /// ロビーの顔ぶれと段階（段階、ホストが選んでいるステージの番号、番号の順に つながっているか・キャラクターの番号・準備完了か・
-        /// プレイヤーネームの UTF-8）。
+        /// ロビーの顔ぶれと段階（段階、ホストが選んでいるステージの番号、チーム対戦か、番号の順に つながっているか・キャラクターの番号・
+        /// 準備完了か・チームの番号・プレイヤーネームの UTF-8）。
         /// </summary>
-        public static byte[] Lobby(IReadOnlyList<LobbySlot> slots, LobbyPhase phase = LobbyPhase.Waiting, int stage = 0)
+        public static byte[] Lobby(IReadOnlyList<LobbySlot> slots, LobbyPhase phase = LobbyPhase.Waiting, int stage = 0, bool teamMode = false)
         {
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream))
@@ -198,12 +209,14 @@ namespace Airerage.Net
                 writer.Write((byte)slots.Count);
                 writer.Write((byte)phase);
                 writer.Write((byte)Math.Max(0, Math.Min(byte.MaxValue, stage)));
+                writer.Write(teamMode);
                 foreach (LobbySlot slot in slots)
                 {
                     byte[] name = Encoding.UTF8.GetBytes(slot.Name);
                     writer.Write(slot.Connected);
                     writer.Write((byte)Math.Max(0, Math.Min(byte.MaxValue, slot.Character)));
                     writer.Write(slot.Ready);
+                    writer.Write(slot.Team);
                     writer.Write((byte)Math.Min(name.Length, byte.MaxValue));
                     writer.Write(name, 0, Math.Min(name.Length, byte.MaxValue));
                 }
@@ -214,12 +227,19 @@ namespace Airerage.Net
 
         public static LobbySlot[] ReadLobby(byte[] data)
         {
-            return ReadLobby(data, out _, out _);
+            return ReadLobby(data, out _, out _, out _);
         }
 
         public static LobbySlot[] ReadLobby(byte[] data, out LobbyPhase phase, out int stage)
         {
-            Expect(data, NetKind.Lobby, 4);
+            return ReadLobby(data, out phase, out stage, out _);
+        }
+
+        public static LobbySlot[] ReadLobby(byte[] data, out LobbyPhase phase, out int stage, out bool teamMode)
+        {
+            const int header = 5;
+            const int slotHeader = 5;
+            Expect(data, NetKind.Lobby, header);
             int count = data[1];
             if (data[2] > (byte)LobbyPhase.StageSelect)
             {
@@ -227,22 +247,40 @@ namespace Airerage.Net
             }
             phase = (LobbyPhase)data[2];
             stage = data[3];
+            teamMode = data[4] != 0;
             var slots = new LobbySlot[count];
-            int offset = 4;
+            int offset = header;
             for (int i = 0; i < count; i++)
             {
-                if (offset + 4 > data.Length || offset + 4 + data[offset + 3] > data.Length)
+                if (offset + slotHeader > data.Length || offset + slotHeader + data[offset + slotHeader - 1] > data.Length)
                 {
                     throw new FormatException($"ロビーのメッセージが途中で切れています（{data.Length} バイト）");
                 }
                 bool connected = data[offset] != 0;
                 int character = data[offset + 1];
                 bool ready = data[offset + 2] != 0;
-                int length = data[offset + 3];
-                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + 4, length), character, ready);
-                offset += 4 + length;
+                byte team = data[offset + 3];
+                if (team > Airerage.Core.Match.TeamRules.MaxTeams)
+                {
+                    throw new FormatException($"チームの番号が不正です（{team}）");
+                }
+                int length = data[offset + 4];
+                slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + slotHeader, length), character, ready, team);
+                offset += slotHeader + length;
             }
             return slots;
+        }
+
+        /// <summary>入りたいチーム（1〜4。クライアント → ホスト）。</summary>
+        public static byte[] Team(int team)
+        {
+            return new[] { (byte)NetKind.Team, (byte)Math.Max(0, Math.Min(byte.MaxValue, team)) };
+        }
+
+        public static int ReadTeam(byte[] data)
+        {
+            Expect(data, NetKind.Team, 2);
+            return data[1];
         }
 
         /// <summary>準備完了か（クライアント → ホスト）。</summary>

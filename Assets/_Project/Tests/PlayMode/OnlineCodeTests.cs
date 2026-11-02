@@ -66,7 +66,7 @@ namespace Airerage.PlayMode.Tests
             online.HostOnlineButton.Button.onClick.Invoke();
             yield return null;
             Assert.That(relay.CreateCalls, Is.EqualTo(1), "HOST ONLINE で割り当てを作らない");
-            Assert.That(relay.MaxClients, Is.EqualTo(OnlineSession.MaxPlayers - 1), "ホストのほかに 3 人入れる割り当てでない");
+            Assert.That(relay.MaxClients, Is.EqualTo(OnlineSession.MaxPlayers - 1), "ホストのほかに 7 人入れる割り当てでない");
             Assert.That(connection.Busy, Is.True);
             Assert.That(online.HostOnlineButton.Button.interactable || online.JoinOnlineButton.Button.interactable
                 || online.HostButton.Button.interactable || online.JoinButton.Button.interactable, Is.False, "問い合わせ中にボタンを押せる");

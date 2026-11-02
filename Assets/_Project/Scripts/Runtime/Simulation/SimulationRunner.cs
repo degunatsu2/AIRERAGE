@@ -50,7 +50,7 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private CharacterView _characterView;
         [SerializeField] private WireView _wireView;
         [SerializeField] private AimIndicatorView _aimIndicator;
-        [Tooltip("ダミーの出現位置（攻撃を当てて試す相手。入力なし。なければ、ステージの SpawnPointAuthoring の 2 番目から）")]
+        [Tooltip("ダミーの出現位置（攻撃を当てて試す相手。入力なし。なければ、ステージの SpawnPointAuthoring の 2 番目から表示の数だけ）")]
         [SerializeField] private Transform[] _dummySpawns = new Transform[0];
         [Tooltip("ダミーの表示（出現位置と同じ数・順番）")]
         [SerializeField] private CharacterView[] _dummyViews = new CharacterView[0];
@@ -245,7 +245,9 @@ namespace Airerage.Runtime.Simulation
             }
             else
             {
-                _dummySpawnPositions = stageSpawns.GetRange(Mathf.Min(1, stageSpawns.Count), Mathf.Max(0, stageSpawns.Count - 1)).ToArray();
+                // ステージの 2 番目からダミーの表示の数だけ（ステージには 8 人分あるが、5 人目からはチーム対戦用。docs/19 T9-4）。
+                int first = Mathf.Min(1, stageSpawns.Count);
+                _dummySpawnPositions = stageSpawns.GetRange(first, Mathf.Min(_dummyViews.Length, stageSpawns.Count - first)).ToArray();
             }
 
             var errors = new List<string>();

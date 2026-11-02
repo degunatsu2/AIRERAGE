@@ -150,6 +150,71 @@ namespace Airerage.Core.Match
         }
 
         /// <summary>
+        /// count 人を 2〜MaxTeams チームに分ける人数配分の一覧（均等に分けるボタンで選ぶ。D-78）。どのチームも 1 人以上で、多い順に並べた
+        /// 配分（4-4 と 4-4 の並べ替えは同じとみなす）。人数の差が小さい順、同じならチームの少ない順。2 人に足りなければ空。
+        /// 例: 8 人 → 4-4、3-3-2、2-2-2-2、5-3、4-2-2、3-3-1-1 …
+        /// </summary>
+        public static List<int[]> SizePatterns(int count)
+        {
+            var patterns = new List<int[]>();
+            if (count < 2)
+            {
+                return patterns;
+            }
+            for (int teams = 2; teams <= MaxTeams && teams <= count; teams++)
+            {
+                AddPartitions(patterns, new int[teams], 0, count, count);
+            }
+            patterns.Sort((a, b) =>
+            {
+                int spreadA = a[0] - a[a.Length - 1];
+                int spreadB = b[0] - b[b.Length - 1];
+                if (spreadA != spreadB)
+                {
+                    return spreadA.CompareTo(spreadB);
+                }
+                if (a.Length != b.Length)
+                {
+                    return a.Length.CompareTo(b.Length);
+                }
+                // 同じ差・同じチームの数なら、多いチームが少ない順（決まった順にする）。
+                for (int i = 0; i < a.Length; i++)
+                {
+                    if (a[i] != b[i])
+                    {
+                        return a[i].CompareTo(b[i]);
+                    }
+                }
+                return 0;
+            });
+            return patterns;
+        }
+
+        // sizes[index..] を、合計 left・各 1 以上・max 以下・多い順で埋める。
+        private static void AddPartitions(List<int[]> patterns, int[] sizes, int index, int left, int max)
+        {
+            int remaining = sizes.Length - index;
+            if (remaining == 0)
+            {
+                if (left == 0)
+                {
+                    patterns.Add((int[])sizes.Clone());
+                }
+                return;
+            }
+            for (int size = Math.Min(max, left - (remaining - 1)); size >= 1; size--)
+            {
+                // 残りのチームが全部 size 以下でも、残りを埋めきれないなら、これより小さい size も無理。
+                if (size * remaining < left)
+                {
+                    break;
+                }
+                sizes[index] = size;
+                AddPartitions(patterns, sizes, index + 1, left - size, size);
+            }
+        }
+
+        /// <summary>
         /// 均等に分けるボタン（D-78。ユーザーの決定、2026-11-02）: 人数配分 sizes（チームごとの人数。合計が人数 count と同じ）のとおりに、
         /// count 人を種 seed で並べ替えて順に割り当てる。返り値は人ごとのチームの番号（1 から）。配分が合わなければ例外。
         /// </summary>

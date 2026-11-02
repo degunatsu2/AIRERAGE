@@ -210,7 +210,9 @@ namespace Airerage.Editor.Stages
                     new Vector2(0f, 30.5f), new Vector2(-34.5f, 3f), new Vector2(34.5f, 3f), new Vector2(-13.5f, 13.5f), new Vector2(13.5f, 13.5f),
                     new Vector2(-41.5f, 34f), new Vector2(41.5f, 34f), new Vector2(0f, 25.5f),
                 },
-                Spawns = new[] { new Vector3(-23f, 1f, 0f), new Vector3(23f, 1f, 0f), new Vector3(-17f, 7.5f, 0f), new Vector3(17f, 7.5f, 0f) },
+                Spawns = new[] { new Vector3(-23f, 1f, 0f), new Vector3(23f, 1f, 0f), new Vector3(-17f, 7.5f, 0f), new Vector3(17f, 7.5f, 0f),
+                    // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
+                    new Vector3(-39.75f, 1f, 0f), new Vector3(39.75f, 1f, 0f), new Vector3(-10f, 7.5f, 0f), new Vector3(10f, 7.5f, 0f) },
                 Decorate = Decorate,
             };
         }

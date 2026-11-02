@@ -173,7 +173,9 @@ namespace Airerage.Editor.Stages
                     new Vector2(-12f, 33f), new Vector2(-20f, 11f), new Vector2(20f, 11f),
                 },
                 // トラックの出現位置は、大きくなったつむじ風（左右の端で x = ±9 まで）の外（2026-10-26）。
-                Spawns = new[] { new Vector3(-10.5f, 1f, 0f), new Vector3(10.5f, 1f, 0f), new Vector3(-43.5f, 3.5f, 0f), new Vector3(43.5f, 3.5f, 0f) },
+                Spawns = new[] { new Vector3(-10.5f, 1f, 0f), new Vector3(10.5f, 1f, 0f), new Vector3(-43.5f, 3.5f, 0f), new Vector3(43.5f, 3.5f, 0f),
+                    // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
+                    new Vector3(-36.75f, 1f, 0f), new Vector3(36.75f, 1f, 0f), new Vector3(-45f, 17.6f, 0f), new Vector3(45f, 17.6f, 0f) },
                 Decorate = Decorate,
             };
         }

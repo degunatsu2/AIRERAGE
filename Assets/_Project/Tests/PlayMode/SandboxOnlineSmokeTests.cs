@@ -36,7 +36,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(runner, Is.Not.Null, "OnlineRunner がない");
             Assert.That(runner.enabled, Is.True, "OnlineRunner が無効になっている（設定の不足）");
             CharacterView[] views = Object.FindObjectsByType<CharacterView>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            Assert.That(views.Length, Is.EqualTo(OnlineSession.MaxPlayers), "キャラクターの表示が4人分ない");
+            Assert.That(views.Length, Is.EqualTo(OnlineSession.MaxPlayers), "キャラクターの表示が 8 人分ない");
             foreach (CharacterView view in views)
             {
                 Assert.That(view.gameObject.activeSelf, Is.False, "試合の前にキャラクターが表示されている");
@@ -142,7 +142,7 @@ namespace Airerage.PlayMode.Tests
 
             OnlineStage stage = runner.Stage;
             Assert.That(stage.Bounds.HasValue, Is.True, "ステージの範囲（撃破）がない");
-            Assert.That(stage.Spawns.Count, Is.EqualTo(OnlineSession.MaxPlayers), "出現位置が4人分ない");
+            Assert.That(stage.Spawns.Count, Is.EqualTo(OnlineSession.MaxPlayers), "出現位置が 8 人分ない");
             Assert.That(stage.Zones.Count(z => z.Kind == StageZoneKind.JumpPad), Is.GreaterThanOrEqualTo(1), "ジャンプ台がない");
             Assert.That(stage.Zones.Count(z => z.Kind == StageZoneKind.Updraft), Is.GreaterThanOrEqualTo(1), "上昇気流がない");
             Assert.That(stage.Zones.Count(z => z.Kind == StageZoneKind.BoostRing), Is.GreaterThanOrEqualTo(1), "加速リングがない");

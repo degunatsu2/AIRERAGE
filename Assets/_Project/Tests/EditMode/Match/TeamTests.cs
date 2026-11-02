@@ -173,6 +173,37 @@ namespace Airerage.Core.Tests.Match
             Assert.Throws<System.ArgumentException>(() => TeamRules.Distribute(5, new[] { 5 }, 0), "チームが 1 つ");
         }
 
+        [Test]
+        public void SizePatterns_ListEverySplit_MostBalancedFirst()
+        {
+            Assert.That(TeamRules.SizePatterns(1), Is.Empty);
+            Assert.That(TeamRules.SizePatterns(2), Is.EqualTo(new[] { new[] { 1, 1 } }));
+            Assert.That(TeamRules.SizePatterns(5), Is.EqualTo(new[]
+            {
+                new[] { 3, 2 }, new[] { 2, 2, 1 }, new[] { 2, 1, 1, 1 }, new[] { 3, 1, 1 }, new[] { 4, 1 },
+            }));
+            List<int[]> eight = TeamRules.SizePatterns(8);
+            Assert.That(eight[0], Is.EqualTo(new[] { 4, 4 }), "8 人なら 4 対 4 がいちばん先");
+            Assert.That(eight[1], Is.EqualTo(new[] { 2, 2, 2, 2 }));
+            Assert.That(eight[2], Is.EqualTo(new[] { 3, 3, 2 }));
+            foreach (int[] sizes in eight)
+            {
+                int total = 0;
+                foreach (int size in sizes)
+                {
+                    total += size;
+                }
+                Assert.That(total, Is.EqualTo(8));
+                Assert.That(sizes.Length, Is.InRange(2, TeamRules.MaxTeams));
+                Assert.That(TeamRules.Distribute(8, sizes, 1).Length, Is.EqualTo(8), "一覧の配分で分けられない");
+            }
+            var unique = new HashSet<string>();
+            foreach (int[] sizes in eight)
+            {
+                Assert.That(unique.Add(string.Join("-", sizes)), Is.True, "同じ配分が 2 回ある");
+            }
+        }
+
         [Test, Explicit("8 人の重さの計測（T9-1）。数値を docs/19 に書く。dotnet test --filter Name~EightPlayers で実行する")]
         public void EightPlayers_StepAndRollbackCost()
         {

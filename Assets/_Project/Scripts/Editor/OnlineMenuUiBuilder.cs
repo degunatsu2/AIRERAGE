@@ -9,8 +9,8 @@ namespace Airerage.Editor
 {
     /// <summary>
     /// ネットワーク対戦のメニュー（OnlineMenu。docs/15 T6-7）の画面を作る: 接続（名前・参加コード・アドレス・ポート、HOST ONLINE・
-    /// JOIN WITH CODE・HOST (LAN)・JOIN (LAN)・BACK。参加コードは docs/15 T6-10）、待機所（1P〜4P の札、READY・時間の制限・
-    /// 参加コードのコピー・LEAVE）、読み込み中。キャラクター選択とステージ選択は、メニューの画面のものを使う。
+    /// JOIN WITH CODE・HOST (LAN)・JOIN (LAN)・BACK。参加コードは docs/15 T6-10）、待機所（1P〜8P の札、チーム対戦の 4 色の列の見出し、
+    /// READY・自分のチーム・チーム対戦か・人数配分・均等に分ける・時間の制限・参加コードのコピー・LEAVE。docs/19 T9-4、T9-5）、読み込み中。キャラクター選択とステージ選択は、メニューの画面のものを使う。
     /// 基準の画面の大きさは 1920×1080。
     /// </summary>
     internal static class OnlineMenuUiBuilder
@@ -19,7 +19,6 @@ namespace Airerage.Editor
             StageSelectScreen stageSelect, StageCatalog stages)
         {
             var top = new Vector2(0f, 1f);
-            var item = new Vector2(560f, 72f);
 
             // 接続の画面。
             RectTransform connect = MenuUiBuilder.CreateFull(canvas, "OnlineConnect");
@@ -59,7 +58,11 @@ namespace Airerage.Editor
                 top, new Vector2(90f, -60f), new Vector2(900f, 90f), Color.white);
             Text info = MenuUiBuilder.CreateText(waiting, "Info", string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft,
                 top, new Vector2(94f, -150f), new Vector2(1400f, 40f), MenuUiBuilder.Accent);
+            // プレイヤーの札（8 枚。docs/19 T9-4）。位置と大きさは実行中に OnlineMenu が決める（個人戦は 1 列、チーム対戦は 4 色の列）。
+            // チーム対戦では、ホストは札を選んで決定すると、その人を次のチームへ移せる（自分の札は自分でも。D-78）。
             var plates = new Object[OnlineSession.MaxPlayers];
+            var slotButtons = new Object[OnlineSession.MaxPlayers];
+            var numbers = new Object[OnlineSession.MaxPlayers];
             var names = new Object[OnlineSession.MaxPlayers];
             var states = new Object[OnlineSession.MaxPlayers];
             var colors = new Color[OnlineSession.MaxPlayers];
@@ -71,26 +74,63 @@ namespace Airerage.Editor
                 var rect = (RectTransform)slot.transform;
                 rect.anchorMin = rect.anchorMax = top;
                 rect.pivot = top;
-                rect.anchoredPosition = new Vector2(110f, -210f - p * 96f);
-                rect.sizeDelta = new Vector2(780f, 84f);
+                rect.anchoredPosition = new Vector2(110f, -200f - p * 72f);
+                rect.sizeDelta = new Vector2(780f, 64f);
                 var plate = slot.AddComponent<SlantedPlate>();
                 plate.Configure(0.2f, 3f, new Color(0.03f, 0.05f, 0.09f, 0.45f), new Color(1f, 1f, 1f, 0.2f));
-                plate.raycastTarget = false;
                 plates[p] = plate;
-                MenuUiBuilder.CreateText(slot.transform, "Number", $"{p + 1}P", 40, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                    new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(100f, 60f), colors[p]);
-                names[p] = MenuUiBuilder.CreateText(slot.transform, "Name", string.Empty, 30, FontStyle.Bold, TextAnchor.MiddleLeft,
-                    new Vector2(0f, 0.5f), new Vector2(150f, 0f), new Vector2(420f, 60f), Color.white);
-                states[p] = MenuUiBuilder.CreateText(slot.transform, "State", string.Empty, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleRight,
-                    new Vector2(1f, 0.5f), new Vector2(-40f, 0f), new Vector2(240f, 60f), Color.white);
+                var button = slot.AddComponent<Button>();
+                button.transition = Selectable.Transition.None;
+                button.targetGraphic = plate;
+                button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+                button.interactable = false;
+                slotButtons[p] = slot.AddComponent<PlateButton>();
+                numbers[p] = MenuUiBuilder.CreateText(slot.transform, "Number", $"{p + 1}P", 34, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+                    new Vector2(0f, 0.5f), new Vector2(34f, 0f), new Vector2(90f, 56f), colors[p]);
+                names[p] = MenuUiBuilder.CreateText(slot.transform, "Name", string.Empty, 28, FontStyle.Bold, TextAnchor.MiddleLeft,
+                    new Vector2(0f, 0.5f), new Vector2(130f, 0f), new Vector2(420f, 56f), Color.white);
+                states[p] = MenuUiBuilder.CreateText(slot.transform, "State", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.MiddleRight,
+                    new Vector2(1f, 0.5f), new Vector2(-40f, 0f), new Vector2(240f, 56f), Color.white);
+                ((Text)names[p]).resizeTextForBestFit = true;
+                ((Text)names[p]).resizeTextMinSize = 14;
+                ((Text)names[p]).resizeTextMaxSize = 28;
             }
-            MenuOption ready = MenuUiBuilder.CreateMenuItem(waiting, "Ready", "READY", top, new Vector2(990f, -210f), item);
-            MenuOption timeLimit = MenuUiBuilder.CreateMenuItem(waiting, "TimeLimit", "TIME LIMIT: ON", top, new Vector2(990f, -298f), item);
-            MenuOption copyCode = MenuUiBuilder.CreateMenuItem(waiting, "CopyCode", "COPY JOIN CODE", top, new Vector2(990f, -386f), item);
-            MenuOption leave = MenuUiBuilder.CreateMenuItem(waiting, "Leave", "LEAVE", top, new Vector2(990f, -474f), item);
+            // チーム対戦の列の見出し（4 色。チームの名前と人数）。
+            var headers = new Object[Airerage.Core.Match.TeamRules.MaxTeams];
+            var headerTexts = new Object[Airerage.Core.Match.TeamRules.MaxTeams];
+            for (int t = 0; t < headers.Length; t++)
+            {
+                var header = new GameObject($"Team{t + 1}", typeof(RectTransform));
+                header.transform.SetParent(waiting, false);
+                var rect = (RectTransform)header.transform;
+                rect.anchorMin = rect.anchorMax = top;
+                rect.pivot = top;
+                rect.anchoredPosition = new Vector2(110f + t * 198f, -200f);
+                rect.sizeDelta = new Vector2(190f, 50f);
+                var plate = header.AddComponent<SlantedPlate>();
+                Color teamColor = Airerage.Runtime.Presentation.TeamColors.Of(t + 1);
+                plate.Configure(0.2f, 3f, new Color(teamColor.r * 0.35f, teamColor.g * 0.35f, teamColor.b * 0.35f, 0.9f), teamColor);
+                plate.raycastTarget = false;
+                headers[t] = header;
+                headerTexts[t] = MenuUiBuilder.CreateText(header.transform, "Label", Airerage.Runtime.Presentation.TeamColors.NameOf(t + 1), 26,
+                    FontStyle.BoldAndItalic, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(170f, 46f), teamColor);
+                header.SetActive(false);
+            }
+            // 右の列: READY、自分のチーム、チーム対戦か（ホスト）、人数配分と均等に分ける（ホスト、チーム対戦）、時間の制限（ホスト）、
+            // 参加コードのコピー、LEAVE。左のプレイヤーの札へも動けるように、上下左右で動く。
+            var row = new Vector2(560f, 64f);
+            float rowY = -200f;
+            MenuOption ready = WaitingItem(waiting, "Ready", "READY", ref rowY, row);
+            MenuOption team = WaitingItem(waiting, "Team", "MY TEAM: RED", ref rowY, row);
+            MenuOption mode = WaitingItem(waiting, "Mode", "MODE: FREE FOR ALL", ref rowY, row);
+            MenuOption split = WaitingItem(waiting, "Split", "SPLIT: 4 VS 4", ref rowY, row);
+            MenuOption shuffle = WaitingItem(waiting, "Shuffle", "RANDOM SPLIT", ref rowY, row);
+            MenuOption timeLimit = WaitingItem(waiting, "TimeLimit", "TIME LIMIT: ON", ref rowY, row);
+            MenuOption copyCode = WaitingItem(waiting, "CopyCode", "COPY JOIN CODE", ref rowY, row);
+            MenuOption leave = WaitingItem(waiting, "Leave", "LEAVE", ref rowY, row);
             Text waitingMessage = MenuUiBuilder.CreateText(waiting, "Message", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(110f, -610f), new Vector2(1400f, 44f), Color.white);
-            MenuUiBuilder.CreateText(waiting, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: cancel ready, leave", 22, FontStyle.Bold,
+                top, new Vector2(110f, -800f), new Vector2(1500f, 44f), Color.white);
+            MenuUiBuilder.CreateText(waiting, "Hint", "Up / Down / Left / Right: select     Enter / A: OK     Esc / B: cancel ready, leave", 22, FontStyle.Bold,
                 TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1400f, 40f), new Color(1f, 1f, 1f, 0.7f));
             waiting.gameObject.SetActive(false);
 
@@ -120,9 +160,17 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(menu, "_waitingPanel", waiting.gameObject);
             SandboxWireSceneBuilder.SetReference(menu, "_waitingInfo", info);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotPlates", plates);
+            SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotButtons", slotButtons);
+            SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotNumbers", numbers);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotNames", names);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotStates", states);
+            SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaders", headers);
+            SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaderTexts", headerTexts);
             SandboxWireSceneBuilder.SetReference(menu, "_ready", ready);
+            SandboxWireSceneBuilder.SetReference(menu, "_team", team);
+            SandboxWireSceneBuilder.SetReference(menu, "_mode", mode);
+            SandboxWireSceneBuilder.SetReference(menu, "_split", split);
+            SandboxWireSceneBuilder.SetReference(menu, "_shuffle", shuffle);
             SandboxWireSceneBuilder.SetReference(menu, "_timeLimit", timeLimit);
             SandboxWireSceneBuilder.SetReference(menu, "_copyCode", copyCode);
             SandboxWireSceneBuilder.SetReference(menu, "_leave", leave);
@@ -130,6 +178,15 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(menu, "_loadingPanel", loading.gameObject);
             SandboxOnlineSceneBuilder.SetColors(menu, "_colors", colors);
             return menu;
+        }
+
+        // 待機所の右の列の項目 1 つ（上から順に y を進める。上下左右で動く）。
+        private static MenuOption WaitingItem(Transform parent, string name, string label, ref float y, Vector2 size)
+        {
+            MenuOption item = MenuUiBuilder.CreateMenuItem(parent, name, label, new Vector2(0f, 1f), new Vector2(990f, y), size);
+            item.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+            y -= size.y + 10f;
+            return item;
         }
     }
 }

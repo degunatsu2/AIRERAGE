@@ -443,7 +443,7 @@ namespace Airerage.Net
             return false;
         }
 
-        // 出現位置（_spawnPoints が人数分なければ、_spawnPoint を中心に横に並べる。OnlineStage.SpawnPosition）。接続を使うときは、
+        // 出現位置（_spawnPoints がなければ _spawnPoint。人数分なければ、最初の位置を中心に横に並べる。OnlineStage.SpawnPosition）。接続を使うときは、
         // 読み込んだステージのシーンの出現位置（SpawnPointAuthoring）。
         private List<System.Numerics.Vector3> SpawnPositions()
         {
@@ -463,9 +463,9 @@ namespace Airerage.Net
                     spawns.Add(spawn.position.ToNumerics());
                 }
             }
-            if (spawns.Count < OnlineSession.MaxPlayers)
+            if (spawns.Count == 0)
             {
-                spawns.Clear();
+                // 人数より少なければ、OnlineStage が最初の位置を中心に横に並べる。
                 spawns.Add(_spawnPoint.position.ToNumerics());
             }
             return spawns;
@@ -713,7 +713,13 @@ namespace Airerage.Net
                 int seconds = _match.DurationTicks / SimTime.TicksPerSecond;
                 _timedMatch = GUI.Toggle(new Rect(footer.x, footer.y, footer.width, 20f), _timedMatch,
                     $" Timed match ({seconds / 60}:{seconds % 60:00}). Off = free play");
-                if (GUI.Button(new Rect(footer.x, footer.y + 24f, footer.width, 32f), "START"))
+                // この検証用のシーンは個人戦だけ（チーム対戦はメニューの NETWORK VS）。5 人以上では始めない。
+                string problem = _session.WaitingProblem;
+                bool enabled = GUI.enabled;
+                GUI.enabled = enabled && problem == null;
+                bool start = GUI.Button(new Rect(footer.x, footer.y + 24f, footer.width, 32f), problem ?? "START");
+                GUI.enabled = enabled;
+                if (start)
                 {
                     UiSounds.Find().Play(SoundId.UiConfirm);
                     StartMatch();

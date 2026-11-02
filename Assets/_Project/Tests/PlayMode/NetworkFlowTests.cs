@@ -79,6 +79,26 @@ namespace Airerage.PlayMode.Tests
                 pump.AddComponent<BotPump>().Session = bot;
                 yield return WaitFor(() => bot.LocalPlayer == 1 && host.LobbyPlayerCount == 2 && host.Roster[1].Name == "BOT", 10f, "相手がつながらない");
 
+                // 待機所のチーム分け（docs/19 T9-5）: ホストが MODE でチーム対戦にすると、札が 4 色の列に並ぶ。ホストは札を決定してその人を
+                // 次のチームへ、自分のチームは MY TEAM で変えられる。MODE をもう一度で個人戦に戻す（この後は今までと同じ流れ）。
+                Assert.That(online.TeamButton.gameObject.activeSelf, Is.False, "個人戦なのに MY TEAM がある");
+                online.ModeButton.Button.onClick.Invoke();
+                yield return null;
+                Assert.That(host.TeamMode, Is.True, "MODE でチーム対戦にならない");
+                yield return WaitFor(() => bot.TeamMode && bot.LocalTeam == 2, 10f, "相手にチーム対戦とチームが届かない");
+                Assert.That(online.TeamButton.gameObject.activeSelf && online.ShuffleButton.gameObject.activeSelf, Is.True);
+                Assert.That(online.SlotPosition(1).x, Is.GreaterThan(online.SlotPosition(0).x), "チームの列に並んでいない");
+                online.SlotButton(1).Button.onClick.Invoke();
+                yield return WaitFor(() => bot.LocalTeam == 3, 10f, "ホストが札を決定しても相手のチームが変わらない");
+                online.TeamButton.Button.onClick.Invoke();
+                Assert.That(host.LocalTeam, Is.EqualTo(2), "MY TEAM で自分のチームが変わらない");
+                online.SplitButton.Button.onClick.Invoke();
+                online.ShuffleButton.Button.onClick.Invoke();
+                yield return null;
+                Assert.That(host.Roster[0].Team != host.Roster[1].Team, Is.True, "2 人を 1 対 1 に分けていない");
+                online.ModeButton.Button.onClick.Invoke();
+                yield return WaitFor(() => !bot.TeamMode, 10f, "個人戦に戻らない");
+
                 // 待機所: 全員が READY でキャラクター選択へ。
                 online.ReadyButton.Button.onClick.Invoke();
                 Assert.That(host.LocalReady, Is.True, "READY で準備完了にならない");

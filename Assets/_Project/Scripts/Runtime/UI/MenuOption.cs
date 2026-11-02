@@ -73,6 +73,19 @@ namespace Airerage.Runtime.UI
             }
         }
 
+        /// <summary>
+        /// 項目の置き場所（選んでいないときの anchoredPosition）を変える（出す項目が変わる画面で並べ直す。待機所。docs/19 T9-5）。
+        /// </summary>
+        public void SetHome(Vector2 position)
+        {
+            if (_rect == null)
+            {
+                _rect = (RectTransform)transform;
+            }
+            _home = position;
+            _rect.anchoredPosition = _home + (_selected ? _selectedShift : Vector2.zero);
+        }
+
         /// <summary>選んでいるときに動かす量を変える（シーンのビルダー用）。</summary>
         public void SetSelectedShift(Vector2 shift)
         {

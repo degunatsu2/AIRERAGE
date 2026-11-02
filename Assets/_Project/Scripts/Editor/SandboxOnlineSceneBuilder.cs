@@ -40,6 +40,11 @@ namespace Airerage.Editor
             ("Player2", new Color(0.25f, 0.45f, 0.95f)),
             ("Player3", new Color(0.3f, 0.8f, 0.35f)),
             ("Player4", new Color(0.9f, 0.3f, 0.75f)),
+            // 5P〜8P（チーム対戦は 8 人まで。docs/19 T9-4）。チームの色（TeamColors）とは別に、人を見分ける色。
+            ("Player5", new Color(0.2f, 0.85f, 0.9f)),
+            ("Player6", new Color(0.95f, 0.85f, 0.25f)),
+            ("Player7", new Color(0.6f, 0.4f, 0.95f)),
+            ("Player8", new Color(0.65f, 0.9f, 0.3f)),
         };
 
         // 地形（左右対称）。青は接続できる、灰色（飛び石）は接続できない（跳んで渡る）。
@@ -204,6 +209,11 @@ namespace Airerage.Editor
             new Vector3(5f, 1f, 0f),
             new Vector3(-24f, 3.5f, 0f),
             new Vector3(24f, 3.5f, 0f),
+            // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
+            new Vector3(-14.5f, 8.5f, 0f),
+            new Vector3(14.5f, 8.5f, 0f),
+            new Vector3(-27.75f, 11.5f, 0f),
+            new Vector3(27.75f, 11.5f, 0f),
         };
 
         [MenuItem("Airerage/Sandbox_Online シーンを作り直す")]
