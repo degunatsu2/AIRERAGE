@@ -177,6 +177,99 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator LocalTeamMatch_WithCpus_UpToEight_StartsWithTheChosenTeams()
+        {
+            // ローカル対戦のチーム対戦（docs/19 T9-6。D-85）: M ／ X でチーム対戦、C ／ LB で CPU の数（人と合わせて 8 人まで）、
+            // Q ／ RB で自分のチーム。CPU は人数の少ないチームから入る。
+            InputSettings.EditorInputBehaviorInPlayMode savedBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSettings.BackgroundBehavior savedBackground = InputSystem.settings.backgroundBehavior;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            var gamepad = InputSystem.AddDevice<Gamepad>();
+            try
+            {
+                SceneManager.LoadScene("App");
+                yield return null;
+                var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
+                yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+                var menu = UnityEngine.Object.FindFirstObjectByType<MenuScreens>();
+                menu.ContinueFromTitle();
+                yield return null;
+                menu.Local.Button.onClick.Invoke();
+                yield return null;
+                CharacterSelectScreen join = menu.CharacterSelect;
+
+                // 1 人だけでも、CPU を入れれば始められる。個人戦は人と CPU で 4 人まで。
+                yield return Tap(keyboard, Key.Enter);
+                Assert.That(join.JoinedCount, Is.EqualTo(1));
+                for (int i = 0; i < 5; i++)
+                {
+                    yield return Tap(keyboard, Key.C);
+                }
+                Assert.That(join.CpuCount, Is.EqualTo(1), "個人戦の CPU が 3 人で 0 に戻らない（人と合わせて 4 人まで）");
+
+                // チーム対戦では 8 人まで。
+                yield return Tap(keyboard, Key.M);
+                Assert.That(join.TeamMode, Is.True, "M でチーム対戦にならない");
+                yield return Press(gamepad, GamepadButton.South);
+                Assert.That(join.JoinedCount, Is.EqualTo(2));
+                Assert.That(join.TeamOf(0), Is.EqualTo(1));
+                Assert.That(join.TeamOf(1), Is.EqualTo(2), "後から入った人が少ないチームに入らない");
+                // RB で BLUE → GREEN → YELLOW → RED → BLUE と回る。
+                yield return Press(gamepad, GamepadButton.RightShoulder);
+                Assert.That(join.TeamOf(1), Is.EqualTo(3), "RB で自分のチームが変わらない");
+                yield return Press(gamepad, GamepadButton.RightShoulder);
+                Assert.That(join.TeamOf(1), Is.EqualTo(4));
+                yield return Press(gamepad, GamepadButton.RightShoulder);
+                Assert.That(join.TeamOf(1), Is.EqualTo(1));
+                yield return Press(gamepad, GamepadButton.RightShoulder);
+                Assert.That(join.TeamOf(1), Is.EqualTo(2), "チームが 4 色で 1 周しない");
+                Assert.That(join.TeamOf(0), Is.EqualTo(1), "ほかの人のチームが変わった");
+                while (join.CpuCount != 6)
+                {
+                    yield return Press(gamepad, GamepadButton.LeftShoulder);
+                }
+                Assert.That(join.CpuCount + join.JoinedCount, Is.EqualTo(8));
+                byte[] cpuTeams = join.CpuTeams();
+                Assert.That(Array.FindAll(cpuTeams, t => t == 1).Length, Is.EqualTo(3), "CPU が人数の少ないチームから入らない");
+                Assert.That(Array.FindAll(cpuTeams, t => t == 2).Length, Is.EqualTo(3));
+
+                yield return Tap(keyboard, Key.Enter);
+                yield return Press(gamepad, GamepadButton.South);
+                yield return null;
+                Assert.That(menu.ShowingStageSelect, Is.True, "全員が READY でステージ選択に進まない");
+                menu.StageSelect.Option(0).Button.onClick.Invoke();
+                yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Local && !flow.IsLoading, 10f, "ローカル対戦にならない");
+                var runner = UnityEngine.Object.FindFirstObjectByType<LocalMatchRunner>();
+                Assert.That(runner.enabled, Is.True, "8 人の試合の仕組みが動かない（表示が 8 人分あるか）");
+                Assert.That(runner.CharacterCount, Is.EqualTo(8));
+                int red = 0;
+                int blue = 0;
+                for (int p = 0; p < 8; p++)
+                {
+                    int team = runner.GetState(p).Combat.Team;
+                    red += team == 1 ? 1 : 0;
+                    blue += team == 2 ? 1 : 0;
+                    Assert.That(runner.IsCpu(p), Is.EqualTo(p >= 2), "人の後ろが CPU でない");
+                    Assert.That(runner.ColorOf(p), Is.EqualTo(TeamColors.Of(team)), "札の色がチームの色でない");
+                }
+                Assert.That(red, Is.EqualTo(4));
+                Assert.That(blue, Is.EqualTo(4));
+                yield return WaitFor(() => runner.CurrentTick > runner.World.Rules.CountdownTicks + 60, 10f, "8 人で試合が進まない");
+                runner.Quit();
+                yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューに戻らない");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keyboard);
+                InputSystem.RemoveDevice(gamepad);
+                InputSystem.settings.editorInputBehaviorInPlayMode = savedBehavior;
+                InputSystem.settings.backgroundBehavior = savedBackground;
+            }
+        }
+
         [Test]
         public void SharedCamera_FramesTheWholeStage()
         {

@@ -268,6 +268,11 @@ namespace Airerage.Core.Skills
                             continue;
                         }
                         // 抹茶: 置いた本人も含めて全員に効く（ユーザーの要望、2026-10-21）。張り付いた所はだれも壁に張り付けない。
+                        // チーム対戦では、置いた人の味方（本人を除く）には効かない（D-81）。
+                        if (v != patch.Owner && TeamRules.Allies(states, v, patch.Owner))
+                        {
+                            continue;
+                        }
                         noCling |= wall;
                         matchaSpeed = tuning.MatchaSpeedPercent;
                         if ((wall || IsCeilingPatch(patch)) && tuning.MatchaStickTicks > 0)

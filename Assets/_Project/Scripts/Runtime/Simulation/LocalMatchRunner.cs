@@ -33,7 +33,8 @@ namespace Airerage.Runtime.Simulation
     /// </summary>
     public sealed class LocalMatchRunner : MonoBehaviour, ISimulationFeed, IMatchControls, IPauseTarget, ICpuRoster, ILocalAimSource
     {
-        public const int MaxPlayers = 4;
+        /// <summary>試合に出られる人数（人は機器ごとに 4 人まで、残りは CPU。チーム対戦で 8 人まで。docs/19 T9-6・D-85）。</summary>
+        public const int MaxPlayers = 8;
 
         // 1フレームで進める最大のティック数（SimulationRunner と同じ。技術的な上限）。
         private const int MaxTicksPerFrame = 5;
@@ -151,7 +152,12 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>キャラクター index の CPU（人なら null。テスト用）。</summary>
         public CpuPlayer CpuOf(int index) => index >= 0 && index < _cpus.Length ? _cpus[index] : null;
-        public Color ColorOf(int index) => index >= 0 && index < _playerColors.Length ? _playerColors[index] : Color.white;
+        // チーム対戦ならチームの色（T9-6）。
+        public Color ColorOf(int index)
+        {
+            Color player = index >= 0 && index < _playerColors.Length ? _playerColors[index] : Color.white;
+            return _world != null && index >= 0 && index < _world.CharacterCount ? TeamColors.ForCharacter(_world.GetState(index), player) : player;
+        }
         public int CurrentTick => _world == null ? 0 : _world.Tick;
         MatchRules ISimulationFeed.Rules => _world?.Rules;
         MatchState ISimulationFeed.Match => _world != null ? _world.Match : MatchState.None;
@@ -342,6 +348,11 @@ namespace Airerage.Runtime.Simulation
             {
                 Vector3 spawn = SpawnPosition(p, count);
                 _world.AddCharacter(_roster.Get(_players[p].Character).Config, spawn.ToNumerics(), SpawnFacing(spawn, count));
+                if (_players[p].Team != 0)
+                {
+                    // チーム対戦（docs/19 T9-6）: 試合の前にチームを決める。
+                    _world.SetTeam(p, _players[p].Team);
+                }
             }
             _tickInputs = new SimInput[count];
             _previous = new CharacterState[count];

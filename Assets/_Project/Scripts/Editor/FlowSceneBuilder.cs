@@ -172,7 +172,8 @@ namespace Airerage.Editor
             Save(scene, TrainingScenePath);
         }
 
-        // ローカル対戦の試合の仕組み（docs/15 T6-5）: 4 人分の表示（オンラインと同じ色）、全員が入るカメラ、人ごとの技の札、HUD、一時停止。
+        // ローカル対戦の試合の仕組み（docs/15 T6-5）: 8 人分の表示（オンラインと同じ色。人は 4 人まで、残りは CPU。T9-6）、全員が入るカメラ、
+        // 人ごとの技の札、HUD、一時停止。
         private static void BuildLocal()
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
@@ -206,7 +207,8 @@ namespace Airerage.Editor
 
             GameAudio audio = SandboxWireSceneBuilder.CreateAudio(runner);
             SandboxWireSceneBuilder.CreateComboHud(runner, everyone: true);
-            SandboxWireSceneBuilder.CreateSkillHud(runner, audio, count);
+            // 技の札は人の分だけ（人は 4 人まで。CPU には出さない）。
+            SandboxWireSceneBuilder.CreateSkillHud(runner, audio, CharacterSelectScreen.MaxLocalPlayers);
             // 頭上のプレイヤーの番号の札（ローカル対戦だけ。全員が入るカメラで自分を見失わないように。2026-10-22）。
             var tags = new GameObject("PlayerTagHud").AddComponent<PlayerTagHud>();
             SandboxWireSceneBuilder.SetReference(tags, "_source", runner);
@@ -293,6 +295,12 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateComboHud(runner);
             SandboxWireSceneBuilder.CreateMissIndicator(runner, camera);
             SandboxWireSceneBuilder.CreateSkillHud(runner, audio);
+            // チーム対戦の間だけ、頭上にチームの色の名前の札（敵と味方を見分ける。T9-6）。
+            var tags = new GameObject("PlayerTagHud").AddComponent<PlayerTagHud>();
+            SandboxWireSceneBuilder.SetReference(tags, "_source", runner);
+            SandboxWireSceneBuilder.SetReferenceArray(tags, "_views", characterViews);
+            SandboxWireSceneBuilder.SetReference(tags, "_camera", camera);
+            SandboxWireSceneBuilder.SetBool(tags, "_teamMatchesOnly", true);
             MatchHud matchHud = SandboxWireSceneBuilder.CreateMatchHud(runner, audio);
             SandboxWireSceneBuilder.CreateNoticeHud(runner);
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();

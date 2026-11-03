@@ -182,15 +182,16 @@ namespace Airerage.Core.Simulation
         /// THIEF が置いたピッチャーマシンのボールにも使う（ThiefRules）。
         /// </summary>
         public static void StrikeWithBall(StageTrap trap, Vector2 position, Vector2 velocity, List<CharacterState> states,
-            IReadOnlyList<CharacterConfig> configs)
+            IReadOnlyList<CharacterConfig> configs, int sparedTeam = 0)
         {
             float speed = velocity.Length();
             bool fast = speed >= trap.MinHitSpeed && speed > 0f;
             for (int c = 0; c < states.Count; c++)
             {
                 CharacterState state = states[c];
-                if (!StageZones.CanBeHitByStage(state) || state.Combat.IsUntouchable)
+                if (!StageZones.CanBeHitByStage(state) || state.Combat.IsUntouchable || (sparedTeam != 0 && state.Combat.Team == sparedTeam))
                 {
+                    // sparedTeam（チーム対戦で、ボールを打つ仕掛けを置いた人のチーム。D-81）の人には当たらない。
                     continue;
                 }
                 if (!Overlaps(state.Position, Half(configs[c]), position - trap.HalfSize, position + trap.HalfSize))

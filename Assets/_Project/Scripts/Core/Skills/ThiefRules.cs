@@ -612,9 +612,11 @@ namespace Airerage.Core.Skills
 
         /// <summary>
         /// 効かせるギミックの一覧 active を、ステージのギミック stageZones と、置いたギミック（objects の PlacedZone。番号の順）にする。
-        /// SimWorld が毎ティックの初めに呼ぶ。
+        /// SimWorld が毎ティックの初めに呼ぶ。states があれば、置いたギミックに置いた人のチームを持たせる（チーム対戦で、害のある面を
+        /// 味方に効かせない。D-81）。
         /// </summary>
-        public static void RefreshZones(List<StageZone> active, IReadOnlyList<StageZone> stageZones, WorldObjects objects)
+        public static void RefreshZones(List<StageZone> active, IReadOnlyList<StageZone> stageZones, WorldObjects objects,
+            IReadOnlyList<CharacterState> states = null)
         {
             int keep = stageZones.Count;
             if (active.Count > keep)
@@ -626,7 +628,9 @@ namespace Airerage.Core.Skills
                 WorldObject item = objects[o];
                 if (item.Kind == WorldObjectKind.PlacedZone && !item.Ended && item.Stored >= 0 && item.Stored < keep)
                 {
-                    active.Add(PlacedZone(stageZones[item.Stored], item));
+                    StageZone placed = PlacedZone(stageZones[item.Stored], item);
+                    int team = states != null && item.Owner >= 0 && item.Owner < states.Count ? states[item.Owner].Combat.Team : 0;
+                    active.Add(team != 0 ? placed.WithOwnerTeam(team) : placed);
                 }
             }
         }
@@ -713,12 +717,14 @@ namespace Airerage.Core.Skills
                 item.HitMask = 0;
                 tripped = 0;
             }
+            // チーム対戦では、置いた人のチームの人（置いた本人を含む）は赤外線に引っかからず、ミサイルにも当たらない（D-81）。
+            int spared = OwnerTeam(states, item.Owner);
             if (item.ChargeMilli == 0)
             {
                 PlacedBeam(source, item, out Vector2 min, out Vector2 max);
                 for (int c = 0; c < states.Count; c++)
                 {
-                    if (StageZones.CanBeStruck(states[c]) && Overlaps(states[c].Position, Half(configs[c]), min, max))
+                    if (StageZones.CanBeStruck(states[c]) && !Spared(states[c], spared) && Overlaps(states[c].Position, Half(configs[c]), min, max))
                     {
                         item.ChargeMilli = tick;
                         return;
@@ -738,7 +744,7 @@ namespace Airerage.Core.Skills
             for (int c = 0; c < states.Count; c++)
             {
                 CharacterState state = states[c];
-                if (!StageZones.CanBeStruck(state))
+                if (!StageZones.CanBeStruck(state) || Spared(state, spared))
                 {
                     continue;
                 }
@@ -796,13 +802,25 @@ namespace Airerage.Core.Skills
                 // 点滅している間は当たらない。
                 return;
             }
-            StageTraps.StrikeWithBall(source, ball.Position, ball.Velocity, states, configs);
+            StageTraps.StrikeWithBall(source, ball.Position, ball.Velocity, states, configs, OwnerTeam(states, ball.Owner));
         }
 
         /// <summary>置いたピッチャーマシンのボールが点滅しているか（止まって消えるまで）。</summary>
         public static bool IsBlinking(in WorldObject ball)
         {
             return ball.Kind == WorldObjectKind.TrapBall && ball.ChargeMilli != 0;
+        }
+
+        // 置いた人 owner のチーム（チームなし・範囲の外なら 0）。
+        private static int OwnerTeam(IReadOnlyList<CharacterState> states, int owner)
+        {
+            return owner >= 0 && owner < states.Count ? states[owner].Combat.Team : 0;
+        }
+
+        // チーム team（0 ならだれも）の人か。
+        private static bool Spared(in CharacterState state, int team)
+        {
+            return team != 0 && state.Combat.Team == team;
         }
 
         private static Vector2 Half(CharacterConfig config)

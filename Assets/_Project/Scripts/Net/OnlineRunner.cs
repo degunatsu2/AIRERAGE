@@ -175,7 +175,10 @@ namespace Airerage.Net
         bool ISimulationFeed.TryGetClone(int index, out CharacterState clone) => SimWorldFeed.TryGetClone(Running ? _session.World : null, index, out clone);
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => Running ? _session.World.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => Running ? _session.World.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
-        Color ISimulationFeed.ColorOf(int index) => index < _playerColors.Length ? _playerColors[index] : Color.white;
+        // チーム対戦ならチームの色（T9-6）。
+        Color ISimulationFeed.ColorOf(int index) => Running && index >= 0 && index < _session.World.CharacterCount
+            ? TeamColors.ForCharacter(_session.World.GetState(index), index < _playerColors.Length ? _playerColors[index] : Color.white)
+            : index < _playerColors.Length ? _playerColors[index] : Color.white;
 
         /// <summary>ホストとして待ち受ける（port が 0 なら空いているポート）。失敗したら false で、理由を画面に出す。</summary>
         public bool StartHost(ushort port)

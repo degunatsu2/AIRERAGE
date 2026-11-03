@@ -90,6 +90,10 @@ namespace Airerage.Runtime.UI
         private Slot[] _slots = NewSlots();
         private int _activeFromFrame = int.MaxValue;
         private bool _timed = true;
+
+        // ローカル対戦のチーム対戦と CPU（docs/19 T9-6。D-85: 人は 4 人まで、残りを CPU で、個人戦は合わせて 4 人・チーム対戦は 8 人まで）。
+        private bool _teamMode;
+        private int _cpuCount;
         private int _localSlot;
         private string _networkMessage = string.Empty;
         private GameLanguage _language = GameLanguage.Japanese;
@@ -139,6 +143,166 @@ namespace Airerage.Runtime.UI
         /// <summary>時間の制限ありか（ローカル対戦）。</summary>
         public bool Timed => _timed;
 
+        /// <summary>ローカル対戦をチーム対戦で始めるか（M ／ X で切り替える）。</summary>
+        public bool TeamMode => _teamMode;
+
+        /// <summary>ローカル対戦に入れる CPU の数（C ／ LB で 0 から上限まで回す）。</summary>
+        public int CpuCount => _cpuCount;
+
+        /// <summary>ローカル対戦の人と CPU を合わせた上限（個人戦 4 人、チーム対戦 8 人）。</summary>
+        public int LocalCapacity => _teamMode ? MaxPlayers : MaxLocalPlayers;
+
+        /// <summary>参加した人 slotIndex のチーム（チーム対戦のときだけ意味がある）。</summary>
+        public int TeamOf(int slotIndex) => slotIndex >= 0 && slotIndex < _slots.Length ? _slots[slotIndex].Team : 0;
+
+        /// <summary>CPU のチーム（チーム対戦で、人数の少ないチームから順に入れる。テスト用にも公開）。</summary>
+        public byte[] CpuTeams()
+        {
+            var teams = new byte[_cpuCount];
+            if (!_teamMode)
+            {
+                return teams;
+            }
+            var counts = new int[TeamColorsCount + 1];
+            bool[] used = new bool[TeamColorsCount + 1];
+            foreach (Slot slot in _slots)
+            {
+                if (slot.Joined)
+                {
+                    counts[slot.Team]++;
+                    used[slot.Team] = true;
+                }
+            }
+            // 人のチームが 1 つだけなら、CPU は別のチーム（RED なら BLUE、ほかなら RED）から入れる（2 チーム以上にする）。
+            int distinct = 0;
+            for (int t = 1; t <= TeamColorsCount; t++)
+            {
+                distinct += used[t] ? 1 : 0;
+            }
+            if (distinct < 2)
+            {
+                used[1] = true;
+                used[2] = true;
+            }
+            for (int c = 0; c < teams.Length; c++)
+            {
+                int best = -1;
+                for (int t = 1; t <= TeamColorsCount; t++)
+                {
+                    if (used[t] && (best < 0 || counts[t] < counts[best]))
+                    {
+                        best = t;
+                    }
+                }
+                teams[c] = (byte)best;
+                counts[best]++;
+            }
+            return teams;
+        }
+
+        private const int TeamColorsCount = 4;
+
+        // ローカル対戦を始められるか（人が 1 人以上、人と CPU で 2 人以上、チーム対戦なら 2 チーム以上）。
+        private bool CanStartLocal
+        {
+            get
+            {
+                int humans = JoinedCount;
+                return humans >= 1 && humans + _cpuCount >= 2 && LocalProblem() == null;
+            }
+        }
+
+        // ローカル対戦で始められない理由（なければ null）。
+        private string LocalProblem()
+        {
+            if (!_teamMode)
+            {
+                return null;
+            }
+            int mask = 0;
+            foreach (Slot slot in _slots)
+            {
+                if (slot.Joined)
+                {
+                    mask |= 1 << slot.Team;
+                }
+            }
+            foreach (byte team in CpuTeams())
+            {
+                mask |= 1 << team;
+            }
+            int teams = 0;
+            for (; mask != 0; mask &= mask - 1)
+            {
+                teams++;
+            }
+            return teams >= 2 ? null : Loc.T("MAKE AT LEAST 2 TEAMS", "2 つ以上のチームに分かれてください");
+        }
+
+        // ローカル対戦の試合に出る人（参加した人の順、その後に CPU。CPU のキャラクターはランダム、強さは CPU LEVEL の画面の値）。
+        private List<LocalPlayerSetup> LocalPlayers()
+        {
+            var players = new List<LocalPlayerSetup>();
+            foreach (Slot slot in _slots)
+            {
+                if (slot.Joined)
+                {
+                    players.Add(new LocalPlayerSetup(slot.Devices, slot.DeviceName, slot.Character) { Team = _teamMode ? slot.Team : (byte)0 });
+                }
+            }
+            var level = (Airerage.Core.Ai.CpuLevel)Mathf.Clamp(PlayerPrefs.GetInt(CpuLevelScreen.PreferenceKey, (int)Airerage.Core.Ai.CpuLevel.Normal),
+                0, Enum.GetValues(typeof(Airerage.Core.Ai.CpuLevel)).Length - 1);
+            byte[] teams = CpuTeams();
+            for (int c = 0; c < _cpuCount; c++)
+            {
+                LocalPlayerSetup cpu = LocalPlayerSetup.Cpu(UnityEngine.Random.Range(0, Count), level);
+                cpu.Team = teams[c];
+                players.Add(cpu);
+            }
+            return players;
+        }
+
+        // ローカル対戦の設定（だれの機器でも）: M ／ X で個人戦とチーム対戦、C ／ LB で CPU の数、Q ／ RB で自分のチーム（チーム対戦のとき）。
+        private void HandleLocalSettings(int slotIndex, Intent intent)
+        {
+            if (intent.ToggleMode)
+            {
+                _teamMode = !_teamMode;
+                if (_teamMode)
+                {
+                    // チーム対戦にしたら、参加した順に RED と BLUE に分ける（各自が Q ／ RB で変えられる）。
+                    int n = 0;
+                    foreach (Slot slot in _slots)
+                    {
+                        if (slot.Joined)
+                        {
+                            slot.Team = (byte)(n++ % 2 + 1);
+                        }
+                    }
+                }
+                ClampCpus();
+                UiSounds.Find().Play(SoundId.UiMove);
+            }
+            if (intent.CycleCpu)
+            {
+                int max = Mathf.Max(0, LocalCapacity - JoinedCount);
+                _cpuCount = max == 0 ? 0 : (_cpuCount + 1) % (max + 1);
+                UiSounds.Find().Play(SoundId.UiMove);
+            }
+            if (intent.CycleTeam && _teamMode && slotIndex >= 0)
+            {
+                Slot slot = _slots[slotIndex];
+                slot.Team = (byte)(slot.Team % TeamColorsCount + 1);
+                UiSounds.Find().Play(SoundId.UiMove);
+            }
+        }
+
+        // CPU の数を、上限（人と合わせて個人戦 4 人・チーム対戦 8 人）に収める。
+        private void ClampCpus()
+        {
+            _cpuCount = Mathf.Clamp(_cpuCount, 0, Mathf.Max(0, LocalCapacity - JoinedCount));
+        }
+
         /// <summary>番号 slot（1P が 0）の人のカーソルのキャラクター・READY か・参加しているか。</summary>
         public int CharacterOf(int slot) => _slots[slot].Character;
         public bool IsReady(int slot) => _slots[slot].Ready;
@@ -173,6 +337,9 @@ namespace Airerage.Runtime.UI
             public string DeviceName = string.Empty;
             public int Character;
             public bool Ready;
+
+            // チーム対戦のチーム（ローカル対戦。1〜4。T9-6）。
+            public byte Team = 1;
         }
 
         // 機器のまとまり 1 つの、このフレームの操作。
@@ -182,10 +349,13 @@ namespace Airerage.Runtime.UI
             public bool Back;
             public bool Details;
             public bool ToggleTime;
+            public bool ToggleMode;
+            public bool CycleTeam;
+            public bool CycleCpu;
             public int Dx;
             public int Dy;
 
-            public bool Any => Confirm || Back || Details || ToggleTime || Dx != 0 || Dy != 0;
+            public bool Any => Confirm || Back || Details || ToggleTime || ToggleMode || CycleTeam || CycleCpu || Dx != 0 || Dy != 0;
         }
 
         private void Awake()
@@ -251,6 +421,8 @@ namespace Airerage.Runtime.UI
             {
                 ClearSlots();
                 _timed = true;
+                _teamMode = false;
+                _cpuCount = 0;
             }
             foreach (Slot slot in _slots)
             {
@@ -268,9 +440,18 @@ namespace Airerage.Runtime.UI
             Open(SelectMode.Local);
             ClearSlots();
             _timed = timed;
+            _teamMode = false;
+            _cpuCount = 0;
             int index = 0;
             foreach (LocalPlayerSetup player in players)
             {
+                // 前の試合のチーム対戦と CPU の数を引き継ぐ。
+                _teamMode |= player.Team != 0;
+                if (player.IsCpu)
+                {
+                    _cpuCount++;
+                    continue;
+                }
                 if (index >= MaxLocalPlayers || player.Devices.Length == 0 || !player.Devices[0].added)
                 {
                     continue;
@@ -281,8 +462,10 @@ namespace Airerage.Runtime.UI
                 slot.Devices = player.Devices;
                 slot.DeviceName = player.DeviceName;
                 slot.Character = _roster.Clamp(player.Character);
+                slot.Team = player.Team != 0 ? player.Team : (byte)1;
                 slot.Ready = false;
             }
+            ClampCpus();
             Refresh();
         }
 
@@ -409,17 +592,9 @@ namespace Airerage.Runtime.UI
             {
                 Handle(gamepad, ReadGamepad(gamepad));
             }
-            if (isActiveAndEnabled && Mode == SelectMode.Local && JoinedCount >= 2 && AllJoinedReady())
+            if (isActiveAndEnabled && Mode == SelectMode.Local && CanStartLocal && AllJoinedReady())
             {
-                var players = new List<LocalPlayerSetup>();
-                foreach (Slot slot in _slots)
-                {
-                    if (slot.Joined)
-                    {
-                        players.Add(new LocalPlayerSetup(slot.Devices, slot.DeviceName, slot.Character));
-                    }
-                }
-                LocalConfirmed?.Invoke(players, _timed);
+                LocalConfirmed?.Invoke(LocalPlayers(), _timed);
             }
         }
 
@@ -431,6 +606,9 @@ namespace Airerage.Runtime.UI
                 Back = k.escapeKey.wasPressedThisFrame || k.backspaceKey.wasPressedThisFrame,
                 Details = k.f1Key.wasPressedThisFrame,
                 ToggleTime = k.tKey.wasPressedThisFrame,
+                ToggleMode = k.mKey.wasPressedThisFrame,
+                CycleTeam = k.qKey.wasPressedThisFrame,
+                CycleCpu = k.cKey.wasPressedThisFrame,
                 Dx = Pressed(k.aKey, k.leftArrowKey) ? -1 : Pressed(k.dKey, k.rightArrowKey) ? 1 : 0,
                 Dy = Pressed(k.wKey, k.upArrowKey) ? -1 : Pressed(k.sKey, k.downArrowKey) ? 1 : 0,
             };
@@ -444,6 +622,9 @@ namespace Airerage.Runtime.UI
                 Back = g.buttonEast.wasPressedThisFrame,
                 Details = g.selectButton.wasPressedThisFrame,
                 ToggleTime = g.buttonNorth.wasPressedThisFrame,
+                ToggleMode = g.buttonWest.wasPressedThisFrame,
+                CycleTeam = g.rightShoulder.wasPressedThisFrame,
+                CycleCpu = g.leftShoulder.wasPressedThisFrame,
                 Dx = Pressed(g.dpad.left, g.leftStick.left) ? -1 : Pressed(g.dpad.right, g.leftStick.right) ? 1 : 0,
                 Dy = Pressed(g.dpad.up, g.leftStick.up) ? -1 : Pressed(g.dpad.down, g.leftStick.down) ? 1 : 0,
             };
@@ -496,6 +677,10 @@ namespace Airerage.Runtime.UI
                 _timed = !_timed;
                 UiSounds.Find().Play(SoundId.UiMove);
             }
+            if (Mode == SelectMode.Local)
+            {
+                HandleLocalSettings(slotIndex, intent);
+            }
             if (intent.Back)
             {
                 Back(slotIndex);
@@ -533,6 +718,19 @@ namespace Airerage.Runtime.UI
                 ? _roster.Clamp(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0))
                 : free % _roster.Count;
             slot.Ready = false;
+            // チーム対戦なら、人数の少ないほう（RED と BLUE）に入る。参加して人と CPU が上限を超えたら CPU を減らす。
+            int red = 0;
+            int blue = 0;
+            foreach (Slot other in _slots)
+            {
+                if (other.Joined && other != slot)
+                {
+                    red += other.Team == 1 ? 1 : 0;
+                    blue += other.Team == 2 ? 1 : 0;
+                }
+            }
+            slot.Team = (byte)(red <= blue ? 1 : 2);
+            ClampCpus();
             UiSounds.Find().Play(SoundId.UiConfirm);
             Refresh();
         }
@@ -719,8 +917,11 @@ namespace Airerage.Runtime.UI
             {
                 if (Mode == SelectMode.Local)
                 {
-                    LocalizedText.Show(_hint, "ENTER / A: JOIN, READY     ESC / B: BACK     F1 / SELECT: DETAILS     T / Y: TIME LIMIT",
-                        "Enter ／ A: 参加・決定　　Esc ／ B: 戻る　　F1 ／ SELECT: 技の説明　　T ／ Y: 制限時間");
+                    LocalizedText.Show(_hint,
+                        "ENTER / A: JOIN, READY     ESC / B: BACK     F1 / SELECT: DETAILS     T / Y: TIME LIMIT\n"
+                        + "M / X: MODE (FREE FOR ALL / TEAM)     C / LB: CPU     Q / RB: MY TEAM",
+                        "Enter ／ A: 参加・決定　　Esc ／ B: 戻る　　F1 ／ SELECT: 技の説明　　T ／ Y: 制限時間\n"
+                        + "M ／ X: 個人戦 ／ チーム対戦　　C ／ LB: CPU の数　　Q ／ RB: 自分のチーム");
                 }
                 else
                 {
@@ -730,7 +931,7 @@ namespace Airerage.Runtime.UI
             }
             if (_timeLimit != null)
             {
-                _timeLimit.text = Mode == SelectMode.Local ? $"TIME LIMIT: {(_timed ? "ON" : "OFF")}" : string.Empty;
+                _timeLimit.text = Mode == SelectMode.Local ? LocalSettingsText() : string.Empty;
             }
             if (_message != null)
             {
@@ -738,14 +939,38 @@ namespace Airerage.Runtime.UI
             }
         }
 
+        // ローカル対戦の設定の行（時間の制限・個人戦かチーム対戦か・CPU の数と、チーム対戦なら CPU のチーム）。
+        private string LocalSettingsText()
+        {
+            string text = $"TIME LIMIT: {(_timed ? "ON" : "OFF")}     MODE: {(_teamMode ? "TEAM" : "FREE FOR ALL")}     CPU: {_cpuCount}";
+            if (_teamMode && _cpuCount > 0)
+            {
+                byte[] teams = CpuTeams();
+                var parts = new List<string>();
+                for (int t = 1; t <= TeamColorsCount; t++)
+                {
+                    int n = Array.FindAll(teams, x => x == t).Length;
+                    if (n > 0)
+                    {
+                        parts.Add($"{Airerage.Runtime.Presentation.TeamColors.NameOf(t)} {n}");
+                    }
+                }
+                text += $" ({string.Join(" / ", parts)})";
+            }
+            return text;
+        }
+
         private string MessageText()
         {
             switch (Mode)
             {
                 case SelectMode.Local:
-                    return JoinedCount < 2
-                        ? Loc.T("2-4 PLAYERS: JOIN WITH ENTER (KEYBOARD) OR A (GAMEPAD)", "2〜4 人: Enter（キーボード）か A（ゲームパッド）で参加")
-                        : string.Empty;
+                    if (JoinedCount + _cpuCount < 2)
+                    {
+                        return Loc.T("JOIN WITH ENTER (KEYBOARD) OR A (GAMEPAD), OR ADD CPUs WITH C / LB",
+                            "Enter（キーボード）か A（ゲームパッド）で参加。C ／ LB で CPU も入れられます");
+                    }
+                    return LocalProblem() ?? string.Empty;
                 case SelectMode.Network:
                     return _networkMessage;
                 default:
@@ -809,8 +1034,15 @@ namespace Airerage.Runtime.UI
                 return;
             }
             _cornerPlates[i].color = JoinedFill;
+            if (Mode == SelectMode.Local && _teamMode)
+            {
+                // チーム対戦: 枠はチームの色、機器の名前の横にチームの名前（T9-6）。
+                color = Airerage.Runtime.Presentation.TeamColors.Of(slot.Team);
+            }
             _cornerPlates[i].BorderColor = slot.Ready ? color : new Color(color.r, color.g, color.b, 0.55f);
-            _cornerDevices[i].text = slot.DeviceName;
+            _cornerDevices[i].text = Mode == SelectMode.Local && _teamMode
+                ? $"{slot.DeviceName}  {Airerage.Runtime.Presentation.TeamColors.NameOf(slot.Team)}"
+                : slot.DeviceName;
             if (slot.Character == RandomIndex)
             {
                 _cornerLogos[i].enabled = false;

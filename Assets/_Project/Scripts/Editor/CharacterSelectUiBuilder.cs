@@ -30,8 +30,8 @@ namespace Airerage.Editor
             MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, Vector2.one);
             MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 50, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(900f, 70f), Color.white);
-            Text timeLimit = MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(900f, 40f), MenuUiBuilder.Accent);
+            Text timeLimit = MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(1500f, 40f), MenuUiBuilder.Accent);
 
             var colors = new Color[CharacterSelectScreen.MaxPlayers];
             for (int i = 0; i < colors.Length; i++)
@@ -98,8 +98,9 @@ namespace Airerage.Editor
                 tags[p] = tag;
                 states[p] = state;
             }
+            // 操作の説明は 2 行まで（ローカル対戦の MODE・CPU・チームの操作。T9-6）。
             Text hint = MenuUiBuilder.CreateText(panel, "Hint", string.Empty, 19, FontStyle.Bold, TextAnchor.LowerCenter,
-                new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(1000f, 36f), new Color(1f, 1f, 1f, 0.75f));
+                new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(1500f, 56f), new Color(1f, 1f, 1f, 0.75f));
 
             CharacterDetailsParts details = CreateDetails(panel);
 

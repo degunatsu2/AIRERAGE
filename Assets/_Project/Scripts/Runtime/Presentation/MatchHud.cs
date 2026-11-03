@@ -67,6 +67,8 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _small;
         private PlayerStatusPlate _resultPlate;
         private GUIStyle _rank;
+        private GUIStyle _teamHeader;
+        private GUIStyle _teamBank;
 
         /// <summary>画面の中央に出している文字（なければ空。テスト用）。</summary>
         public string CenterText { get; private set; } = string.Empty;
@@ -213,7 +215,10 @@ namespace Airerage.Runtime.Presentation
                     TimerDigits = TimerText;
                     if (Time.time - _finishAt < _finishSeconds)
                     {
-                        CenterText = match.Winner >= 0 ? $"{_feed.LabelOf(match.Winner)} WINS!" : "FINISH!";
+                        // チーム対戦は勝ったチームの名前（RED WINS! など。T9-6）。
+                        int winnerTeam = match.Winner >= 0 ? _feed.GetState(match.Winner).Combat.Team : 0;
+                        CenterText = match.Winner < 0 ? "FINISH!"
+                            : winnerTeam != 0 ? $"{TeamColors.NameOf(winnerTeam)} WINS!" : $"{_feed.LabelOf(match.Winner)} WINS!";
                         _centerSub = match.Winner >= 0 ? Loc.T("REACHED THE BANK IN OVERTIME", "アディショナルタイムに拠点へ到達") : "TIME UP";
                         _centerColor = match.Winner >= 0 ? _feed.ColorOf(match.Winner) : new Color(1f, 0.85f, 0.3f);
                         _centerProgress = (Time.time - _finishAt) / _finishSeconds;
@@ -430,23 +435,43 @@ namespace Airerage.Runtime.Presentation
             }
             float width = 640f;
             bool buttons = _matchControls != null;
-            float height = 82f + Ranking.Count * (plateHeight + rowGap) + (buttons ? 64f : 0f);
-            var area = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            CharacterState[] states = States();
+            bool teams = TeamRules.IsTeamMatch(states);
+            // チーム対戦は、チームごとに見出し（順位・チームの名前・チームの BANK の合計）を出し、その下にチームの人の札（T9-6）。
+            int headers = teams ? CountTeams(states) : 0;
+            const float headerHeight = 34f;
+            float rows = Ranking.Count * (plateHeight + rowGap) + headers * (headerHeight + rowGap);
+            float height = 82f + rows + (buttons ? 64f : 0f);
+            var area = new Rect((Screen.width - width) * 0.5f, Mathf.Max(4f, (Screen.height - height) * 0.5f), width, height);
             GUI.color = new Color(0f, 0f, 0f, 0.55f);
             GUI.DrawTexture(area, Texture2D.whiteTexture);
             GUI.color = Color.white;
             Shadowed(new Rect(area.x, area.y + 8f, width, 44f), "RESULT", _timer, new Color(1f, 0.85f, 0.3f));
             float plateX = area.x + (width - plateWidth) * 0.5f + 30f;
+            float y = area.y + 60f;
+            int lastTeam = -1;
+            int teamRank = 0;
             for (int i = 0; i < Ranking.Count; i++)
             {
                 int index = Ranking[i];
-                float y = area.y + 60f + i * (plateHeight + rowGap);
-                Color rankColor = i == 0 ? new Color(1f, 0.85f, 0.3f) : Color.white;
+                int team = states[index].Combat.Team;
+                if (teams && team != lastTeam)
+                {
+                    teamRank++;
+                    DrawTeamResultHeader(new Rect(plateX - 70f, y, plateWidth + 70f, headerHeight), teamRank, team, TeamRules.ScoreOf(states, index));
+                    y += headerHeight + rowGap;
+                }
+                lastTeam = team;
                 bool crown = ScoreboardHud.IsLeader(_feed, index);
-                float rankRight = plateX - (crown ? _resultPlate.CrownWidth : 0f) - 8f;
-                Shadowed(new Rect(rankRight - 60f, y, 60f, plateHeight), (i + 1).ToString(), _rank, rankColor);
+                if (!teams)
+                {
+                    Color rankColor = i == 0 ? new Color(1f, 0.85f, 0.3f) : Color.white;
+                    float rankRight = plateX - (crown ? _resultPlate.CrownWidth : 0f) - 8f;
+                    Shadowed(new Rect(rankRight - 60f, y, 60f, plateHeight), (i + 1).ToString(), _rank, rankColor);
+                }
                 _resultPlate.Draw(new Rect(plateX, y, plateWidth, plateHeight), index + 1, _feed.LabelOf(index), _feed.ColorOf(index),
-                    _feed.GetState(index), crown, default, new Color(1f, 0.85f, 0.2f), ScoreboardHud.LogoOf(_feed, index));
+                    states[index], crown, default, new Color(1f, 0.85f, 0.2f), ScoreboardHud.LogoOf(_feed, index));
+                y += plateHeight + rowGap;
             }
             // 順位の決め方（確定コインの数。D-25）の説明の行は出さない（ユーザーの要望、2026-10-30）。
             if (!buttons)
@@ -468,6 +493,44 @@ namespace Airerage.Runtime.Presentation
                 UiSounds.Find().Play(SoundId.UiConfirm);
                 _matchControls.Quit();
             }
+        }
+
+        // チーム対戦の結果のチームの見出し: チームの色の帯に、順位・チームの名前・チームの BANK の合計。
+        private void DrawTeamResultHeader(Rect rect, int rank, int team, int bank)
+        {
+            if (_teamHeader == null)
+            {
+                _teamHeader = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleLeft });
+                _teamBank = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight });
+            }
+            Color color = TeamColors.Of(team);
+            GUI.color = new Color(color.r * 0.5f, color.g * 0.5f, color.b * 0.5f, 0.9f);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = color;
+            GUI.DrawTexture(new Rect(rect.x, rect.y, 8f, rect.height), Texture2D.whiteTexture);
+            Color rankColor = rank == 1 ? new Color(1f, 0.85f, 0.3f) : Color.white;
+            Shadowed(new Rect(rect.x + 18f, rect.y, rect.width, rect.height), $"{rank}  {TeamColors.NameOf(team)}", _teamHeader, rankColor);
+            Shadowed(new Rect(rect.x, rect.y, rect.width - 14f, rect.height), $"BANK {bank}", _teamBank, new Color(1f, 0.85f, 0.2f));
+            GUI.color = Color.white;
+        }
+
+        // 試合にいるチームの数（チームなしは数えない）。
+        private static int CountTeams(CharacterState[] states)
+        {
+            int mask = 0;
+            foreach (CharacterState state in states)
+            {
+                if (state.Combat.Team > 0 && state.Combat.Team < 31)
+                {
+                    mask |= 1 << state.Combat.Team;
+                }
+            }
+            int count = 0;
+            for (; mask != 0; mask &= mask - 1)
+            {
+                count++;
+            }
+            return count;
         }
 
         private static void Shadowed(Rect rect, string text, GUIStyle style, Color color)

@@ -279,6 +279,11 @@ namespace Airerage.Core.Simulation
             UpdateWater(ref state, startPosition, config, zones, tick);
             for (int i = 0; i < zones.Count; i++)
             {
+                if (zones[i].SparesTeam(state.Combat.Team))
+                {
+                    // チーム対戦: 味方の THIEF が置いた危険・吹雪・悪魔の手は効かない（D-81）。
+                    continue;
+                }
                 StageZone zone = zones[i].At(tick);
                 switch (zone.Kind)
                 {

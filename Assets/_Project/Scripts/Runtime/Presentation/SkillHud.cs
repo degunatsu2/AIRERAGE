@@ -436,8 +436,16 @@ namespace Airerage.Runtime.Presentation
             Matrix4x4 matrix = GUI.matrix;
             if (_player >= 0)
             {
-                // 画面の下を人数で等分した、自分の番号の場所（狭ければ縮める）。
-                float width = Screen.width / (float)Mathf.Max(1, _feed.CharacterCount);
+                // 画面の下を人数で等分した、自分の番号の場所（狭ければ縮める）。CPU（人の後ろの番号）には札を出さないので数えない。
+                int people = _feed.CharacterCount;
+                if (_feed is ICpuRoster roster)
+                {
+                    while (people > 0 && roster.IsCpu(people - 1))
+                    {
+                        people--;
+                    }
+                }
+                float width = Screen.width / (float)Mathf.Max(1, people);
                 center = width * (_player + 0.5f);
                 float scale = Mathf.Min(1f, width * 0.92f / (total + 2f * (StackSpacing + StackWidth)));
                 if (scale < 1f)

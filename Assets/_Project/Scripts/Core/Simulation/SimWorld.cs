@@ -252,7 +252,7 @@ namespace Airerage.Core.Simulation
             _match = snapshot.Match;
             Tick = snapshot.Tick;
             RefreshConfigs();
-            ThiefRules.RefreshZones(_zoneList, Zones, _objects);
+            ThiefRules.RefreshZones(_zoneList, Zones, _objects, _states);
         }
 
         /// <summary>今の全状態のチェックサム（WorldSnapshot.Checksum と同じ値）。</summary>
@@ -329,7 +329,7 @@ namespace Airerage.Core.Simulation
                 return;
             }
             // THIEF が置いたギミックも、ステージのギミックと一緒に効かせる（このティックの初めの物から決める）。
-            ThiefRules.RefreshZones(_zoneList, Zones, _objects);
+            ThiefRules.RefreshZones(_zoneList, Zones, _objects, _states);
             // 置かれた物のアンカーポイントは、このティックの初めの物から決める（巻き戻しても全員で同じ）。
             _collision.Refresh(_objects);
             // 動く足場と扉: このティックの位置の当たりを作り、動いた分だけ乗っている人とつないだワイヤーを運ぶ。

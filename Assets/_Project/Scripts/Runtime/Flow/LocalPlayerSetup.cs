@@ -25,6 +25,9 @@ namespace Airerage.Runtime.Flow
         /// <summary>キャラクター（CharacterRoster の番号）。</summary>
         public int Character { get; set; }
 
+        /// <summary>チーム対戦のチーム（1〜4。0 なら個人戦。docs/19 T9-6）。</summary>
+        public byte Team { get; set; }
+
         /// <summary>CPU が操作するか（シングルモード。docs/16 T7-2）。</summary>
         public bool IsCpu { get; private set; }
 

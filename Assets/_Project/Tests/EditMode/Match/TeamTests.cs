@@ -6,6 +6,7 @@ using Airerage.Core.Economy;
 using Airerage.Core.Input;
 using Airerage.Core.Match;
 using Airerage.Core.Simulation;
+using Airerage.Core.Skills;
 using Airerage.Core.Tests.Support;
 using NUnit.Framework;
 
@@ -79,6 +80,89 @@ namespace Airerage.Core.Tests.Match
             resolver.Resolve(states, configs, 1, null, 0, extra);
             Assert.That(resolver.LastHits.Count, Is.EqualTo(1), "味方への投射物の命中が残った");
             Assert.That(resolver.LastHits[0].Victim, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void MatchaCream_SparesTheOwnersAllies_ButStillSlowsTheOwnerAndEnemies()
+        {
+            // 抹茶のクリームは置いた本人にも効く（2026-10-21 の要望）が、チーム対戦の味方には効かない（D-81。T9-6）。
+            var world = new SimWorld(TestArenas.Ground());
+            for (int i = 0; i < 3; i++)
+            {
+                world.AddCharacter(i == 0 ? CharacterPresets.PastryChef() : new CharacterConfig(), new Vector3(i * 2f - 2f, GroundY, 0f));
+            }
+            world.SetTeam(0, 1);
+            world.SetTeam(1, 1);
+            world.SetTeam(2, 2);
+            world.Objects.Add(new Airerage.Core.Objects.WorldObject
+            {
+                Kind = Airerage.Core.Objects.WorldObjectKind.CreamPatch, Owner = 0, Slot = AttackSlot.Special2,
+                Position = new Vector2(0f, 0.12f), End = new Vector2(6f, 0.12f), Velocity = Vector2.UnitY, ExpireTick = int.MaxValue,
+                Variant = (byte)Airerage.Core.Objects.CreamFlavor.Matcha,
+            });
+            world.Step(new PlayerInput[3]);
+            world.Step(new PlayerInput[3]);
+            int matcha = CharacterPresets.PastryChef().Skills.Cream.MatchaSpeedPercent;
+            Assert.That(world.GetState(0).Combat.CreamSpeedPercent, Is.EqualTo(matcha), "置いた本人に効かない");
+            Assert.That(world.GetState(1).Combat.CreamSpeedPercent, Is.Zero, "味方に抹茶が効いた");
+            Assert.That(world.GetState(2).Combat.CreamSpeedPercent, Is.EqualTo(matcha), "敵に効かない");
+        }
+
+        [Test]
+        public void HarmfulPlacedZones_SpareThePlacersTeam_StageZonesHitEveryone()
+        {
+            // THIEF が置いた危険（溶岩流）は、置いた人のチームに効かない（D-81）。ステージの危険と、チームのない人には今までどおり効く。
+            var lava = new StageZone(StageZoneKind.Hazard, -2f, -1f, 2f, 8f, Vector2.UnitY, 30f, 0f, new StageZoneTiming(120, 30, 0), Vector2.Zero, 4f);
+            StageZone placed = lava.WithOwnerTeam(1);
+            Assert.That(placed.SparesTeam(1), Is.True);
+            Assert.That(placed.SparesTeam(2) || placed.SparesTeam(0) || lava.SparesTeam(1), Is.False);
+            Assert.That(new StageZone(StageZoneKind.JumpPad, -1f, 0f, 1f, 1f, Vector2.UnitY, 10f).WithOwnerTeam(1).SparesTeam(1), Is.False,
+                "得になるギミックまで味方から外した");
+
+            var config = new CharacterConfig();
+            CharacterState ally = CharacterState.Spawn(new Vector3(0f, config.Movement.HalfHeight, 0f), 1);
+            ally.Combat.Team = 1;
+            CharacterState enemy = ally;
+            enemy.Combat.Team = 2;
+            CharacterState ally2 = ally;
+            StageZones.Apply(ref ally, ally.Position, config, new[] { placed }, 0);
+            StageZones.Apply(ref enemy, enemy.Position, config, new[] { placed }, 0);
+            StageZones.Apply(ref ally2, ally2.Position, config, new[] { lava }, 0);
+            Assert.That(ally.Combat.HazardHitCount, Is.Zero, "置いた人のチームに当たった");
+            Assert.That(enemy.Combat.HazardHitCount, Is.EqualTo(1), "敵に当たらない");
+            Assert.That(ally2.Combat.HazardHitCount, Is.EqualTo(1), "ステージの危険が当たらない");
+
+            // 置いたギミックの一覧を作るときに、置いた人のチームを持たせる。
+            var objects = new Airerage.Core.Objects.WorldObjects();
+            objects.Add(new Airerage.Core.Objects.WorldObject
+            {
+                Kind = Airerage.Core.Objects.WorldObjectKind.PlacedZone, Owner = 1, Stored = 0, Position = new Vector2(10f, 3f),
+                End = new Vector2(2f, 4f), ExpireTick = int.MaxValue,
+            });
+            // 一覧の初めはステージのギミック（SimWorld が持つ一覧と同じ形）。
+            var active = new List<StageZone> { lava };
+            ThiefRules.RefreshZones(active, new[] { lava }, objects, States((0, 0, 0), (3, 0, 0)));
+            Assert.That(active.Count, Is.EqualTo(2));
+            Assert.That(active[0].OwnerTeam, Is.Zero, "ステージのギミックにチームが付いた");
+            Assert.That(active[1].OwnerTeam, Is.EqualTo(3), "置いたギミックに置いた人のチームがない");
+        }
+
+        [Test]
+        public void PlacedPitcherBalls_SpareThePlacersTeam()
+        {
+            StageTrap pitcher = StageTrap.Pitcher(new Vector2(0f, 1f), new Vector2(16f, 0f), 1200, 0, 0.35f, 10, 20f, 6f, 60);
+            var config = new CharacterConfig();
+            List<CharacterState> states = States((1, 0, 0), (2, 0, 0));
+            for (int i = 0; i < states.Count; i++)
+            {
+                CharacterState s = states[i];
+                s.Position = new Vector3(0f, 1f, 0f);
+                states[i] = s;
+            }
+            var configs = new[] { config, config };
+            StageTraps.StrikeWithBall(pitcher, new Vector2(0f, 1f), new Vector2(20f, 0f), states, configs, sparedTeam: 1);
+            Assert.That(states[0].Combat.HazardHitCount, Is.Zero, "置いた人のチームにボールが当たった");
+            Assert.That(states[1].Combat.HazardHitCount, Is.EqualTo(1), "敵にボールが当たらない");
         }
 
         [Test]

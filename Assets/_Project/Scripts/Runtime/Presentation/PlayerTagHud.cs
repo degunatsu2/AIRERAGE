@@ -6,7 +6,9 @@ namespace Airerage.Runtime.Presentation
 {
     /// <summary>
     /// ローカル対戦の頭上の札（ユーザーの要望、2026-10-22: 全員が入るカメラでは自分のキャラクターを見失いやすい）。キャラクターの頭の上に、
-    /// プレイヤーの色の枠の黒い四角と、プレイヤーの番号（ISimulationFeed.LabelOf。P1・CPU2 など）を出す。ローカル対戦のシーンにだけ置く。
+    /// プレイヤーの色の枠の黒い四角と、プレイヤーの番号（ISimulationFeed.LabelOf。P1・CPU2 など）を出す。ローカル対戦のシーンに置く。
+    /// チーム対戦では枠をチームの色にする（ISimulationFeed.ColorOf）。ネットワーク対戦のシーンでは、チーム対戦の間だけ出す（_teamMatchesOnly。
+    /// 敵と味方を見分ける。T9-6）。
     /// 撃破されて復帰を待つ間と、抜けた人には出さない。位置は表示の箱（CharacterView。補間した位置）に合わせる。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class PlayerTagHud : MonoBehaviour
@@ -25,6 +27,8 @@ namespace Airerage.Runtime.Presentation
         [Tooltip("枠の太さ（画面の点）")]
         [SerializeField] private float _border = 3f;
         [SerializeField] private int _fontSize = 18;
+        [Tooltip("チーム対戦の間だけ出す（ネットワーク対戦のシーン）")]
+        [SerializeField] private bool _teamMatchesOnly;
 
         private ISimulationFeed _feed;
         private GUIStyle _style;
@@ -56,7 +60,7 @@ namespace Airerage.Runtime.Presentation
                 return false;
             }
             CharacterState state = _feed.GetState(index);
-            if (state.Combat.IsWaitingToRespawn)
+            if (state.Combat.IsWaitingToRespawn || state.Combat.HasLeft || (_teamMatchesOnly && state.Combat.Team == 0))
             {
                 return false;
             }

@@ -6,6 +6,7 @@ using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.UI;
 using UnityEngine;
 
 namespace Airerage.Runtime.Presentation
@@ -25,6 +26,8 @@ namespace Airerage.Runtime.Presentation
     /// （印鑑を押すように落ちてきて、朱色の輪が広がり、札が揺れる）、札を赤く強調して斜めに大きな「WANTED!」のスタンプを押し、低めの
     /// サイレンを鳴らす。赤い強調とスタンプは 1 秒たつと薄くなって消え、手配書の印だけが残る（下の数を隠さないように。ユーザーの指摘、
     /// 2026-11-02）。所持コインが減って外れたら、印が光の粒になって消える（赤い強調がまだ残っていれば、それも一緒に薄くなる）。
+    /// チーム対戦（docs/19 T9-6）: 札の色はチームの色（ISimulationFeed.ColorOf）。チームごとにまとまって並び（順位はチームの確定の合計）、
+    /// 各チームの先頭に、チームの色の細い見出し（チームの名前と、チームの BANK の合計）を出す。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class ScoreboardHud : MonoBehaviour
@@ -34,6 +37,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private int _width = 300;
         [SerializeField] private int _rowHeight = 52;
         [SerializeField] private float _rowGap = 6f;
+        [Tooltip("チーム対戦のチームの見出しの高さ（画面の点）")]
+        [SerializeField] private float _teamHeaderHeight = 24f;
 
         // キャラクターと重なった札を透かす（HudOcclusion）。
         private readonly HudOcclusion.Link _occlusion = new HudOcclusion.Link();
@@ -62,6 +67,11 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _emphasisFadeSeconds = 0.5f;
 
         private readonly List<float> _rowY = new List<float>();
+        // チームの見出し（チームの番号 1〜4 ごと）の今の位置（-1 なら出していない）と、出す見出し（上から、チームの番号）。
+        private readonly float[] _headerY = { -1f, -1f, -1f, -1f, -1f };
+        private readonly List<int> _headers = new List<int>();
+        private GUIStyle _headerName;
+        private GUIStyle _headerBank;
         private ISimulationFeed _feed;
         private PlayerStatusPlate _plate;
         private int[] _order = new int[0];
@@ -94,6 +104,9 @@ namespace Airerage.Runtime.Presentation
         {
             return index < _jackpotAt.Length && Time.time - _jackpotAt[index] < _jackpotSeconds;
         }
+
+        /// <summary>チームの見出し（上から、チームの番号。個人戦なら空。テスト用）。</summary>
+        public IReadOnlyList<int> TeamHeaders => _headers;
 
         /// <summary>今の並び（上から、キャラクターの番号）と、王冠をつけている人の数（テスト用）。</summary>
         public IReadOnlyList<int> Order => _order;
@@ -176,12 +189,32 @@ namespace Airerage.Runtime.Presentation
             }
             float blend = 1f - Mathf.Exp(-_slideSpeed * Time.unscaledDeltaTime);
             int crowns = 0;
+            bool teams = TeamRules.IsTeamMatch(states);
+            _headers.Clear();
+            float y = _margin.y;
+            int lastTeam = -1;
             for (int rank = 0; rank < _order.Length; rank++)
             {
                 int index = _order[rank];
-                float target = _margin.y + rank * (_rowHeight + _rowGap);
-                _rowY[index] = _rowY[index] < 0f ? target : Mathf.Lerp(_rowY[index], target, blend);
+                int team = states[index].Combat.Team;
+                if (teams && team != lastTeam && team > 0 && team < _headerY.Length)
+                {
+                    // チームの先頭の見出し（チームはまとまって並ぶ。MatchResults.Rank）。
+                    _headers.Add(team);
+                    _headerY[team] = _headerY[team] < 0f ? y : Mathf.Lerp(_headerY[team], y, blend);
+                    y += _teamHeaderHeight + _rowGap * 0.5f;
+                }
+                lastTeam = team;
+                _rowY[index] = _rowY[index] < 0f ? y : Mathf.Lerp(_rowY[index], y, blend);
+                y += _rowHeight + _rowGap;
                 crowns += IsLeader(_feed, index) ? 1 : 0;
+            }
+            for (int t = 0; t < _headerY.Length; t++)
+            {
+                if (!_headers.Contains(t))
+                {
+                    _headerY[t] = -1f;
+                }
             }
             CrownCount = crowns;
         }
@@ -369,6 +402,48 @@ namespace Airerage.Runtime.Presentation
             return look;
         }
 
+        // チームの見出し: チームの色の帯に、左にチームの名前、右にチームの BANK の合計（黄色）。
+        private void DrawTeamHeaders(float x)
+        {
+            if (_headerName == null)
+            {
+                _headerName = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleLeft });
+                _headerBank = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight });
+            }
+            int count = _feed.CharacterCount;
+            var states = new CharacterState[count];
+            for (int i = 0; i < count; i++)
+            {
+                states[i] = _feed.GetState(i);
+            }
+            Color previous = GUI.color;
+            foreach (int team in _headers)
+            {
+                int member = -1;
+                for (int i = 0; i < count && member < 0; i++)
+                {
+                    member = states[i].Combat.Team == team ? i : -1;
+                }
+                if (member < 0 || _headerY[team] < 0f)
+                {
+                    continue;
+                }
+                var rect = new Rect(x, _headerY[team], _width, _teamHeaderHeight);
+                HudFade.Begin(_occlusion.AlphaFor(this, 100 + team, rect));
+                Color color = TeamColors.Of(team);
+                GUI.color = HudFade.Apply(new Color(color.r * 0.55f, color.g * 0.55f, color.b * 0.55f, 0.85f));
+                GUI.DrawTexture(rect, Texture2D.whiteTexture);
+                GUI.color = HudFade.Apply(color);
+                GUI.DrawTexture(new Rect(rect.x, rect.y, 6f, rect.height), Texture2D.whiteTexture);
+                GuidePlate.DrawText(new Rect(rect.x + 14f, rect.y, rect.width - 20f, rect.height), TeamColors.NameOf(team), _headerName,
+                    Color.white);
+                GuidePlate.DrawText(new Rect(rect.x + 14f, rect.y, rect.width - 24f, rect.height), $"BANK {TeamRules.ScoreOf(states, member)}",
+                    _headerBank, _bankColor);
+                HudFade.End();
+            }
+            GUI.color = previous;
+        }
+
         private void OnGUI()
         {
             int count = _feed.CharacterCount;
@@ -381,6 +456,10 @@ namespace Airerage.Runtime.Presentation
                 _plate = new PlayerStatusPlate(_width, _rowHeight);
             }
             float x = Screen.width - _margin.x - _width;
+            if (_headers.Count > 0)
+            {
+                DrawTeamHeaders(x);
+            }
             foreach (int index in _order)
             {
                 var rect = new Rect(x, _rowY[index], _width, _rowHeight);

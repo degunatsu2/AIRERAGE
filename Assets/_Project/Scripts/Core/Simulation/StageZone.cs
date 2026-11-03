@@ -169,6 +169,12 @@ namespace Airerage.Core.Simulation
         public readonly Vector2 Travel;
         public readonly int TravelPeriod;
 
+        /// <summary>
+        /// 置いた人のチーム（チーム対戦。THIEF が置いたギミック。1〜4。0 ならステージのギミックかチームなし）。害のある面（危険・吹雪・
+        /// 悪魔の手）は、このチームの人に効かない（D-81。ステージのギミックはチームに関係なく全員に効く）。
+        /// </summary>
+        public readonly int OwnerTeam;
+
         public int Period => Timing.Period;
         public int ActiveTicks => Timing.ActiveTicks;
         public int PhaseTicks => Timing.PhaseTicks;
@@ -282,6 +288,7 @@ namespace Airerage.Core.Simulation
             Width = width;
             Travel = travel;
             TravelPeriod = travelPeriod;
+            OwnerTeam = 0;
         }
 
         // 検査を済ませた値から、範囲だけを動かしたものを作る（At）。
@@ -300,6 +307,46 @@ namespace Airerage.Core.Simulation
             Width = source.Width;
             Travel = Vector2.Zero;
             TravelPeriod = 0;
+            OwnerTeam = source.OwnerTeam;
+        }
+
+        // 検査を済ませた値から、置いた人のチームだけを変えたものを作る（WithOwnerTeam）。
+        private StageZone(in StageZone source, int ownerTeam)
+        {
+            Kind = source.Kind;
+            MinX = source.MinX;
+            MinY = source.MinY;
+            MaxX = source.MaxX;
+            MaxY = source.MaxY;
+            Direction = source.Direction;
+            Power = source.Power;
+            Limit = source.Limit;
+            Timing = source.Timing;
+            Target = source.Target;
+            Width = source.Width;
+            Travel = source.Travel;
+            TravelPeriod = source.TravelPeriod;
+            OwnerTeam = ownerTeam;
+        }
+
+        /// <summary>置いた人のチーム team（0〜4）を持たせたもの。</summary>
+        public StageZone WithOwnerTeam(int team)
+        {
+            return new StageZone(this, Math.Max(0, team));
+        }
+
+        /// <summary>
+        /// 害のある種類（危険・吹雪・悪魔の手。置いた人のチームには効かない。D-81）か。水は浮かぶ足場にもなるので、置いた物でも全員に効く【仮】。
+        /// </summary>
+        public static bool IsHarmful(StageZoneKind kind)
+        {
+            return kind == StageZoneKind.Hazard || kind == StageZoneKind.Blizzard || kind == StageZoneKind.Grab;
+        }
+
+        /// <summary>チーム team（CombatState.Team）の人に、害のある面を効かせないか（置いた人のチームと同じ）。</summary>
+        public bool SparesTeam(int team)
+        {
+            return OwnerTeam != 0 && team == OwnerTeam && IsHarmful(Kind);
         }
 
         private static StageZoneTiming ValidateTiming(StageZoneKind kind, StageZoneTiming timing)
@@ -560,7 +607,7 @@ namespace Airerage.Core.Simulation
             return Kind == other.Kind && MinX.Equals(other.MinX) && MinY.Equals(other.MinY) && MaxX.Equals(other.MaxX)
                 && MaxY.Equals(other.MaxY) && Direction.Equals(other.Direction) && Power.Equals(other.Power) && Limit.Equals(other.Limit)
                 && Timing.Equals(other.Timing) && Target.Equals(other.Target) && Width.Equals(other.Width) && Travel.Equals(other.Travel)
-                && TravelPeriod == other.TravelPeriod;
+                && TravelPeriod == other.TravelPeriod && OwnerTeam == other.OwnerTeam;
         }
 
         public override bool Equals(object obj)
@@ -570,7 +617,8 @@ namespace Airerage.Core.Simulation
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(HashCode.Combine(Kind, MinX, MinY, MaxX, MaxY, Direction, Power, Limit), Timing, Target, Width, Travel, TravelPeriod);
+            return HashCode.Combine(HashCode.Combine(Kind, MinX, MinY, MaxX, MaxY, Direction, Power, Limit), Timing, Target, Width, Travel, TravelPeriod,
+                OwnerTeam);
         }
 
         public override string ToString()
