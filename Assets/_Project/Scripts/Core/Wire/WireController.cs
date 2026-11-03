@@ -103,7 +103,17 @@ namespace Airerage.Core.Wire
                 input.Move, gravity, SimTime.DeltaTime, tuning);
             WireMotionResult result = model.Step(context);
             state.Wire.RopeLength = result.RopeLength;
-            return SimMath.ClampMagnitude(result.Velocity, tuning.MaxAttachedSpeed);
+            // 前の上限（AttachedSpeedSoftStart）を超えた先は、伸びを曲線的に緩やかにする（SpeedRamp。2026-11-03 のユーザーの要望）。
+            Vector3 velocity = result.Velocity;
+            float before = state.Velocity.Length();
+            float after = velocity.Length();
+            float limited = SpeedRamp.Limit(before, after, tuning.AttachedSpeedSoftStart, tuning.MaxAttachedSpeed,
+                SpeedRamp.ScaleFor(tuning.AttachedSpeedSoftStart, tuning.MaxAttachedSpeed, gravity, tuning.SpeedRampSeconds));
+            if (limited < after && after > SimMath.Epsilon)
+            {
+                velocity *= limited / after;
+            }
+            return SimMath.ClampMagnitude(velocity, tuning.MaxAttachedSpeed);
         }
 
         /// <summary>

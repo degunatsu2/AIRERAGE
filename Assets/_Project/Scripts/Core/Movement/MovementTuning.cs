@@ -36,6 +36,17 @@ namespace Airerage.Core.Movement
         public float MaxFallSpeed = 40f;
 
         /// <summary>
+        /// 落ちる速さが、この速さ（前の上限。m/s）を超えたら、伸びを曲線的に緩やかにする（SpeedRamp。2026-11-03 のユーザーの要望）【仮】。
+        /// </summary>
+        public float FallSpeedSoftStart = 20f;
+
+        /// <summary>
+        /// 前の上限を超えた先の伸びの緩やかさ: 重力の加速度（Gravity）で止まった状態から伸び続けたとき、この秒数で上限（MaxFallSpeed）に
+        /// 届く（SpeedRamp.ScaleFor）【仮】。
+        /// </summary>
+        public float SpeedRampSeconds = 4f;
+
+        /// <summary>
         /// 地上と空中の横の速さの上限（m/s）。走る速さ（RunSpeed）より速い勢い（ワイヤー・ギミックの後）をここまで保てる【仮】。
         /// のけぞり中（吹き飛び）は切らない。2026-11-03 にユーザーの要望で 40 にした（それまでは上限なし。ワイヤーの解除で 18 に切っていた）。
         /// </summary>
@@ -110,6 +121,9 @@ namespace Airerage.Core.Movement
             v.NonNegative(nameof(AirDrag), AirDrag);
             v.NonNegative(nameof(Gravity), Gravity);
             v.Positive(nameof(MaxFallSpeed), MaxFallSpeed);
+            // 上限以上なら曲線にしない（上限で切るだけ。SpeedRamp.Limit）。
+            v.NonNegative(nameof(FallSpeedSoftStart), FallSpeedSoftStart);
+            v.Positive(nameof(SpeedRampSeconds), SpeedRampSeconds);
             v.InRange(nameof(MaxGroundSpeed), MaxGroundSpeed, RunSpeed, float.MaxValue);
             v.InRange(nameof(MaxAirSpeed), MaxAirSpeed, Math.Max(RunSpeed, AirRunSpeed), float.MaxValue);
             v.NonNegative(nameof(LandingGraceTicks), LandingGraceTicks);

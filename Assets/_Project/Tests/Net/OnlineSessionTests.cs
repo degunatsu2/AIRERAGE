@@ -470,9 +470,10 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
-        public void JoinDuringAMatch_WaitsInTheWaitingRoom_TheOthersAreTold_AndTheNextMatchIncludesThem()
+        public void JoinDuringAMatch_WaitsAsASpectator_TheOthersAreTold_AndCanPlayAfterBackToTheRoom()
         {
-            // 試合の途中から入った人（2026-11-03 のユーザーの要望）: 待機所で今の試合が終わるのを待ち、試合中の全員に「名前 JOIN」を知らせる。
+            // 試合の途中から入った人（2026-11-03 のユーザーの要望）: 観戦の列で今の試合が終わるのを待ち、試合中の全員に「名前 JOIN」を知らせる。
+            // 待っている人がいる間は、ホストの再戦を押せない（結果の画面）。待機所へ戻ると、見出しを選んで参加できる。
             OnlineSession host = Host();
             OnlineSession player = Join(host);
             PumpUntil(() => player.LocalPlayer == 1);
@@ -485,6 +486,8 @@ namespace Airerage.Net.Tests
             Assert.That(late.State, Is.EqualTo(OnlineSession.SessionState.Lobby), "途中から入った人が試合を始めた");
             Assert.That(late.Roster[0].Connected && late.Roster[1].Connected, Is.True, "待機所に試合中の人が出ない");
             Assert.That(late.Roster[1].Late, Is.False);
+            Assert.That(late.LocalSpectator, Is.True, "途中から入った人が観戦の列にいない");
+            Assert.That(host.HasLateJoiners && late.HasLateJoiners, Is.True);
             Assert.That(host.PlayerCount, Is.EqualTo(2), "途中から入った人が試合の人数に入った");
             Assert.That(host.LobbyParticipantCount, Is.EqualTo(2));
 
@@ -500,11 +503,16 @@ namespace Airerage.Net.Tests
             Assert.That(player.State, Is.EqualTo(OnlineSession.SessionState.Running));
             Assert.That(host.Desyncs, Is.Empty);
 
-            // 再戦から、3 人で遊ぶ。
-            host.RestartMatch(MatchRules.FreePlay());
+            // 全員で待機所へ戻る（BACK ROOM）と、待っていた人は観戦の列のまま、待つ印が外れる。PLAYERS を選んで参加し、3 人で遊ぶ。
+            host.ReturnToLobby(LobbyPhase.Waiting);
+            PumpUntil(() => late.State == OnlineSession.SessionState.Lobby && player.State == OnlineSession.SessionState.Lobby && !late.LocalLate);
+            Assert.That(late.LocalSpectator, Is.True, "待機所に戻ったら観戦の列から出た");
+            Assert.That(host.HasLateJoiners, Is.False);
+            late.LocalSpectator = false;
+            PumpUntil(() => !host.Roster[2].Spectator);
+            host.StartMatch(MatchRules.FreePlay());
             PumpUntil(() => late.State == OnlineSession.SessionState.Running && late.MatchNumber == host.MatchNumber
                 && player.MatchNumber == host.MatchNumber);
-            Assert.That(late.LocalLate, Is.False);
             Assert.That(late.IsSpectating, Is.False);
             Assert.That(host.PlayerCount, Is.EqualTo(3));
             const int ticks = 120;
@@ -547,10 +555,33 @@ namespace Airerage.Net.Tests
             PumpUntil(() => ninth.State == OnlineSession.SessionState.Ended);
             Assert.That(ninth.LocalPlayer, Is.EqualTo(-1));
 
-            // 待機所へ戻ると、待っていた人も参加する人になる（個人戦は 4 人まで。残りは待機所の準備完了で決まる）。
+            // 待機所へ戻ると、待っていた人は観戦の列のまま待つ印が外れる（参加は各自が見出しを選ぶ）。
             host.ReturnToLobby(LobbyPhase.Waiting);
             PumpUntil(() => waiting.TrueForAll(s => s.State == OnlineSession.SessionState.Lobby && !s.LocalLate));
-            Assert.That(host.LobbyParticipantCount, Is.EqualTo(OnlineSession.MaxPlayers));
+            Assert.That(waiting.TrueForAll(s => s.LocalSpectator), Is.True, "待っていた人が観戦の列にいない");
+            Assert.That(host.LobbyParticipantCount, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void JoinDuringCharacterSelect_SeesTheMatchStart_AsItHappens()
+        {
+            // キャラクター選択の途中から入った人の待機所の表示は、試合が始まったら「選択中」から「対戦中」へすぐに変わる（2026-11-03 の指摘）。
+            OnlineSession host = Host();
+            OnlineSession player = Join(host);
+            PumpUntil(() => player.LocalPlayer == 1);
+            host.LocalReady = true;
+            player.LocalReady = true;
+            PumpUntil(() => player.Phase == LobbyPhase.CharacterSelect);
+            OnlineSession late = Join(host);
+            PumpUntil(() => late.LocalLate && late.Phase == LobbyPhase.CharacterSelect);
+            Assert.That(late.MatchRunning, Is.False, "選択の途中なのに試合中");
+            Assert.That(late.LocalSpectator, Is.True, "途中から入った人が観戦の列にいない");
+            host.StartMatch(MatchRules.FreePlay());
+            PumpUntil(() => late.MatchRunning, "試合が始まっても、待っている人に試合中と伝わらない");
+            Assert.That(late.State, Is.EqualTo(OnlineSession.SessionState.Lobby), "待っている人が試合に入った");
+            Assert.That(host.PlayerCount, Is.EqualTo(2));
+            host.ReturnToLobby(LobbyPhase.Waiting);
+            PumpUntil(() => !late.MatchRunning && !late.LocalLate && late.Phase == LobbyPhase.Waiting);
         }
 
         [Test]
@@ -767,7 +798,7 @@ namespace Airerage.Net.Tests
             // キャラクター選択の途中から入った人は、待機所で待つ（試合の人数・決定に入らない。2026-11-03）。
             OnlineSession late = OnlineSession.Join("127.0.0.1", host.Port, new RollbackSettings());
             _sessions.Add(late);
-            PumpUntil(() => late.LocalPlayer == 2 && late.LocalLate && client.Roster[2].Late);
+            PumpUntil(() => late.LocalPlayer == 2 && late.LocalLate && client.Roster[2].Late && client.Roster[2].Spectator);
             Assert.That(late.State, Is.EqualTo(OnlineSession.SessionState.Lobby));
             Assert.That(late.MatchRunning, Is.False, "選択の途中なのに試合中と出ている");
             Assert.That(host.LobbyParticipantCount, Is.EqualTo(2));
@@ -1182,6 +1213,20 @@ namespace Airerage.Net.Tests
                 : OnlineSession.Join("127.0.0.1", host.Port, _terrain, SpawnBase, new RollbackSettings());
             _sessions.Add(client);
             return client;
+        }
+
+        private void PumpUntil(Func<bool> done, string message)
+        {
+            var watch = Stopwatch.StartNew();
+            while (!done())
+            {
+                if (watch.ElapsedMilliseconds > TimeoutMs)
+                {
+                    Assert.Fail(message + ": " + string.Join(" / ", _sessions.ConvertAll(s => s.Status)));
+                }
+                PumpFrames(1);
+                Thread.Sleep(1);
+            }
         }
 
         // 全員を1フレームずつ（1/60 秒として）進めることを、条件を満たすまで繰り返す。時間内に満たさなければ失敗。

@@ -82,11 +82,13 @@ namespace Airerage.Core.Skills
             movement.AirDrag *= s;
             movement.Gravity *= s2;
             movement.MaxFallSpeed *= s;
+            movement.FallSpeedSoftStart *= s;
             movement.JumpSpeed *= s;
 
             WireTuning wire = config.Wire.Clone();
             wire.FireSpeed *= s;
             wire.MaxAttachedSpeed *= s;
+            wire.AttachedSpeedSoftStart *= s;
             wire.ExitSpeedCap *= s;
             wire.Inertial.StartPullSpeed *= s;
             wire.Inertial.ReelSpeed *= s;

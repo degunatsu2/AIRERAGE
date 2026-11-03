@@ -25,6 +25,13 @@ namespace Airerage.Core.Movement
 
             float fallSpeedBefore = state.Velocity.Y;
             state.Velocity.Y -= tuning.Gravity * dt;
+            if (!knockback && state.Velocity.Y < -tuning.FallSpeedSoftStart)
+            {
+                // 前の上限（FallSpeedSoftStart）を超えて落ちる速さは、上限に近いほどゆっくり伸びる（SpeedRamp。2026-11-03 のユーザーの要望）。
+                float down = SpeedRamp.Limit(-fallSpeedBefore, -state.Velocity.Y, tuning.FallSpeedSoftStart, tuning.MaxFallSpeed,
+                    SpeedRamp.ScaleFor(tuning.FallSpeedSoftStart, tuning.MaxFallSpeed, tuning.Gravity, tuning.SpeedRampSeconds));
+                state.Velocity.Y = -down;
+            }
             if (state.Velocity.Y < -tuning.MaxFallSpeed)
             {
                 // のけぞり中は、吹き飛びの下向きの速さを上限で切らない（重力で上限より速くならないだけ。D-43）。

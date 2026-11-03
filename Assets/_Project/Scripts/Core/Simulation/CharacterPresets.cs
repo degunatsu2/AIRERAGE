@@ -981,6 +981,7 @@ namespace Airerage.Core.Simulation
             WireTuning wire = config.Wire;
             wire.MaxLength *= 1.5f;
             wire.MaxAttachedSpeed *= 0.5f;
+            wire.AttachedSpeedSoftStart *= 0.5f;
             wire.ExitSpeedCap *= 0.5f;
             wire.Inertial.StartPullSpeed *= 0.5f;
             wire.Inertial.ReelSpeed *= 0.5f;

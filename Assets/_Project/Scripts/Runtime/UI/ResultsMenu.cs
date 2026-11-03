@@ -12,7 +12,8 @@ namespace Airerage.Runtime.UI
     /// 結果の画面の項目（docs/15 T6-8）: REMATCH（同じ人・同じキャラクター・同じステージで再戦）、CHARACTER SELECT（同じ人のまま
     /// キャラクター選択へ）、MAIN MENU（メニューへ）。結果（MatchHud の順位の表）が出たら、画面の下に横に並べて出す。キーボード（矢印・
     /// Enter）、ゲームパッド（十字キー・スティック・A）、マウスで選べる。ネットワーク対戦では、REMATCH と CHARACTER SELECT はホストだけが
-    /// 押せる（ほかの人は「ホストを待つ」）。
+    /// 押せる（ほかの人は「ホストを待つ」）。ネットワーク対戦の 3 つ目の項目は MAIN MENU ではなく BACK ROOM（ホストが全員を待機所へ戻す。
+    /// 途中から部屋に入った人がいる間は、REMATCH と CHARACTER SELECT を押せない。2026-11-03 のユーザーの要望）。
     /// 出している間は、カメラの操作（十字キーのズーム）を止める（一時停止と同じ。項目を選ぶとカメラが寄り引きしないように）。
     /// 一時停止のメニューを開いている間は、選んでいる項目を奪わない。
     /// 結果を出している間は、試合中の表示（技の札、右上の表、お知らせ、コンボ、画面の端の札、頭上の数など）を止めて消す
@@ -40,6 +41,8 @@ namespace Airerage.Runtime.UI
         private bool _cameraWasEnabled;
         private bool _canRestart;
         private bool _canReturn;
+        private bool _canBack;
+        private bool _newcomers;
         private int _selectAtFrame = -1;
         private readonly System.Collections.Generic.List<Behaviour> _hidden = new System.Collections.Generic.List<Behaviour>();
 
@@ -49,6 +52,9 @@ namespace Airerage.Runtime.UI
         public MenuOption Rematch => _rematch;
         public MenuOption CharacterSelect => _characterSelect;
         public MenuOption MainMenu => _menu;
+
+        /// <summary>3 つ目の項目（ネットワーク対戦では BACK ROOM、ほかでは MAIN MENU）。</summary>
+        public MenuOption BackRoom => _menu;
 
         /// <summary>下に出している文（ホストを待つ、など。テスト用）。</summary>
         public string Note => _note != null ? _note.text : string.Empty;
@@ -77,7 +83,17 @@ namespace Airerage.Runtime.UI
                     _target.ReturnToCharacterSelect();
                 }
             });
-            _menu.Clicked.AddListener(() => _target.Quit());
+            _menu.Clicked.AddListener(() =>
+            {
+                if (!_target.HasRoom)
+                {
+                    _target.Quit();
+                }
+                else if (_target.CanBackToRoom)
+                {
+                    _target.BackToRoom();
+                }
+            });
             _panel.SetActive(false);
         }
 
@@ -141,6 +157,8 @@ namespace Airerage.Runtime.UI
             }
             _canRestart = !_target.CanRestart;
             _canReturn = !_target.CanReturnToCharacterSelect;
+            _canBack = !CanBack;
+            _menu.SetLabel(_target.HasRoom ? "BACK ROOM" : "MAIN MENU");
             RefreshAvailability();
             // 試合の最後の操作（押しっぱなしの決定のボタンなど）で、そのまま押さないよう、項目を選ぶのは次のフレーム。
             EventSystem.current.SetSelectedGameObject(null);
@@ -180,24 +198,36 @@ namespace Airerage.Runtime.UI
         {
             bool canRestart = _target.CanRestart;
             bool canReturn = _target.CanReturnToCharacterSelect;
-            if (canRestart == _canRestart && canReturn == _canReturn)
+            bool canBack = CanBack;
+            bool newcomers = _target.NewcomersWaiting;
+            if (canRestart == _canRestart && canReturn == _canReturn && canBack == _canBack && newcomers == _newcomers)
             {
                 return;
             }
             _canRestart = canRestart;
             _canReturn = canReturn;
+            _canBack = canBack;
+            _newcomers = newcomers;
             // 押せない理由は札の中ではなく（長い名前と重なる）、下の文に出す。
             _rematch.SetAvailable(canRestart);
             _characterSelect.SetAvailable(canReturn);
+            _menu.SetAvailable(canBack);
             if (_note != null)
             {
                 // 再戦できるのに戻れないのは、試合のシーンを直接再生したとき（ゲームの流れがない）。
-                _note.text = !canRestart && !canReturn
+                _note.text = _target.HasRoom && !canBack
+                    ? Loc.T("WAITING FOR THE HOST TO CHOOSE", "ホストが選ぶのを待っています")
+                    : newcomers && canBack
+                    ? Loc.T("A NEW PLAYER JOINED. CHOOSE BACK ROOM SO THEY CAN PLAY", "新しい人が入りました。BACK ROOM で待機所へ戻ると参加できます")
+                    : !canRestart && !canReturn
                     ? Loc.T("WAITING FOR THE HOST TO CHOOSE REMATCH OR CHARACTER SELECT", "ホストが再戦かキャラクター選択を選ぶのを待っています")
                     : !canReturn ? Loc.T("CHARACTER SELECT: START FROM THE MAIN MENU (APP SCENE)", "キャラクター選択はメインメニュー（App のシーン）から")
                     : string.Empty;
             }
         }
+
+        // 3 つ目の項目を押せるか（MAIN MENU はいつも、BACK ROOM はホストだけ）。
+        private bool CanBack => !_target.HasRoom || _target.CanBackToRoom;
 
         private MenuOption FirstAvailable()
         {

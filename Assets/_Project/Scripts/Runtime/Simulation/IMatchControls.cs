@@ -20,5 +20,20 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>メニューへ戻る（App のシーンから始めていなければ、ゲームを終える。エディタでは再生を止める）。</summary>
         void Quit();
+
+        /// <summary>
+        /// 待機所（部屋）がある試合か（ネットワーク対戦。結果の画面の 3 つ目の項目を MAIN MENU ではなく BACK ROOM にする。2026-11-03 の
+        /// ユーザーの要望）。
+        /// </summary>
+        bool HasRoom { get; }
+
+        /// <summary>「BACK ROOM」（全員を待機所へ戻す）を押せるか（ネットワーク対戦のホストだけ）。</summary>
+        bool CanBackToRoom { get; }
+
+        /// <summary>全員を待機所へ戻す。</summary>
+        void BackToRoom();
+
+        /// <summary>途中から部屋に入って待っている人がいるか（いれば REMATCH・CHARACTER SELECT を押せない。BACK ROOM で戻す）。</summary>
+        bool NewcomersWaiting { get; }
     }
 }

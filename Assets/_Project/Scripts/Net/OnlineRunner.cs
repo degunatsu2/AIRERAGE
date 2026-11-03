@@ -203,8 +203,35 @@ namespace Airerage.Net
             _session.StartMatch(RulesForNextMatch());
         }
 
-        /// <summary>結果の画面の「Restart」を押せるか（ホストだけ。IMatchControls）。</summary>
-        public bool CanRestart => _session != null && _session.IsHost && _session.State == OnlineSession.SessionState.Running;
+        /// <summary>
+        /// 結果の画面の「Restart」を押せるか（ホストだけ。途中から部屋に入って待っている人がいれば押せない。BACK ROOM で待機所へ戻す。
+        /// IMatchControls）。
+        /// </summary>
+        public bool CanRestart => HostRunning && !_session.HasLateJoiners;
+
+        // ホストが試合中（結果を含む）か。
+        private bool HostRunning => _session != null && _session.IsHost && _session.State == OnlineSession.SessionState.Running;
+
+        /// <summary>結果の画面の 3 つ目の項目は BACK ROOM（App の接続を使う試合。IMatchControls）。</summary>
+        public bool HasRoom => _connection != null;
+
+        /// <summary>BACK ROOM を押せるか（ホストだけ。IMatchControls）。</summary>
+        public bool CanBackToRoom => _connection != null && HostRunning;
+
+        /// <summary>途中から部屋に入って待っている人がいるか（IMatchControls）。</summary>
+        public bool NewcomersWaiting => _session != null && _session.HasLateJoiners;
+
+        /// <summary>ホスト: 全員を待機所へ戻す（2026-11-03 のユーザーの要望。途中から入った人も、ここから参加を選べる）。</summary>
+        public void BackToRoom()
+        {
+            if (!CanBackToRoom)
+            {
+                return;
+            }
+            _session.ReturnToLobby(LobbyPhase.Waiting);
+            _smoother = null;
+            _notifiedTick = -1;
+        }
 
         /// <summary>同じ人で試合を始め直す（ホストのみ。ロビーで選んだルールで）。</summary>
         public void Restart()

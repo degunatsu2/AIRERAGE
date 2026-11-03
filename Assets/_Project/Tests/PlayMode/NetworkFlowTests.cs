@@ -171,6 +171,9 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(results, Is.Not.Null, "結果の画面の項目がない");
                 yield return WaitFor(() => results.IsOpen, 10f, "試合が終わっても結果の項目を出さない");
                 Assert.That(results.Rematch.Button.interactable && results.CharacterSelect.Button.interactable, Is.True, "ホストが選べない");
+                // ネットワーク対戦の 3 つ目は MAIN MENU ではなく BACK ROOM（全員を待機所へ戻す。2026-11-03）。
+                Assert.That(results.BackRoom.LabelText.text, Is.EqualTo("BACK ROOM"), "3 つ目の項目が BACK ROOM でない");
+                Assert.That(results.BackRoom.Button.interactable, Is.True, "ホストが BACK ROOM を押せない");
                 results.CharacterSelect.Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューに戻らない");
                 // メニューのシーンを読み込み直したので、画面を探し直す。

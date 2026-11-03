@@ -548,6 +548,26 @@ namespace Airerage.Net
             }
         }
 
+        /// <summary>
+        /// 途中から部屋に入って、今の試合が終わるのを待っている人がいるか（結果の画面で REMATCH・CHARACTER SELECT を押せなくし、BACK ROOM で
+        /// 待機所へ戻ってもらう。2026-11-03 のユーザーの要望）。
+        /// </summary>
+        public bool HasLateJoiners
+        {
+            get
+            {
+                IReadOnlyList<LobbySlot> roster = Roster;
+                for (int p = 0; p < roster.Count; p++)
+                {
+                    if (roster[p].Connected && roster[p].Late)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
         /// <summary>ホストが試合中か（ステージの読み込みを含む。ホストは今の値、クライアントはホストから最後に届いた値か、自分の状態）。</summary>
         public bool MatchRunning => IsHost || State != SessionState.Lobby
             ? State == SessionState.Running || State == SessionState.Loading
@@ -1045,6 +1065,11 @@ namespace Airerage.Net
         // ホスト: ロビーの段階を変える（全員の準備完了を外す）。
         private void SetPhase(LobbyPhase phase)
         {
+            if (phase == LobbyPhase.Waiting)
+            {
+                // 待機所へ戻ったら、途中から入って待っていた人も、ここから参加を選べる（観戦の列のまま）。
+                ClearLate();
+            }
             _phase = phase;
             for (int p = 0; p < MaxPlayers; p++)
             {
@@ -1298,6 +1323,8 @@ namespace Airerage.Net
             _pending = new PendingStart { Count = count, Match = match, Settings = settings };
             State = SessionState.Loading;
             Status = Loc.T($"Loading stage {settings.Stage}", $"ステージ {settings.Stage} を読み込み中……");
+            // 待っている人の待機所の表示を「対戦中」にする（BroadcastLobby は試合中は待っている人にだけ送る）。
+            BroadcastLobby();
         }
 
         /// <summary>
@@ -1784,6 +1811,8 @@ namespace Airerage.Net
                 _previous[p] = World.GetState(p);
             }
             State = SessionState.Running;
+            // 途中から入って待っている人の待機所の表示を、すぐに「対戦中」にする（ホストだけが送る）。
+            BroadcastLobby();
             Status = _spectator != null
                 ? Loc.T($"Spectating {playerCount} players", $"{playerCount} 人の試合を観戦中")
                 : Loc.T($"Running: player {LocalPlayer + 1} of {playerCount}", $"対戦中: {playerCount} 人のうちプレイヤー {LocalPlayer + 1}");
@@ -1859,7 +1888,9 @@ namespace Airerage.Net
                     _spectatorNext[player] = -1;
                     _lobbyLate[player] = late;
                     _lateAnnounced[player] = false;
-                    if (_teamMode)
+                    // 途中から入った人は、観戦の列に入れる（2026-11-03 のユーザーの要望。待機所に戻ってから、見出しを選んで参加する）。
+                    _lobbySpectators[player] = late;
+                    if (_teamMode && !late)
                     {
                         _lobbyTeams[player] = SmallestTeam();
                     }

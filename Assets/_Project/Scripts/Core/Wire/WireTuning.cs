@@ -113,6 +113,17 @@ namespace Airerage.Core.Wire
         /// <summary>接続中の最高速（m/s）。両タイプ共通の上限。2026-11-03 にユーザーの要望で 22 → 40 に上げて試している【仮】。</summary>
         public float MaxAttachedSpeed = 40f;
 
+        /// <summary>
+        /// 接続中の速さが、この速さ（前の上限。m/s）を超えたら、伸びを曲線的に緩やかにする（SpeedRamp。2026-11-03 のユーザーの要望）【仮】。
+        /// </summary>
+        public float AttachedSpeedSoftStart = 22f;
+
+        /// <summary>
+        /// 前の上限を超えた先の伸びの緩やかさ: 重力の加速度で止まった状態から伸び続けたとき、この秒数で上限（MaxAttachedSpeed）に届く
+        /// （SpeedRamp.ScaleFor）【仮】。
+        /// </summary>
+        public float SpeedRampSeconds = 4f;
+
         /// <summary>解除時の速度の上限（m/s）。両タイプ共通の上限。2026-11-03 にユーザーの要望で 18 → 40 に上げて試している【仮】。</summary>
         public float ExitSpeedCap = 40f;
 
@@ -164,6 +175,9 @@ namespace Airerage.Core.Wire
             v.AtMost(nameof(MinRopeLength), MinRopeLength, nameof(MaxLength), MaxLength);
             v.Positive(nameof(MaxAttachTicks), MaxAttachTicks);
             v.Positive(nameof(MaxAttachedSpeed), MaxAttachedSpeed);
+            // 上限以上なら曲線にしない（上限で切るだけ。SpeedRamp.Limit）。前に作ったキャラクターのアセットに値がないときも通す。
+            v.NonNegative(nameof(AttachedSpeedSoftStart), AttachedSpeedSoftStart);
+            v.Positive(nameof(SpeedRampSeconds), SpeedRampSeconds);
             v.Positive(nameof(ExitSpeedCap), ExitSpeedCap);
             v.InRange(nameof(AttachedInputInfluence), AttachedInputInfluence, 0f, 1f);
             v.InRange(nameof(AttachTurnSpeed), AttachTurnSpeed, 0f, 1f);

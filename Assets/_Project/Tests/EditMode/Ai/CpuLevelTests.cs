@@ -15,7 +15,8 @@ namespace Airerage.Core.Tests.Ai
     /// </summary>
     public class CpuLevelTests
     {
-        private const int Seeds = 4;
+        // 試す対戦の数（ジャストガードはまれなので、1 回の結果に頼らないよう 8 回。2026-11-03 に速さの伸びを変えたら 4 回では 0 になった）。
+        private const int Seeds = 8;
 
         [TestCase(CpuLevel.Easy, CpuLevel.Normal)]
         [TestCase(CpuLevel.Normal, CpuLevel.Hard)]

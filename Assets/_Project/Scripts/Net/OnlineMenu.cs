@@ -903,8 +903,10 @@ namespace Airerage.Net
             if (session.LocalLate)
             {
                 return running
-                    ? Loc.T("A MATCH IS IN PROGRESS. YOU WILL JOIN WHEN IT ENDS", "対戦中です。試合が終わるまで待機所でお待ちください")
-                    : Loc.T("THE PLAYERS ARE CHOOSING. YOU WILL JOIN THE NEXT MATCH", "選択中です。次の試合から参加できます");
+                    ? Loc.T("A MATCH IS IN PROGRESS. WHEN EVERYONE IS BACK IN THE ROOM, SELECT A TEAM (OR PLAYERS) TO JOIN",
+                        "対戦中です。全員が待機所に戻ったら、チーム（または PLAYERS）を選ぶと参加できます")
+                    : Loc.T("THE PLAYERS ARE CHOOSING. WHEN EVERYONE IS BACK IN THE ROOM, SELECT A TEAM (OR PLAYERS) TO JOIN",
+                        "選択中です。全員が待機所に戻ったら、チーム（または PLAYERS）を選ぶと参加できます");
             }
             if (!waiting)
             {

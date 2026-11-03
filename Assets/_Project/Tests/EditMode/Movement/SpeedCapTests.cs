@@ -63,13 +63,49 @@ namespace Airerage.Core.Tests.Movement
         }
 
         [Test]
+        public void SpeedRamp_KeepsTheOldGainBelowTheOldCap_AndReachesTheTopInAboutFourSeconds()
+        {
+            // 2026-11-03 の要望: 前の上限（22 m/s）までは今までどおり、その先は曲線的に緩やかに、4 秒ほどで 40 m/s に届く。
+            Assert.That(SpeedRamp.Limit(10f, 15f, 22f, 40f, 0.3f), Is.EqualTo(15f), "前の上限より下の伸びが変わった");
+            Assert.That(SpeedRamp.Limit(30f, 25f, 22f, 40f, 0.3f), Is.EqualTo(25f), "減速が変わった");
+            Assert.That(SpeedRamp.Limit(40f, 45f, 22f, 40f, 0.3f), Is.EqualTo(40f), "上限を超えた");
+            const float gravity = 30f;
+            float scale = SpeedRamp.ScaleFor(22f, 40f, gravity, 4f);
+            float speed = 0f;
+            float lastGain = float.MaxValue;
+            int ticks = 0;
+            while (speed < 40f - 1e-3f && ticks < 1000)
+            {
+                float next = SpeedRamp.Limit(speed, speed + gravity / 60f, 22f, 40f, scale);
+                if (speed >= 22f)
+                {
+                    Assert.That(next - speed, Is.LessThanOrEqualTo(lastGain + 1e-6f), "上限に近いほど伸びが小さくならない");
+                    lastGain = next - speed;
+                }
+                speed = next;
+                ticks++;
+            }
+            Assert.That(ticks / 60f, Is.EqualTo(4f).Within(0.1f), "重力の加速で 4 秒ほどで上限に届かない");
+        }
+
+        [Test]
+        public void Falling_KeepsTheOldSpeedUpTo20_ThenReaches40InAboutFourSeconds()
+        {
+            var harness = new SimHarness(new BoxTerrain(), spawn: new Vector3(0f, 2000f, 0f));
+            harness.Step(Inputs.None, 40);
+            Assert.That(harness.State.Velocity.Y, Is.EqualTo(-20f).Within(0.05f), "前の上限（20 m/s）までの落ち方が変わった");
+            int ticks = 40 + harness.StepUntil(s => s.Velocity.Y <= -39.99f, Inputs.None, 600);
+            Assert.That(ticks / 60f, Is.EqualTo(4f).Within(0.15f), "止まった状態から 4 秒ほどで最大の落下速度に届かない");
+        }
+
+        [Test]
         public void FallAndAirSpeeds_StopAt40()
         {
             var harness = new SimHarness(new BoxTerrain(), spawn: new Vector3(0f, 500f, 0f));
             CharacterState state = harness.State;
             state.Velocity = new Vector3(55f, 0f, 0f);
             harness.State = state;
-            harness.Step(Inputs.Right, 150);
+            harness.Step(Inputs.Right, 300);
             Assert.That(harness.State.Velocity.Y, Is.EqualTo(-40f).Within(1e-3f), "落ちる速さが 40 m/s で止まらない");
             Assert.That(harness.State.Velocity.X, Is.EqualTo(40f).Within(1e-3f), "空中の横の速さが 40 m/s で止まらない");
         }

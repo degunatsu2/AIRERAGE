@@ -288,6 +288,13 @@
 
 - **着地の直後に跳ぶと勢いを保つ**: 地面に立ってから 4 ティック【仮】（`MovementTuning.LandingGraceTicks`）の間は、走る速さより速い勢いを、逆の向きに入れていなければ落とさない。その間にジャンプすれば、勢いを保ったまま空中へ戻れる。過ぎると今までどおり、地上の加速度（`GroundAcceleration`）で走る速さへ急速に落ちる。逆の向きに入れたら、着地の直後でもすぐ減速する。地面に立ってからのティック数は `CharacterState.GroundedTicks`（状態の形式は版 33）。
 - のけぞり中（吹き飛び）は、横・下の上限で切らない（D-43 と同じ。撃破技の吹き飛びは今までどおり速く飛ぶ）。
+- **上限までの伸びを曲線的に緩やかに（2026-11-03、ユーザーの要望: 上がりきるのが速すぎる）**: 前の上限（落下 20 m/s・ワイヤーの接続中
+  22 m/s）までの伸びは今までどおり。その先は、伸びに「倍率 × √(上限までの残りの割合)」を掛け、上限に近いほどゆっくり伸びる（`SpeedRamp`）。
+  倍率は、重力の加速度（30 m/s²）で止まった状態から伸び続けたとき 4 秒で上限の 40 m/s に届くように決める（`SpeedRampSeconds` 4【仮】、
+  前の上限は `MovementTuning.FallSpeedSoftStart` 20・`WireTuning.AttachedSpeedSoftStart` 22【仮】）。落ちるときは、約 0.67 秒で 20 m/s
+  （今までどおり）、約 4 秒で 40 m/s（自動テスト `SpeedCapTests`）。減速と、走る・空中の横の速さ（もともと加速では走る速さまでしか
+  伸びない）、ギミック（ジャンプ台・加速リング）の速さは変えない。ワイヤーを解除したときの速さ（上限 40）は、接続中に伸びた速さを
+  そのまま引き継ぐ。
 - 速くなっても地形をすり抜けない（動きの衝突は連続判定の `KinematicMotor`。40 m/s で厚さ 0.2m の壁に当てる自動テスト `SpeedCapTests`）。撃破技の速さの倍率（D-38。STANDARD だけ）は、解除の速さが 18 → 40 m/s になったので、強く出やすくなる（強すぎれば係数か上限を戻す）。
 - 確認の手順は 5.15。
 
@@ -453,8 +460,10 @@
 1. トレーニングか `Sandbox_Wire` で、ワイヤーを振って速く飛び、解除する（F4 のトレーニングの表示に速さが出る）。
 2. 確認すること:
    - 振りの勢いが 22 m/s で頭打ちにならず、もっと速く飛べるか。速すぎて操作しにくくないか（スピード感は上がったか）。
+   - 22 m/s（落下は 20 m/s）を超えた先は、上限の 40 m/s に近づくほどゆっくり伸び、勢いを保ったまま 4 秒ほど動き続けると最高速度に
+     届くか。早すぎ・遅すぎなら `Speed Ramp Seconds`（Movement と Wire。4）を変えて比べてほしい。
    - 着地した瞬間にジャンプすると、勢いを保ったまま空中へ戻れるか。着地して少し（約 0.07 秒）でも遅れると、急に走る速さへ落ちるか。猶予の長さ（`Landing Grace Ticks` 4）が短すぎ・長すぎないか。
    - 着地の直後に逆の向きへ入れると、すぐに減速するか。
    - 高い所から落ちたときの落下（40 m/s まで）が速すぎないか。
    - 速い勢いで壁・床をすり抜けないか。撃破技（STANDARD の空中下）が強くなりすぎていないか。
-3. 調整値は `DefaultCharacter.asset`（ほかのキャラクターも同じ値を持つ）の Movement（`Max Ground Speed`・`Max Air Speed`・`Max Fall Speed`・`Landing Grace Ticks`）と Wire（`Max Attached Speed`・`Exit Speed Cap`）。
+3. 調整値は `DefaultCharacter.asset`（ほかのキャラクターも同じ値を持つ）の Movement（`Max Ground Speed`・`Max Air Speed`・`Max Fall Speed`・`Fall Speed Soft Start`・`Speed Ramp Seconds`・`Landing Grace Ticks`）と Wire（`Max Attached Speed`・`Attached Speed Soft Start`・`Speed Ramp Seconds`・`Exit Speed Cap`）。

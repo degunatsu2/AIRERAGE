@@ -301,6 +301,14 @@ namespace Airerage.Runtime.Simulation
         /// <summary>キャラクター選択へ戻れるか（App のシーンから始めたときだけ。IMatchControls）。</summary>
         public bool CanReturnToCharacterSelect => _flow != null;
 
+        // ローカル対戦には待機所がない（結果の画面は MAIN MENU のまま。IMatchControls）。
+        bool IMatchControls.HasRoom => false;
+        bool IMatchControls.CanBackToRoom => false;
+        void IMatchControls.BackToRoom()
+        {
+        }
+        bool IMatchControls.NewcomersWaiting => false;
+
         /// <summary>同じ人（機器）とキャラクターで、ローカル対戦のキャラクター選択へ戻る（IMatchControls。docs/15 T6-8）。</summary>
         public void ReturnToCharacterSelect()
         {
