@@ -110,11 +110,11 @@ namespace Airerage.Core.Wire
         /// <summary>最大接続時間（ティック）。</summary>
         public int MaxAttachTicks = 180;
 
-        /// <summary>接続中の最高速（m/s）。両タイプ共通の上限。</summary>
-        public float MaxAttachedSpeed = 22f;
+        /// <summary>接続中の最高速（m/s）。両タイプ共通の上限。2026-11-03 にユーザーの要望で 22 → 40 に上げて試している【仮】。</summary>
+        public float MaxAttachedSpeed = 40f;
 
-        /// <summary>解除時の速度の上限（m/s）。両タイプ共通の上限。</summary>
-        public float ExitSpeedCap = 18f;
+        /// <summary>解除時の速度の上限（m/s）。両タイプ共通の上限。2026-11-03 にユーザーの要望で 18 → 40 に上げて試している【仮】。</summary>
+        public float ExitSpeedCap = 40f;
 
         /// <summary>
         /// フックを今の横の動きと逆の側に刺したとき（AttachTurnBehind を参照）、速さのこの割合を保ったまま、フックの側へ向かう

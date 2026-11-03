@@ -174,7 +174,7 @@ namespace Airerage.PlayMode.Tests
                 // ジャンプのキーを L に。
                 options.KeyCell(jump).Button.onClick.Invoke();
                 Assert.That(options.IsRebinding, Is.True, "決定してもキーの変更が始まらない");
-                Assert.That(options.PromptText, Does.Contain("PRESS A KEY OR MOUSE BUTTON"));
+                Assert.That(options.PromptText, Does.Contain(Loc.T("PRESS A KEY OR MOUSE BUTTON", "キーかマウスのボタンを押してください")));
                 yield return Press(keyboard, Key.L);
                 yield return WaitFor(() => !options.IsRebinding, 2f, "キーを押しても変更が終わらない");
                 Assert.That(options.KeyCell(jump).Label, Is.EqualTo("L"));
@@ -197,7 +197,7 @@ namespace Airerage.PlayMode.Tests
                 // ゲームパッドのジャンプを Y に。Esc ／ Start でやめると変わらない。
                 yield return WaitSeconds(0.3f);
                 options.PadCell(jump).Button.onClick.Invoke();
-                Assert.That(options.PromptText, Does.Contain("PRESS A BUTTON"));
+                Assert.That(options.PromptText, Does.Contain(Loc.T("PRESS A BUTTON", "ボタンを押してください")));
                 yield return Press(gamepad, GamepadButton.North);
                 yield return WaitFor(() => !options.IsRebinding, 2f, "ゲームパッドのボタンの変更が終わらない");
                 Assert.That(options.PadCell(jump).Label, Is.EqualTo("Y"));
@@ -206,7 +206,7 @@ namespace Airerage.PlayMode.Tests
                 yield return Press(gamepad, GamepadButton.Start);
                 yield return WaitFor(() => !options.IsRebinding, 2f, "Start でやめられない");
                 Assert.That(options.PadCell(attack).Label, Is.EqualTo("X"), "やめたのに変わった");
-                Assert.That(options.PromptText, Does.Contain("CANCELLED"));
+                Assert.That(options.PromptText, Does.Contain(Loc.T("CANCELLED", "やめました")));
                 // 案内は 3 秒で消える。
                 yield return WaitSeconds(3.3f);
                 Assert.That(options.PromptText, Is.Empty, "変えた結果の案内が消えない");

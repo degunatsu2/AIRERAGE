@@ -52,6 +52,16 @@ namespace Airerage.Core.Tests.Skills
             Edit(world, index, s => { s.Position = position; s.Velocity = Vector3.Zero; return s; });
         }
 
+        // ticks の間、キャラクター index を position に留めて進める（何もない空中で長く待つと、落ちて撃破されるので）。
+        private static void Hold(SimWorld world, int index, Vector3 position, int ticks)
+        {
+            for (int t = 0; t < ticks; t++)
+            {
+                MoveTo(world, index, position);
+                Step(world, 1);
+            }
+        }
+
         private static List<WorldObject> Portals(SimWorld world)
         {
             return world.Objects.Items.Where(o => o.Kind == WorldObjectKind.Portal).ToList();
@@ -282,8 +292,8 @@ namespace Airerage.Core.Tests.Skills
             Step(world, 90);
             Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Missile), Is.False, "ステージの外に出ても消えない（D-63）");
 
-            // 金庫に当たると壊す。
-            Step(world, 400);
+            // 金庫に当たると壊す（クールタイムを待つ間、何もない空中で落ちて撃破されないように、その場に留める）。
+            Hold(world, 0, new Vector3(0f, 50f, 0f), 400);
             world.Objects.Add(new WorldObject { Kind = WorldObjectKind.Safe, Owner = 1, Position = new Vector2(-6f, 50f), SpawnTick = world.Tick,
                 ExpireTick = int.MaxValue });
             MoveTo(world, 0, new Vector3(0f, 50f, 0f));
@@ -303,7 +313,7 @@ namespace Airerage.Core.Tests.Skills
             MoveTo(world, 0, new Vector3(0f, 80f, 0f));
             TapPortal(world);
             WorldObject exit = Portals(world)[1];
-            Step(world, 600);
+            Hold(world, 0, new Vector3(0f, 50f, 0f), 600);
             MoveTo(world, 0, new Vector3(0f, 50f, 0f));
             Step(world, 1, new PlayerInput(0, 0, InputButtons.Special2, 127, 0));
             Step(world, 1, new PlayerInput(0, 0, InputButtons.None, 127, 0));

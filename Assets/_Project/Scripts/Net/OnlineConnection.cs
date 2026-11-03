@@ -123,7 +123,7 @@ namespace Airerage.Net
             {
                 configs.Add(_roster.Get(i).Config);
             }
-            int request = BeginRequest("Creating an online room...");
+            int request = BeginRequest(Loc.T("Creating an online room...", "オンラインの部屋を作っています……"));
             RelayHostAllocation allocation;
             try
             {
@@ -131,7 +131,7 @@ namespace Airerage.Net
             }
             catch (Exception e) when (IsServiceError(e))
             {
-                return FailRequest(request, $"Could not create an online room: {e.Message}", e);
+                return FailRequest(request, Loc.T($"Could not create an online room: {e.Message}", $"オンラインの部屋を作れませんでした: {e.Message}"), e);
             }
             finally
             {
@@ -153,10 +153,10 @@ namespace Airerage.Net
             string joinCode = JoinCodes.Normalize(code);
             if (joinCode.Length == 0)
             {
-                Message = "ENTER THE JOIN CODE FROM THE HOST";
+                Message = Loc.T("ENTER THE JOIN CODE FROM THE HOST", "ホストの参加コードを入れてください");
                 return false;
             }
-            int request = BeginRequest($"Looking for the room {joinCode}...");
+            int request = BeginRequest(Loc.T($"Looking for the room {joinCode}...", $"部屋 {joinCode} を探しています……"));
             RelayServerData relay;
             try
             {
@@ -164,7 +164,7 @@ namespace Airerage.Net
             }
             catch (Exception e) when (IsServiceError(e))
             {
-                return FailRequest(request, $"Could not join {joinCode}: {e.Message}", e);
+                return FailRequest(request, Loc.T($"Could not join {joinCode}: {e.Message}", $"{joinCode} に参加できませんでした: {e.Message}"), e);
             }
             finally
             {

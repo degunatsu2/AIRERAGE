@@ -339,8 +339,8 @@ namespace Airerage.Editor
                 items[i] = MenuUiBuilder.CreateMenuItem(main, labels[i].Replace(" ", string.Empty), labels[i], anchor,
                     new Vector2(110f, -230f - i * 88f), size);
             }
-            MenuUiBuilder.CreateText(main, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
-                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(main, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f)), "上下: 選ぶ　　Enter ／ A: 決定　　Esc ／ B: 戻る");
             main.gameObject.SetActive(false);
 
             CharacterSelectScreen characterSelect = CharacterSelectUiBuilder.Create(canvas.transform);
@@ -384,10 +384,10 @@ namespace Airerage.Editor
                 options[i] = MenuUiBuilder.CreateMenuItem(panel, $"Level{labels[i]}", labels[i], new Vector2(0f, 1f),
                     new Vector2(110f, -230f - i * 88f), new Vector2(560f, 72f));
             }
-            MenuUiBuilder.CreateText(panel, "Description", "YOU + 3 CPUs.  The CPUs pick random characters.", 30, FontStyle.Bold,
-                TextAnchor.MiddleLeft, new Vector2(1f, 0.6f), new Vector2(-80f, 0f), new Vector2(900f, 60f), new Color(1f, 1f, 1f, 0.85f));
-            MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
-                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Description", "YOU + 3 CPUs.  The CPUs pick random characters.", 30, FontStyle.Bold,
+                TextAnchor.MiddleLeft, new Vector2(1f, 0.6f), new Vector2(-80f, 0f), new Vector2(900f, 60f), new Color(1f, 1f, 1f, 0.85f)), "自分と CPU 3 体で対戦します。CPU のキャラクターはランダムです。");
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f)), "上下: 選ぶ　　Enter ／ A: 決定　　Esc ／ B: 戻る");
             var screen = panel.gameObject.AddComponent<CpuLevelScreen>();
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
             panel.gameObject.SetActive(false);
@@ -433,8 +433,9 @@ namespace Airerage.Editor
             description.gameObject.AddComponent<LineBreakText>();
             UnityEngine.UI.Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 new Vector2(1f, 0.5f), new Vector2(-80f, -220f), new Vector2(900f, 50f), MenuUiBuilder.Accent);
-            MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
-                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down / Left / Right: select     Enter / A: OK     Esc / B: back", 22,
+                FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f)),
+                "上下左右: 選ぶ　　Enter ／ A: 決定　　Esc ／ B: 戻る");
 
             var screen = panel.gameObject.AddComponent<StageSelectScreen>();
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);

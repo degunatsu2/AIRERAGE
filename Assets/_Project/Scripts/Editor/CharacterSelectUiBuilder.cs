@@ -278,8 +278,8 @@ namespace Airerage.Editor
                 TextAnchor.LowerLeft, new Vector2(0f, 0f), Vector2.zero, new Vector2(500f, 84f), Color.white);
             Text tags = MenuUiBuilder.CreateText(header.transform, "Tags", string.Empty, 30, FontStyle.Bold,
                 TextAnchor.LowerLeft, new Vector2(0f, 0f), Vector2.zero, new Vector2(500f, 52f), MenuUiBuilder.Accent);
-            MenuUiBuilder.CreateText(info, "Close", "F1 / SELECT: CLOSE", 18, FontStyle.Bold, TextAnchor.UpperRight,
-                new Vector2(1f, 1f), new Vector2(-40f, -16f), new Vector2(400f, 28f), new Color(1f, 1f, 1f, 0.6f));
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(info, "Close", "F1 / SELECT: CLOSE", 18, FontStyle.Bold, TextAnchor.UpperRight,
+                new Vector2(1f, 1f), new Vector2(-40f, -16f), new Vector2(400f, 28f), new Color(1f, 1f, 1f, 0.6f)), "F1 ／ SELECT: 閉じる");
 
             var skills = new GameObject("Skills", typeof(RectTransform));
             skills.transform.SetParent(info, false);

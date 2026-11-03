@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using Airerage.Runtime.Settings;
 
 namespace Airerage.Runtime.UI
 {
@@ -191,8 +192,10 @@ namespace Airerage.Runtime.UI
             if (_note != null)
             {
                 // 再戦できるのに戻れないのは、試合のシーンを直接再生したとき（ゲームの流れがない）。
-                _note.text = !canRestart && !canReturn ? "WAITING FOR THE HOST TO CHOOSE REMATCH OR CHARACTER SELECT"
-                    : !canReturn ? "CHARACTER SELECT: START FROM THE MAIN MENU (APP SCENE)" : string.Empty;
+                _note.text = !canRestart && !canReturn
+                    ? Loc.T("WAITING FOR THE HOST TO CHOOSE REMATCH OR CHARACTER SELECT", "ホストが再戦かキャラクター選択を選ぶのを待っています")
+                    : !canReturn ? Loc.T("CHARACTER SELECT: START FROM THE MAIN MENU (APP SCENE)", "キャラクター選択はメインメニュー（App のシーン）から")
+                    : string.Empty;
             }
         }
 

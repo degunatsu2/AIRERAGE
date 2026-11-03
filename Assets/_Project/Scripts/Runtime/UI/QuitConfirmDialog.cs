@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using Airerage.Runtime.Settings;
 
 namespace Airerage.Runtime.UI
 {
@@ -29,6 +30,10 @@ namespace Airerage.Runtime.UI
         public MenuOption No => _no;
         public string Message => _message != null ? _message.text : string.Empty;
 
+        /// <summary>確認の文（英語と日本語）。</summary>
+        public const string MessageEnglish = "QUIT THE GAME. ARE YOU SURE?";
+        public const string MessageJapanese = "ゲームを終了します。本当によろしいですか？";
+
         private void Awake()
         {
             if (_message == null || _yes == null || _no == null)
@@ -50,10 +55,6 @@ namespace Airerage.Runtime.UI
             _no.Cancelled += Cancel;
             Link(_yes.Button, _no.Button);
             Link(_no.Button, _yes.Button);
-            foreach (Text text in new[] { _message, _yes.LabelText, _no.LabelText })
-            {
-                text.font = GameFonts.Switch(text.font, japanese: true);
-            }
         }
 
         // 左右で「はい」と「いいえ」を行き来する。
@@ -72,6 +73,14 @@ namespace Airerage.Runtime.UI
         {
             _onCancel = onCancel;
             _shownAt = Time.unscaledTime;
+            // 言語の設定に合わせる（日本語なら日本語の字体）。
+            LocalizedText.Show(_message, MessageEnglish, MessageJapanese);
+            foreach (Text text in new[] { _yes.LabelText, _no.LabelText })
+            {
+                text.font = GameFonts.Switch(text.font, Loc.Japanese);
+            }
+            _yes.SetLabel(Loc.T("YES", "はい"));
+            _no.SetLabel(Loc.T("NO", "いいえ"));
             gameObject.SetActive(true);
             _no.SelectQuietly();
         }

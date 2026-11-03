@@ -61,7 +61,7 @@ namespace Airerage.Net.Tests
             {
                 Assert.That(host.UsesRelay, Is.False);
                 Assert.That(host.JoinCode, Is.Empty);
-                Assert.That(host.Status, Does.Contain("port"));
+                Assert.That(host.Status, Does.Contain("port").Or.Contain("ポート"));
             }
         }
 

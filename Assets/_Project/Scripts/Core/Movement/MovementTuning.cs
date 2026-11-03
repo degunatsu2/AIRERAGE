@@ -32,8 +32,21 @@ namespace Airerage.Core.Movement
         /// <summary>重力加速度（m/s²）。</summary>
         public float Gravity = 30f;
 
-        /// <summary>最大落下速度（m/s）。</summary>
-        public float MaxFallSpeed = 20f;
+        /// <summary>最大落下速度（m/s）。2026-11-03 にユーザーの要望で 20 → 40 に上げて試している【仮】。</summary>
+        public float MaxFallSpeed = 40f;
+
+        /// <summary>
+        /// 地上と空中の横の速さの上限（m/s）。走る速さ（RunSpeed）より速い勢い（ワイヤー・ギミックの後）をここまで保てる【仮】。
+        /// のけぞり中（吹き飛び）は切らない。2026-11-03 にユーザーの要望で 40 にした（それまでは上限なし。ワイヤーの解除で 18 に切っていた）。
+        /// </summary>
+        public float MaxGroundSpeed = 40f;
+        public float MaxAirSpeed = 40f;
+
+        /// <summary>
+        /// 着地してからこのティック数は、走る速さより速い横の勢いを地面で落とさない（着地の瞬間にジャンプすれば、勢いを保ったまま
+        /// 空中に戻れる）。その後は GroundAcceleration で急速に走る速さへ落ちる【仮】（2026-11-03 のユーザーの要望）。
+        /// </summary>
+        public int LandingGraceTicks = 4;
 
         /// <summary>ジャンプの初速（m/s）。</summary>
         public float JumpSpeed = 12f;
@@ -97,6 +110,9 @@ namespace Airerage.Core.Movement
             v.NonNegative(nameof(AirDrag), AirDrag);
             v.NonNegative(nameof(Gravity), Gravity);
             v.Positive(nameof(MaxFallSpeed), MaxFallSpeed);
+            v.InRange(nameof(MaxGroundSpeed), MaxGroundSpeed, RunSpeed, float.MaxValue);
+            v.InRange(nameof(MaxAirSpeed), MaxAirSpeed, Math.Max(RunSpeed, AirRunSpeed), float.MaxValue);
+            v.NonNegative(nameof(LandingGraceTicks), LandingGraceTicks);
             v.NonNegative(nameof(JumpSpeed), JumpSpeed);
             v.NonNegative(nameof(AirJumps), AirJumps);
             v.NonNegative(nameof(CoyoteTicks), CoyoteTicks);

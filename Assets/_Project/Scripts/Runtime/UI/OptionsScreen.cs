@@ -401,7 +401,7 @@ namespace Airerage.Runtime.UI
             _settings = new GameSettings { BindingOverrides = bindings };
             BuildResolutions();
             ApplyAndSave(true);
-            SetPrompt("GENERAL SETTINGS RESET");
+            SetPrompt(Loc.T("GENERAL SETTINGS RESET", "GENERAL の設定を元に戻しました"));
         }
 
         // 今の設定を当てて保存する（音量は鳴っている BGM と効果音にもすぐ当てる）。
@@ -500,15 +500,18 @@ namespace Airerage.Runtime.UI
             int binding = BindingSettings.BindingIndex(action, column);
             if (binding < 0)
             {
-                SetPrompt($"{BindingSettings.Labels[actionIndex]} HAS NO {column.ToString().ToUpperInvariant()} BINDING");
+                SetPrompt(Loc.T($"{BindingSettings.Labels[actionIndex]} HAS NO {column.ToString().ToUpperInvariant()} BINDING",
+                    $"{BindingSettings.Labels[actionIndex]} には {column.ToString().ToUpperInvariant()} の割り当てがありません"));
                 return;
             }
             string previous = action.bindings[binding].effectivePath;
             MenuOption cell = column == BindingSettings.Column.Keyboard ? _keyCells[actionIndex] : _padCells[actionIndex];
             cell.SetLabel("...");
             SetPrompt(column == BindingSettings.Column.Keyboard
-                ? $"PRESS A KEY OR MOUSE BUTTON FOR {BindingSettings.Labels[actionIndex]}   (ESC: CANCEL)"
-                : $"PRESS A BUTTON FOR {BindingSettings.Labels[actionIndex]}   (START: CANCEL)", false);
+                ? Loc.T($"PRESS A KEY OR MOUSE BUTTON FOR {BindingSettings.Labels[actionIndex]}   (ESC: CANCEL)",
+                    $"{BindingSettings.Labels[actionIndex]} に割り当てるキーかマウスのボタンを押してください（Esc: やめる）")
+                : Loc.T($"PRESS A BUTTON FOR {BindingSettings.Labels[actionIndex]}   (START: CANCEL)",
+                    $"{BindingSettings.Labels[actionIndex]} に割り当てるボタンを押してください（START: やめる）"), false);
             // 変えている間は、メニューの移動・決定・戻るを止める（押したキーで項目が動かないように）。操作の組も止める。
             if (EventSystem.current != null)
             {
@@ -537,7 +540,7 @@ namespace Airerage.Runtime.UI
                 }
                 else
                 {
-                    message = "CANCELLED";
+                    message = Loc.T("CANCELLED", "やめました");
                 }
                 RefreshBindings();
                 SetPrompt(message);
@@ -570,7 +573,7 @@ namespace Airerage.Runtime.UI
             _inputActions.RemoveAllBindingOverrides();
             SaveBindings();
             RefreshBindings();
-            SetPrompt("CONTROLS RESET");
+            SetPrompt(Loc.T("CONTROLS RESET", "CONTROLS の割り当てを元に戻しました"));
         }
 
         private void SaveBindings()

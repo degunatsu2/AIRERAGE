@@ -717,9 +717,16 @@ namespace Airerage.Runtime.UI
             }
             if (_hint != null)
             {
-                _hint.text = Mode == SelectMode.Local
-                    ? "ENTER / A: JOIN, READY     ESC / B: BACK     F1 / SELECT: DETAILS     T / Y: TIME LIMIT"
-                    : "ENTER / A: OK     ESC / B: BACK     F1 / SELECT: DETAILS";
+                if (Mode == SelectMode.Local)
+                {
+                    LocalizedText.Show(_hint, "ENTER / A: JOIN, READY     ESC / B: BACK     F1 / SELECT: DETAILS     T / Y: TIME LIMIT",
+                        "Enter ／ A: 参加・決定　　Esc ／ B: 戻る　　F1 ／ SELECT: 技の説明　　T ／ Y: 制限時間");
+                }
+                else
+                {
+                    LocalizedText.Show(_hint, "ENTER / A: OK     ESC / B: BACK     F1 / SELECT: DETAILS",
+                        "Enter ／ A: 決定　　Esc ／ B: 戻る　　F1 ／ SELECT: 技の説明");
+                }
             }
             if (_timeLimit != null)
             {
@@ -736,7 +743,9 @@ namespace Airerage.Runtime.UI
             switch (Mode)
             {
                 case SelectMode.Local:
-                    return JoinedCount < 2 ? "2-4 PLAYERS: JOIN WITH ENTER (KEYBOARD) OR A (GAMEPAD)" : string.Empty;
+                    return JoinedCount < 2
+                        ? Loc.T("2-4 PLAYERS: JOIN WITH ENTER (KEYBOARD) OR A (GAMEPAD)", "2〜4 人: Enter（キーボード）か A（ゲームパッド）で参加")
+                        : string.Empty;
                 case SelectMode.Network:
                     return _networkMessage;
                 default:
@@ -795,7 +804,7 @@ namespace Airerage.Runtime.UI
                 _cornerLogos[i].enabled = false;
                 _cornerNames[i].text = string.Empty;
                 _cornerTags[i].text = string.Empty;
-                _cornerStates[i].text = Mode == SelectMode.Local ? "PRESS ENTER / A" : "EMPTY";
+                _cornerStates[i].text = Mode == SelectMode.Local ? Loc.T("PRESS ENTER / A", "Enter ／ A で参加") : "EMPTY";
                 _cornerStates[i].color = new Color(1f, 1f, 1f, 0.5f);
                 return;
             }

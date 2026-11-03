@@ -18,7 +18,10 @@ namespace Airerage.Core.Movement
             float dt = SimTime.DeltaTime;
             float inputX = MathF.Abs(input.Move.X) >= tuning.MoveDeadzone ? input.Move.X : 0f;
 
-            state.Velocity.X = ComputeHorizontalVelocity(state.Velocity.X, inputX, state.Grounded, tuning, dt, groundDrift);
+            // のけぞり中（吹き飛び）は横の上限で切らない（D-43 と同じ考え）。
+            bool knockback = state.Action.Kind == ActionKind.Hitstun;
+            bool landing = state.Grounded && state.GroundedTicks <= tuning.LandingGraceTicks;
+            state.Velocity.X = ComputeHorizontalVelocity(state.Velocity.X, inputX, state.Grounded, landing, knockback, tuning, dt, groundDrift);
 
             float fallSpeedBefore = state.Velocity.Y;
             state.Velocity.Y -= tuning.Gravity * dt;
@@ -38,6 +41,8 @@ namespace Airerage.Core.Movement
         public static void ApplyGroundState(ref CharacterState state, bool groundBelow, MovementTuning tuning)
         {
             state.Grounded = groundBelow && state.Velocity.Y <= 0f;
+            // 着地してからのティック数（着地の直後は勢いを落とさない。LandingGraceTicks）。
+            state.GroundedTicks = state.Grounded ? Math.Min(state.GroundedTicks + 1, GroundedTicksCap) : 0;
             if (state.Grounded)
             {
                 state.CoyoteTicksLeft = tuning.CoyoteTicks;
@@ -53,26 +58,38 @@ namespace Airerage.Core.Movement
             }
         }
 
-        private static float ComputeHorizontalVelocity(float vx, float inputX, bool grounded, MovementTuning tuning, float dt, float groundDrift)
+        /// <summary>GroundedTicks の上限（数え続けないように）。</summary>
+        public const int GroundedTicksCap = 1000;
+
+        private static float ComputeHorizontalVelocity(float vx, float inputX, bool grounded, bool landing, bool knockback, MovementTuning tuning,
+            float dt, float groundDrift)
         {
             float target = inputX * (grounded || tuning.AirRunSpeed <= 0f ? tuning.RunSpeed : tuning.AirRunSpeed);
+            float result;
             if (grounded)
             {
-                return SimMath.MoveTowards(vx, target + groundDrift, tuning.GroundAcceleration * dt);
+                // 着地の直後（LandingGraceTicks）は、走る速さより速い勢いを、逆の向きに入れていなければ落とさない（すぐにジャンプすれば
+                // 勢いを保ったまま空中へ戻れる。2026-11-03 のユーザーの要望）。その後は急速に走る速さへ落ちる。
+                bool overspeed = MathF.Abs(vx) > MathF.Abs(target + groundDrift) && MathF.Abs(vx) > tuning.RunSpeed;
+                bool against = inputX != 0f && MathF.Sign(inputX) != MathF.Sign(vx);
+                result = landing && overspeed && !against ? vx : SimMath.MoveTowards(vx, target + groundDrift, tuning.GroundAcceleration * dt);
+                return knockback ? result : MathF.Max(-tuning.MaxGroundSpeed, MathF.Min(tuning.MaxGroundSpeed, result));
             }
 
             if (inputX == 0f)
             {
-                return SimMath.MoveTowards(vx, 0f, tuning.AirDrag * dt);
+                result = SimMath.MoveTowards(vx, 0f, tuning.AirDrag * dt);
             }
-
-            // ワイヤー解除後などで走行速度を超えている場合、同じ向きに入力している間は勢いを保つ。
-            bool sameDirection = MathF.Sign(vx) == MathF.Sign(inputX);
-            if (sameDirection && MathF.Abs(vx) > MathF.Abs(target))
+            else if (MathF.Sign(vx) == MathF.Sign(inputX) && MathF.Abs(vx) > MathF.Abs(target))
             {
-                return vx;
+                // ワイヤー解除後などで走行速度を超えている場合、同じ向きに入力している間は勢いを保つ。
+                result = vx;
             }
-            return SimMath.MoveTowards(vx, target, tuning.AirAcceleration * dt);
+            else
+            {
+                result = SimMath.MoveTowards(vx, target, tuning.AirAcceleration * dt);
+            }
+            return knockback ? result : MathF.Max(-tuning.MaxAirSpeed, MathF.Min(tuning.MaxAirSpeed, result));
         }
 
         private static void UpdateJump(ref CharacterState state, in InputFrame input, MovementTuning tuning)

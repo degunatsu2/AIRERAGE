@@ -53,6 +53,9 @@ namespace Airerage.Core.Simulation
         /// <summary>地上のジャンプの発生を待っている残り（ティック。MovementTuning.JumpStartupTicks。0 なら待っていない）。</summary>
         public int JumpSquatTicksLeft;
 
+        /// <summary>地面に立ってからのティック数（空中では 0。着地の直後の勢いの扱いに使う。MovementTuning.LandingGraceTicks）。</summary>
+        public int GroundedTicks;
+
         /// <summary>コイン（所持と確定。docs/12 T4-3）。増減は CoinLedger だけが行う。</summary>
         public CoinPurse Coins;
 
@@ -84,6 +87,7 @@ namespace Airerage.Core.Simulation
                 && WallClingTicks == other.WallClingTicks
                 && WallJumpCount == other.WallJumpCount
                 && JumpSquatTicksLeft == other.JumpSquatTicksLeft
+                && GroundedTicks == other.GroundedTicks
                 && Coins.Equals(other.Coins);
         }
 
@@ -112,6 +116,7 @@ namespace Airerage.Core.Simulation
             hash.Add(WallClingTicks);
             hash.Add(WallJumpCount);
             hash.Add(JumpSquatTicksLeft);
+            hash.Add(GroundedTicks);
             hash.Add(Coins);
             return hash.ToHashCode();
         }

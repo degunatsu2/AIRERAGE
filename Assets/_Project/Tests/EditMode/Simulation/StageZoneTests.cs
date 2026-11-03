@@ -200,8 +200,12 @@ namespace Airerage.Core.Tests.Simulation
         public void BoostRing_CatchesACharacterThatPassesThroughInOneTick()
         {
             SimWorld world = World(new StageZone(StageZoneKind.BoostRing, 2f, 3f, 3f, 7f, Vector2.UnitX, 20f));
-            // 1 ティックで 5m 進む（x = 0 → 5）。始まりと終わりのどちらでもリングに重ならない。
+            // 1 ティックで 5m 進む（x = 0 → 5）。始まりと終わりのどちらでもリングに重ならない。横の速さの上限（MaxAirSpeed）に
+            // 切られないよう、のけぞり中（吹き飛び）にする。
             SetState(world, new Vector3(0f, 5f, 0f), new Vector3(300f, 0f, 0f));
+            CharacterState flying = world.GetState(0);
+            flying.Action = new Airerage.Core.Combat.ActionState { Kind = Airerage.Core.Combat.ActionKind.Hitstun, Duration = 30 };
+            world.SetState(0, flying);
             Step(world, 1);
 
             Assert.That(world.GetState(0).BoostRingCount, Is.EqualTo(1), "通り抜けたのに見つからない");

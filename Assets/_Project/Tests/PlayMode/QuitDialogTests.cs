@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using Airerage.Runtime.Flow;
+using Airerage.Runtime.Settings;
 using Airerage.Runtime.UI;
 using NUnit.Framework;
 using UnityEngine;
@@ -39,7 +40,7 @@ namespace Airerage.PlayMode.Tests
                 // タイトルで Esc: 終了の確認が出て、「いいえ」を選んでいる。
                 yield return Press(keyboard, Key.Escape);
                 Assert.That(menu.ShowingQuitDialog, Is.True, "タイトルで Esc を押しても終了の確認が出ない");
-                Assert.That(menu.QuitDialog.Message, Does.Contain("ゲームを終了します"));
+                Assert.That(menu.QuitDialog.Message, Does.Contain(Loc.T("QUIT THE GAME", "ゲームを終了します")));
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.QuitDialog.No.gameObject), "最初に「いいえ」を選んでいない");
                 Assert.That(menu.ShowingTitle, Is.True, "確認の後ろのタイトルが消えた");
                 yield return WaitSeconds(0.3f);

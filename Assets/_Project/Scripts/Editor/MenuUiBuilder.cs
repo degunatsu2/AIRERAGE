@@ -57,6 +57,16 @@ namespace Airerage.Editor
             return image;
         }
 
+        /// <summary>
+        /// 説明の文（操作の説明など）text に、今の英語の文と日本語の文 japanese を持たせる（LocalizedText。オプションの LANGUAGE で
+        /// 切り替わる。2026-11-03 のユーザーの要望）。同じ文字を返す。
+        /// </summary>
+        public static Text Localize(Text text, string japanese)
+        {
+            LocalizedText.Attach(text, text.text, japanese);
+            return text;
+        }
+
         /// <summary>文字。anchor（0〜1）に pivot を合わせ、position だけずらす。</summary>
         public static Text CreateText(Transform parent, string name, string text, int size, FontStyle style, TextAnchor alignment,
             Vector2 anchor, Vector2 position, Vector2 boxSize, Color color, bool outline = true)
@@ -179,7 +189,7 @@ namespace Airerage.Editor
             var plate = panel.AddComponent<SlantedPlate>();
             // 中は不透明にする（線形の色空間では、半透明の暗い色を重ねても後ろの文字が透けて見える）。
             plate.Configure(0.12f, 4f, new Color(0.03f, 0.05f, 0.09f, 1f), Accent);
-            Text message = CreateText(panel.transform, "Message", "ゲームを終了します。本当によろしいですか？", 40, FontStyle.Bold,
+            Text message = CreateText(panel.transform, "Message", QuitConfirmDialog.MessageJapanese, 40, FontStyle.Bold,
                 TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(980f, 90f), Color.white);
             MenuOption yes = CreateMenuItem(panel.transform, "Yes", "はい", new Vector2(0.5f, 0f), new Vector2(-330f, 150f), new Vector2(300f, 76f));
             MenuOption no = CreateMenuItem(panel.transform, "No", "いいえ", new Vector2(0.5f, 0f), new Vector2(50f, 150f), new Vector2(300f, 76f));
@@ -297,8 +307,9 @@ namespace Airerage.Editor
             MenuOption resume = CreateMenuItem(panel, "Resume", "RESUME", center, new Vector2(-260f, 110f), size);
             MenuOption reset = CreateMenuItem(panel, "ResetPosition", "RESET POSITION", center, new Vector2(-260f, 20f), size);
             MenuOption menu = CreateMenuItem(panel, "BackToMenu", "BACK TO MENU", center, new Vector2(-260f, -70f), size);
-            CreateText(panel, "Hint", "Esc / Start: close    Enter / A: OK", 20, FontStyle.Bold, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -190f), new Vector2(800f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            Localize(CreateText(panel, "Hint", "Esc / Start: close    Enter / A: OK", 20, FontStyle.Bold, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -190f), new Vector2(800f, 40f), new Color(1f, 1f, 1f, 0.7f)),
+                "Esc ／ Start: 閉じる　　Enter ／ A: 決定");
 
             var pause = canvas.gameObject.AddComponent<PauseMenu>();
             SandboxWireSceneBuilder.SetReference(pause, "_runner", runner);

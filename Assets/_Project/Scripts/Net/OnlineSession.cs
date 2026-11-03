@@ -10,6 +10,7 @@ using Airerage.Core.Simulation;
 using Unity.Networking.Transport.Relay;
 using UnityEngine;
 using NVector3 = System.Numerics.Vector3;
+using Airerage.Runtime.Settings;
 
 namespace Airerage.Net
 {
@@ -108,8 +109,30 @@ namespace Airerage.Net
         // クライアント: ホストから届いた、チーム対戦か。
         private bool _clientTeamMode;
 
-        // ホスト: プレイヤーの番号 → 観戦の待機所にいるか（試合に参加せず見るだけ。docs/19。ホスト自身はいつも参加）。
+        // ホスト: プレイヤーの番号 → 観戦の待機所にいるか（試合に参加せず見るだけ。docs/19。ホスト自身も観戦にできる。2026-11-03）。
         private readonly bool[] _lobbySpectators = new bool[MaxPlayers];
+
+        // ホストの番号（ロビーの番号。初めは 0。ホストが観戦するときは、参加する人の後ろへ詰める）と、クライアントが知っているホストの番号。
+        private int _hostSlot;
+        private int _clientHostSlot;
+
+        // 最初に入力を使うティック（試合の初め。ホストが観戦していると巻き戻しのセッションがないので、ここに覚える）。
+        private int _firstInputTick;
+
+        // ホストが観戦: 自分のワールドへ渡した最後のティック（中継した全員の入力が届いたティックまで、順に渡す）と、抜けた人の抜けたティック。
+        private int _hostFedTick;
+        private readonly int[] _departFrom = new int[MaxPlayers];
+
+        // ホスト: 途中から入って、今の選択・試合が終わるのを待っている人（2026-11-03）と、入ったことをもう知らせたか。
+        private readonly bool[] _lobbyLate = new bool[MaxPlayers];
+        private readonly bool[] _lateAnnounced = new bool[MaxPlayers];
+
+        // クライアント: ホストから届いた、試合中か（途中から入った人の待機所の表示に使う）。
+        private bool _clientMatchRunning;
+
+        // 途中から入った人の知らせ（名前と、知らせを受けた時刻。画面の左下に少しの間だけ出す）と、Update で進める時計（秒）。
+        private readonly List<JoinNotice> _joinNotices = new List<JoinNotice>();
+        private float _clock;
 
         // 観戦の人: 確定した入力で進めるワールド（試合を見ている間だけ）。
         private SpectatorSession _spectator;
@@ -181,6 +204,12 @@ namespace Airerage.Net
         }
 
         public bool IsHost => _link.IsHost;
+
+        /// <summary>
+        /// ホストの番号（ロビーの番号。初めは 0。ホストが観戦の待機所にいると、キャラクター選択に進むときに参加する人の後ろへ移る。
+        /// 2026-11-03）。待機所の「(HOST)」の印に使う。
+        /// </summary>
+        public int HostSlot => IsHost ? _hostSlot : _clientHostSlot;
         public SessionState State { get; private set; }
 
         /// <summary>自分のプレイヤーの番号（クライアントは Welcome が届くまで -1）。</summary>
@@ -215,7 +244,7 @@ namespace Airerage.Net
                 _localCharacter = character;
                 if (IsHost)
                 {
-                    _lobbyCharacters[0] = ClampCharacter(character);
+                    _lobbyCharacters[_hostSlot] = ClampCharacter(character);
                     BroadcastLobby();
                 }
                 else if (LocalPlayer >= 0)
@@ -252,7 +281,7 @@ namespace Airerage.Net
             get
             {
                 ulong mask = _localStagePool;
-                for (int p = 1; p < MaxPlayers; p++)
+                for (int p = 0; p < MaxPlayers; p++)
                 {
                     if (_playerPeer[p] >= 0)
                     {
@@ -285,7 +314,7 @@ namespace Airerage.Net
                 _localName = name;
                 if (IsHost)
                 {
-                    _lobbyNames[0] = name;
+                    _lobbyNames[_hostSlot] = name;
                     BroadcastLobby();
                 }
                 else if (LocalPlayer >= 0)
@@ -345,16 +374,16 @@ namespace Airerage.Net
         /// </summary>
         public bool LocalReady
         {
-            get => IsHost ? _lobbyReady[0] : _localReady;
+            get => IsHost ? _lobbyReady[_hostSlot] : _localReady;
             set
             {
                 if (IsHost)
                 {
-                    if (_lobbyReady[0] == value)
+                    if (_lobbyReady[_hostSlot] == value)
                     {
                         return;
                     }
-                    _lobbyReady[0] = value;
+                    _lobbyReady[_hostSlot] = value;
                     CheckLobbyProgress();
                     BroadcastLobby();
                 }
@@ -418,7 +447,7 @@ namespace Airerage.Net
             {
                 if (IsHost)
                 {
-                    SetTeamOf(0, value);
+                    SetTeamOf(_hostSlot, value);
                 }
                 else if (LocalPlayer >= 0 && TeamMode && Phase == LobbyPhase.Waiting)
                 {
@@ -442,10 +471,9 @@ namespace Airerage.Net
             {
                 if (IsHost)
                 {
-                    if (value)
-                    {
-                        throw new InvalidOperationException("ホストは観戦にできません（ホストはいつも試合に参加します）");
-                    }
+                    // ホストも観戦にできる（大会で、開催者が参加者どうしの試合を見る。2026-11-03 のユーザーの要望）。観戦していても、
+                    // 全員の入力の中継とずれの判定はホストが受け持つ。
+                    SetSpectatorOf(_hostSlot, value);
                     return;
                 }
                 if (LocalPlayer >= 0 && Phase == LobbyPhase.Waiting)
@@ -456,7 +484,7 @@ namespace Airerage.Net
         }
 
         /// <summary>
-        /// ホスト: プレイヤー player を観戦の待機所へ入れる（spectate）か、出して参加させる（待機所でだけ。ホスト自身は観戦にできない）。
+        /// ホスト: プレイヤー player を観戦の待機所へ入れる（spectate）か、出して参加させる（待機所でだけ。ホスト自身も観戦にできる）。
         /// 観戦に入ると準備完了とチームが外れ、参加に戻るとチーム対戦なら人数の少ないチームに入る。
         /// </summary>
         public void SetSpectatorOf(int player, bool spectate)
@@ -465,7 +493,7 @@ namespace Airerage.Net
             {
                 throw new InvalidOperationException("ほかの人を観戦にできるのはホストだけです");
             }
-            if (State != SessionState.Lobby || _phase != LobbyPhase.Waiting || player <= 0 || !IsPresent(player)
+            if (State != SessionState.Lobby || _phase != LobbyPhase.Waiting || player < 0 || !IsPresent(player)
                 || _lobbySpectators[player] == spectate)
             {
                 return;
@@ -489,16 +517,85 @@ namespace Airerage.Net
                 int count = 0;
                 for (int p = 0; p < MaxPlayers; p++)
                 {
-                    count += IsPresent(p) && !SpectatorAt(p) ? 1 : 0;
+                    count += IsPresent(p) && !SpectatorAt(p) && !LateAt(p) ? 1 : 0;
                 }
                 return count;
             }
+        }
+
+        // 番号 p の人が途中から入って待っているか（ホストは自分の表、クライアントは届いた顔ぶれ）。
+        private bool LateAt(int p)
+        {
+            return IsHost ? _lobbyLate[p] : p < _clientRoster.Length && _clientRoster[p].Late;
         }
 
         // 番号 p の人が観戦の待機所にいるか（ホストは自分の表、クライアントは届いた顔ぶれ）。
         private bool SpectatorAt(int p)
         {
             return IsHost ? _lobbySpectators[p] : p < _clientRoster.Length && _clientRoster[p].Spectator;
+        }
+
+        /// <summary>
+        /// 自分が途中から入って、今の選択・試合が終わるのを待っているか（2026-11-03。キャラクター選択・ステージ選択・試合の途中に入った人）。
+        /// 待機所で待ち、次の試合から参加する。
+        /// </summary>
+        public bool LocalLate
+        {
+            get
+            {
+                IReadOnlyList<LobbySlot> roster = Roster;
+                return LocalPlayer >= 0 && LocalPlayer < roster.Count && roster[LocalPlayer].Late;
+            }
+        }
+
+        /// <summary>ホストが試合中か（ステージの読み込みを含む。ホストは今の値、クライアントはホストから最後に届いた値か、自分の状態）。</summary>
+        public bool MatchRunning => IsHost || State != SessionState.Lobby
+            ? State == SessionState.Running || State == SessionState.Loading
+            : _clientMatchRunning;
+
+        /// <summary>途中から人が入った知らせ（名前と、受けてからの秒数 Age）。JoinNotice.Seconds を過ぎたものは Update で消える。</summary>
+        public IReadOnlyList<JoinNotice> JoinNotices => _joinNotices;
+
+        /// <summary>途中から入った人の知らせ 1 つ。</summary>
+        public readonly struct JoinNotice
+        {
+            /// <summary>知らせを出しておく秒数。</summary>
+            public const float Seconds = 5f;
+
+            public readonly string Name;
+
+            /// <summary>知らせを受けた時刻（セッションの時計の秒）。</summary>
+            public readonly float Received;
+
+            /// <summary>受けてからの秒数（Update のたびに増える）。</summary>
+            public readonly float Age;
+
+            public JoinNotice(string name, float received, float age)
+            {
+                Name = name;
+                Received = received;
+                Age = age;
+            }
+        }
+
+        private void AddJoinNotice(string name)
+        {
+            _joinNotices.Add(new JoinNotice(name, _clock, 0f));
+        }
+
+        private void AgeJoinNotices()
+        {
+            for (int i = _joinNotices.Count - 1; i >= 0; i--)
+            {
+                JoinNotice notice = _joinNotices[i];
+                float age = _clock - notice.Received;
+                if (age > JoinNotice.Seconds)
+                {
+                    _joinNotices.RemoveAt(i);
+                    continue;
+                }
+                _joinNotices[i] = new JoinNotice(notice.Name, notice.Received, age);
+            }
         }
 
         /// <summary>試合を観戦しているか（試合に参加せず、確定した入力で見ている。docs/19）。</summary>
@@ -547,7 +644,7 @@ namespace Airerage.Net
             var present = new List<int>();
             for (int p = 0; p < MaxPlayers; p++)
             {
-                if (IsPresent(p) && !_lobbySpectators[p])
+                if (IsPresent(p) && !_lobbySpectators[p] && !_lobbyLate[p])
                 {
                     present.Add(p);
                 }
@@ -608,10 +705,10 @@ namespace Airerage.Net
             return null;
         }
 
-        // ホスト: 番号 p の人がロビーにいるか（0 はホスト自身）。
+        // ホスト: 番号 p の人がロビーにいるか（HostSlot はホスト自身）。
         private bool IsPresent(int p)
         {
-            return p == 0 || (p > 0 && p < MaxPlayers && _playerPeer[p] >= 0);
+            return p == _hostSlot || (p >= 0 && p < MaxPlayers && _playerPeer[p] >= 0);
         }
 
         // ホスト: 人数のいちばん少ないチーム（同じなら番号の小さいほう。新しく入った人や、チーム対戦にしたとき）。
@@ -672,13 +769,14 @@ namespace Airerage.Net
                     return _clientRoster;
                 }
                 var slots = new LobbySlot[MaxPlayers];
-                slots[0] = new LobbySlot(true, _localName, _lobbyCharacters[0], _lobbyReady[0], _teamMode ? _lobbyTeams[0] : (byte)0);
-                for (int p = 1; p < MaxPlayers; p++)
+                for (int p = 0; p < MaxPlayers; p++)
                 {
-                    bool connected = _playerPeer[p] >= 0;
+                    bool connected = IsPresent(p);
                     bool spectator = connected && _lobbySpectators[p];
-                    slots[p] = new LobbySlot(connected, connected ? _lobbyNames[p] : string.Empty, connected ? _lobbyCharacters[p] : 0,
-                        connected && _lobbyReady[p], connected && _teamMode && !spectator ? _lobbyTeams[p] : (byte)0, spectator);
+                    string name = p == _hostSlot ? _localName : connected ? _lobbyNames[p] : string.Empty;
+                    slots[p] = new LobbySlot(connected, name, connected ? _lobbyCharacters[p] : 0,
+                        connected && _lobbyReady[p], connected && _teamMode && !spectator ? _lobbyTeams[p] : (byte)0, spectator,
+                        connected && _lobbyLate[p]);
                 }
                 return slots;
             }
@@ -693,7 +791,15 @@ namespace Airerage.Net
         public bool UsesRelay => _link.UsesRelay;
 
         // ホストの状態の文の頭（参加コードか、待ち受けているポート）。
-        private string HostingLabel => JoinCode.Length > 0 ? $"Hosting online (code {JoinCode})" : $"Hosting on port {Port}";
+        // ホストの待機所の状態の文（待ち受けと人数）。
+        private string PlayersLabel()
+        {
+            return Loc.T($"{HostingLabel}: {LobbyPlayerCount} player(s)", $"{HostingLabel}: {LobbyPlayerCount} 人");
+        }
+
+        private string HostingLabel => JoinCode.Length > 0
+            ? Loc.T($"Hosting online (code {JoinCode})", $"オンラインで待ち受け中（参加コード {JoinCode}）")
+            : Loc.T($"Hosting on port {Port}", $"ポート {Port} で待ち受け中");
         public SimWorld World { get; private set; }
         public RollbackSession Session { get; private set; }
         public InputExchange Exchange { get; private set; }
@@ -761,7 +867,7 @@ namespace Airerage.Net
         private static OnlineSession HostWith(ushort port, OnlineStage stage, IReadOnlyList<CharacterConfig> characters, RollbackSettings settings)
         {
             OnlineSession session = HostOver(() => TransportLink.Host(port), stage, characters, settings);
-            session.Status = $"Hosting on port {session.Port}";
+            session.Status = Loc.T($"Hosting on port {session.Port}", $"ポート {session.Port} で待ち受け中");
             return session;
         }
 
@@ -772,7 +878,7 @@ namespace Airerage.Net
         {
             OnlineSession session = HostOver(() => TransportLink.HostRelay(allocation.ServerData), null, characters, settings);
             session.JoinCode = allocation.JoinCode;
-            session.Status = $"Hosting online. Join code: {allocation.JoinCode}";
+            session.Status = Loc.T($"Hosting online. Join code: {allocation.JoinCode}", $"オンラインで待ち受け中。参加コード: {allocation.JoinCode}");
             return session;
         }
 
@@ -784,7 +890,7 @@ namespace Airerage.Net
                 State = SessionState.Connecting,
                 JoinCode = joinCode,
             };
-            session.Status = $"Connecting with code {joinCode}";
+            session.Status = Loc.T($"Connecting with code {joinCode}", $"参加コード {joinCode} で接続中……");
             return session;
         }
 
@@ -827,7 +933,7 @@ namespace Airerage.Net
             {
                 State = SessionState.Connecting,
             };
-            session.Status = $"Connecting to {address}:{port}";
+            session.Status = Loc.T($"Connecting to {address}:{port}", $"{address}:{port} に接続中……");
             return session;
         }
 
@@ -848,7 +954,7 @@ namespace Airerage.Net
             {
                 State = SessionState.Connecting,
             };
-            session.Status = $"Connecting to {address}:{port}";
+            session.Status = Loc.T($"Connecting to {address}:{port}", $"{address}:{port} に接続中……");
             return session;
         }
 
@@ -915,6 +1021,8 @@ namespace Airerage.Net
             }
             EnterLobby();
             _startMessage = null;
+            // 途中から入って待っていた人も、ここから参加する。
+            ClearLate();
             SetPhase(phase);
             BroadcastLobby();
         }
@@ -931,7 +1039,7 @@ namespace Airerage.Net
             _confirmedLog.Clear();
             PlayerCount = 0;
             _previous = new CharacterState[0];
-            Status = IsHost ? $"{HostingLabel}: {LobbyPlayerCount} player(s)" : $"Joined as player {LocalPlayer + 1}";
+            Status = IsHost ? PlayersLabel() : Loc.T($"Joined as player {LocalPlayer + 1}", $"プレイヤー {LocalPlayer + 1} として参加中");
         }
 
         // ホスト: ロビーの段階を変える（全員の準備完了を外す）。
@@ -965,7 +1073,7 @@ namespace Airerage.Net
             for (int p = 0; p < MaxPlayers; p++)
             {
                 // 観戦の人は準備完了を待たない。
-                if (IsPresent(p) && !_lobbySpectators[p] && !_lobbyReady[p])
+                if (IsPresent(p) && !_lobbySpectators[p] && !_lobbyLate[p] && !_lobbyReady[p])
                 {
                     return;
                 }
@@ -982,12 +1090,13 @@ namespace Airerage.Net
         // （試合の番号 = ロビーの番号。観戦の人の番号は試合の人数以上）。番号が変わる人には Welcome を送り直す。
         private void CloseUpPlayers()
         {
-            var order = new List<int> { 0 };
-            for (int pass = 0; pass < 2; pass++)
+            // 並べる順: 参加する人（ホストも、参加するなら）→ 観戦の人。同じ組の中は今の番号の順。
+            var order = new List<int>();
+            for (int group = 0; group < 3; group++)
             {
-                for (int p = 1; p < MaxPlayers; p++)
+                for (int p = 0; p < MaxPlayers; p++)
                 {
-                    if (_playerPeer[p] >= 0 && _lobbySpectators[p] == (pass == 1))
+                    if (IsPresent(p) && SeatGroup(p) == group)
                     {
                         order.Add(p);
                     }
@@ -1000,7 +1109,10 @@ namespace Airerage.Net
             var ready = (bool[])_lobbyReady.Clone();
             var teams = (byte[])_lobbyTeams.Clone();
             var spectators = (bool[])_lobbySpectators.Clone();
-            for (int next = 1; next < MaxPlayers; next++)
+            var late = (bool[])_lobbyLate.Clone();
+            var announced = (bool[])_lateAnnounced.Clone();
+            int hostFrom = _hostSlot;
+            for (int next = 0; next < MaxPlayers; next++)
             {
                 bool filled = next < order.Count;
                 int from = filled ? order[next] : -1;
@@ -1011,24 +1123,61 @@ namespace Airerage.Net
                 _lobbyReady[next] = filled && ready[from];
                 _lobbyTeams[next] = filled ? teams[from] : (byte)0;
                 _lobbySpectators[next] = filled && spectators[from];
-                if (filled && from != next)
+                _lobbyLate[next] = filled && late[from];
+                _lateAnnounced[next] = filled && announced[from];
+                if (filled && from == hostFrom)
+                {
+                    _hostSlot = next;
+                }
+                else if (filled && from != next)
                 {
                     _link.Send(_playerPeer[next], NetMessages.Welcome(next), reliable: true);
                 }
             }
+            LocalPlayer = _hostSlot;
+        }
+
+        // ホスト: 途中から入って待っていた人を、次の試合に参加する人にする（チーム対戦なら、チームがなければ人数の少ないチームへ）。
+        private void ClearLate()
+        {
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                if (!_lobbyLate[p])
+                {
+                    continue;
+                }
+                _lobbyLate[p] = false;
+                _lobbyReady[p] = false;
+                if (_teamMode && _lobbyTeams[p] == 0 && !_lobbySpectators[p])
+                {
+                    _lobbyTeams[p] = SmallestTeam();
+                }
+            }
+        }
+
+        // 番号を詰めるときの組（0: 参加する人、1: 観戦の人、2: 途中から入って待っている人）。
+        private int SeatGroup(int p)
+        {
+            return _lobbyLate[p] ? 2 : _lobbySpectators[p] ? 1 : 0;
         }
 
         // ホスト: ロビーの顔ぶれを全員へ送る（ロビーにいる間だけ）。
         private void BroadcastLobby()
         {
-            if (!IsHost || State != SessionState.Lobby)
+            if (!IsHost)
             {
                 return;
             }
-            byte[] message = NetMessages.Lobby(Roster, _phase, _stageCursor, _teamMode);
-            for (int p = 1; p < MaxPlayers; p++)
+            // 試合中（ステージの読み込みを含む）は、途中から入って待っている人にだけ送る（試合中の人はロビーのメッセージで試合を抜けるので）。
+            bool matchRunning = State == SessionState.Running || State == SessionState.Loading;
+            if (State != SessionState.Lobby && !matchRunning)
             {
-                if (_playerPeer[p] >= 0)
+                return;
+            }
+            byte[] message = NetMessages.Lobby(Roster, _phase, _stageCursor, _teamMode, _hostSlot, matchRunning);
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                if (_playerPeer[p] >= 0 && (!matchRunning || _lobbyLate[p]))
                 {
                     _link.Send(_playerPeer[p], message, reliable: true);
                 }
@@ -1055,13 +1204,29 @@ namespace Airerage.Net
             {
                 throw new InvalidOperationException("試合を始め直せるのは、試合中のホストだけです");
             }
-            // 試合中に抜けた人がいれば、番号を詰めて、今いる人で始め直す。
+            // 試合中に抜けた人がいれば、番号を詰めて、今いる人で始め直す。途中から入って待っていた人も、再戦から参加する。
+            var joining = new List<int>();
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                if (_lobbyLate[p] && _playerPeer[p] >= 0)
+                {
+                    joining.Add(_playerPeer[p]);
+                }
+            }
+            ClearLate();
             CloseUpPlayers();
             if (WaitingProblem != null)
             {
                 // 抜けた人がいて、チームが 1 つだけになった（チーム対戦）: 再戦はできないので、全員で待機所へ戻ってチームを分け直す。
                 ReturnToLobby(LobbyPhase.Waiting);
                 return;
+            }
+            // 待っていた人へ、待つ印を外した待機所の様子を、開始のメッセージより先に送る（試合中の人へはロビーのメッセージを送らない。
+            // 受けると試合を抜けるので）。
+            byte[] lobby = NetMessages.Lobby(Roster, _phase, _stageCursor, _teamMode, _hostSlot, matchRunning: false);
+            foreach (int peer in joining)
+            {
+                _link.Send(peer, lobby, reliable: true);
             }
             SendStartAndBegin(LobbyParticipantCount, rules, StageIndex);
         }
@@ -1075,7 +1240,7 @@ namespace Airerage.Net
             var names = new string[count];
             for (int p = 0; p < count; p++)
             {
-                names[p] = SanitizeName(p == 0 ? _localName : _lobbyNames[p]);
+                names[p] = SanitizeName(p == _hostSlot ? _localName : _lobbyNames[p]);
             }
             // 使うキャラクターの調整値だけを、重ねずに送る（同じキャラクターを選んだ人は同じ調整値を指す）。
             var picks = new int[count];
@@ -1108,10 +1273,10 @@ namespace Airerage.Net
                 Characters = configs, Picks = picks, CharacterIds = ids, Match = rules, Names = names, Stage = stage, Teams = teams,
             });
             byte[] start = NetMessages.Start(count, match, json);
-            for (int p = 1; p < MaxPlayers; p++)
+            for (int p = 0; p < MaxPlayers; p++)
             {
                 _peerMatch[p] = -1;
-                if (_playerPeer[p] >= 0 && !_link.Send(_playerPeer[p], start, reliable: true))
+                if (_playerPeer[p] >= 0 && !_lobbyLate[p] && !_link.Send(_playerPeer[p], start, reliable: true))
                 {
                     Debug.LogError($"OnlineSession: 試合の開始のメッセージをプレイヤー {p + 1} に送れませんでした（{start.Length} バイト）。送り直します");
                 }
@@ -1132,7 +1297,7 @@ namespace Airerage.Net
             }
             _pending = new PendingStart { Count = count, Match = match, Settings = settings };
             State = SessionState.Loading;
-            Status = $"Loading stage {settings.Stage}";
+            Status = Loc.T($"Loading stage {settings.Stage}", $"ステージ {settings.Stage} を読み込み中……");
         }
 
         /// <summary>
@@ -1158,10 +1323,21 @@ namespace Airerage.Net
         /// </summary>
         public void Update(float deltaTime, Func<int, PlayerInput> localInput)
         {
+            _clock += Math.Max(0f, deltaTime);
             PumpEvents();
+            AgeJoinNotices();
             if (State == SessionState.Running && _spectator != null)
             {
+                if (IsHost)
+                {
+                    FeedHostSpectator();
+                }
                 AdvanceSpectator(deltaTime);
+                if (IsHost)
+                {
+                    SendSpectatorInputs();
+                    ResendStartIfNeeded(deltaTime);
+                }
             }
             else if (State == SessionState.Running)
             {
@@ -1213,6 +1389,57 @@ namespace Airerage.Net
                 }
                 _spectator.Step();
                 ticks++;
+                if (IsHost && World.Tick == _nextChecksumTick)
+                {
+                    // 観戦しているホストも、自分のワールドの確定した状態でずれを判定する（参加している人のチェックサムと比べる）。
+                    RecordHostChecksum(World.Tick, World.Checksum());
+                    _nextChecksumTick += ChecksumIntervalTicks;
+                }
+            }
+        }
+
+        // ホストが観戦: 中継した全員の入力が届いたティックまで、自分のワールドへ順に渡し、ほかの観戦の人へ送る分にも記録する。抜けた人は
+        // 抜けたティックから PlayerInput.Departed。試合の初めの入力遅延の分は、全員の空の入力。
+        private void FeedHostSpectator()
+        {
+            int through = int.MaxValue;
+            for (int p = 0; p < PlayerCount; p++)
+            {
+                int contiguous = _departFrom[p] != int.MaxValue ? int.MaxValue : _seenContiguous[p];
+                through = Math.Min(through, contiguous);
+            }
+            if (through == int.MaxValue)
+            {
+                return;
+            }
+            bool log = SpectatorPeers() > 0;
+            while (_hostFedTick < through)
+            {
+                int tick = _hostFedTick + 1;
+                var inputs = new PlayerInput[PlayerCount];
+                for (int p = 0; p < PlayerCount; p++)
+                {
+                    if (tick >= _departFrom[p])
+                    {
+                        inputs[p] = PlayerInput.Departed;
+                    }
+                    else if (tick < _firstInputTick)
+                    {
+                        inputs[p] = default;
+                    }
+                    else if (!_seenInputs[p].TryGetValue(tick, out inputs[p]))
+                    {
+                        // 起きないはず（全員の分がそろったティックまでしか進めず、渡すまでは捨てない。OldestNeeded）。
+                        Debug.LogError($"OnlineSession: 観戦しているホストに、プレイヤー {p + 1} のティック {tick} の入力がありません");
+                        return;
+                    }
+                }
+                _spectator.AddInputs(tick, inputs);
+                if (log)
+                {
+                    _confirmedLog.Add(inputs);
+                }
+                _hostFedTick = tick;
             }
         }
 
@@ -1248,7 +1475,7 @@ namespace Airerage.Net
         private int SpectatorPeers()
         {
             int count = 0;
-            for (int p = 1; p < MaxPlayers; p++)
+            for (int p = 0; p < MaxPlayers; p++)
             {
                 count += _playerPeer[p] >= 0 && _lobbySpectators[p] ? 1 : 0;
             }
@@ -1261,7 +1488,7 @@ namespace Airerage.Net
             int count = 0;
             for (int p = 0; p < PlayerCount; p++)
             {
-                count += (p == 0 || _playerPeer[p] >= 0) && !_departed[p] ? 1 : 0;
+                count += (p == _hostSlot || _playerPeer[p] >= 0) && !_departed[p] ? 1 : 0;
             }
             return count;
         }
@@ -1369,9 +1596,9 @@ namespace Airerage.Net
             }
             // 観戦の人にも送る（観戦の人は Watching で見始めたことを知らせる）。
             bool waiting = false;
-            for (int p = 1; p < MaxPlayers; p++)
+            for (int p = 0; p < MaxPlayers; p++)
             {
-                waiting |= _playerPeer[p] >= 0 && _peerMatch[p] != MatchNumber;
+                waiting |= _playerPeer[p] >= 0 && !_lobbyLate[p] && _peerMatch[p] != MatchNumber;
             }
             if (!waiting)
             {
@@ -1384,9 +1611,9 @@ namespace Airerage.Net
                 return;
             }
             _startResendTimer = StartResendSeconds;
-            for (int p = 1; p < MaxPlayers; p++)
+            for (int p = 0; p < MaxPlayers; p++)
             {
-                if (_playerPeer[p] >= 0 && _peerMatch[p] != MatchNumber)
+                if (_playerPeer[p] >= 0 && !_lobbyLate[p] && _peerMatch[p] != MatchNumber)
                 {
                     _link.Send(_playerPeer[p], _startMessage, reliable: true);
                     StartResends++;
@@ -1409,7 +1636,7 @@ namespace Airerage.Net
             }
             if (IsHost)
             {
-                RecordChecksum(LocalPlayer, _nextChecksumTick, checksum);
+                RecordHostChecksum(_nextChecksumTick, checksum);
             }
             else
             {
@@ -1418,21 +1645,48 @@ namespace Airerage.Net
             _nextChecksumTick += ChecksumIntervalTicks;
         }
 
+        // ホスト: クライアント player が報告した確定した状態のチェックサム。
         private void RecordChecksum(int player, int tick, ulong checksum)
+        {
+            ChecksumRow row = RowAt(tick);
+            row.Values[player] = checksum;
+            CompareRow(tick, row);
+        }
+
+        // ホスト: 自分のワールド（参加していれば巻き戻しのセッション、観戦していれば観戦のワールド）の確定した状態のチェックサム。
+        private void RecordHostChecksum(int tick, ulong checksum)
+        {
+            ChecksumRow row = RowAt(tick);
+            row.Host = checksum;
+            CompareRow(tick, row);
+        }
+
+        private ChecksumRow RowAt(int tick)
         {
             if (!_checksums.TryGetValue(tick, out ChecksumRow row))
             {
                 row = new ChecksumRow();
                 _checksums[tick] = row;
             }
-            row.Values[player] = checksum;
-            ulong? host = row.Values[0];
+            return row;
+        }
+
+        // ホストの値が届いていれば、届いているクライアントの値と比べる（ずれの判定。ホストが観戦していても同じ）。全員の分を比べたら消す。
+        private void CompareRow(int tick, ChecksumRow row)
+        {
+            ulong? host = row.Host;
             if (host == null)
             {
                 return;
             }
-            for (int p = 1; p < PlayerCount; p++)
+            int remotes = 0;
+            for (int p = 0; p < PlayerCount; p++)
             {
+                if (p == LocalPlayer || _departed[p])
+                {
+                    continue;
+                }
+                remotes++;
                 if (row.Values[p] == null)
                 {
                     continue;
@@ -1446,11 +1700,6 @@ namespace Airerage.Net
                     Debug.LogError($"OnlineSession: 不一致を検出しました。{message}");
                 }
                 row.Values[p] = null;
-            }
-            int remotes = 0;
-            for (int p = 1; p < PlayerCount; p++)
-            {
-                remotes += _departed[p] ? 0 : 1;
             }
             if (row.Compared >= remotes)
             {
@@ -1487,13 +1736,19 @@ namespace Airerage.Net
             }
             _confirmedLog.Clear();
             _confirmedLogStart = World.Tick;
+            _firstInputTick = World.Tick + _settings.InputDelayTicks;
+            _hostFedTick = World.Tick - 1;
             if (LocalPlayer >= playerCount)
             {
-                // 観戦（docs/19）: 試合に参加せず、ホストから届く確定した入力でワールドを進める。見始めたことをホストへ知らせる。
+                // 観戦（docs/19）: 試合に参加せず、確定した入力でワールドを進める。クライアントは見始めたことをホストへ知らせ、ホストから
+                // 届く入力で進める。観戦しているホストは、中継した全員の入力から自分で確定したティックを決めて進める（FeedHostSpectator）。
                 Session = null;
                 Exchange = null;
                 _spectator = new SpectatorSession(World);
-                _link.Send(0, NetMessages.Watching(match), reliable: true);
+                if (!IsHost)
+                {
+                    _link.Send(0, NetMessages.Watching(match), reliable: true);
+                }
             }
             else
             {
@@ -1510,6 +1765,7 @@ namespace Airerage.Net
             for (int p = 0; p < MaxPlayers; p++)
             {
                 _departed[p] = false;
+                _departFrom[p] = int.MaxValue;
                 // 観戦の人が、ホストより先にステージを読み込んで見始めていたら（Watching が先に届いた）、すぐに送り始める。
                 _spectatorNext[p] = IsHost && p >= playerCount && _playerPeer[p] >= 0 && _peerMatch[p] == match ? World.Tick : -1;
                 _seenInputs[p].Clear();
@@ -1528,7 +1784,9 @@ namespace Airerage.Net
                 _previous[p] = World.GetState(p);
             }
             State = SessionState.Running;
-            Status = _spectator != null ? $"Spectating {playerCount} players" : $"Running: player {LocalPlayer + 1} of {playerCount}";
+            Status = _spectator != null
+                ? Loc.T($"Spectating {playerCount} players", $"{playerCount} 人の試合を観戦中")
+                : Loc.T($"Running: player {LocalPlayer + 1} of {playerCount}", $"対戦中: {playerCount} 人のうちプレイヤー {LocalPlayer + 1}");
             // ステージを読み込んでいる間に届いた、この試合の抜けた知らせ。
             foreach (byte[] leave in _pendingLeaves)
             {
@@ -1582,8 +1840,10 @@ namespace Airerage.Net
             {
                 case TransportLink.EventKind.Connected:
                     int player = FreePlayer();
-                    // 参加できるのは、ロビーの待機所の段階だけ（キャラクター選択の途中からは入れない）。
-                    if (State != SessionState.Lobby || _phase != LobbyPhase.Waiting || player < 0)
+                    // 待機所の段階なら、そのまま参加する。キャラクター選択・ステージ選択・試合の途中なら、待機所で今の試合が終わるのを待つ
+                    // （2026-11-03 のユーザーの要望。次の試合から参加する）。満員なら断る。
+                    bool late = State != SessionState.Lobby || _phase != LobbyPhase.Waiting;
+                    if (player < 0 || State == SessionState.Ended || State == SessionState.Connecting)
                     {
                         _link.Send(e.Peer, NetMessages.Refused(), reliable: true);
                         _link.Disconnect(e.Peer);
@@ -1597,17 +1857,19 @@ namespace Airerage.Net
                     _lobbyTeams[player] = 0;
                     _lobbySpectators[player] = false;
                     _spectatorNext[player] = -1;
+                    _lobbyLate[player] = late;
+                    _lateAnnounced[player] = false;
                     if (_teamMode)
                     {
                         _lobbyTeams[player] = SmallestTeam();
                     }
                     _link.Send(e.Peer, NetMessages.Welcome(player), reliable: true);
-                    Status = $"{HostingLabel}: {LobbyPlayerCount} player(s)";
+                    Status = PlayersLabel();
                     BroadcastLobby();
                     break;
 
                 case TransportLink.EventKind.Disconnected:
-                    for (int p = 1; p < MaxPlayers; p++)
+                    for (int p = 0; p < MaxPlayers; p++)
                     {
                         if (_playerPeer[p] == e.Peer)
                         {
@@ -1617,8 +1879,9 @@ namespace Airerage.Net
                             _lobbyStagePools[p] = ulong.MaxValue;
                             _lobbyReady[p] = false;
                             _lobbyTeams[p] = 0;
-                            bool wasSpectator = _lobbySpectators[p];
+                            bool wasSpectator = _lobbySpectators[p] || _lobbyLate[p];
                             _lobbySpectators[p] = false;
+                            _lobbyLate[p] = false;
                             _spectatorNext[p] = -1;
                             CheckLobbyProgress();
                             BroadcastLobby();
@@ -1633,7 +1896,7 @@ namespace Airerage.Net
                             {
                                 // 1 人だけになったか、外せなかったら、試合を終える（残りの人も止まったままにしないよう、接続を切る）。
                                 State = SessionState.Ended;
-                                Status = $"Player {p + 1} disconnected";
+                                Status = Loc.T($"Player {p + 1} disconnected", $"プレイヤー {p + 1} の接続が切れました");
                                 DisconnectAll();
                             }
                         }
@@ -1652,7 +1915,7 @@ namespace Airerage.Net
             {
                 case NetKind.Input:
                     int inputSender = PlayerOfPeer(e.Peer);
-                    if (inputSender > 0)
+                    if (inputSender >= 0)
                     {
                         // そのクライアントが今どの試合にいるか（開始のメッセージを送り直すかどうかに使う）。
                         _peerMatch[inputSender] = NetMessages.InputMatch(e.Data);
@@ -1663,7 +1926,7 @@ namespace Airerage.Net
                         return;
                     }
                     int target = NetMessages.InputTarget(e.Data);
-                    if (inputSender <= 0 || inputSender >= PlayerCount || _departed[inputSender] || target < 0 || target >= PlayerCount)
+                    if (inputSender < 0 || inputSender >= PlayerCount || _departed[inputSender] || target < 0 || target >= PlayerCount)
                     {
                         return;
                     }
@@ -1673,7 +1936,7 @@ namespace Airerage.Net
                     {
                         Exchange.Receive(message);
                     }
-                    else if (target > 0 && _playerPeer[target] >= 0)
+                    else if (_playerPeer[target] >= 0)
                     {
                         _link.Send(_playerPeer[target], e.Data, reliable: false);
                     }
@@ -1681,16 +1944,31 @@ namespace Airerage.Net
 
                 case NetKind.Hello:
                     int sender = PlayerOfPeer(e.Peer);
-                    if (sender > 0)
+                    if (sender >= 0)
                     {
                         _lobbyNames[sender] = SanitizeName(NetMessages.ReadHello(e.Data));
                         BroadcastLobby();
+                        if (_lobbyLate[sender] && !_lateAnnounced[sender])
+                        {
+                            // 途中から入った人を、試合・選択の途中の全員へ知らせる（画面の左下に「名前 JOIN」）。
+                            _lateAnnounced[sender] = true;
+                            string joined = _lobbyNames[sender].Length > 0 ? _lobbyNames[sender] : $"P{sender + 1}";
+                            byte[] notice = NetMessages.Joined(joined);
+                            for (int q = 0; q < MaxPlayers; q++)
+                            {
+                                if (_playerPeer[q] >= 0 && !_lobbyLate[q])
+                                {
+                                    _link.Send(_playerPeer[q], notice, reliable: true);
+                                }
+                            }
+                            AddJoinNotice(joined);
+                        }
                     }
                     break;
 
                 case NetKind.StagePool:
                     int pooler = PlayerOfPeer(e.Peer);
-                    if (pooler > 0)
+                    if (pooler >= 0)
                     {
                         _lobbyStagePools[pooler] = NetMessages.ReadStagePool(e.Data);
                     }
@@ -1698,7 +1976,7 @@ namespace Airerage.Net
 
                 case NetKind.Pick:
                     int picker = PlayerOfPeer(e.Peer);
-                    if (picker > 0)
+                    if (picker >= 0)
                     {
                         _lobbyCharacters[picker] = ClampCharacter(NetMessages.ReadPick(e.Data));
                         BroadcastLobby();
@@ -1707,7 +1985,7 @@ namespace Airerage.Net
 
                 case NetKind.Spectate:
                     int seat = PlayerOfPeer(e.Peer);
-                    if (seat > 0)
+                    if (seat >= 0)
                     {
                         SetSpectatorOf(seat, NetMessages.ReadSpectate(e.Data));
                     }
@@ -1716,7 +1994,7 @@ namespace Airerage.Net
                 case NetKind.Watching:
                     int watcher = PlayerOfPeer(e.Peer);
                     int watchedMatch = NetMessages.ReadWatching(e.Data);
-                    if (watcher > 0)
+                    if (watcher >= 0)
                     {
                         _peerMatch[watcher] = watchedMatch;
                         if (State == SessionState.Running && watchedMatch == MatchNumber && watcher >= PlayerCount)
@@ -1729,7 +2007,7 @@ namespace Airerage.Net
 
                 case NetKind.Team:
                     int mover = PlayerOfPeer(e.Peer);
-                    if (mover > 0)
+                    if (mover >= 0)
                     {
                         SetTeamOf(mover, NetMessages.ReadTeam(e.Data));
                     }
@@ -1737,7 +2015,7 @@ namespace Airerage.Net
 
                 case NetKind.Ready:
                     int readier = PlayerOfPeer(e.Peer);
-                    if (readier > 0 && State == SessionState.Lobby)
+                    if (readier >= 0 && State == SessionState.Lobby)
                     {
                         _lobbyReady[readier] = NetMessages.ReadReady(e.Data);
                         CheckLobbyProgress();
@@ -1747,7 +2025,8 @@ namespace Airerage.Net
 
                 case NetKind.Checksum:
                     NetMessages.ReadChecksum(e.Data, out int checksumMatch, out int player, out int tick, out ulong checksum);
-                    if (State == SessionState.Running && checksumMatch == MatchNumber && player > 0 && player < PlayerCount)
+                    if (State == SessionState.Running && checksumMatch == MatchNumber && player >= 0 && player < PlayerCount && player != LocalPlayer
+                        && player == PlayerOfPeer(e.Peer))
                     {
                         RecordChecksum(player, tick, checksum);
                     }
@@ -1760,12 +2039,12 @@ namespace Airerage.Net
             switch (e.Kind)
             {
                 case TransportLink.EventKind.Connected:
-                    Status = "Connected. Waiting for the host";
+                    Status = Loc.T("Connected. Waiting for the host", "接続しました。ホストを待っています");
                     break;
 
                 case TransportLink.EventKind.Disconnected:
                     State = SessionState.Ended;
-                    Status = "Disconnected from the host";
+                    Status = Loc.T("Disconnected from the host", "ホストとの接続が切れました");
                     break;
 
                 case TransportLink.EventKind.Data:
@@ -1774,10 +2053,8 @@ namespace Airerage.Net
                         case NetKind.Welcome:
                             LocalPlayer = NetMessages.ReadWelcome(e.Data);
                             State = SessionState.Lobby;
-                            if (_localName.Length > 0)
-                            {
-                                _link.Send(0, NetMessages.Hello(_localName), reliable: true);
-                            }
+                            // 名前がなくても送る（途中から入ったとき、ホストがこれを受けて全員に知らせる）。
+                            _link.Send(0, NetMessages.Hello(_localName), reliable: true);
                             if (_localCharacter != 0)
                             {
                                 _link.Send(0, NetMessages.Pick(_localCharacter), reliable: true);
@@ -1786,15 +2063,19 @@ namespace Airerage.Net
                             {
                                 _link.Send(0, NetMessages.StagePool(_localStagePool), reliable: true);
                             }
-                            Status = $"Joined as player {LocalPlayer + 1}. Waiting for the host to start";
+                            Status = Loc.T($"Joined as player {LocalPlayer + 1}. Waiting for the host to start",
+                                $"プレイヤー {LocalPlayer + 1} として参加しました。ホストの開始を待っています");
                             break;
                         case NetKind.Lobby:
-                            LobbySlot[] roster = NetMessages.ReadLobby(e.Data, out LobbyPhase phase, out int stage, out bool teamMode);
+                            LobbySlot[] roster = NetMessages.ReadLobby(e.Data, out LobbyPhase phase, out int stage, out bool teamMode, out int hostSlot,
+                                out bool matchRunning);
+                            _clientHostSlot = hostSlot;
+                            _clientMatchRunning = matchRunning;
                             _clientRoster = EmptyRoster();
                             for (int p = 0; p < MaxPlayers && p < roster.Length; p++)
                             {
                                 _clientRoster[p] = new LobbySlot(roster[p].Connected, SanitizeName(roster[p].Name), roster[p].Character,
-                                    roster[p].Ready, roster[p].Team, roster[p].Spectator);
+                                    roster[p].Ready, roster[p].Team, roster[p].Spectator, roster[p].Late);
                             }
                             _clientTeamMode = teamMode;
                             _clientPhase = phase;
@@ -1812,7 +2093,7 @@ namespace Airerage.Net
                             break;
                         case NetKind.Refused:
                             State = SessionState.Ended;
-                            Status = "The host refused (full or already playing)";
+                            Status = Loc.T("The host refused (the room is full)", "ホストに断られました（満員）");
                             break;
                         case NetKind.Start:
                             NetMessages.ReadStart(e.Data, out int count, out int match, out string json);
@@ -1830,6 +2111,9 @@ namespace Airerage.Net
                             {
                                 Exchange.Receive(Airerage.Core.Rollback.InputMessage.FromBytes(NetMessages.InputPayload(e.Data)));
                             }
+                            break;
+                        case NetKind.Joined:
+                            AddJoinNotice(SanitizeName(NetMessages.ReadJoined(e.Data)));
                             break;
                         case NetKind.SpectateInputs:
                             NetMessages.ReadSpectateInputs(e.Data, out int spectateMatch, out int spectateStart, out PlayerInput[][] ticks);
@@ -1891,22 +2175,27 @@ namespace Airerage.Net
         // ホスト: プレイヤー player の入力のうち、まだだれかに届いていないかもしれない最も古いティック（自分と、今いるほかの人の確認応答の最小の次）。
         private int OldestNeeded(int player)
         {
-            int oldest = Session.ContiguousTick(player) + 1;
-            for (int r = 1; r < PlayerCount; r++)
+            // 参加していれば自分の巻き戻しのセッションがまだ受け取っていない分、観戦していれば自分のワールドへまだ渡していない分も残す。
+            int oldest = Session != null ? Session.ContiguousTick(player) + 1 : _hostFedTick + 1;
+            for (int r = 0; r < PlayerCount; r++)
             {
                 if (r != player && !_departed[r] && _playerPeer[r] >= 0)
                 {
                     oldest = Math.Min(oldest, _seenAck[player, r] + 1);
                 }
             }
-            return Math.Max(oldest, Session.FirstInputTick);
+            if (_spectator != null)
+            {
+                oldest = Math.Min(oldest, _hostFedTick + 1);
+            }
+            return Math.Max(oldest, _firstInputTick);
         }
 
         // ホスト: 試合中に抜けたプレイヤー player を外す。抜けたティックは、その人の入力でホストが見た（中継した）最後の次。そこまでの入力の
         // うち、まだだれかに届いていないかもしれない分を、抜けた知らせに入れて全員へ確実に送る。外せなければ false（試合を終える）。
         private bool RemoveDeparted(int player)
         {
-            int fromTick = Math.Max(_seenContiguous[player] + 1, Session.FirstInputTick);
+            int fromTick = Math.Max(_seenContiguous[player] + 1, _firstInputTick);
             int start = OldestNeeded(player);
             var inputs = new List<PlayerInput>();
             for (int tick = start; tick < fromTick; tick++)
@@ -1925,7 +2214,7 @@ namespace Airerage.Net
             }
             byte[] message = NetMessages.Left(MatchNumber, player, fromTick, start, inputs);
             ApplyDeparture(player, fromTick, start, inputs);
-            for (int r = 1; r < MaxPlayers; r++)
+            for (int r = 0; r < MaxPlayers; r++)
             {
                 if (_playerPeer[r] >= 0)
                 {
@@ -1938,23 +2227,25 @@ namespace Airerage.Net
         // 抜けた人を外す（ホストもクライアントも同じ。InputExchange.RemovePlayer）。
         private void ApplyDeparture(int player, int fromTick, int startTick, IReadOnlyList<PlayerInput> inputs)
         {
-            if (player <= 0 || player >= PlayerCount || player == LocalPlayer || _departed[player])
+            if (player < 0 || player >= PlayerCount || player == LocalPlayer || player == HostSlot || _departed[player])
             {
                 Debug.LogWarning($"OnlineSession: 抜けた知らせのプレイヤーの番号がおかしいので無視しました（{player}）");
                 return;
             }
             if (_spectator == null)
             {
-                // 観戦の人は、抜けた人の入力も確定した入力（PlayerInput.Departed）で届くので、印をつけるだけ。
+                // 観戦の人は、抜けた人の入力も確定した入力（PlayerInput.Departed）で届くので、印をつけるだけ（観戦しているホストは、
+                // 抜けたティックから自分のワールドへ「抜けた」入力を渡す。_departFrom）。
                 Exchange.RemovePlayer(player, fromTick, startTick, inputs);
             }
+            _departFrom[player] = fromTick;
             _departed[player] = true;
-            Status = $"Player {player + 1} left. The match goes on";
+            Status = Loc.T($"Player {player + 1} left. The match goes on", $"プレイヤー {player + 1} が抜けました。試合は続きます");
         }
 
         private void DisconnectAll()
         {
-            for (int p = 1; p < MaxPlayers; p++)
+            for (int p = 0; p < MaxPlayers; p++)
             {
                 if (_playerPeer[p] >= 0)
                 {
@@ -2053,7 +2344,7 @@ namespace Airerage.Net
         // 接続の番号 → プレイヤーの番号（いなければ -1）。
         private int PlayerOfPeer(int peer)
         {
-            for (int p = 1; p < MaxPlayers; p++)
+            for (int p = 0; p < MaxPlayers; p++)
             {
                 if (_playerPeer[p] == peer)
                 {
@@ -2065,9 +2356,12 @@ namespace Airerage.Net
 
         private int FreePlayer()
         {
-            for (int p = 1; p < MaxPlayers; p++)
+            // 試合中は、試合の人の番号（抜けた人の番号も）より後ろを先に探す（試合の番号と重ならないように）。
+            int from = State == SessionState.Running || State == SessionState.Loading ? PlayerCount : 0;
+            for (int i = 0; i < MaxPlayers; i++)
             {
-                if (_playerPeer[p] < 0)
+                int p = (from + i) % MaxPlayers;
+                if (p != _hostSlot && _playerPeer[p] < 0)
                 {
                     return p;
                 }
@@ -2078,6 +2372,7 @@ namespace Airerage.Net
         private sealed class ChecksumRow
         {
             public readonly ulong?[] Values = new ulong?[MaxPlayers];
+            public ulong? Host;
             public int Compared;
         }
     }

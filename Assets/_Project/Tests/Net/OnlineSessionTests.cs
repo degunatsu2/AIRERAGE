@@ -470,17 +470,87 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
-        public void JoinAfterStart_IsRefused()
+        public void JoinDuringAMatch_WaitsInTheWaitingRoom_TheOthersAreTold_AndTheNextMatchIncludesThem()
         {
+            // 試合の途中から入った人（2026-11-03 のユーザーの要望）: 待機所で今の試合が終わるのを待ち、試合中の全員に「名前 JOIN」を知らせる。
             OnlineSession host = Host();
-            OnlineSession early = Join(host);
-            PumpUntil(() => early.LocalPlayer >= 0);
-            host.StartMatch();
+            OnlineSession player = Join(host);
+            PumpUntil(() => player.LocalPlayer == 1);
+            host.StartMatch(MatchRules.FreePlay());
+            PumpUntil(() => player.State == OnlineSession.SessionState.Running && player.World.Tick > 30);
 
             OnlineSession late = Join(host);
-            PumpUntil(() => late.State == OnlineSession.SessionState.Ended);
-            Assert.That(late.LocalPlayer, Is.EqualTo(-1));
-            Assert.That(host.LobbyPlayerCount, Is.EqualTo(2));
+            late.LocalName = "NEWCOMER";
+            PumpUntil(() => late.LocalPlayer == 2 && late.LocalLate && late.MatchRunning);
+            Assert.That(late.State, Is.EqualTo(OnlineSession.SessionState.Lobby), "途中から入った人が試合を始めた");
+            Assert.That(late.Roster[0].Connected && late.Roster[1].Connected, Is.True, "待機所に試合中の人が出ない");
+            Assert.That(late.Roster[1].Late, Is.False);
+            Assert.That(host.PlayerCount, Is.EqualTo(2), "途中から入った人が試合の人数に入った");
+            Assert.That(host.LobbyParticipantCount, Is.EqualTo(2));
+
+            PumpUntil(() => player.JoinNotices.Count == 1 && host.JoinNotices.Count == 1);
+            Assert.That(player.JoinNotices[0].Name, Is.EqualTo("NEWCOMER"));
+            Assert.That(late.JoinNotices, Is.Empty, "入った本人に知らせた");
+            // 名前を変えても、もう一度は知らせない。知らせは 5 秒で消える。
+            late.LocalName = "RENAMED";
+            PumpUntil(() => host.Roster[2].Name == "RENAMED");
+            PumpFrames((int)(OnlineSession.JoinNotice.Seconds * 60f) + 10);
+            Assert.That(player.JoinNotices, Is.Empty, "知らせが消えない");
+            Assert.That(host.State, Is.EqualTo(OnlineSession.SessionState.Running), "途中から人が入ったら試合が止まった");
+            Assert.That(player.State, Is.EqualTo(OnlineSession.SessionState.Running));
+            Assert.That(host.Desyncs, Is.Empty);
+
+            // 再戦から、3 人で遊ぶ。
+            host.RestartMatch(MatchRules.FreePlay());
+            PumpUntil(() => late.State == OnlineSession.SessionState.Running && late.MatchNumber == host.MatchNumber
+                && player.MatchNumber == host.MatchNumber);
+            Assert.That(late.LocalLate, Is.False);
+            Assert.That(late.IsSpectating, Is.False);
+            Assert.That(host.PlayerCount, Is.EqualTo(3));
+            const int ticks = 120;
+            host.TickLimit = ticks;
+            player.TickLimit = ticks;
+            late.TickLimit = ticks;
+            PumpUntil(() => _sessions.TrueForAll(s => s.Session.CurrentTick == ticks && s.Session.ConfirmedTick >= ticks - 1));
+            PumpFrames(2);
+            Assert.That(late.World.Checksum(), Is.EqualTo(host.World.Checksum()), "途中から入った人の次の試合がずれた");
+            Assert.That(player.World.Checksum(), Is.EqualTo(host.World.Checksum()));
+            Assert.That(host.Desyncs, Is.Empty);
+        }
+
+        [Test]
+        public void JoinDuringAMatch_LeavingBeforeItEnds_DoesNotStopTheMatch_AndAFullRoomIsRefused()
+        {
+            OnlineSession host = Host();
+            OnlineSession player = Join(host);
+            PumpUntil(() => player.LocalPlayer == 1);
+            host.StartMatch(MatchRules.FreePlay());
+            PumpUntil(() => player.State == OnlineSession.SessionState.Running);
+
+            OnlineSession late = Join(host);
+            PumpUntil(() => late.LocalLate);
+            late.Dispose();
+            _sessions.Remove(late);
+            PumpUntil(() => host.LobbyPlayerCount == 2);
+            PumpFrames(30);
+            Assert.That(host.State, Is.EqualTo(OnlineSession.SessionState.Running), "待っていた人が抜けたら試合が終わった");
+            Assert.That(host.HasDeparted(1), Is.False);
+
+            // 試合中に 8 人まで入れて、9 人目は断る。
+            var waiting = new List<OnlineSession>();
+            for (int i = 0; i < OnlineSession.MaxPlayers - 2; i++)
+            {
+                waiting.Add(Join(host));
+            }
+            PumpUntil(() => host.LobbyPlayerCount == OnlineSession.MaxPlayers && waiting.TrueForAll(s => s.LocalLate));
+            OnlineSession ninth = Join(host);
+            PumpUntil(() => ninth.State == OnlineSession.SessionState.Ended);
+            Assert.That(ninth.LocalPlayer, Is.EqualTo(-1));
+
+            // 待機所へ戻ると、待っていた人も参加する人になる（個人戦は 4 人まで。残りは待機所の準備完了で決まる）。
+            host.ReturnToLobby(LobbyPhase.Waiting);
+            PumpUntil(() => waiting.TrueForAll(s => s.State == OnlineSession.SessionState.Lobby && !s.LocalLate));
+            Assert.That(host.LobbyParticipantCount, Is.EqualTo(OnlineSession.MaxPlayers));
         }
 
         [Test]
@@ -509,8 +579,8 @@ namespace Airerage.Net.Tests
             Assert.That(stays.World.Checksum(), Is.EqualTo(host.World.Checksum()), "残りの人の状態がそろわない");
             Assert.That(host.Desyncs, Is.Empty);
             Assert.That(host.World.GetState(leaver).Combat.HasLeft, Is.True, "抜けた人のキャラクターが外れていない");
-            Assert.That(host.Status, Does.Contain("left"));
-            Assert.That(stays.Status, Does.Contain("left"));
+            Assert.That(host.Status, Does.Contain("left").Or.Contain("抜けました"));
+            Assert.That(stays.Status, Does.Contain("left").Or.Contain("抜けました"));
         }
 
         [Test]
@@ -554,7 +624,7 @@ namespace Airerage.Net.Tests
             leaves.Dispose();
             _sessions.Remove(leaves);
             PumpUntil(() => host.State == OnlineSession.SessionState.Ended);
-            Assert.That(host.Status, Does.Contain("disconnected"));
+            Assert.That(host.Status, Does.Contain("disconnected").Or.Contain("接続が切れました"));
         }
 
         [Test]
@@ -694,13 +764,16 @@ namespace Airerage.Net.Tests
             Assert.That(host.Phase, Is.EqualTo(LobbyPhase.CharacterSelect));
             Assert.That(host.LocalReady || client.LocalReady, Is.False, "段階が変わっても準備完了が残っている");
 
-            // キャラクター選択の途中からは参加できない。
+            // キャラクター選択の途中から入った人は、待機所で待つ（試合の人数・決定に入らない。2026-11-03）。
             OnlineSession late = OnlineSession.Join("127.0.0.1", host.Port, new RollbackSettings());
             _sessions.Add(late);
-            PumpUntil(() => late.State == OnlineSession.SessionState.Ended);
-            Assert.That(host.LobbyPlayerCount, Is.EqualTo(2));
+            PumpUntil(() => late.LocalPlayer == 2 && late.LocalLate && client.Roster[2].Late);
+            Assert.That(late.State, Is.EqualTo(OnlineSession.SessionState.Lobby));
+            Assert.That(late.MatchRunning, Is.False, "選択の途中なのに試合中と出ている");
+            Assert.That(host.LobbyParticipantCount, Is.EqualTo(2));
             late.Dispose();
             _sessions.Remove(late);
+            PumpUntil(() => host.LobbyPlayerCount == 2 && !client.Roster[2].Connected);
 
             client.LocalCharacter = 1;
             PumpUntil(() => host.Roster[1].Character == 1);
@@ -792,7 +865,7 @@ namespace Airerage.Net.Tests
             Assert.Throws<FormatException>(() => NetMessages.ReadLobby(new[] { (byte)NetKind.Lobby, (byte)2, (byte)1, (byte)9 }));
             // チームの番号が 4 より大きい。
             byte[] broken = NetMessages.Lobby(new[] { new LobbySlot(true, "A", 0, false, 1) }, LobbyPhase.Waiting, 0, true);
-            broken[5 + 3] = 9;
+            broken[7 + 3] = 9;
             Assert.Throws<FormatException>(() => NetMessages.ReadLobby(broken));
         }
 
@@ -913,7 +986,6 @@ namespace Airerage.Net.Tests
             OnlineSession player = Join(host);
             OnlineSession second = Join(host);
             PumpUntil(() => host.LobbyPlayerCount == 4 && second.LocalPlayer >= 0);
-            Assert.Throws<InvalidOperationException>(() => host.LocalSpectator = true, "ホストが観戦になった");
 
             watcher.LocalSpectator = true;
             PumpUntil(() => host.Roster[1].Spectator && player.Roster[1].Spectator);
@@ -1002,7 +1074,50 @@ namespace Airerage.Net.Tests
             PumpUntil(() => !host.Roster[2].Spectator && host.Roster[2].Team == 4);
             Assert.That(second.LocalSpectator, Is.False);
             host.SetSpectatorOf(0, true);
-            Assert.That(host.Roster[0].Spectator, Is.False, "ホストが観戦になった");
+            Assert.That(host.Roster[0].Spectator, Is.True, "ホストが観戦の待機所に入れない");
+        }
+
+        [Test]
+        public void HostCanSpectate_StillRelaysAndChecksDesyncs_AndOtherSpectatorsWatchToo()
+        {
+            // ホストが観戦（大会で開催者が参加者どうしの試合を見る。2026-11-03 のユーザーの要望）: 参加するクライアントの入力を中継し、
+            // 自分のワールドは中継した入力で進め、参加する人のチェックサムと比べてずれを判定する。ほかの観戦の人にも確定した入力を送る。
+            OnlineSession host = Host();
+            OnlineSession a = Join(host);
+            OnlineSession b = Join(host);
+            OnlineSession watcher = Join(host);
+            PumpUntil(() => host.LobbyPlayerCount == 4 && watcher.LocalPlayer >= 0);
+            host.LocalSpectator = true;
+            watcher.LocalSpectator = true;
+            PumpUntil(() => host.Roster[0].Spectator && a.Roster[0].Spectator && host.Roster[3].Spectator);
+            Assert.That(host.LobbyParticipantCount, Is.EqualTo(2));
+            a.LocalReady = true;
+            b.LocalReady = true;
+            PumpUntil(() => a.Phase == LobbyPhase.CharacterSelect && watcher.Phase == LobbyPhase.CharacterSelect);
+            // 参加する 2 人が前の番号、観戦のホストと観戦の人が後ろ。「(HOST)」はホストの番号で分かる。
+            PumpUntil(() => a.LocalPlayer == 0 && b.LocalPlayer == 1 && a.HostSlot == host.HostSlot);
+            Assert.That(host.HostSlot, Is.GreaterThanOrEqualTo(2), "観戦のホストが参加する人の前にいる");
+            Assert.That(host.LocalSpectator, Is.True);
+
+            host.StartMatch(MatchRules.FreePlay());
+            PumpUntil(() => a.State == OnlineSession.SessionState.Running && b.State == OnlineSession.SessionState.Running
+                && watcher.IsSpectating);
+            Assert.That(host.IsSpectating, Is.True, "ホストが観戦になっていない");
+            Assert.That(host.PlayerCount, Is.EqualTo(2));
+
+            const int ticks = 300;
+            a.TickLimit = ticks;
+            b.TickLimit = ticks;
+            PumpUntil(() => host.World.Tick == ticks && watcher.World.Tick == ticks);
+            Assert.That(host.World.Checksum(), Is.EqualTo(a.World.Checksum()), "観戦しているホストのワールドがずれた");
+            Assert.That(watcher.World.Checksum(), Is.EqualTo(a.World.Checksum()), "観戦の人のワールドがずれた");
+            PumpFrames(5);
+            Assert.That(host.ComparedChecksums, Is.GreaterThan(0), "観戦しているホストがずれを判定していない");
+            Assert.That(host.Desyncs, Is.Empty);
+
+            // 再戦も、ホストは観戦のまま。
+            host.RestartMatch(MatchRules.FreePlay());
+            PumpUntil(() => a.MatchNumber == host.MatchNumber && a.State == OnlineSession.SessionState.Running && host.IsSpectating);
         }
 
         private static int[] TeamsOf(IReadOnlyList<LobbySlot> roster, int count)

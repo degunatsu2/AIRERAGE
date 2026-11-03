@@ -6,6 +6,7 @@ using Airerage.Runtime.Audio;
 using Airerage.Runtime.Simulation;
 using Airerage.Runtime.UI;
 using UnityEngine;
+using Airerage.Runtime.Settings;
 
 namespace Airerage.Runtime.Presentation
 {
@@ -195,7 +196,7 @@ namespace Airerage.Runtime.Presentation
                     if (Time.time - _overtimeAt < _bannerSeconds)
                     {
                         CenterText = "OVERTIME";
-                        _centerSub = "REACH THE BANK TO WIN";
+                        _centerSub = Loc.T("REACH THE BANK TO WIN", "拠点にたどり着いた人の勝ち");
                         _centerColor = new Color(1f, 0.6f, 0.15f);
                         _centerProgress = (Time.time - _overtimeAt) / _bannerSeconds;
                     }
@@ -213,7 +214,7 @@ namespace Airerage.Runtime.Presentation
                     if (Time.time - _finishAt < _finishSeconds)
                     {
                         CenterText = match.Winner >= 0 ? $"{_feed.LabelOf(match.Winner)} WINS!" : "FINISH!";
-                        _centerSub = match.Winner >= 0 ? "REACHED THE BANK IN OVERTIME" : "TIME UP";
+                        _centerSub = match.Winner >= 0 ? Loc.T("REACHED THE BANK IN OVERTIME", "アディショナルタイムに拠点へ到達") : "TIME UP";
                         _centerColor = match.Winner >= 0 ? _feed.ColorOf(match.Winner) : new Color(1f, 0.85f, 0.3f);
                         _centerProgress = (Time.time - _finishAt) / _finishSeconds;
                     }
@@ -456,7 +457,7 @@ namespace Airerage.Runtime.Presentation
             var restart = new Rect(area.x + 40f, area.yMax - 56f, 220f, 40f);
             var quit = new Rect(area.xMax - 260f, area.yMax - 56f, 220f, 40f);
             GUI.enabled = _matchControls.CanRestart;
-            if (GUI.Button(restart, _matchControls.CanRestart ? "Restart" : "Waiting for the host"))
+            if (GUI.Button(restart, _matchControls.CanRestart ? "Restart" : Loc.T("Waiting for the host", "ホストを待っています")))
             {
                 UiSounds.Find().Play(SoundId.UiConfirm);
                 _matchControls.Restart();

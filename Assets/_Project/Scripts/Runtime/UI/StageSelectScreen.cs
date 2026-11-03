@@ -219,7 +219,7 @@ namespace Airerage.Runtime.UI
                 _random.gameObject.SetActive(false);
             }
             RefreshChecks();
-            SetNote("CHECKED STAGES CAN BE PICKED BY RANDOM");
+            SetNote(Loc.T("CHECKED STAGES CAN BE PICKED BY RANDOM", "チェックしたステージが RANDOM で選ばれます"));
         }
 
         // RANDOM STAGES: 番号 index のチェックを付け外しする（最後の 1 つは外せない）。
@@ -229,11 +229,11 @@ namespace Airerage.Runtime.UI
             bool included = RandomStagePool.IsIncluded(stage);
             if (included && RandomStagePool.Indices(_stages.Length, RandomStagePool.Mask(_stages)).Count <= 1)
             {
-                SetNote("AT LEAST ONE STAGE MUST STAY CHECKED");
+                SetNote(Loc.T("AT LEAST ONE STAGE MUST STAY CHECKED", "1 つ以上のステージにチェックが必要です"));
                 return;
             }
             RandomStagePool.SetIncluded(stage, !included);
-            SetNote("CHECKED STAGES CAN BE PICKED BY RANDOM");
+            SetNote(Loc.T("CHECKED STAGES CAN BE PICKED BY RANDOM", "チェックしたステージが RANDOM で選ばれます"));
             RefreshChecks();
         }
 
@@ -288,7 +288,9 @@ namespace Airerage.Runtime.UI
             Highlight(_stages.Length > 0 ? _stages[_selectIndex] : null);
             if (_note != null)
             {
-                _note.text = !network ? string.Empty : readOnly ? "THE HOST IS CHOOSING THE STAGE" : "YOU CHOOSE THE STAGE FOR EVERYONE";
+                _note.text = !network ? string.Empty
+                    : readOnly ? Loc.T("THE HOST IS CHOOSING THE STAGE", "ホストがステージを選んでいます")
+                    : Loc.T("YOU CHOOSE THE STAGE FOR EVERYONE", "全員のステージを選んでください");
             }
             _selectAtFrame = Time.frameCount + 1;
         }

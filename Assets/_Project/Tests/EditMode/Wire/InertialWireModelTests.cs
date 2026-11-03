@@ -177,6 +177,9 @@ namespace Airerage.Core.Tests.Wire
             // 縦の入力がなければ（標準）巻き取らない。左右で振ることはできる（D-50。以前は下を押したときの動き）。
             // 振りの高いところで接続点の方へ落ちたときは、その分だけたるみを取る（ロープは少しだけ縮むことがある）。
             var config = WireTestSetup.LongAttachConfig(WireModelType.Inertial);
+            // 振りで速くなりすぎて接続点の上まで回る（その分のたるみを取る）と、縦の入力の影響を確かめられないので、接続中の最高速を
+            // 以前の 22 m/s にする（2026-11-03 に標準は 40 m/s へ上げた）。
+            config.Wire.MaxAttachedSpeed = 22f;
             var harness = new SimHarness(new BoxTerrain(), config);
             WireTestSetup.AttachAt(harness, Anchor + new Vector3(6f, -8f, 0f), Anchor);
             float rope = harness.State.Wire.RopeLength;

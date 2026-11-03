@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 32;
+        public const int FormatVersion = 33;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -428,6 +428,7 @@ namespace Airerage.Core.Simulation
             writer.Write(state.WallClingTicks);
             writer.Write(state.WallJumpCount);
             writer.Write(state.JumpSquatTicksLeft);
+            writer.Write(state.GroundedTicks);
             writer.Write(state.Coins.Held);
             writer.Write(state.Coins.Banked);
         }
@@ -601,6 +602,7 @@ namespace Airerage.Core.Simulation
             state.WallClingTicks = reader.ReadInt32();
             state.WallJumpCount = reader.ReadInt32();
             state.JumpSquatTicksLeft = reader.ReadInt32();
+            state.GroundedTicks = reader.ReadInt32();
             state.Coins = new CoinPurse { Held = reader.ReadInt32(), Banked = reader.ReadInt32() };
             return state;
         }

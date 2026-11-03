@@ -20,6 +20,7 @@ using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using SimInput = Airerage.Core.Input.PlayerInput;
+using Airerage.Runtime.Settings;
 
 namespace Airerage.Net
 {
@@ -666,6 +667,11 @@ namespace Airerage.Net
                 _style.normal.textColor = Color.white;
             }
             DrawSpectatorBanner();
+            if (_session != null)
+            {
+                // 途中から人が入った知らせ（左下の黄色い文字。2026-11-03）。
+                JoinNoticeHud.Draw(_session.JoinNotices);
+            }
             if (_connection != null)
             {
                 DrawConnectionState();
@@ -713,8 +719,8 @@ namespace Airerage.Net
             GUI.color = new Color(0f, 0f, 0f, 0.55f);
             GUI.DrawTexture(new Rect(rect.x, rect.y - 4f, rect.width, rect.height + 26f), Texture2D.whiteTexture);
             GUI.color = previous;
-            GuidePlate.DrawText(rect, $"SPECTATING: {name}", _spectatorStyle, color);
-            GuidePlate.DrawText(new Rect(rect.x, rect.y + 24f, rect.width, 20f), "< >  /  LB RB: SWITCH PLAYER", _spectatorStyle,
+            GuidePlate.DrawText(rect, Loc.T($"SPECTATING: {name}", $"観戦中: {name}"), _spectatorStyle, color);
+            GuidePlate.DrawText(new Rect(rect.x, rect.y + 24f, rect.width, 20f), Loc.T("< >  /  LB RB: SWITCH PLAYER", "← → ／ LB RB: 見る人を切り替え"), _spectatorStyle,
                 new Color(1f, 1f, 1f, 0.7f));
         }
 
@@ -726,9 +732,9 @@ namespace Airerage.Net
             }
             var box = new Rect((Screen.width - 420f) * 0.5f, (Screen.height - 130f) * 0.5f, 420f, 130f);
             GUILayout.BeginArea(box, GUI.skin.box);
-            GUILayout.Label(_session != null ? _session.Status : "Disconnected", _style);
-            GUILayout.Label("The match ended because someone left.", _style);
-            if (GUILayout.Button("Back to menu (Esc / B)", GUILayout.Height(36f)))
+            GUILayout.Label(_session != null ? _session.Status : Loc.T("Disconnected", "接続が切れました"), _style);
+            GUILayout.Label(Loc.T("The match ended because someone left.", "抜けた人がいたので、試合が終わりました"), _style);
+            if (GUILayout.Button(Loc.T("Back to menu (Esc / B)", "メニューへ戻る（Esc ／ B）"), GUILayout.Height(36f)))
             {
                 UiSounds.Find().Play(SoundId.UiConfirm);
                 Quit();
@@ -810,7 +816,8 @@ namespace Airerage.Net
             else
             {
                 int dots = 1 + (int)(Time.unscaledTime * 2f) % 3;
-                GuidePlate.DrawText(footer, "Waiting for the host to start" + new string('.', dots), _footer, new Color(1f, 1f, 1f, 0.8f));
+                GuidePlate.DrawText(footer, Loc.T("Waiting for the host to start", "ホストの開始を待っています") + new string('.', dots), _footer,
+                    new Color(1f, 1f, 1f, 0.8f));
             }
         }
 
@@ -912,7 +919,7 @@ namespace Airerage.Net
 
             if (!validPort)
             {
-                GUILayout.Label("Port must be 0-65535", _style);
+                GUILayout.Label(Loc.T("Port must be 0-65535", "ポートは 0〜65535 で入れてください"), _style);
             }
             if (_message.Length > 0)
             {

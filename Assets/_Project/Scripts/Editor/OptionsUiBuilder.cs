@@ -85,8 +85,9 @@ namespace Airerage.Editor
             MenuOption back = MenuUiBuilder.CreateMenuItem(panel, "Back", "BACK", anchor, new Vector2(Left, -820f), new Vector2(Width, RowHeight));
             Text prompt = MenuUiBuilder.CreateText(panel, "Prompt", string.Empty, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
                 new Vector2(0f, 0f), new Vector2(90f, 125f), new Vector2(1100f, 44f), MenuUiBuilder.Accent);
-            MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Left / Right: change     Enter / A: OK     Esc / B: back", 22,
-                FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(1200f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Left / Right: change     Enter / A: OK     Esc / B: back", 22,
+                FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(1200f, 40f), new Color(1f, 1f, 1f, 0.7f)),
+                "上下: 選ぶ　　左右: 変える　　Enter ／ A: 決定　　Esc ／ B: 戻る");
 
             var screen = panel.gameObject.AddComponent<OptionsScreen>();
             SandboxWireSceneBuilder.SetReference(screen, "_inputActions", inputActions);

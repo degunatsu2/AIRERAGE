@@ -46,9 +46,10 @@ namespace Airerage.Editor
             Text connectMessage = MenuUiBuilder.CreateText(connect, "Message", string.Empty, 26, FontStyle.Bold, TextAnchor.UpperLeft,
                 top, new Vector2(110f, -690f), new Vector2(1500f, 120f), new Color(1f, 0.85f, 0.3f));
             connectMessage.horizontalOverflow = HorizontalWrapMode.Wrap;
-            MenuUiBuilder.CreateText(connect, "Hint",
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(connect, "Hint",
                 "HOST ONLINE: get a JOIN CODE and tell it to your friends.   JOIN WITH CODE: enter the host's code.   LAN: the host's ADDRESS and PORT.",
-                22, FontStyle.Bold, TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1750f, 40f), new Color(1f, 1f, 1f, 0.7f));
+                22, FontStyle.Bold, TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1750f, 40f), new Color(1f, 1f, 1f, 0.7f)),
+                "HOST ONLINE: 参加コードを受け取って友だちに伝える　　JOIN WITH CODE: ホストのコードを入れる　　LAN: ホストのアドレスとポートを入れる");
             connect.gameObject.SetActive(false);
 
             // 待機所。
@@ -58,8 +59,11 @@ namespace Airerage.Editor
                 top, new Vector2(90f, -60f), new Vector2(900f, 90f), Color.white);
             Text info = MenuUiBuilder.CreateText(waiting, "Info", string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft,
                 top, new Vector2(94f, -150f), new Vector2(1400f, 40f), MenuUiBuilder.Accent);
-            // プレイヤーの札（8 枚。docs/19 T9-4）。位置と大きさは実行中に OnlineMenu が決める（個人戦は 1 列、チーム対戦は 4 色の列）。
-            // チーム対戦では、ホストは札を選んで決定すると、その人を次のチームへ移せる（自分の札は自分でも。D-78）。
+            // 札を並べる場所（左。はみ出す分は縦にスクロールする。2026-11-03 のユーザーの要望）。札の位置は実行中に OnlineMenu が決める
+            // （個人戦は PLAYERS の下に 1 列、チーム対戦は 4 色のチームを縦に並べ、人が入ったチームはその分だけ下へ広がる）。
+            RectTransform slotContent = CreateScrollArea(waiting, new Vector2(110f, -200f), new Vector2(800f, 580f), out ScrollRect slotScroll);
+            // プレイヤーの札（8 枚。docs/19 T9-4）。チーム対戦では、ホストは札を選んで決定すると、その人を次のチームへ移せる（自分の札は
+            // 自分でも。D-78）。観戦の人の札は、実行中に右の端の観戦の列（スクロールの外）へ移す。
             var plates = new Object[OnlineSession.MaxPlayers];
             var slotButtons = new Object[OnlineSession.MaxPlayers];
             var numbers = new Object[OnlineSession.MaxPlayers];
@@ -70,7 +74,7 @@ namespace Airerage.Editor
             {
                 colors[p] = SandboxOnlineSceneBuilder.PlayerColors[p].Color;
                 var slot = new GameObject($"Slot{p + 1}P", typeof(RectTransform));
-                slot.transform.SetParent(waiting, false);
+                slot.transform.SetParent(slotContent, false);
                 var rect = (RectTransform)slot.transform;
                 rect.anchorMin = rect.anchorMax = top;
                 rect.pivot = top;
@@ -104,7 +108,7 @@ namespace Airerage.Editor
             for (int t = 0; t < headers.Length; t++)
             {
                 Color teamColor = Airerage.Runtime.Presentation.TeamColors.Of(t + 1);
-                GameObject header = CreateHeader(waiting, $"Team{t + 1}", new Vector2(110f + t * 198f, -200f), new Vector2(190f, 50f), teamColor,
+                GameObject header = CreateHeader(slotContent, $"Team{t + 1}", new Vector2(110f + t * 198f, -200f), new Vector2(190f, 50f), teamColor,
                     Airerage.Runtime.Presentation.TeamColors.NameOf(t + 1), out SlantedPlate plate, out PlateButton button, out Text label);
                 headers[t] = header;
                 headerPlates[t] = plate;
@@ -129,15 +133,16 @@ namespace Airerage.Editor
             MenuOption leave = WaitingItem(waiting, "Leave", "LEAVE", ref rowY, row);
             Text waitingMessage = MenuUiBuilder.CreateText(waiting, "Message", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 top, new Vector2(110f, -800f), new Vector2(1500f, 44f), Color.white);
-            MenuUiBuilder.CreateText(waiting, "Hint", "Up / Down / Left / Right: select     Enter / A: OK     Esc / B: cancel ready, leave", 22, FontStyle.Bold,
-                TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1400f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(waiting, "Hint", "Up / Down / Left / Right: select     Enter / A: OK     Esc / B: cancel ready, leave", 22, FontStyle.Bold,
+                TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1400f, 40f), new Color(1f, 1f, 1f, 0.7f)),
+                "上下左右: 選ぶ　　Enter ／ A: 決定　　Esc ／ B: 準備完了の取り消し・退室");
             waiting.gameObject.SetActive(false);
 
             // 読み込み中。
             RectTransform loading = MenuUiBuilder.CreateFull(canvas, "OnlineLoading");
             MenuUiBuilder.CreateFill(loading, "Dim", new Color(0f, 0f, 0f, 0.6f), Vector2.zero, Vector2.one);
-            MenuUiBuilder.CreateText(loading, "Text", "LOADING...", 56, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 90f), Color.white);
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(loading, "Text", "LOADING...", 56, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 90f), Color.white), "読み込み中……");
             loading.gameObject.SetActive(false);
 
             var menu = canvas.gameObject.AddComponent<OnlineMenu>();
@@ -168,6 +173,8 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaderButtons", headerButtons);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaderTexts", headerTexts);
             SandboxWireSceneBuilder.SetReference(menu, "_spectatorHeader", spectatorButton);
+            SandboxWireSceneBuilder.SetReference(menu, "_slotContent", slotContent);
+            SandboxWireSceneBuilder.SetReference(menu, "_slotScroll", slotScroll);
             SandboxWireSceneBuilder.SetReference(menu, "_spectatorHeaderText", spectatorText);
             SandboxWireSceneBuilder.SetReference(menu, "_ready", ready);
             SandboxWireSceneBuilder.SetReference(menu, "_team", team);
@@ -181,6 +188,64 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(menu, "_loadingPanel", loading.gameObject);
             SandboxOnlineSceneBuilder.SetColors(menu, "_colors", colors);
             return menu;
+        }
+
+        // 縦にスクロールする場所（左上 position、大きさ size。中身の RectTransform を返す。右に細いスクロールバー。はみ出さなければ隠す）。
+        private static RectTransform CreateScrollArea(Transform parent, Vector2 position, Vector2 size, out ScrollRect scroll)
+        {
+            var viewportGo = new GameObject("SlotArea", typeof(RectTransform));
+            viewportGo.transform.SetParent(parent, false);
+            var viewport = (RectTransform)viewportGo.transform;
+            viewport.anchorMin = viewport.anchorMax = viewport.pivot = new Vector2(0f, 1f);
+            viewport.anchoredPosition = position;
+            viewport.sizeDelta = size;
+            viewportGo.AddComponent<RectMask2D>();
+            // スクロールの操作（ホイール・ドラッグ）を受けるための透明な面。
+            var catcher = viewportGo.AddComponent<Image>();
+            catcher.color = new Color(0f, 0f, 0f, 0f);
+            var contentGo = new GameObject("Content", typeof(RectTransform));
+            contentGo.transform.SetParent(viewport, false);
+            var content = (RectTransform)contentGo.transform;
+            content.anchorMin = content.anchorMax = content.pivot = new Vector2(0f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = new Vector2(size.x - 20f, size.y);
+
+            var barGo = new GameObject("Scrollbar", typeof(RectTransform));
+            barGo.transform.SetParent(parent, false);
+            var bar = (RectTransform)barGo.transform;
+            bar.anchorMin = bar.anchorMax = bar.pivot = new Vector2(0f, 1f);
+            bar.anchoredPosition = position + new Vector2(size.x - 10f, 0f);
+            bar.sizeDelta = new Vector2(8f, size.y);
+            var track = barGo.AddComponent<Image>();
+            track.color = new Color(1f, 1f, 1f, 0.12f);
+            var handleArea = new GameObject("Area", typeof(RectTransform));
+            handleArea.transform.SetParent(bar, false);
+            var areaRect = (RectTransform)handleArea.transform;
+            areaRect.anchorMin = Vector2.zero;
+            areaRect.anchorMax = Vector2.one;
+            areaRect.offsetMin = areaRect.offsetMax = Vector2.zero;
+            var handleGo = new GameObject("Handle", typeof(RectTransform));
+            handleGo.transform.SetParent(handleArea.transform, false);
+            var handle = (RectTransform)handleGo.transform;
+            handle.offsetMin = handle.offsetMax = Vector2.zero;
+            var handleImage = handleGo.AddComponent<Image>();
+            handleImage.color = new Color(MenuUiBuilder.Accent.r, MenuUiBuilder.Accent.g, MenuUiBuilder.Accent.b, 0.8f);
+            var scrollbar = barGo.AddComponent<Scrollbar>();
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+            scrollbar.handleRect = handle;
+            scrollbar.targetGraphic = handleImage;
+            scrollbar.navigation = new Navigation { mode = Navigation.Mode.None };
+
+            scroll = viewportGo.AddComponent<ScrollRect>();
+            scroll.viewport = viewport;
+            scroll.content = content;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 40f;
+            scroll.verticalScrollbar = scrollbar;
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            return content;
         }
 
         // 待機所の列の見出し 1 つ（斜めの札と名前。選んで決定できる。上下左右で動く）。初めは隠す。
@@ -215,6 +280,8 @@ namespace Airerage.Editor
         {
             MenuOption item = MenuUiBuilder.CreateMenuItem(parent, name, label, new Vector2(0f, 1f), new Vector2(990f, y), size);
             item.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+            // 長い項目（SPLIT: 2 VS 2 VS 2 VS 2 など）も 1 行のまま枠に収める（2026-11-03 の指摘）。
+            item.SetShrinkToFit(true);
             y -= size.y + 10f;
             return item;
         }

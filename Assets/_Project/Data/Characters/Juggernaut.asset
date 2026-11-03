@@ -20,7 +20,10 @@ MonoBehaviour:
       AirAcceleration: 30
       AirDrag: 2
       Gravity: 30
-      MaxFallSpeed: 20
+      MaxFallSpeed: 40
+      MaxGroundSpeed: 40
+      MaxAirSpeed: 40
+      LandingGraceTicks: 4
       JumpSpeed: 8.4852
       JumpStartupTicks: 8
       AirJumps: 1
@@ -52,8 +55,8 @@ MonoBehaviour:
       ReleaseWhenLineBlocked: 0
       RopeWrapping: 1
       MaxAttachTicks: 180
-      MaxAttachedSpeed: 11
-      ExitSpeedCap: 9
+      MaxAttachedSpeed: 20
+      ExitSpeedCap: 20
       AttachTurnSpeed: 1
       AttachTurnBehind: 0.5
       AttachAnySurface: 0

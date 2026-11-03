@@ -3,6 +3,7 @@ using System.Collections;
 using System.Threading.Tasks;
 using Airerage.Net;
 using Airerage.Runtime.Flow;
+using Airerage.Runtime.Settings;
 using Airerage.Runtime.UI;
 using NUnit.Framework;
 using Unity.Networking.Transport.Relay;
@@ -70,13 +71,13 @@ namespace Airerage.PlayMode.Tests
             Assert.That(connection.Busy, Is.True);
             Assert.That(online.HostOnlineButton.Button.interactable || online.JoinOnlineButton.Button.interactable
                 || online.HostButton.Button.interactable || online.JoinButton.Button.interactable, Is.False, "問い合わせ中にボタンを押せる");
-            Assert.That(online.ConnectMessage, Does.Contain("online room"), "問い合わせ中であることを出さない");
+            Assert.That(online.ConnectMessage, Does.Contain(Loc.T("online room", "オンラインの部屋")), "問い合わせ中であることを出さない");
 
             // 割り当てができたら待機所へ。参加コードを出し、コピーできる。
             relay.Create.SetResult(new RelayHostAllocation(FakeServer(), "AB12CD"));
             yield return WaitFor(() => online.ShownPanel == "Waiting", 5f, "割り当てができても待機所を出さない");
             Assert.That(connection.Session.JoinCode, Is.EqualTo("AB12CD"));
-            Assert.That(online.WaitingInfo, Does.Contain("JOIN CODE: AB12CD"), "待機所に参加コードを出さない");
+            Assert.That(online.WaitingInfo, Does.Contain(Loc.T("JOIN CODE: AB12CD", "参加コード: AB12CD")), "待機所に参加コードを出さない");
             Assert.That(online.CopyCodeButton.gameObject.activeInHierarchy, Is.True, "参加コードのコピーがない");
             online.CopyCodeButton.Button.onClick.Invoke();
             Assert.That(GUIUtility.systemCopyBuffer, Is.EqualTo("AB12CD"), "参加コードをコピーしない");
@@ -92,7 +93,7 @@ namespace Airerage.PlayMode.Tests
             online.JoinOnlineButton.Button.onClick.Invoke();
             yield return null;
             Assert.That(relay.JoinedCode, Is.Empty, "コードが空なのに問い合わせた");
-            Assert.That(online.ConnectMessage, Does.Contain("JOIN CODE"), "コードを入れるように出さない");
+            Assert.That(online.ConnectMessage, Does.Contain(Loc.T("JOIN CODE", "参加コード")), "コードを入れるように出さない");
 
             // 小文字・ハイフンでも大文字にそろえて問い合わせる。サービスが断ったら理由を出す。
             online.CodeField.text = "zz-99xy";

@@ -23,6 +23,12 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Color _accent = new Color(0.35f, 0.85f, 1f);
         [Tooltip("選んでいるときに動かす量（ピクセル。メニューは右へ、キャラクターの札は上へ）")]
         [SerializeField] private Vector2 _selectedShift = new Vector2(18f, 0f);
+        [Tooltip("文字が枠の幅より長ければ、1 行のまま字を小さくして収める（待機所の SPLIT など）")]
+        [SerializeField] private bool _shrinkToFit;
+
+        // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。
+        private int _baseFontSize;
+        private const int MinFitFontSize = 16;
 
         private static readonly Color IdleFill = new Color(0.03f, 0.05f, 0.09f, 0.78f);
         private static readonly Color SelectedFill = new Color(0.08f, 0.16f, 0.24f, 0.9f);
@@ -70,6 +76,34 @@ namespace Airerage.Runtime.UI
             if (_label != null && _label.text != text)
             {
                 _label.text = text;
+                FitLabel();
+            }
+        }
+
+        /// <summary>文字が長ければ 1 行のまま縮めて枠に収めるか（シーンのビルダー用）。</summary>
+        public void SetShrinkToFit(bool shrink)
+        {
+            _shrinkToFit = shrink;
+        }
+
+        // 字の大きさを、元の大きさから、文字の幅が枠に収まるまで小さくする（MinFitFontSize まで）。
+        private void FitLabel()
+        {
+            if (!_shrinkToFit || _label == null)
+            {
+                return;
+            }
+            if (_baseFontSize <= 0)
+            {
+                _baseFontSize = _label.fontSize;
+            }
+            float width = _label.rectTransform.rect.width;
+            int size = _baseFontSize;
+            _label.fontSize = size;
+            while (size > MinFitFontSize && _label.preferredWidth > width)
+            {
+                size -= 2;
+                _label.fontSize = size;
             }
         }
 
@@ -121,6 +155,11 @@ namespace Airerage.Runtime.UI
         {
             _rect = (RectTransform)transform;
             _home = _rect.anchoredPosition;
+            if (_label != null && _baseFontSize <= 0)
+            {
+                _baseFontSize = _label.fontSize;
+            }
+            FitLabel();
             Button.onClick.AddListener(() => Sounds.Play(SoundId.UiConfirm));
             Refresh();
         }

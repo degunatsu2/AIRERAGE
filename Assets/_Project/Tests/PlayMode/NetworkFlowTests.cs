@@ -6,6 +6,7 @@ using Airerage.Net;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Simulation;
+using Airerage.Runtime.Settings;
 using Airerage.Runtime.UI;
 using NUnit.Framework;
 using UnityEngine;
@@ -87,7 +88,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(host.TeamMode, Is.True, "MODE でチーム対戦にならない");
                 yield return WaitFor(() => bot.TeamMode && bot.LocalTeam == 2, 10f, "相手にチーム対戦とチームが届かない");
                 Assert.That(online.TeamButton.gameObject.activeSelf && online.ShuffleButton.gameObject.activeSelf, Is.True);
-                Assert.That(online.SlotPosition(1).x, Is.GreaterThan(online.SlotPosition(0).x), "チームの列に並んでいない");
+                Assert.That(online.SlotPosition(1).y, Is.LessThan(online.SlotPosition(0).y), "チームが縦に並んでいない（BLUE の札が RED の下にない）");
                 online.SlotButton(1).Button.onClick.Invoke();
                 yield return WaitFor(() => bot.LocalTeam == 3, 10f, "ホストが札を決定しても相手のチームが変わらない");
                 online.TeamButton.Button.onClick.Invoke();
@@ -100,12 +101,18 @@ namespace Airerage.PlayMode.Tests
                 online.TeamHeader(3).Button.onClick.Invoke();
                 Assert.That(host.LocalTeam, Is.EqualTo(4), "見出しを決定してもそのチームに入らない");
                 // 観戦の待機所: 相手が入ると、右の端の列に札が並ぶ。ホストは入れない。
-                Assert.That(online.SpectatorHeader.Button.interactable, Is.False, "ホストが観戦の見出しを選べる");
+                // ホストも観戦の見出しで観戦に回れる（2026-11-03）。チームの見出しで戻る。
+                Assert.That(online.SpectatorHeader.Button.interactable, Is.True, "ホストが観戦の見出しを選べない");
+                online.SpectatorHeader.Button.onClick.Invoke();
+                Assert.That(host.LocalSpectator, Is.True, "ホストが観戦にならない");
+                online.TeamHeader(3).Button.onClick.Invoke();
+                Assert.That(host.LocalSpectator, Is.False, "チームの見出しで観戦から戻れない");
+                Assert.That(host.LocalTeam, Is.EqualTo(4));
                 bot.LocalSpectator = true;
                 yield return WaitFor(() => host.Roster[1].Spectator, 10f, "相手が観戦の待機所に入らない");
                 yield return null;
                 Assert.That(online.SlotPosition(1).x, Is.GreaterThan(1500f), "観戦の人の札が観戦の列にない");
-                Assert.That(online.WaitingMessage, Does.Contain("WAITING FOR PLAYERS"), "参加者が 1 人なのに進めそうな案内");
+                Assert.That(online.WaitingMessage, Does.Contain(Loc.T("WAITING FOR PLAYERS", "プレイヤーを待っています")), "参加者が 1 人なのに進めそうな案内");
                 bot.LocalTeam = 1;
                 yield return WaitFor(() => !host.Roster[1].Spectator && host.Roster[1].Team == 1, 10f, "観戦から見出しのチームに戻れない");
                 online.ModeButton.Button.onClick.Invoke();
