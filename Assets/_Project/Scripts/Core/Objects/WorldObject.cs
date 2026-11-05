@@ -121,6 +121,22 @@ namespace Airerage.Core.Objects
         /// （キャラクターの番号、動く足場の番号 + 1。地形は 0）、End は張り付いた相手の中心からの位置。
         /// </summary>
         Mine = 23,
+
+        /// <summary>
+        /// 落ちているアイテム（アイテムドロップのモードで落ちてきた物と、捨てた物。docs/20_item_plan.md）。Variant はアイテム（ItemId）。
+        /// 重力で落ち、足場に着いたらその場に止まる（Stored が 1）。ChargeMilli は拾えるようになるティック（捨てた人だけ。Owner）。
+        /// ステージの外に出たら消える。
+        /// </summary>
+        DroppedItem = 24,
+
+        /// <summary>エネルギーショットの光弾（アイテム）。照準の方向へまっすぐ飛び、最初に当たった相手に当たって消える。ChargeMilli は飛んだ距離（mm）。</summary>
+        ItemShot = 25,
+
+        /// <summary>
+        /// 砂岩ボール（アイテム）。重力で落ち、地形で跳ね返る。攻撃で打たれると、その吹き飛びで飛ぶ。速く動いているボールは触れた人に当たる。
+        /// End.X は半径、Stored は最後に打った人の番号 + 1（0 なら持ち主）、ChargeMilli は最後に打たれたティック、HitMask は打たれてから当てた人。
+        /// </summary>
+        SandBall = 26,
     }
 
     /// <summary>クリームの味（PASTRY CHEF の E。WorldObject.Variant）。</summary>

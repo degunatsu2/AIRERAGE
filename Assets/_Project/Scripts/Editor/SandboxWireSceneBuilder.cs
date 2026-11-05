@@ -552,6 +552,17 @@ namespace Airerage.Editor
             SetReference(electric, "_lineTemplate", electricLine);
             CreateThiefEffects(source, audio);
             CreateJuggernautEffects(source, audio);
+            // アイテム（落ちているアイテム・光弾・砂岩ボール・刀・風・羽・詠唱のゲージ。docs/20_item_plan.md）。
+            var items = new GameObject("ItemEffects").AddComponent<ItemEffectsView>();
+            LineRenderer itemLine = CreateIndicatorLine(items.transform, "ItemLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);
+            itemLine.gameObject.SetActive(false);
+            SetReference(items, "_source", source);
+            SetReference(items, "_camera", Object.FindFirstObjectByType<Camera>());
+            SetReference(items, "_lineTemplate", itemLine);
+            if (audio != null)
+            {
+                SetReference(items, "_audio", audio);
+            }
             // 照準の方向の技を長押しで狙っている間の矢印（水色。ユーザーの要望、2026-10-29）。
             var aimArrow = new GameObject("SkillAim").AddComponent<SkillAimView>();
             LineRenderer aimLine = CreateIndicatorLine(aimArrow.transform, "AimLineTemplate", AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), 0.08f);

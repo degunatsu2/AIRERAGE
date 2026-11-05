@@ -211,6 +211,12 @@ namespace Airerage.Core.Skills
     [Serializable]
     public sealed class WindZoneTuning
     {
+        /// <summary>同じ値の写し（アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public WindZoneTuning Clone()
+        {
+            return (WindZoneTuning)MemberwiseClone();
+        }
+
         /// <summary>残る長さ（ティック。10 秒）。</summary>
         public int DurationTicks = 600;
 
@@ -260,6 +266,12 @@ namespace Airerage.Core.Skills
     [Serializable]
     public sealed class MirrorBallTuning
     {
+        /// <summary>同じ値の写し（アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public MirrorBallTuning Clone()
+        {
+            return (MirrorBallTuning)MemberwiseClone();
+        }
+
         /// <summary>残る長さ（ティック。5 秒）。</summary>
         public int DurationTicks = 300;
 
@@ -288,6 +300,12 @@ namespace Airerage.Core.Skills
     [Serializable]
     public sealed class SafeTuning
     {
+        /// <summary>同じ値の写し（アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public SafeTuning Clone()
+        {
+            return (SafeTuning)MemberwiseClone();
+        }
+
         /// <summary>残る長さ（ティック。3 分）。過ぎたら、その場にばらまく。</summary>
         public int DurationTicks = 10800;
 
@@ -424,6 +442,12 @@ namespace Airerage.Core.Skills
     [Serializable]
     public sealed class CottonCandyTuning
     {
+        /// <summary>同じ値の写し（アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public CottonCandyTuning Clone()
+        {
+            return (CottonCandyTuning)MemberwiseClone();
+        }
+
         /// <summary>消えるまで（ティック。10 秒）。</summary>
         public int DurationTicks = 600;
 
@@ -469,6 +493,12 @@ namespace Airerage.Core.Skills
     [Serializable]
     public sealed class CreamTuning
     {
+        /// <summary>同じ値の写し（アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public CreamTuning Clone()
+        {
+            return (CreamTuning)MemberwiseClone();
+        }
+
         /// <summary>1 回に飛ばす数と、扇の広がり（度。いちばん外の 2 つの間）。</summary>
         public int ShotCount = 7;
         public float SpreadDeg = 22f;
@@ -764,6 +794,12 @@ namespace Airerage.Core.Skills
     [Serializable]
     public sealed class PortalTuning
     {
+        /// <summary>同じ値の写し（アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public PortalTuning Clone()
+        {
+            return (PortalTuning)MemberwiseClone();
+        }
+
         /// <summary>残る長さ（ティック。30 秒）。</summary>
         public int DurationTicks = 1800;
 
@@ -891,6 +927,12 @@ namespace Airerage.Core.Skills
     [Serializable]
     public sealed class SkillTuning
     {
+        /// <summary>同じ値の写し（アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public SkillTuning Clone()
+        {
+            return (SkillTuning)MemberwiseClone();
+        }
+
         public MirrorBallTuning MirrorBall = new MirrorBallTuning();
         public SafeTuning Safe = new SafeTuning();
         public CoinBoostTuning CoinBoost = new CoinBoostTuning();

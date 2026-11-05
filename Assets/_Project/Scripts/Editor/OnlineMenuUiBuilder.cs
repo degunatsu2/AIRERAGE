@@ -16,7 +16,7 @@ namespace Airerage.Editor
     internal static class OnlineMenuUiBuilder
     {
         public static OnlineMenu Create(Transform canvas, MenuScreens screens, CharacterSelectScreen characterSelect,
-            StageSelectScreen stageSelect, StageCatalog stages)
+            StageSelectScreen stageSelect, StageCatalog stages, ItemSelectScreen itemSelect)
         {
             var top = new Vector2(0f, 1f);
 
@@ -133,6 +133,12 @@ namespace Airerage.Editor
             MenuOption mode = WaitingItem(waiting, "Mode", "MODE: FREE FOR ALL", ref rowY, row);
             MenuOption split = WaitingItem(waiting, "Split", "SPLIT: 4 VS 4", ref rowY, row);
             MenuOption shuffle = WaitingItem(waiting, "Shuffle", "RANDOM SPLIT", ref rowY, row);
+            // アイテムのルール（docs/20_item_plan.md。並べ方は OnlineMenu が出す項目に合わせて詰める）。
+            MenuOption itemMode = WaitingItem(waiting, "ItemMode", "ITEMS: DEFAULT", ref rowY, row);
+            MenuOption itemCount = WaitingItem(waiting, "ItemCount", "START ITEM COUNT: 3", ref rowY, row);
+            MenuOption itemPick = WaitingItem(waiting, "ItemPick", "SELECT START ITEMS", ref rowY, row);
+            MenuOption dropRate = WaitingItem(waiting, "DropRate", "DROP RATE: MID", ref rowY, row);
+            MenuOption dropPool = WaitingItem(waiting, "DropPool", "SELECT DROP ITEMS", ref rowY, row);
             MenuOption timeLimit = WaitingItem(waiting, "TimeLimit", "TIME LIMIT: ON", ref rowY, row);
             MenuOption copyCode = WaitingItem(waiting, "CopyCode", "COPY JOIN CODE", ref rowY, row);
             MenuOption leave = WaitingItem(waiting, "Leave", "LEAVE", ref rowY, row);
@@ -189,6 +195,12 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(menu, "_split", split);
             SandboxWireSceneBuilder.SetReference(menu, "_shuffle", shuffle);
             SandboxWireSceneBuilder.SetReference(menu, "_timeLimit", timeLimit);
+            SandboxWireSceneBuilder.SetReference(menu, "_itemMode", itemMode);
+            SandboxWireSceneBuilder.SetReference(menu, "_itemCount", itemCount);
+            SandboxWireSceneBuilder.SetReference(menu, "_itemPick", itemPick);
+            SandboxWireSceneBuilder.SetReference(menu, "_dropRate", dropRate);
+            SandboxWireSceneBuilder.SetReference(menu, "_dropPool", dropPool);
+            SandboxWireSceneBuilder.SetReference(menu, "_itemSelect", itemSelect);
             SandboxWireSceneBuilder.SetReference(menu, "_copyCode", copyCode);
             SandboxWireSceneBuilder.SetReference(menu, "_leave", leave);
             SandboxWireSceneBuilder.SetReference(menu, "_waitingMessage", waitingMessage);

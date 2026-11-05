@@ -28,7 +28,7 @@ namespace Airerage.Core.Rollback
         {
             bool wirePressed = input.IsHeld(InputButtons.Wire) && !previous.IsHeld(InputButtons.Wire);
             bool aimUsed = keepAim || wirePressed || (keepWireAim && input.IsHeld(InputButtons.Wire))
-                || (input.Buttons & ActionController.SkillButtons) != 0;
+                || (input.Buttons & (ActionController.SkillButtons | Items.ItemRules.SlotButtons)) != 0;
             sbyte aimX = aimUsed ? input.AimX : (sbyte)0;
             sbyte aimY = aimUsed ? input.AimY : (sbyte)0;
             sbyte moveX = Settle(input.MoveX, previous.MoveX, moveHysteresis);

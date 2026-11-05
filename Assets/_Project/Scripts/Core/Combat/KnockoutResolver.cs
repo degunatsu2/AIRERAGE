@@ -92,6 +92,8 @@ namespace Airerage.Core.Combat
             respawned.Combat.MaydayRejectCount = state.Combat.MaydayRejectCount;
             // コインはここではなくさない（撃破ドロップは CoinDropRules が、台帳を通して落とす。T4-6）。
             respawned.Coins = state.Coins;
+            // アイテムバッグの持ち物とクールタイムは、撃破されても残る（使っている途中のアイテムは止める。docs/20_item_plan.md）。
+            respawned.Items = state.Items.AfterKnockout();
             // 撃破で終わったコンボのダメージ報酬は、このティックの後で CombatRewardRules が払う（T4-5）。
             respawned.Combat.RewardDamage = state.Combat.RewardDamage;
             respawned.Combat.RewardAttacker = state.Combat.RewardAttacker;

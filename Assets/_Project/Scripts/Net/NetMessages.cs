@@ -71,6 +71,66 @@ namespace Airerage.Net
         /// 待機所で待つ。試合中の人の画面の左下に「名前 JOIN」を出す（2026-11-03 のユーザーの要望）。
         /// </summary>
         Joined = 16,
+
+        /// <summary>
+        /// クライアント → ホスト: アイテムを選ぶ画面を開いているか（待機所の「アイテム選択中……」）と、プリアイテムで持って始めるアイテム
+        /// （最大 3 つ。ItemId。ユーザーの要望、2026-11-05。docs/20_item_plan.md）。変えるたびに送る。
+        /// </summary>
+        Items = 17,
+    }
+
+    /// <summary>
+    /// 待機所でホストが決めるアイテムのルール（モード・初期アイテム数・ドロップ頻度・ドロップするアイテム。docs/20_item_plan.md）。
+    /// ロビーのメッセージで全員へ送り、試合の開始のときに MatchRules に入れる。
+    /// </summary>
+    public readonly struct LobbyItems : IEquatable<LobbyItems>
+    {
+        public readonly Airerage.Core.Items.ItemMode Mode;
+        public readonly int StartCount;
+        public readonly int DropRate;
+        public readonly uint Pool;
+
+        public LobbyItems(Airerage.Core.Items.ItemMode mode, int startCount, int dropRate, uint pool)
+        {
+            Mode = mode >= Airerage.Core.Items.ItemMode.Default && mode <= Airerage.Core.Items.ItemMode.PreItem ? mode : Airerage.Core.Items.ItemMode.Default;
+            StartCount = Math.Max(1, Math.Min(Airerage.Core.Items.ItemCatalog.BagSlots, startCount));
+            DropRate = Math.Max(0, Math.Min(2, dropRate));
+            uint valid = pool & Airerage.Core.Items.ItemCatalog.AllMask;
+            Pool = valid == 0 ? Airerage.Core.Items.ItemCatalog.AllMask : valid;
+        }
+
+        /// <summary>初めの値（アイテムなし、3 個、中、すべてのアイテム）。</summary>
+        public static LobbyItems Default => new LobbyItems(Airerage.Core.Items.ItemMode.Default, Airerage.Core.Items.ItemCatalog.BagSlots, 1,
+            Airerage.Core.Items.ItemCatalog.AllMask);
+
+        public LobbyItems WithMode(Airerage.Core.Items.ItemMode mode) => new LobbyItems(mode, StartCount, DropRate, Pool);
+        public LobbyItems WithStartCount(int count) => new LobbyItems(Mode, count, DropRate, Pool);
+        public LobbyItems WithDropRate(int rate) => new LobbyItems(Mode, StartCount, rate, Pool);
+        public LobbyItems WithPool(uint pool) => new LobbyItems(Mode, StartCount, DropRate, pool);
+
+        /// <summary>試合のルールに入れる。</summary>
+        public void ApplyTo(Airerage.Core.Match.MatchRules rules)
+        {
+            rules.ItemMode = Mode;
+            rules.StartItemCount = StartCount;
+            rules.ItemDropRate = DropRate;
+            rules.ItemDropPool = (int)Pool;
+        }
+
+        public bool Equals(LobbyItems other)
+        {
+            return Mode == other.Mode && StartCount == other.StartCount && DropRate == other.DropRate && Pool == other.Pool;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is LobbyItems other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine((int)Mode, StartCount, DropRate, Pool);
+        }
     }
 
     /// <summary>
@@ -110,9 +170,13 @@ namespace Airerage.Net
         /// </summary>
         public readonly bool Late;
 
+        /// <summary>アイテムを選ぶ画面を開いているか（待機所に入ったまま。状態は「アイテム選択中……」。docs/20_item_plan.md）。</summary>
+        public readonly bool ItemSelecting;
+
         public LobbySlot(bool connected, string name, int character = 0, bool ready = false, byte team = 0, bool spectator = false,
-            bool late = false)
+            bool late = false, bool itemSelecting = false)
         {
+            ItemSelecting = itemSelecting;
             Connected = connected;
             Name = name ?? string.Empty;
             Character = character;
@@ -128,7 +192,7 @@ namespace Airerage.Net
         public bool Equals(LobbySlot other)
         {
             return Connected == other.Connected && Name == other.Name && Character == other.Character && Ready == other.Ready
-                && Team == other.Team && Spectator == other.Spectator && Late == other.Late;
+                && Team == other.Team && Spectator == other.Spectator && Late == other.Late && ItemSelecting == other.ItemSelecting;
         }
 
         public override bool Equals(object obj)
@@ -138,7 +202,7 @@ namespace Airerage.Net
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Connected, Name, Character, Ready, Team, Spectator, Late);
+            return HashCode.Combine(Connected, Name, Character, Ready, Team, Spectator, Late, ItemSelecting);
         }
 
         public override string ToString()
@@ -233,11 +297,13 @@ namespace Airerage.Net
 
         /// <summary>
         /// ロビーの顔ぶれと段階（段階、ホストが選んでいるステージの番号、チーム対戦か、ホストの番号、番号の順に つながっているか・
-        /// キャラクターの番号・準備完了か・チームの番号・観戦か・プレイヤーネームの UTF-8）。
+        /// キャラクターの番号・準備完了か・チームの番号・観戦か・途中から入ったか・アイテムを選んでいるか・プレイヤーネームの UTF-8、
+        /// 最後にアイテムのルール（モード・初期アイテム数・ドロップ頻度・ドロップするアイテムのビット 4 バイト））。
         /// </summary>
         public static byte[] Lobby(IReadOnlyList<LobbySlot> slots, LobbyPhase phase = LobbyPhase.Waiting, int stage = 0, bool teamMode = false,
-            int hostSlot = 0, bool matchRunning = false)
+            int hostSlot = 0, bool matchRunning = false, LobbyItems? items = null)
         {
+            LobbyItems rules = items ?? LobbyItems.Default;
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream))
             {
@@ -257,9 +323,14 @@ namespace Airerage.Net
                     writer.Write(slot.Team);
                     writer.Write(slot.Spectator);
                     writer.Write(slot.Late);
+                    writer.Write(slot.ItemSelecting);
                     writer.Write((byte)Math.Min(name.Length, byte.MaxValue));
                     writer.Write(name, 0, Math.Min(name.Length, byte.MaxValue));
                 }
+                writer.Write((byte)rules.Mode);
+                writer.Write((byte)rules.StartCount);
+                writer.Write((byte)rules.DropRate);
+                writer.Write(rules.Pool);
                 writer.Flush();
                 return stream.ToArray();
             }
@@ -288,8 +359,14 @@ namespace Airerage.Net
         public static LobbySlot[] ReadLobby(byte[] data, out LobbyPhase phase, out int stage, out bool teamMode, out int hostSlot,
             out bool matchRunning)
         {
+            return ReadLobby(data, out phase, out stage, out teamMode, out hostSlot, out matchRunning, out _);
+        }
+
+        public static LobbySlot[] ReadLobby(byte[] data, out LobbyPhase phase, out int stage, out bool teamMode, out int hostSlot,
+            out bool matchRunning, out LobbyItems items)
+        {
             const int header = 7;
-            const int slotHeader = 7;
+            const int slotHeader = 8;
             Expect(data, NetKind.Lobby, header);
             int count = data[1];
             if (data[2] > (byte)LobbyPhase.StageSelect)
@@ -319,12 +396,49 @@ namespace Airerage.Net
                 }
                 bool spectator = data[offset + 4] != 0;
                 bool late = data[offset + 5] != 0;
-                int length = data[offset + 6];
+                bool itemSelecting = data[offset + 6] != 0;
+                int length = data[offset + 7];
                 slots[i] = new LobbySlot(connected, Encoding.UTF8.GetString(data, offset + slotHeader, length), character, ready, team, spectator,
-                    late);
+                    late, itemSelecting);
                 offset += slotHeader + length;
             }
+            const int itemBytes = 7;
+            if (offset + itemBytes > data.Length)
+            {
+                throw new FormatException($"ロビーのメッセージのアイテムのルールが途中で切れています（{data.Length} バイト）");
+            }
+            if (data[offset] > (byte)Airerage.Core.Items.ItemMode.PreItem)
+            {
+                throw new FormatException($"アイテムのモードが不正です（{data[offset]}）");
+            }
+            items = new LobbyItems((Airerage.Core.Items.ItemMode)data[offset], data[offset + 1], data[offset + 2], (uint)(data[offset + 3] | data[offset + 4] << 8 | data[offset + 5] << 16 | data[offset + 6] << 24));
             return slots;
+        }
+
+        /// <summary>アイテムを選ぶ画面を開いているかと、プリアイテムで持って始めるアイテム（最大 3 つ。クライアント → ホスト）。</summary>
+        public static byte[] Items(bool selecting, IReadOnlyList<Airerage.Core.Items.ItemId> items)
+        {
+            var data = new byte[2 + Airerage.Core.Items.ItemCatalog.BagSlots];
+            data[0] = (byte)NetKind.Items;
+            data[1] = selecting ? (byte)1 : (byte)0;
+            for (int i = 0; items != null && i < items.Count && i < Airerage.Core.Items.ItemCatalog.BagSlots; i++)
+            {
+                data[2 + i] = Airerage.Core.Items.ItemCatalog.IsValid(items[i]) ? (byte)items[i] : (byte)0;
+            }
+            return data;
+        }
+
+        public static Airerage.Core.Items.ItemId[] ReadItems(byte[] data, out bool selecting)
+        {
+            Expect(data, NetKind.Items, 2 + Airerage.Core.Items.ItemCatalog.BagSlots);
+            selecting = data[1] != 0;
+            var items = new Airerage.Core.Items.ItemId[Airerage.Core.Items.ItemCatalog.BagSlots];
+            for (int i = 0; i < items.Length; i++)
+            {
+                var id = (Airerage.Core.Items.ItemId)data[2 + i];
+                items[i] = Airerage.Core.Items.ItemCatalog.IsValid(id) ? id : Airerage.Core.Items.ItemId.None;
+            }
+            return items;
         }
 
         /// <summary>入りたいチーム（1〜4。クライアント → ホスト）。</summary>

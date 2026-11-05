@@ -155,6 +155,21 @@ namespace Airerage.Core.Match
         /// <summary>コインを拾える距離（m。キャラクターの箱をこれだけ広げて、コインの中心が入れば拾う）。</summary>
         public float CoinPickupRadius = 0.7f;
 
+        /// <summary>
+        /// アイテムのモード（ユーザーの要望、2026-11-05。docs/20_item_plan.md）: デフォルト（なし）・アイテムドロップ・プリアイテム。ローカル
+        /// 対戦はオプションで、ネットワーク対戦は待機所でホストが選ぶ。
+        /// </summary>
+        public Items.ItemMode ItemMode = Items.ItemMode.Default;
+
+        /// <summary>プリアイテム: 持っていけるアイテムの数（1〜3）。</summary>
+        public int StartItemCount = 3;
+
+        /// <summary>アイテムドロップ: 落ちてくる頻度（0: 少・1: 中・2: 多。30 秒に 4・8・12 個ほど。ItemTuning.DropIntervalTicks）。</summary>
+        public int ItemDropRate = 1;
+
+        /// <summary>アイテムドロップ: 落ちてくるアイテム（ItemCatalog.Bit のビット。0 なら落ちてこない）。</summary>
+        public int ItemDropPool = (int)Items.ItemCatalog.AllMask;
+
         /// <summary>時間の制限もカウントダウンもない（検証用のシーン、入力の記録の再生）。撃破と復帰のルールは同じ。</summary>
         public static MatchRules FreePlay()
         {
@@ -241,6 +256,9 @@ namespace Airerage.Core.Match
             v.Positive(nameof(BankMoveIntervalTicks), BankMoveIntervalTicks);
             v.NonNegative(nameof(BankNoticeTicks), BankNoticeTicks);
             v.Positive(nameof(BankRadius), BankRadius);
+            v.InRange(nameof(StartItemCount), StartItemCount, 1f, Items.ItemCatalog.BagSlots);
+            v.InRange(nameof(ItemDropRate), ItemDropRate, 0f, 2f);
+            v.InRange(nameof(ItemMode), (int)ItemMode, 0f, 2f);
             return v;
         }
     }

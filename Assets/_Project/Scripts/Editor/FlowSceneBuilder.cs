@@ -354,6 +354,7 @@ namespace Airerage.Editor
             CharacterSelectScreen characterSelect = CharacterSelectUiBuilder.Create(canvas.transform);
             StageSelectScreen stageSelect = CreateStageSelect(canvas.transform);
             OptionsScreen options = OptionsUiBuilder.Create(canvas.transform, LoadInputActions());
+            ItemSelectScreen itemSelect = ItemSelectUiBuilder.Create(canvas.transform, LoadInputActions());
 
             CpuLevelScreen cpuLevel = CreateCpuLevel(canvas.transform);
 
@@ -362,7 +363,9 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screens, "_characterSelect", characterSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_stageSelect", stageSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_optionsScreen", options);
-            Airerage.Net.OnlineMenu online = OnlineMenuUiBuilder.Create(canvas.transform, screens, characterSelect, stageSelect, LoadOrCreateStages());
+            SandboxWireSceneBuilder.SetReference(screens, "_itemSelect", itemSelect);
+            Airerage.Net.OnlineMenu online = OnlineMenuUiBuilder.Create(canvas.transform, screens, characterSelect, stageSelect, LoadOrCreateStages(),
+                itemSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_online", online);
             // 終了の確認（いちばん手前に出すため、ほかの画面の後に作る）。
             SandboxWireSceneBuilder.SetReference(screens, "_quitDialog", MenuUiBuilder.CreateQuitDialog(canvas.transform));
@@ -472,7 +475,7 @@ namespace Airerage.Editor
         }
 
         // 札の左端のチェック（白い枠の箱と、付いているときの水色の印）。
-        private static void CreateStageCheck(Transform plate, out GameObject box, out GameObject mark)
+        internal static void CreateStageCheck(Transform plate, out GameObject box, out GameObject mark)
         {
             box = new GameObject("Check", typeof(RectTransform));
             box.transform.SetParent(plate, false);

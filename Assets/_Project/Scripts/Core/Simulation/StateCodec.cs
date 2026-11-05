@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 33;
+        public const int FormatVersion = 34;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -431,6 +431,71 @@ namespace Airerage.Core.Simulation
             writer.Write(state.GroundedTicks);
             writer.Write(state.Coins.Held);
             writer.Write(state.Coins.Banked);
+            Write(writer, state.Items);
+        }
+
+        private static void Write(BinaryWriter writer, in Items.ItemBag bag)
+        {
+            writer.Write(bag.Item0);
+            writer.Write(bag.Item1);
+            writer.Write(bag.Item2);
+            writer.Write(bag.Cooldown0);
+            writer.Write(bag.Cooldown1);
+            writer.Write(bag.Cooldown2);
+            writer.Write(bag.Spent0);
+            writer.Write(bag.Spent1);
+            writer.Write(bag.Spent2);
+            writer.Write((ushort)bag.PreviousButtons);
+            writer.Write(bag.Armed);
+            writer.Write(bag.Act);
+            writer.Write(bag.ActSlot);
+            writer.Write(bag.ActTicks);
+            writer.Write(bag.ActAim.X);
+            writer.Write(bag.ActAim.Y);
+            writer.Write(bag.ActFrom.X);
+            writer.Write(bag.ActFrom.Y);
+            writer.Write(bag.ActTo.X);
+            writer.Write(bag.ActTo.Y);
+            writer.Write(bag.ActHitMask);
+            writer.Write(bag.PickupCount);
+            writer.Write(bag.LastPicked);
+            writer.Write(bag.UseCount);
+            writer.Write(bag.LastUsed);
+            writer.Write(bag.DropCount);
+            writer.Write(bag.BurstCount);
+            writer.Write(bag.FlashCount);
+        }
+
+        private static Items.ItemBag ReadItemBag(BinaryReader reader)
+        {
+            return new Items.ItemBag
+            {
+                Item0 = reader.ReadByte(),
+                Item1 = reader.ReadByte(),
+                Item2 = reader.ReadByte(),
+                Cooldown0 = reader.ReadInt32(),
+                Cooldown1 = reader.ReadInt32(),
+                Cooldown2 = reader.ReadInt32(),
+                Spent0 = reader.ReadByte(),
+                Spent1 = reader.ReadByte(),
+                Spent2 = reader.ReadByte(),
+                PreviousButtons = (InputButtons)reader.ReadUInt16(),
+                Armed = reader.ReadByte(),
+                Act = reader.ReadByte(),
+                ActSlot = reader.ReadByte(),
+                ActTicks = reader.ReadInt32(),
+                ActAim = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                ActFrom = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                ActTo = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                ActHitMask = reader.ReadUInt32(),
+                PickupCount = reader.ReadInt32(),
+                LastPicked = reader.ReadByte(),
+                UseCount = reader.ReadInt32(),
+                LastUsed = reader.ReadByte(),
+                DropCount = reader.ReadInt32(),
+                BurstCount = reader.ReadInt32(),
+                FlashCount = reader.ReadInt32(),
+            };
         }
 
         public static CharacterState Read(BinaryReader reader)
@@ -604,6 +669,7 @@ namespace Airerage.Core.Simulation
             state.JumpSquatTicksLeft = reader.ReadInt32();
             state.GroundedTicks = reader.ReadInt32();
             state.Coins = new CoinPurse { Held = reader.ReadInt32(), Banked = reader.ReadInt32() };
+            state.Items = ReadItemBag(reader);
             return state;
         }
 

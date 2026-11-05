@@ -90,6 +90,26 @@ namespace Airerage.Editor
             CaptureAll(screens, "Options_General");
             options.Page.Button.onClick.Invoke();
             CaptureAll(screens, "Options_Controls");
+            options.Page.Button.onClick.Invoke();
+            CaptureAll(screens, "Options_Items");
+        }
+
+        /// <summary>
+        /// アイテムを選ぶ画面（docs/20_item_plan.md）: 初期アイテム（2 つ選んで Z・X、カーソルのアイテムの効果のポップアップ）と、
+        /// ドロップするアイテム（チェック）。
+        /// </summary>
+        public static void CaptureItemSelect()
+        {
+            MenuScreens screens = OpenMenu();
+            ItemSelectScreen items = screens.ItemSelect;
+            ShowOnly(screens, items.transform);
+            items.ShowPick(3, new[] { Airerage.Core.Items.ItemId.EnergyShot, Airerage.Core.Items.ItemId.QuickBooster });
+            MethodInfo highlight = typeof(ItemSelectScreen).GetMethod("Highlight", Private);
+            highlight.Invoke(items, new object[] { 11 });
+            CaptureAll(screens, "ItemSelect_Pick");
+            items.ShowPool(Airerage.Core.Items.ItemCatalog.AllMask & ~Airerage.Core.Items.ItemCatalog.Bit(Airerage.Core.Items.ItemId.GreenBanana));
+            highlight.Invoke(items, new object[] { 8 });
+            CaptureAll(screens, "ItemSelect_Pool");
         }
 
         /// <summary>

@@ -197,7 +197,7 @@ namespace Airerage.Core.Skills
         /// </summary>
         public static bool AimsWithCursor(in CharacterState state, CharacterConfig config)
         {
-            if (state.Combat.FlakStance || JuggernautRules.TracksAim(state))
+            if (state.Combat.FlakStance || JuggernautRules.TracksAim(state) || Items.ItemRules.AimsWithCursor(state))
             {
                 return true;
             }

@@ -352,6 +352,9 @@ namespace Airerage.Runtime.Simulation
                 rules.DurationTicks = 0;
             }
             rules.Seed = Environment.TickCount;
+            // アイテムのモードはオプションの ITEMS で決める（ユーザーの要望、2026-11-05。docs/20_item_plan.md）。
+            Airerage.Runtime.Settings.ItemSettings items = Airerage.Runtime.Settings.ItemSettings.Load();
+            items.ApplyTo(rules);
             _world = new SimWorld(_terrain, _bounds, _zones, rules, _coinSpawns, _bankSpots, _platforms, _traps);
             int count = _players.Count;
             for (int p = 0; p < count; p++)
@@ -362,6 +365,13 @@ namespace Airerage.Runtime.Simulation
                 {
                     // チーム対戦（docs/19 T9-6）: 試合の前にチームを決める。
                     _world.SetTeam(p, _players[p].Team);
+                }
+                if (rules.ItemMode == Airerage.Core.Items.ItemMode.PreItem)
+                {
+                    // プリアイテム: 人はオプションの初期アイテム、CPU はランダムな違うアイテム（数は初期アイテム数）。
+                    _world.SetItems(p, _players[p].IsCpu
+                        ? Airerage.Runtime.Settings.ItemSettings.RandomItems(rules.StartItemCount, new System.Random(rules.Seed + 97 * (p + 1)))
+                        : items.StartItemsUpTo(rules.StartItemCount));
                 }
             }
             _tickInputs = new SimInput[count];

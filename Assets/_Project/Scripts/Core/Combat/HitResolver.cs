@@ -56,6 +56,9 @@ namespace Airerage.Core.Combat
         /// </summary>
         public IReadOnlyList<HitRecord> LastHits => _hits;
 
+        /// <summary>アイテムの値（攻撃で砂岩ボールを打つ。null なら打たない。SimWorld が入れる）。</summary>
+        public Airerage.Core.Items.ItemTuning Items { get; set; }
+
         /// <summary>
         /// 直前の Resolve で、別の人の新しいコンボに置き換わって終わったコンボ（終わった順。ダメージ報酬に使う。docs/12 T4-5）。
         /// のけぞりが終わって終わったコンボは、ここには出ない（CombatState.RewardDamage に残る）。
@@ -104,6 +107,10 @@ namespace Airerage.Core.Combat
                     }
                     Hitbox(attacker, hitData, out Vector2 center, out Vector2 half);
                     float angle = HitAngle(attacker, hitData);
+                    // 砂岩ボール（アイテム）は、攻撃の吹き飛びのまま飛ぶ（docs/20_item_plan.md）。
+                    Airerage.Core.Items.ItemRules.StrikeBalls(objects, a, ObjectHitKey(a, attacker.Combat.AttackSerial, h), center,
+                        HitShapes.Bounds(half, angle),
+                        new Vector2(hitData.KnockbackX * attacker.Facing, hitData.KnockbackY) * power.KnockbackScale, tick, Items);
                     if (objects != null && DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, HitShapes.Bounds(half, angle),
                             AttackPower.Damage(hitData.Damage, power.Multiplier, power.BonusPercent)))
                     {

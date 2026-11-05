@@ -34,6 +34,9 @@ namespace Airerage.Net
             CharacterSelect,
             StageSelect,
             Loading,
+
+            // アイテムを選ぶ画面（待機所に入ったまま。docs/20_item_plan.md）。
+            Items,
         }
 
         [SerializeField] private MenuScreens _menu;
@@ -80,6 +83,14 @@ namespace Airerage.Net
         [SerializeField] private MenuOption _split;
         [SerializeField] private MenuOption _shuffle;
         [SerializeField] private MenuOption _timeLimit;
+        [Tooltip("アイテムのルール（ホストが決める。docs/20_item_plan.md）: モード、初期アイテム数・初期アイテム選択（プリアイテム）、ドロップ頻度・ドロップアイテム選択（アイテムドロップ）")]
+        [SerializeField] private MenuOption _itemMode;
+        [SerializeField] private MenuOption _itemCount;
+        [SerializeField] private MenuOption _itemPick;
+        [SerializeField] private MenuOption _dropRate;
+        [SerializeField] private MenuOption _dropPool;
+        [Tooltip("アイテムを選ぶ画面（メニューの画面のものを使う）")]
+        [SerializeField] private ItemSelectScreen _itemSelect;
         [SerializeField] private MenuOption _copyCode;
         [SerializeField] private MenuOption _leave;
         [SerializeField] private Text _waitingMessage;
@@ -104,9 +115,19 @@ namespace Airerage.Net
         private bool _shownSpectator;
         private bool _shownLate;
         private LobbyPhase _shownPhase;
+        private Airerage.Core.Items.ItemMode _shownItemMode;
+        // アイテムを選ぶ画面を開いているか（ドロップするアイテムか、初期アイテムか）と、閉じた後に選ぶ項目。
+        private bool _itemsOpen;
+        private bool _itemsPool;
+        private MenuOption _focusAfterItems;
 
         // 待機所の札の並べ方（基準の画面 1920×1080）。参加する人の札と見出しはスクロールの中身の座標（左上が 0）、観戦の列は待機所の座標。
         private const float SlotTop = -200f;
+
+        // 待機所の右の列の項目の高さと間隔（多いときは OptionArea に収まるように詰める）。
+        private const float OptionHeight = 64f;
+        private const float OptionStep = 74f;
+        private const float OptionArea = 590f;
         private const float RowWidth = 780f;
         private const float HeaderHeight = 46f;
         private const float RowHeight = 58f;
@@ -150,6 +171,11 @@ namespace Airerage.Net
         public MenuOption ModeButton => _mode;
         public MenuOption SplitButton => _split;
         public MenuOption ShuffleButton => _shuffle;
+        public MenuOption ItemModeButton => _itemMode;
+        public MenuOption ItemCountButton => _itemCount;
+        public MenuOption ItemPickButton => _itemPick;
+        public MenuOption DropRateButton => _dropRate;
+        public MenuOption DropPoolButton => _dropPool;
 
         /// <summary>列の見出し（t 番目。決定でそのチームに入る。個人戦は 0 番が PLAYERS。テスト用）と、観戦の待機所の見出し。</summary>
         public PlateButton TeamHeader(int t) => _teamHeaderButtons[t];
@@ -182,7 +208,8 @@ namespace Airerage.Net
                 || _slotHostIcons.Length != OnlineSession.MaxPlayers || _slotYouIcons.Length != OnlineSession.MaxPlayers
                 || _teamHeaders.Length != Airerage.Core.Match.TeamRules.MaxTeams || _teamHeaderTexts.Length != _teamHeaders.Length
                 || _teamHeaderPlates.Length != _teamHeaders.Length || _teamHeaderButtons.Length != _teamHeaders.Length
-                || _spectatorHeader == null || _spectatorHeaderText == null || _slotContent == null || _slotScroll == null)
+                || _spectatorHeader == null || _spectatorHeaderText == null || _slotContent == null || _slotScroll == null
+                || _itemMode == null || _itemCount == null || _itemPick == null || _dropRate == null || _dropPool == null || _itemSelect == null)
             {
                 Debug.LogError($"{name}: ネットワーク対戦のメニューの部品がそろっていません", this);
                 enabled = false;
@@ -255,6 +282,7 @@ namespace Airerage.Net
                 }
             });
             _shuffle.Clicked.AddListener(ShuffleTeams);
+            WireItems();
             System.Action cancel = () =>
             {
                 // 戻る操作: READY なら取り消し、そうでなければ抜ける。
@@ -267,7 +295,7 @@ namespace Airerage.Net
                     Leave();
                 }
             };
-            foreach (MenuOption option in new[] { _ready, _team, _mode, _split, _shuffle, _timeLimit, _copyCode, _leave })
+            foreach (MenuOption option in WaitingOptions())
             {
                 option.Cancelled += cancel;
             }
@@ -335,6 +363,106 @@ namespace Airerage.Net
                 }
             };
             HidePanels();
+        }
+
+        // 待機所の右の列の項目（上からの順）。
+        private MenuOption[] WaitingOptions()
+        {
+            return new[] { _ready, _team, _mode, _split, _shuffle, _itemMode, _itemCount, _itemPick, _dropRate, _dropPool, _timeLimit, _copyCode, _leave };
+        }
+
+        // アイテムの項目と、アイテムを選ぶ画面の操作をつなぐ（docs/20_item_plan.md）。
+        private void WireItems()
+        {
+            _itemMode.Clicked.AddListener(() =>
+            {
+                if (Session != null && Session.IsHost)
+                {
+                    LobbyItems items = Session.Items;
+                    Session.Items = items.WithMode((Airerage.Core.Items.ItemMode)(((int)items.Mode + 1) % 3));
+                }
+            });
+            _itemCount.Clicked.AddListener(() =>
+            {
+                if (Session != null && Session.IsHost)
+                {
+                    LobbyItems items = Session.Items;
+                    Session.Items = items.WithStartCount(items.StartCount % Airerage.Core.Items.ItemCatalog.BagSlots + 1);
+                }
+            });
+            _dropRate.Clicked.AddListener(() =>
+            {
+                if (Session != null && Session.IsHost)
+                {
+                    LobbyItems items = Session.Items;
+                    Session.Items = items.WithDropRate((items.DropRate + 1) % 3);
+                }
+            });
+            _itemPick.Clicked.AddListener(() => OpenItems(false));
+            _dropPool.Clicked.AddListener(() =>
+            {
+                if (Session != null && Session.IsHost)
+                {
+                    OpenItems(true);
+                }
+            });
+            _itemSelect.PicksChanged += picks =>
+            {
+                if (!_itemsOpen || Session == null)
+                {
+                    return;
+                }
+                Session.LocalStartItems = picks;
+                // 次の初めの値にもする（オプションの START ITEMS と同じ設定）。
+                ItemSettings saved = ItemSettings.Load();
+                saved.StartItems = new Airerage.Core.Items.ItemId[Airerage.Core.Items.ItemCatalog.BagSlots];
+                System.Array.Copy(picks, saved.StartItems, Mathf.Min(picks.Length, saved.StartItems.Length));
+                saved.Save();
+            };
+            _itemSelect.PoolChanged += pool =>
+            {
+                if (!_itemsOpen || Session == null || !Session.IsHost)
+                {
+                    return;
+                }
+                Session.Items = Session.Items.WithPool(pool);
+                ItemSettings saved = ItemSettings.Load();
+                saved.DropPool = pool;
+                saved.Save();
+            };
+            _itemSelect.Closed += () =>
+            {
+                if (!_itemsOpen)
+                {
+                    return;
+                }
+                CloseItems();
+                // 待機所を出し直して、開いた項目を選ぶ。
+                _shown = Panel.None;
+            };
+        }
+
+        // アイテムを選ぶ画面を開く（待機所に入ったまま。状態は「アイテム選択中……」）。
+        private void OpenItems(bool pool)
+        {
+            OnlineSession session = Session;
+            if (session == null || session.Phase != LobbyPhase.Waiting)
+            {
+                return;
+            }
+            _itemsOpen = true;
+            _itemsPool = pool;
+            _focusAfterItems = pool ? _dropPool : _itemPick;
+            session.LocalItemSelecting = true;
+        }
+
+        private void CloseItems()
+        {
+            _itemsOpen = false;
+            if (Session != null)
+            {
+                Session.LocalItemSelecting = false;
+            }
         }
 
         private void OnDestroy()
@@ -503,6 +631,18 @@ namespace Airerage.Net
                 session = null;
             }
             Panel want = Desired(session);
+            if (_itemsOpen)
+            {
+                if (want == Panel.Waiting && session != null && session.Phase == LobbyPhase.Waiting && !session.LocalLate)
+                {
+                    want = Panel.Items;
+                }
+                else
+                {
+                    // 待機所の段階でなくなった（全員の準備完了など）: アイテムを選ぶ画面を閉じる。
+                    CloseItems();
+                }
+            }
             if (want != _shown)
             {
                 Show(want, session);
@@ -585,7 +725,19 @@ namespace Airerage.Net
                     _copiedCode = string.Empty;
                     _splitIndex = 0;
                     ShowWaitingOptions(session);
-                    Focus(_ready.gameObject.activeSelf ? _ready : _leave);
+                    MenuOption back = _focusAfterItems;
+                    _focusAfterItems = null;
+                    Focus(back != null && back.gameObject.activeSelf ? back : _ready.gameObject.activeSelf ? _ready : _leave);
+                    break;
+                case Panel.Items:
+                    if (_itemsPool)
+                    {
+                        _itemSelect.ShowPool(session.Items.Pool);
+                    }
+                    else
+                    {
+                        _itemSelect.ShowPick(session.Items.StartCount, session.LocalStartItems);
+                    }
                     break;
                 case Panel.CharacterSelect:
                     _characterSelect.ShowNetwork(session.LocalPlayer, session.LocalCharacter);
@@ -618,6 +770,10 @@ namespace Airerage.Net
             {
                 _stageSelect.Hide();
             }
+            if (_itemSelect.IsShowing && !_menu.ShowingItemSelectFromOptions)
+            {
+                _itemSelect.Hide();
+            }
             if (EventSystem.current != null)
             {
                 EventSystem.current.SetSelectedGameObject(null);
@@ -643,23 +799,42 @@ namespace Airerage.Net
             _shownHost = session.IsHost;
             _shownSpectator = spectator;
             _shownPhase = session.Phase;
+            Airerage.Core.Items.ItemMode itemMode = session.Items.Mode;
+            _shownItemMode = itemMode;
             _ready.gameObject.SetActive(waiting && !spectator);
+            // アイテムのルール（docs/20_item_plan.md）: モードはだれでも見える（決めるのはホスト）。プリアイテムなら初期アイテム数と
+            // 初期アイテム選択、アイテムドロップならドロップ頻度とドロップアイテム選択。
+            _itemMode.gameObject.SetActive(waiting);
+            _itemCount.gameObject.SetActive(waiting && itemMode == Airerage.Core.Items.ItemMode.PreItem);
+            _itemPick.gameObject.SetActive(waiting && itemMode == Airerage.Core.Items.ItemMode.PreItem && !spectator);
+            _dropRate.gameObject.SetActive(waiting && itemMode == Airerage.Core.Items.ItemMode.ItemDrop);
+            _dropPool.gameObject.SetActive(waiting && itemMode == Airerage.Core.Items.ItemMode.ItemDrop);
             _team.gameObject.SetActive(waiting && team);
             _mode.gameObject.SetActive(waiting && session.IsHost);
             _split.gameObject.SetActive(waiting && session.IsHost && team);
             _shuffle.gameObject.SetActive(waiting && session.IsHost && team);
             _timeLimit.gameObject.SetActive(waiting && session.IsHost);
             _copyCode.gameObject.SetActive(session.JoinCode.Length > 0);
-            // 出ている項目だけを上から詰めて並べる（項目の位置は MenuOption が覚えているので、作り直さずに y だけ変える）。
+            // 出ている項目だけを上から詰めて並べる（項目の位置は MenuOption が覚えているので、作り直さずに y だけ変える）。項目が多いときは、
+            // 下の文に重ならないように、項目を低くして詰める（アイテムの項目を足して、最大 13。2026-11-05）。
+            int shown = 0;
+            foreach (MenuOption option in WaitingOptions())
+            {
+                shown += option.gameObject.activeSelf ? 1 : 0;
+            }
+            float step = Mathf.Min(OptionStep, OptionArea / Mathf.Max(1, shown));
+            float height = Mathf.Min(OptionHeight, step - 8f);
             float y = SlotTop;
-            foreach (MenuOption option in new[] { _ready, _team, _mode, _split, _shuffle, _timeLimit, _copyCode, _leave })
+            foreach (MenuOption option in WaitingOptions())
             {
                 if (!option.gameObject.activeSelf)
                 {
                     continue;
                 }
+                var rect = (RectTransform)option.transform;
+                rect.sizeDelta = new Vector2(rect.sizeDelta.x, height);
                 option.SetHome(new Vector2(990f, y));
-                y -= ((RectTransform)option.transform).sizeDelta.y + 10f;
+                y -= step;
             }
             GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             if (selected == null || !selected.activeInHierarchy)
@@ -774,7 +949,7 @@ namespace Airerage.Net
             bool waiting = session.Phase == LobbyPhase.Waiting && !late;
             bool running = session.MatchRunning;
             if (teamMode != _shownTeamMode || session.IsHost != _shownHost || session.LocalSpectator != _shownSpectator
-                || session.Phase != _shownPhase || late != _shownLate)
+                || session.Phase != _shownPhase || late != _shownLate || session.Items.Mode != _shownItemMode)
             {
                 ShowWaitingOptions(session);
             }
@@ -905,6 +1080,7 @@ namespace Airerage.Net
                 }
             }
             _timeLimit.SetLabel($"TIME LIMIT: {(Connection.Timed ? "ON" : "OFF")}");
+            RefreshItemOptions(session);
             if (session.JoinCode.Length > 0)
             {
                 _waitingInfo.text = session.IsHost
@@ -923,6 +1099,27 @@ namespace Airerage.Net
             }
             _waitingMessage.text = ComposeWaitingMessage(session, teamMode, waiting, running, players, out bool problem);
             _waitingMessage.color = problem ? new Color(1f, 0.85f, 0.3f) : Color.white;
+        }
+
+        // アイテムの項目の文字と、ホストだけが選べる項目（ほかの人は見るだけ）。
+        private void RefreshItemOptions(OnlineSession session)
+        {
+            LobbyItems items = session.Items;
+            _itemMode.SetLabel(Loc.T($"ITEMS: {ItemSettings.ModeLabel(items.Mode)}", $"アイテム: {ItemSettings.ModeLabel(items.Mode)}"));
+            _itemCount.SetLabel(Loc.T($"START ITEM COUNT: {items.StartCount}", $"初期アイテム数: {items.StartCount}"));
+            int picked = Mathf.Min(session.LocalStartItems.Count, items.StartCount);
+            _itemPick.SetLabel(Loc.T($"SELECT START ITEMS ({picked}/{items.StartCount})", $"初期アイテム選択（{picked}/{items.StartCount}）"));
+            _dropRate.SetLabel(Loc.T($"DROP RATE: {ItemSettings.RateLabel(items.DropRate)}", $"ドロップ頻度: {ItemSettings.RateLabel(items.DropRate)}"));
+            int pool = Airerage.Core.Items.ItemCatalog.CountIn(items.Pool);
+            _dropPool.SetLabel(Loc.T($"SELECT DROP ITEMS ({pool}/{Airerage.Core.Items.ItemCatalog.Count})",
+                $"ドロップアイテム選択（{pool}/{Airerage.Core.Items.ItemCatalog.Count}）"));
+            foreach (MenuOption hostOnly in new[] { _itemMode, _itemCount, _dropRate, _dropPool })
+            {
+                if (hostOnly.Button.interactable != session.IsHost)
+                {
+                    hostOnly.SetAvailable(session.IsHost, "HOST");
+                }
+            }
         }
 
         // 待機所の下の文（進めない理由、待っている人数、観戦・途中から入った人の案内）。
@@ -997,6 +1194,12 @@ namespace Airerage.Net
             else if (session.Phase != LobbyPhase.Waiting)
             {
                 state = Loc.T("SELECTING...", "選択中……");
+                bright = true;
+            }
+            else if (slot.ItemSelecting)
+            {
+                // アイテムを選ぶ画面を開いている（待機所に入ったまま。docs/20_item_plan.md）。
+                state = Loc.T("CHOOSING ITEMS...", "アイテム選択中……");
                 bright = true;
             }
             else

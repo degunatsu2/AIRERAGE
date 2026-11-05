@@ -41,6 +41,8 @@ namespace Airerage.Runtime.Presentation
         private InputAction _scroll;
         private InputAction _hold;
         private InputAction _reset;
+        // アイテムの枠のキー（押しながらホイールを押し込むと、アイテムを捨てる。その間はズームを戻さない）。
+        private InputAction[] _itemKeys = new InputAction[0];
 
         /// <summary>目標の距離（m）。実際の距離はこれになめらかに近づく。</summary>
         public float TargetDistance { get; private set; }
@@ -72,6 +74,20 @@ namespace Airerage.Runtime.Presentation
             _scroll = _map.FindAction("ScrollZoom", throwIfNotFound: true);
             _hold = _map.FindAction("HoldZoom", throwIfNotFound: true);
             _reset = _map.FindAction("ResetZoom", throwIfNotFound: true);
+            InputActionMap player = _inputActions.FindActionMap("Player", throwIfNotFound: false);
+            if (player != null)
+            {
+                var keys = new System.Collections.Generic.List<InputAction>();
+                foreach (string action in new[] { "Item1", "Item2", "Item3" })
+                {
+                    InputAction key = player.FindAction(action, throwIfNotFound: false);
+                    if (key != null)
+                    {
+                        keys.Add(key);
+                    }
+                }
+                _itemKeys = keys.ToArray();
+            }
             DefaultDistance = Mathf.Clamp(_composer.CameraDistance, _minDistance, _maxDistance);
             TargetDistance = DefaultDistance;
             _virtualCamera = _composer.GetComponent<CinemachineCamera>();
@@ -134,7 +150,7 @@ namespace Airerage.Runtime.Presentation
             // 十字キーの下で離れ、上で近づく。
             float hold = _hold.ReadValue<float>();
             ZoomIn(scroll * _scrollStep + hold * _holdSpeed * Time.unscaledDeltaTime);
-            if (_reset.WasPressedThisFrame())
+            if (_reset.WasPressedThisFrame() && !ItemKeyHeld())
             {
                 ResetZoom();
             }
@@ -144,6 +160,19 @@ namespace Airerage.Runtime.Presentation
         }
 
         /// <summary>目標の距離を初期の距離に戻す。</summary>
+        // アイテムの枠のキーを押しているか（押しながらのホイールの押し込みは、アイテムを捨てる操作。docs/20_item_plan.md）。
+        private bool ItemKeyHeld()
+        {
+            foreach (InputAction key in _itemKeys)
+            {
+                if (key.IsPressed())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public void ResetZoom()
         {
             TargetDistance = DefaultDistance;

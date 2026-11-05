@@ -45,6 +45,9 @@ namespace Airerage.Core.Combat
 
         /// <summary>倍率: 急所の判定（JUGGERNAUT の地上技の砲塔の先。AttackHit.FatalScale）。</summary>
         SweetSpot = 1 << 9,
+
+        /// <summary>上乗せ（威力）: 持っているアイテム（ダイアモンドアレイ。直接攻撃の技とアイテム。docs/20_item_plan.md）。</summary>
+        Item = 1 << 10,
     }
 
     /// <summary>
@@ -174,6 +177,13 @@ namespace Airerage.Core.Combat
                 // 走る速さに比例して強くなる（強化の倍率をかけた速さ。STORM RUNNER。C-11）。
                 damageBonus += config.Skills.Run.BonusPercentAt(attacker.Action.RunSpeed * SpeedBoosts.ScaleOf(attacker, config));
                 sources |= PowerSource.RunSpeed;
+            }
+            if (combat.SkillDamageBonusPercent != 0 && (attacker.Action.Attack == AttackSlot.Special1
+                || attacker.Action.Attack == AttackSlot.Special2 || attacker.Action.Attack == AttackSlot.Super))
+            {
+                // 直接攻撃の技の威力（アイテムのダイアモンドアレイ。ItemRules.ConfigFor が調整値に入れる）。
+                damageBonus += combat.SkillDamageBonusPercent;
+                sources |= PowerSource.Item;
             }
             int level = attack.ChargeLevelOf(attacker.Action.Charge);
             if (level >= 0)

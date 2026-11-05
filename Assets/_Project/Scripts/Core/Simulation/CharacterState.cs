@@ -59,6 +59,9 @@ namespace Airerage.Core.Simulation
         /// <summary>コイン（所持と確定。docs/12 T4-3）。増減は CoinLedger だけが行う。</summary>
         public CoinPurse Coins;
 
+        /// <summary>アイテムバッグと、使っているアクティブアイテム（docs/20_item_plan.md）。</summary>
+        public Items.ItemBag Items;
+
         public static CharacterState Spawn(Vector3 position, int facing)
         {
             return new CharacterState
@@ -88,7 +91,8 @@ namespace Airerage.Core.Simulation
                 && WallJumpCount == other.WallJumpCount
                 && JumpSquatTicksLeft == other.JumpSquatTicksLeft
                 && GroundedTicks == other.GroundedTicks
-                && Coins.Equals(other.Coins);
+                && Coins.Equals(other.Coins)
+                && Items.Equals(other.Items);
         }
 
         public override bool Equals(object obj)
@@ -118,6 +122,7 @@ namespace Airerage.Core.Simulation
             hash.Add(JumpSquatTicksLeft);
             hash.Add(GroundedTicks);
             hash.Add(Coins);
+            hash.Add(Items);
             return hash.ToHashCode();
         }
 

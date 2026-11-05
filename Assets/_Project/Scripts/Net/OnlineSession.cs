@@ -109,6 +109,15 @@ namespace Airerage.Net
         // クライアント: ホストから届いた、チーム対戦か。
         private bool _clientTeamMode;
 
+        // ホスト: アイテムのルール（待機所でホストが決める）と、プレイヤーの番号 → プリアイテムで持って始めるアイテム（NetKind.Items）・
+        // アイテムを選ぶ画面を開いているか。クライアント: ホストから届いたアイテムのルール。自分の値（docs/20_item_plan.md）。
+        private LobbyItems _items = LobbyItems.Default;
+        private LobbyItems _clientItems = LobbyItems.Default;
+        private readonly Airerage.Core.Items.ItemId[][] _lobbyStartItems = new Airerage.Core.Items.ItemId[MaxPlayers][];
+        private readonly bool[] _lobbyItemSelecting = new bool[MaxPlayers];
+        private Airerage.Core.Items.ItemId[] _localStartItems = new Airerage.Core.Items.ItemId[0];
+        private bool _localItemSelecting;
+
         // ホスト: プレイヤーの番号 → 観戦の待機所にいるか（試合に参加せず見るだけ。docs/19。ホスト自身も観戦にできる。2026-11-03）。
         private readonly bool[] _lobbySpectators = new bool[MaxPlayers];
 
@@ -396,6 +405,93 @@ namespace Airerage.Net
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// アイテムのルール（モード・初期アイテム数・ドロップ頻度・ドロップするアイテム。docs/20_item_plan.md）。待機所でホストが決める
+        /// （クライアントはホストから最後に届いた値）。変えたら全員へ送る。
+        /// </summary>
+        public LobbyItems Items
+        {
+            get => IsHost ? _items : _clientItems;
+            set
+            {
+                if (!IsHost)
+                {
+                    throw new InvalidOperationException("アイテムのルールを決められるのはホストだけです");
+                }
+                if (value.Equals(_items))
+                {
+                    return;
+                }
+                _items = value;
+                if (State == SessionState.Lobby)
+                {
+                    BroadcastLobby();
+                }
+            }
+        }
+
+        /// <summary>自分がプリアイテムで持って始めるアイテム（最大 3 つ。Z・X・C の順）。変えたらホストへ送る。</summary>
+        public IReadOnlyList<Airerage.Core.Items.ItemId> LocalStartItems
+        {
+            get => _localStartItems;
+            set
+            {
+                _localStartItems = CleanItems(value);
+                SendLocalItems();
+            }
+        }
+
+        /// <summary>自分がアイテムを選ぶ画面を開いているか（待機所の「アイテム選択中……」）。変えたらホストへ送る。</summary>
+        public bool LocalItemSelecting
+        {
+            get => _localItemSelecting;
+            set
+            {
+                if (value == _localItemSelecting)
+                {
+                    return;
+                }
+                _localItemSelecting = value;
+                SendLocalItems();
+            }
+        }
+
+        // 自分のアイテムの選び方を、ホストへ送る（ホストは全員へ待機所の様子を送り直す）。
+        private void SendLocalItems()
+        {
+            if (IsHost)
+            {
+                if (State == SessionState.Lobby)
+                {
+                    BroadcastLobby();
+                }
+            }
+            else if (LocalPlayer >= 0)
+            {
+                _link.Send(0, NetMessages.Items(_localItemSelecting, _localStartItems), reliable: true);
+            }
+        }
+
+        // アイテムの並びの、ないアイテムと重なりを除いて 3 つまでにする。
+        private static Airerage.Core.Items.ItemId[] CleanItems(IReadOnlyList<Airerage.Core.Items.ItemId> items)
+        {
+            var clean = new List<Airerage.Core.Items.ItemId>();
+            for (int i = 0; items != null && i < items.Count && clean.Count < Airerage.Core.Items.ItemCatalog.BagSlots; i++)
+            {
+                if (Airerage.Core.Items.ItemCatalog.IsValid(items[i]) && !clean.Contains(items[i]))
+                {
+                    clean.Add(items[i]);
+                }
+            }
+            return clean.ToArray();
+        }
+
+        // プレイヤー p がプリアイテムで持って始めるアイテム（ホスト）。
+        private Airerage.Core.Items.ItemId[] StartItemsOf(int p)
+        {
+            return p == _hostSlot ? _localStartItems : _lobbyStartItems[p] ?? new Airerage.Core.Items.ItemId[0];
         }
 
         /// <summary>
@@ -796,7 +892,7 @@ namespace Airerage.Net
                     string name = p == _hostSlot ? _localName : connected ? _lobbyNames[p] : string.Empty;
                     slots[p] = new LobbySlot(connected, name, connected ? _lobbyCharacters[p] : 0,
                         connected && _lobbyReady[p], connected && _teamMode && !spectator ? _lobbyTeams[p] : (byte)0, spectator,
-                        connected && _lobbyLate[p]);
+                        connected && _lobbyLate[p], connected && (p == _hostSlot ? _localItemSelecting : _lobbyItemSelecting[p]));
                 }
                 return slots;
             }
@@ -1136,6 +1232,8 @@ namespace Airerage.Net
             var spectators = (bool[])_lobbySpectators.Clone();
             var late = (bool[])_lobbyLate.Clone();
             var announced = (bool[])_lateAnnounced.Clone();
+            var startItems = (Airerage.Core.Items.ItemId[][])_lobbyStartItems.Clone();
+            var selecting = (bool[])_lobbyItemSelecting.Clone();
             int hostFrom = _hostSlot;
             for (int next = 0; next < MaxPlayers; next++)
             {
@@ -1150,6 +1248,8 @@ namespace Airerage.Net
                 _lobbySpectators[next] = filled && spectators[from];
                 _lobbyLate[next] = filled && late[from];
                 _lateAnnounced[next] = filled && announced[from];
+                _lobbyStartItems[next] = filled ? startItems[from] : null;
+                _lobbyItemSelecting[next] = filled && selecting[from];
                 if (filled && from == hostFrom)
                 {
                     _hostSlot = next;
@@ -1199,7 +1299,7 @@ namespace Airerage.Net
             {
                 return;
             }
-            byte[] message = NetMessages.Lobby(Roster, _phase, _stageCursor, _teamMode, _hostSlot, matchRunning);
+            byte[] message = NetMessages.Lobby(Roster, _phase, _stageCursor, _teamMode, _hostSlot, matchRunning, _items);
             for (int p = 0; p < MaxPlayers; p++)
             {
                 if (_playerPeer[p] >= 0 && (!matchRunning || _lobbyLate[p]))
@@ -1248,7 +1348,7 @@ namespace Airerage.Net
             }
             // 待っていた人へ、待つ印を外した待機所の様子を、開始のメッセージより先に送る（試合中の人へはロビーのメッセージを送らない。
             // 受けると試合を抜けるので）。
-            byte[] lobby = NetMessages.Lobby(Roster, _phase, _stageCursor, _teamMode, _hostSlot, matchRunning: false);
+            byte[] lobby = NetMessages.Lobby(Roster, _phase, _stageCursor, _teamMode, _hostSlot, matchRunning: false, items: _items);
             foreach (int peer in joining)
             {
                 _link.Send(peer, lobby, reliable: true);
@@ -1258,7 +1358,9 @@ namespace Airerage.Net
 
         private void SendStartAndBegin(int count, MatchRules rules, int stage)
         {
-            rules = rules ?? MatchRules.FreePlay();
+            rules = (rules ?? MatchRules.FreePlay()).Clone();
+            // アイテムのルールは待機所でホストが決めたもの（docs/20_item_plan.md）。
+            _items.ApplyTo(rules);
             rules.Validate().ThrowIfInvalid();
             int match = (MatchNumber + 1) & 0xFF;
             // ホストも送ったものと同じ JSON から作った値を使う（全員が同じ値になり、試合中にアセットを編集しても影響しない）。
@@ -1293,9 +1395,19 @@ namespace Airerage.Net
             {
                 teams[p] = _teamMode ? _lobbyTeams[p] : 0;
             }
+            // プリアイテムで持って始めるアイテム（人ごとに 3 つ。なしは 0）。
+            var items = new int[count * Airerage.Core.Items.ItemCatalog.BagSlots];
+            for (int p = 0; p < count; p++)
+            {
+                Airerage.Core.Items.ItemId[] own = StartItemsOf(p);
+                for (int i = 0; i < own.Length && i < Airerage.Core.Items.ItemCatalog.BagSlots; i++)
+                {
+                    items[p * Airerage.Core.Items.ItemCatalog.BagSlots + i] = (int)own[i];
+                }
+            }
             string json = JsonUtility.ToJson(new StartSettings
             {
-                Characters = configs, Picks = picks, CharacterIds = ids, Match = rules, Names = names, Stage = stage, Teams = teams,
+                Characters = configs, Picks = picks, CharacterIds = ids, Match = rules, Names = names, Stage = stage, Teams = teams, Items = items,
             });
             byte[] start = NetMessages.Start(count, match, json);
             for (int p = 0; p < MaxPlayers; p++)
@@ -1760,6 +1872,8 @@ namespace Airerage.Net
             for (int p = 0; p < playerCount; p++)
             {
                 World.SetTeam(p, PlayerTeams[p]);
+                // プリアイテム: 開始の設定のアイテムを持って始める（全員が同じ値を入れる。docs/20_item_plan.md）。
+                World.SetItems(p, ItemsOf(settings, p));
             }
             _confirmedLog.Clear();
             _confirmedLogStart = World.Tick;
@@ -1888,6 +2002,8 @@ namespace Airerage.Net
                     _spectatorNext[player] = -1;
                     _lobbyLate[player] = late;
                     _lateAnnounced[player] = false;
+                    _lobbyStartItems[player] = null;
+                    _lobbyItemSelecting[player] = false;
                     // 途中から入った人は、観戦の列に入れる（2026-11-03 のユーザーの要望。待機所に戻ってから、見出しを選んで参加する）。
                     _lobbySpectators[player] = late;
                     if (_teamMode && !late)
@@ -1910,6 +2026,8 @@ namespace Airerage.Net
                             _lobbyStagePools[p] = ulong.MaxValue;
                             _lobbyReady[p] = false;
                             _lobbyTeams[p] = 0;
+                            _lobbyStartItems[p] = null;
+                            _lobbyItemSelecting[p] = false;
                             bool wasSpectator = _lobbySpectators[p] || _lobbyLate[p];
                             _lobbySpectators[p] = false;
                             _lobbyLate[p] = false;
@@ -2008,6 +2126,19 @@ namespace Airerage.Net
                     }
                     break;
 
+                case NetKind.Items:
+                    int chooser = PlayerOfPeer(e.Peer);
+                    if (chooser >= 0)
+                    {
+                        _lobbyStartItems[chooser] = CleanItems(NetMessages.ReadItems(e.Data, out bool choosing));
+                        _lobbyItemSelecting[chooser] = choosing;
+                        if (State == SessionState.Lobby)
+                        {
+                            BroadcastLobby();
+                        }
+                    }
+                    break;
+
                 case NetKind.Pick:
                     int picker = PlayerOfPeer(e.Peer);
                     if (picker >= 0)
@@ -2097,19 +2228,24 @@ namespace Airerage.Net
                             {
                                 _link.Send(0, NetMessages.StagePool(_localStagePool), reliable: true);
                             }
+                            if (_localStartItems.Length > 0 || _localItemSelecting)
+                            {
+                                _link.Send(0, NetMessages.Items(_localItemSelecting, _localStartItems), reliable: true);
+                            }
                             Status = Loc.T($"Joined as player {LocalPlayer + 1}. Waiting for the host to start",
                                 $"プレイヤー {LocalPlayer + 1} として参加しました。ホストの開始を待っています");
                             break;
                         case NetKind.Lobby:
                             LobbySlot[] roster = NetMessages.ReadLobby(e.Data, out LobbyPhase phase, out int stage, out bool teamMode, out int hostSlot,
-                                out bool matchRunning);
+                                out bool matchRunning, out LobbyItems lobbyItems);
+                            _clientItems = lobbyItems;
                             _clientHostSlot = hostSlot;
                             _clientMatchRunning = matchRunning;
                             _clientRoster = EmptyRoster();
                             for (int p = 0; p < MaxPlayers && p < roster.Length; p++)
                             {
                                 _clientRoster[p] = new LobbySlot(roster[p].Connected, SanitizeName(roster[p].Name), roster[p].Character,
-                                    roster[p].Ready, roster[p].Team, roster[p].Spectator, roster[p].Late);
+                                    roster[p].Ready, roster[p].Team, roster[p].Spectator, roster[p].Late, roster[p].ItemSelecting);
                             }
                             _clientTeamMode = teamMode;
                             _clientPhase = phase;
@@ -2317,8 +2453,12 @@ namespace Airerage.Net
                 }
             }
             settings.Match.Validate().ThrowIfInvalid();
-            // チームの番号も、受け取ったときに確かめる（試合を始めるときに失敗しないように）。
+            // チームの番号とアイテムも、受け取ったときに確かめる（試合を始めるときに失敗しないように）。
             TeamsOf(settings, playerCount);
+            for (int p = 0; p < playerCount; p++)
+            {
+                ItemsOf(settings, p);
+            }
             return settings;
         }
 
@@ -2345,6 +2485,30 @@ namespace Airerage.Net
 
             /// <summary>プレイヤーごとのチームの番号（1〜4。個人戦なら 0 か、なし）。</summary>
             public int[] Teams;
+
+            /// <summary>プレイヤーごとの、プリアイテムで持って始めるアイテム（人ごとに 3 つ。ItemId。なしは 0。なければアイテムなし）。</summary>
+            public int[] Items;
+        }
+
+        // 開始の設定の、プレイヤー p のアイテム（範囲の外なら FormatException。違うビルドどうしなど）。
+        private static Airerage.Core.Items.ItemId[] ItemsOf(StartSettings settings, int p)
+        {
+            var items = new List<Airerage.Core.Items.ItemId>();
+            int slots = Airerage.Core.Items.ItemCatalog.BagSlots;
+            for (int i = 0; settings.Items != null && i < slots && p * slots + i < settings.Items.Length; i++)
+            {
+                int value = settings.Items[p * slots + i];
+                if (value == 0)
+                {
+                    continue;
+                }
+                if (!Airerage.Core.Items.ItemCatalog.IsValid((Airerage.Core.Items.ItemId)value))
+                {
+                    throw new FormatException($"開始の設定のアイテムが不正です（プレイヤー {p + 1}: {value}）");
+                }
+                items.Add((Airerage.Core.Items.ItemId)value);
+            }
+            return items.ToArray();
         }
 
         // 開始の設定のチームの番号（なければ、すべて 0。範囲の外なら FormatException。違うビルドどうしなど）。

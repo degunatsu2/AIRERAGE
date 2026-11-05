@@ -289,6 +289,14 @@ namespace Airerage.Net
                 _session.LocalCharacter = Mathf.Clamp(character, 0, _roster.Count - 1);
                 // RANDOM で選んでよいステージ（オプションの RANDOM STAGES。ホストは全員の共通のステージから選ぶ）。
                 _session.LocalStagePool = RandomStagePool.Mask(_flow != null && _flow.Stages != null ? _flow.Stages.Stages : null);
+                // アイテム（docs/20_item_plan.md）: 自分の初期アイテムと、ホストならドロップするアイテム・初期アイテム数・ドロップ頻度の
+                // 初めの値は、オプションの ITEMS の設定（モードは DEFAULT から。待機所でホストが選ぶ）。
+                ItemSettings items = ItemSettings.Load();
+                _session.LocalStartItems = items.StartItemsUpTo(Airerage.Core.Items.ItemCatalog.BagSlots);
+                if (_session.IsHost)
+                {
+                    _session.Items = new LobbyItems(Airerage.Core.Items.ItemMode.Default, items.StartCount, items.DropRate, items.DropPool);
+                }
                 Message = string.Empty;
                 return true;
             }

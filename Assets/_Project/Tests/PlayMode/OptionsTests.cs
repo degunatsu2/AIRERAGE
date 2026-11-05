@@ -29,6 +29,7 @@ namespace Airerage.PlayMode.Tests
         public void SetUp()
         {
             GameSettings.DeleteSaved();
+            ItemSettings.DeleteSaved();
             _savedBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
             _savedBackground = InputSystem.settings.backgroundBehavior;
             InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
@@ -39,6 +40,7 @@ namespace Airerage.PlayMode.Tests
         public void TearDown()
         {
             GameSettings.DeleteSaved();
+            ItemSettings.DeleteSaved();
             AudioListener.volume = 1f;
             InputSystem.settings.editorInputBehaviorInPlayMode = _savedBehavior;
             InputSystem.settings.backgroundBehavior = _savedBackground;
@@ -96,6 +98,56 @@ namespace Airerage.PlayMode.Tests
             var audio = UnityEngine.Object.FindFirstObjectByType<GameAudio>();
             Assert.That(audio.SeScale, Is.EqualTo(1f));
             Assert.That(audio.BgmVolume, Is.EqualTo(0.3f * 0.5f).Within(1e-3f), "試合の BGM に音量が効かない");
+        }
+
+        // アイテムのモード（docs/20_item_plan.md）: ITEMS のページで値が変わって保存され、START ITEMS で選んだアイテムの左に Z・X・C、
+        // 上限まで、もう一度で外れ、カーソルで効果のポップアップ。DROP ITEMS でチェックを外せ、最後の 1 つは外せない。閉じると ITEMS へ戻る。
+        [UnityTest]
+        public IEnumerator Items_ModeAndStartItemsAndDropPool_AreSaved()
+        {
+            MenuScreens menu = null;
+            yield return OpenOptions(m => menu = m);
+            OptionsScreen options = menu.OptionsScreen;
+            Move(options.Page.gameObject, MoveDirection.Left);
+            Assert.That(options.CurrentPage, Is.EqualTo(OptionsScreen.PageKind.Items), "左で ITEMS のページにならない");
+            Move(options.ItemRowOption(OptionsScreen.ItemRow.Mode).gameObject, MoveDirection.Right);
+            Move(options.ItemRowOption(OptionsScreen.ItemRow.Mode).gameObject, MoveDirection.Right);
+            Move(options.ItemRowOption(OptionsScreen.ItemRow.StartCount).gameObject, MoveDirection.Left);
+            Assert.That(ItemSettings.Load().Mode, Is.EqualTo(Airerage.Core.Items.ItemMode.PreItem), "モードが保存されない");
+            Assert.That(ItemSettings.Load().StartCount, Is.EqualTo(2), "初期アイテム数が保存されない");
+
+            options.StartItems.Button.onClick.Invoke();
+            yield return null;
+            yield return null;
+            ItemSelectScreen items = menu.ItemSelect;
+            Assert.That(menu.ShowingItemSelect, Is.True, "START ITEMS で選ぶ画面が出ない");
+            Assert.That(items.PopupName, Is.Not.Empty, "カーソルのアイテムの効果が出ない");
+            items.Option(10).Button.onClick.Invoke();
+            items.Option(0).Button.onClick.Invoke();
+            items.Option(14).Button.onClick.Invoke();
+            Assert.That(items.Picks.Count, Is.EqualTo(2), "上限（2）を超えて選べる");
+            Assert.That(items.KeyShown(10), Is.EqualTo("Z"));
+            Assert.That(items.KeyShown(0), Is.EqualTo("X"));
+            Assert.That(items.KeyShown(14), Is.Empty);
+            items.Option(10).Button.onClick.Invoke();
+            Assert.That(items.KeyShown(0), Is.EqualTo("Z"), "外したら後ろのアイテムが詰まらない");
+            Assert.That(ItemSettings.Load().StartItems[0], Is.EqualTo(Airerage.Core.Items.ItemId.QuickBooster), "選んだアイテムが保存されない");
+            items.Done.Button.onClick.Invoke();
+            yield return null;
+            Assert.That(menu.ShowingOptions, Is.True, "閉じてもオプションへ戻らない");
+            Assert.That(options.CurrentPage, Is.EqualTo(OptionsScreen.PageKind.Items));
+
+            options.DropItems.Button.onClick.Invoke();
+            yield return null;
+            yield return null;
+            Assert.That(items.CheckShown(3), Is.True, "初めはすべてにチェックが付いていない");
+            items.Option(3).Button.onClick.Invoke();
+            Assert.That(items.CheckShown(3), Is.False);
+            Assert.That(ItemSettings.Load().DropPool & Airerage.Core.Items.ItemCatalog.Bit(Airerage.Core.Items.ItemId.QuickBoosterEx), Is.EqualTo(0u),
+                "外したアイテムが保存されない");
+            items.Close();
+            yield return null;
+            Assert.That(menu.ShowingOptions, Is.True);
         }
 
         [UnityTest]

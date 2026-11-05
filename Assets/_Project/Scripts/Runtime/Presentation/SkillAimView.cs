@@ -99,6 +99,21 @@ namespace Airerage.Runtime.Presentation
                         var origin = new Vector3(state.Position.X, state.Position.Y + offsetY, 0f);
                         Draw(arrow, origin, new Vector3(aim.X, aim.Y, 0f), ArrowLength(holding, config), _camera);
                     }
+                    else if (!state.Combat.IsWaitingToRespawn)
+                    {
+                        // 照準の方向に出すアクティブアイテムのキーを押して狙っている間も、同じ矢印（docs/20_item_plan.md）。
+                        int slot = Airerage.Core.Items.ItemRules.ArmedSlot(state.Items);
+                        Airerage.Core.Items.ItemId item = slot >= 0 ? state.Items.Get(slot) : Airerage.Core.Items.ItemId.None;
+                        if (Airerage.Core.Items.ItemRules.IsAimed(item))
+                        {
+                            shown = true;
+                            System.Numerics.Vector2 aim = state.Items.ActAim.LengthSquared() > 0.01f
+                                ? System.Numerics.Vector2.Normalize(state.Items.ActAim)
+                                : new System.Numerics.Vector2(state.Facing < 0 ? -1f : 1f, 0f);
+                            Draw(arrow, new Vector3(state.Position.X, state.Position.Y, 0f), new Vector3(aim.X, aim.Y, 0f), ItemArrowLength(item),
+                                _camera);
+                        }
+                    }
                 }
                 SetShown(arrow, shown);
             }
@@ -136,6 +151,27 @@ namespace Airerage.Runtime.Presentation
                     {
                         reach = MaxLength;
                     }
+                    break;
+            }
+            return Mathf.Clamp(reach, MinLength, MaxLength);
+        }
+
+        // アイテムの矢印の長さ（m）: エネルギーショットは届く距離、櫓落としは突進の距離、砂岩ボールは出す距離の少し先。
+        private static readonly Airerage.Core.Items.ItemTuning ItemValues = new Airerage.Core.Items.ItemTuning();
+
+        private static float ItemArrowLength(Airerage.Core.Items.ItemId item)
+        {
+            float reach;
+            switch (item)
+            {
+                case Airerage.Core.Items.ItemId.EnergyShot:
+                    reach = ItemValues.ShotRange;
+                    break;
+                case Airerage.Core.Items.ItemId.Yaguraotoshi:
+                    reach = ItemValues.SwordDashDistance;
+                    break;
+                default:
+                    reach = ItemValues.BallSpawnDistance + 2f;
                     break;
             }
             return Mathf.Clamp(reach, MinLength, MaxLength);

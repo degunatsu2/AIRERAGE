@@ -74,6 +74,7 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _headerBank;
         private ISimulationFeed _feed;
         private PlayerStatusPlate _plate;
+        private int _plateWidth;
         private int[] _order = new int[0];
         private bool[] _waiting = new bool[0];
         private float[] _fellAt = new float[0];
@@ -403,7 +404,7 @@ namespace Airerage.Runtime.Presentation
         }
 
         // チームの見出し: チームの色の帯に、左にチームの名前、右にチームの BANK の合計（黄色）。
-        private void DrawTeamHeaders(float x)
+        private void DrawTeamHeaders(float x, float width)
         {
             if (_headerName == null)
             {
@@ -428,7 +429,7 @@ namespace Airerage.Runtime.Presentation
                 {
                     continue;
                 }
-                var rect = new Rect(x, _headerY[team], _width, _teamHeaderHeight);
+                var rect = new Rect(x, _headerY[team], width, _teamHeaderHeight);
                 HudFade.Begin(_occlusion.AlphaFor(this, 100 + team, rect));
                 Color color = TeamColors.Of(team);
                 GUI.color = HudFade.Apply(new Color(color.r * 0.55f, color.g * 0.55f, color.b * 0.55f, 0.85f));
@@ -451,23 +452,27 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
-            if (_plate == null)
+            // アイテムのモードでは、札をアイテムバッグの分だけ広げる（docs/20_item_plan.md）。
+            bool bag = _feed.Rules != null && _feed.Rules.ItemMode != Airerage.Core.Items.ItemMode.Default;
+            int width = bag ? _width + Mathf.CeilToInt(PlayerStatusPlate.BagWidth(_rowHeight)) : _width;
+            if (_plate == null || _plateWidth != width)
             {
-                _plate = new PlayerStatusPlate(_width, _rowHeight);
+                _plate = new PlayerStatusPlate(width, _rowHeight);
+                _plateWidth = width;
             }
-            float x = Screen.width - _margin.x - _width;
+            float x = Screen.width - _margin.x - width;
             if (_headers.Count > 0)
             {
-                DrawTeamHeaders(x);
+                DrawTeamHeaders(x, width);
             }
             foreach (int index in _order)
             {
-                var rect = new Rect(x, _rowY[index], _width, _rowHeight);
+                var rect = new Rect(x, _rowY[index], width, _rowHeight);
                 // キャラクターと重なったら透かす（王冠の分を含めて調べる。HudOcclusion）。
                 var area = new Rect(rect.x - _plate.CrownWidth, rect.y, rect.width + _plate.CrownWidth, rect.height);
                 HudFade.Begin(_occlusion.AlphaFor(this, index, area));
                 _plate.Draw(rect, index + 1, _feed.LabelOf(index), _feed.ColorOf(index), _feed.GetState(index),
-                    IsLeader(_feed, index), CurrentLook(index), _bankColor, LogoOf(_feed, index));
+                    IsLeader(_feed, index), CurrentLook(index), _bankColor, LogoOf(_feed, index), bag);
                 HudFade.End();
             }
         }

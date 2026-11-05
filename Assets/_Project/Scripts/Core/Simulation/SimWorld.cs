@@ -4,6 +4,7 @@ using System.Numerics;
 using Airerage.Core.Economy;
 using Airerage.Core.Combat;
 using Airerage.Core.Input;
+using Airerage.Core.Items;
 using Airerage.Core.Match;
 using Airerage.Core.Objects;
 using Airerage.Core.Physics;
@@ -42,6 +43,8 @@ namespace Airerage.Core.Simulation
         // このティックに押したボタン（THIEF のもう一度の E・R）。
         private readonly List<InputButtons> _pressed = new List<InputButtons>();
         private readonly ThiefContext _thief;
+        // パッシブアイテムで値を変えた調整値（もとの調整値と持っているパッシブの組ごとに 1 つ。ItemRules.ConfigFor）。
+        private readonly Dictionary<(CharacterConfig, int), CharacterConfig> _itemConfigs = new Dictionary<(CharacterConfig, int), CharacterConfig>();
         private MatchState _match = MatchState.None;
 
         /// <param name="bounds">ステージの範囲。外に出たキャラクターは撃破になる（T3-3）。null なら撃破はない。</param>
@@ -100,6 +103,27 @@ namespace Airerage.Core.Simulation
             _simulator = new CharacterSimulator(_collision, _zoneList);
             Bounds = bounds;
             _thief = new ThiefContext(sorted, _traps, Rules, BankSpots, _clones, _cloneMinds);
+            ItemTuning.Validate().ThrowIfInvalid();
+            _hits.Items = ItemTuning;
+        }
+
+        /// <summary>アイテムの値（全員で同じ。docs/20_item_plan.md）。</summary>
+        public ItemTuning ItemTuning { get; } = new ItemTuning();
+
+        /// <summary>
+        /// キャラクター index に、持って始めるアイテムを入れる（プリアイテム。試合を始める前に呼ぶ）。items の前から、使えるアイテムを
+        /// Rules.StartItemCount 個まで Z・X・C の枠の順に入れる（プリアイテムのモードでなければ何もしない）。
+        /// </summary>
+        public void SetItems(int index, IReadOnlyList<ItemId> items)
+        {
+            if (Rules.ItemMode != ItemMode.PreItem)
+            {
+                return;
+            }
+            CharacterState state = _states[index];
+            state.Items = ItemRules.StartingBag(items, Rules.StartItemCount);
+            _states[index] = state;
+            RefreshConfig(index);
         }
 
         /// <summary>ワールドに置かれた物と投射物（docs/13 T5-6）。状態の一部（巻き戻しとチェックサムに乗る）。表示用に読むだけにする。</summary>
@@ -293,7 +317,27 @@ namespace Airerage.Core.Simulation
 
         private void RefreshConfig(int index)
         {
-            _tickConfigs[index] = ThiefRules.ConfigFor(_states[index], _configs[index], _configs);
+            CharacterConfig config = ThiefRules.ConfigFor(_states[index], _configs[index], _configs);
+            ItemBag bag = _states[index].Items;
+            int key = ItemRules.PassiveKey(bag);
+            if (key != 0)
+            {
+                // 持っているパッシブアイテムで値を変える（もとの調整値のままなら、同じ写しを使い回す）。
+                if (ReferenceEquals(config, _configs[index]))
+                {
+                    if (!_itemConfigs.TryGetValue((config, key), out CharacterConfig cached))
+                    {
+                        cached = ItemRules.ConfigFor(bag, config, ItemTuning);
+                        _itemConfigs[(config, key)] = cached;
+                    }
+                    config = cached;
+                }
+                else
+                {
+                    config = ItemRules.ConfigFor(bag, config, ItemTuning);
+                }
+            }
+            _tickConfigs[index] = config;
         }
 
         /// <summary>
@@ -354,8 +398,14 @@ namespace Airerage.Core.Simulation
                 }
                 // このティックに押したボタン（止まっている間は、押したことにしない）。
                 _pressed[i] = state.Combat.HitstopTicksLeft > 0 ? InputButtons.None : input.Buttons & ~state.PreviousButtons;
+                // アイテムのキー（拾う・捨てる・使う）と、使っているアイテムの間の動き（docs/20_item_plan.md）。
+                input = ItemRules.BeforeMove(ref state, input, i, _tickConfigs[i], ItemTuning, _objects, _collision, Tick + 1,
+                    phase != MatchPhase.Countdown);
+                Vector3 held = state.Position;
+                Vector3 flight = state.Velocity;
                 // 行動の速さの強化の間は、速さを上げた調整値で動かす（SpeedBoosts）。
                 _simulator.Step(ref state, input, SpeedBoosts.EffectiveConfig(state, _tickConfigs[i]), Tick, Rules.Seed);
+                ItemRules.AfterMove(ref state, held, flight, ItemTuning);
                 _states[i] = state;
             }
             // THIEF の分身（移動とワイヤーだけ）。
@@ -370,6 +420,9 @@ namespace Airerage.Core.Simulation
             SkillRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits);
             ThiefRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits, _thief, _stage);
             JuggernautRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits, _platforms, _stage, _pressed);
+            // アイテム（使っているアイテムの攻撃と風、落ちているアイテム・エネルギーショット・砂岩ボール、アイテムドロップ）。
+            ItemRules.StepWorld(_states, _tickConfigs, ItemTuning, _objects, _collision, Bounds, Rules, CoinSpawns, Tick,
+                phase == MatchPhase.Playing || phase == MatchPhase.Overtime, _projectileHits);
             _hits.Resolve(_states, _tickConfigs, Tick, _objects, Rules.Seed, _projectileHits);
             ThiefRules.PopClones(_clones, _states, _tickConfigs, _objects, Tick);
             SkillRules.EndObjects(_objects, Coins, _states, _tickConfigs, Rules, Tick, BankSpots,

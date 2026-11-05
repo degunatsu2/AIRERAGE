@@ -13,7 +13,7 @@ namespace Airerage.Runtime.Input
     /// Input System を読み、ティックごとの PlayerInput を作る（docs/03_architecture.md 4.5）。
     /// Input System を直接読むのはここだけで、シミュレーションは PlayerInput だけを見る。
     /// アクションは AirerageControls.inputactions の "Player" マップ（Move / Jump / Wire / Attack / Guard / Special1 / Special2 / Super /
-    /// Reset / Point / Aim）。特殊攻撃 2 つと必殺技は Q・E・R（D-53）。検証用の位置のリセットは Backspace。
+    /// Item1〜3 / ItemDrop / Reset / Point / Aim）。アイテムの枠は Z・X・C、捨てるのはホイールの押し込み（docs/20_item_plan.md）。特殊攻撃 2 つと必殺技は Q・E・R（D-53）。検証用の位置のリセットは Backspace。
     ///
     /// 照準（D-08）: 最後に使った機器がキーボードかマウスなら、マウスポインターの方向に照準する（PlayerInput の照準の方向）。
     /// ゲームパッドなら、右スティックを倒しているときはその方向に照準する。倒していなければ照準の方向を指定せず、
@@ -39,6 +39,9 @@ namespace Airerage.Runtime.Input
         private readonly InputAction _special1;
         private readonly InputAction _special2;
         private readonly InputAction _super;
+        // アイテムの枠のキー（Z・X・C）と捨てるキー（ホイールの押し込み。docs/20_item_plan.md）。
+        private readonly InputAction[] _items;
+        private readonly InputAction _itemDrop;
         private readonly InputAction _reset;
         private readonly InputAction _point;
         private readonly InputAction _aim;
@@ -76,10 +79,16 @@ namespace Airerage.Runtime.Input
             _special1 = _map.FindAction("Special1", throwIfNotFound: true);
             _special2 = _map.FindAction("Special2", throwIfNotFound: true);
             _super = _map.FindAction("Super", throwIfNotFound: true);
+            _items = new[]
+            {
+                _map.FindAction("Item1", throwIfNotFound: true), _map.FindAction("Item2", throwIfNotFound: true),
+                _map.FindAction("Item3", throwIfNotFound: true),
+            };
+            _itemDrop = _map.FindAction("ItemDrop", throwIfNotFound: true);
             _reset = _map.FindAction("Reset", throwIfNotFound: true);
             _point = _map.FindAction("Point", throwIfNotFound: true);
             _aim = _map.FindAction("Aim", throwIfNotFound: true);
-            _deviceActions = new[] { _move, _jump, _wire, _attack, _guard, _special1, _special2, _super, _reset, _aim };
+            _deviceActions = new[] { _move, _jump, _wire, _attack, _guard, _special1, _special2, _super, _reset, _aim, _items[0], _items[1], _items[2], _itemDrop };
             UsingPointer = HasMouse(actions);
         }
 
@@ -171,6 +180,17 @@ namespace Airerage.Runtime.Input
             if (_super.WasPressedThisFrame())
             {
                 _pressedSinceLastTick |= InputButtons.Super;
+            }
+            for (int i = 0; i < _items.Length; i++)
+            {
+                if (_items[i].WasPressedThisFrame())
+                {
+                    _pressedSinceLastTick |= Airerage.Core.Items.ItemRules.SlotButton(i);
+                }
+            }
+            if (_itemDrop.WasPressedThisFrame())
+            {
+                _pressedSinceLastTick |= InputButtons.ItemDrop;
             }
             ResetRequested = _reset.WasPressedThisFrame();
             // 離したボタンは、もう無視しない。
@@ -297,6 +317,17 @@ namespace Airerage.Runtime.Input
             if (_super.IsPressed())
             {
                 buttons |= InputButtons.Super;
+            }
+            for (int i = 0; i < _items.Length; i++)
+            {
+                if (_items[i].IsPressed())
+                {
+                    buttons |= Airerage.Core.Items.ItemRules.SlotButton(i);
+                }
+            }
+            if (_itemDrop.IsPressed())
+            {
+                buttons |= InputButtons.ItemDrop;
             }
             return buttons;
         }

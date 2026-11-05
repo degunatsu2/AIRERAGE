@@ -264,7 +264,17 @@ namespace Airerage.Runtime.Simulation
             }
 
             _terrain = terrain;
-            _world = new SimWorld(terrain, bounds, zones, null, coinSpawns, bankSpots, platforms, traps);
+            // トレーニング（メニューから。前に選んだキャラクターを使うとき）は、オプションの ITEMS のアイテムのモードで遊ぶ
+            // （docs/20_item_plan.md）。検証用のシーンは今までどおりアイテムなし。
+            MatchRules rules = null;
+            Airerage.Runtime.Settings.ItemSettings items = null;
+            if (_rememberCharacter)
+            {
+                rules = MatchRules.FreePlay();
+                items = Airerage.Runtime.Settings.ItemSettings.Load();
+                items.ApplyTo(rules);
+            }
+            _world = new SimWorld(terrain, bounds, zones, rules, coinSpawns, bankSpots, platforms, traps);
             _playerCharacter = _character;
             if (_rememberCharacter && _roster != null && _roster.Count > 0)
             {
@@ -272,6 +282,10 @@ namespace Airerage.Runtime.Simulation
                 _playerCharacter = _roster.Get(_rosterIndex);
             }
             _player = _world.AddCharacter(_playerCharacter.Config, _playerSpawn.ToNumerics());
+            if (items != null && rules.ItemMode == Airerage.Core.Items.ItemMode.PreItem)
+            {
+                _world.SetItems(_player, items.StartItemsUpTo(rules.StartItemCount));
+            }
             _previous = _world.GetState(_player);
             if (_dummyViews.Length != _dummySpawnPositions.Length)
             {

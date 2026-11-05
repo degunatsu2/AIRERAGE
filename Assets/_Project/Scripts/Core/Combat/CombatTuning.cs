@@ -800,6 +800,18 @@ namespace Airerage.Core.Combat
         /// 特殊攻撃 1 だけを attack にした写し（クールタイムは cooldownTicks、続けて使える回数は 1。ほかの値は同じものを指す）。THIEF が
         /// コピーした Q を使うとき・奪ったギミックを置くときに使う（ThiefRules.ConfigFor）。
         /// </summary>
+        /// <summary>同じ値の写し（技のデータは同じものを指す。アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public CombatTuning Clone()
+        {
+            return (CombatTuning)MemberwiseClone();
+        }
+
+        /// <summary>
+        /// 特殊攻撃 2 つと必殺技（Q・E・R）の、キャラクターの判定の威力の上乗せ（%。AttackPower の上乗せ）。持っているアイテム（ダイアモンドアレイ）
+        /// から ItemRules.ConfigFor が決める。キャラクターのデータでは 0。
+        /// </summary>
+        public int SkillDamageBonusPercent;
+
         public CombatTuning WithSpecial1(AttackData attack, int cooldownTicks)
         {
             var copy = (CombatTuning)MemberwiseClone();

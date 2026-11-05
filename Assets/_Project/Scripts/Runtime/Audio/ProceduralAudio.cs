@@ -236,6 +236,18 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>だれかが WANTED になった（警戒させる低めのサイレン: 上下する 2 音のうなり。ユーザーの要望、2026-11-02）。</summary>
         WantedSiren,
+
+        /// <summary>アイテムを拾った（明るい 2 音の上がる音。docs/20_item_plan.md）。</summary>
+        ItemPickup,
+
+        /// <summary>アクティブアイテムを使った（短い光の音）。</summary>
+        ItemUse,
+
+        /// <summary>アイテムを捨てた（下がる短い音）。</summary>
+        ItemDiscard,
+
+        /// <summary>刀を振った（櫓落としの振り。短い風切り）。</summary>
+        ItemSlash,
     }
 
     /// <summary>
@@ -923,6 +935,30 @@ namespace Airerage.Runtime.Audio
                         AddTone(b, r, i * 0.3f, 0.34f, from, to, Wave.Saw, 0.22f, 0.02f, 0.06f);
                         AddTone(b, r, i * 0.3f, 0.34f, from * 0.5f, to * 0.5f, Wave.Triangle, 0.3f, 0.02f, 0.06f);
                     }
+                    break;
+                case SoundId.ItemPickup:
+                    // 拾った: 明るい 2 音（ソ → 上のド）と、きらきらした高い音。
+                    b = new float[Samples(0.45f, r)];
+                    AddTone(b, r, 0f, 0.12f, NoteFrequency(79), NoteFrequency(79), Wave.Pulse25, 0.22f, 0.002f, 0.06f);
+                    AddTone(b, r, 0.08f, 0.22f, NoteFrequency(84), NoteFrequency(84), Wave.Pulse25, 0.24f, 0.002f, 0.14f);
+                    AddTone(b, r, 0.08f, 0.3f, NoteFrequency(96), NoteFrequency(96), Wave.Sine, 0.12f, 0.002f, 0.24f);
+                    break;
+                case SoundId.ItemUse:
+                    // 使った: 上がる光の音（三角波のスイープ）。
+                    b = new float[Samples(0.3f, r)];
+                    AddTone(b, r, 0f, 0.22f, 440f, 1320f, Wave.Triangle, 0.3f, 0.003f, 0.12f);
+                    AddTone(b, r, 0f, 0.18f, 880f, 2200f, Wave.Sine, 0.12f, 0.003f, 0.1f);
+                    break;
+                case SoundId.ItemDiscard:
+                    // 捨てた: 下がる短い音。
+                    b = new float[Samples(0.25f, r)];
+                    AddTone(b, r, 0f, 0.2f, 660f, 220f, Wave.Triangle, 0.28f, 0.003f, 0.1f);
+                    break;
+                case SoundId.ItemSlash:
+                    // 刀の振り: 短い風切り（高いノイズの代わりに、速く下がるのこぎり波）。
+                    b = new float[Samples(0.16f, r)];
+                    AddTone(b, r, 0f, 0.12f, 2600f, 900f, Wave.Saw, 0.12f, 0.002f, 0.08f);
+                    AddTone(b, r, 0f, 0.1f, 1300f, 500f, Wave.Triangle, 0.16f, 0.002f, 0.06f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

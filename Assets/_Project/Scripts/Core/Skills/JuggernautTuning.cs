@@ -19,6 +19,12 @@ namespace Airerage.Core.Skills
     [Serializable]
     public sealed class JuggernautTuning
     {
+        /// <summary>同じ値の写し（アイテムのパッシブで値を変えた調整値を作る。ItemRules.ConfigFor）。</summary>
+        public JuggernautTuning Clone()
+        {
+            return (JuggernautTuning)MemberwiseClone();
+        }
+
         /// <summary>空中横の砲弾の速さ（m/s）、当たりの半径（m）、届く距離（m）、出す位置（中心から前と上。m）。</summary>
         public float CannonSpeed = 24f;
         public float CannonRadius = 0.35f;

@@ -23,6 +23,14 @@ namespace Airerage.Core.Input
         /// <summary>必殺技（R ／ ゲームパッドの右スティックの押し込み【仮】）。</summary>
         Super = 1 << 6,
 
+        /// <summary>アイテムバッグの 1〜3 枠目（Z・X・C ／ ゲームパッドの Y・LT・L3【仮】。拾う・使う。docs/20_item_plan.md）。</summary>
+        Item1 = 1 << 7,
+        Item2 = 1 << 8,
+        Item3 = 1 << 9,
+
+        /// <summary>アイテムを捨てる（マウスのホイールの押し込み ／ ゲームパッドの SELECT【仮】。枠のキーを押しながら押す）。</summary>
+        ItemDrop = 1 << 10,
+
         /// <summary>
         /// 試合から抜けた（ネットワーク対戦で切れた人。人が押すボタンではない）。ホストが決めたティックから、全員がその人の入力を
         /// PlayerInput.Departed として同じように使う（docs/15 T6-10）。

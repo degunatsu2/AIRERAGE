@@ -905,6 +905,25 @@ namespace Airerage.Net.Tests
         }
 
         [Test]
+        public void ItemMessages_RoundTrip()
+        {
+            // アイテムのルールと、アイテムを選んでいる印（docs/20_item_plan.md）。
+            var slots = new[] { new LobbySlot(true, "A", itemSelecting: true), new LobbySlot(true, "B") };
+            var rules = new LobbyItems(Airerage.Core.Items.ItemMode.PreItem, 2, 0, 0b101u);
+            byte[] data = NetMessages.Lobby(slots, LobbyPhase.Waiting, 0, false, 0, false, rules);
+            LobbySlot[] read = NetMessages.ReadLobby(data, out _, out _, out _, out _, out _, out LobbyItems items);
+            Assert.That(read, Is.EqualTo(slots));
+            Assert.That(read[0].ItemSelecting, Is.True);
+            Assert.That(items, Is.EqualTo(rules));
+            var picks = new[] { Airerage.Core.Items.ItemId.EnergyShot, Airerage.Core.Items.ItemId.GreenBanana };
+            Airerage.Core.Items.ItemId[] back = NetMessages.ReadItems(NetMessages.Items(true, picks), out bool selecting);
+            Assert.That(selecting, Is.True);
+            Assert.That(back, Is.EqualTo(new[] { Airerage.Core.Items.ItemId.EnergyShot, Airerage.Core.Items.ItemId.GreenBanana, Airerage.Core.Items.ItemId.None }));
+            // 範囲の外の値は直す（モードはデフォルト、数は 1〜3、ドロップするアイテムは 1 つ以上）。
+            Assert.That(new LobbyItems((Airerage.Core.Items.ItemMode)9, 7, 5, 0).Pool, Is.EqualTo(Airerage.Core.Items.ItemCatalog.AllMask));
+        }
+
+        [Test]
         public void LobbyMessage_RoundTrips_AndRejectsBrokenData()
         {
             var slots = new[] { new LobbySlot(true, "ボブ", 2, true, 3), new LobbySlot(true, "Eve", 1, false, 0, spectator: true), new LobbySlot(false, string.Empty) };

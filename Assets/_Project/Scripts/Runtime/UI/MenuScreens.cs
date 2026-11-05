@@ -26,6 +26,8 @@ namespace Airerage.Runtime.UI
     ///   そのまま（READY だけ外す）。
     /// - OPTIONS → オプションの画面（OptionsScreen。音量・画面・キーの割り当て。docs/15 T6-9）。閉じるとメインメニューの OPTIONS へ。
     ///   RANDOM STAGES → ステージ選択の画面で、RANDOM で選ぶステージのチェックを付け外し（閉じるとオプションへ）。
+    ///   ITEMS の START ITEMS ／ DROP ITEMS → アイテムを選ぶ画面（ItemSelectScreen。選ぶたびに ItemSettings に保存し、閉じるとオプションへ。
+    ///   docs/20_item_plan.md）。
     /// - SINGLE（docs/16 T7-2。D-72【仮】）→ キャラクター選択（トレーニングと同じ 1 人の画面）→ CPU の強さ（CpuLevelScreen）→ ステージ選択 →
     ///   自分＋CPU 3 体のローカル対戦（CPU のキャラクターはランダム。なるべく自分と違うキャラクター）。自分はキーボード＋マウスとどの
     ///   ゲームパッドでも操作できる。
@@ -48,6 +50,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private OptionsScreen _optionsScreen;
         [SerializeField] private QuitConfirmDialog _quitDialog;
         [SerializeField] private CpuLevelScreen _cpuLevel;
+        [Tooltip("アイテムを選ぶ画面（オプションの START ITEMS ／ DROP ITEMS と、ネットワーク対戦の待機所。なくてもよい）")]
+        [SerializeField] private ItemSelectScreen _itemSelect;
         [Tooltip("ネットワーク対戦のメニュー（IOnlineMenu。なければ、NETWORK VS は今のオンラインの検証用のシーンを開く）")]
         [SerializeField] private MonoBehaviour _online;
 
@@ -69,6 +73,8 @@ namespace Airerage.Runtime.UI
         private bool _localTimed = true;
         private Airerage.Core.Ai.CpuLevel _level = Airerage.Core.Ai.CpuLevel.Normal;
         private bool _started;
+        // アイテムを選ぶ画面を、オプションから開いているか。
+        private bool _itemsFromOptions;
 
         /// <summary>タイトルを出しているか（テスト用）。</summary>
         public bool ShowingTitle => _title != null && _title.activeSelf;
@@ -101,6 +107,15 @@ namespace Airerage.Runtime.UI
         public bool ShowingCpuLevel => _cpuLevel != null && _cpuLevel.IsShowing;
 
         public CpuLevelScreen CpuLevel => _cpuLevel;
+
+        /// <summary>アイテムを選ぶ画面（なければ null）。</summary>
+        public ItemSelectScreen ItemSelect => _itemSelect;
+
+        /// <summary>アイテムを選ぶ画面を、オプションから開いて出しているか（ネットワーク対戦のメニューは、このときは画面を隠さない）。</summary>
+        public bool ShowingItemSelectFromOptions => _itemsFromOptions && ShowingItemSelect;
+
+        /// <summary>アイテムを選ぶ画面を出しているか（テスト用）。</summary>
+        public bool ShowingItemSelect => _itemSelect != null && _itemSelect.IsShowing;
 
         /// <summary>オプションの画面を出しているか（テスト用）。</summary>
         public bool ShowingOptions => _optionsScreen != null && _optionsScreen.IsShowing;
@@ -160,6 +175,53 @@ namespace Airerage.Runtime.UI
                 HideAll();
                 _optionsScreen.ShowAtRandomStages();
             };
+            if (_itemSelect != null)
+            {
+                // 初期アイテムとドロップするアイテム（オプションの ITEMS。ユーザーの要望、2026-11-05）。
+                _optionsScreen.StartItemsRequested += () =>
+                {
+                    HideAll();
+                    Airerage.Runtime.Settings.ItemSettings items = Airerage.Runtime.Settings.ItemSettings.Load();
+                    _itemsFromOptions = true;
+                    _itemSelect.ShowPick(items.StartCount, items.StartItems);
+                };
+                _optionsScreen.DropItemsRequested += () =>
+                {
+                    HideAll();
+                    _itemsFromOptions = true;
+                    _itemSelect.ShowPool(Airerage.Runtime.Settings.ItemSettings.Load().DropPool);
+                };
+                _itemSelect.PicksChanged += picks =>
+                {
+                    if (_itemsFromOptions)
+                    {
+                        Airerage.Runtime.Settings.ItemSettings items = Airerage.Runtime.Settings.ItemSettings.Load();
+                        items.StartItems = new Airerage.Core.Items.ItemId[Airerage.Core.Items.ItemCatalog.BagSlots];
+                        System.Array.Copy(picks, items.StartItems, Mathf.Min(picks.Length, items.StartItems.Length));
+                        items.Save();
+                    }
+                };
+                _itemSelect.PoolChanged += pool =>
+                {
+                    if (_itemsFromOptions)
+                    {
+                        Airerage.Runtime.Settings.ItemSettings items = Airerage.Runtime.Settings.ItemSettings.Load();
+                        items.DropPool = pool;
+                        items.Save();
+                    }
+                };
+                _itemSelect.Closed += () =>
+                {
+                    if (!_itemsFromOptions)
+                    {
+                        return;
+                    }
+                    bool start = _itemSelect.LastMode == ItemSelectScreen.SelectMode.Pick;
+                    _itemsFromOptions = false;
+                    HideAll();
+                    _optionsScreen.ShowAtItems(start);
+                };
+            }
             _network.Clicked.AddListener(() =>
             {
                 if (Online != null)
@@ -463,6 +525,10 @@ namespace Airerage.Runtime.UI
             _cpuLevel.Hide();
             _optionsScreen.Hide();
             _quitDialog.Hide();
+            if (_itemSelect != null && _itemsFromOptions)
+            {
+                _itemSelect.Hide();
+            }
             _selectAtFrame = -1;
         }
 

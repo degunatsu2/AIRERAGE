@@ -6,9 +6,9 @@ namespace Airerage.Runtime.Settings
 {
     /// <summary>
     /// キーの割り当ての変更（docs/15 T6-9。D-68）。変えられるのは "Player" の組のボタンの操作（ジャンプ・攻撃・ワイヤー・ガード・
-    /// 特殊攻撃 2 つ・必殺技）の、キーボードとマウスの 1 つ（キーか、マウスの左・右・サイドのボタン。ユーザーの要望、2026-10-20）と
-    /// ゲームパッドのボタン【仮】。移動（WASD・左スティック）、照準（マウスの位置・右スティック）、マウスのホイールと真ん中のボタン
-    /// （ズーム）、一時停止（Esc・Start）は変えない。
+    /// 特殊攻撃 2 つ・必殺技・アイテムの 3 枠・アイテムを捨てる。docs/20_item_plan.md）の、キーボードとマウスの 1 つ（キーか、マウスの左・
+    /// 右・サイド・真ん中のボタン。ユーザーの要望、2026-10-20・2026-11-05）とゲームパッドのボタン【仮】。移動（WASD・左スティック）、照準
+    /// （マウスの位置・右スティック）、マウスのホイール（ズーム）、一時停止（Esc・Start）は変えない。
     /// 変更は Input System の割り当ての上書き（元のアセットは変えない）で、JSON にして GameSettings に保存する。試合の入力
     /// （InputSystemAdapter）を作るときに ApplySaved で当てる。
     /// </summary>
@@ -23,11 +23,20 @@ namespace Airerage.Runtime.Settings
         public const string MapName = "Player";
 
         /// <summary>変えられる操作（アクションの名前）と、オプションの画面に出す名前（同じ順）。</summary>
-        public static readonly string[] Actions = { "Jump", "Attack", "Wire", "Guard", "Special1", "Special2", "Super" };
-        public static readonly string[] Labels = { "JUMP", "ATTACK", "WIRE", "GUARD", "SKILL 1", "SKILL 2", "SUPER" };
+        public static readonly string[] Actions =
+        {
+            "Jump", "Attack", "Wire", "Guard", "Special1", "Special2", "Super", "Item1", "Item2", "Item3", "ItemDrop",
+        };
+        public static readonly string[] Labels =
+        {
+            "JUMP", "ATTACK", "WIRE", "GUARD", "SKILL 1", "SKILL 2", "SUPER", "ITEM 1", "ITEM 2", "ITEM 3", "DROP ITEM",
+        };
 
         // キーボードの列で使えるマウスのボタンと、画面に出す名前。
-        private static readonly string[] MouseButtons = { "<Mouse>/leftButton", "<Mouse>/rightButton", "<Mouse>/backButton", "<Mouse>/forwardButton" };
+        private static readonly string[] MouseButtons =
+        {
+            "<Mouse>/leftButton", "<Mouse>/rightButton", "<Mouse>/backButton", "<Mouse>/forwardButton", "<Mouse>/middleButton",
+        };
         private static readonly Dictionary<string, string> MouseNames = new Dictionary<string, string>
         {
             { "leftButton", "LEFT CLICK" }, { "rightButton", "RIGHT CLICK" }, { "backButton", "MOUSE 4" }, { "forwardButton", "MOUSE 5" },
@@ -96,6 +105,15 @@ namespace Airerage.Runtime.Settings
                 return "-";
             }
             return Readable(action.bindings[bindingIndex].effectivePath);
+        }
+
+        /// <summary>
+        /// 操作 actionName（"Item1" など）の、列 column の今の割り当ての名前（asset に当てた変更で。アイテムの選択の画面に出すキー）。
+        /// </summary>
+        public static string KeyName(InputActionAsset asset, string actionName, Column column)
+        {
+            InputAction action = asset != null ? asset.FindActionMap(MapName, throwIfNotFound: false)?.FindAction(actionName, throwIfNotFound: false) : null;
+            return action == null ? "-" : DisplayName(action, BindingIndex(action, column));
         }
 
         /// <summary>割り当ての道（"&lt;Keyboard&gt;/space" など）の、画面に出す名前。</summary>

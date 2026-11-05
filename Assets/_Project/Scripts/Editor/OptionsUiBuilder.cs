@@ -8,7 +8,8 @@ namespace Airerage.Editor
 {
     /// <summary>
     /// オプションの画面（OptionsScreen。docs/15 T6-9）を作る。左に縦に並んだ斜めの札（メインメニューと同じ形）。いちばん上で
-    /// ページ（GENERAL ／ CONTROLS）を切り替え、いちばん下に BACK。CONTROLS は操作ごとに、キーボードとゲームパッドの 2 つの札。
+    /// ページ（GENERAL ／ CONTROLS ／ ITEMS）を切り替え、いちばん下に BACK。CONTROLS は操作ごとに、キーボードとゲームパッドの 2 つの札
+    /// （アイテムの 4 つを足して 11 の操作。行を詰めた。2026-11-05）。ITEMS はアイテムのモードの項目（docs/20_item_plan.md）。
     /// </summary>
     internal static class OptionsUiBuilder
     {
@@ -22,6 +23,12 @@ namespace Airerage.Editor
 
         // GENERAL の項目の間隔（LANGUAGE を足して 7 つ。BACK に重ならないように詰めた。2026-10-27）。
         private const float GeneralStep = 64f;
+
+        // CONTROLS の行の間隔と札の高さ（11 の操作が BACK に重ならないように）。
+        private const float ControlStep = 44f;
+        private const float ControlHeight = 40f;
+
+        private static readonly string[] ItemLabels = { "ITEM MODE", "START ITEM COUNT", "DROP RATE" };
 
         public static OptionsScreen Create(Transform canvas, InputActionAsset inputActions)
         {
@@ -58,29 +65,56 @@ namespace Airerage.Editor
             const float keyX = Left + 330f;
             const float padX = Left + 700f;
             MenuUiBuilder.CreateText(controls, "KeyboardHeader", "KEYBOARD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
-                new Vector2(keyX + 30f, -228f), new Vector2(320f, 40f), MenuUiBuilder.Accent);
+                new Vector2(keyX + 30f, -222f), new Vector2(320f, 36f), MenuUiBuilder.Accent);
             MenuUiBuilder.CreateText(controls, "GamepadHeader", "GAMEPAD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
-                new Vector2(padX + 30f, -228f), new Vector2(280f, 40f), MenuUiBuilder.Accent);
+                new Vector2(padX + 30f, -222f), new Vector2(280f, 36f), MenuUiBuilder.Accent);
             int actions = BindingSettings.Actions.Length;
             var keyCells = new Object[actions];
             var padCells = new Object[actions];
             for (int i = 0; i < actions; i++)
             {
-                float y = -268f - i * 60f;
-                MenuUiBuilder.CreateText(controls, $"{BindingSettings.Actions[i]}Label", BindingSettings.Labels[i], 32, FontStyle.BoldAndItalic,
-                    TextAnchor.MiddleLeft, anchor, new Vector2(Left + 20f, y), new Vector2(300f, 54f), Color.white);
+                float y = -258f - i * ControlStep;
+                MenuUiBuilder.CreateText(controls, $"{BindingSettings.Actions[i]}Label", BindingSettings.Labels[i], 26, FontStyle.BoldAndItalic,
+                    TextAnchor.MiddleLeft, anchor, new Vector2(Left + 20f, y), new Vector2(300f, ControlHeight), Color.white);
                 MenuOption key = MenuUiBuilder.CreateMenuItem(controls, $"{BindingSettings.Actions[i]}Key", "-", anchor, new Vector2(keyX, y),
-                    new Vector2(340f, 54f));
+                    new Vector2(340f, ControlHeight));
                 MenuOption pad = MenuUiBuilder.CreateMenuItem(controls, $"{BindingSettings.Actions[i]}Pad", "-", anchor, new Vector2(padX, y),
-                    new Vector2(280f, 54f));
-                key.SetSelectedShift(new Vector2(0f, 4f));
-                pad.SetSelectedShift(new Vector2(0f, 4f));
+                    new Vector2(280f, ControlHeight));
+                key.LabelText.fontSize = 26;
+                pad.LabelText.fontSize = 26;
+                key.SetSelectedShift(new Vector2(0f, 3f));
+                pad.SetSelectedShift(new Vector2(0f, 3f));
                 keyCells[i] = key;
                 padCells[i] = pad;
             }
             MenuOption resetControls = MenuUiBuilder.CreateMenuItem(controls, "ResetControls", "RESET CONTROLS", anchor,
-                new Vector2(Left, -268f - actions * 60f - 4f), new Vector2(Width, RowHeight));
+                new Vector2(Left, -258f - actions * ControlStep - 6f), new Vector2(Width, 52f));
             controls.gameObject.SetActive(false);
+
+            // ITEMS: アイテムのモード・初期アイテム数・ドロップ頻度と、初期アイテム・ドロップするアイテムを選ぶ画面へ（ユーザーの要望、2026-11-05）。
+            RectTransform itemsPage = MenuUiBuilder.CreateFull(panel, "Items");
+            var itemRows = new Object[ItemLabels.Length];
+            var itemValues = new Object[ItemLabels.Length];
+            for (int i = 0; i < ItemLabels.Length; i++)
+            {
+                MenuOption row = MenuUiBuilder.CreateMenuItem(itemsPage, ItemLabels[i].Replace(" ", string.Empty), ItemLabels[i], anchor,
+                    new Vector2(Left, -235f - i * GeneralStep), new Vector2(Width, RowHeight));
+                row.gameObject.AddComponent<OptionStepper>();
+                itemRows[i] = row;
+                itemValues[i] = Value(row, string.Empty);
+            }
+            MenuOption startItems = MenuUiBuilder.CreateMenuItem(itemsPage, "StartItems", "START ITEMS", anchor,
+                new Vector2(Left, -235f - ItemLabels.Length * GeneralStep - 8f), new Vector2(Width, RowHeight));
+            MenuOption dropItems = MenuUiBuilder.CreateMenuItem(itemsPage, "DropItems", "DROP ITEMS", anchor,
+                new Vector2(Left, -235f - (ItemLabels.Length + 1) * GeneralStep - 8f), new Vector2(Width, RowHeight));
+            Text itemNote = MenuUiBuilder.Localize(MenuUiBuilder.CreateText(itemsPage, "ItemNote",
+                "Rules for LOCAL VS, SINGLE and TRAINING. START ITEMS and DROP ITEMS are also the defaults in the NETWORK VS waiting room.", 24,
+                FontStyle.Bold, TextAnchor.UpperLeft, anchor, new Vector2(Left + 20f, -235f - (ItemLabels.Length + 2) * GeneralStep - 24f),
+                new Vector2(Width - 40f, 90f), new Color(1f, 1f, 1f, 0.75f)),
+                "ローカル対戦・シングル・トレーニングのルールです。START ITEMS と DROP ITEMS は、ネットワーク対戦の待機所の初めの値にもなります。");
+            itemNote.horizontalOverflow = HorizontalWrapMode.Wrap;
+            itemNote.font = GameFonts.JapaneseBold;
+            itemsPage.gameObject.SetActive(false);
 
             MenuOption back = MenuUiBuilder.CreateMenuItem(panel, "Back", "BACK", anchor, new Vector2(Left, -820f), new Vector2(Width, RowHeight));
             Text prompt = MenuUiBuilder.CreateText(panel, "Prompt", string.Empty, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
@@ -102,6 +136,11 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_keyCells", keyCells);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_padCells", padCells);
             SandboxWireSceneBuilder.SetReference(screen, "_resetControls", resetControls);
+            SandboxWireSceneBuilder.SetReference(screen, "_itemsPage", itemsPage.gameObject);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_itemRows", itemRows);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_itemValues", itemValues);
+            SandboxWireSceneBuilder.SetReference(screen, "_startItems", startItems);
+            SandboxWireSceneBuilder.SetReference(screen, "_dropItems", dropItems);
             SandboxWireSceneBuilder.SetReference(screen, "_back", back);
             SandboxWireSceneBuilder.SetReference(screen, "_prompt", prompt);
             panel.gameObject.SetActive(false);

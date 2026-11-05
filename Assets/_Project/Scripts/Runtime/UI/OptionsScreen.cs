@@ -20,6 +20,10 @@ namespace Airerage.Runtime.UI
     /// - CONTROLS: 変えられる操作（BindingSettings）ごとに、キーボードのキー（マウスの左・右・サイドのボタンも）とゲームパッドのボタン。項目を決定すると、次に押した
     ///   キー（ボタン）に変わる（キーボードは Esc、ゲームパッドは Start でやめる）。ほかの操作と同じキーなら入れ替える。RESET CONTROLS で
     ///   元に戻す。
+    /// - ITEMS（ユーザーの要望、2026-11-05。docs/20_item_plan.md）: ローカル対戦・シングルモード・トレーニングのアイテムのモード
+    ///   （DEFAULT ／ ITEM DROP ／ PRE-ITEM）、初期アイテム数（1〜3）、ドロップ頻度（少・中・多）と、START ITEMS（初期アイテムを選ぶ画面へ。
+    ///   StartItemsRequested）・DROP ITEMS（ドロップするアイテムを選ぶ画面へ。DropItemsRequested）。初期アイテムとドロップするアイテムは
+    ///   ネットワーク対戦の待機所の初めの値にもなる。保存は ItemSettings。
     /// BACK か戻る操作（Esc・B）で閉じる（Closed）。設定は GameSettings で PlayerPrefs に保存し、キーの割り当ては試合の入力を
     /// 作るときに当たる（InputSystemAdapter）。
     /// </summary>
@@ -35,6 +39,22 @@ namespace Airerage.Runtime.UI
             Resolution,
             VSync,
             Language,
+        }
+
+        /// <summary>ITEMS のページの値を変える項目（_itemRows と同じ順）。</summary>
+        public enum ItemRow
+        {
+            Mode,
+            StartCount,
+            DropRate,
+        }
+
+        /// <summary>ページ（PAGE の項目で切り替える順）。</summary>
+        public enum PageKind
+        {
+            General,
+            Controls,
+            Items,
         }
 
         /// <summary>LANGUAGE の値の文字。</summary>
@@ -62,14 +82,21 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption[] _keyCells = new MenuOption[0];
         [SerializeField] private MenuOption[] _padCells = new MenuOption[0];
         [SerializeField] private MenuOption _resetControls;
+        [Tooltip("ITEMS のページ、値を変える項目（ItemRow の順）とその値の文字、初期アイテム・ドロップするアイテムを選ぶ画面への項目")]
+        [SerializeField] private GameObject _itemsPage;
+        [SerializeField] private MenuOption[] _itemRows = new MenuOption[0];
+        [SerializeField] private Text[] _itemValues = new Text[0];
+        [SerializeField] private MenuOption _startItems;
+        [SerializeField] private MenuOption _dropItems;
         [SerializeField] private MenuOption _back;
         [Tooltip("キーの割り当てを変えている間の案内と、変えた結果")]
         [SerializeField] private Text _prompt;
 
         private readonly List<Vector2Int> _resolutions = new List<Vector2Int>();
         private GameSettings _settings;
+        private ItemSettings _items;
         private int _resolutionIndex;
-        private bool _controls;
+        private PageKind _pageKind;
         private InputActionMap _map;
         private InputActionRebindingExtensions.RebindingOperation _rebind;
         private float _navigationRestoreAt = -1f;
@@ -82,11 +109,21 @@ namespace Airerage.Runtime.UI
         /// <summary>RANDOM STAGES を決定した（設定を保存して隠してある。呼んだ側がステージ選択を RANDOM STAGES として出す）。</summary>
         public event Action RandomStagesRequested;
 
+        /// <summary>START ITEMS ／ DROP ITEMS を決定した（設定を保存して隠してある。呼んだ側がアイテムを選ぶ画面を出す）。</summary>
+        public event Action StartItemsRequested;
+        public event Action DropItemsRequested;
+
         /// <summary>出しているか（テスト用）。</summary>
         public bool IsShowing => gameObject.activeSelf;
 
         /// <summary>CONTROLS のページを出しているか（テスト用）。</summary>
-        public bool ShowingControls => _controls;
+        public bool ShowingControls => _pageKind == PageKind.Controls;
+
+        /// <summary>出しているページ（テスト用）。</summary>
+        public PageKind CurrentPage => _pageKind;
+
+        /// <summary>今のアイテムの設定（テスト用）。</summary>
+        public ItemSettings Items => _items;
 
         /// <summary>キーの割り当てを変えている途中か（テスト用）。</summary>
         public bool IsRebinding => _rebind != null;
@@ -106,6 +143,10 @@ namespace Airerage.Runtime.UI
         public string GeneralValue(Row row) => _generalValues[(int)row].text;
         public MenuOption KeyCell(int action) => _keyCells[action];
         public MenuOption PadCell(int action) => _padCells[action];
+        public MenuOption ItemRowOption(ItemRow row) => _itemRows[(int)row];
+        public string ItemValue(ItemRow row) => _itemValues[(int)row].text;
+        public MenuOption StartItems => _startItems;
+        public MenuOption DropItems => _dropItems;
         public string PromptText => _prompt != null ? _prompt.text : string.Empty;
 
         private void Awake()
@@ -124,7 +165,9 @@ namespace Airerage.Runtime.UI
             int actions = BindingSettings.Actions.Length;
             if (_inputActions == null || _page == null || _pageValue == null || _generalPage == null || _controlsPage == null
                 || _generalRows.Length != rows || _generalValues.Length != rows || _resetGeneral == null || _keyCells.Length != actions
-                || _padCells.Length != actions || _resetControls == null || _back == null)
+                || _padCells.Length != actions || _resetControls == null || _back == null || _itemsPage == null
+                || _itemRows.Length != Enum.GetValues(typeof(ItemRow)).Length || _itemValues.Length != _itemRows.Length
+                || _startItems == null || _dropItems == null)
             {
                 Debug.LogError($"{name}: オプションの画面の項目が設定されていません", this);
                 enabled = false;
@@ -143,12 +186,34 @@ namespace Airerage.Runtime.UI
                 return;
             }
             _wired = true;
-            Stepper(_page).Stepped += _ =>
+            Stepper(_page).Stepped += delta =>
             {
                 UiSounds.Find().Play(SoundId.UiMove);
-                SetPage(!_controls);
+                SetPage(NextPage(delta));
             };
-            _page.Clicked.AddListener(() => SetPage(!_controls));
+            _page.Clicked.AddListener(() => SetPage(NextPage(1)));
+            for (int i = 0; i < _itemRows.Length; i++)
+            {
+                var row = (ItemRow)i;
+                Stepper(_itemRows[i]).Stepped += delta => StepItem(row, delta);
+                _itemRows[i].Clicked.AddListener(() => StepItem(row, 1, quiet: true));
+            }
+            _startItems.Clicked.AddListener(() =>
+            {
+                CancelRebind();
+                _settings?.Save();
+                _items?.Save();
+                gameObject.SetActive(false);
+                StartItemsRequested?.Invoke();
+            });
+            _dropItems.Clicked.AddListener(() =>
+            {
+                CancelRebind();
+                _settings?.Save();
+                _items?.Save();
+                gameObject.SetActive(false);
+                DropItemsRequested?.Invoke();
+            });
             for (int i = 0; i < _generalRows.Length; i++)
             {
                 var row = (Row)i;
@@ -213,7 +278,31 @@ namespace Airerage.Runtime.UI
                 yield return cell;
             }
             yield return _resetControls;
+            foreach (MenuOption row in _itemRows)
+            {
+                yield return row;
+            }
+            yield return _startItems;
+            yield return _dropItems;
             yield return _back;
+        }
+
+        private PageKind NextPage(int delta)
+        {
+            int count = Enum.GetValues(typeof(PageKind)).Length;
+            return (PageKind)((((int)_pageKind + delta) % count + count) % count);
+        }
+
+        /// <summary>出して、ITEMS のページの START ITEMS（start）か DROP ITEMS の項目を選ぶ（アイテムを選ぶ画面から戻ったとき）。</summary>
+        public void ShowAtItems(bool start)
+        {
+            Show();
+            if (!IsShowing)
+            {
+                return;
+            }
+            SetPage(PageKind.Items);
+            (start ? _startItems : _dropItems).SelectQuietly();
         }
 
         /// <summary>出して、RANDOM STAGES の項目を選ぶ（RANDOM STAGES の画面から戻ったとき）。</summary>
@@ -235,10 +324,11 @@ namespace Airerage.Runtime.UI
             }
             gameObject.SetActive(true);
             _settings = GameSettings.Load();
+            _items = ItemSettings.Load();
             BindingSettings.Apply(_inputActions, _settings.BindingOverrides);
             BuildResolutions();
             SetPrompt(string.Empty);
-            SetPage(false);
+            SetPage(PageKind.General);
         }
 
         /// <summary>隠す（保存はしない。閉じるときは Close）。</summary>
@@ -257,6 +347,7 @@ namespace Airerage.Runtime.UI
             }
             CancelRebind();
             _settings?.Save();
+            _items?.Save();
             gameObject.SetActive(false);
             Closed?.Invoke();
         }
@@ -280,16 +371,18 @@ namespace Airerage.Runtime.UI
         }
 
         // ページを切り替える（ページの項目を選んだまま）。
-        private void SetPage(bool controls)
+        private void SetPage(PageKind page)
         {
-            _controls = controls;
-            _generalPage.SetActive(!controls);
-            _controlsPage.SetActive(controls);
-            _pageValue.text = controls ? "CONTROLS" : "GENERAL";
+            _pageKind = page;
+            _generalPage.SetActive(page == PageKind.General);
+            _controlsPage.SetActive(page == PageKind.Controls);
+            _itemsPage.SetActive(page == PageKind.Items);
+            _pageValue.text = page == PageKind.Controls ? "CONTROLS" : page == PageKind.Items ? "ITEMS" : "GENERAL";
             SetPrompt(string.Empty);
             BuildNavigation();
             RefreshGeneral();
             RefreshBindings();
+            RefreshItems();
             _page.SelectQuietly();
         }
 
@@ -297,7 +390,22 @@ namespace Airerage.Runtime.UI
         private void BuildNavigation()
         {
             var column = new List<Selectable> { _page.Button };
-            if (_controls)
+            if (_pageKind == PageKind.Items)
+            {
+                foreach (MenuOption row in _itemRows)
+                {
+                    column.Add(row.Button);
+                }
+                column.Add(_startItems.Button);
+                column.Add(_dropItems.Button);
+                column.Add(_back.Button);
+                for (int i = 0; i < column.Count; i++)
+                {
+                    Link(column[i], column[(i + column.Count - 1) % column.Count], column[(i + 1) % column.Count], null, null);
+                }
+                return;
+            }
+            if (_pageKind == PageKind.Controls)
             {
                 for (int i = 0; i < _keyCells.Length; i++)
                 {
@@ -383,6 +491,49 @@ namespace Airerage.Runtime.UI
                 UiSounds.Find().Play(SoundId.UiMove);
             }
             ApplyAndSave(row == Row.Display || row == Row.Resolution || row == Row.VSync);
+        }
+
+        /// <summary>ITEMS の項目 row の値を delta だけ変える（端から反対の端へ回る）。すぐに保存する。</summary>
+        public void StepItem(ItemRow row, int delta, bool quiet = false)
+        {
+            if (_items == null || delta == 0)
+            {
+                return;
+            }
+            switch (row)
+            {
+                case ItemRow.Mode:
+                    _items.Mode = (Airerage.Core.Items.ItemMode)(((int)_items.Mode + delta + 3) % 3);
+                    break;
+                case ItemRow.StartCount:
+                    _items.StartCount = (_items.StartCount - 1 + delta + 3) % 3 + 1;
+                    break;
+                case ItemRow.DropRate:
+                    _items.DropRate = (_items.DropRate + delta + 3) % 3;
+                    break;
+            }
+            if (!quiet)
+            {
+                UiSounds.Find().Play(SoundId.UiMove);
+            }
+            _items.Save();
+            RefreshItems();
+        }
+
+        private void RefreshItems()
+        {
+            if (_items == null)
+            {
+                return;
+            }
+            _itemValues[(int)ItemRow.Mode].text = ItemSettings.ModeLabel(_items.Mode);
+            _itemValues[(int)ItemRow.StartCount].text = _items.StartCount.ToString();
+            _itemValues[(int)ItemRow.DropRate].text = ItemSettings.RateLabel(_items.DropRate);
+            bool ja = GameSettings.LoadLanguage() == GameLanguage.Japanese;
+            foreach (Text value in _itemValues)
+            {
+                value.font = GameFonts.Switch(value.font, ja);
+            }
         }
 
         private static int StepVolume(int volume, int delta, bool wrap)

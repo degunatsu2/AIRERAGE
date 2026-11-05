@@ -97,7 +97,7 @@ namespace Airerage.Runtime.Presentation
         /// null。番号の四角だけを出す）。
         /// </summary>
         public void Draw(Rect rect, int number, string name, Color color, in CharacterState state, bool crown, Look look, Color bankColor,
-            Texture2D logo = null)
+            Texture2D logo = null, bool showBag = false)
         {
             EnsureStyles();
             rect.position += look.Shake;
@@ -146,8 +146,14 @@ namespace Airerage.Runtime.Presentation
             }
 
 
-            // 右: 4 つに分けて BANK / COIN / K / F。
+            // 右: アイテムのモードなら、まずアイテムバッグの 3 枠（斜めの線で区切る。docs/20_item_plan.md）。残りを 4 つに分けて BANK / COIN / K / F。
             Rect right = _plate.RightRect(rect);
+            if (showBag)
+            {
+                float bagWidth = BagWidth(rect.height);
+                DrawBag(new Rect(right.x, right.y, bagWidth, right.height), state.Items, look.Gray);
+                right = new Rect(right.x + bagWidth, right.y, right.width - bagWidth, right.height);
+            }
             int[] values = { state.Coins.Banked, state.Coins.Held, state.Combat.Knockouts, state.Combat.Falls };
             float cell = right.width / Labels.Length;
             for (int c = 0; c < Labels.Length; c++)
@@ -204,6 +210,60 @@ namespace Airerage.Runtime.Presentation
                 text.a = look.Jackpot;
                 GuidePlate.DrawText(jackpotArea, "JACKPOT!", _overlay, text);
             }
+            GUI.color = previous;
+        }
+
+        /// <summary>札の高さ height のときのアイテムバッグの幅（3 枠と区切り）。札をこれだけ広げる。</summary>
+        public static float BagWidth(float height)
+        {
+            return (height - 12f) * 3f + 30f;
+        }
+
+        // 値は全員で同じ（ItemTuning の初めの値）。
+        private static readonly Airerage.Core.Items.ItemTuning ItemValues = new Airerage.Core.Items.ItemTuning();
+
+        // アイテムバッグ: 3 つの枠を斜めの線で区切り、入っているアイテムの絵を出す。アクティブアイテムのクールタイムの間は、残りの分だけ
+        // 暗くする（効果が終わるのを待つ間は全部）。
+        private static void DrawBag(Rect area, in Airerage.Core.Items.ItemBag bag, float gray)
+        {
+            Color previous = GUI.color;
+            float size = area.height - 12f;
+            float slot = (area.width - 6f) / 3f;
+            for (int i = 0; i < 3; i++)
+            {
+                var cell = new Rect(area.x + 3f + i * slot + (slot - size) * 0.5f, area.y + 6f, size, size);
+                GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.07f));
+                GUI.DrawTexture(cell, Texture2D.whiteTexture);
+                Airerage.Core.Items.ItemId id = bag.Get(i);
+                Texture2D icon = ItemIcons.Get(id);
+                if (icon != null)
+                {
+                    GUI.color = HudFade.Apply(Color.Lerp(Color.white, Gray, gray));
+                    GUI.DrawTexture(cell, icon, ScaleMode.ScaleToFit);
+                    int cooldown = bag.GetCooldown(i);
+                    if (Airerage.Core.Items.ItemCatalog.IsActive(id) && cooldown != 0
+                        && Airerage.Core.Items.ItemRules.ChargesLeft(bag, i, ItemValues) == 0)
+                    {
+                        int full = Mathf.Max(1, ItemValues.CooldownOf(id));
+                        float left = cooldown < 0 ? 1f : Mathf.Clamp01(cooldown / (float)full);
+                        GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.62f));
+                        GUI.DrawTexture(new Rect(cell.x, cell.y, cell.width, cell.height * left), Texture2D.whiteTexture);
+                    }
+                }
+                if (i > 0)
+                {
+                    // 斜めの区切り（右上から左下へ）。
+                    Matrix4x4 matrix = GUI.matrix;
+                    var pivot = new Vector2(area.x + 3f + i * slot, area.center.y);
+                    GUIUtility.RotateAroundPivot(20f, pivot);
+                    GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.35f));
+                    GUI.DrawTexture(new Rect(pivot.x - 1f, area.y + 3f, 2f, area.height - 6f), Texture2D.whiteTexture);
+                    GUI.matrix = matrix;
+                }
+            }
+            // バッグと右の数の区切り。
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.25f));
+            GUI.DrawTexture(new Rect(area.xMax - 1f, area.y + 4f, 1f, area.height - 8f), Texture2D.whiteTexture);
             GUI.color = previous;
         }
 

@@ -29,6 +29,8 @@ namespace Airerage.Runtime.Presentation
     /// 逆転の恩恵（確定コインの順位が 2 位以下で、毎秒ゲージを得ている。CatchUpRules。ユーザーの要望、2026-11-02）を受けている間は、
     /// 必殺技の札の真上に白い縁の四角の印（上向きの矢印と順位）を出す。順位が変わると、前の印が大きくなりながら消え、新しい印が白く
     /// 光りながら縮んで現れる。
+    /// アイテムを拾ったときは、札の真上に拾ったアイテムの絵・名前・効果の札をフェードインして出し、しばらくしたらフェードアウトする
+    /// （ユーザーの要望、2026-11-05。docs/20_item_plan.md）。
     /// オフライン（SimulationRunner）とオンライン（OnlineRunner）のどちらでも使う（ISimulationFeed）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class SkillHud : MonoBehaviour
@@ -101,6 +103,19 @@ namespace Airerage.Runtime.Presentation
         private int _buffRank;
         private int _fadingRank;
         private float _buffChangedAt = -10f;
+        // 拾ったアイテムの札（ItemBag.PickupCount が増えたら出す）。
+        private const float PickupInSeconds = 0.25f;
+        private const float PickupHoldSeconds = 2.6f;
+        private const float PickupOutSeconds = 0.6f;
+        private const float PickupHeight = 78f;
+        private const float PickupWidthExtra = 70f;
+        private int _pickupSeen = -1;
+        private int _pickupCharacter = -1;
+        private Airerage.Core.Items.ItemId _pickupItem;
+        private float _pickupAt = -10f;
+        private GUIStyle _pickupName;
+        private GUIStyle _pickupKind;
+        private GUIStyle _pickupText;
 
         /// <summary>札 1 枚の今の表示（テスト用）。</summary>
         public sealed class Slot
@@ -176,6 +191,13 @@ namespace Airerage.Runtime.Presentation
         /// <summary>逆転の恩恵の印に出している順位（恩恵がなければ 0）と、印が変わった回数（テスト用）。</summary>
         public int BuffRank => _buffRank;
         public int BuffChangeCount { get; private set; }
+
+        /// <summary>拾ったアイテムの札を出した回数と、最後に出したアイテム（テスト用）。</summary>
+        public int PickupPopupCount { get; private set; }
+        public Airerage.Core.Items.ItemId PickupPopupItem => _pickupItem;
+
+        /// <summary>拾ったアイテムの札を出しているか（フェードアウトの間を含む）。</summary>
+        public bool PickupPopupShown => Time.time - _pickupAt < PickupInSeconds + PickupHoldSeconds + PickupOutSeconds;
 
         /// <summary>英語の順位の書き方（2ND、3RD、4TH など）。</summary>
         public static string RankText(int rank)
@@ -344,6 +366,77 @@ namespace Airerage.Runtime.Presentation
             }
             _notices.RemoveAll(n => Time.time - n.At >= HeadNoticeSeconds);
             UpdateBuff(shown ? local : -1);
+            UpdatePickup(shown ? local : -1);
+        }
+
+        // 拾った回数が増えたら、最後に拾ったアイテムの札を出す（表示するキャラクターが変わったときは数え直す）。
+        private void UpdatePickup(int local)
+        {
+            if (local < 0)
+            {
+                _pickupCharacter = -1;
+                return;
+            }
+            Airerage.Core.Items.ItemBag bag = _feed.GetState(local).Items;
+            if (local != _pickupCharacter)
+            {
+                _pickupCharacter = local;
+                _pickupSeen = bag.PickupCount;
+                return;
+            }
+            if (bag.PickupCount != _pickupSeen)
+            {
+                _pickupSeen = bag.PickupCount;
+                var item = (Airerage.Core.Items.ItemId)bag.LastPicked;
+                if (Airerage.Core.Items.ItemCatalog.IsValid(item))
+                {
+                    _pickupItem = item;
+                    _pickupAt = Time.time;
+                    PickupPopupCount++;
+                }
+            }
+        }
+
+        // 拾ったアイテムの札（札の全体の幅より少し広い、斜めの札。左に絵、右に名前・種類・効果）。下の端を bottom に合わせる。
+        private void DrawPickup(float center, float bottom, float width)
+        {
+            float age = Time.time - _pickupAt;
+            float end = PickupInSeconds + PickupHoldSeconds + PickupOutSeconds;
+            if (age >= end || !Airerage.Core.Items.ItemCatalog.IsValid(_pickupItem))
+            {
+                return;
+            }
+            float alpha = age < PickupInSeconds ? age / PickupInSeconds
+                : age > PickupInSeconds + PickupHoldSeconds ? 1f - (age - PickupInSeconds - PickupHoldSeconds) / PickupOutSeconds : 1f;
+            alpha = Mathf.Clamp01(alpha);
+            // フェードインの間は少し下からせり上がる。
+            float rise = (1f - Mathf.Clamp01(age / PickupInSeconds)) * 10f;
+            var rect = new Rect(center - width * 0.5f, bottom - PickupHeight + rise, width, PickupHeight);
+            Color accent = ItemIcons.Accent(_pickupItem);
+            Color previous = GUI.color;
+            GUI.color = HudFade.Apply(new Color(Fill.r, Fill.g, Fill.b, Fill.a * alpha));
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = HudFade.Apply(new Color(accent.r, accent.g, accent.b, alpha));
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2f, rect.width, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, 4f, rect.height), Texture2D.whiteTexture);
+            float icon = PickupHeight - 16f;
+            Texture2D texture = ItemIcons.Get(_pickupItem);
+            if (texture != null)
+            {
+                GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
+                GUI.DrawTexture(new Rect(rect.x + 12f, rect.y + 8f, icon, icon), texture, ScaleMode.ScaleToFit);
+            }
+            float textX = rect.x + 20f + icon;
+            float textWidth = rect.xMax - 10f - textX;
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
+            _pickupName.normal.textColor = Color.white;
+            GUI.Label(new Rect(textX, rect.y + 5f, textWidth, 22f), ItemTexts.Name(_pickupItem), _pickupName);
+            _pickupKind.normal.textColor = accent;
+            GUI.Label(new Rect(textX, rect.y + 5f, textWidth, 22f), ItemTexts.Kind(_pickupItem), _pickupKind);
+            _pickupText.normal.textColor = new Color(0.86f, 0.9f, 0.96f);
+            GUI.Label(new Rect(textX, rect.y + 27f, textWidth, rect.height - 31f), ItemTexts.Description(_pickupItem), _pickupText);
+            GUI.color = previous;
         }
 
         // 逆転の恩恵を受けているか（試合中かアディショナルタイムで、順位の恩恵が 0 より多い）。順位が変わったら、印を入れ替える。
@@ -473,6 +566,8 @@ namespace Airerage.Runtime.Presentation
             float superCenter = x + 2 * (SlotWidth + SlotGap) + SlotWidth * 0.5f;
             float buffBottom = y - BuffGap;
             DrawBuff(new Vector2(superCenter, buffBottom - BuffHeight * 0.5f));
+            // 拾ったアイテムの札（名前と逆転の恩恵の印のさらに上）。
+            DrawPickup(x + total * 0.5f, y - above - 6f, total + PickupWidthExtra);
             HudFade.End();
             GUI.matrix = matrix;
             DrawHeadNotices();
@@ -815,6 +910,9 @@ namespace Airerage.Runtime.Presentation
             _number = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _notice = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false });
             _buff = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false, clipping = TextClipping.Overflow });
+            _pickupName = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false, clipping = TextClipping.Clip });
+            _pickupKind = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, wordWrap = false });
+            _pickupText = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 12, alignment = TextAnchor.UpperLeft, wordWrap = true, clipping = TextClipping.Clip });
             _upArrow = GuideIcons.Arrow(32, Color.white);
             foreach (GUIStyle style in new[] { _key, _name, _number, _notice, _buff })
             {
