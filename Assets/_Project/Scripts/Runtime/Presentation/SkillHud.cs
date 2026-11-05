@@ -432,7 +432,7 @@ namespace Airerage.Runtime.Presentation
             GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, alpha));
             _pickupName.normal.textColor = Color.white;
             GUI.Label(new Rect(textX, rect.y + 5f, textWidth, 22f), ItemTexts.Name(_pickupItem), _pickupName);
-            _pickupKind.normal.textColor = accent;
+            _pickupKind.normal.textColor = Color.Lerp(accent, Color.white, 0.45f);
             GUI.Label(new Rect(textX, rect.y + 5f, textWidth, 22f), ItemTexts.Kind(_pickupItem), _pickupKind);
             _pickupText.normal.textColor = new Color(0.86f, 0.9f, 0.96f);
             GUI.Label(new Rect(textX, rect.y + 27f, textWidth, rect.height - 31f), ItemTexts.Description(_pickupItem), _pickupText);

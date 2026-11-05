@@ -232,7 +232,7 @@ namespace Airerage.Runtime.UI
                 }
                 else
                 {
-                    Note(Loc.T($"UP TO {_limit} ITEMS. SELECT A CHOSEN ITEM TO REMOVE IT", $"選べるのは {_limit} 個までです。選んだアイテムを決定すると外せます"));
+                    Note(Loc.T($"UP TO {_limit} ITEMS. SELECT A CHOSEN ITEM TO REMOVE IT", $"選べるのは{_limit}個までです。選んだアイテムを決定すると外せます"));
                     return;
                 }
             }
@@ -242,7 +242,7 @@ namespace Airerage.Runtime.UI
                 uint next = _pool ^ bit;
                 if ((next & ItemCatalog.AllMask) == 0)
                 {
-                    Note(Loc.T("AT LEAST ONE ITEM MUST STAY CHECKED", "1 つ以上のアイテムにチェックが必要です"));
+                    Note(Loc.T("AT LEAST ONE ITEM MUST STAY CHECKED", "1つ以上のアイテムにチェックが必要です"));
                     return;
                 }
                 _pool = next;
@@ -297,7 +297,7 @@ namespace Airerage.Runtime.UI
             }
             if (Mode == SelectMode.Pick)
             {
-                _note.text = Loc.T($"CHOOSE UP TO {_limit} ITEMS ({_picks.Count} / {_limit})", $"持っていくアイテムを {_limit} 個まで選んでください（{_picks.Count} / {_limit}）");
+                _note.text = Loc.T($"CHOOSE UP TO {_limit} ITEMS ({_picks.Count} / {_limit})", $"持っていくアイテムを{_limit}個まで選んでください（{_picks.Count}／{_limit}）");
             }
             else
             {
@@ -332,7 +332,8 @@ namespace Airerage.Runtime.UI
             if (_popupKind != null)
             {
                 _popupKind.text = Presentation.ItemTexts.Kind(id);
-                _popupKind.color = Presentation.ItemIcons.Accent(id);
+                // 暗い色のアイテム（臙脂色の刀など）でも読めるように、白に寄せる。
+                _popupKind.color = Color.Lerp(Presentation.ItemIcons.Accent(id), Color.white, 0.45f);
             }
             if (_popupDescription != null)
             {

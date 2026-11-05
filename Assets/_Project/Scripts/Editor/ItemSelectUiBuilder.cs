@@ -121,8 +121,11 @@ namespace Airerage.Editor
             text.font = GameFonts.JapaneseBold;
             text.rectTransform.anchoredPosition += new Vector2(IconSize + 10f, 0f);
             text.rectTransform.sizeDelta = new Vector2(PlateWidth - IconSize - 90f, PlateHeight);
+            // 長い名前（アルティメットブースター極）も札に収める（折り返しを許すと、大きさを合わせる機能が 1 行に収まるまで縮める）。
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
             text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 16;
+            text.resizeTextMinSize = 14;
             text.resizeTextMaxSize = 24;
             option.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
             return option;

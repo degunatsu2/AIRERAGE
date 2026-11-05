@@ -555,6 +555,7 @@ MonoBehaviour:
       GaugeOnGuard: 20
       GaugeOnJustGuard: 200
       GaugePerCoin: 2
+      SkillDamageBonusPercent: 0
     Skills:
       MirrorBall:
         DurationTicks: 300
