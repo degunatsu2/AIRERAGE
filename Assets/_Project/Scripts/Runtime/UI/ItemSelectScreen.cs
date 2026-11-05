@@ -277,7 +277,8 @@ namespace Airerage.Runtime.UI
             _random.gameObject.SetActive(pick);
             if (pick)
             {
-                ((RectTransform)_random.transform).anchoredPosition = new Vector2(PlateLeft, y);
+                // 選んだときに動かす札は、元の位置（SetHome）で置く（anchoredPosition だと、選んだときに作ったときの位置へ戻る）。
+                _random.SetHome(new Vector2(PlateLeft, y));
                 y -= RowStep + SectionGap;
             }
             y = LayoutSection(_passiveHeader, 0, ItemCatalog.PassiveCount, y);
@@ -287,6 +288,19 @@ namespace Airerage.Runtime.UI
             size.y = -y + 12f;
             _content.sizeDelta = size;
             _content.anchoredPosition = new Vector2(_content.anchoredPosition.x, 0f);
+            SyncScrollbar();
+        }
+
+        // スクロールバーのつまみを中身の位置に合わせる（つまみの初めの値 0 は「いちばん下」なので、開いたときに下へ飛ばないように）。
+        private void SyncScrollbar()
+        {
+            Scrollbar bar = _scroll.verticalScrollbar;
+            if (bar == null)
+            {
+                return;
+            }
+            float range = _content.sizeDelta.y - ((RectTransform)_scroll.transform).rect.height;
+            bar.SetValueWithoutNotify(range > 0f ? 1f - Mathf.Clamp01(_content.anchoredPosition.y / range) : 1f);
         }
 
         private float LayoutSection(Text header, int first, int count, float y)
@@ -296,8 +310,7 @@ namespace Airerage.Runtime.UI
             y -= HeaderHeight;
             for (int k = 0; k < count; k++)
             {
-                var plate = (RectTransform)_options[first + k].transform;
-                plate.anchoredPosition = new Vector2(PlateLeft + (k % Columns) * ColumnStep, y - (k / Columns) * RowStep);
+                _options[first + k].SetHome(new Vector2(PlateLeft + (k % Columns) * ColumnStep, y - (k / Columns) * RowStep));
             }
             return y - (count + Columns - 1) / Columns * RowStep;
         }
@@ -324,6 +337,7 @@ namespace Airerage.Runtime.UI
             position.y = Mathf.Clamp(position.y, 0f, Mathf.Max(0f, _content.sizeDelta.y - view));
             _scroll.StopMovement();
             _content.anchoredPosition = position;
+            SyncScrollbar();
         }
 
         // ランダムセレクトの付け外し（付けると、ほかの選択はすべて外れる）。
