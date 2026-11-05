@@ -43,6 +43,7 @@ namespace Airerage.Runtime.Presentation
         private InputAction _reset;
         // アイテムの枠のキー（押しながらホイールを押し込むと、アイテムを捨てる。その間はズームを戻さない）。
         private InputAction[] _itemKeys = new InputAction[0];
+        private InputAction _itemMenu;
 
         /// <summary>目標の距離（m）。実際の距離はこれになめらかに近づく。</summary>
         public float TargetDistance { get; private set; }
@@ -87,6 +88,7 @@ namespace Airerage.Runtime.Presentation
                     }
                 }
                 _itemKeys = keys.ToArray();
+                _itemMenu = player.FindAction("ItemMenu", throwIfNotFound: false);
             }
             DefaultDistance = Mathf.Clamp(_composer.CameraDistance, _minDistance, _maxDistance);
             TargetDistance = DefaultDistance;
@@ -148,9 +150,11 @@ namespace Airerage.Runtime.Presentation
             // ホイールの値は1目盛りで ±1（Input System の既定の scrollDeltaBehavior）。上に回すと近づく。
             float scroll = _scroll.ReadValue<float>();
             // 十字キーの下で離れ、上で近づく。
-            float hold = _hold.ReadValue<float>();
+            // ゲームパッドの ITEM MENU（X）を押している間の十字キーは、アイテムの操作（docs/20_item_plan.md）。
+            bool menu = _itemMenu != null && _itemMenu.IsPressed();
+            float hold = menu ? 0f : _hold.ReadValue<float>();
             ZoomIn(scroll * _scrollStep + hold * _holdSpeed * Time.unscaledDeltaTime);
-            if (_reset.WasPressedThisFrame() && !ItemKeyHeld())
+            if (_reset.WasPressedThisFrame() && !ItemKeyHeld() && !menu)
             {
                 ResetZoom();
             }
@@ -165,7 +169,8 @@ namespace Airerage.Runtime.Presentation
         {
             foreach (InputAction key in _itemKeys)
             {
-                if (key.IsPressed())
+                // キーボードの枠のキーだけ（ゲームパッドの枠は十字キーで、ITEM MENU で分ける）。
+                if (Airerage.Runtime.Input.DeviceButtons.IsPressed(key, false))
                 {
                     return true;
                 }

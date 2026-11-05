@@ -137,6 +137,32 @@ namespace Airerage.Core.Objects
         /// End.X は半径、Stored は最後に打った人の番号 + 1（0 なら持ち主）、ChargeMilli は最後に打たれたティック、HitMask は打たれてから当てた人。
         /// </summary>
         SandBall = 26,
+
+        /// <summary>
+        /// グラップリングボム（アイテム）。重力で山なりに飛び、地形か相手に刺さって、少し後に爆発する。Stored は 0 飛んでいる・1 地形に
+        /// 刺さった・2 相手に刺さった（LastPushId がその人、End がその人からのずれ）。ChargeMilli は爆発するティック。
+        /// </summary>
+        ItemBomb = 27,
+
+        /// <summary>折りたたみの足場（アイテム）。End は半分の大きさ。動かない足場（ワイヤーもつながる。WorldCollision）。</summary>
+        ItemPlatform = 28,
+
+        /// <summary>携帯トランポリン（アイテム）。End は半分の大きさ。乗った人（だれでも）を跳ね上げる。Damage は跳ね上げた回数。</summary>
+        Trampoline = 29,
+
+        /// <summary>身代わり人形（アイテム）。End は持ち主の箱の半分の大きさ。Damage は受けた攻撃の回数（決まった回数で壊れる）。</summary>
+        Decoy = 30,
+
+        /// <summary>瓶詰めの雷雲（アイテム）。End は（雷の届く幅の半分、下への長さ）。Damage は落とした雷の数。</summary>
+        ThunderCloud = 31,
+
+        /// <summary>チェーンフックの鉤（アイテム）。照準の方向へ飛び、当たった相手を持ち主の前へ引き寄せる。ChargeMilli は飛んだ距離（mm）。</summary>
+        ChainHook = 32,
+
+        /// <summary>
+        /// スパイクの靴底で凍らせた壁（アイテム）。End は半分の大きさ。触れた相手（持ち主と味方は除く）を凍らせる。HitMask はもう凍らせた人。
+        /// </summary>
+        FrozenWall = 33,
     }
 
     /// <summary>クリームの味（PASTRY CHEF の E。WorldObject.Variant）。</summary>

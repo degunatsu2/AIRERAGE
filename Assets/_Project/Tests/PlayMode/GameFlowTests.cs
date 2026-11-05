@@ -268,8 +268,8 @@ namespace Airerage.PlayMode.Tests
         [UnityTest]
         public IEnumerator PauseMenu_BlocksGameInput_WhileOpen()
         {
-            // 一時停止のメニューを開いている間は、十字キーでカメラが寄り引きせず、閉じたときの決定（A）でジャンプしない
-            // （ユーザーの指摘、2026-10-19）。閉じた後は、離してからもう一度押せば使える。
+            // 一時停止のメニューを開いている間は、十字キーでカメラが寄り引きせず、閉じたときの決定（A）でガードしない
+            // （ユーザーの指摘、2026-10-19。2026-11-05 からゲームパッドの A はガード、ジャンプは L1）。閉じた後は、離してからもう一度押せば使える。
             InputSettings.EditorInputBehaviorInPlayMode savedBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
             InputSettings.BackgroundBehavior savedBackground = InputSystem.settings.backgroundBehavior;
             InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
@@ -300,19 +300,19 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(pause.Resume.gameObject));
                 Assert.That(zoom.TargetDistance, Is.EqualTo(distance), "一時停止中に十字キーでカメラが寄り引きした");
 
-                // RESUME を A で決定して、そのまま押し続けてもジャンプしない。
+                // RESUME を A で決定して、そのまま押し続けてもガードしない。
                 InputSystem.QueueStateEvent(gamepad, new GamepadState().WithButton(GamepadButton.South));
                 yield return null;
                 yield return null;
                 Assert.That(pause.IsOpen, Is.False, "A で RESUME が決まらない");
                 yield return WaitSeconds(0.3f);
-                Assert.That(runner.PlayerState.Grounded, Is.True, "メニューの決定に使った A でジャンプした");
+                Assert.That(runner.PlayerState.Action.Kind, Is.Not.EqualTo(Airerage.Core.Combat.ActionKind.Guard), "メニューの決定に使った A でガードした");
                 InputSystem.QueueStateEvent(gamepad, new GamepadState());
                 yield return null;
 
-                // 離した後は、A でジャンプでき、十字キーでカメラが動く。
-                yield return PressPad(gamepad, GamepadButton.South);
-                yield return WaitFor(() => !runner.PlayerState.Grounded, 1f, "閉じた後に A でジャンプできない");
+                // 離した後は、L1 でジャンプでき、十字キーでカメラが動く。
+                yield return PressPad(gamepad, GamepadButton.LeftShoulder);
+                yield return WaitFor(() => !runner.PlayerState.Grounded, 1f, "閉じた後に L1 でジャンプできない");
                 InputSystem.QueueStateEvent(gamepad, new GamepadState().WithButton(GamepadButton.DpadDown));
                 yield return WaitSeconds(0.2f);
                 InputSystem.QueueStateEvent(gamepad, new GamepadState());

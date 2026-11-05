@@ -117,9 +117,20 @@ namespace Airerage.PlayMode.Tests
                 .GetField("_inputActions", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(zoom);
             Assert.That(asset, Is.Not.Null, "前提: 入力のアセットがある");
 
-            Assert.That(Paths(asset, "Player", "Special1"), Does.Contain("<Gamepad>/leftShoulder").And.Contain("<Keyboard>/q"));
-            Assert.That(Paths(asset, "Player", "Special2"), Does.Contain("<Gamepad>/rightShoulder").And.Contain("<Keyboard>/e"));
-            Assert.That(Paths(asset, "Player", "Super"), Does.Contain("<Keyboard>/r"));
+            // 2026-11-05（ユーザーの指定）: Q・E は L2・R2（LT・RT）、R は Y、ジャンプは L1、ワイヤーは R1、攻撃は B、ガードは A、
+            // アイテムは X（ITEM MENU）を押しながら十字キーの左・上・右（捨てるのは X + A + 十字キー）。
+            Assert.That(Paths(asset, "Player", "Special1"), Does.Contain("<Gamepad>/leftTrigger").And.Contain("<Keyboard>/q"));
+            Assert.That(Paths(asset, "Player", "Special2"), Does.Contain("<Gamepad>/rightTrigger").And.Contain("<Keyboard>/e"));
+            Assert.That(Paths(asset, "Player", "Super"), Does.Contain("<Gamepad>/buttonNorth").And.Contain("<Keyboard>/r"));
+            Assert.That(Paths(asset, "Player", "Jump"), Does.Contain("<Gamepad>/leftShoulder"));
+            Assert.That(Paths(asset, "Player", "Wire"), Does.Contain("<Gamepad>/rightShoulder"));
+            Assert.That(Paths(asset, "Player", "Attack"), Does.Contain("<Gamepad>/buttonEast"));
+            Assert.That(Paths(asset, "Player", "Guard"), Does.Contain("<Gamepad>/buttonSouth"));
+            Assert.That(Paths(asset, "Player", "ItemMenu"), Does.Contain("<Gamepad>/buttonWest"));
+            Assert.That(Paths(asset, "Player", "Item1"), Does.Contain("<Gamepad>/dpad/left"));
+            Assert.That(Paths(asset, "Player", "Item2"), Does.Contain("<Gamepad>/dpad/up"));
+            Assert.That(Paths(asset, "Player", "Item3"), Does.Contain("<Gamepad>/dpad/right"));
+            Assert.That(Paths(asset, "Player", "ItemDrop"), Does.Contain("<Gamepad>/buttonSouth"));
             Assert.That(Paths(asset, "Camera", "HoldZoom"), Does.Contain("<Gamepad>/dpad/up").And.Contain("<Gamepad>/dpad/down"));
             Assert.That(Paths(asset, "Camera", "ResetZoom"),
                 Does.Contain("<Gamepad>/dpad/left").And.Contain("<Gamepad>/dpad/right").And.Contain("<Mouse>/middleButton"));

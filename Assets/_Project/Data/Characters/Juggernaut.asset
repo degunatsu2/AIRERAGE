@@ -529,6 +529,18 @@ MonoBehaviour:
       GaugeOnJustGuard: 200
       GaugePerCoin: 2
       SkillDamageBonusPercent: 0
+      ItemDamageTakenPercent: 0
+      ItemKnockbackTakenPercent: 0
+      ItemGaugePercent: 0
+      ItemCoinPickupScale: 1
+      ItemBankBonusPercent: 0
+      ItemRespawnReductionTicks: 0
+      ItemKoDropPercent: 100
+      ItemKoDropAll: 0
+      ItemCharmDamagePercent: 0
+      ItemCharmGaugePercent: 0
+      ItemCharmCoinPercent: 0
+      ItemFreezesWalls: 0
     Skills:
       MirrorBall:
         DurationTicks: 300

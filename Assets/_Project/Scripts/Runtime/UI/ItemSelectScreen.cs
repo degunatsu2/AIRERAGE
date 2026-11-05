@@ -16,6 +16,10 @@ namespace Airerage.Runtime.UI
     /// - ドロップするアイテム（ShowPool）: 札の左のチェックを決定で付け外しする（最後の 1 つは外せない）。変えるたびに PoolChanged。
     /// どちらも戻る操作（Esc・B）か DONE で Closed。オプション（PlayerPrefs の ItemSettings）とネットワーク対戦の待機所の両方で使う
     /// （待機所では、開いている間も待機所に入ったまま。状態は「アイテム選択中……」）。
+    /// 2026-11-05（ユーザーの要望）: 札はパッシブとアクティブの見出しで分け、画面に収まらない分はスクロールで見る（ホイール・ドラッグ。
+    /// カーソルを動かすと、選んだ札が見える所までスクロールする）。初期アイテムでは、いちばん上に RANDOM（ランダムセレクト）。選ぶと
+    /// ほかの選択がすべて外れ、試合の始めに初期アイテム数だけのランダムなアイテムを持つ（全員で同じ。SimWorld.SetItems）。
+    /// 札の並びは実行中に決める（Layout。アイテムを足しても、ビルダーの位置を直さなくてよい）。
     /// </summary>
     public sealed class ItemSelectScreen : MonoBehaviour
     {
@@ -29,6 +33,14 @@ namespace Airerage.Runtime.UI
 
         private const float PopupSeconds = 0.14f;
 
+        // 札の並び（スクロールの中身の中の位置。左上から）。
+        private const int Columns = 2;
+        private const float PlateLeft = 64f;
+        private const float ColumnStep = 430f;
+        private const float RowStep = 76f;
+        private const float HeaderHeight = 48f;
+        private const float SectionGap = 14f;
+
         [Tooltip("アイテムの札（ItemCatalog の順）")]
         [SerializeField] private MenuOption[] _options = new MenuOption[0];
         [Tooltip("札の左の、入るバッグのキーの箱とその文字（_options と同じ順。初期アイテムで選んだときだけ）")]
@@ -39,6 +51,17 @@ namespace Airerage.Runtime.UI
         [SerializeField] private GameObject[] _checkMarks = new GameObject[0];
         [Tooltip("札の中のアイテムの絵（_options と同じ順）")]
         [SerializeField] private RawImage[] _icons = new RawImage[0];
+        [Tooltip("ランダムセレクトの札と、そのチェックの箱・印・絵（初期アイテムのときだけ出す）")]
+        [SerializeField] private MenuOption _random;
+        [SerializeField] private GameObject _randomCheck;
+        [SerializeField] private GameObject _randomMark;
+        [SerializeField] private RawImage _randomIcon;
+        [Tooltip("札を入れるスクロールの中身と、スクロール（ホイール・ドラッグ）")]
+        [SerializeField] private RectTransform _content;
+        [SerializeField] private ScrollRect _scroll;
+        [Tooltip("パッシブとアクティブの見出し（スクロールの中身の中）")]
+        [SerializeField] private Text _passiveHeader;
+        [SerializeField] private Text _activeHeader;
         [SerializeField] private MenuOption _done;
         [SerializeField] private Text _title;
         [SerializeField] private Text _note;
@@ -53,7 +76,7 @@ namespace Airerage.Runtime.UI
 
         private readonly List<ItemId> _picks = new List<ItemId>();
         private readonly string[] _keyNames = { "Z", "X", "C" };
-        private uint _pool = ItemCatalog.AllMask;
+        private ulong _pool = ItemCatalog.AllMask;
         private int _limit = ItemCatalog.BagSlots;
         private int _selectAtFrame = -1;
         private int _highlighted = -1;
@@ -70,7 +93,7 @@ namespace Airerage.Runtime.UI
         public event Action<ItemId[]> PicksChanged;
 
         /// <summary>ドロップするアイテムを変えた（ビット）。</summary>
-        public event Action<uint> PoolChanged;
+        public event Action<ulong> PoolChanged;
 
         /// <summary>閉じた（戻る操作か DONE）。</summary>
         public event Action Closed;
@@ -79,12 +102,22 @@ namespace Airerage.Runtime.UI
         public int Count => _options.Length;
         public MenuOption Option(int index) => _options[index];
         public MenuOption Done => _done;
+        public MenuOption RandomOption => _random;
 
-        /// <summary>選んでいる初期アイテム（Z・X・C の順）。</summary>
+        /// <summary>選んでいる初期アイテム（Z・X・C の順。ランダムセレクトなら ItemId.Random だけ）。</summary>
         public IReadOnlyList<ItemId> Picks => _picks;
 
+        /// <summary>ランダムセレクトを選んでいるか。</summary>
+        public bool RandomPicked => _picks.Count == 1 && _picks[0] == ItemId.Random;
+
         /// <summary>ドロップするアイテム（ビット）。</summary>
-        public uint Pool => _pool;
+        public ulong Pool => _pool;
+
+        /// <summary>ランダムセレクトのチェックが付いているか（テスト用）。</summary>
+        public bool RandomShown => _randomMark != null && _randomMark.activeSelf && _random != null && _random.gameObject.activeSelf;
+
+        /// <summary>スクロールの中身の位置（上からの量。テスト用）。</summary>
+        public float ScrollOffset => _content != null ? _content.anchoredPosition.y : 0f;
 
         /// <summary>札 index の左に出しているキー（テスト用。なければ空）。</summary>
         public string KeyShown(int index) => index < _keyBoxes.Length && _keyBoxes[index] != null && _keyBoxes[index].activeSelf ? _keys[index].text : string.Empty;
@@ -109,9 +142,11 @@ namespace Airerage.Runtime.UI
             }
             if (_options.Length != ItemCatalog.Count || _keys.Length != _options.Length || _keyBoxes.Length != _options.Length
                 || _checkBoxes.Length != _options.Length
-                || _checkMarks.Length != _options.Length || _icons.Length != _options.Length || _done == null)
+                || _checkMarks.Length != _options.Length || _icons.Length != _options.Length || _done == null || _random == null
+                || _randomCheck == null || _randomMark == null || _content == null || _scroll == null || _passiveHeader == null || _activeHeader == null)
             {
-                Debug.LogError($"{name}: アイテムの札（{_options.Length} / {ItemCatalog.Count}）か、キー・チェック・絵・DONE が設定されていません", this);
+                Debug.LogError($"{name}: アイテムの札（{_options.Length} / {ItemCatalog.Count}）か、キー・チェック・絵・RANDOM・スクロール・見出し・DONE が" +
+                    "設定されていません", this);
                 enabled = false;
                 return false;
             }
@@ -130,6 +165,13 @@ namespace Airerage.Runtime.UI
             _done.Clicked.AddListener(Close);
             _done.Cancelled += Close;
             _done.Selected += () => Highlight(-1);
+            _random.Selected += () => Highlight(RandomIndex);
+            _random.Clicked.AddListener(ToggleRandom);
+            _random.Cancelled += Close;
+            if (_randomIcon != null)
+            {
+                _randomIcon.texture = Presentation.ItemIcons.RandomIcon();
+            }
             return true;
         }
 
@@ -142,13 +184,20 @@ namespace Airerage.Runtime.UI
             }
             _limit = Mathf.Clamp(limit, 1, ItemCatalog.BagSlots);
             _picks.Clear();
-            _picks.AddRange(ItemSettings.Trim(current, _limit));
+            if (current != null && current.Count > 0 && current[0] == ItemId.Random)
+            {
+                _picks.Add(ItemId.Random);
+            }
+            else
+            {
+                _picks.AddRange(ItemSettings.Trim(current, _limit));
+            }
             ReadKeyNames();
             Open(SelectMode.Pick);
         }
 
         /// <summary>ドロップするアイテムを選ぶ画面として出す（pool はビット）。</summary>
-        public void ShowPool(uint pool)
+        public void ShowPool(ulong pool)
         {
             if (!Wire())
             {
@@ -190,6 +239,10 @@ namespace Airerage.Runtime.UI
             {
                 _options[i].SetLabel(Presentation.ItemTexts.Name(ItemCatalog.At(i)));
             }
+            _random.SetLabel(Loc.T("RANDOM", "ランダム"));
+            _passiveHeader.text = Loc.T("PASSIVE", "パッシブ");
+            _activeHeader.text = Loc.T("ACTIVE", "アクティブ");
+            Layout();
             Refresh();
             Note();
             _highlighted = -1;
@@ -216,11 +269,91 @@ namespace Airerage.Runtime.UI
             }
         }
 
+        // 札の並び: （初期アイテムなら RANDOM）→ パッシブの見出しと札 → アクティブの見出しと札（2 列）。中身の高さも合わせる。
+        private void Layout()
+        {
+            float y = 0f;
+            bool pick = Mode == SelectMode.Pick;
+            _random.gameObject.SetActive(pick);
+            if (pick)
+            {
+                ((RectTransform)_random.transform).anchoredPosition = new Vector2(PlateLeft, y);
+                y -= RowStep + SectionGap;
+            }
+            y = LayoutSection(_passiveHeader, 0, ItemCatalog.PassiveCount, y);
+            y -= SectionGap;
+            y = LayoutSection(_activeHeader, ItemCatalog.PassiveCount, ItemCatalog.ActiveCount, y);
+            Vector2 size = _content.sizeDelta;
+            size.y = -y + 12f;
+            _content.sizeDelta = size;
+            _content.anchoredPosition = new Vector2(_content.anchoredPosition.x, 0f);
+        }
+
+        private float LayoutSection(Text header, int first, int count, float y)
+        {
+            var rect = header.rectTransform;
+            rect.anchoredPosition = new Vector2(PlateLeft - 40f, y);
+            y -= HeaderHeight;
+            for (int k = 0; k < count; k++)
+            {
+                var plate = (RectTransform)_options[first + k].transform;
+                plate.anchoredPosition = new Vector2(PlateLeft + (k % Columns) * ColumnStep, y - (k / Columns) * RowStep);
+            }
+            return y - (count + Columns - 1) / Columns * RowStep;
+        }
+
+        // 選んだ札が見える所までスクロールする（見出しのすぐ下の札なら見出しも見せる）。
+        private void KeepVisible(RectTransform plate)
+        {
+            if (plate == null || plate.parent != _content)
+            {
+                return;
+            }
+            float view = ((RectTransform)_scroll.transform).rect.height;
+            float top = -plate.anchoredPosition.y - HeaderHeight - 6f;
+            float bottom = -plate.anchoredPosition.y + plate.rect.height + 8f;
+            Vector2 position = _content.anchoredPosition;
+            if (top < position.y)
+            {
+                position.y = Mathf.Max(0f, top);
+            }
+            else if (bottom > position.y + view)
+            {
+                position.y = bottom - view;
+            }
+            position.y = Mathf.Clamp(position.y, 0f, Mathf.Max(0f, _content.sizeDelta.y - view));
+            _scroll.StopMovement();
+            _content.anchoredPosition = position;
+        }
+
+        // ランダムセレクトの付け外し（付けると、ほかの選択はすべて外れる）。
+        private void ToggleRandom()
+        {
+            if (Mode != SelectMode.Pick)
+            {
+                return;
+            }
+            bool random = RandomPicked;
+            _picks.Clear();
+            if (!random)
+            {
+                _picks.Add(ItemId.Random);
+            }
+            PicksChanged?.Invoke(_picks.ToArray());
+            Refresh();
+            Note();
+        }
+
         private void Toggle(int index)
         {
             ItemId id = ItemCatalog.At(index);
             if (Mode == SelectMode.Pick)
             {
+                if (RandomPicked)
+                {
+                    // ランダムセレクトから、選んだアイテムへ切り替える。
+                    _picks.Clear();
+                }
                 if (_picks.Remove(id))
                 {
                     PicksChanged?.Invoke(_picks.ToArray());
@@ -238,8 +371,8 @@ namespace Airerage.Runtime.UI
             }
             else if (Mode == SelectMode.Pool)
             {
-                uint bit = ItemCatalog.Bit(id);
-                uint next = _pool ^ bit;
+                ulong bit = ItemCatalog.Bit(id);
+                ulong next = _pool ^ bit;
                 if ((next & ItemCatalog.AllMask) == 0)
                 {
                     Note(Loc.T("AT LEAST ONE ITEM MUST STAY CHECKED", "1つ以上のアイテムにチェックが必要です"));
@@ -254,6 +387,9 @@ namespace Airerage.Runtime.UI
 
         private void Refresh()
         {
+            bool random = RandomPicked;
+            _randomCheck.SetActive(Mode == SelectMode.Pick);
+            _randomMark.SetActive(Mode == SelectMode.Pick && random);
             for (int i = 0; i < _options.Length; i++)
             {
                 ItemId id = ItemCatalog.At(i);
@@ -279,7 +415,7 @@ namespace Airerage.Runtime.UI
                 {
                     // 選んでいない・チェックのないアイテムは少し暗く。
                     bool on = Mode == SelectMode.Pick ? picked : (_pool & ItemCatalog.Bit(id)) != 0;
-                    _icons[i].color = on || (Mode == SelectMode.Pick && _picks.Count < _limit) ? Color.white : new Color(0.55f, 0.55f, 0.6f, 1f);
+                    _icons[i].color = on || (Mode == SelectMode.Pick && !random && _picks.Count < _limit) ? Color.white : new Color(0.55f, 0.55f, 0.6f, 1f);
                 }
             }
         }
@@ -295,7 +431,11 @@ namespace Airerage.Runtime.UI
                 _note.text = text;
                 return;
             }
-            if (Mode == SelectMode.Pick)
+            if (Mode == SelectMode.Pick && RandomPicked)
+            {
+                _note.text = Loc.T($"RANDOM: START WITH {_limit} RANDOM ITEMS", $"ランダム: 試合の始めに{_limit}個のランダムなアイテムを持ちます");
+            }
+            else if (Mode == SelectMode.Pick)
             {
                 _note.text = Loc.T($"CHOOSE UP TO {_limit} ITEMS ({_picks.Count} / {_limit})", $"持っていくアイテムを{_limit}個まで選んでください（{_picks.Count}／{_limit}）");
             }
@@ -313,46 +453,67 @@ namespace Airerage.Runtime.UI
             {
                 return;
             }
-            if (index < 0)
+            if (index == -1)
             {
                 _popup.gameObject.SetActive(false);
                 return;
             }
-            ItemId id = ItemCatalog.At(index);
+            bool random = index == RandomIndex;
+            ItemId id = random ? ItemId.Random : ItemCatalog.At(index);
+            var plate = (RectTransform)(random ? _random.transform : _options[index].transform);
+            KeepVisible(plate);
             _popup.gameObject.SetActive(true);
             if (_popupIcon != null)
             {
-                _popupIcon.texture = Presentation.ItemIcons.Get(id);
+                _popupIcon.texture = random ? Presentation.ItemIcons.RandomIcon() : Presentation.ItemIcons.Get(id);
             }
             if (_popupName != null)
             {
-                _popupName.text = Presentation.ItemTexts.Name(id);
+                _popupName.text = random ? Loc.T("RANDOM SELECT", "ランダムセレクト") : Presentation.ItemTexts.Name(id);
                 _popupName.font = GameFonts.Switch(_popupName.font, GameSettings.LoadLanguage() == GameLanguage.Japanese);
             }
             if (_popupKind != null)
             {
-                _popupKind.text = Presentation.ItemTexts.Kind(id);
+                _popupKind.text = random ? Loc.T($"{_limit} ITEMS", $"{_limit}個") : Presentation.ItemTexts.Kind(id);
                 // 暗い色のアイテム（臙脂色の刀など）でも読めるように、白に寄せる。
-                _popupKind.color = Color.Lerp(Presentation.ItemIcons.Accent(id), Color.white, 0.45f);
+                _popupKind.color = random ? MenuAccent : Color.Lerp(Presentation.ItemIcons.Accent(id), Color.white, 0.45f);
             }
             if (_popupDescription != null)
             {
-                LineBreakText.Set(_popupDescription, Presentation.ItemTexts.Description(id));
+                LineBreakText.Set(_popupDescription, random
+                    ? Loc.T($"Clears your other picks. You start with {_limit} random items (the same picks on every player's screen).",
+                        $"ほかの選択はすべて外れる。試合の始めに、初期アイテム数（{_limit}個）だけランダムなアイテムを持つ（どの人の画面でも同じアイテム）。")
+                    : Presentation.ItemTexts.Description(id));
             }
-            // カーソルの札の高さに合わせる（画面の外にはみ出さない）。
-            var plate = (RectTransform)_options[index].transform;
+            // カーソルの札の高さに合わせる（スクロールの中の札は、画面での高さに直す。画面の外にはみ出さない）。
+            var parent = (RectTransform)_popup.parent;
+            Vector3 local = parent.InverseTransformPoint(plate.position);
+            float plateY = local.y - parent.rect.yMax;
             Vector2 position = _popup.anchoredPosition;
-            position.y = Mathf.Clamp(plate.anchoredPosition.y + 20f, -960f + _popup.sizeDelta.y, -150f);
+            position.y = Mathf.Clamp(plateY + 20f, -960f + _popup.sizeDelta.y, -150f);
             _popup.anchoredPosition = position;
         }
+
+        /// <summary>Highlight の、ランダムセレクトの札の番号（アイテムの札は 0〜、DONE は -1）。</summary>
+        private const int RandomIndex = -2;
+
+        private static readonly Color MenuAccent = new Color(0.35f, 0.85f, 1f, 1f);
 
         private void Update()
         {
             if (_selectAtFrame >= 0 && Time.frameCount >= _selectAtFrame)
             {
                 _selectAtFrame = -1;
-                _options[0].SelectQuietly();
-                Highlight(0);
+                if (Mode == SelectMode.Pick)
+                {
+                    _random.SelectQuietly();
+                    Highlight(RandomIndex);
+                }
+                else
+                {
+                    _options[0].SelectQuietly();
+                    Highlight(0);
+                }
             }
             if (_popup != null && _popup.gameObject.activeSelf)
             {

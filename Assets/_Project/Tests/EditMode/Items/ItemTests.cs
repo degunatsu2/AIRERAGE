@@ -261,7 +261,7 @@ namespace Airerage.Core.Tests.Items
             MatchRules rules = MatchRules.FreePlay();
             rules.ItemMode = ItemMode.ItemDrop;
             rules.ItemDropRate = 1;
-            rules.ItemDropPool = (int)(ItemCatalog.Bit(ItemId.EarBone) | ItemCatalog.Bit(ItemId.PhotonShield));
+            rules.ItemDropPool = (long)(ItemCatalog.Bit(ItemId.EarBone) | ItemCatalog.Bit(ItemId.PhotonShield));
             var spawns = new[] { new CoinSpawnPoint(new Vector2(-5f, 8f), 1), new CoinSpawnPoint(new Vector2(5f, 8f), 1) };
             var world = new SimWorld(TestArenas.Ground(), new StageBounds(-60f, -30f, 60f, 60f), rules: rules, coinSpawns: spawns);
             world.AddCharacter(new CharacterConfig(), new Vector3(30f, GroundY, 0f));

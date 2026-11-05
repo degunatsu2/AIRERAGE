@@ -30,7 +30,8 @@ namespace Airerage.Runtime.Presentation
     /// 必殺技の札の真上に白い縁の四角の印（上向きの矢印と順位）を出す。順位が変わると、前の印が大きくなりながら消え、新しい印が白く
     /// 光りながら縮んで現れる。
     /// アイテムを拾ったときは、札の真上に拾ったアイテムの絵・名前・効果の札をフェードインして出し、しばらくしたらフェードアウトする
-    /// （ユーザーの要望、2026-11-05。docs/20_item_plan.md）。
+    /// （ユーザーの要望、2026-11-05。docs/20_item_plan.md）。この札はほかの表示より前に描き（SkillHudFront。GUI.depth）、キャラクターと
+    /// 重なっても透かさない。アクティブアイテムのクールタイムが終わったときも、技と同じ頭上の通知（アイテムの絵）と音を出す。
     /// オフライン（SimulationRunner）とオンライン（OnlineRunner）のどちらでも使う（ISimulationFeed）。状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class SkillHud : MonoBehaviour
@@ -65,7 +66,7 @@ namespace Airerage.Runtime.Presentation
         private static readonly Color BuffColor = new Color(0.55f, 1f, 0.55f);
 
         private static readonly AttackSlot[] Slots = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
-        private static readonly string[] Keys = { "Q / LB", "E / RB", "R / R3" };
+        private static readonly string[] Keys = { "Q / LT", "E / RT", "R / Y" };
         private static readonly Color Fill = new Color(0.03f, 0.05f, 0.09f, 0.82f);
         private static readonly Color Idle = new Color(0.45f, 0.5f, 0.6f, 0.9f);
         private static readonly Color SpecialColor = new Color(0.35f, 0.85f, 1f);
@@ -116,6 +117,15 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _pickupName;
         private GUIStyle _pickupKind;
         private GUIStyle _pickupText;
+        // アイテムバッグの枠ごとの「使える」（頭上の通知を出すため。持っているアイテムが変わった枠は数え直す）。
+        private readonly bool[] _itemReady = new bool[Airerage.Core.Items.ItemCatalog.BagSlots];
+        private readonly Airerage.Core.Items.ItemId[] _itemSeen = new Airerage.Core.Items.ItemId[Airerage.Core.Items.ItemCatalog.BagSlots];
+        private int _itemCharacter = -1;
+        private SkillHudFront _front;
+        private readonly ItemWheel _wheel = new ItemWheel();
+
+        /// <summary>ゲームパッドの ITEM MENU の頭上のアイテムバッグ（テスト用）。</summary>
+        public ItemWheel Wheel => _wheel;
 
         /// <summary>札 1 枚の今の表示（テスト用）。</summary>
         public sealed class Slot
@@ -222,11 +232,16 @@ namespace Airerage.Runtime.Presentation
             {
                 Debug.LogError($"{name}: 状態を読む相手（ISimulationFeed）が設定されていません", this);
                 enabled = false;
+                return;
             }
+            // 拾ったアイテムの札をほかの表示より前に描く部品（実行中に足す）。
+            _front = gameObject.AddComponent<SkillHudFront>();
+            _front.Hud = this;
         }
 
         private void OnDestroy()
         {
+            _wheel.Release();
             foreach (Texture2D texture in new[] { _fill, _frame, _line, _upArrow, _partial[0], _partial[1], _partial[2], _stack[0], _stack[1], _stack[2] })
             {
                 if (texture != null)
@@ -367,7 +382,47 @@ namespace Airerage.Runtime.Presentation
             _notices.RemoveAll(n => Time.time - n.At >= HeadNoticeSeconds);
             UpdateBuff(shown ? local : -1);
             UpdatePickup(shown ? local : -1);
+            UpdateItemReady(shown ? local : -1);
+            _wheel.Update(_feed, shown ? local : -1);
         }
+
+        /// <summary>アイテムのクールタイムが終わって頭上に通知を出した回数（テスト用）。</summary>
+        public int ItemReadyCount { get; private set; }
+
+        // アクティブアイテムのスタックが 0 から戻ったら、頭上に通知（アイテムの絵）と音。拾った・持ち替えた枠は、その時点の状態から数える。
+        private void UpdateItemReady(int local)
+        {
+            if (local < 0)
+            {
+                _itemCharacter = -1;
+                return;
+            }
+            CharacterState state = _feed.GetState(local);
+            Airerage.Core.Items.ItemBag bag = state.Items;
+            Airerage.Core.Items.ItemTuning tuning = ItemValues;
+            bool fresh = local != _itemCharacter;
+            _itemCharacter = local;
+            for (int i = 0; i < _itemReady.Length; i++)
+            {
+                Airerage.Core.Items.ItemId id = bag.Get(i);
+                bool ready = Airerage.Core.Items.ItemCatalog.IsActive(id) && Airerage.Core.Items.ItemRules.ChargesLeft(bag, i, tuning) > 0;
+                if (!fresh && id == _itemSeen[i] && ready && !_itemReady[i])
+                {
+                    ItemReadyCount++;
+                    if (_audio != null)
+                    {
+                        _audio.Play(SoundId.SkillReady, 0.6f);
+                    }
+                    _notices.Add(new HeadNotice { Text = ItemTexts.Name(id), Icon = ItemIcons.Get(id), Color = ItemIcons.Accent(id), At = Time.time });
+                    HeadNoticeCount++;
+                }
+                _itemSeen[i] = id;
+                _itemReady[i] = ready;
+            }
+        }
+
+        // 値は全員で同じ（ItemTuning の初めの値）。
+        private static readonly Airerage.Core.Items.ItemTuning ItemValues = new Airerage.Core.Items.ItemTuning();
 
         // 拾った回数が増えたら、最後に拾ったアイテムの札を出す（表示するキャラクターが変わったときは数え直す）。
         private void UpdatePickup(int local)
@@ -524,12 +579,38 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             EnsureResources();
-            float total = SlotCount * SlotWidth + (SlotCount - 1) * SlotGap;
-            float center = Screen.width * 0.5f;
             Matrix4x4 matrix = GUI.matrix;
+            // 画面の下を人数で等分した、自分の番号の場所（狭ければ縮める）。CPU（人の後ろの番号）には札を出さないので数えない。
+            // 上（above）は、ローカル対戦の名前と逆転の恩恵の印の分。
+            Place(out float x, out float y, out float total, out float above);
+            // キャラクターと重なったら、札を透かす（HudOcclusion。名前とスタックのゲージを含めた範囲を、画面の座標で調べる）。
+            float side = StackSpacing + StackWidth;
+            var area = new Rect(x - side, y - above, total + side * 2f, SlotHeight + above);
+            HudFade.Begin(_occlusion.AlphaFor(this, 0, ToScreen(GUI.matrix, area)));
+            for (int i = 0; i < SlotCount; i++)
+            {
+                DrawSlot(_slots[i], i, new Rect(x + i * (SlotWidth + SlotGap), y, SlotWidth, SlotHeight));
+            }
             if (_player >= 0)
             {
-                // 画面の下を人数で等分した、自分の番号の場所（狭ければ縮める）。CPU（人の後ろの番号）には札を出さないので数えない。
+                GuidePlate.DrawText(new Rect(x, y - 24f, total, 22f), _feed.LabelOf(_player), _name, _feed.ColorOf(_player));
+            }
+            // 逆転の恩恵の印（必殺技の札の真上のすぐ上。ローカル対戦の名前は札の全体の真ん中なので、重ならない）。
+            float superCenter = x + 2 * (SlotWidth + SlotGap) + SlotWidth * 0.5f;
+            float buffBottom = y - BuffGap;
+            DrawBuff(new Vector2(superCenter, buffBottom - BuffHeight * 0.5f));
+            HudFade.End();
+            GUI.matrix = matrix;
+            DrawHeadNotices();
+        }
+
+        // 札の並びの場所（ローカル対戦は、画面の下を人数で等分した自分の場所。狭ければ GUI.matrix を縮める）。
+        private void Place(out float x, out float y, out float total, out float above)
+        {
+            total = SlotCount * SlotWidth + (SlotCount - 1) * SlotGap;
+            float center = Screen.width * 0.5f;
+            if (_player >= 0)
+            {
                 int people = _feed.CharacterCount;
                 if (_feed is ICpuRoster roster)
                 {
@@ -546,31 +627,25 @@ namespace Airerage.Runtime.Presentation
                     GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), new Vector2(center, Screen.height));
                 }
             }
-            float x = center - total * 0.5f;
-            float y = Screen.height - BottomMargin - SlotHeight;
-            // キャラクターと重なったら、札を透かす（HudOcclusion。名前とスタックのゲージを含めた範囲を、画面の座標で調べる）。
-            float side = StackSpacing + StackWidth;
-            // 上は、ローカル対戦の名前と逆転の恩恵の印の分も含める。
-            float above = Mathf.Max(24f, BuffGap + BuffHeight);
-            var area = new Rect(x - side, y - above, total + side * 2f, SlotHeight + above);
-            HudFade.Begin(_occlusion.AlphaFor(this, 0, ToScreen(GUI.matrix, area)));
-            for (int i = 0; i < SlotCount; i++)
+            x = center - total * 0.5f;
+            y = Screen.height - BottomMargin - SlotHeight;
+            above = Mathf.Max(24f, BuffGap + BuffHeight);
+        }
+
+        /// <summary>拾ったアイテムの札を描く（SkillHudFront から。名前と逆転の恩恵の印のさらに上。キャラクターと重なっても透かさない）。</summary>
+        internal void DrawFront()
+        {
+            if (_feed == null || !_slots[0].Shown)
             {
-                DrawSlot(_slots[i], i, new Rect(x + i * (SlotWidth + SlotGap), y, SlotWidth, SlotHeight));
+                return;
             }
-            if (_player >= 0)
-            {
-                GuidePlate.DrawText(new Rect(x, y - 24f, total, 22f), _feed.LabelOf(_player), _name, _feed.ColorOf(_player));
-            }
-            // 逆転の恩恵の印（必殺技の札の真上のすぐ上。ローカル対戦の名前は札の全体の真ん中なので、重ならない）。
-            float superCenter = x + 2 * (SlotWidth + SlotGap) + SlotWidth * 0.5f;
-            float buffBottom = y - BuffGap;
-            DrawBuff(new Vector2(superCenter, buffBottom - BuffHeight * 0.5f));
-            // 拾ったアイテムの札（名前と逆転の恩恵の印のさらに上）。
+            // ゲームパッドの ITEM MENU の頭上のアイテムバッグ（画面の座標で描く。ローカル対戦の札の縮小は効かせない）。
+            _wheel.Draw(_feed, _camera != null ? _camera : Camera.main);
+            EnsureResources();
+            Matrix4x4 matrix = GUI.matrix;
+            Place(out float x, out float y, out float total, out float above);
             DrawPickup(x + total * 0.5f, y - above - 6f, total + PickupWidthExtra);
-            HudFade.End();
             GUI.matrix = matrix;
-            DrawHeadNotices();
         }
 
         // 逆転の恩恵の印を中心 center に描く（新しい印は白く光りながら縮んで現れ、前の印は大きくなりながら消える）。

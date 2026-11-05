@@ -77,8 +77,11 @@ namespace Airerage.Core.Combat
             respawned.Combat.Knockouts = state.Combat.Knockouts;
             respawned.Combat.Falls = state.Combat.Falls + 1;
             respawned.Combat.Gauge = state.Combat.Gauge;
-            respawned.Combat.RespawnTicksLeft = rules.RespawnDelayTicks;
-            respawned.Combat.InvincibleTicksLeft = rules.RespawnDelayTicks + rules.InvincibleTicks;
+            // 不死鳥の羽根（アイテム）で復帰待ちが短くなる。
+            int delay = rules.RespawnDelayTicks <= 0 ? 0
+                : System.Math.Max(1, rules.RespawnDelayTicks - (combat != null ? combat.ItemRespawnReductionTicks : 0));
+            respawned.Combat.RespawnTicksLeft = delay;
+            respawned.Combat.InvincibleTicksLeft = delay + rules.InvincibleTicks;
             // 押し続けているボタンを、戻った直後に押したとみなさない（ワイヤーの射出などが勝手に起きないように）。
             respawned.PreviousButtons = state.PreviousButtons;
             respawned.JumpPadCount = state.JumpPadCount;

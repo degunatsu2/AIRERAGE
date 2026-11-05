@@ -248,6 +248,11 @@ namespace Airerage.Runtime.Presentation
                         float left = cooldown < 0 ? 1f : Mathf.Clamp01(cooldown / (float)full);
                         GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.62f));
                         GUI.DrawTexture(new Rect(cell.x, cell.y, cell.width, cell.height * left), Texture2D.whiteTexture);
+                        if (cooldown > 0)
+                        {
+                            // 残りの秒数をアイコンの真ん中に（ユーザーの要望、2026-11-05）。
+                            DrawSeconds(cell, cooldown);
+                        }
                     }
                 }
                 if (i > 0)
@@ -265,6 +270,24 @@ namespace Airerage.Runtime.Presentation
             GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.25f));
             GUI.DrawTexture(new Rect(area.xMax - 1f, area.y + 4f, 1f, area.height - 8f), Texture2D.whiteTexture);
             GUI.color = previous;
+        }
+
+        private static GUIStyle _seconds;
+
+        // クールタイムの残りの秒数（切り上げ。影を付けた白い太字）。
+        private static void DrawSeconds(Rect cell, int ticks)
+        {
+            if (_seconds == null)
+            {
+                _seconds = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow });
+            }
+            _seconds.fontSize = Mathf.Max(10, Mathf.RoundToInt(cell.height * 0.55f));
+            string text = Mathf.CeilToInt(ticks / (float)Airerage.Core.Common.SimTime.TicksPerSecond).ToString();
+            _seconds.normal.textColor = HudFade.Apply(new Color(0f, 0f, 0f, 0.9f));
+            GUI.color = Color.white;
+            GUI.Label(new Rect(cell.x + 1.5f, cell.y + 1.5f, cell.width, cell.height), text, _seconds);
+            _seconds.normal.textColor = HudFade.Apply(Color.white);
+            GUI.Label(cell, text, _seconds);
         }
 
         // WANTED の赤い強調: 札が赤く脈打ち、縁が赤くなり、札の上に斜めの「WANTED!」のスタンプ（二重の枠と文字。押すときは大きくから縮む）。

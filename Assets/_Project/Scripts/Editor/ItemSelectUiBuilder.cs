@@ -10,16 +10,17 @@ namespace Airerage.Editor
     /// <summary>
     /// アイテムを選ぶ画面（ItemSelectScreen。ユーザーの要望、2026-11-05。docs/20_item_plan.md）を作る。ステージ選択と同じ形: 左にアイテムの札を
     /// 2 列に並べ（札の中の左に絵、右に名前）、札の左の外にバッグのキー（Z・X・C）の箱かチェックの箱、右にカーソルのアイテムの効果の
-    /// ポップアップ（絵・名前・種類・説明）。最後の札は DONE。
+    /// ポップアップ（絵・名前・種類・説明）。
+    /// 2026-11-05: 札はスクロールの中身（左。ホイール・ドラッグ・カーソルで動く）に入れ、パッシブとアクティブの見出しで分ける。初期アイテムでは
+    /// いちばん上に RANDOM の札（チェックの箱）。札の位置は実行中に決める（ItemSelectScreen.Layout）。DONE はスクロールの下に固定。
     /// </summary>
     internal static class ItemSelectUiBuilder
     {
-        private const int Columns = 2;
         private const float PlateWidth = 360f;
         private const float PlateHeight = 64f;
-        private const float ColumnStep = 430f;
-        private const float RowStep = 76f;
         private const float IconSize = 50f;
+        private static readonly Vector2 ScrollPosition = new Vector2(86f, -176f);
+        private static readonly Vector2 ScrollSize = new Vector2(900f, 690f);
 
         public static ItemSelectScreen Create(Transform canvas, InputActionAsset inputActions)
         {
@@ -31,6 +32,14 @@ namespace Airerage.Editor
                 new Vector2(0f, 1f), new Vector2(110f, -138f), new Vector2(1000f, 40f), MenuUiBuilder.Accent);
             note.font = GameFonts.JapaneseBold;
 
+            RectTransform content = OnlineMenuUiBuilder.CreateScrollArea(panel, ScrollPosition, ScrollSize, out ScrollRect scroll);
+            scroll.name = "ItemScroll";
+            Text passiveHeader = CreateHeader(content, "PassiveHeader", "PASSIVE");
+            Text activeHeader = CreateHeader(content, "ActiveHeader", "ACTIVE");
+            MenuOption random = CreatePlate(content, "Random", "RANDOM");
+            RawImage randomIcon = CreateIcon(random.transform);
+            FlowSceneBuilder.CreateStageCheck(random.transform, out GameObject randomCheck, out GameObject randomMark);
+
             var options = new Object[ItemCatalog.Count];
             var keyBoxes = new Object[ItemCatalog.Count];
             var keys = new Object[ItemCatalog.Count];
@@ -40,7 +49,7 @@ namespace Airerage.Editor
             for (int i = 0; i < ItemCatalog.Count; i++)
             {
                 ItemId id = ItemCatalog.At(i);
-                MenuOption option = CreatePlate(panel, $"Item{(int)id}", ItemTexts.Name(id), i);
+                MenuOption option = CreatePlate(content, $"Item{(int)id}", ItemTexts.Name(id));
                 options[i] = option;
                 icons[i] = CreateIcon(option.transform);
                 CreateKey(option.transform, out GameObject box, out Text key);
@@ -50,7 +59,9 @@ namespace Airerage.Editor
                 checkBoxes[i] = check;
                 checkMarks[i] = mark;
             }
-            MenuOption done = CreatePlate(panel, "Done", "DONE", ItemCatalog.Count);
+            // DONE はスクロールの下に固定（いつでも見える）。
+            MenuOption done = CreatePlate(panel, "Done", "DONE");
+            ((RectTransform)done.transform).anchoredPosition = new Vector2(150f, ScrollPosition.y - ScrollSize.y - 16f);
 
             // 効果のポップアップ（右。カーソルの札の高さに動く）。
             var popupObject = new GameObject("Popup", typeof(RectTransform));
@@ -87,9 +98,9 @@ namespace Airerage.Editor
             description.gameObject.AddComponent<LineBreakText>();
             popupObject.SetActive(false);
 
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down / Left / Right: select     Enter / A: choose     Esc / B: done", 22,
-                FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(1200f, 40f), new Color(1f, 1f, 1f, 0.7f)),
-                "上下左右: 選ぶ　　Enter ／ A: 決定（もう一度で外す）　　Esc ／ B: 終わる");
+            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down / Left / Right: select     Wheel: scroll     Enter / A: choose     Esc / B: done",
+                22, FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 30f), new Vector2(1500f, 40f), new Color(1f, 1f, 1f, 0.7f)),
+                "上下左右: 選ぶ　　ホイール: スクロール　　Enter ／ A: 決定（もう一度で外す）　　Esc ／ B: 終わる");
 
             var screen = panel.gameObject.AddComponent<ItemSelectScreen>();
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
@@ -98,6 +109,14 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_checkBoxes", checkBoxes);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_checkMarks", checkMarks);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_icons", icons);
+            SandboxWireSceneBuilder.SetReference(screen, "_random", random);
+            SandboxWireSceneBuilder.SetReference(screen, "_randomCheck", randomCheck);
+            SandboxWireSceneBuilder.SetReference(screen, "_randomMark", randomMark);
+            SandboxWireSceneBuilder.SetReference(screen, "_randomIcon", randomIcon);
+            SandboxWireSceneBuilder.SetReference(screen, "_content", content);
+            SandboxWireSceneBuilder.SetReference(screen, "_scroll", scroll);
+            SandboxWireSceneBuilder.SetReference(screen, "_passiveHeader", passiveHeader);
+            SandboxWireSceneBuilder.SetReference(screen, "_activeHeader", activeHeader);
             SandboxWireSceneBuilder.SetReference(screen, "_done", done);
             SandboxWireSceneBuilder.SetReference(screen, "_title", title);
             SandboxWireSceneBuilder.SetReference(screen, "_note", note);
@@ -111,11 +130,24 @@ namespace Airerage.Editor
             return screen;
         }
 
-        // アイテムの札（2 列。番号の順に左の列から右の列へ、上から下へ）。名前は絵の右（日本語も出せる字体）。
-        private static MenuOption CreatePlate(RectTransform panel, string name, string label, int index)
+        // 区切りの見出し（PASSIVE ／ ACTIVE。水色の斜めの文字と下の線）。位置は実行中に決める。
+        private static Text CreateHeader(RectTransform content, string name, string label)
         {
-            var position = new Vector2(150f + (index % Columns) * ColumnStep, -200f - (index / Columns) * RowStep);
-            MenuOption option = MenuUiBuilder.CreateMenuItem(panel, name, label, new Vector2(0f, 1f), position, new Vector2(PlateWidth, PlateHeight));
+            Text header = MenuUiBuilder.CreateText(content, name, label, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft, new Vector2(0f, 1f),
+                Vector2.zero, new Vector2(820f, 40f), MenuUiBuilder.Accent);
+            header.rectTransform.pivot = new Vector2(0f, 1f);
+            header.font = GameFonts.JapaneseBold;
+            Image line = MenuUiBuilder.CreateFill(header.rectTransform, "Line", new Color(MenuUiBuilder.Accent.r, MenuUiBuilder.Accent.g, MenuUiBuilder.Accent.b, 0.5f),
+                new Vector2(0f, 0f), new Vector2(1f, 0f));
+            line.rectTransform.offsetMin = new Vector2(0f, -2f);
+            line.rectTransform.offsetMax = new Vector2(0f, 0f);
+            return header;
+        }
+
+        // アイテムの札（2 列。位置は実行中に決める）。名前は絵の右（日本語も出せる字体）。
+        private static MenuOption CreatePlate(RectTransform parent, string name, string label)
+        {
+            MenuOption option = MenuUiBuilder.CreateMenuItem(parent, name, label, new Vector2(0f, 1f), Vector2.zero, new Vector2(PlateWidth, PlateHeight));
             Text text = option.LabelText;
             text.fontSize = 24;
             text.font = GameFonts.JapaneseBold;

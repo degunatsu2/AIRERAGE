@@ -88,14 +88,14 @@ namespace Airerage.Net
         public readonly Airerage.Core.Items.ItemMode Mode;
         public readonly int StartCount;
         public readonly int DropRate;
-        public readonly uint Pool;
+        public readonly ulong Pool;
 
-        public LobbyItems(Airerage.Core.Items.ItemMode mode, int startCount, int dropRate, uint pool)
+        public LobbyItems(Airerage.Core.Items.ItemMode mode, int startCount, int dropRate, ulong pool)
         {
             Mode = mode >= Airerage.Core.Items.ItemMode.Default && mode <= Airerage.Core.Items.ItemMode.PreItem ? mode : Airerage.Core.Items.ItemMode.Default;
             StartCount = Math.Max(1, Math.Min(Airerage.Core.Items.ItemCatalog.BagSlots, startCount));
             DropRate = Math.Max(0, Math.Min(2, dropRate));
-            uint valid = pool & Airerage.Core.Items.ItemCatalog.AllMask;
+            ulong valid = pool & Airerage.Core.Items.ItemCatalog.AllMask;
             Pool = valid == 0 ? Airerage.Core.Items.ItemCatalog.AllMask : valid;
         }
 
@@ -106,7 +106,7 @@ namespace Airerage.Net
         public LobbyItems WithMode(Airerage.Core.Items.ItemMode mode) => new LobbyItems(mode, StartCount, DropRate, Pool);
         public LobbyItems WithStartCount(int count) => new LobbyItems(Mode, count, DropRate, Pool);
         public LobbyItems WithDropRate(int rate) => new LobbyItems(Mode, StartCount, rate, Pool);
-        public LobbyItems WithPool(uint pool) => new LobbyItems(Mode, StartCount, DropRate, pool);
+        public LobbyItems WithPool(ulong pool) => new LobbyItems(Mode, StartCount, DropRate, pool);
 
         /// <summary>試合のルールに入れる。</summary>
         public void ApplyTo(Airerage.Core.Match.MatchRules rules)
@@ -114,7 +114,7 @@ namespace Airerage.Net
             rules.ItemMode = Mode;
             rules.StartItemCount = StartCount;
             rules.ItemDropRate = DropRate;
-            rules.ItemDropPool = (int)Pool;
+            rules.ItemDropPool = (long)Pool;
         }
 
         public bool Equals(LobbyItems other)
@@ -402,7 +402,7 @@ namespace Airerage.Net
                     late, itemSelecting);
                 offset += slotHeader + length;
             }
-            const int itemBytes = 7;
+            const int itemBytes = 11;
             if (offset + itemBytes > data.Length)
             {
                 throw new FormatException($"ロビーのメッセージのアイテムのルールが途中で切れています（{data.Length} バイト）");
@@ -411,7 +411,12 @@ namespace Airerage.Net
             {
                 throw new FormatException($"アイテムのモードが不正です（{data[offset]}）");
             }
-            items = new LobbyItems((Airerage.Core.Items.ItemMode)data[offset], data[offset + 1], data[offset + 2], (uint)(data[offset + 3] | data[offset + 4] << 8 | data[offset + 5] << 16 | data[offset + 6] << 24));
+            ulong pool = 0;
+            for (int b = 0; b < 8; b++)
+            {
+                pool |= (ulong)data[offset + 3 + b] << (8 * b);
+            }
+            items = new LobbyItems((Airerage.Core.Items.ItemMode)data[offset], data[offset + 1], data[offset + 2], pool);
             return slots;
         }
 
@@ -423,7 +428,8 @@ namespace Airerage.Net
             data[1] = selecting ? (byte)1 : (byte)0;
             for (int i = 0; items != null && i < items.Count && i < Airerage.Core.Items.ItemCatalog.BagSlots; i++)
             {
-                data[2 + i] = Airerage.Core.Items.ItemCatalog.IsValid(items[i]) ? (byte)items[i] : (byte)0;
+                bool random = i == 0 && items[i] == Airerage.Core.Items.ItemId.Random;
+                data[2 + i] = Airerage.Core.Items.ItemCatalog.IsValid(items[i]) || random ? (byte)items[i] : (byte)0;
             }
             return data;
         }
@@ -436,7 +442,8 @@ namespace Airerage.Net
             for (int i = 0; i < items.Length; i++)
             {
                 var id = (Airerage.Core.Items.ItemId)data[2 + i];
-                items[i] = Airerage.Core.Items.ItemCatalog.IsValid(id) ? id : Airerage.Core.Items.ItemId.None;
+                bool random = i == 0 && id == Airerage.Core.Items.ItemId.Random;
+                items[i] = Airerage.Core.Items.ItemCatalog.IsValid(id) || random ? id : Airerage.Core.Items.ItemId.None;
             }
             return items;
         }

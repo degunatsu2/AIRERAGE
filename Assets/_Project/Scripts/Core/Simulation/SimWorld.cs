@@ -121,7 +121,8 @@ namespace Airerage.Core.Simulation
                 return;
             }
             CharacterState state = _states[index];
-            state.Items = ItemRules.StartingBag(items, Rules.StartItemCount);
+            // ランダムセレクトなら、試合の種と番号から選ぶ（全員が同じアイテムになる）。
+            state.Items = ItemRules.StartingBag(ItemRules.ResolveStartItems(items, Rules.StartItemCount, Rules.Seed, index), Rules.StartItemCount);
             _states[index] = state;
             RefreshConfig(index);
         }
@@ -422,7 +423,7 @@ namespace Airerage.Core.Simulation
             JuggernautRules.StepObjects(_objects, _collision, _states, _tickConfigs, Bounds, Tick, _projectileHits, _platforms, _stage, _pressed);
             // アイテム（使っているアイテムの攻撃と風、落ちているアイテム・エネルギーショット・砂岩ボール、アイテムドロップ）。
             ItemRules.StepWorld(_states, _tickConfigs, ItemTuning, _objects, _collision, Bounds, Rules, CoinSpawns, Tick,
-                phase == MatchPhase.Playing || phase == MatchPhase.Overtime, _projectileHits);
+                phase == MatchPhase.Playing || phase == MatchPhase.Overtime, _projectileHits, Coins);
             _hits.Resolve(_states, _tickConfigs, Tick, _objects, Rules.Seed, _projectileHits);
             ThiefRules.PopClones(_clones, _states, _tickConfigs, _objects, Tick);
             SkillRules.EndObjects(_objects, Coins, _states, _tickConfigs, Rules, Tick, BankSpots,
@@ -431,7 +432,7 @@ namespace Airerage.Core.Simulation
             if (Bounds.HasValue)
             {
                 KnockoutResolver.Resolve(_states, _spawns, Bounds.Value, Rules, _knockouts, _tickConfigs);
-                CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, CoinSpawns, Rules, Tick);
+                CoinDropRules.DropOnKnockouts(Coins, _states, _knockouts, Bounds.Value, CoinSpawns, Rules, Tick, _tickConfigs);
             }
             CombatRewardRules.Step(Coins, _states, _hits.LastEndedCombos, _knockouts, Rules, Tick, _tickConfigs);
             bool active = phase == MatchPhase.Playing || phase == MatchPhase.Overtime;

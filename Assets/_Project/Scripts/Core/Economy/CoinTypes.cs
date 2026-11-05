@@ -141,6 +141,12 @@ namespace Airerage.Core.Economy
 
         /// <summary>ホットエリアのコインの出現（生成。フィールド＋。寿命がある。HotAreaRules）。</summary>
         HotArea = 14,
+
+        /// <summary>アイテムのボーナス（生成。→ 所持。金庫の鍵。docs/20_item_plan.md）。</summary>
+        ItemBonus = 15,
+
+        /// <summary>アイテムでの確定（移動。所持 → 確定。金庫の鍵のボーナスと、確定の印鑑）。</summary>
+        ItemBank = 16,
     }
 
     /// <summary>

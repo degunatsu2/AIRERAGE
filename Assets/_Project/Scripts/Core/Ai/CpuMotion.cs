@@ -183,13 +183,14 @@ namespace Airerage.Core.Ai
                 {
                     continue;
                 }
-                float distance = Vector2.Distance(position, Flat(opponent.Position));
+                Vector2 at = TargetPosition(world, other, opponent);
+                float distance = Vector2.Distance(position, at);
                 float score = _tuning.Aggression * 6f / (distance + 6f) * (1f + opponent.Coins.Held / 40f) * Jitter(key, tick, 100 + other);
                 if (score > best)
                 {
                     best = score;
                     m.Goal = CpuGoalKind.Fight;
-                    m.Target = Flat(opponent.Position);
+                    m.Target = at;
                     m.TargetCharacter = other;
                 }
             }
@@ -205,8 +206,14 @@ namespace Airerage.Core.Ai
                 {
                     m.NextDecisionTick = tick;
                 }
-                m.Target = Flat(opponent.Position);
+                m.Target = TargetPosition(world, m.TargetCharacter, opponent);
             }
+        }
+
+        // 相手 other を狙う位置（身代わり人形があれば人形の位置。アイテム）。
+        private static Vector2 TargetPosition(SimWorld world, int other, in CharacterState opponent)
+        {
+            return Items.ItemRules.TryGetDecoy(world.Objects, other, out Vector2 decoy) ? decoy : Flat(opponent.Position);
         }
 
         /// <summary>目標へ動く: 走る・跳ぶ・空中ジャンプ・ワイヤー。ワイヤーを撃ったら true。</summary>

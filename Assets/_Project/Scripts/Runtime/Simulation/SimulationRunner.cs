@@ -26,7 +26,7 @@ namespace Airerage.Runtime.Simulation
     /// シーンにステージの範囲（KnockoutBounds）があれば、外に出たキャラクターは撃破されて出現位置に戻る（T3-3）。
     /// シーンにギミック（StageZoneAuthoring）、コインの出現地点（CoinSpawnAuthoring）、拠点の候補（BankSpotAuthoring）があれば、それも使う。
     /// </summary>
-    public sealed class SimulationRunner : MonoBehaviour, ISimulationFeed, IPauseTarget, ILocalAimSource
+    public sealed class SimulationRunner : MonoBehaviour, ISimulationFeed, IPauseTarget, ILocalAimSource, ILocalItemMenu
     {
         // 1フレームで進める最大のティック数。処理が遅れたときに追いつこうとして、さらに遅れるのを防ぐ（技術的な上限）。
         private const int MaxTicksPerFrame = 5;
@@ -133,6 +133,17 @@ namespace Airerage.Runtime.Simulation
                 return false;
             }
             cursor = _input.TargetCursor;
+            return true;
+        }
+
+        bool ILocalItemMenu.TryGetItemMenu(int index, out LocalItemMenu menu)
+        {
+            menu = default;
+            if (_world == null || _input == null || index != _player || _inputBlocked || InputOverride != null)
+            {
+                return false;
+            }
+            menu = new LocalItemMenu { Held = _input.ItemMenuHeld, Choices = _input.ItemMenuChoices, Slot = _input.ItemMenuSlot, Drop = _input.ItemMenuDrop };
             return true;
         }
 
@@ -271,6 +282,9 @@ namespace Airerage.Runtime.Simulation
             if (_rememberCharacter)
             {
                 rules = MatchRules.FreePlay();
+                // 試合ごとの乱数の種（落ちてくるアイテム・ランダムセレクトの初期アイテムなど）。決まった種だと、毎回同じ所に同じアイテムが落ちる
+                // （ユーザーの指摘、2026-11-05）。
+                rules.Seed = Environment.TickCount;
                 items = Airerage.Runtime.Settings.ItemSettings.Load();
                 items.ApplyTo(rules);
             }

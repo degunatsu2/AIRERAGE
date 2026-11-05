@@ -368,7 +368,8 @@ namespace Airerage.Core.Skills
                     }
                     else
                     {
-                        Steal(ref shot, states, StealKind.Skill, victim, Math.Max(1, configs[victim].Combat.Special1MaxCharges));
+                        Steal(ref shot, states, StealKind.Skill, victim, Math.Max(1, configs[victim].Combat.Special1MaxCharges),
+                            configs[shot.Owner].Combat);
                     }
                     return;
                 }
@@ -377,13 +378,13 @@ namespace Airerage.Core.Skills
                     int zone = StealableZoneAt(context.Zones, shot.Position, tuning.SnatchRadius, tick, context.Rules.Seed);
                     if (zone >= 0)
                     {
-                        Steal(ref shot, states, StealKind.Zone, zone, 1);
+                        Steal(ref shot, states, StealKind.Zone, zone, 1, configs[shot.Owner].Combat);
                         return;
                     }
                     int trap = TrapAt(context.Traps, stage, shot.Position, tuning, tick);
                     if (trap >= 0)
                     {
-                        Steal(ref shot, states, StealKind.Trap, trap, 1);
+                        Steal(ref shot, states, StealKind.Trap, trap, 1, configs[shot.Owner].Combat);
                         return;
                     }
                 }
@@ -414,7 +415,8 @@ namespace Airerage.Core.Skills
 
         // 弾が当たって奪った: 消して、持ち主に奪ったものを持たせ、Q をすぐ使えるようにする（タレントスナッチを撃っている途中なら、その攻撃が
         // 終わるまでは、もとの Q のまま）。
-        private static void Steal(ref WorldObject shot, List<CharacterState> states, StealKind kind, int source, int uses)
+        // ownerCombat は奪った人のこのティックの戦闘の値（もとの Q のスタック数とクールタイム。アイテムで変わったものを含む）。
+        private static void Steal(ref WorldObject shot, List<CharacterState> states, StealKind kind, int source, int uses, CombatTuning ownerCombat)
         {
             shot.Ended = true;
             shot.Stored = 1;
@@ -428,6 +430,14 @@ namespace Airerage.Core.Skills
             owner.Combat.StealUses = uses;
             owner.Combat.StealSerial = 0;
             owner.Combat.StealFromSerial = owner.Combat.AttackSerial;
+            // もとの Q のスタックとクールタイムを、奪っている間も裏で数える（マガジンマガジンでスタックが増えたとき、奪った技を使い切った
+            // 後にクールタイムなしで使えてしまわないように。ユーザーの指示、2026-11-05。UpdateSteal）。
+            int cooldown = owner.Combat.Special1CooldownTicksLeft;
+            owner.Combat.StealSavedSpent = Math.Max(1, owner.Combat.Special1Spent);
+            owner.Combat.StealSavedCooldown = cooldown > 0 ? cooldown : 0;
+            owner.Combat.StealSavedMax = Math.Max(1, ownerCombat.Special1MaxCharges);
+            owner.Combat.StealSavedCooldownTicks = ownerCombat.Special1CooldownTicks;
+            owner.Combat.Special1Spent = 0;
             owner.Combat.Special1CooldownTicksLeft = 0;
             owner.Combat.StealCount++;
             states[shot.Owner] = owner;
@@ -1060,6 +1070,7 @@ namespace Airerage.Core.Skills
             bool busy = inSpecial || c.ChainCount > 0 || (c.Holding && c.HoldSlot == AttackSlot.Special1);
             if (c.StealUses > 0 || busy)
             {
+                CountSavedCooldown(ref c);
                 return;
             }
             c.StealKind = StealKind.None;
@@ -1067,8 +1078,51 @@ namespace Airerage.Core.Skills
             c.StealSerial = 0;
             c.StealFromSerial = 0;
             c.ChainTicksLeft = 0;
-            c.Special1Spent = 0;
-            c.Special1CooldownTicksLeft = baseConfig.Combat.Special1CooldownTicks;
+            // 奪った技を使い切った（本来クールタイムが始まるとき）: 裏で数えていたもとの Q のスタックとクールタイムに戻し、止めていた
+            // クールタイムを続きから数える。
+            int full = c.StealSavedCooldownTicks > 0 ? c.StealSavedCooldownTicks : baseConfig.Combat.Special1CooldownTicks;
+            if (c.StealSavedMax > 1)
+            {
+                c.Special1Spent = Math.Max(1, c.StealSavedSpent);
+                c.Special1CooldownTicksLeft = c.StealSavedCooldown > 0 ? c.StealSavedCooldown : full;
+            }
+            else
+            {
+                c.Special1Spent = 0;
+                c.Special1CooldownTicksLeft = full;
+            }
+            c.StealSavedSpent = 0;
+            c.StealSavedCooldown = 0;
+            c.StealSavedMax = 0;
+            c.StealSavedCooldownTicks = 0;
+        }
+
+        /// <summary>
+        /// 奪っている間に、もとの Q のクールタイムを裏で 1 ティック数える。使えるスタックが「スタック数 − 1」より少ない間だけ数え、
+        /// 「スタック数 − 1」に届いたら止めて待つ（奪った技の分の 1 つは、使い切ってから戻す。ユーザーの指示、2026-11-05）。
+        /// </summary>
+        public static void CountSavedCooldown(ref CombatState c)
+        {
+            if (c.StealKind == StealKind.None || c.StealSavedMax <= 1)
+            {
+                return;
+            }
+            int target = c.StealSavedMax - 1;
+            if (c.StealSavedMax - c.StealSavedSpent >= target)
+            {
+                // 届いている: その時点で止めて待つ。
+                return;
+            }
+            if (c.StealSavedCooldown <= 0)
+            {
+                c.StealSavedCooldown = c.StealSavedCooldownTicks;
+            }
+            c.StealSavedCooldown--;
+            if (c.StealSavedCooldown <= 0)
+            {
+                c.StealSavedSpent = Math.Max(0, c.StealSavedSpent - 1);
+                c.StealSavedCooldown = 0;
+            }
         }
 
         private static void UpdateInvisibility(ref CharacterState state, CharacterConfig baseConfig, InputButtons pressed)

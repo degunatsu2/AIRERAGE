@@ -28,7 +28,7 @@ namespace Airerage.Core.Items
     ///    集めて、HitResolver がキャラクターの攻撃と一緒に当てる。
     /// パッシブアイテムの効果は、調整値を変えて表す（ConfigFor。クールタイム・ゲージ・スタック数・設置物の大きさ・技の威力）。
     /// </summary>
-    public static class ItemRules
+    public static partial class ItemRules
     {
         /// <summary>アイテムバッグの枠のキー（Z・X・C）。</summary>
         public const InputButtons SlotButtons = InputButtons.Item1 | InputButtons.Item2 | InputButtons.Item3;
@@ -81,6 +81,43 @@ namespace Airerage.Core.Items
             return bag;
         }
 
+        private const int RandomStartSalt = 9307;
+
+        /// <summary>
+        /// 持って始めるアイテムを決める: items の最初が「ランダムセレクト」（ItemId.Random）なら、試合の種 seed と人の番号 player から、
+        /// count 個の違うアイテムを選ぶ（全員が同じ結果になる。ユーザーの要望、2026-11-05）。そうでなければ items のまま。
+        /// </summary>
+        public static ItemId[] ResolveStartItems(IReadOnlyList<ItemId> items, int count, int seed, int player)
+        {
+            if (items == null || items.Count == 0)
+            {
+                return new ItemId[0];
+            }
+            if (items[0] != ItemId.Random)
+            {
+                var copy = new ItemId[items.Count];
+                for (int i = 0; i < items.Count; i++)
+                {
+                    copy[i] = items[i];
+                }
+                return copy;
+            }
+            var left = new List<ItemId>();
+            for (int i = 0; i < ItemCatalog.Count; i++)
+            {
+                left.Add(ItemCatalog.At(i));
+            }
+            int wanted = Math.Max(0, Math.Min(Math.Min(count, ItemCatalog.BagSlots), left.Count));
+            var picked = new ItemId[wanted];
+            for (int k = 0; k < wanted; k++)
+            {
+                int index = StableHash.Range(seed, RandomStartSalt + player, k, left.Count);
+                picked[k] = left[index];
+                left.RemoveAt(index);
+            }
+            return picked;
+        }
+
         // ---------------------------------------------------------------- パッシブ
 
         /// <summary>
@@ -88,16 +125,28 @@ namespace Airerage.Core.Items
         /// </summary>
         public static int PassiveKey(in ItemBag bag)
         {
-            int key = 0;
-            for (int slot = 0; slot < ItemCatalog.BagSlots; slot++)
+            // パッシブの番号を小さい順に 1 バイトずつ並べる（持つ順に関係なく、同じ持ち物なら同じ鍵）。
+            int a = PassiveOrZero(bag.Get(0));
+            int b = PassiveOrZero(bag.Get(1));
+            int c = PassiveOrZero(bag.Get(2));
+            if (a > b)
             {
-                ItemId id = bag.Get(slot);
-                if (ItemCatalog.IsPassive(id))
-                {
-                    key += 1 << (((int)id - 1) * 2);
-                }
+                (a, b) = (b, a);
             }
-            return key;
+            if (b > c)
+            {
+                (b, c) = (c, b);
+            }
+            if (a > b)
+            {
+                (a, b) = (b, a);
+            }
+            return a | (b << 8) | (c << 16);
+        }
+
+        private static int PassiveOrZero(ItemId id)
+        {
+            return ItemCatalog.IsPassive(id) ? (int)id : 0;
         }
 
         /// <summary>Q（slot が Special1）・E（Special2）のクールタイムにかける数（パッシブのブースター。重なれば掛ける）。</summary>
@@ -193,9 +242,13 @@ namespace Airerage.Core.Items
                 }
             }
             combat.SkillDamageBonusPercent += DamageBonusPercent(bag, tuning);
+            ApplyPassiveCombat(bag, combat, tuning);
             float size = SizeScale(bag, tuning);
             SkillTuning skills = size != 1f ? ScaledPlacements(config.Skills, size) : config.Skills;
-            return new CharacterConfig { Movement = config.Movement, Wire = config.Wire, Combat = combat, Skills = skills };
+            return new CharacterConfig
+            {
+                Movement = PassiveMovement(bag, config.Movement, tuning), Wire = PassiveWire(bag, config.Wire, tuning), Combat = combat, Skills = skills,
+            };
         }
 
         // 設置物（ミラーボール、セーフティボックス、風の帯、ワープポータル、わたがしの足場、クリーム、地雷）の大きさを scale 倍にした写し【仮】。
@@ -240,10 +293,16 @@ namespace Airerage.Core.Items
 
         // ---------------------------------------------------------------- スタックとクールタイム
 
-        /// <summary>アクティブアイテム id のスタック数（エネルギーショットはマガジンマガジンで増える）。</summary>
+        /// <summary>アクティブアイテム id のスタック数（投射物のアイテムはマガジンマガジンで増える）。</summary>
         public static int MaxCharges(in ItemBag bag, ItemId id, ItemTuning tuning)
         {
-            return id == ItemId.EnergyShot ? 1 + ExtraCharges(bag, tuning) : 1;
+            return IsProjectileItem(id) ? 1 + ExtraCharges(bag, tuning) : 1;
+        }
+
+        /// <summary>投射物のアクティブアイテムか（マガジンマガジンでスタックが増える）: エネルギーショット、グラップリングボム、チェーンフック【仮】。</summary>
+        public static bool IsProjectileItem(ItemId id)
+        {
+            return id == ItemId.EnergyShot || id == ItemId.GrappleBomb || id == ItemId.ChainHook;
         }
 
         /// <summary>枠 slot のアクティブアイテムを今使えるスタックの数。</summary>
@@ -321,7 +380,20 @@ namespace Airerage.Core.Items
         /// <summary>照準の方向に出すアクティブアイテムか（押している間に水色の矢印で狙う）。</summary>
         public static bool IsAimed(ItemId id)
         {
-            return id == ItemId.EnergyShot || id == ItemId.Yaguraotoshi || id == ItemId.SandstoneBall;
+            switch (id)
+            {
+                case ItemId.EnergyShot:
+                case ItemId.Yaguraotoshi:
+                case ItemId.SandstoneBall:
+                case ItemId.GrappleBomb:
+                case ItemId.FoldingPlatform:
+                case ItemId.ChainHook:
+                case ItemId.PocketRocket:
+                case ItemId.BottledThunder:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         /// <summary>照準の方向に出すアイテムを、キーを押して狙っている間か（ワイヤーの照準の表示を隠す。SkillRules.AimsWithCursor）。</summary>
@@ -360,6 +432,7 @@ namespace Airerage.Core.Items
         {
             ItemBag bag = state.Items;
             CountDown(ref bag, tuning);
+            CountStatuses(ref bag, tuning);
             InputButtons held = input.Buttons & Buttons;
             InputButtons pressed = held & ~bag.PreviousButtons;
             InputButtons released = bag.PreviousButtons & ~held;
@@ -370,6 +443,7 @@ namespace Airerage.Core.Items
                 bag.Armed = 0;
                 if (combat.IsWaitingToRespawn || combat.HasLeft)
                 {
+                    ReleaseRemote(ref bag, tuning);
                     bag = bag.AfterKnockout();
                 }
                 state.Items = bag;
@@ -417,7 +491,7 @@ namespace Airerage.Core.Items
                                 break;
                             }
                         }
-                        else if (ItemCatalog.IsActive(id) && ChargesLeft(bag, slot, tuning) > 0 && !bag.Acting)
+                        else if (ItemCatalog.IsActive(id) && (ChargesLeft(bag, slot, tuning) > 0 || CanRecall(bag, id)) && !bag.Acting)
                         {
                             // 押した: 狙い始める（離したら使う）。照準がなければ向いている方向。
                             bag.Armed |= bit;
@@ -427,6 +501,12 @@ namespace Airerage.Core.Items
                     if ((released & key) != 0 && (bag.Armed & bit) != 0)
                     {
                         bag.Armed &= (byte)~bit;
+                        if (CanRecall(bag, id) && CanActivate(state))
+                        {
+                            // 帰還のリモコンの 2 回目: 印へ瞬間移動する。
+                            Recall(ref state, ref bag, slot, config, tuning);
+                            break;
+                        }
                         if (ItemCatalog.IsActive(id) && ChargesLeft(bag, slot, tuning) > 0 && !bag.Acting && CanActivate(state))
                         {
                             Activate(ref state, ref bag, slot, id, index, config, objects, collision, tuning, tick);
@@ -509,6 +589,8 @@ namespace Airerage.Core.Items
             Vector3 half = config.Movement.HalfExtents;
             int best = -1;
             float bestDistance = float.MaxValue;
+            // 拾える範囲は、アイテムの箱とキャラクターの箱の重なりより少し広い（ユーザーの要望、2026-11-05）。
+            float reach = tuning.DropHalfSize + tuning.DropPickupMargin;
             for (int o = 0; o < objects.Count; o++)
             {
                 WorldObject item = objects[o];
@@ -518,7 +600,7 @@ namespace Airerage.Core.Items
                 }
                 float dx = item.Position.X - state.Position.X;
                 float dy = item.Position.Y - state.Position.Y;
-                if (MathF.Abs(dx) > half.X + tuning.DropHalfSize || MathF.Abs(dy) > half.Y + tuning.DropHalfSize)
+                if (MathF.Abs(dx) > half.X + reach || MathF.Abs(dy) > half.Y + reach)
                 {
                     continue;
                 }
@@ -567,6 +649,18 @@ namespace Airerage.Core.Items
                         ExpireTick = int.MaxValue,
                         Variant = (byte)id,
                     });
+                    break;
+                case ItemId.GrappleBomb:
+                case ItemId.FoldingPlatform:
+                case ItemId.ChainHook:
+                case ItemId.PocketTrampoline:
+                case ItemId.DecoyDoll:
+                case ItemId.BottledThunder:
+                case ItemId.Reflector:
+                case ItemId.BubbleBarrier:
+                case ItemId.BigMagnet:
+                case ItemId.ReturnRemote:
+                    ActivateMore(ref state, ref bag, slot, id, index, config, objects, collision, tuning, tick, aim, center);
                     break;
                 case ItemId.SandstoneBall:
                     Spend(ref bag, slot, tuning.BallCooldownTicks, true);
@@ -653,6 +747,13 @@ namespace Airerage.Core.Items
                     state.Items = bag;
                     return still;
                 }
+                case ItemId.PocketRocket:
+                {
+                    // 照準の方向へ急加速する（重力を受けない。地形に当たったら止まる。ジャンプとワイヤーは使わない）。
+                    Vector2 velocity = bag.ActAim * tuning.RocketSpeed;
+                    state.Velocity = new Vector3(velocity.X, velocity.Y, 0f);
+                    return new PlayerInput(0, 0, input.Buttons & ~(InputButtons.Jump | InputButtons.Wire), input.AimX, input.AimY);
+                }
                 case ItemId.IcarusWing:
                     if (t < tuning.WingCastTicks)
                     {
@@ -679,6 +780,8 @@ namespace Airerage.Core.Items
             {
                 case ItemId.Yaguraotoshi:
                 case ItemId.EarBone:
+                case ItemId.Hourglass:
+                case ItemId.BankSeal:
                     return true;
                 case ItemId.IcarusWing:
                     return bag.ActTicks < tuning.WingCastTicks;
@@ -687,11 +790,11 @@ namespace Airerage.Core.Items
             }
         }
 
-        /// <summary>飛んでいる段階か（イカロスウイング）。</summary>
+        /// <summary>飛んでいる段階か（イカロスウイングとポケットロケット。重力を受けず、決めた速さで動く）。</summary>
         public static bool Flying(in CharacterState state, ItemTuning tuning)
         {
             ItemBag bag = state.Items;
-            return bag.Act == (byte)ItemId.IcarusWing && bag.ActTicks >= tuning.WingCastTicks;
+            return (bag.Act == (byte)ItemId.IcarusWing && bag.ActTicks >= tuning.WingCastTicks) || bag.Act == (byte)ItemId.PocketRocket;
         }
 
         /// <summary>
@@ -728,6 +831,8 @@ namespace Airerage.Core.Items
                     return total > 0 && elapsed >= 0 && elapsed < total;
                 case ItemId.EarBone:
                 case ItemId.IcarusWing:
+                case ItemId.Hourglass:
+                case ItemId.BankSeal:
                     total = tuning.CastTicksOf((ItemId)bag.Act);
                     elapsed = t;
                     return total > 0 && elapsed < total;
@@ -741,7 +846,9 @@ namespace Airerage.Core.Items
         /// <summary>イカロスウイングで飛べる残り（ティック。飛んでいなければ 0）。</summary>
         public static int FlightTicksLeft(in CharacterState state, ItemTuning tuning)
         {
-            return Flying(state, tuning) ? tuning.WingCastTicks + tuning.WingFlightTicks - state.Items.ActTicks : 0;
+            return Flying(state, tuning) && state.Items.Act == (byte)ItemId.IcarusWing
+                ? tuning.WingCastTicks + tuning.WingFlightTicks - state.Items.ActTicks
+                : 0;
         }
 
         // ---------------------------------------------------------------- 3. 全員を動かした後
@@ -752,15 +859,16 @@ namespace Airerage.Core.Items
         /// </summary>
         public static void StepWorld(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, ItemTuning tuning, WorldObjects objects,
             ICollisionQuery collision, StageBounds? bounds, MatchRules rules, IReadOnlyList<CoinSpawnPoint> spawns, int tick, bool active,
-            List<HitRecord> hits)
+            List<HitRecord> hits, CoinLedger ledger = null)
         {
             for (int i = 0; i < states.Count; i++)
             {
                 if (states[i].Items.Acting)
                 {
-                    StepAct(states, configs, i, tuning, objects, hits);
+                    StepAct(states, configs, i, tuning, objects, hits, ledger, tick);
                 }
             }
+            StepStatuses(states, configs, tuning, objects, ledger, tick);
             for (int o = 0; o < objects.Count; o++)
             {
                 WorldObject item = objects[o];
@@ -771,7 +879,7 @@ namespace Airerage.Core.Items
                 switch (item.Kind)
                 {
                     case WorldObjectKind.DroppedItem:
-                        StepDropped(ref item, collision, bounds, tuning);
+                        StepDropped(ref item, collision, bounds, tuning, tick);
                         break;
                     case WorldObjectKind.ItemShot:
                         StepShot(ref item, states, configs, collision, bounds, tuning, hits);
@@ -780,10 +888,15 @@ namespace Airerage.Core.Items
                         StepBall(ref item, states, configs, collision, bounds, tuning, tick, hits);
                         break;
                     default:
-                        continue;
+                        if (!StepMore(ref item, states, configs, collision, bounds, tuning, tick, hits))
+                        {
+                            continue;
+                        }
+                        break;
                 }
                 objects[o] = item;
             }
+            SpreadDropped(objects, collision, tuning);
             if (active)
             {
                 SpawnDrops(objects, rules, spawns, bounds, tuning, tick);
@@ -792,7 +905,7 @@ namespace Airerage.Core.Items
 
         // 使っているアイテムの段階を 1 ティック進める（櫓落としの振りと一閃、イヤーボーンの風）。
         private static void StepAct(List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int index, ItemTuning tuning,
-            WorldObjects objects, List<HitRecord> hits)
+            WorldObjects objects, List<HitRecord> hits, CoinLedger ledger, int tick)
         {
             CharacterState state = states[index];
             ItemBag bag = state.Items;
@@ -849,6 +962,27 @@ namespace Airerage.Core.Items
                     break;
                 case ItemId.IcarusWing:
                     end = tuning.WingCastTicks + tuning.WingFlightTicks;
+                    break;
+                case ItemId.PocketRocket:
+                    end = tuning.RocketTicks;
+                    break;
+                case ItemId.Hourglass:
+                    end = tuning.HourglassCastTicks + 1;
+                    if (t == tuning.HourglassCastTicks)
+                    {
+                        Slow(states, index, tuning);
+                        state = states[index];
+                        bag.BurstCount++;
+                    }
+                    break;
+                case ItemId.BankSeal:
+                    end = tuning.SealCastTicks + 1;
+                    if (t == tuning.SealCastTicks)
+                    {
+                        states[index] = state;
+                        Seal(states, index, ref bag, ledger, tuning, tick);
+                        state = states[index];
+                    }
                     break;
                 default:
                     end = 0;
@@ -964,7 +1098,7 @@ namespace Airerage.Core.Items
         }
 
         // 落ちているアイテム: 重力で落ち、足場に着いたら止まる（足場がなくなれば、また落ちる）。ステージの外に出たら消える。
-        private static void StepDropped(ref WorldObject item, ICollisionQuery collision, StageBounds? bounds, ItemTuning tuning)
+        private static void StepDropped(ref WorldObject item, ICollisionQuery collision, StageBounds? bounds, ItemTuning tuning, int tick)
         {
             var half = new Vector3(tuning.DropHalfSize, tuning.DropHalfSize, 0.5f);
             var center = new Vector3(item.Position.X, item.Position.Y, 0f);
@@ -988,9 +1122,14 @@ namespace Airerage.Core.Items
             {
                 if (velocity.Y < 0f)
                 {
-                    // 足場に着いた: その場に止まる。
+                    // 足場に着いた: その場に止まる。初めて着いたときから、拾われずに 30 秒で消える（ユーザーの要望、2026-11-05。
+                    // 消すのは SkillRules.StepObjects の ExpireTick）。
                     item.Stored = Resting;
                     velocity = Vector2.Zero;
+                    if (item.ExpireTick == int.MaxValue)
+                    {
+                        item.ExpireTick = tick + tuning.DropLifetimeTicks;
+                    }
                 }
                 else
                 {
@@ -1201,7 +1340,7 @@ namespace Airerage.Core.Items
                 return;
             }
             int n = elapsed / interval;
-            var pool = (uint)rules.ItemDropPool;
+            ulong pool = (ulong)rules.ItemDropPool;
             int choices = ItemCatalog.CountIn(pool);
             if (choices == 0)
             {
@@ -1211,7 +1350,7 @@ namespace Airerage.Core.Items
             ItemId id = ItemId.None;
             for (int i = 0, seen = 0; i < ItemCatalog.Count; i++)
             {
-                if ((pool & (1u << i)) != 0 && seen++ == pick)
+                if ((pool & (1UL << i)) != 0 && seen++ == pick)
                 {
                     id = ItemCatalog.At(i);
                     break;

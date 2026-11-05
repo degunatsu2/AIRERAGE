@@ -62,6 +62,30 @@ namespace Airerage.Core.Items
         public int BurstCount;
         public int FlashCount;
 
+        /// <summary>反射板で跳ね返している残り（ティック）と、跳ね返した回数（表示と音）。</summary>
+        public int ReflectTicks;
+        public int ReflectCount;
+
+        /// <summary>シャボンのバリアの残り（ティック）と、攻撃を防いで割れた回数（表示と音）。</summary>
+        public int BarrierTicks;
+        public int BarrierPopCount;
+
+        /// <summary>砂時計で遅くされている残り（ティック。相手に使われたもの。SpeedBoosts が遅くする）。</summary>
+        public int SlowTicks;
+        public int SlowPercent;
+
+        /// <summary>大きな磁石でコインを吸い寄せている残り（ティック）。</summary>
+        public int MagnetTicks;
+
+        /// <summary>帰還のリモコンの印の位置と残り（ティック。0 なら印なし）と、瞬間移動した回数（表示と音）。</summary>
+        public Vector2 Mark;
+        public int MarkTicks;
+        public int TeleportCount;
+
+        /// <summary>確定の印鑑で確定した回数と、最後に確定した枚数（表示）。</summary>
+        public int SealCount;
+        public int SealCoins;
+
         /// <summary>枠 slot のアイテム。</summary>
         public ItemId Get(int slot)
         {
@@ -162,6 +186,11 @@ namespace Airerage.Core.Items
             bag.ActTicks = 0;
             bag.ActHitMask = 0;
             bag.Armed = 0;
+            bag.ReflectTicks = 0;
+            bag.BarrierTicks = 0;
+            bag.SlowTicks = 0;
+            bag.MagnetTicks = 0;
+            bag.MarkTicks = 0;
             return bag;
         }
 
@@ -174,7 +203,10 @@ namespace Airerage.Core.Items
                 && ActAim.Equals(other.ActAim) && ActFrom.Equals(other.ActFrom) && ActTo.Equals(other.ActTo) && ActHitMask == other.ActHitMask
                 && PickupCount == other.PickupCount && LastPicked == other.LastPicked && UseCount == other.UseCount
                 && LastUsed == other.LastUsed && DropCount == other.DropCount && BurstCount == other.BurstCount
-                && FlashCount == other.FlashCount;
+                && FlashCount == other.FlashCount && ReflectTicks == other.ReflectTicks && ReflectCount == other.ReflectCount
+                && BarrierTicks == other.BarrierTicks && BarrierPopCount == other.BarrierPopCount && SlowTicks == other.SlowTicks && SlowPercent == other.SlowPercent
+                && MagnetTicks == other.MagnetTicks && Mark.Equals(other.Mark) && MarkTicks == other.MarkTicks
+                && TeleportCount == other.TeleportCount && SealCount == other.SealCount && SealCoins == other.SealCoins;
         }
 
         public override bool Equals(object obj)

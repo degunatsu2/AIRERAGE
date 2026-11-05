@@ -31,7 +31,7 @@ namespace Airerage.Runtime.Simulation
     /// - シングルモード（docs/16 T7-2）: CPU の人（LocalPlayerSetup.IsCpu）は、CpuPlayer が入力を作る（機器は読まない。照準の表示と技の札は出さない）。
     /// ステージの地形・範囲・ギミック・コインの出現地点・拠点・出現位置は、読み込んだステージのシーンから探す（D-66）。
     /// </summary>
-    public sealed class LocalMatchRunner : MonoBehaviour, ISimulationFeed, IMatchControls, IPauseTarget, ICpuRoster, ILocalAimSource
+    public sealed class LocalMatchRunner : MonoBehaviour, ISimulationFeed, IMatchControls, IPauseTarget, ICpuRoster, ILocalAimSource, ILocalItemMenu
     {
         /// <summary>試合に出られる人数（人は機器ごとに 4 人まで、残りは CPU。チーム対戦で 8 人まで。docs/19 T9-6・D-85）。</summary>
         public const int MaxPlayers = 8;
@@ -144,6 +144,18 @@ namespace Airerage.Runtime.Simulation
                 return false;
             }
             cursor = _inputs[index].TargetCursor;
+            return true;
+        }
+
+        bool ILocalItemMenu.TryGetItemMenu(int index, out LocalItemMenu menu)
+        {
+            menu = default;
+            if (_world == null || index < 0 || index >= _inputs.Count || IsCpu(index) || _inputBlocked)
+            {
+                return false;
+            }
+            InputSystemAdapter input = _inputs[index];
+            menu = new LocalItemMenu { Held = input.ItemMenuHeld, Choices = input.ItemMenuChoices, Slot = input.ItemMenuSlot, Drop = input.ItemMenuDrop };
             return true;
         }
 

@@ -323,6 +323,11 @@ namespace Airerage.Core.Ai
                 {
                     continue;
                 }
+                if (Items.ItemRules.TryGetDecoy(world.Objects, other, out Vector2 decoy))
+                {
+                    // 身代わり人形（アイテム）があれば、人形のほうを狙う。
+                    opponent.Position = new Vector3(decoy.X, decoy.Y, 0f);
+                }
                 Vector3 opponentHalf = world.GetConfig(other).Movement.HalfExtents;
                 int facing = opponent.Position.X >= self.Position.X ? 1 : -1;
                 if (self.Grounded)

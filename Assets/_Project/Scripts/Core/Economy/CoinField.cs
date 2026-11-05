@@ -53,6 +53,13 @@ namespace Airerage.Core.Economy
         }
 
         /// <summary>番号 id のコインの位置（なければ -1）。</summary>
+        /// <summary>番号 index のコインを位置 position へ動かす（大きな磁石で吸い寄せる。docs/20_item_plan.md）。</summary>
+        internal void MoveCoin(int index, System.Numerics.Vector2 position)
+        {
+            FieldCoin coin = _coins[index];
+            _coins[index] = new FieldCoin(coin.Id, position, coin.Value, coin.PickableFromTick, coin.ExpireTick, coin.Source, coin.Origin);
+        }
+
         public int IndexOf(int id)
         {
             for (int i = 0; i < _coins.Count; i++)

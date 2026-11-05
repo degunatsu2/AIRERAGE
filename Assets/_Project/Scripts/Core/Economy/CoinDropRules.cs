@@ -210,11 +210,17 @@ namespace Airerage.Core.Economy
         /// spots はコインの出現地点（落とす場所の候補）。
         /// </summary>
         public static void DropOnKnockouts(CoinLedger ledger, List<CharacterState> states, IReadOnlyList<KnockoutRecord> knockouts,
-            StageBounds bounds, IReadOnlyList<CoinSpawnPoint> spots, MatchRules rules, int tick)
+            StageBounds bounds, IReadOnlyList<CoinSpawnPoint> spots, MatchRules rules, int tick, IReadOnlyList<CharacterConfig> configs = null)
         {
             foreach (KnockoutRecord ko in knockouts)
             {
-                int amount = KoDropAmount(rules, states[ko.Victim].Coins.Held);
+                int held = states[ko.Victim].Coins.Held;
+                int amount = KoDropAmount(rules, held);
+                if (configs != null)
+                {
+                    // 不死鳥の羽根で半分、逆境のお守りで所持の全部（アイテム）。
+                    amount = Items.ItemRules.KoDropAmount(amount, held, configs[ko.Victim].Combat);
+                }
                 Vector2 origin = KoDropOrigin(ko, bounds, spots, rules, tick);
                 Drop(ledger, states, ko.Victim, CoinEventKind.KoDrop, amount, origin, KoOffsets, rules, tick);
             }

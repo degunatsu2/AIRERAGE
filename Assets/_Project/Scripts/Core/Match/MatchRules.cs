@@ -168,7 +168,7 @@ namespace Airerage.Core.Match
         public int ItemDropRate = 1;
 
         /// <summary>アイテムドロップ: 落ちてくるアイテム（ItemCatalog.Bit のビット。0 なら落ちてこない）。</summary>
-        public int ItemDropPool = (int)Items.ItemCatalog.AllMask;
+        public long ItemDropPool = (long)Items.ItemCatalog.AllMask;
 
         /// <summary>時間の制限もカウントダウンもない（検証用のシーン、入力の記録の再生）。撃破と復帰のルールは同じ。</summary>
         public static MatchRules FreePlay()

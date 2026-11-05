@@ -22,6 +22,10 @@ namespace Airerage.Runtime.Input
     /// オプションで変えたキーの割り当て（BindingSettings。docs/15 T6-9）は、作るときにアセットへ当てる。
     /// メーデー（JUGGERNAUT の R）で場所を選んでいる間は、照準の代わりに選ぶ場所を入れる（UpdateTargeting。JuggernautRules.EncodeTarget）。
     /// 場所は、マウスならポインターの位置、ゲームパッドならスティックで動かす大きなカーソル（ユーザーの案、2026-10-29）。
+    /// ゲームパッドのアイテム（ユーザーの指定、2026-11-05）: ITEM MENU（X）を押している間だけ、Item1〜3 のゲームパッドの割り当て（十字キーの
+    /// 左・上・右）が効き、押した瞬間に使う（1 ティックだけ押して離した入力にする。拾うのも同じ）。ITEM MENU を押している間は、ゲームパッドの
+    /// ガード（A）は効かず、ItemDrop のゲームパッドの割り当て（A）が「捨てる」になる（X + A + 十字キーで捨てる）。キーボードの Z・X・C と
+    /// ホイールの押し込みは今までどおり。
     /// </summary>
     public sealed class InputSystemAdapter : IDisposable
     {
@@ -42,6 +46,7 @@ namespace Airerage.Runtime.Input
         // アイテムの枠のキー（Z・X・C）と捨てるキー（ホイールの押し込み。docs/20_item_plan.md）。
         private readonly InputAction[] _items;
         private readonly InputAction _itemDrop;
+        private readonly InputAction _itemMenu;
         private readonly InputAction _reset;
         private readonly InputAction _point;
         private readonly InputAction _aim;
@@ -85,10 +90,11 @@ namespace Airerage.Runtime.Input
                 _map.FindAction("Item3", throwIfNotFound: true),
             };
             _itemDrop = _map.FindAction("ItemDrop", throwIfNotFound: true);
+            _itemMenu = _map.FindAction("ItemMenu", throwIfNotFound: true);
             _reset = _map.FindAction("Reset", throwIfNotFound: true);
             _point = _map.FindAction("Point", throwIfNotFound: true);
             _aim = _map.FindAction("Aim", throwIfNotFound: true);
-            _deviceActions = new[] { _move, _jump, _wire, _attack, _guard, _special1, _special2, _super, _reset, _aim, _items[0], _items[1], _items[2], _itemDrop };
+            _deviceActions = new[] { _move, _jump, _wire, _attack, _guard, _special1, _special2, _super, _reset, _aim, _items[0], _items[1], _items[2], _itemDrop, _itemMenu };
             UsingPointer = HasMouse(actions);
         }
 
@@ -108,6 +114,14 @@ namespace Airerage.Runtime.Input
             }
             return false;
         }
+
+        /// <summary>ゲームパッドの ITEM MENU（X）を押しているか（頭上のアイテムバッグを出す。Poll で更新する）。</summary>
+        public bool ItemMenuHeld { get; private set; }
+
+        /// <summary>ITEM MENU を押したまま十字キーで選んだ回数と、最後に選んだ枠（0〜2）と、そのとき捨てる（A）だったか。</summary>
+        public int ItemMenuChoices { get; private set; }
+        public int ItemMenuSlot { get; private set; } = -1;
+        public bool ItemMenuDrop { get; private set; }
 
         /// <summary>このフレームで位置のリセットが押されたか（Poll で更新する）。</summary>
         public bool ResetRequested { get; private set; }
@@ -165,7 +179,8 @@ namespace Airerage.Runtime.Input
             {
                 _pressedSinceLastTick |= InputButtons.Attack;
             }
-            if (_guard.WasPressedThisFrame())
+            ItemMenuHeld = _itemMenu.IsPressed();
+            if (DeviceButtons.WasPressedThisFrame(_guard, false) || (!ItemMenuHeld && DeviceButtons.WasPressedThisFrame(_guard, true)))
             {
                 _pressedSinceLastTick |= InputButtons.Guard;
             }
@@ -183,12 +198,20 @@ namespace Airerage.Runtime.Input
             }
             for (int i = 0; i < _items.Length; i++)
             {
-                if (_items[i].WasPressedThisFrame())
+                if (DeviceButtons.WasPressedThisFrame(_items[i], false))
                 {
                     _pressedSinceLastTick |= Airerage.Core.Items.ItemRules.SlotButton(i);
                 }
+                else if (ItemMenuHeld && DeviceButtons.WasPressedThisFrame(_items[i], true))
+                {
+                    // ゲームパッド: 押した瞬間に使う（このティックだけ押した入力。次のティックで離した入力になる）。
+                    _pressedSinceLastTick |= Airerage.Core.Items.ItemRules.SlotButton(i);
+                    ItemMenuChoices++;
+                    ItemMenuSlot = i;
+                    ItemMenuDrop = DeviceButtons.IsPressed(_itemDrop, true);
+                }
             }
-            if (_itemDrop.WasPressedThisFrame())
+            if (DeviceButtons.WasPressedThisFrame(_itemDrop, false) || (ItemMenuHeld && DeviceButtons.WasPressedThisFrame(_itemDrop, true)))
             {
                 _pressedSinceLastTick |= InputButtons.ItemDrop;
             }
@@ -302,7 +325,8 @@ namespace Airerage.Runtime.Input
             {
                 buttons |= InputButtons.Attack;
             }
-            if (_guard.IsPressed())
+            bool menu = _itemMenu.IsPressed();
+            if (DeviceButtons.IsPressed(_guard, false) || (!menu && DeviceButtons.IsPressed(_guard, true)))
             {
                 buttons |= InputButtons.Guard;
             }
@@ -318,14 +342,15 @@ namespace Airerage.Runtime.Input
             {
                 buttons |= InputButtons.Super;
             }
+            // ゲームパッドのアイテムの枠は押した瞬間だけ（Poll）なので、押し続けても数えない。
             for (int i = 0; i < _items.Length; i++)
             {
-                if (_items[i].IsPressed())
+                if (DeviceButtons.IsPressed(_items[i], false))
                 {
                     buttons |= Airerage.Core.Items.ItemRules.SlotButton(i);
                 }
             }
-            if (_itemDrop.IsPressed())
+            if (DeviceButtons.IsPressed(_itemDrop, false) || (menu && DeviceButtons.IsPressed(_itemDrop, true)))
             {
                 buttons |= InputButtons.ItemDrop;
             }

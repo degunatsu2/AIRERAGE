@@ -270,6 +270,15 @@ namespace Airerage.Core.Combat
         public int StealCount;
 
         /// <summary>
+        /// 奪っている間の、もとの Q（タレントスナッチ）のスタックとクールタイムを裏で数える値（ユーザーの指示、2026-11-05）: 使ったスタック、
+        /// 次の 1 つが戻るまでの残り、スタック数、クールタイムの長さ。奪った技を使い切ったときに Special1Spent・Special1CooldownTicksLeft に戻す。
+        /// </summary>
+        public int StealSavedSpent;
+        public int StealSavedCooldown;
+        public int StealSavedMax;
+        public int StealSavedCooldownTicks;
+
+        /// <summary>
         /// ミスディレクション（THIEF の E）: 透明でいる残り（ティック）と、分身が残っている残り（ティック。分身は SimWorld.GetClone）。
         /// ClonePopCount は分身が煙になって消えた数（表示と効果音）。
         /// </summary>
@@ -403,7 +412,9 @@ namespace Airerage.Core.Combat
                 && SplashCount == other.SplashCount && CaptureTicks == other.CaptureTicks && CaptureZone == other.CaptureZone
                 && CaptureCount == other.CaptureCount && StealKind == other.StealKind && StealSource == other.StealSource
                 && StealUses == other.StealUses && StealSerial == other.StealSerial && StealFromSerial == other.StealFromSerial
-                && StealCount == other.StealCount && InvisibleTicksLeft == other.InvisibleTicksLeft
+                && StealCount == other.StealCount && StealSavedSpent == other.StealSavedSpent && StealSavedCooldown == other.StealSavedCooldown
+                && StealSavedMax == other.StealSavedMax && StealSavedCooldownTicks == other.StealSavedCooldownTicks
+                && InvisibleTicksLeft == other.InvisibleTicksLeft
                 && CloneTicksLeft == other.CloneTicksLeft && ClonePopCount == other.ClonePopCount && HeistTicks == other.HeistTicks
                 && HeistSpot == other.HeistSpot && NearBank == other.NearBank && HeistPayoutCount == other.HeistPayoutCount
                 && HeistLastPayout == other.HeistLastPayout

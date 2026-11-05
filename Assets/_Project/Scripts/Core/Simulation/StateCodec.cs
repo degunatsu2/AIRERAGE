@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 34;
+        public const int FormatVersion = 35;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -400,6 +400,10 @@ namespace Airerage.Core.Simulation
             writer.Write(combat.StealSerial);
             writer.Write(combat.StealFromSerial);
             writer.Write(combat.StealCount);
+            writer.Write(combat.StealSavedSpent);
+            writer.Write(combat.StealSavedCooldown);
+            writer.Write(combat.StealSavedMax);
+            writer.Write(combat.StealSavedCooldownTicks);
             writer.Write(combat.InvisibleTicksLeft);
             writer.Write(combat.CloneTicksLeft);
             writer.Write(combat.ClonePopCount);
@@ -464,6 +468,19 @@ namespace Airerage.Core.Simulation
             writer.Write(bag.DropCount);
             writer.Write(bag.BurstCount);
             writer.Write(bag.FlashCount);
+            writer.Write(bag.ReflectTicks);
+            writer.Write(bag.ReflectCount);
+            writer.Write(bag.BarrierTicks);
+            writer.Write(bag.BarrierPopCount);
+            writer.Write(bag.SlowTicks);
+            writer.Write(bag.SlowPercent);
+            writer.Write(bag.MagnetTicks);
+            writer.Write(bag.Mark.X);
+            writer.Write(bag.Mark.Y);
+            writer.Write(bag.MarkTicks);
+            writer.Write(bag.TeleportCount);
+            writer.Write(bag.SealCount);
+            writer.Write(bag.SealCoins);
         }
 
         private static Items.ItemBag ReadItemBag(BinaryReader reader)
@@ -495,6 +512,18 @@ namespace Airerage.Core.Simulation
                 DropCount = reader.ReadInt32(),
                 BurstCount = reader.ReadInt32(),
                 FlashCount = reader.ReadInt32(),
+                ReflectTicks = reader.ReadInt32(),
+                ReflectCount = reader.ReadInt32(),
+                BarrierTicks = reader.ReadInt32(),
+                BarrierPopCount = reader.ReadInt32(),
+                SlowTicks = reader.ReadInt32(),
+                SlowPercent = reader.ReadInt32(),
+                MagnetTicks = reader.ReadInt32(),
+                Mark = new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle()),
+                MarkTicks = reader.ReadInt32(),
+                TeleportCount = reader.ReadInt32(),
+                SealCount = reader.ReadInt32(),
+                SealCoins = reader.ReadInt32(),
             };
         }
 
@@ -641,6 +670,10 @@ namespace Airerage.Core.Simulation
                 StealSerial = reader.ReadInt32(),
                 StealFromSerial = reader.ReadInt32(),
                 StealCount = reader.ReadInt32(),
+                StealSavedSpent = reader.ReadInt32(),
+                StealSavedCooldown = reader.ReadInt32(),
+                StealSavedMax = reader.ReadInt32(),
+                StealSavedCooldownTicks = reader.ReadInt32(),
                 InvisibleTicksLeft = reader.ReadInt32(),
                 CloneTicksLeft = reader.ReadInt32(),
                 ClonePopCount = reader.ReadInt32(),

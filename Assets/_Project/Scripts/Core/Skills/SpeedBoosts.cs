@@ -39,6 +39,11 @@ namespace Airerage.Core.Skills
                 percent += config.Skills.SkyBoost.SpeedPercent;
             }
             percent += state.Combat.CreamSpeedPercent;
+            // 砂時計（アイテム）で遅くされている間。
+            if (state.Items.SlowTicks > 0)
+            {
+                percent += state.Items.SlowPercent;
+            }
             return Math.Min(Math.Max(percent, -MaxSlowPercent), MaxPercent);
         }
 

@@ -84,6 +84,11 @@ namespace Airerage.Core.Economy
             foreach (KnockoutRecord ko in knockouts)
             {
                 int amount = KoRewardAmount(rules, states, ko.Attacker, ko.Victim);
+                if (configs != null && ko.Attacker >= 0 && ko.Attacker < configs.Count)
+                {
+                    // 逆境のお守り（アイテム。最下位の間）。
+                    amount = Items.ItemRules.RewardAmount(states, configs[ko.Attacker].Combat, ko.Attacker, amount);
+                }
                 if (amount > 0 && ledger.Reward(new CoinEventId(tick, CoinEventKind.KoReward, ko.Victim), states, ko.Attacker, amount))
                 {
                     AccrueBonus(states, configs, ko.Attacker, amount);
@@ -95,6 +100,10 @@ namespace Airerage.Core.Economy
             MatchRules rules, int tick, IReadOnlyList<CharacterConfig> configs)
         {
             int amount = DamageRewardAmount(rules, damage);
+            if (configs != null && attacker >= 0 && attacker < configs.Count)
+            {
+                amount = Items.ItemRules.RewardAmount(states, configs[attacker].Combat, attacker, amount);
+            }
             if (amount > 0 && attacker >= 0 && attacker < states.Count && attacker != victim
                 && ledger.Reward(new CoinEventId(tick, CoinEventKind.DamageReward, victim, sequence), states, attacker, amount))
             {

@@ -478,6 +478,11 @@ namespace Airerage.Net
         private static Airerage.Core.Items.ItemId[] CleanItems(IReadOnlyList<Airerage.Core.Items.ItemId> items)
         {
             var clean = new List<Airerage.Core.Items.ItemId>();
+            if (items != null && items.Count > 0 && items[0] == Airerage.Core.Items.ItemId.Random)
+            {
+                // ランダムセレクト（試合を始めるとき、全員が試合の種から同じアイテムを選ぶ。SimWorld.SetItems）。
+                return new[] { Airerage.Core.Items.ItemId.Random };
+            }
             for (int i = 0; items != null && i < items.Count && clean.Count < Airerage.Core.Items.ItemCatalog.BagSlots; i++)
             {
                 if (Airerage.Core.Items.ItemCatalog.IsValid(items[i]) && !clean.Contains(items[i]))
@@ -2502,7 +2507,8 @@ namespace Airerage.Net
                 {
                     continue;
                 }
-                if (!Airerage.Core.Items.ItemCatalog.IsValid((Airerage.Core.Items.ItemId)value))
+                bool random = i == 0 && value == (int)Airerage.Core.Items.ItemId.Random;
+                if (!random && !Airerage.Core.Items.ItemCatalog.IsValid((Airerage.Core.Items.ItemId)value))
                 {
                     throw new FormatException($"開始の設定のアイテムが不正です（プレイヤー {p + 1}: {value}）");
                 }

@@ -11,8 +11,9 @@ namespace Airerage.Runtime.Presentation
     /// - 光子の盾: エネルギーでできた水色の盾。マガジンマガジン: 雑誌のような本。グリーンバナナ: 緑のバナナ。ダイアモンドアレイ: ダイアの鉄アレイ。
     /// - エネルギーショット: 青い炎をまとった光弾。櫓落とし: 細長い臙脂色の刀身の刀。イヤーボーン: 耳の形の骨。イカロスウイング: 蝋の羽。
     ///   砂岩ボール: 砂岩のサッカーボールを描いた四角いアイコン。
+    /// - 追加の 25 個（2026-11-05）は ItemIcons.More.cs。
     /// </summary>
-    public static class ItemIcons
+    public static partial class ItemIcons
     {
         public const int Size = 64;
 
@@ -71,7 +72,7 @@ namespace Airerage.Runtime.Presentation
                 case ItemId.SandstoneBall:
                     return new Color(0.85f, 0.7f, 0.45f);
                 default:
-                    return Color.white;
+                    return AccentMore(id);
             }
         }
 
@@ -110,7 +111,7 @@ namespace Airerage.Runtime.Presentation
                 case ItemId.SandstoneBall:
                     return Ball();
                 default:
-                    return null;
+                    return DrawMore(id);
             }
         }
 

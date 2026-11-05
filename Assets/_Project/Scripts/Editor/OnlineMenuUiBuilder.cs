@@ -224,7 +224,7 @@ namespace Airerage.Editor
             return image;
         }
 
-        private static RectTransform CreateScrollArea(Transform parent, Vector2 position, Vector2 size, out ScrollRect scroll)
+        internal static RectTransform CreateScrollArea(Transform parent, Vector2 position, Vector2 size, out ScrollRect scroll)
         {
             var viewportGo = new GameObject("SlotArea", typeof(RectTransform));
             viewportGo.transform.SetParent(parent, false);

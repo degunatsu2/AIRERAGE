@@ -184,7 +184,9 @@ namespace Airerage.Core.Economy
                 Vector3 half = configs[i].Movement.HalfExtents;
                 float dx = coin.X - state.Position.X;
                 float dy = coin.Y - state.Position.Y;
-                if (MathF.Abs(dx) > half.X + radius || MathF.Abs(dy) > half.Y + radius)
+                // ゴールドマグネット（アイテム）で拾える範囲が広がる。
+                float reach = radius * configs[i].Combat.ItemCoinPickupScale;
+                if (MathF.Abs(dx) > half.X + reach || MathF.Abs(dy) > half.Y + reach)
                 {
                     continue;
                 }

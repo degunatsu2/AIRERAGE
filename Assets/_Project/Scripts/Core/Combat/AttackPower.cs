@@ -115,6 +115,13 @@ namespace Airerage.Core.Combat
                 damage);
         }
 
+        /// <summary>威力の上乗せ damagePercent と吹き飛びの上乗せ knockbackPercent（%）を足した強さ（source を内訳に入れる）。</summary>
+        public AttackPower WithBonus(int damagePercent, int knockbackPercent, PowerSource source)
+        {
+            return new AttackPower(Multiplier, BonusPercent + damagePercent, KnockbackBonusPercent + knockbackPercent, Fatal, Jackpot, Sources | source,
+                DamageOverride);
+        }
+
         /// <summary>何もかからない強さ（倍率 1、上乗せ 0）。</summary>
         public static AttackPower Normal => new AttackPower(1f, 0);
 

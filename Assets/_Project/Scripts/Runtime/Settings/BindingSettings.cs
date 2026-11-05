@@ -11,6 +11,9 @@ namespace Airerage.Runtime.Settings
     /// （マウスの位置・右スティック）、マウスのホイール（ズーム）、一時停止（Esc・Start）は変えない。
     /// 変更は Input System の割り当ての上書き（元のアセットは変えない）で、JSON にして GameSettings に保存する。試合の入力
     /// （InputSystemAdapter）を作るときに ApplySaved で当てる。
+    /// ゲームパッドのアイテムの操作（2026-11-05）: ITEM MENU（X）を押している間だけ、アイテムの 3 枠（十字キーの左・上・右）と捨てる（A）が
+    /// 効く。この 4 つ（MenuLayer）は ITEM MENU と一緒に押す組なので、ゲームパッドの列では「X+左」のように出し、同じボタンの入れ替えは
+    /// この 4 つの中でだけ行う（ガードの A と捨てるの A は、同じでよい）。十字キーを選べるのも、この 4 つだけ。
     /// </summary>
     public static class BindingSettings
     {
@@ -25,12 +28,21 @@ namespace Airerage.Runtime.Settings
         /// <summary>変えられる操作（アクションの名前）と、オプションの画面に出す名前（同じ順）。</summary>
         public static readonly string[] Actions =
         {
-            "Jump", "Attack", "Wire", "Guard", "Special1", "Special2", "Super", "Item1", "Item2", "Item3", "ItemDrop",
+            "Jump", "Attack", "Wire", "Guard", "Special1", "Special2", "Super", "Item1", "Item2", "Item3", "ItemDrop", "ItemMenu",
         };
         public static readonly string[] Labels =
         {
-            "JUMP", "ATTACK", "WIRE", "GUARD", "SKILL 1", "SKILL 2", "SUPER", "ITEM 1", "ITEM 2", "ITEM 3", "DROP ITEM",
+            "JUMP", "ATTACK", "WIRE", "GUARD", "SKILL 1", "SKILL 2", "SUPER", "ITEM 1", "ITEM 2", "ITEM 3", "DROP ITEM", "ITEM MENU",
         };
+
+        /// <summary>ゲームパッドでは ITEM MENU を押しながら使う操作（docs/20_item_plan.md）。</summary>
+        public static readonly string[] MenuLayer = { "Item1", "Item2", "Item3", "ItemDrop" };
+
+        /// <summary>ゲームパッドで、ITEM MENU と一緒に押す操作か。</summary>
+        public static bool InMenuLayer(string actionName)
+        {
+            return Array.IndexOf(MenuLayer, actionName) >= 0;
+        }
 
         // キーボードの列で使えるマウスのボタンと、画面に出す名前。
         private static readonly string[] MouseButtons =
@@ -49,6 +61,7 @@ namespace Airerage.Runtime.Settings
             { "buttonSouth", "A" }, { "buttonEast", "B" }, { "buttonWest", "X" }, { "buttonNorth", "Y" },
             { "leftShoulder", "LB" }, { "rightShoulder", "RB" }, { "leftTrigger", "LT" }, { "rightTrigger", "RT" },
             { "leftStickPress", "L3" }, { "rightStickPress", "R3" }, { "start", "START" }, { "select", "SELECT" },
+            { "dpad/left", "LEFT" }, { "dpad/up", "UP" }, { "dpad/right", "RIGHT" }, { "dpad/down", "DOWN" },
         };
 
         /// <summary>割り当ての変更を当てる（前の変更は消す。json が空なら元の割り当てに戻す）。</summary>
@@ -97,14 +110,25 @@ namespace Airerage.Runtime.Settings
             return path.StartsWith("<Keyboard>/", StringComparison.Ordinal) || Array.IndexOf(MouseButtons, path) >= 0;
         }
 
-        /// <summary>今の割り当て（上書きがあればそれ）の、画面に出す名前。</summary>
+        /// <summary>
+        /// 今の割り当て（上書きがあればそれ）の、画面に出す名前。ゲームパッドの、ITEM MENU と一緒に押す操作は「X+LEFT」の形
+        /// （捨てるは「X+A+D-PAD」）。
+        /// </summary>
         public static string DisplayName(InputAction action, int bindingIndex)
         {
             if (bindingIndex < 0 || bindingIndex >= action.bindings.Count)
             {
                 return "-";
             }
-            return Readable(action.bindings[bindingIndex].effectivePath);
+            string path = action.bindings[bindingIndex].effectivePath;
+            string name = Readable(path);
+            if (InMenuLayer(action.name) && InColumn(path ?? string.Empty, Column.Gamepad))
+            {
+                InputAction menu = action.actionMap?.FindAction("ItemMenu", throwIfNotFound: false);
+                string menuName = menu != null ? DisplayName(menu, BindingIndex(menu, Column.Gamepad)) : "X";
+                return action.name == "ItemDrop" ? $"{menuName}+{name}+D-PAD" : $"{menuName}+{name}";
+            }
+            return name;
         }
 
         /// <summary>
@@ -169,9 +193,13 @@ namespace Airerage.Runtime.Settings
                 operation.WithControlsHavingToMatchPath("<Gamepad>")
                     .WithControlsExcluding("<Gamepad>/leftStick")
                     .WithControlsExcluding("<Gamepad>/rightStick")
-                    .WithControlsExcluding("<Gamepad>/dpad")
                     .WithControlsExcluding("<Gamepad>/select")
                     .WithCancelingThrough("<Gamepad>/start");
+                // 十字キーはカメラのズームに使うので、ITEM MENU と一緒に押す操作だけが選べる。
+                if (!InMenuLayer(action.name))
+                {
+                    operation.WithControlsExcluding("<Gamepad>/dpad");
+                }
             }
             operation.OnComplete(op =>
                 {
@@ -202,6 +230,11 @@ namespace Airerage.Runtime.Settings
             {
                 InputAction other = map.FindAction(name, throwIfNotFound: true);
                 if (other == changed)
+                {
+                    continue;
+                }
+                // ゲームパッドでは、ITEM MENU と一緒に押す操作とそれ以外は、同じボタンでもぶつからない。
+                if (column == Column.Gamepad && InMenuLayer(name) != InMenuLayer(changed.name))
                 {
                     continue;
                 }

@@ -132,6 +132,26 @@ namespace Airerage.PlayMode.Tests
             items.Option(10).Button.onClick.Invoke();
             Assert.That(items.KeyShown(0), Is.EqualTo("Z"), "外したら後ろのアイテムが詰まらない");
             Assert.That(ItemSettings.Load().StartItems[0], Is.EqualTo(Airerage.Core.Items.ItemId.QuickBooster), "選んだアイテムが保存されない");
+
+            // ランダムセレクト（2026-11-05）: 選ぶとほかの選択が外れて保存され、アイテムを選ぶとランダムが外れる。
+            Assert.That(items.RandomOption.gameObject.activeSelf, Is.True, "初期アイテムの画面に RANDOM がない");
+            items.RandomOption.Button.onClick.Invoke();
+            Assert.That(items.RandomPicked, Is.True, "RANDOM を選べない");
+            Assert.That(items.RandomShown, Is.True, "RANDOM のチェックが付かない");
+            Assert.That(items.KeyShown(0), Is.Empty, "RANDOM を選んでもほかの選択が外れない");
+            Assert.That(ItemSettings.Load().RandomStart, Is.True, "RANDOM が保存されない");
+            Assert.That(ItemSettings.Load().StartItemsUpTo(2), Is.EqualTo(new[] { Airerage.Core.Items.ItemId.Random }));
+            items.Option(1).Button.onClick.Invoke();
+            Assert.That(items.RandomPicked, Is.False, "アイテムを選んでも RANDOM が外れない");
+            Assert.That(items.KeyShown(1), Is.EqualTo("Z"));
+            Assert.That(ItemSettings.Load().RandomStart, Is.False);
+
+            // 下の方の札（最後のアクティブアイテム）にカーソルを動かすと、見える所までスクロールする。
+            Assert.That(items.ScrollOffset, Is.EqualTo(0f).Within(0.5f), "初めはいちばん上");
+            items.Option(Airerage.Core.Items.ItemCatalog.Count - 1).Button.Select();
+            yield return null;
+            Assert.That(items.ScrollOffset, Is.GreaterThan(100f), "下の札を選んでもスクロールしない");
+            Assert.That(items.PopupName, Is.EqualTo(Airerage.Runtime.Presentation.ItemTexts.Name(Airerage.Core.Items.ItemCatalog.At(Airerage.Core.Items.ItemCatalog.Count - 1))));
             items.Done.Button.onClick.Invoke();
             yield return null;
             Assert.That(menu.ShowingOptions, Is.True, "閉じてもオプションへ戻らない");
@@ -140,10 +160,11 @@ namespace Airerage.PlayMode.Tests
             options.DropItems.Button.onClick.Invoke();
             yield return null;
             yield return null;
+            Assert.That(items.RandomOption.gameObject.activeSelf, Is.False, "ドロップするアイテムの画面に RANDOM が出ている");
             Assert.That(items.CheckShown(3), Is.True, "初めはすべてにチェックが付いていない");
             items.Option(3).Button.onClick.Invoke();
             Assert.That(items.CheckShown(3), Is.False);
-            Assert.That(ItemSettings.Load().DropPool & Airerage.Core.Items.ItemCatalog.Bit(Airerage.Core.Items.ItemId.QuickBoosterEx), Is.EqualTo(0u),
+            Assert.That(ItemSettings.Load().DropPool & Airerage.Core.Items.ItemCatalog.Bit(Airerage.Core.Items.ItemId.QuickBoosterEx), Is.EqualTo(0UL),
                 "外したアイテムが保存されない");
             items.Close();
             yield return null;
@@ -218,7 +239,11 @@ namespace Airerage.PlayMode.Tests
                 int attack = Array.IndexOf(BindingSettings.Actions, "Attack");
                 int wire = Array.IndexOf(BindingSettings.Actions, "Wire");
                 Assert.That(options.KeyCell(jump).Label, Is.EqualTo("SPACE"));
-                Assert.That(options.PadCell(jump).Label, Is.EqualTo("A"));
+                // ゲームパッドの初めの割り当て（ユーザーの指定、2026-11-05）: ジャンプ L1（LB）、攻撃 B、アイテムは X と十字キー。
+                Assert.That(options.PadCell(jump).Label, Is.EqualTo("LB"));
+                Assert.That(options.PadCell(attack).Label, Is.EqualTo("B"));
+                Assert.That(options.PadCell(Array.IndexOf(BindingSettings.Actions, "Item1")).Label, Is.EqualTo("X+LEFT"));
+                Assert.That(options.PadCell(Array.IndexOf(BindingSettings.Actions, "ItemDrop")).Label, Is.EqualTo("X+A+D-PAD"));
                 // 攻撃とワイヤーのキーボードの列は、マウスのボタン（ユーザーの要望、2026-10-20）。
                 Assert.That(options.KeyCell(attack).Label, Is.EqualTo("RIGHT CLICK"));
                 Assert.That(options.KeyCell(wire).Label, Is.EqualTo("LEFT CLICK"));
@@ -246,18 +271,19 @@ namespace Airerage.PlayMode.Tests
                 yield return WaitFor(() => !options.IsRebinding, 2f, "マウスのボタンで変更が終わらない");
                 Assert.That(options.KeyCell(wire).Label, Is.EqualTo("MOUSE 4"), "マウスのサイドのボタンにできない");
 
-                // ゲームパッドのジャンプを Y に。Esc ／ Start でやめると変わらない。
+                // ゲームパッドのジャンプを Y に（必殺技の Y と入れ替わる）。Esc ／ Start でやめると変わらない。
                 yield return WaitSeconds(0.3f);
                 options.PadCell(jump).Button.onClick.Invoke();
                 Assert.That(options.PromptText, Does.Contain(Loc.T("PRESS A BUTTON", "ボタンを押してください")));
                 yield return Press(gamepad, GamepadButton.North);
                 yield return WaitFor(() => !options.IsRebinding, 2f, "ゲームパッドのボタンの変更が終わらない");
                 Assert.That(options.PadCell(jump).Label, Is.EqualTo("Y"));
+                Assert.That(options.PadCell(Array.IndexOf(BindingSettings.Actions, "Super")).Label, Is.EqualTo("LB"), "同じボタンの必殺技と入れ替わらない");
                 yield return WaitSeconds(0.3f);
                 options.PadCell(attack).Button.onClick.Invoke();
                 yield return Press(gamepad, GamepadButton.Start);
                 yield return WaitFor(() => !options.IsRebinding, 2f, "Start でやめられない");
-                Assert.That(options.PadCell(attack).Label, Is.EqualTo("X"), "やめたのに変わった");
+                Assert.That(options.PadCell(attack).Label, Is.EqualTo("B"), "やめたのに変わった");
                 Assert.That(options.PromptText, Does.Contain(Loc.T("CANCELLED", "やめました")));
                 // 案内は 3 秒で消える。
                 yield return WaitSeconds(3.3f);
@@ -283,7 +309,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(options.KeyCell(jump).Label, Is.EqualTo("SPACE"));
                 Assert.That(options.KeyCell(attack).Label, Is.EqualTo("RIGHT CLICK"));
                 Assert.That(options.KeyCell(wire).Label, Is.EqualTo("LEFT CLICK"));
-                Assert.That(options.PadCell(jump).Label, Is.EqualTo("A"));
+                Assert.That(options.PadCell(jump).Label, Is.EqualTo("LB"));
                 Assert.That(GameSettings.LoadBindingOverrides(), Is.EqualTo("{\"bindings\":[]}").Or.Empty, "元に戻しても保存が残る");
             }
             finally

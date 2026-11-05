@@ -111,8 +111,11 @@ namespace Airerage.Core.Combat
                     Airerage.Core.Items.ItemRules.StrikeBalls(objects, a, ObjectHitKey(a, attacker.Combat.AttackSerial, h), center,
                         HitShapes.Bounds(half, angle),
                         new Vector2(hitData.KnockbackX * attacker.Facing, hitData.KnockbackY) * power.KnockbackScale, tick, Items);
-                    if (objects != null && DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, HitShapes.Bounds(half, angle),
-                            AttackPower.Damage(hitData.Damage, power.Multiplier, power.BonusPercent)))
+                    // 相手の身代わり人形（アイテム）にも当たる（壊れるまでの回数を数える）。
+                    bool decoy = Airerage.Core.Items.ItemRules.HitDecoys(objects, states, a, ObjectHitKey(a, attacker.Combat.AttackSerial, h), center,
+                        HitShapes.Bounds(half, angle), Items);
+                    if (objects != null && (DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, HitShapes.Bounds(half, angle),
+                            AttackPower.Damage(hitData.Damage, power.Multiplier, power.BonusPercent)) | decoy))
                     {
                         // 壊せる物に当てたら、キャラクターに当てたときと同じように止まる（ユーザーの要望、2026-10-16）。
                         CharacterState stopped = states[a];
@@ -170,7 +173,15 @@ namespace Airerage.Core.Combat
 
             for (int i = 0; i < _hits.Count; i++)
             {
-                _hits[i] = Apply(states, configs, _hits[i], tick, _endedCombos);
+                if (Airerage.Core.Items.ItemRules.TryAbsorb(states, _hits[i].Victim))
+                {
+                    // シャボンのバリアで 1 回だけ防いだ（アイテム。命中にしない）。
+                    _hits.RemoveAt(i);
+                    i--;
+                    continue;
+                }
+                // アイテムの上乗せ（受ける威力・吹き飛び、逆境のお守り。D-64 の上乗せに足す）。
+                _hits[i] = Apply(states, configs, Airerage.Core.Items.ItemRules.AdjustHit(states, configs, _hits[i]), tick, _endedCombos);
             }
         }
 
@@ -292,7 +303,8 @@ namespace Airerage.Core.Combat
             }
             // 当てた側のゲージは判定ごと（必殺技の判定は 0）。ガードされたら割合だけ、ジャストガードされたら得ない。
             CombatTuning.AddGauge(ref attacker.Combat,
-                result == HitResult.Hit ? data.Gauge : result == HitResult.Guarded ? data.Gauge * attackerCombat.GaugeGuardedPercent / 100 : 0,
+                Airerage.Core.Items.ItemRules.AttackGauge(states, attackerCombat, hit.Attacker,
+                    result == HitResult.Hit ? data.Gauge : result == HitResult.Guarded ? data.Gauge * attackerCombat.GaugeGuardedPercent / 100 : 0),
                 configs[hit.Attacker].Skills.CoinBoost);
             states[hit.Attacker] = attacker;
 
@@ -499,6 +511,12 @@ namespace Airerage.Core.Combat
         public HitRecord WithResult(HitResult result, bool startsCombo = false)
         {
             return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, Power, result, startsCombo, FromObject);
+        }
+
+        /// <summary>強さ power に置き換えた命中（アイテムの上乗せ。ItemRules.AdjustHit）。</summary>
+        public HitRecord WithPower(AttackPower power)
+        {
+            return new HitRecord(Attacker, Victim, Attack, HitIndex, Data, Facing, power, Result, StartsCombo, FromObject);
         }
 
         /// <summary>倍率（吹き飛びと威力。撃破技は打つ直前の速さ、ルーレットの技は目による。それ以外は 1。D-38）。</summary>

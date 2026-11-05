@@ -111,7 +111,8 @@ namespace Airerage.Core.Simulation
         public static void ApplyFriction(ref CharacterState state, Vector3 velocityBefore, Vector2 halfExtents, IReadOnlyList<StageZone> zones,
             int tick = 0)
         {
-            if (zones == null || !state.Grounded || !state.Action.IsFree)
+            // スパイクの靴底（アイテム）を持っていれば、氷の上でも滑らない。
+            if (zones == null || !state.Grounded || !state.Action.IsFree || state.Items.CountOf(Items.ItemId.SpikeSoles) > 0)
             {
                 return;
             }

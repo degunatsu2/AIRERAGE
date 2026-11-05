@@ -39,7 +39,7 @@ namespace Airerage.Net
     /// 使い、ロビー（待機所・キャラクター選択・ステージ選択）はメニューで済んでいる。読み込んだステージ（出現位置はステージの
     /// SpawnPointAuthoring）で、待っていた試合を始める（BeginPending）。接続の画面と待機所は出さない。Quit で接続を閉じてメニューへ。
     /// </summary>
-    public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls, ILocalAimSource
+    public sealed class OnlineRunner : MonoBehaviour, ISimulationFeed, IMatchControls, ILocalAimSource, ILocalItemMenu
     {
         [Tooltip("一覧がないときのキャラクター")]
         [SerializeField] private CharacterConfigAsset _character;
@@ -153,6 +153,17 @@ namespace Airerage.Net
                 return false;
             }
             cursor = _input.TargetCursor;
+            return true;
+        }
+
+        bool ILocalItemMenu.TryGetItemMenu(int index, out LocalItemMenu menu)
+        {
+            menu = default;
+            if (!Running || _input == null || _session.IsSpectating || index != _session.LocalPlayer)
+            {
+                return false;
+            }
+            menu = new LocalItemMenu { Held = _input.ItemMenuHeld, Choices = _input.ItemMenuChoices, Slot = _input.ItemMenuSlot, Drop = _input.ItemMenuDrop };
             return true;
         }
 

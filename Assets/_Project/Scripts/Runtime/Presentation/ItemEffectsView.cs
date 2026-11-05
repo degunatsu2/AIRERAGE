@@ -17,6 +17,11 @@ namespace Airerage.Runtime.Presentation
     /// - イヤーボーン: 円の縁まで広がる風の輪。イカロスウイング: 背中の両側の羽（羽ばたく。残り 1 秒で点滅）。
     /// - 詠唱: キャラクターの下に棒のゲージ（以降、詠唱するものはすべてこれを出す。ユーザーの指示、2026-11-05）。
     /// - 音: 拾った・使った・捨てた・振った・一閃・風。
+    /// 追加のアイテム（2026-11-05）: グラップリングボム（刺さると赤く点滅、消えたら爆発の光）、折りたたみの足場、携帯トランポリン、
+    /// 身代わり人形、瓶詰めの雷雲（雷の線）、チェーンフック（持ち主からの鎖）、凍らせた壁、反射板の盾、シャボンのバリア、砂時計で遅い人の
+    /// 紫の光、大きな磁石の赤い光、帰還のリモコンの印、ポケットロケットの炎。
+    /// 落ちているアイテム: 出た瞬間に強い光を放ってフェードインし、着地して消える 5 秒前から点滅して円形ゲージと残りの秒数を出し、消えると
+    /// 光の粒になる（ユーザーの要望、2026-11-05）。
     /// </summary>
     public sealed class ItemEffectsView : MonoBehaviour
     {
@@ -47,7 +52,26 @@ namespace Airerage.Runtime.Presentation
         private Sprite _ballSprite;
         private readonly Dictionary<ItemId, Sprite> _sprites = new Dictionary<ItemId, Sprite>();
         private GUIStyle _castStyle;
+        private GUIStyle _expiryStyle;
+        private Sprite _square;
+        private readonly List<Particle> _particles = new List<Particle>();
+        private readonly Dictionary<int, SlantedRingGauge> _expiryGauges = new Dictionary<int, SlantedRingGauge>();
         private bool _primed;
+
+        // 光の粒（消えた落ちているアイテム、爆発）。
+        private sealed class Particle
+        {
+            public SpriteRenderer Renderer;
+            public Vector3 Velocity;
+            public float Start;
+            public float Duration;
+            public Color Color;
+            public float Size;
+        }
+
+        /// <summary>出た瞬間の光と、消える前の点滅を出す長さ（秒）と残り（ティック）。</summary>
+        private const float SpawnFlashSeconds = 0.45f;
+        private const int ExpiryWarningTicks = 300;
 
         private sealed class Shown
         {
@@ -56,6 +80,12 @@ namespace Airerage.Runtime.Presentation
             public Transform Icon;
             public SpriteRenderer Glow;
             public float Spin;
+            public float CreatedAt;
+            public int Remaining = int.MaxValue;
+            public Vector3 LastPosition;
+            public int Owner;
+            public int Strikes;
+            public LineRenderer Chain;
         }
 
         private sealed class Character
@@ -65,10 +95,18 @@ namespace Airerage.Runtime.Presentation
             public int Drops;
             public int Bursts;
             public int Flashes;
+            public int Reflects;
+            public int Pops;
+            public int Teleports;
+            public int Seals;
             public int LastSlash = -1;
             public GameObject Wings;
             public SpriteRenderer LeftWing;
             public SpriteRenderer RightWing;
+            public SpriteRenderer Shield;
+            public SpriteRenderer Bubble;
+            public SpriteRenderer Aura;
+            public SpriteRenderer Mark;
         }
 
         // しばらく出して消える線（振りの弧・一閃・風の輪）。
@@ -103,11 +141,22 @@ namespace Airerage.Runtime.Presentation
             }
             _lineTemplate.gameObject.SetActive(false);
             _glow = SoftSprites.CreateGlow("ItemGlow");
+            _square = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height),
+                new Vector2(0.5f, 0.5f), Texture2D.whiteTexture.width);
+            _square.name = "ItemSquare";
         }
 
         private void OnDestroy()
         {
             SoftSprites.Release(_glow);
+            if (_square != null)
+            {
+                Destroy(_square);
+            }
+            foreach (SlantedRingGauge gauge in _expiryGauges.Values)
+            {
+                gauge.Destroy();
+            }
             foreach (Sprite sprite in _sprites.Values)
             {
                 if (sprite != null)
@@ -137,6 +186,7 @@ namespace Airerage.Runtime.Presentation
             RenderObjects();
             RenderCharacters();
             RenderEffects();
+            RenderParticles();
             _primed = true;
         }
 
@@ -150,7 +200,7 @@ namespace Airerage.Runtime.Presentation
             for (int i = 0; i < objects.Count; i++)
             {
                 WorldObject item = objects[i];
-                if (item.Kind != WorldObjectKind.DroppedItem && item.Kind != WorldObjectKind.ItemShot && item.Kind != WorldObjectKind.SandBall)
+                if (!IsItemObject(item.Kind))
                 {
                     continue;
                 }
@@ -158,16 +208,60 @@ namespace Airerage.Runtime.Presentation
                 if (!_shown.TryGetValue(item.Id, out Shown shown))
                 {
                     shown = Create(item);
+                    shown.CreatedAt = _primed ? time : -10f;
                     _shown[item.Id] = shown;
                 }
                 var position = new Vector3(item.Position.X, item.Position.Y, Z);
+                shown.LastPosition = position;
+                shown.Owner = item.Owner;
                 switch (item.Kind)
                 {
                     case WorldObjectKind.DroppedItem:
-                        // ゆっくり上下に揺れ、光が脈打つ。
-                        float bob = item.Stored == 1 ? 0.12f + 0.08f * Mathf.Sin(time * 3f + item.Id) : 0f;
-                        shown.Root.transform.position = position + new Vector3(0f, bob, 0f);
-                        shown.Glow.color = WithAlpha(ItemIcons.Accent((ItemId)item.Variant), 0.45f + 0.2f * Mathf.Sin(time * 5f + item.Id));
+                        RenderDropped(item, shown, position, time);
+                        break;
+                    case WorldObjectKind.ItemBomb:
+                        shown.Root.transform.position = position;
+                        bool armed = item.Stored != 0;
+                        shown.Glow.color = armed && Mathf.Repeat(time * 8f, 1f) < 0.5f ? new Color(1f, 0.2f, 0.1f, 0.85f) : new Color(1f, 0.6f, 0.2f, 0.35f);
+                        break;
+                    case WorldObjectKind.ItemPlatform:
+                    case WorldObjectKind.Trampoline:
+                    case WorldObjectKind.FrozenWall:
+                        shown.Root.transform.position = position;
+                        shown.Icon.localScale = new Vector3(item.End.X * 2f, item.End.Y * 2f, 1f);
+                        float fade = item.ExpireTick - _feed.CurrentTick < 60 && Mathf.Repeat(time * 8f, 1f) < 0.5f ? 0.35f : 1f;
+                        var tint = shown.Icon.GetComponent<SpriteRenderer>();
+                        tint.color = WithAlpha(tint.color, (item.Kind == WorldObjectKind.FrozenWall ? 0.55f : 0.95f) * fade);
+                        if (item.Kind == WorldObjectKind.Trampoline && item.Damage > shown.Strikes)
+                        {
+                            shown.Strikes = item.Damage;
+                            shown.Glow.transform.localScale = new Vector3(item.End.X * 4f, item.End.X * 2f, 1f);
+                        }
+                        break;
+                    case WorldObjectKind.Decoy:
+                        shown.Root.transform.position = position;
+                        shown.Icon.localScale = new Vector3(item.End.X * 2.4f * (item.Stored < 0 ? -1f : 1f), item.End.Y * 2.2f, 1f);
+                        shown.Icon.GetComponent<SpriteRenderer>().color = new Color(1f, 1f, 1f, item.Damage > 0 ? 0.6f : 0.9f);
+                        break;
+                    case WorldObjectKind.ThunderCloud:
+                        shown.Root.transform.position = position;
+                        shown.Icon.localScale = new Vector3(item.End.X * 2.6f, 1.4f, 1f);
+                        if (item.Damage > shown.Strikes)
+                        {
+                            shown.Strikes = item.Damage;
+                            AddBolt(position, item.End.Y);
+                            Play(SoundId.Thunder);
+                        }
+                        break;
+                    case WorldObjectKind.ChainHook:
+                        shown.Root.transform.position = position;
+                        shown.Icon.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(item.Velocity.Y, item.Velocity.X) * Mathf.Rad2Deg - 90f);
+                        if (shown.Chain != null && item.Owner >= 0 && item.Owner < _feed.CharacterCount)
+                        {
+                            CharacterState owner = _feed.GetState(item.Owner);
+                            shown.Chain.SetPosition(0, new Vector3(owner.Position.X, owner.Position.Y, Z));
+                            shown.Chain.SetPosition(1, position);
+                        }
                         break;
                     case WorldObjectKind.ItemShot:
                         shown.Root.transform.position = position;
@@ -195,8 +289,124 @@ namespace Airerage.Runtime.Presentation
             }
             foreach (int id in _gone)
             {
-                Destroy(_shown[id].Root);
+                Shown gone = _shown[id];
+                if (gone.Kind == WorldObjectKind.DroppedItem && gone.Remaining <= 3)
+                {
+                    // 拾われずに時間切れで消えた: 光の粒になって消える。
+                    Burst(gone.LastPosition, gone.Glow.color, 14, 2.4f, 0.7f, 0.18f);
+                }
+                else if (gone.Kind == WorldObjectKind.ItemBomb)
+                {
+                    // 爆発（オレンジの光と粒）。
+                    Burst(gone.LastPosition, new Color(1f, 0.55f, 0.15f, 1f), 18, 7f, 0.5f, 0.35f);
+                    AddRing(gone.LastPosition, Tuning.BombBlastRadius, new Color(1f, 0.8f, 0.4f, 0.95f), new Color(1f, 0.3f, 0.1f, 0f));
+                    Play(SoundId.MissileExplode);
+                }
+                if (_expiryGauges.TryGetValue(id, out SlantedRingGauge gauge))
+                {
+                    gauge.Destroy();
+                    _expiryGauges.Remove(id);
+                }
+                if (gone.Chain != null)
+                {
+                    Destroy(gone.Chain.gameObject);
+                }
+                Destroy(gone.Root);
                 _shown.Remove(id);
+            }
+        }
+
+        private static bool IsItemObject(WorldObjectKind kind)
+        {
+            switch (kind)
+            {
+                case WorldObjectKind.DroppedItem:
+                case WorldObjectKind.ItemShot:
+                case WorldObjectKind.SandBall:
+                case WorldObjectKind.ItemBomb:
+                case WorldObjectKind.ItemPlatform:
+                case WorldObjectKind.Trampoline:
+                case WorldObjectKind.Decoy:
+                case WorldObjectKind.ThunderCloud:
+                case WorldObjectKind.ChainHook:
+                case WorldObjectKind.FrozenWall:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        // 落ちているアイテム: ゆっくり上下に揺れ、光が脈打つ。出た瞬間は強く光ってフェードインし、消える 5 秒前から点滅して円形ゲージを出す。
+        private void RenderDropped(in WorldObject item, Shown shown, Vector3 position, float time)
+        {
+            float bob = item.Stored == 1 ? 0.12f + 0.08f * Mathf.Sin(time * 3f + item.Id) : 0f;
+            shown.Root.transform.position = position + new Vector3(0f, bob, 0f);
+            Color accent = ItemIcons.Accent((ItemId)item.Variant);
+            float age = time - shown.CreatedAt;
+            var icon = shown.Icon.GetComponent<SpriteRenderer>();
+            if (age < SpawnFlashSeconds)
+            {
+                float t = age / SpawnFlashSeconds;
+                shown.Glow.transform.localScale = Vector3.one * DropSize * Mathf.Lerp(6f, 2.2f, t);
+                shown.Glow.color = Color.Lerp(new Color(1f, 1f, 1f, 1f), WithAlpha(accent, 0.55f), t);
+                icon.color = new Color(1f, 1f, 1f, t);
+            }
+            else
+            {
+                shown.Glow.transform.localScale = Vector3.one * DropSize * 2.2f;
+                shown.Glow.color = WithAlpha(accent, 0.45f + 0.2f * Mathf.Sin(time * 5f + item.Id));
+                icon.color = Color.white;
+            }
+            int remaining = item.ExpireTick == int.MaxValue ? int.MaxValue : item.ExpireTick - _feed.CurrentTick;
+            shown.Remaining = remaining;
+            if (remaining <= ExpiryWarningTicks)
+            {
+                bool off = Mathf.Repeat(time * 6f, 1f) < 0.35f;
+                icon.color = new Color(1f, 1f, 1f, off ? 0.25f : 1f);
+                if (!_expiryGauges.TryGetValue(item.Id, out SlantedRingGauge gauge))
+                {
+                    gauge = new SlantedRingGauge(this, $"ItemExpiry{item.Id}", _lineTemplate.sharedMaterial, 20);
+                    _expiryGauges[item.Id] = gauge;
+                }
+                gauge.Draw(shown.Root.transform.position, DropSize * 0.85f, 0.08f, Mathf.Clamp01(remaining / (float)ExpiryWarningTicks), accent, Z - 0.05f);
+            }
+        }
+
+        // 光の粒を count 個、center から外へ飛ばす（speed m/s、duration 秒、大きさ size m）。
+        private void Burst(Vector3 center, Color color, int count, float speed, float duration, float size)
+        {
+            for (int k = 0; k < count; k++)
+            {
+                float angle = (k + Random.value * 0.5f) * Mathf.PI * 2f / count;
+                var go = new GameObject("ItemParticle");
+                go.transform.SetParent(transform, false);
+                go.transform.position = center;
+                SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
+                renderer.sprite = _glow;
+                _particles.Add(new Particle
+                {
+                    Renderer = renderer, Velocity = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * speed * (0.6f + 0.4f * Random.value),
+                    Start = Time.time, Duration = duration, Color = WithAlpha(color, 1f), Size = size,
+                });
+            }
+        }
+
+        private void RenderParticles()
+        {
+            float now = Time.time;
+            for (int i = _particles.Count - 1; i >= 0; i--)
+            {
+                Particle p = _particles[i];
+                float t = (now - p.Start) / p.Duration;
+                if (t >= 1f)
+                {
+                    Destroy(p.Renderer.gameObject);
+                    _particles.RemoveAt(i);
+                    continue;
+                }
+                p.Renderer.transform.position += p.Velocity * Time.deltaTime;
+                p.Renderer.transform.localScale = Vector3.one * p.Size * (1f - 0.6f * t);
+                p.Renderer.color = WithAlpha(Color.Lerp(Color.white, p.Color, t), 1f - t);
             }
         }
 
@@ -224,6 +434,51 @@ namespace Airerage.Runtime.Presentation
                     iconObject.transform.localScale = Vector3.one * Tuning.ShotRadius * 3f;
                     glowObject.transform.localScale = Vector3.one * Tuning.ShotRadius * 5f;
                     break;
+                case WorldObjectKind.ItemBomb:
+                    icon.sprite = SpriteOf(ItemId.GrappleBomb);
+                    iconObject.transform.localScale = Vector3.one * Tuning.BombRadius * 3f;
+                    glowObject.transform.localScale = Vector3.one * Tuning.BombRadius * 5f;
+                    break;
+                case WorldObjectKind.ItemPlatform:
+                    icon.sprite = _square;
+                    icon.color = new Color(1f, 0.85f, 0.25f, 0.95f);
+                    glow.color = new Color(1f, 0.9f, 0.4f, 0.35f);
+                    glowObject.transform.localScale = new Vector3(item.End.X * 3f, item.End.Y * 6f, 1f);
+                    break;
+                case WorldObjectKind.Trampoline:
+                    icon.sprite = _square;
+                    icon.color = new Color(0.3f, 0.75f, 1f, 0.95f);
+                    glow.color = new Color(0.4f, 0.85f, 1f, 0.4f);
+                    glowObject.transform.localScale = new Vector3(item.End.X * 3f, item.End.X * 1.5f, 1f);
+                    break;
+                case WorldObjectKind.FrozenWall:
+                    icon.sprite = _square;
+                    icon.color = new Color(0.6f, 0.9f, 1f, 0.55f);
+                    glow.color = new Color(0.6f, 0.95f, 1f, 0.35f);
+                    glowObject.transform.localScale = new Vector3(item.End.X * 6f, item.End.Y * 2.4f, 1f);
+                    break;
+                case WorldObjectKind.Decoy:
+                    icon.sprite = SpriteOf(ItemId.DecoyDoll);
+                    glow.color = new Color(1f, 1f, 1f, 0f);
+                    break;
+                case WorldObjectKind.ThunderCloud:
+                    icon.sprite = _glow;
+                    icon.color = new Color(0.2f, 0.2f, 0.28f, 0.9f);
+                    glow.color = new Color(1f, 0.95f, 0.4f, 0.25f);
+                    glowObject.transform.localScale = new Vector3(item.End.X * 3f, 2f, 1f);
+                    break;
+                case WorldObjectKind.ChainHook:
+                {
+                    icon.sprite = SpriteOf(ItemId.ChainHook);
+                    iconObject.transform.localScale = Vector3.one * 0.9f;
+                    glow.color = new Color(0.8f, 0.8f, 0.85f, 0.3f);
+                    glowObject.transform.localScale = Vector3.one * 1.2f;
+                    LineRenderer chain = NewLine(2, 0.08f);
+                    chain.startColor = new Color(0.75f, 0.75f, 0.8f, 1f);
+                    chain.endColor = new Color(0.75f, 0.75f, 0.8f, 1f);
+                    var shownHook = new Shown { Kind = item.Kind, Root = root, Icon = iconObject.transform, Glow = glow, Chain = chain };
+                    return shownHook;
+                }
                 default:
                     icon.sprite = BallSprite();
                     glowObject.transform.localScale = Vector3.one * Tuning.BallRadius * 4f;
@@ -331,12 +586,37 @@ namespace Airerage.Runtime.Presentation
                         Play(SoundId.Zap);
                         AddFlash(bag);
                     }
+                    if (bag.ReflectCount > view.Reflects)
+                    {
+                        Play(SoundId.ShieldBlock);
+                        Burst(center + new Vector3(state.Facing * Tuning.ReflectorReach, 0f, 0f), new Color(0.85f, 0.9f, 1f, 1f), 8, 4f, 0.3f, 0.2f);
+                    }
+                    if (bag.BarrierPopCount > view.Pops)
+                    {
+                        Play(SoundId.Splash);
+                        Burst(center, new Color(0.7f, 0.9f, 1f, 1f), 16, 4f, 0.45f, 0.25f);
+                    }
+                    if (bag.TeleportCount > view.Teleports)
+                    {
+                        Play(SoundId.Warp);
+                        Burst(center, new Color(0.6f, 1f, 0.8f, 1f), 12, 3f, 0.4f, 0.25f);
+                    }
+                    if (bag.SealCount > view.Seals)
+                    {
+                        Play(SoundId.Bank);
+                        Burst(center, new Color(1f, 0.3f, 0.25f, 1f), 12, 3f, 0.5f, 0.25f);
+                    }
                 }
                 view.Pickups = bag.PickupCount;
                 view.Uses = bag.UseCount;
                 view.Drops = bag.DropCount;
                 view.Bursts = bag.BurstCount;
                 view.Flashes = bag.FlashCount;
+                view.Reflects = bag.ReflectCount;
+                view.Pops = bag.BarrierPopCount;
+                view.Teleports = bag.TeleportCount;
+                view.Seals = bag.SealCount;
+                RenderStatuses(view, state, center, time);
 
                 // 櫓落としの振り（振りが始まるティックごとに弧を出す）。
                 if (bag.Act == (byte)ItemId.Yaguraotoshi && bag.ActTicks < Tuning.SwordSlashesTicks)
@@ -354,20 +634,17 @@ namespace Airerage.Runtime.Presentation
                     view.LastSlash = -1;
                 }
 
-                // イカロスウイング: 飛んでいる間、背中の両側に羽（羽ばたき。残り 1 秒で点滅）。
-                bool flying = ItemRules.Flying(state, Tuning);
+                // イカロスウイング: 飛んでいる間、背中の両側に羽（羽ばたき。点滅はしない。ユーザーの指示、2026-11-05）。
+                bool flying = ItemRules.Flying(state, Tuning) && bag.Act == (byte)ItemId.IcarusWing;
                 view.Wings.SetActive(flying);
                 if (flying)
                 {
-                    int left = ItemRules.FlightTicksLeft(state, Tuning);
-                    bool blink = left <= Tuning.WingBlinkTicks && Mathf.Repeat(time * 10f, 1f) < 0.4f;
                     float flap = 0.75f + 0.25f * Mathf.Sin(time * 22f);
                     view.Wings.transform.position = center + new Vector3(0f, 0.35f, 0.05f);
                     view.LeftWing.transform.localScale = new Vector3(-1.2f, 1.2f * flap, 1f);
                     view.RightWing.transform.localScale = new Vector3(1.2f, 1.2f * flap, 1f);
-                    Color wing = new Color(1f, 1f, 1f, blink ? 0.25f : 1f);
-                    view.LeftWing.color = wing;
-                    view.RightWing.color = wing;
+                    view.LeftWing.color = Color.white;
+                    view.RightWing.color = Color.white;
                 }
             }
         }
@@ -387,7 +664,86 @@ namespace Airerage.Runtime.Presentation
             }
             var view = new Character { Wings = wings, LeftWing = Wing("Left", -0.55f), RightWing = Wing("Right", 0.55f) };
             wings.SetActive(false);
+            SpriteRenderer Status(string statusName, Sprite sprite)
+            {
+                var go = new GameObject($"{statusName}{index + 1}");
+                go.transform.SetParent(transform, false);
+                SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
+                renderer.sprite = sprite;
+                renderer.enabled = false;
+                return renderer;
+            }
+            view.Shield = Status("Reflector", SpriteOf(ItemId.Reflector));
+            view.Bubble = Status("Bubble", _glow);
+            view.Aura = Status("Aura", _glow);
+            view.Mark = Status("Mark", SpriteOf(ItemId.ReturnRemote));
             return view;
+        }
+
+        // 状態の見た目（反射板の盾、シャボンのバリア、遅い人の紫・磁石の赤・ロケットの炎の光、帰還のリモコンの印）。
+        private void RenderStatuses(Character view, in CharacterState state, Vector3 center, float time)
+        {
+            ItemBag bag = state.Items;
+            bool active = !state.Combat.IsWaitingToRespawn;
+            view.Shield.enabled = active && bag.ReflectTicks > 0;
+            if (view.Shield.enabled)
+            {
+                view.Shield.transform.position = center + new Vector3(state.Facing * Tuning.ReflectorReach, 0f, -0.1f);
+                view.Shield.transform.localScale = new Vector3(1.4f, 2.2f, 1f);
+                view.Shield.color = new Color(1f, 1f, 1f, 0.7f + 0.3f * Mathf.Sin(time * 20f));
+            }
+            view.Bubble.enabled = active && bag.BarrierTicks > 0;
+            if (view.Bubble.enabled)
+            {
+                view.Bubble.transform.position = center + new Vector3(0f, 0f, -0.12f);
+                view.Bubble.transform.localScale = Vector3.one * (3.2f + 0.15f * Mathf.Sin(time * 4f));
+                view.Bubble.color = Color.HSVToRGB(Mathf.Repeat(time * 0.4f, 1f), 0.35f, 1f) * new Color(1f, 1f, 1f, 0.45f);
+            }
+            Color aura = Color.clear;
+            if (bag.SlowTicks > 0)
+            {
+                aura = new Color(0.65f, 0.4f, 1f, 0.55f);
+            }
+            else if (bag.MagnetTicks > 0)
+            {
+                aura = new Color(1f, 0.3f, 0.3f, 0.35f + 0.2f * Mathf.Sin(time * 12f));
+            }
+            else if (bag.Act == (byte)ItemId.PocketRocket)
+            {
+                aura = new Color(1f, 0.55f, 0.15f, 0.8f);
+            }
+            view.Aura.enabled = active && aura.a > 0f;
+            if (view.Aura.enabled)
+            {
+                Vector3 offset = bag.Act == (byte)ItemId.PocketRocket ? new Vector3(-bag.ActAim.X, -bag.ActAim.Y, 0f) * 0.8f : Vector3.zero;
+                view.Aura.transform.position = center + offset + new Vector3(0f, 0f, 0.05f);
+                view.Aura.transform.localScale = Vector3.one * (bag.MagnetTicks > 0 ? Tuning.BigMagnetRadius * 0.5f : 3f);
+                view.Aura.color = aura;
+            }
+            view.Mark.enabled = bag.MarkTicks > 0;
+            if (view.Mark.enabled)
+            {
+                view.Mark.transform.position = new Vector3(bag.Mark.X, bag.Mark.Y, Z);
+                view.Mark.transform.localScale = Vector3.one * 0.9f;
+                view.Mark.color = new Color(1f, 1f, 1f, bag.MarkTicks < 120 && Mathf.Repeat(time * 6f, 1f) < 0.4f ? 0.3f : 0.95f);
+            }
+        }
+
+        // 雷雲の雷（雲から下へのぎざぎざの線）。
+        private void AddBolt(Vector3 cloud, float depth)
+        {
+            const int points = 8;
+            LineRenderer line = NewLine(points, 0.18f);
+            for (int p = 0; p < points; p++)
+            {
+                float t = p / (float)(points - 1);
+                float x = p == 0 || p == points - 1 ? 0f : (Random.value - 0.5f) * 0.8f;
+                line.SetPosition(p, cloud + new Vector3(x, -depth * t, -0.05f));
+            }
+            _effects.Add(new Effect
+            {
+                Line = line, Start = Time.time, Duration = 0.25f, From = new Color(1f, 1f, 0.7f, 1f), To = new Color(1f, 0.9f, 0.3f, 0f), Width = 0.18f,
+            });
         }
 
         // ---------------------------------------------------------------- 線の効果
@@ -436,13 +792,17 @@ namespace Airerage.Runtime.Presentation
         // イヤーボーンの風の輪（円の縁まで広がる）。
         private void AddRing(Vector3 center)
         {
+            AddRing(center, Tuning.EarRadius, new Color(0.85f, 1f, 0.95f, 0.9f), new Color(0.6f, 0.95f, 0.85f, 0f));
+        }
+
+        private void AddRing(Vector3 center, float radius, Color from, Color to)
+        {
             const int points = 48;
             LineRenderer line = NewLine(points, 0.3f);
             line.loop = true;
             _effects.Add(new Effect
             {
-                Line = line, Start = Time.time, Duration = 0.45f, From = new Color(0.85f, 1f, 0.95f, 0.9f), To = new Color(0.6f, 0.95f, 0.85f, 0f),
-                Width = 0.3f, Center = center, Radius = Tuning.EarRadius,
+                Line = line, Start = Time.time, Duration = 0.45f, From = from, To = to, Width = 0.3f, Center = center, Radius = radius,
             });
         }
 
@@ -495,6 +855,7 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             Color previous = GUI.color;
+            DrawExpirySeconds();
             int count = _feed.CharacterCount;
             for (int i = 0; i < count; i++)
             {
@@ -542,6 +903,33 @@ namespace Airerage.Runtime.Presentation
             GUI.DrawTexture(new Rect(back.x, back.y, back.width * progress, back.height), Texture2D.whiteTexture);
             GUI.color = new Color(1f, 1f, 1f, 0.9f);
             GUI.DrawTexture(new Rect(back.x + back.width * progress - 1f, back.y - 2f, 2f, back.height + 4f), Texture2D.whiteTexture);
+        }
+
+        // 消える 5 秒前からの、落ちているアイテムの残りの秒数（円形ゲージの真ん中）。
+        private void DrawExpirySeconds()
+        {
+            if (_expiryStyle == null)
+            {
+                _expiryStyle = Airerage.Runtime.UI.GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+            }
+            foreach (Shown shown in _shown.Values)
+            {
+                if (shown.Kind != WorldObjectKind.DroppedItem || shown.Remaining > ExpiryWarningTicks)
+                {
+                    continue;
+                }
+                Vector3 screen = _camera.WorldToScreenPoint(shown.Root.transform.position + new Vector3(0f, DropSize * 1.1f, 0f));
+                if (screen.z <= 0f)
+                {
+                    continue;
+                }
+                var rect = new Rect(screen.x - 30f, Screen.height - screen.y - 12f, 60f, 24f);
+                int seconds = Mathf.Max(1, Mathf.CeilToInt(shown.Remaining / (float)SimTime.TicksPerSecond));
+                _expiryStyle.normal.textColor = new Color(0f, 0f, 0f, 0.8f);
+                GUI.Label(new Rect(rect.x + 1f, rect.y + 1f, rect.width, rect.height), seconds.ToString(), _expiryStyle);
+                _expiryStyle.normal.textColor = Color.white;
+                GUI.Label(rect, seconds.ToString(), _expiryStyle);
+            }
         }
 
         private void Play(SoundId id)

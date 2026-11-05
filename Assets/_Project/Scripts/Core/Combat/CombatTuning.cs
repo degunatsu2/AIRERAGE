@@ -812,6 +812,25 @@ namespace Airerage.Core.Combat
         /// </summary>
         public int SkillDamageBonusPercent;
 
+        /// <summary>
+        /// 持っているパッシブアイテムで変わる値（ItemRules.ConfigFor が決める。キャラクターのデータでは初めの値のまま。docs/20_item_plan.md）:
+        /// 受ける威力・吹き飛びの上乗せ（%。AttackPower に足す）、攻撃で得るゲージの上乗せ（%）、コインを拾える範囲の倍率、拠点で確定したときの
+        /// ボーナス（%）、復帰待ちを短くするティック、撃破ドロップの倍率（%）と所持の全部を落とすか、逆境のお守りの最下位の間の威力・
+        /// 攻撃で得るゲージ・戦闘の報酬の上乗せ（%）、張り付いた壁を凍らせるか。
+        /// </summary>
+        public int ItemDamageTakenPercent;
+        public int ItemKnockbackTakenPercent;
+        public int ItemGaugePercent;
+        public float ItemCoinPickupScale = 1f;
+        public int ItemBankBonusPercent;
+        public int ItemRespawnReductionTicks;
+        public int ItemKoDropPercent = 100;
+        public bool ItemKoDropAll;
+        public int ItemCharmDamagePercent;
+        public int ItemCharmGaugePercent;
+        public int ItemCharmCoinPercent;
+        public bool ItemFreezesWalls;
+
         public CombatTuning WithSpecial1(AttackData attack, int cooldownTicks)
         {
             var copy = (CombatTuning)MemberwiseClone();

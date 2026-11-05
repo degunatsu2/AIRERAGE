@@ -93,7 +93,7 @@ namespace Airerage.Core.Objects
                 {
                     _hookObjects.Add(item);
                 }
-                if (!item.Ended && item.Kind == WorldObjectKind.PlacedZone && item.ChargeMilli == 1)
+                if (!item.Ended && ((item.Kind == WorldObjectKind.PlacedZone && item.ChargeMilli == 1) || item.Kind == WorldObjectKind.ItemPlatform))
                 {
                     _footings.Add(item);
                 }
@@ -150,6 +150,14 @@ namespace Airerage.Core.Objects
         {
             foreach (WorldObject item in _footings)
             {
+                if (item.Kind == WorldObjectKind.ItemPlatform)
+                {
+                    // 折りたたみの足場（アイテム）: 見た目どおりの箱。ワイヤーもつながる。
+                    _platforms.AddBox(item.Position.X - item.End.X, item.Position.Y - item.End.Y, item.Position.X + item.End.X,
+                        item.Position.Y + item.End.Y, true, 0);
+                    _hasPlatforms = true;
+                    continue;
+                }
                 FootingBox(item, out Vector2 min, out Vector2 max);
                 _platforms.AddBox(min.X, min.Y, max.X, max.Y, false, 0);
                 _hasPlatforms = true;

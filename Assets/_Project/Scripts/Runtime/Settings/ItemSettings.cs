@@ -21,8 +21,9 @@ namespace Airerage.Runtime.Settings
         private const string ModeKey = Prefix + "Mode";
         private const string CountKey = Prefix + "StartCount";
         private const string RateKey = Prefix + "DropRate";
-        private const string StartKey = Prefix + "StartItems";
-        private const string PoolKey = Prefix + "DropPool";
+        // アイテムの番号を並べ直した（2026-11-05）ので、前の保存とは別の名前で保存する。
+        private const string StartKey = Prefix + "StartItems2";
+        private const string PoolKey = Prefix + "DropPool2";
 
         private static readonly string[] AllKeys = { ModeKey, CountKey, RateKey, StartKey, PoolKey };
 
@@ -32,11 +33,11 @@ namespace Airerage.Runtime.Settings
         /// <summary>ドロップ頻度（0 少・1 中・2 多）。</summary>
         public int DropRate = 1;
 
-        /// <summary>初期アイテム（Z・X・C の順。なしは None）。</summary>
+        /// <summary>初期アイテム（Z・X・C の順。なしは None。最初が ItemId.Random ならランダムセレクト）。</summary>
         public ItemId[] StartItems = new ItemId[ItemCatalog.BagSlots];
 
         /// <summary>ドロップするアイテム（ItemCatalog.Bit の和。0 にはしない）。</summary>
-        public uint DropPool = ItemCatalog.AllMask;
+        public ulong DropPool = ItemCatalog.AllMask;
 
         /// <summary>保存した設定を読む（保存していない項目は初めの値）。</summary>
         public static ItemSettings Load()
@@ -48,7 +49,7 @@ namespace Airerage.Runtime.Settings
                 StartCount = Mathf.Clamp(PlayerPrefs.GetInt(CountKey, ItemCatalog.BagSlots), 1, ItemCatalog.BagSlots),
                 DropRate = Mathf.Clamp(PlayerPrefs.GetInt(RateKey, 1), 0, 2),
                 StartItems = ParseItems(PlayerPrefs.GetString(StartKey, string.Empty)),
-                DropPool = ValidPool((uint)PlayerPrefs.GetInt(PoolKey, (int)ItemCatalog.AllMask)),
+                DropPool = ValidPool(ReadPool(PlayerPrefs.GetString(PoolKey, string.Empty))),
             };
             return settings;
         }
@@ -60,7 +61,7 @@ namespace Airerage.Runtime.Settings
             PlayerPrefs.SetInt(CountKey, Mathf.Clamp(StartCount, 1, ItemCatalog.BagSlots));
             PlayerPrefs.SetInt(RateKey, Mathf.Clamp(DropRate, 0, 2));
             PlayerPrefs.SetString(StartKey, FormatItems(StartItems));
-            PlayerPrefs.SetInt(PoolKey, (int)ValidPool(DropPool));
+            PlayerPrefs.SetString(PoolKey, ValidPool(DropPool).ToString(System.Globalization.CultureInfo.InvariantCulture));
             PlayerPrefs.Save();
         }
 
@@ -84,13 +85,14 @@ namespace Airerage.Runtime.Settings
             rules.ItemMode = Mode;
             rules.StartItemCount = Mathf.Clamp(StartCount, 1, ItemCatalog.BagSlots);
             rules.ItemDropRate = Mathf.Clamp(DropRate, 0, 2);
-            rules.ItemDropPool = (int)ValidPool(DropPool);
+            rules.ItemDropPool = (long)ValidPool(DropPool);
         }
 
         /// <summary>初期アイテムのうち、上限 count までの選んだもの（なしは詰める）。</summary>
         public ItemId[] StartItemsUpTo(int count)
         {
-            return Trim(StartItems, count);
+            // ランダムセレクトの印は、そのまま渡す（試合を始めるときに、試合の種から選ぶ。SimWorld.SetItems）。
+            return RandomStart ? new[] { ItemId.Random } : Trim(StartItems, count);
         }
 
         /// <summary>items の選んだもの（なしは詰める）を count 個まで。</summary>
@@ -108,11 +110,21 @@ namespace Airerage.Runtime.Settings
         }
 
         /// <summary>ドロップするアイテムの集まり（範囲の外のビットを落とし、1 つもなければすべて）。</summary>
-        public static uint ValidPool(uint pool)
+        public static ulong ValidPool(ulong pool)
         {
-            uint valid = pool & ItemCatalog.AllMask;
+            ulong valid = pool & ItemCatalog.AllMask;
             return valid == 0 ? ItemCatalog.AllMask : valid;
         }
+
+        private static ulong ReadPool(string text)
+        {
+            return ulong.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out ulong pool)
+                ? pool
+                : ItemCatalog.AllMask;
+        }
+
+        /// <summary>ランダムセレクトを選んでいるか（初期アイテムの最初が ItemId.Random）。</summary>
+        public bool RandomStart => StartItems != null && StartItems.Length > 0 && StartItems[0] == ItemId.Random;
 
         /// <summary>count 個まで、ランダムに違うアイテムを選ぶ（ローカルの CPU の初期アイテム）。</summary>
         public static ItemId[] RandomItems(int count, System.Random random)
@@ -167,13 +179,18 @@ namespace Airerage.Runtime.Settings
             string[] parts = (text ?? string.Empty).Split(',');
             for (int i = 0; i < items.Length && i < parts.Length; i++)
             {
-                if (int.TryParse(parts[i], out int value) && ItemCatalog.IsValid((ItemId)value))
+                if (int.TryParse(parts[i], out int value) && (ItemCatalog.IsValid((ItemId)value) || (i == 0 && value == (int)ItemId.Random)))
                 {
                     items[i] = (ItemId)value;
                 }
             }
-            ItemId[] trimmed = Trim(items, ItemCatalog.BagSlots);
             var result = new ItemId[ItemCatalog.BagSlots];
+            if (items[0] == ItemId.Random)
+            {
+                result[0] = ItemId.Random;
+                return result;
+            }
+            ItemId[] trimmed = Trim(items, ItemCatalog.BagSlots);
             Array.Copy(trimmed, result, trimmed.Length);
             return result;
         }

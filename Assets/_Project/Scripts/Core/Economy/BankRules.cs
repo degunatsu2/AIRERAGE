@@ -151,7 +151,16 @@ namespace Airerage.Core.Economy
                 {
                     continue;
                 }
-                ledger.Bank(new CoinEventId(tick, CoinEventKind.Bank, i), states, i, state.Coins.Held);
+                int held = state.Coins.Held;
+                if (ledger.Bank(new CoinEventId(tick, CoinEventKind.Bank, i), states, i, held))
+                {
+                    // 金庫の鍵（アイテム）: 確定した枚数のボーナスを足して、それも確定する。
+                    int bonus = held * configs[i].Combat.ItemBankBonusPercent / 100;
+                    if (bonus > 0 && ledger.Reward(new CoinEventId(tick, CoinEventKind.ItemBonus, i), states, i, bonus))
+                    {
+                        ledger.Bank(new CoinEventId(tick, CoinEventKind.ItemBank, i), states, i, bonus);
+                    }
+                }
             }
         }
     }
