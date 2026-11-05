@@ -1921,8 +1921,11 @@ namespace Airerage.Net
                                 // 観戦の人が抜けても、試合はそのまま。
                                 continue;
                             }
-                            // 試合中に抜けた人は外して、残りの 2 人以上で続ける（docs/15 T6-10）。
-                            bool goesOn = State == SessionState.Running && p < PlayerCount && RemainingPlayers() >= 2 && RemoveDeparted(p);
+                            // 試合中に抜けた人は外して、残りの 2 人以上で続ける（docs/15 T6-10）。試合が終わった後（結果の画面の EXIT）に
+                            // 抜けたときは、残りが 1 人でも部屋を閉じない（ホストは BACK ROOM で待機所へ戻って人を待てる。2026-11-03）。
+                            bool finished = World != null && World.Phase == Airerage.Core.Match.MatchPhase.Finished;
+                            bool goesOn = State == SessionState.Running && p < PlayerCount && (RemainingPlayers() >= 2 || finished)
+                                && RemoveDeparted(p);
                             if (!goesOn && (State == SessionState.Running || State == SessionState.Loading))
                             {
                                 // 1 人だけになったか、外せなかったら、試合を終える（残りの人も止まったままにしないよう、接続を切る）。

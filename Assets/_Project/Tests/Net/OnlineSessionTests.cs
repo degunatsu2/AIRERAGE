@@ -340,7 +340,7 @@ namespace Airerage.Net.Tests
                 Assert.That(session.PlayerCharacters, Is.EqualTo(new[] { 1, 1, 0 }), $"プレイヤー {session.LocalPlayer} のキャラクターの表");
                 Assert.That(session.World.GetConfig(0).Movement.RunSpeed, Is.EqualTo(11f));
                 Assert.That(session.World.GetConfig(1).Movement.RunSpeed, Is.EqualTo(11f));
-                Assert.That(session.World.GetConfig(2).Movement.RunSpeed, Is.EqualTo(8f));
+                Assert.That(session.World.GetConfig(2).Movement.RunSpeed, Is.EqualTo(standard.Movement.RunSpeed));
                 Assert.That(session.World.GetConfig(1).Combat.SuperGaugeCost, Is.EqualTo(500));
                 session.TickLimit = ticks;
             }
@@ -680,6 +680,28 @@ namespace Airerage.Net.Tests
             Assert.That(stays.PlayerCount, Is.EqualTo(2));
             Assert.That(stays.LocalPlayer, Is.EqualTo(1), "番号を詰めていない");
             Assert.That(stays.HasDeparted(1), Is.False);
+        }
+
+        [Test]
+        public void LeavingFromTheResults_KeepsTheRoomOpen_EvenWhenTheHostIsLeftAlone()
+        {
+            // 結果の画面の EXIT（2026-11-03）: 試合が終わった後に抜けた人がいても、ホストの部屋は閉じない（BACK ROOM で待機所へ戻って人を待つ）。
+            OnlineSession host = Host();
+            OnlineSession leaves = Join(host);
+            PumpUntil(() => leaves.LocalPlayer == 1);
+            host.StartMatch(new MatchRules { CountdownTicks = 10, DurationTicks = 60, OvertimeTicks = 0 });
+            PumpUntil(() => _sessions.TrueForAll(s => s.World != null && s.World.Phase == MatchPhase.Finished));
+
+            leaves.Dispose();
+            _sessions.Remove(leaves);
+            PumpUntil(() => host.HasDeparted(1));
+            Assert.That(host.State, Is.EqualTo(OnlineSession.SessionState.Running), "結果の画面で抜けた人がいて、部屋が閉じた");
+            Assert.That(host.LobbyParticipantCount, Is.EqualTo(1), "抜けた人を数えている");
+
+            host.ReturnToLobby(LobbyPhase.Waiting);
+            Assert.That(host.State, Is.EqualTo(OnlineSession.SessionState.Lobby), "待機所へ戻れない");
+            OnlineSession joins = Join(host);
+            PumpUntil(() => joins.LocalPlayer >= 1 && host.LobbyPlayerCount == 2);
         }
 
         [Test]

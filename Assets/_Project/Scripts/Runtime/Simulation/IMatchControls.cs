@@ -35,5 +35,11 @@ namespace Airerage.Runtime.Simulation
 
         /// <summary>途中から部屋に入って待っている人がいるか（いれば REMATCH・CHARACTER SELECT を押せない。BACK ROOM で戻す）。</summary>
         bool NewcomersWaiting { get; }
+
+        /// <summary>
+        /// 結果の画面でほかの人が抜けて、試合に出られる人が 1 人だけになったか（REMATCH・CHARACTER SELECT を押せない。BACK ROOM で待機所へ
+        /// 戻って人を待つ。2026-11-03）。
+        /// </summary>
+        bool TooFewPlayers { get; }
     }
 }

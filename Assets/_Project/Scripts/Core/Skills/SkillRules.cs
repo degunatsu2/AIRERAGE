@@ -191,6 +191,24 @@ namespace Airerage.Core.Skills
             return (int)(safe.ChargeMilli / 1000);
         }
 
+        /// <summary>
+        /// 照準（マウスポインター）をワイヤーではなく技に使っている間か（ワイヤーの照準のインジケーターを隠す。2026-11-03 のユーザーの要望）:
+        /// 照準の方向へ出す技を長押しで狙っている間（AttackData.AimHold。水色の矢印）、JUGGERNAUT の Q の構え、R で場所を選んでいる間。
+        /// </summary>
+        public static bool AimsWithCursor(in CharacterState state, CharacterConfig config)
+        {
+            if (state.Combat.FlakStance || JuggernautRules.TracksAim(state))
+            {
+                return true;
+            }
+            if (!state.Combat.Holding || config == null)
+            {
+                return false;
+            }
+            AttackData holding = config.Combat.Get(state.Combat.HoldSlot);
+            return holding != null && holding.AimHold;
+        }
+
         /// <summary>セーフティボックスが上限に着いたか（もうチャージしない）。</summary>
         public static bool IsSafeFull(in WorldObject safe, SafeTuning tuning)
         {

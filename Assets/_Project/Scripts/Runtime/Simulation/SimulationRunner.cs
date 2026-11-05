@@ -407,7 +407,9 @@ namespace Airerage.Runtime.Simulation
                 // 置かれた物のアンカー（ミラーボール）も含めて予測する。
                 WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _world.Collision);
                 // 結果の画面（試合が終わった後）では出さない。始まる前のカウントダウンでは出す（動き出しの計画を立てやすい）。
-                bool hidden = current.Combat.InvisibleTicksLeft > 0 || _world.Phase == Airerage.Core.Match.MatchPhase.Finished;
+                // 照準を技に使っている間（Q の構え・R の場所選び・長押しの矢印）も出さない。
+                bool hidden = current.Combat.InvisibleTicksLeft > 0 || _world.Phase == Airerage.Core.Match.MatchPhase.Finished
+                    || Airerage.Core.Skills.SkillRules.AimsWithCursor(current, PlayerConfig);
                 _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, hidden);
             }
         }

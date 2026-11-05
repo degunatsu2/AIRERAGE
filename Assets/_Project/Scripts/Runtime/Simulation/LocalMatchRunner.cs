@@ -309,6 +309,8 @@ namespace Airerage.Runtime.Simulation
         }
         bool IMatchControls.NewcomersWaiting => false;
 
+        bool IMatchControls.TooFewPlayers => false;
+
         /// <summary>同じ人（機器）とキャラクターで、ローカル対戦のキャラクター選択へ戻る（IMatchControls。docs/15 T6-8）。</summary>
         public void ReturnToCharacterSelect()
         {
@@ -471,7 +473,9 @@ namespace Airerage.Runtime.Simulation
                 WireTuning wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, config).Wire;
                 WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _world.Collision);
                 // 結果の画面（試合が終わった後）では出さない。始まる前のカウントダウンでは出す。
-                bool hidden = current.Combat.InvisibleTicksLeft > 0 || _world.Phase == Airerage.Core.Match.MatchPhase.Finished;
+                // 照準を技に使っている間（Q の構え・R の場所選び・長押しの矢印）も出さない。
+                bool hidden = current.Combat.InvisibleTicksLeft > 0 || _world.Phase == Airerage.Core.Match.MatchPhase.Finished
+                    || Airerage.Core.Skills.SkillRules.AimsWithCursor(current, config);
                 _aimIndicators[p].Render(origin, current.Wire, preview, wire.MaxLength, hidden);
             }
         }

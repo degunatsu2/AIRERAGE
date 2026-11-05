@@ -70,6 +70,7 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(results.Rematch.gameObject), "REMATCH を選んでいない");
                 Assert.That(results.CharacterSelect.Button.interactable && results.MainMenu.Button.interactable, Is.True);
+                Assert.That(results.Exit != null && results.Exit.gameObject.activeInHierarchy, Is.False, "ローカル対戦で EXIT を出している（MAIN MENU で抜ける）");
 
                 // ゲームパッドの A で REMATCH: 同じ人で始め直し、項目を閉じる。
                 yield return Press(gamepad, GamepadButton.South);

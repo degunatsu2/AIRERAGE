@@ -272,9 +272,26 @@ namespace Airerage.Editor
             MenuOption menu = CreateMenuItem(panel, "MainMenu", "MAIN MENU", bottom, new Vector2(left + (size.x + gap) * 2f, 150f), size);
             foreach (MenuOption option in new[] { rematch, characters, menu })
             {
-                option.Button.navigation = new Navigation { mode = Navigation.Mode.Horizontal };
+                // 上で右上の EXIT へ移れるように、向きは自動（押せない札は飛ばす）。
+                option.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
                 option.SetSelectedShift(new Vector2(0f, 12f));
             }
+            // 右上の EXIT（ネットワーク対戦だけ。自分だけ部屋を出る。2026-11-03 のユーザーの要望）: 左に印（ドアと矢印）、右に EXIT。
+            var exitSize = new Vector2(250f, 64f);
+            MenuOption exit = CreateMenuItem(panel, "Exit", "EXIT", Vector2.one, new Vector2(-exitSize.x - 40f, -32f), exitSize);
+            exit.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+            exit.SetSelectedShift(new Vector2(-10f, 0f));
+            RectTransform exitLabel = exit.LabelText.rectTransform;
+            exitLabel.anchoredPosition += new Vector2(50f, 0f);
+            var iconObject = new GameObject("Icon", typeof(RectTransform));
+            iconObject.transform.SetParent(exit.transform, false);
+            var iconRect = (RectTransform)iconObject.transform;
+            iconRect.anchorMin = iconRect.anchorMax = new Vector2(0f, 0.5f);
+            iconRect.pivot = new Vector2(0f, 0.5f);
+            iconRect.anchoredPosition = new Vector2(exitSize.y * 0.35f + 18f, 0f);
+            iconRect.sizeDelta = new Vector2(46f, 46f);
+            var exitIcon = iconObject.AddComponent<RawImage>();
+            exitIcon.raycastTarget = false;
             Text note = CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
                 bottom, new Vector2(0f, 46f), new Vector2(1400f, 40f), Accent);
 
@@ -286,6 +303,8 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(results, "_rematch", rematch);
             SandboxWireSceneBuilder.SetReference(results, "_characterSelect", characters);
             SandboxWireSceneBuilder.SetReference(results, "_menu", menu);
+            SandboxWireSceneBuilder.SetReference(results, "_exit", exit);
+            SandboxWireSceneBuilder.SetReference(results, "_exitIcon", exitIcon);
             SandboxWireSceneBuilder.SetReference(results, "_note", note);
             SandboxWireSceneBuilder.SetReferenceArray(results, "_hideDuringResults", huds.ToArray());
             return results;

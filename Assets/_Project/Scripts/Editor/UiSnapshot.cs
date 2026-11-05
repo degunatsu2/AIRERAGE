@@ -321,14 +321,19 @@ namespace Airerage.Editor
         /// </summary>
         public static void CaptureResults()
         {
+            // ネットワーク対戦の結果の画面（3 つ目は BACK ROOM、右上に EXIT。EXIT の印は実行中にコードで描くので、ここで付ける）。
             EditorSceneManager.OpenScene(StageScenePath, OpenSceneMode.Single);
-            EditorSceneManager.OpenScene(FlowSceneBuilder.LocalScenePath, OpenSceneMode.Additive);
+            EditorSceneManager.OpenScene(FlowSceneBuilder.OnlineMatchScenePath, OpenSceneMode.Additive);
             var results = Object.FindFirstObjectByType<ResultsMenu>(FindObjectsInactive.Include);
             Transform panel = results.transform.Find("Panel");
             panel.gameObject.SetActive(true);
             results.Rematch.SetAvailable(false);
             results.CharacterSelect.SetAvailable(false);
-            panel.Find("Note").GetComponent<Text>().text = "WAITING FOR THE HOST TO CHOOSE REMATCH OR CHARACTER SELECT";
+            results.BackRoom.SetLabel("BACK ROOM");
+            Texture2D exitIcon = GuideIcons.Exit(96, Color.white);
+            results.Exit.gameObject.SetActive(true);
+            results.Exit.GetComponentInChildren<RawImage>(true).texture = exitIcon;
+            panel.Find("Note").GetComponent<Text>().text = "EVERYONE ELSE LEFT. CHOOSE BACK ROOM TO WAIT FOR PLAYERS";
             Directory.CreateDirectory(OutputFolder);
             foreach (Vector2Int size in Sizes)
             {
@@ -336,6 +341,7 @@ namespace Airerage.Editor
                 Capture(results.GetComponent<Canvas>(), size, path);
                 Debug.Log($"[UiSnapshot] {path}");
             }
+            Object.DestroyImmediate(exitIcon);
         }
 
         private static void RenderCamera(Camera camera, Vector2Int size, string path)
@@ -376,15 +382,45 @@ namespace Airerage.Editor
             ShowOnly(screens, waiting);
             waiting.Find("Info").GetComponent<UnityEngine.UI.Text>().text = "HOSTING ON PORT 7777. FRIENDS JOIN WITH YOUR ADDRESS.";
             waiting.Find("Message").GetComponent<UnityEngine.UI.Text>().text = "WHEN EVERYONE IS READY, CHARACTER SELECT STARTS";
-            string[] names = { "DEGU  (HOST)  (YOU)", "FRIEND", "WAITING...", "WAITING..." };
+            string[] names = { "DEGU", "FRIEND", "WAITING...", "WAITING..." };
             string[] states = { "READY!", "NOT READY", string.Empty, string.Empty };
-            for (int p = 0; p < names.Length; p++)
+            // 札はスクロールの中身にある（実行中は OnlineMenu が並べるので、ここでは上から順に置く）。
+            Transform[] slots = waiting.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("Slot") && t.name.EndsWith("P")).ToArray();
+            for (int p = 0; p < slots.Length; p++)
             {
-                Transform slot = waiting.Find($"Slot{p + 1}P");
+                Transform slot = slots[p];
+                bool shown = p < names.Length;
+                slot.gameObject.SetActive(shown);
+                if (!shown)
+                {
+                    continue;
+                }
+                var rect = (RectTransform)slot;
+                rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 1f);
+                rect.anchoredPosition = new Vector2(0f, -56f - p * 66f);
+                rect.sizeDelta = new Vector2(780f, 58f);
                 slot.Find("Name").GetComponent<UnityEngine.UI.Text>().text = names[p];
                 slot.Find("State").GetComponent<UnityEngine.UI.Text>().text = states[p];
             }
+            // 1P はホストで自分（名前の前に王冠と人の形の印。実行中は OnlineMenu が付ける）。
+            Transform first = slots.First(t => t.name == "Slot1P");
+            Texture2D crown = Airerage.Runtime.Presentation.GuideIcons.Crown(64);
+            Texture2D person = Airerage.Runtime.Presentation.GuideIcons.Person(64, new Color(0.35f, 0.85f, 1f));
+            var nameRect = (RectTransform)first.Find("Name");
+            float x = nameRect.anchoredPosition.x;
+            foreach ((string mark, Texture2D texture) in new[] { ("HostIcon", crown), ("YouIcon", person) })
+            {
+                Transform icon = first.Find(mark);
+                icon.gameObject.SetActive(true);
+                icon.GetComponent<UnityEngine.UI.RawImage>().texture = texture;
+                ((RectTransform)icon).anchoredPosition = new Vector2(x, nameRect.anchoredPosition.y);
+                ((RectTransform)icon).sizeDelta = new Vector2(32f, 32f);
+                x += 38f;
+            }
+            nameRect.anchoredPosition = new Vector2(x, nameRect.anchoredPosition.y);
             CaptureAll(screens, "OnlineWaiting");
+            Object.DestroyImmediate(crown);
+            Object.DestroyImmediate(person);
         }
 
         /// <summary>トレーニングのキャラクター選択（1P のカーソルをキャラクターごとに。最後のキャラクターでは技の説明も開く）。</summary>

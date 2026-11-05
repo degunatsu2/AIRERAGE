@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Settings;
@@ -15,7 +14,7 @@ namespace Airerage.Net
     /// （IOnlineMenu）。接続は App のシーンの OnlineConnection が持ち、ここは画面だけを受け持つ。接続の段階に合わせて画面を出す:
     /// - 接続: 名前・参加コード・アドレス・ポートの入力と、HOST ONLINE ／ JOIN WITH CODE（Unity の Relay の参加コード。docs/15 T6-10）、
     ///   HOST (LAN) ／ JOIN (LAN)（IP アドレスとポート）、BACK。参加コードのサービスに問い合わせている間はボタンを押せない。
-    /// - 待機所: 1P〜8P の札（名前と準備完了）、参加コード（コピーできる）、READY（もう一度で取り消し）、時間の制限（ホストだけ）、LEAVE。
+    /// - 待機所: 1P〜8P の札（名前と準備完了。ホストと自分は名前の前の印で示す）、参加コード（コピーできる）、READY（もう一度で取り消し）、時間の制限（ホストだけ）、LEAVE。
     ///   2 人以上が全員 READY で、全員がキャラクター選択へ進む。チーム対戦（docs/19 T9-5。D-78〜D-79）: ホストが MODE で個人戦（4 人まで）と
     ///   チーム対戦（8 人まで）を切り替える。チーム対戦では札を 4 色の列（RED・BLUE・GREEN・YELLOW）に並べ、各自が MY TEAM で自分の
     ///   チームを選ぶ。ホストは札を選んで決定すると、その人を次のチームへ移せる。SPLIT で人数配分を選び、RANDOM SPLIT でその配分のとおりに
@@ -61,6 +60,9 @@ namespace Airerage.Net
         [SerializeField] private Text[] _slotNumbers = new Text[0];
         [SerializeField] private Text[] _slotNames = new Text[0];
         [SerializeField] private Text[] _slotStates = new Text[0];
+        [Tooltip("札の名前の前の印: ホスト（金色の王冠）と自分（水色の人の形）。文字の「(HOST)」「(YOU)」の代わり（2026-11-03 の要望）")]
+        [SerializeField] private RawImage[] _slotHostIcons = new RawImage[0];
+        [SerializeField] private RawImage[] _slotYouIcons = new RawImage[0];
         [Tooltip("列の見出し（チーム対戦は RED・BLUE・GREEN・YELLOW。個人戦は 1 つ目を PLAYERS に。決定でそこに入る）")]
         [SerializeField] private GameObject[] _teamHeaders = new GameObject[0];
         [SerializeField] private SlantedPlate[] _teamHeaderPlates = new SlantedPlate[0];
@@ -116,6 +118,9 @@ namespace Airerage.Net
         private const float SpectatorLaneWidth = 280f;
         private static readonly Color PlayersColor = new Color(0.35f, 0.85f, 1f);
         private static readonly Color SpectatorColor = new Color(0.75f, 0.75f, 0.8f);
+        private static readonly Color YouColor = new Color(0.35f, 0.85f, 1f);
+        private Texture2D _hostTexture;
+        private Texture2D _youTexture;
 
         /// <summary>開いているか（テスト用）。</summary>
         public bool IsOpen => _open;
@@ -174,6 +179,7 @@ namespace Airerage.Net
                 || _slotPlates.Length != OnlineSession.MaxPlayers || _slotNames.Length != OnlineSession.MaxPlayers
                 || _slotStates.Length != OnlineSession.MaxPlayers || _slotButtons.Length != OnlineSession.MaxPlayers
                 || _slotNumbers.Length != OnlineSession.MaxPlayers
+                || _slotHostIcons.Length != OnlineSession.MaxPlayers || _slotYouIcons.Length != OnlineSession.MaxPlayers
                 || _teamHeaders.Length != Airerage.Core.Match.TeamRules.MaxTeams || _teamHeaderTexts.Length != _teamHeaders.Length
                 || _teamHeaderPlates.Length != _teamHeaders.Length || _teamHeaderButtons.Length != _teamHeaders.Length
                 || _spectatorHeader == null || _spectatorHeaderText == null || _slotContent == null || _slotScroll == null)
@@ -181,6 +187,16 @@ namespace Airerage.Net
                 Debug.LogError($"{name}: ネットワーク対戦のメニューの部品がそろっていません", this);
                 enabled = false;
                 return;
+            }
+            // ホスト・自分の印の絵（コードで描く）。
+            _hostTexture = Airerage.Runtime.Presentation.GuideIcons.Crown(64);
+            _youTexture = Airerage.Runtime.Presentation.GuideIcons.Person(64, YouColor);
+            for (int p = 0; p < OnlineSession.MaxPlayers; p++)
+            {
+                _slotHostIcons[p].texture = _hostTexture;
+                _slotYouIcons[p].texture = _youTexture;
+                _slotHostIcons[p].gameObject.SetActive(false);
+                _slotYouIcons[p].gameObject.SetActive(false);
             }
             // 参加コードは英数字の大文字で入れる（小文字で打っても大文字にする）。
             _code.onValidateInput = (text, index, c) => char.IsLetterOrDigit(c) && c < 128 ? char.ToUpperInvariant(c) : '\0';
@@ -319,6 +335,18 @@ namespace Airerage.Net
                 }
             };
             HidePanels();
+        }
+
+        private void OnDestroy()
+        {
+            if (_hostTexture != null)
+            {
+                Destroy(_hostTexture);
+            }
+            if (_youTexture != null)
+            {
+                Destroy(_youTexture);
+            }
         }
 
         private void Start()
@@ -839,6 +867,7 @@ namespace Airerage.Net
                     _slotPlates[p].BorderColor = EmptyBorder;
                     _slotNames[p].text = Loc.T("WAITING...", "待機中……");
                     _slotNames[p].color = new Color(1f, 1f, 1f, 0.45f);
+                    PlaceMarks(p, false, false, false);
                     _slotStates[p].text = string.Empty;
                     y -= RowHeight + RowGap;
                 }
@@ -945,8 +974,9 @@ namespace Airerage.Net
         {
             bool selected = _slotButtons[p].IsSelected;
             _slotPlates[p].color = JoinedFill;
-            _slotNames[p].text = SlotLabel(session, slot, p, compact);
+            _slotNames[p].text = SlotLabel(slot, p);
             _slotNames[p].color = Color.white;
+            PlaceMarks(p, p == session.HostSlot, p == session.LocalPlayer, compact);
             string state;
             bool bright;
             if (slot.Late)
@@ -1044,20 +1074,46 @@ namespace Airerage.Net
             _slotContent.anchoredPosition = position;
         }
 
-        // 札の名前の行（名前、ホスト・自分の印）。列の札（compact）は短く。
-        private static string SlotLabel(OnlineSession session, LobbySlot slot, int p, bool compact)
+        // 札の名前の行（名前。ホスト・自分は文字ではなく、名前の前の印 PlaceMarks で示す）。
+        private static string SlotLabel(LobbySlot slot, int p)
         {
-            string label = string.IsNullOrEmpty(slot.Name) ? $"P{p + 1}" : slot.Name;
-            var marks = new StringBuilder(label);
-            if (p == session.HostSlot)
+            return string.IsNullOrEmpty(slot.Name) ? $"P{p + 1}" : slot.Name;
+        }
+
+        /// <summary>札 p の名前の前に出しているホストの印・自分の印（テスト用）。</summary>
+        public bool HostMarkShown(int p) => _slotHostIcons[p].gameObject.activeSelf;
+        public bool YouMarkShown(int p) => _slotYouIcons[p].gameObject.activeSelf;
+
+        // 札 p の名前の前にホストの印（王冠）・自分の印（人の形）を並べ、その分だけ名前を右へずらす（LayoutSlot の後に呼ぶ。
+        // 「(HOST)」「(YOU)」の文字が札を圧迫していた。2026-11-03 のユーザーの要望）。
+        private void PlaceMarks(int p, bool host, bool you, bool lane)
+        {
+            float size = lane ? 22f : 32f;
+            float gap = lane ? 4f : 6f;
+            var name = (RectTransform)_slotNames[p].transform;
+            float x = name.anchoredPosition.x;
+            float y = name.anchoredPosition.y;
+            foreach ((RawImage icon, bool shown) in new[] { (_slotHostIcons[p], host), (_slotYouIcons[p], you) })
             {
-                marks.Append(compact ? " (H)" : "  (HOST)");
+                if (icon.gameObject.activeSelf != shown)
+                {
+                    icon.gameObject.SetActive(shown);
+                }
+                if (!shown)
+                {
+                    continue;
+                }
+                var rect = (RectTransform)icon.transform;
+                rect.anchoredPosition = new Vector2(x, y);
+                rect.sizeDelta = new Vector2(size, size);
+                x += size + gap;
             }
-            if (p == session.LocalPlayer)
+            float shift = x - name.anchoredPosition.x;
+            if (shift > 0f)
             {
-                marks.Append(compact ? " (YOU)" : "  (YOU)");
+                name.anchoredPosition = new Vector2(x, y);
+                name.sizeDelta = new Vector2(Mathf.Max(40f, name.sizeDelta.x - shift), name.sizeDelta.y);
             }
-            return marks.ToString();
         }
 
         // 札 p を parent の中の topLeft に、大きさ size で置く（列の札 lane は番号を小さく、名前を上の段、状態を下の段に）。

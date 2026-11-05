@@ -79,6 +79,10 @@ namespace Airerage.PlayMode.Tests
                 UnityEngine.Object.DontDestroyOnLoad(pump);
                 pump.AddComponent<BotPump>().Session = bot;
                 yield return WaitFor(() => bot.LocalPlayer == 1 && host.LobbyPlayerCount == 2 && host.Roster[1].Name == "BOT", 10f, "相手がつながらない");
+                yield return null;
+                // ホストと自分は、名前の後ろの文字ではなく名前の前の印で示す（2026-11-03）。
+                Assert.That(online.HostMarkShown(0) && online.YouMarkShown(0), Is.True, "ホストの札にホストと自分の印がない");
+                Assert.That(online.HostMarkShown(1) || online.YouMarkShown(1), Is.False, "相手の札に印がある");
 
                 // 待機所のチーム分け（docs/19 T9-5）: ホストが MODE でチーム対戦にすると、札が 4 色の列に並ぶ。ホストは札を決定してその人を
                 // 次のチームへ、自分のチームは MY TEAM で変えられる。MODE をもう一度で個人戦に戻す（この後は今までと同じ流れ）。
@@ -174,6 +178,11 @@ namespace Airerage.PlayMode.Tests
                 // ネットワーク対戦の 3 つ目は MAIN MENU ではなく BACK ROOM（全員を待機所へ戻す。2026-11-03）。
                 Assert.That(results.BackRoom.LabelText.text, Is.EqualTo("BACK ROOM"), "3 つ目の項目が BACK ROOM でない");
                 Assert.That(results.BackRoom.Button.interactable, Is.True, "ホストが BACK ROOM を押せない");
+                // 右上の EXIT（自分だけ部屋を出る。2026-11-03）。印の絵はコードで描いて付ける。
+                Assert.That(results.Exit, Is.Not.Null, "EXIT がない");
+                Assert.That(results.Exit.gameObject.activeInHierarchy && results.Exit.Button.interactable, Is.True, "ネットワーク対戦で EXIT を出さない");
+                Assert.That(results.Exit.LabelText.text, Is.EqualTo("EXIT"));
+                Assert.That(results.Exit.GetComponentInChildren<UnityEngine.UI.RawImage>().texture, Is.Not.Null, "EXIT の印がない");
                 results.CharacterSelect.Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューに戻らない");
                 // メニューのシーンを読み込み直したので、画面を探し直す。

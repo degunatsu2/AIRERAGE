@@ -69,6 +69,8 @@ namespace Airerage.Editor
             var numbers = new Object[OnlineSession.MaxPlayers];
             var names = new Object[OnlineSession.MaxPlayers];
             var states = new Object[OnlineSession.MaxPlayers];
+            var hostIcons = new Object[OnlineSession.MaxPlayers];
+            var youIcons = new Object[OnlineSession.MaxPlayers];
             var colors = new Color[OnlineSession.MaxPlayers];
             for (int p = 0; p < OnlineSession.MaxPlayers; p++)
             {
@@ -98,6 +100,9 @@ namespace Airerage.Editor
                 ((Text)names[p]).resizeTextForBestFit = true;
                 ((Text)names[p]).resizeTextMinSize = 14;
                 ((Text)names[p]).resizeTextMaxSize = 28;
+                // ホストと自分の印（名前の前。絵は実行中に OnlineMenu が描いて付け、位置も OnlineMenu が決める）。
+                hostIcons[p] = CreateMark(slot.transform, "HostIcon");
+                youIcons[p] = CreateMark(slot.transform, "YouIcon");
             }
             // 列の見出し（チーム対戦は 4 色のチームの名前と人数。個人戦は 1 つ目を「PLAYERS」に広げる）。選んで決定（クリック）すると、
             // 自分がそのチームに入る（観戦の待機所からも。ユーザーの要望、2026-11-02）。位置と色は実行中に OnlineMenu が決める。
@@ -168,6 +173,8 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotNumbers", numbers);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotNames", names);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotStates", states);
+            SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotHostIcons", hostIcons);
+            SandboxWireSceneBuilder.SetReferenceArray(menu, "_slotYouIcons", youIcons);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaders", headers);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaderPlates", headerPlates);
             SandboxWireSceneBuilder.SetReferenceArray(menu, "_teamHeaderButtons", headerButtons);
@@ -191,6 +198,20 @@ namespace Airerage.Editor
         }
 
         // 縦にスクロールする場所（左上 position、大きさ size。中身の RectTransform を返す。右に細いスクロールバー。はみ出さなければ隠す）。
+        // 札の名前の前に置く印（RawImage。クリックを通す）。
+        private static RawImage CreateMark(Transform parent, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 0.5f);
+            rect.sizeDelta = new Vector2(32f, 32f);
+            var image = go.AddComponent<RawImage>();
+            image.raycastTarget = false;
+            go.SetActive(false);
+            return image;
+        }
+
         private static RectTransform CreateScrollArea(Transform parent, Vector2 position, Vector2 size, out ScrollRect scroll)
         {
             var viewportGo = new GameObject("SlotArea", typeof(RectTransform));

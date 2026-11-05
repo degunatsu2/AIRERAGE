@@ -613,9 +613,8 @@ namespace Airerage.Core.Simulation
         /// </summary>
         public static CharacterConfig Solderer()
         {
+            // 走る速さと空中の加速は、2026-11-03 から全キャラクターの初めの値（MovementTuning）と同じ（ほかのキャラクターをこの速さに合わせた）。
             var config = new CharacterConfig();
-            config.Movement.RunSpeed = 9.5f;
-            config.Movement.AirAcceleration = 36f;
             CombatTuning combat = config.Combat;
 
             combat.Ground = new AttackData
@@ -959,7 +958,7 @@ namespace Airerage.Core.Simulation
         ///   前へ重力を受けない砲弾（威力 10）を撃ち、反動で後ろへ下がる。空中下 GROUND BURST: 足もとで爆発（下向きの判定。反動で少し
         ///   上がる）。どれも発生が遅く、後隙が長い。
         /// - Q FLAK: 地上で構えて、構えている間に Q で重力のある砲弾を照準の方向へ撃つ（爆発。威力 15・強い吹き飛び）。3 回まで、1 回分は
-        ///   4 秒で戻る。上下で弾道を弱・中・強・弩に（初めは強。試合の間覚えておく）。
+        ///   3 秒で戻る（2026-11-03 に 4 秒から）。上下で弾道を弱・中・強・弩に（初めは強。試合の間覚えておく）。
         /// - E MINE TRAP: 照準の方向へ地雷を撃ち（重力で山なりに飛ぶ）、地形かキャラクターに張り付く。もう一度 E で爆発（威力 30）。クールタイム 10 秒（爆発の後から）。
         /// - R MAYDAY: ジェット機で飛び去り、ステージ全体から空いた場所を選んで運ばれる（その間は無敵。10 秒で元の場所へ）。ゲージ 100%。
         /// 技の規則は JuggernautRules、技の値は SkillTuning.Juggernaut。
@@ -968,11 +967,13 @@ namespace Airerage.Core.Simulation
         {
             var config = new CharacterConfig();
             MovementTuning movement = config.Movement;
-            float baseRun = movement.RunSpeed;
             movement.HalfWidth = 0.75f;
             movement.HalfHeight = 0.95f;
-            movement.RunSpeed = baseRun * 1.5f;
-            movement.AirRunSpeed = baseRun * 0.5f;
+            // 地上は前の走る速さ 8 m/s の +50% に、さらに +2 m/s（14 m/s。ユーザーの要望、2026-11-03）。空中は前の −50% のまま 4 m/s、空中の加速も
+            // 前の 30 m/s² のまま（ほかのキャラクターの初めの値を SOLDERER の速さに上げたが、JUGGERNAUT の空中は変えない）。
+            movement.RunSpeed = 14f;
+            movement.AirRunSpeed = 4f;
+            movement.AirAcceleration = 30f;
             // 跳ぶ高さは速さの 2 乗に比例するので、高さを半分にするには速さを 1/√2 にする。
             movement.JumpSpeed *= 0.7071f;
             movement.WallJumpSpeedY *= 0.7071f;
@@ -1114,7 +1115,8 @@ namespace Airerage.Core.Simulation
                 EffectTick = 4,
                 Hits = new AttackHit[0],
             };
-            combat.Special1CooldownTicks = 240;
+            // 1 回分は 3 秒で戻る（ユーザーの要望、2026-11-03: 4 秒から上方修正。低速のデメリットの埋め合わせ）。
+            combat.Special1CooldownTicks = 180;
             combat.Special1MaxCharges = 3;
 
             combat.Special2 = new AttackData

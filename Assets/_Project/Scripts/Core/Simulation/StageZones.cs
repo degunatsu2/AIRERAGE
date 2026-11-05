@@ -51,9 +51,12 @@ namespace Airerage.Core.Simulation
         public const float WaterRiseSpeed = 4.5f;
         public const float WaterBuoyancy = 25f;
 
-        /// <summary>水の中の横の速さの上限（m/s。泳ぐ速さ）と、それより速いときに落とす割合（m/s²）【仮】。</summary>
+        /// <summary>
+        /// 水の中の横の速さの上限（m/s。泳ぐ速さ）と、それより速いときに落とす割合（m/s²）【仮】。落とす割合は 2026-11-03 に 40 から 50 へ
+        /// （空中の加速を 30 から 36 に上げたので、前へ入れたまま泳ぐ速さへ戻るまでの時間が前と同じくらいになるように。加速より十分に大きくする）。
+        /// </summary>
         public const float WaterSwimSpeed = 4f;
-        public const float WaterDrag = 40f;
+        public const float WaterDrag = 50f;
 
         /// <summary>水面に浮いている間、ジャンプできるようにする長さ（コヨーテタイム。ティック）。</summary>
         public const int WaterJumpCoyoteTicks = 2;
@@ -101,8 +104,9 @@ namespace Airerage.Core.Simulation
         }
 
         /// <summary>
-        /// 氷: 地面に立って重なっている間、このティックの横の速さの変化（velocityBefore からの差）を Power 倍にする。何もしていないとき
-        /// （Action.IsFree）だけ（攻撃の動きは変えない）。
+        /// 氷: 地面に立って重なっている間、このティックの横の速さの変化（velocityBefore からの差）のうち、遅くなる向き（止まる・向きを
+        /// 変える）の変化を Power 倍にする（勢いがあるとよく滑る）。止まった状態や同じ向きに速くなる変化は、ふつうの足場と同じ
+        /// （動き出しが遅くならない。2026-11-03 のユーザーの要望）。何もしていないとき（Action.IsFree）だけ（攻撃の動きは変えない）。
         /// </summary>
         public static void ApplyFriction(ref CharacterState state, Vector3 velocityBefore, Vector2 halfExtents, IReadOnlyList<StageZone> zones,
             int tick = 0)
@@ -120,7 +124,13 @@ namespace Airerage.Core.Simulation
                 StageZone zone = zones[i].At(tick);
                 if (zone.Overlaps(state.Position, halfExtents))
                 {
-                    state.Velocity.X = velocityBefore.X + (state.Velocity.X - velocityBefore.X) * zone.Power;
+                    float before = velocityBefore.X;
+                    float after = state.Velocity.X;
+                    bool speedingUp = MathF.Abs(after) > MathF.Abs(before) && (before == 0f || MathF.Sign(after) == MathF.Sign(before));
+                    if (!speedingUp)
+                    {
+                        state.Velocity.X = before + (after - before) * zone.Power;
+                    }
                     return;
                 }
             }

@@ -459,6 +459,29 @@ namespace Airerage.Core.Tests.Simulation
         }
 
         [Test]
+        public void Ice_StartsMovingAsFastAsTheNormalFloor_ButStillSlidesWhenStopping()
+        {
+            // 2026-11-03 の要望: 止まった状態からの動き出しは、ふつうの足場と同じ。勢いがあるときの滑りは今までどおり。
+            var ice = new StageZone(StageZoneKind.Ice, -40f, 0f, 40f, 0.3f, Vector2.Zero, 0.05f);
+            SimWorld icy = World(ice);
+            SimWorld normal = World();
+            SetState(icy, new Vector3(0f, Movement.HalfHeight, 0f), Vector3.Zero);
+            SetState(normal, new Vector3(0f, Movement.HalfHeight, 0f), Vector3.Zero);
+            Step(icy, 1);
+            Step(normal, 1);
+            PlayerInput right = PlayerInput.FromAxes(1f, 0f, InputButtons.None);
+            Step(icy, 4, right);
+            Step(normal, 4, right);
+            Assert.That(icy.GetState(0).Velocity.X, Is.EqualTo(normal.GetState(0).Velocity.X).Within(1e-4f), "氷の上の動き出しが遅い");
+            Assert.That(icy.GetState(0).Velocity.X, Is.GreaterThan(5f), "前提: 走り出している");
+            // 逆へ入れると、氷の上ではなかなか止まらない。
+            PlayerInput left = PlayerInput.FromAxes(-1f, 0f, InputButtons.None);
+            Step(icy, 6, left);
+            Step(normal, 6, left);
+            Assert.That(icy.GetState(0).Velocity.X, Is.GreaterThan(normal.GetState(0).Velocity.X + 3f), "氷の上で切り返しが滑らない");
+        }
+
+        [Test]
         public void LowGravity_LetsACharacterJumpHigher_AndFallSlowly()
         {
             var low = new StageZone(StageZoneKind.LowGravity, -40f, 0f, 40f, 60f, Vector2.Zero, 0.4f, 6f);
@@ -589,7 +612,7 @@ namespace Airerage.Core.Tests.Simulation
             // 風に向かって走ると遅くなる。
             SimWorld against = World(wind);
             Step(against, 60, PlayerInput.FromAxes(-1f, 0f, InputButtons.None));
-            Assert.That(against.GetState(0).Velocity.X, Is.EqualTo(-8f + 10f * StageZones.GroundWindRatio + 30f / 60f).Within(1e-3f));
+            Assert.That(against.GetState(0).Velocity.X, Is.EqualTo(-Movement.RunSpeed + 10f * StageZones.GroundWindRatio + 30f / 60f).Within(1e-3f));
         }
 
         [Test]

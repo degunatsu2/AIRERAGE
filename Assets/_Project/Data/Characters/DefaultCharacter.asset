@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Data.CharacterConfigAsset
   _config:
     Movement:
-      RunSpeed: 8
+      RunSpeed: 9.5
       AirRunSpeed: 0
       GroundAcceleration: 80
-      AirAcceleration: 30
+      AirAcceleration: 36
       AirDrag: 2
       Gravity: 30
       MaxFallSpeed: 40
@@ -1080,12 +1080,12 @@ MonoBehaviour:
           FatalScale: 0
           FatalTicks: 0
         FlakSpeeds:
-        - 14
-        - 20
+        - 18
         - 26
-        - 33
+        - 34
+        - 43
         FlakDefaultLevel: 2
-        FlakGravity: 22
+        FlakGravity: 37
         FlakRadius: 0.35
         FlakExplosionRadius: 2
         FlakLifetimeTicks: 600

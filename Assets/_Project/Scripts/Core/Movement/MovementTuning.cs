@@ -11,8 +11,11 @@ namespace Airerage.Core.Movement
     [Serializable]
     public sealed class MovementTuning
     {
-        /// <summary>走行の最高速（m/s）。</summary>
-        public float RunSpeed = 8f;
+        /// <summary>
+        /// 走行の最高速（m/s）。2026-11-03 に 8 から 9.5 へ（ユーザーの要望: いちばん意図した操作感に近かった SOLDERER の速さに、
+        /// 通常の挙動のキャラクターをすべて合わせる）。
+        /// </summary>
+        public float RunSpeed = 9.5f;
 
         /// <summary>
         /// 空中での走行の最高速（m/s。0 なら RunSpeed と同じ）。地上と空中で速さの違うキャラクターに使う（JUGGERNAUT は地上 +50%・空中 −50%。
@@ -23,8 +26,8 @@ namespace Airerage.Core.Movement
         /// <summary>地上での加速・減速（m/s²）。</summary>
         public float GroundAcceleration = 80f;
 
-        /// <summary>空中での加速（m/s²）。</summary>
-        public float AirAcceleration = 30f;
+        /// <summary>空中での加速（m/s²）。2026-11-03 に 30 から 36 へ（RunSpeed と同じく SOLDERER に合わせた）。</summary>
+        public float AirAcceleration = 36f;
 
         /// <summary>空中で入力がないときの減速（m/s²）。小さいほど慣性が長く残る。</summary>
         public float AirDrag = 2f;

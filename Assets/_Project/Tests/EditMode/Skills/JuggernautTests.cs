@@ -81,8 +81,11 @@ namespace Airerage.Core.Tests.Skills
             var standard = new CharacterConfig();
             Assert.That(Juggernaut.Movement.HalfWidth, Is.GreaterThan(standard.Movement.HalfWidth), "体がふつうより大きくない");
             Assert.That(Juggernaut.Movement.HalfHeight, Is.GreaterThanOrEqualTo(standard.Movement.HalfHeight));
-            Assert.That(Juggernaut.Movement.RunSpeed, Is.EqualTo(standard.Movement.RunSpeed * 1.5f).Within(0.001f), "地上の速さが +50% でない");
-            Assert.That(Juggernaut.Movement.AirRunSpeed, Is.EqualTo(standard.Movement.RunSpeed * 0.5f).Within(0.001f), "空中の速さが -50% でない");
+            // 地上は前の走る速さ 8 m/s の +50% に +2 m/s（2026-11-03）、空中は前の −50% のまま（ほかのキャラクターは 9.5 m/s に上げた）。
+            Assert.That(Juggernaut.Movement.RunSpeed, Is.EqualTo(14f).Within(0.001f), "地上の速さが 14 m/s でない");
+            Assert.That(Juggernaut.Movement.RunSpeed, Is.GreaterThan(standard.Movement.RunSpeed), "地上がふつうより速くない");
+            Assert.That(Juggernaut.Movement.AirRunSpeed, Is.EqualTo(4f).Within(0.001f), "空中の速さが 4 m/s でない");
+            Assert.That(Juggernaut.Movement.AirAcceleration, Is.EqualTo(30f).Within(0.001f), "空中の加速が前のままでない");
             Assert.That(Juggernaut.Wire.MaxLength, Is.EqualTo(standard.Wire.MaxLength * 1.5f).Within(0.001f), "ワイヤーの射程が 1.5 倍でない");
             Assert.That(Juggernaut.Wire.MaxAttachedSpeed, Is.EqualTo(standard.Wire.MaxAttachedSpeed * 0.5f).Within(0.001f), "ワイヤーの間の速さが -50% でない");
             Assert.That(Juggernaut.Combat.GuardCooldownTicks, Is.EqualTo(standard.Combat.GuardCooldownTicks * 2), "ガードのクールタイムが 2 倍でない");
@@ -90,11 +93,21 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(Juggernaut.Combat.KoAttack, Is.EqualTo(AttackSlot.Ground), "撃破技が地上技でない");
             Assert.That(Juggernaut.Combat.Special1.Effect, Is.EqualTo(SkillEffect.Flak));
             Assert.That(Juggernaut.Combat.Special1MaxCharges, Is.EqualTo(3), "フラックが 3 回まででない");
-            Assert.That(Juggernaut.Combat.Special1CooldownTicks, Is.EqualTo(240), "フラックの 1 回分が 4 秒で戻らない");
+            Assert.That(Juggernaut.Combat.Special1CooldownTicks, Is.EqualTo(180), "フラックの 1 回分が 3 秒で戻らない");
             Assert.That(Juggernaut.Combat.Special2CooldownTicks, Is.EqualTo(600), "地雷のクールタイムが 10 秒でない");
             Assert.That(Juggernaut.Combat.SuperGaugeCost, Is.EqualTo(100 * CombatTuning.GaugePerPercent), "メーデーが 100% でない");
             Assert.That(Juggernaut.Skills.Juggernaut.CannonHit.Damage, Is.EqualTo(10), "空中横の砲弾の威力が 10 でない");
             Assert.That(Juggernaut.Skills.Juggernaut.FlakHit.Damage, Is.EqualTo(15), "フラックの威力が 15 でない");
+            // 2026-11-03: 弾速を約 1.3 倍に上げ、届く距離（速さ² ÷ 重力）は前（14・20・26・33 m/s、重力 22 m/s²）とほぼ同じ。
+            JuggernautTuning flak = Juggernaut.Skills.Juggernaut;
+            float[] before = { 14f, 20f, 26f, 33f };
+            for (int i = 0; i < before.Length; i++)
+            {
+                Assert.That(flak.FlakSpeedAt(i), Is.GreaterThanOrEqualTo(before[i] * 1.25f), $"段階 {i} の弾速が上がっていない");
+                float range = flak.FlakSpeedAt(i) * flak.FlakSpeedAt(i) / flak.FlakGravity;
+                float oldRange = before[i] * before[i] / 22f;
+                Assert.That(range, Is.EqualTo(oldRange).Within(oldRange * 0.05f), $"段階 {i} の届く距離が変わった");
+            }
             Assert.That(Juggernaut.Skills.Juggernaut.MineGravity, Is.GreaterThan(0f), "地雷が重力を受けない");
             Assert.That(Juggernaut.Skills.Juggernaut.MineHit.Damage, Is.EqualTo(30), "地雷の威力が 30 でない");
             Assert.That(JuggernautRules.IsJuggernaut(Juggernaut), Is.True);
@@ -585,6 +598,23 @@ namespace Airerage.Core.Tests.Skills
             Step(world, 60);
             Assert.That(world.Objects.Items.Any(o => o.Kind == WorldObjectKind.Mine), Is.False, "ステージの外に出ても消えない");
             Assert.That(world.GetState(0).Combat.Special2CooldownTicksLeft, Is.GreaterThan(0), "消えた後にクールタイムが始まらない");
+        }
+
+        [Test]
+        public void AimsWithCursor_DuringTheFlakStanceAndTheMaydaySelection_ButNotWhenIdle()
+        {
+            // 2026-11-03 の要望: 照準をワイヤー以外に使っている間（フラックの構え・メーデーの場所選び）は、ワイヤーの照準の表示を隠す。
+            var world = World(TestArenas.Ground(), new Vector3(0f, GroundY, 0f));
+            Step(world, 2);
+            Assert.That(SkillRules.AimsWithCursor(world.GetState(0), Juggernaut), Is.False, "何もしていないのに照準を技に使っている");
+            Step(world, 1, Press(InputButtons.Special1));
+            Step(world, 3);
+            Assert.That(world.GetState(0).Combat.FlakStance, Is.True, "前提: 構えた");
+            Assert.That(SkillRules.AimsWithCursor(world.GetState(0), Juggernaut), Is.True, "フラックの構えで照準を技に使っていない");
+
+            SimWorld mayday = MaydayWorld(out _);
+            LiftOff(mayday);
+            Assert.That(SkillRules.AimsWithCursor(mayday.GetState(0), Juggernaut), Is.True, "メーデーの場所選びで照準を技に使っていない");
         }
 
         // ---------------------------------------------------------------- R メーデー

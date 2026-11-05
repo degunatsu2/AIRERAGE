@@ -14,6 +14,8 @@ namespace Airerage.Runtime.UI
     /// Enter）、ゲームパッド（十字キー・スティック・A）、マウスで選べる。ネットワーク対戦では、REMATCH と CHARACTER SELECT はホストだけが
     /// 押せる（ほかの人は「ホストを待つ」）。ネットワーク対戦の 3 つ目の項目は MAIN MENU ではなく BACK ROOM（ホストが全員を待機所へ戻す。
     /// 途中から部屋に入った人がいる間は、REMATCH と CHARACTER SELECT を押せない。2026-11-03 のユーザーの要望）。
+    /// ネットワーク対戦では、画面の右上に EXIT（左向きに開いたドアと右向きの矢印の印）も出し、押すと自分だけ部屋を出てメニューへ戻る
+    /// （2026-11-03 のユーザーの要望。ホストが押すと部屋がなくなり、ほかの人は「ホストとの接続が切れました」になる）。
     /// 出している間は、カメラの操作（十字キーのズーム）を止める（一時停止と同じ。項目を選ぶとカメラが寄り引きしないように）。
     /// 一時停止のメニューを開いている間は、選んでいる項目を奪わない。
     /// 結果を出している間は、試合中の表示（技の札、右上の表、お知らせ、コンボ、画面の端の札、頭上の数など）を止めて消す
@@ -31,6 +33,10 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption _rematch;
         [SerializeField] private MenuOption _characterSelect;
         [SerializeField] private MenuOption _menu;
+        [Tooltip("右上の EXIT（ネットワーク対戦だけ出す。自分だけ部屋を出る）")]
+        [SerializeField] private MenuOption _exit;
+        [Tooltip("EXIT の印（ドアと矢印。絵は起動時にコードで描く）")]
+        [SerializeField] private RawImage _exitIcon;
         [SerializeField] private Text _note;
         [Tooltip("結果を出している間は止める、試合中の表示")]
         [SerializeField] private Behaviour[] _hideDuringResults = new Behaviour[0];
@@ -43,7 +49,9 @@ namespace Airerage.Runtime.UI
         private bool _canReturn;
         private bool _canBack;
         private bool _newcomers;
+        private bool _tooFew;
         private int _selectAtFrame = -1;
+        private Texture2D _exitTexture;
         private readonly System.Collections.Generic.List<Behaviour> _hidden = new System.Collections.Generic.List<Behaviour>();
 
         /// <summary>出しているか。</summary>
@@ -55,6 +63,9 @@ namespace Airerage.Runtime.UI
 
         /// <summary>3 つ目の項目（ネットワーク対戦では BACK ROOM、ほかでは MAIN MENU）。</summary>
         public MenuOption BackRoom => _menu;
+
+        /// <summary>右上の EXIT（ネットワーク対戦だけ出す）。</summary>
+        public MenuOption Exit => _exit;
 
         /// <summary>下に出している文（ホストを待つ、など。テスト用）。</summary>
         public string Note => _note != null ? _note.text : string.Empty;
@@ -94,7 +105,25 @@ namespace Airerage.Runtime.UI
                     _target.BackToRoom();
                 }
             });
+            if (_exit != null)
+            {
+                _exit.Clicked.AddListener(() => _target.Quit());
+                _exit.gameObject.SetActive(false);
+                if (_exitIcon != null)
+                {
+                    _exitTexture = GuideIcons.Exit(96, Color.white);
+                    _exitIcon.texture = _exitTexture;
+                }
+            }
             _panel.SetActive(false);
+        }
+
+        private void OnDestroy()
+        {
+            if (_exitTexture != null)
+            {
+                Destroy(_exitTexture);
+            }
         }
 
         private void Start()
@@ -126,6 +155,10 @@ namespace Airerage.Runtime.UI
                 return;
             }
             RefreshAvailability();
+            if (_exitIcon != null && _exit != null && _exit.LabelText != null)
+            {
+                _exitIcon.color = _exit.LabelText.color;
+            }
             bool paused = _pause != null && _pause.IsOpen;
             if (paused || EventSystem.current == null)
             {
@@ -159,6 +192,11 @@ namespace Airerage.Runtime.UI
             _canReturn = !_target.CanReturnToCharacterSelect;
             _canBack = !CanBack;
             _menu.SetLabel(_target.HasRoom ? "BACK ROOM" : "MAIN MENU");
+            if (_exit != null)
+            {
+                // ローカル対戦とシングルモードは 3 つ目の MAIN MENU で抜けられるので、出さない。
+                _exit.gameObject.SetActive(_target.HasRoom);
+            }
             RefreshAvailability();
             // 試合の最後の操作（押しっぱなしの決定のボタンなど）で、そのまま押さないよう、項目を選ぶのは次のフレーム。
             EventSystem.current.SetSelectedGameObject(null);
@@ -200,10 +238,12 @@ namespace Airerage.Runtime.UI
             bool canReturn = _target.CanReturnToCharacterSelect;
             bool canBack = CanBack;
             bool newcomers = _target.NewcomersWaiting;
-            if (canRestart == _canRestart && canReturn == _canReturn && canBack == _canBack && newcomers == _newcomers)
+            bool tooFew = _target.TooFewPlayers;
+            if (canRestart == _canRestart && canReturn == _canReturn && canBack == _canBack && newcomers == _newcomers && tooFew == _tooFew)
             {
                 return;
             }
+            _tooFew = tooFew;
             _canRestart = canRestart;
             _canReturn = canReturn;
             _canBack = canBack;
@@ -217,6 +257,8 @@ namespace Airerage.Runtime.UI
                 // 再戦できるのに戻れないのは、試合のシーンを直接再生したとき（ゲームの流れがない）。
                 _note.text = _target.HasRoom && !canBack
                     ? Loc.T("WAITING FOR THE HOST TO CHOOSE", "ホストが選ぶのを待っています")
+                    : tooFew && canBack
+                    ? Loc.T("EVERYONE ELSE LEFT. CHOOSE BACK ROOM TO WAIT FOR PLAYERS", "ほかの人が抜けました。BACK ROOM で待機所へ戻ると、人を待てます")
                     : newcomers && canBack
                     ? Loc.T("A NEW PLAYER JOINED. CHOOSE BACK ROOM SO THEY CAN PLAY", "新しい人が入りました。BACK ROOM で待機所へ戻ると参加できます")
                     : !canRestart && !canReturn

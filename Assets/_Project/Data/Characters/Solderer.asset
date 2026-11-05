@@ -1128,12 +1128,12 @@ MonoBehaviour:
           FatalScale: 0
           FatalTicks: 0
         FlakSpeeds:
-        - 14
-        - 20
+        - 18
         - 26
-        - 33
+        - 34
+        - 43
         FlakDefaultLevel: 2
-        FlakGravity: 22
+        FlakGravity: 37
         FlakRadius: 0.35
         FlakExplosionRadius: 2
         FlakLifetimeTicks: 600

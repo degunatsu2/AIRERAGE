@@ -251,6 +251,75 @@ namespace Airerage.Runtime.Presentation
             });
         }
 
+        /// <summary>
+        /// 退出（結果の画面の EXIT。ユーザーの要望、2026-11-03）: 左向きに開いたドア（枠と、左の端を軸に手前へ開いた扉）と、その右に
+        /// 戸口から出ていく右向きの矢印。矢印が通る所は枠の右の線を切る。
+        /// </summary>
+        public static Texture2D Exit(int size, Color color)
+        {
+            return Draw("IconExit", size, (u, v) =>
+            {
+                const float stroke = 0.055f;
+                const float left = 0.08f;
+                const float right = 0.54f;
+                const float top = 0.08f;
+                const float bottom = 0.9f;
+                bool arrowBand = Mathf.Abs(v - 0.5f) < 0.17f;
+                bool frameTop = v >= top && v < top + stroke && u >= left && u <= right;
+                bool frameBottom = v > bottom - stroke && v <= bottom && u >= left && u <= right;
+                bool frameRight = u > right - stroke && u <= right && v >= top && v <= bottom && !arrowBand;
+                bool frameLeft = u >= left && u < left + stroke && v >= top && v <= bottom;
+                // 扉: 左の端（枠の左の線）を軸に手前へ開き、右の端は短く下がって見える台形。取っ手のところは抜く。
+                bool door = false;
+                if (u >= left && u <= 0.33f)
+                {
+                    float t = (u - left) / (0.33f - left);
+                    float doorTop = Mathf.Lerp(top, 0.2f, t);
+                    float doorBottom = Mathf.Lerp(bottom, 0.98f, t);
+                    door = v >= doorTop && v <= doorBottom;
+                }
+                float kx = u - 0.27f;
+                float ky = v - 0.6f;
+                bool knob = kx * kx + ky * ky < 0.0011f;
+                bool shaft = u > 0.38f && u < 0.78f && Mathf.Abs(v - 0.5f) < 0.06f;
+                bool head = u >= 0.72f && u < 0.98f && Mathf.Abs(v - 0.5f) < 0.2f * (0.98f - u) / 0.26f;
+                if (knob)
+                {
+                    return Color.clear;
+                }
+                return frameTop || frameBottom || frameRight || frameLeft || door || shaft || head ? color : Color.clear;
+            });
+        }
+
+        /// <summary>
+        /// 自分（待機所の札の「YOU」の代わり。ユーザーの要望、2026-11-03）: 丸い枠の中の、頭と肩の人の形。
+        /// </summary>
+        public static Texture2D Person(int size, Color color)
+        {
+            return Draw("IconPerson", size, (u, v) =>
+            {
+                float dx = u - 0.5f;
+                float dy = v - 0.5f;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                if (r > 0.48f)
+                {
+                    return Color.clear;
+                }
+                if (r > 0.4f)
+                {
+                    return color;
+                }
+                float hx = u - 0.5f;
+                float hy = v - 0.36f;
+                bool head = hx * hx + hy * hy < 0.0225f;
+                // 肩: 上が丸く、下は丸い枠まで伸びる（枠で切れる）。
+                float sx = (u - 0.5f) / 0.27f;
+                float sy = (v - 0.84f) / 0.27f;
+                bool shoulders = v > 0.57f && (v >= 0.84f ? Mathf.Abs(u - 0.5f) < 0.27f : sx * sx + sy * sy < 1f);
+                return head || shoulders ? color : Color.clear;
+            });
+        }
+
         // 点 (u, v) が、(x0, y0) から (x1, y1) への太さ radius × 2 の線の中か。
         private static bool Segment(float u, float v, float x0, float y0, float x1, float y1, float radius)
         {
