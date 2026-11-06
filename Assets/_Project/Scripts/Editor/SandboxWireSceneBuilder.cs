@@ -1290,18 +1290,11 @@ namespace Airerage.Editor
             // F3 でキャラクターを切り替えたときの、ロゴと名前（docs/13 T5-8）。
             var banner = root.AddComponent<CharacterSwitchBanner>();
             SetReference(banner, "_runner", runner);
-            CreateVersionLabel();
 
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             LineRenderer trailLine = CreateIndicatorLine(root.transform, "Trail", material, 0.05f);
             var trail = trailLine.gameObject.AddComponent<TrailView>();
             SetReference(trail, "_runner", runner);
-        }
-
-        /// <summary>画面の右下の、動いている版（Git のコミット。エディタだけ）。オンライン用のシーンでも使う。</summary>
-        internal static void CreateVersionLabel()
-        {
-            new GameObject("VersionLabel").AddComponent<VersionLabel>();
         }
 
         /// <summary>

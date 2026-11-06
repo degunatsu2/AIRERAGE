@@ -390,6 +390,7 @@ namespace Airerage.Core.Items
                 case ItemId.ChainHook:
                 case ItemId.PocketRocket:
                 case ItemId.BottledThunder:
+                case ItemId.DecoyDoll:
                     return true;
                 default:
                     return false;
@@ -453,6 +454,14 @@ namespace Airerage.Core.Items
             {
                 EndAct(ref bag);
             }
+            if (bag.Acting && input.IsHeld(InputButtons.Wire) && (state.PreviousButtons & InputButtons.Wire) == 0
+                && state.Combat.WireCancelCooldownTicksLeft == 0 && state.Wire.Phase == WirePhase.Ready && state.Combat.HitstopTicksLeft == 0)
+            {
+                // 使っているアイテムをワイヤーでキャンセルする（攻撃→ワイヤーと同じ。クールタイムが始まる。ユーザーの要望、2026-11-06）。
+                // 動きを止める入力に変えないので、このティックにワイヤーを撃つ。
+                EndAct(ref bag);
+                state.Combat.WireCancelCooldownTicksLeft = config.Combat.WireCancelCooldownTicks;
+            }
             if (bag.Armed != 0 && input.HasAim)
             {
                 bag.ActAim = Vector2.Normalize(input.Aim);
@@ -503,7 +512,11 @@ namespace Airerage.Core.Items
                         bag.Armed &= (byte)~bit;
                         if (CanRecall(bag, id) && CanActivate(state))
                         {
-                            // 帰還のリモコンの 2 回目: 印へ瞬間移動する。
+                            // 帰還のリモコンの 2 回目: 印へ瞬間移動する（当たった攻撃はキャンセルする）。
+                            if (state.Action.Kind == ActionKind.Attack)
+                            {
+                                state.Action = default;
+                            }
                             Recall(ref state, ref bag, slot, config, tuning);
                             break;
                         }
@@ -534,12 +547,17 @@ namespace Airerage.Core.Items
             return new Vector2(state.Facing < 0 ? -1f : 1f, 0f);
         }
 
-        /// <summary>アクティブアイテムを使い始められるか（動ける状態で、攻撃・のけぞり・長押し・構えの間でない）。</summary>
+        /// <summary>
+        /// アクティブアイテムを使い始められるか（動ける状態で、のけぞり・長押し・構えの間でない）。攻撃の間は、その攻撃が当たっていれば
+        /// キャンセルして使える（技と同じ。止まっている間（ヒットストップ）でもよい。ユーザーの要望、2026-11-06）。
+        /// </summary>
         public static bool CanActivate(in CharacterState state)
         {
             CombatState c = state.Combat;
+            bool cancel = state.Action.Kind == ActionKind.Attack && state.Action.Connected;
             return !c.IsWaitingToRespawn && !c.HasLeft && !c.IsAway && !c.IsCaptured && !c.IsDrowning && !c.IsFrozen && !c.IsStunned
-                && c.HitstopTicksLeft == 0 && state.Action.Kind != ActionKind.Hitstun && state.Action.Kind != ActionKind.Attack
+                && (c.HitstopTicksLeft == 0 || cancel) && state.Action.Kind != ActionKind.Hitstun
+                && (state.Action.Kind != ActionKind.Attack || cancel)
                 && !c.Holding && !c.FlakStance && !state.Items.Acting;
         }
 
@@ -631,6 +649,11 @@ namespace Airerage.Core.Items
         private static void Activate(ref CharacterState state, ref ItemBag bag, int slot, ItemId id, int index, CharacterConfig config,
             WorldObjects objects, ICollisionQuery collision, ItemTuning tuning, int tick)
         {
+            if (state.Action.Kind == ActionKind.Attack)
+            {
+                // 当たった攻撃をキャンセルして使う（技と同じ。攻撃→攻撃の 1 回とは別枠。ユーザーの要望、2026-11-06）。
+                state.Action = default;
+            }
             Vector2 aim = bag.ActAim.LengthSquared() > 0.01f ? Vector2.Normalize(bag.ActAim) : new Vector2(state.Facing < 0 ? -1f : 1f, 0f);
             var center = new Vector2(state.Position.X, state.Position.Y);
             bag.UseCount++;

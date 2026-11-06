@@ -163,7 +163,7 @@ namespace Airerage.Net
             {
                 return false;
             }
-            menu = new LocalItemMenu { Held = _input.ItemMenuHeld, Choices = _input.ItemMenuChoices, Slot = _input.ItemMenuSlot, Drop = _input.ItemMenuDrop };
+            menu = new LocalItemMenu { Held = _input.ItemMenuHeld, Choices = _input.ItemMenuChoices, Slot = _input.ItemMenuSlot, Drop = _input.ItemMenuDrop, DropHeld = _input.ItemMenuDropHeld };
             return true;
         }
 

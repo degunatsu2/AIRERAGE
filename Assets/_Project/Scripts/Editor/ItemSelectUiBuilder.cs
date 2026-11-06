@@ -28,8 +28,9 @@ namespace Airerage.Editor
             MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.45f), Vector2.zero, new Vector2(0.49f, 1f));
             Text title = MenuUiBuilder.CreateText(panel, "Title", "START ITEMS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 new Vector2(0f, 1f), new Vector2(90f, -50f), new Vector2(1200f, 90f), Color.white);
+            // 案内は、見出しとスクロールの上の端のちょうど間（2026-11-06）。
             Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0f, 1f), new Vector2(110f, -138f), new Vector2(1000f, 40f), MenuUiBuilder.Accent);
+                new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent);
             note.font = GameFonts.JapaneseBold;
 
             RectTransform content = OnlineMenuUiBuilder.CreateScrollArea(panel, ScrollPosition, ScrollSize, out ScrollRect scroll);
@@ -39,6 +40,10 @@ namespace Airerage.Editor
             MenuOption random = CreatePlate(content, "Random", "RANDOM");
             RawImage randomIcon = CreateIcon(random.transform);
             FlowSceneBuilder.CreateStageCheck(random.transform, out GameObject randomCheck, out GameObject randomMark);
+            random.SetPinned((RectTransform)randomCheck.transform);
+            // ドロップするアイテムの、すべてにチェック ／ すべて外す（2026-11-06）。
+            MenuOption checkAll = CreatePlate(content, "CheckAll", "CHECK ALL");
+            MenuOption uncheckAll = CreatePlate(content, "UncheckAll", "UNCHECK ALL");
 
             var options = new Object[ItemCatalog.Count];
             var keyBoxes = new Object[ItemCatalog.Count];
@@ -58,6 +63,8 @@ namespace Airerage.Editor
                 FlowSceneBuilder.CreateStageCheck(option.transform, out GameObject check, out GameObject mark);
                 checkBoxes[i] = check;
                 checkMarks[i] = mark;
+                // 選んで札が右へ動いても、左のキーとチェックの箱は動かさない（押しやすいように。2026-11-06）。
+                option.SetPinned((RectTransform)box.transform, (RectTransform)check.transform);
             }
             // DONE はスクロールの下に固定（いつでも見える）。
             MenuOption done = CreatePlate(panel, "Done", "DONE");
@@ -98,9 +105,7 @@ namespace Airerage.Editor
             description.gameObject.AddComponent<LineBreakText>();
             popupObject.SetActive(false);
 
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down / Left / Right: select     Wheel: scroll     Enter / A: choose     Esc / B: done",
-                22, FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 30f), new Vector2(1500f, 40f), new Color(1f, 1f, 1f, 0.7f)),
-                "上下左右: 選ぶ　　ホイール: スクロール　　Enter ／ A: 決定（もう一度で外す）　　Esc ／ B: 終わる");
+            MenuUiBuilder.CreateHint(panel, "↑↓←→: select     Wheel: scroll     Enter / A: choose     Esc / B: done", "↑↓←→:選択　　ホイール:スクロール　　Enter ／ A: 決定（もう一度で外す）　　Esc ／ B: 終わる");
 
             var screen = panel.gameObject.AddComponent<ItemSelectScreen>();
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
@@ -110,6 +115,8 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_checkMarks", checkMarks);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_icons", icons);
             SandboxWireSceneBuilder.SetReference(screen, "_random", random);
+            SandboxWireSceneBuilder.SetReference(screen, "_checkAll", checkAll);
+            SandboxWireSceneBuilder.SetReference(screen, "_uncheckAll", uncheckAll);
             SandboxWireSceneBuilder.SetReference(screen, "_randomCheck", randomCheck);
             SandboxWireSceneBuilder.SetReference(screen, "_randomMark", randomMark);
             SandboxWireSceneBuilder.SetReference(screen, "_randomIcon", randomIcon);

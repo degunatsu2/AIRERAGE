@@ -20,6 +20,7 @@ namespace Airerage.Runtime.UI
     /// カーソルを動かすと、選んだ札が見える所までスクロールする）。初期アイテムでは、いちばん上に RANDOM（ランダムセレクト）。選ぶと
     /// ほかの選択がすべて外れ、試合の始めに初期アイテム数だけのランダムなアイテムを持つ（全員で同じ。SimWorld.SetItems）。
     /// 札の並びは実行中に決める（Layout。アイテムを足しても、ビルダーの位置を直さなくてよい）。
+    /// ドロップするアイテムでは、いちばん上に CHECK ALL ／ UNCHECK ALL（2026-11-06）。チェックが 0 個の間は閉じられない（案内を出す）。
     /// </summary>
     public sealed class ItemSelectScreen : MonoBehaviour
     {
@@ -56,6 +57,9 @@ namespace Airerage.Runtime.UI
         [SerializeField] private GameObject _randomCheck;
         [SerializeField] private GameObject _randomMark;
         [SerializeField] private RawImage _randomIcon;
+        [Tooltip("ドロップするアイテムで、すべてにチェックを付ける札と、すべて外す札")]
+        [SerializeField] private MenuOption _checkAll;
+        [SerializeField] private MenuOption _uncheckAll;
         [Tooltip("札を入れるスクロールの中身と、スクロール（ホイール・ドラッグ）")]
         [SerializeField] private RectTransform _content;
         [SerializeField] private ScrollRect _scroll;
@@ -103,6 +107,8 @@ namespace Airerage.Runtime.UI
         public MenuOption Option(int index) => _options[index];
         public MenuOption Done => _done;
         public MenuOption RandomOption => _random;
+        public MenuOption CheckAllOption => _checkAll;
+        public MenuOption UncheckAllOption => _uncheckAll;
 
         /// <summary>選んでいる初期アイテム（Z・X・C の順。ランダムセレクトなら ItemId.Random だけ）。</summary>
         public IReadOnlyList<ItemId> Picks => _picks;
@@ -143,7 +149,8 @@ namespace Airerage.Runtime.UI
             if (_options.Length != ItemCatalog.Count || _keys.Length != _options.Length || _keyBoxes.Length != _options.Length
                 || _checkBoxes.Length != _options.Length
                 || _checkMarks.Length != _options.Length || _icons.Length != _options.Length || _done == null || _random == null
-                || _randomCheck == null || _randomMark == null || _content == null || _scroll == null || _passiveHeader == null || _activeHeader == null)
+                || _randomCheck == null || _randomMark == null || _content == null || _scroll == null || _passiveHeader == null || _activeHeader == null
+                || _checkAll == null || _uncheckAll == null)
             {
                 Debug.LogError($"{name}: アイテムの札（{_options.Length} / {ItemCatalog.Count}）か、キー・チェック・絵・RANDOM・スクロール・見出し・DONE が" +
                     "設定されていません", this);
@@ -168,6 +175,12 @@ namespace Airerage.Runtime.UI
             _random.Selected += () => Highlight(RandomIndex);
             _random.Clicked.AddListener(ToggleRandom);
             _random.Cancelled += Close;
+            _checkAll.Clicked.AddListener(() => SetAll(true));
+            _uncheckAll.Clicked.AddListener(() => SetAll(false));
+            _checkAll.Cancelled += Close;
+            _uncheckAll.Cancelled += Close;
+            _checkAll.Selected += () => Highlight(-1);
+            _uncheckAll.Selected += () => Highlight(-1);
             if (_randomIcon != null)
             {
                 _randomIcon.texture = Presentation.ItemIcons.RandomIcon();
@@ -214,11 +227,16 @@ namespace Airerage.Runtime.UI
             gameObject.SetActive(false);
         }
 
-        /// <summary>閉じる（Closed）。</summary>
+        /// <summary>閉じる（Closed）。ドロップするアイテムのチェックが 0 個なら閉じない（案内を出す）。</summary>
         public void Close()
         {
             if (!gameObject.activeSelf)
             {
+                return;
+            }
+            if (Mode == SelectMode.Pool && (_pool & ItemCatalog.AllMask) == 0)
+            {
+                Note(Loc.T("CHECK AT LEAST ONE ITEM", "1つ以上のアイテムにチェックを付けてください"));
                 return;
             }
             Hide();
@@ -240,6 +258,8 @@ namespace Airerage.Runtime.UI
                 _options[i].SetLabel(Presentation.ItemTexts.Name(ItemCatalog.At(i)));
             }
             _random.SetLabel(Loc.T("RANDOM", "ランダム"));
+            _checkAll.SetLabel(Loc.T("CHECK ALL", "すべてチェック"));
+            _uncheckAll.SetLabel(Loc.T("UNCHECK ALL", "すべて外す"));
             _passiveHeader.text = Loc.T("PASSIVE", "パッシブ");
             _activeHeader.text = Loc.T("ACTIVE", "アクティブ");
             Layout();
@@ -275,12 +295,19 @@ namespace Airerage.Runtime.UI
             float y = 0f;
             bool pick = Mode == SelectMode.Pick;
             _random.gameObject.SetActive(pick);
+            _checkAll.gameObject.SetActive(!pick);
+            _uncheckAll.gameObject.SetActive(!pick);
+            // 選んだときに動かす札は、元の位置（SetHome）で置く（anchoredPosition だと、選んだときに作ったときの位置へ戻る）。
             if (pick)
             {
-                // 選んだときに動かす札は、元の位置（SetHome）で置く（anchoredPosition だと、選んだときに作ったときの位置へ戻る）。
                 _random.SetHome(new Vector2(PlateLeft, y));
-                y -= RowStep + SectionGap;
             }
+            else
+            {
+                _checkAll.SetHome(new Vector2(PlateLeft, y));
+                _uncheckAll.SetHome(new Vector2(PlateLeft + ColumnStep, y));
+            }
+            y -= RowStep + SectionGap;
             y = LayoutSection(_passiveHeader, 0, ItemCatalog.PassiveCount, y);
             y -= SectionGap;
             y = LayoutSection(_activeHeader, ItemCatalog.PassiveCount, ItemCatalog.ActiveCount, y);
@@ -340,6 +367,22 @@ namespace Airerage.Runtime.UI
             SyncScrollbar();
         }
 
+        // すべてにチェックを付ける・すべて外す（ドロップするアイテム。外したら、閉じるまでに 1 つ以上に付ける）。
+        private void SetAll(bool on)
+        {
+            if (Mode != SelectMode.Pool)
+            {
+                return;
+            }
+            _pool = on ? ItemCatalog.AllMask : 0UL;
+            if (on)
+            {
+                PoolChanged?.Invoke(_pool);
+            }
+            Refresh();
+            Note();
+        }
+
         // ランダムセレクトの付け外し（付けると、ほかの選択はすべて外れる）。
         private void ToggleRandom()
         {
@@ -386,14 +429,12 @@ namespace Airerage.Runtime.UI
             else if (Mode == SelectMode.Pool)
             {
                 ulong bit = ItemCatalog.Bit(id);
-                ulong next = _pool ^ bit;
-                if ((next & ItemCatalog.AllMask) == 0)
+                _pool ^= bit;
+                // 0 個の間は知らせない（閉じるまでに 1 つ以上にチェックを付ける。Close）。
+                if ((_pool & ItemCatalog.AllMask) != 0)
                 {
-                    Note(Loc.T("AT LEAST ONE ITEM MUST STAY CHECKED", "1つ以上のアイテムにチェックが必要です"));
-                    return;
+                    PoolChanged?.Invoke(_pool);
                 }
-                _pool = next;
-                PoolChanged?.Invoke(_pool);
             }
             Refresh();
             Note();
@@ -451,11 +492,11 @@ namespace Airerage.Runtime.UI
             }
             else if (Mode == SelectMode.Pick)
             {
-                _note.text = Loc.T($"CHOOSE UP TO {_limit} ITEMS ({_picks.Count} / {_limit})", $"持っていくアイテムを{_limit}個まで選んでください（{_picks.Count}／{_limit}）");
+                _note.text = Loc.T($"CHOOSE UP TO {_limit} START ITEMS ({_picks.Count} / {_limit})", $"初期アイテムを{_limit}個まで選んでください（{_picks.Count}／{_limit}）");
             }
             else
             {
-                _note.text = Loc.T("ONLY CHECKED ITEMS APPEAR IN MATCHES", "チェックしたアイテムだけが試合に出ます");
+                _note.text = Loc.T("CHOOSE THE ITEMS THAT APPEAR", "出現させるアイテムを選んでください");
             }
         }
 

@@ -123,6 +123,9 @@ namespace Airerage.Runtime.Input
         public int ItemMenuSlot { get; private set; } = -1;
         public bool ItemMenuDrop { get; private set; }
 
+        /// <summary>ITEM MENU と一緒に、ゲームパッドの捨てるボタン（A）を押しているか。</summary>
+        public bool ItemMenuDropHeld { get; private set; }
+
         /// <summary>このフレームで位置のリセットが押されたか（Poll で更新する）。</summary>
         public bool ResetRequested { get; private set; }
 
@@ -180,6 +183,7 @@ namespace Airerage.Runtime.Input
                 _pressedSinceLastTick |= InputButtons.Attack;
             }
             ItemMenuHeld = _itemMenu.IsPressed();
+            ItemMenuDropHeld = ItemMenuHeld && DeviceButtons.IsPressed(_itemDrop, true);
             if (DeviceButtons.WasPressedThisFrame(_guard, false) || (!ItemMenuHeld && DeviceButtons.WasPressedThisFrame(_guard, true)))
             {
                 _pressedSinceLastTick |= InputButtons.Guard;

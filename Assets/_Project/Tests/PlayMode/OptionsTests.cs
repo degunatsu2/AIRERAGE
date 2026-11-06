@@ -101,7 +101,7 @@ namespace Airerage.PlayMode.Tests
         }
 
         // アイテムのモード（docs/20_item_plan.md）: ITEMS のページで値が変わって保存され、START ITEMS で選んだアイテムの左に Z・X・C、
-        // 上限まで、もう一度で外れ、カーソルで効果のポップアップ。DROP ITEMS でチェックを外せ、最後の 1 つは外せない。閉じると ITEMS へ戻る。
+        // 上限まで、もう一度で外れ、カーソルで効果のポップアップ。DROP ITEMS でチェックを外せ、すべて外すと閉じられない。閉じると ITEMS へ戻る。
         [UnityTest]
         public IEnumerator Items_ModeAndStartItemsAndDropPool_AreSaved()
         {
@@ -166,6 +166,21 @@ namespace Airerage.PlayMode.Tests
             Assert.That(items.CheckShown(3), Is.False);
             Assert.That(ItemSettings.Load().DropPool & Airerage.Core.Items.ItemCatalog.Bit(Airerage.Core.Items.ItemId.QuickBoosterEx), Is.EqualTo(0UL),
                 "外したアイテムが保存されない");
+            // すべて外す ／ すべてチェック（2026-11-06）。0 個の間は閉じられない。チェックの箱は札が選ばれて動いても動かない。
+            Assert.That(items.CheckAllOption.gameObject.activeSelf, Is.True, "ドロップするアイテムの画面にすべてチェックの札がない");
+            items.UncheckAllOption.Button.onClick.Invoke();
+            Assert.That(items.CheckShown(0), Is.False, "すべて外すで外れない");
+            items.Close();
+            yield return null;
+            Assert.That(menu.ShowingItemSelect, Is.True, "チェックが 0 個なのに閉じた");
+            items.CheckAllOption.Button.onClick.Invoke();
+            Assert.That(items.CheckShown(3), Is.True, "すべてチェックで付かない");
+            Assert.That(ItemSettings.Load().DropPool, Is.EqualTo(Airerage.Core.Items.ItemCatalog.AllMask), "すべてチェックが保存されない");
+            Transform box = items.Option(5).transform.Find("Check");
+            Vector3 before = box.position;
+            items.Option(5).Button.Select();
+            yield return null;
+            Assert.That(box.position.x, Is.EqualTo(before.x).Within(0.5f), "札を選ぶとチェックの箱まで動く");
             items.Close();
             yield return null;
             Assert.That(menu.ShowingOptions, Is.True);

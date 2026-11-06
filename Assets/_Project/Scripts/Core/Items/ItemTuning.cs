@@ -289,10 +289,38 @@ namespace Airerage.Core.Items
 
         // ---------------------------------------------------------------- 身代わり人形
 
-        /// <summary>身代わり人形: クールタイム（15 秒）、壊れるまでの攻撃の回数、消えるまで（10 秒）【仮】。</summary>
+        /// <summary>
+        /// 身代わり人形（ユーザーの指定、2026-11-06）: クールタイム（15 秒）、爆発するまでに受けられる攻撃の回数（3 回）、置いておく長さ（2 秒）、
+        /// 置く距離（照準の方向。m）、大きさ（キャラクターの箱にかける数）【仮】。
+        /// </summary>
         public int DecoyCooldownTicks = 900;
         public int DecoyHits = 3;
-        public int DecoyTicks = 600;
+        public int DecoyTicks = 120;
+        public float DecoyDistance = 1.8f;
+        public float DecoySizeScale = 1.3f;
+
+        /// <summary>一度でも攻撃を受けた人形の動き: 攻撃の吹き飛びにかける数、重力（m/s²）、落ちる速さの上限（m/s）、地面での減速（m/s²）【仮】。</summary>
+        public float DecoyKnockScale = 0.8f;
+        public float DecoyGravity = 30f;
+        public float DecoyMaxFallSpeed = 30f;
+        public float DecoyGroundFriction = 12f;
+
+        /// <summary>
+        /// 人形の爆発（記録した威力の合計 recorded に応じる）: 半径は Base + PerDamage × recorded（Max まで。m）、威力は recorded の DamagePercent %
+        /// （DamageMax まで）、吹き飛びは DecoyBlastHit の値に 0.6 + recorded / KnockbackDivisor をかける（KnockbackScaleMax まで）。
+        /// 記録が 0 なら、見た目だけで当たらない【仮】。
+        /// </summary>
+        public float DecoyBlastRadiusBase = 1.6f;
+        public float DecoyBlastRadiusPerDamage = 0.1f;
+        public float DecoyBlastRadiusMax = 6f;
+        public int DecoyBlastDamagePercent = 100;
+        public int DecoyBlastDamageMax = 60;
+        public float DecoyBlastKnockbackDivisor = 40f;
+        public float DecoyBlastKnockbackScaleMax = 2f;
+        public AttackHit DecoyBlastHit = new AttackHit
+        {
+            Damage = 0, Gauge = 60, HitstopTicks = 10, HitstunTicks = 30, KnockbackX = 10f, KnockbackY = 9f,
+        };
 
         // ---------------------------------------------------------------- 瓶詰めの雷雲
 
@@ -469,6 +497,15 @@ namespace Airerage.Core.Items
             v.Positive(nameof(RocketTicks), RocketTicks);
             v.Positive(nameof(TrampolineTicks), TrampolineTicks);
             v.Positive(nameof(DecoyHits), DecoyHits);
+            v.Positive(nameof(DecoyTicks), DecoyTicks);
+            v.NonNegative(nameof(DecoyDistance), DecoyDistance);
+            v.Positive(nameof(DecoySizeScale), DecoySizeScale);
+            v.NonNegative(nameof(DecoyGravity), DecoyGravity);
+            v.Positive(nameof(DecoyMaxFallSpeed), DecoyMaxFallSpeed);
+            v.Positive(nameof(DecoyBlastRadiusBase), DecoyBlastRadiusBase);
+            v.Positive(nameof(DecoyBlastRadiusMax), DecoyBlastRadiusMax);
+            v.Positive(nameof(DecoyBlastKnockbackDivisor), DecoyBlastKnockbackDivisor);
+            v.NotNull(nameof(DecoyBlastHit), DecoyBlastHit);
             v.Positive(nameof(CloudStrikes), CloudStrikes);
             v.InRange(nameof(SealPercent), SealPercent, 0f, 100f);
             for (int i = 1; i <= ItemCatalog.Count; i++)

@@ -258,7 +258,7 @@ namespace Airerage.Runtime.UI
                 _note.text = _target.HasRoom && !canBack
                     ? Loc.T("WAITING FOR THE HOST TO CHOOSE", "ホストが選ぶのを待っています")
                     : tooFew && canBack
-                    ? Loc.T("EVERYONE ELSE LEFT. CHOOSE BACK ROOM TO WAIT FOR PLAYERS", "ほかの人が抜けました。BACK ROOM で待機所へ戻ると、人を待てます")
+                    ? Loc.T("NOT ENOUGH PLAYERS TO PLAY. PLEASE RETURN TO THE WAITING ROOM.", "ゲームプレイ可能な人数に達していません。待機所に戻ってください。")
                     : newcomers && canBack
                     ? Loc.T("A NEW PLAYER JOINED. CHOOSE BACK ROOM SO THEY CAN PLAY", "新しい人が入りました。BACK ROOM で待機所へ戻ると参加できます")
                     : !canRestart && !canReturn

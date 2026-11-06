@@ -294,13 +294,14 @@ namespace Airerage.Core.Items
                 }
                 case ItemId.DecoyDoll:
                 {
+                    // 照準の方向の目の前に置く（ユーザーの指定、2026-11-06）。消えるのは爆発したとき（StepDecoy）なので、ExpireTick では消さない。
                     Spend(ref bag, slot, tuning.DecoyCooldownTicks, false);
-                    var half = new Vector2(body.X, body.Y) * size;
-                    Vector2 position = PlacementRules.FreePosition(collision, center, half, center);
+                    var half = new Vector2(body.X, body.Y) * tuning.DecoySizeScale * size;
+                    Vector2 position = PlacementRules.FreePosition(collision, center + aim * tuning.DecoyDistance, half, center);
                     objects.Add(new WorldObject
                     {
                         Kind = WorldObjectKind.Decoy, Owner = index, Position = position, End = half, SpawnTick = tick,
-                        ExpireTick = tick + tuning.DecoyTicks, Variant = (byte)id, Stored = state.Facing,
+                        ExpireTick = int.MaxValue, Variant = (byte)id, Stored = aim.X < 0f ? -1 : 1,
                     });
                     break;
                 }
@@ -534,8 +535,114 @@ namespace Airerage.Core.Items
                 case WorldObjectKind.FrozenWall:
                     StepFrozenWall(ref item, states, configs, tuning);
                     return true;
+                case WorldObjectKind.Decoy:
+                    StepDecoy(ref item, states, configs, collision, bounds, tuning, tick, hits);
+                    return true;
                 default:
                     return false;
+            }
+        }
+
+        // 身代わり人形: 置いた所にとどまり、一度でも攻撃を受けたら吹き飛んで重力で落ちる。決まった回数の攻撃を受けるか時間が来たら、
+        // 記録した威力の合計に応じた爆発を起こして消える（ユーザーの指定、2026-11-06）。
+        private static void StepDecoy(ref WorldObject decoy, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+            ICollisionQuery collision, StageBounds? bounds, ItemTuning tuning, int tick, List<HitRecord> hits)
+        {
+            if (decoy.Damage >= tuning.DecoyHits || tick - decoy.SpawnTick >= tuning.DecoyTicks)
+            {
+                ExplodeDecoy(decoy, states, configs, tuning, hits);
+                decoy.Ended = true;
+                return;
+            }
+            if (decoy.Damage == 0)
+            {
+                return;
+            }
+            float dt = SimTime.DeltaTime;
+            Vector2 velocity = decoy.Velocity;
+            velocity.Y = Math.Max(velocity.Y - tuning.DecoyGravity * dt, -tuning.DecoyMaxFallSpeed);
+            var half = new Vector3(decoy.End.X, decoy.End.Y, 0.5f);
+            if (collision != null)
+            {
+                // 横と縦を別々に動かす（壁で横を止め、床・天井で縦を止める）。
+                float dx = velocity.X * dt;
+                if (dx != 0f && collision.SweepBox(new Vector3(decoy.Position.X, decoy.Position.Y, 0f), half, new Vector3(dx, 0f, 0f), out CastHit wall))
+                {
+                    dx = Math.Sign(dx) * Math.Max(0f, wall.Distance - 0.01f);
+                    velocity.X = 0f;
+                }
+                decoy.Position = new Vector2(decoy.Position.X + dx, decoy.Position.Y);
+                float dy = velocity.Y * dt;
+                if (dy != 0f && collision.SweepBox(new Vector3(decoy.Position.X, decoy.Position.Y, 0f), half, new Vector3(0f, dy, 0f), out CastHit floor))
+                {
+                    dy = Math.Sign(dy) * Math.Max(0f, floor.Distance - 0.01f);
+                    bool landed = velocity.Y < 0f;
+                    velocity.Y = 0f;
+                    if (landed)
+                    {
+                        // 床の上では止まっていく。
+                        float slow = tuning.DecoyGroundFriction * dt;
+                        velocity.X = Math.Abs(velocity.X) <= slow ? 0f : velocity.X - Math.Sign(velocity.X) * slow;
+                    }
+                }
+                decoy.Position = new Vector2(decoy.Position.X, decoy.Position.Y + dy);
+            }
+            else
+            {
+                decoy.Position += velocity * dt;
+            }
+            decoy.Velocity = velocity;
+            if (bounds.HasValue && !bounds.Value.Contains(new Vector3(decoy.Position.X, decoy.Position.Y, 0f)))
+            {
+                // ステージの外へ飛んだ: 爆発せずに消える。
+                decoy.Ended = true;
+            }
+        }
+
+        /// <summary>身代わり人形が記録した威力の合計 recorded での、爆発の半径（m）。</summary>
+        public static float DecoyBlastRadius(long recorded, ItemTuning tuning)
+        {
+            return Math.Min(tuning.DecoyBlastRadiusMax, tuning.DecoyBlastRadiusBase + tuning.DecoyBlastRadiusPerDamage * Math.Max(0L, recorded));
+        }
+
+        /// <summary>身代わり人形が記録した威力の合計 recorded での、爆発の威力（0 なら当たらない）。</summary>
+        public static int DecoyBlastDamage(long recorded, ItemTuning tuning)
+        {
+            long damage = Math.Max(0L, recorded) * tuning.DecoyBlastDamagePercent / 100;
+            return (int)Math.Min(tuning.DecoyBlastDamageMax, damage);
+        }
+
+        private static void ExplodeDecoy(in WorldObject decoy, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, ItemTuning tuning,
+            List<HitRecord> hits)
+        {
+            int damage = DecoyBlastDamage(decoy.ChargeMilli, tuning);
+            if (damage <= 0 || hits == null)
+            {
+                return;
+            }
+            float radius = DecoyBlastRadius(decoy.ChargeMilli, tuning);
+            float scale = Math.Min(tuning.DecoyBlastKnockbackScaleMax, 0.6f + decoy.ChargeMilli / Math.Max(1f, tuning.DecoyBlastKnockbackDivisor));
+            AttackHit source = tuning.DecoyBlastHit;
+            var blast = new AttackHit
+            {
+                Damage = damage, Gauge = source.Gauge, HitstopTicks = source.HitstopTicks, HitstunTicks = source.HitstunTicks,
+                KnockbackX = source.KnockbackX * scale, KnockbackY = source.KnockbackY * scale,
+            };
+            for (int v = 0; v < states.Count; v++)
+            {
+                if (!IsTarget(states, decoy.Owner, v))
+                {
+                    continue;
+                }
+                Vector3 body = configs[v].Movement.HalfExtents;
+                float nx = Math.Max(Math.Abs(states[v].Position.X - decoy.Position.X) - body.X, 0f);
+                float ny = Math.Max(Math.Abs(states[v].Position.Y - decoy.Position.Y) - body.Y, 0f);
+                if (nx * nx + ny * ny > radius * radius)
+                {
+                    continue;
+                }
+                int facing = states[v].Position.X >= decoy.Position.X ? 1 : -1;
+                hits.Add(new HitRecord(decoy.Owner, v, AttackSlot.Ground, 0, blast, facing, AttackPower.Normal, fromObject: true));
             }
         }
 
@@ -817,10 +924,11 @@ namespace Airerage.Core.Items
 
         /// <summary>
         /// 攻撃 attacker の判定（中心 center、半分の大きさ half）が重なった相手の身代わり人形に、攻撃を 1 回当てる（同じ攻撃の同じ判定は 1 回。key）。
-        /// 決まった回数で壊れる。当てたら true。
+        /// 人形は攻撃の威力 damage を記録し（ChargeMilli）、吹き飛び knockback で飛ぶ（それからは重力で落ちる）。決まった回数で爆発する
+        /// （StepDecoy）。当てたら true。
         /// </summary>
         public static bool HitDecoys(WorldObjects objects, List<CharacterState> states, int attacker, int key, Vector2 center, Vector2 half,
-            ItemTuning tuning)
+            Vector2 knockback, int damage, ItemTuning tuning)
         {
             if (objects == null || tuning == null)
             {
@@ -841,10 +949,8 @@ namespace Airerage.Core.Items
                 }
                 decoy.AddHitKey(key);
                 decoy.Damage++;
-                if (decoy.Damage >= tuning.DecoyHits)
-                {
-                    decoy.Ended = true;
-                }
+                decoy.ChargeMilli += Math.Max(0, damage);
+                decoy.Velocity = knockback * tuning.DecoyKnockScale;
                 objects[i] = decoy;
                 hit = true;
             }

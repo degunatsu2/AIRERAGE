@@ -86,6 +86,11 @@ namespace Airerage.Runtime.Presentation
             public int Owner;
             public int Strikes;
             public LineRenderer Chain;
+            // 身代わり人形: 立体の体の部品（色を付ける）、記録した威力、受けた回数、受けたときの白い光。
+            public Renderer[] Parts;
+            public Color[] PartColors;
+            public long Recorded;
+            public float HitAt = -10f;
         }
 
         private sealed class Character
@@ -197,7 +202,8 @@ namespace Airerage.Runtime.Presentation
             _present.Clear();
             WorldObjects objects = _feed.Objects;
             float time = Time.time;
-            for (int i = 0; i < objects.Count; i++)
+            // 試合の前（オンラインの接続を待つ間など）は、物の一覧がない。
+            for (int i = 0; objects != null && i < objects.Count; i++)
             {
                 WorldObject item = objects[i];
                 if (!IsItemObject(item.Kind))
@@ -239,9 +245,7 @@ namespace Airerage.Runtime.Presentation
                         }
                         break;
                     case WorldObjectKind.Decoy:
-                        shown.Root.transform.position = position;
-                        shown.Icon.localScale = new Vector3(item.End.X * 2.4f * (item.Stored < 0 ? -1f : 1f), item.End.Y * 2.2f, 1f);
-                        shown.Icon.GetComponent<SpriteRenderer>().color = new Color(1f, 1f, 1f, item.Damage > 0 ? 0.6f : 0.9f);
+                        RenderDecoy(item, shown, position, time);
                         break;
                     case WorldObjectKind.ThunderCloud:
                         shown.Root.transform.position = position;
@@ -294,6 +298,22 @@ namespace Airerage.Runtime.Presentation
                 {
                     // 拾われずに時間切れで消えた: 光の粒になって消える。
                     Burst(gone.LastPosition, gone.Glow.color, 14, 2.4f, 0.7f, 0.18f);
+                }
+                else if (gone.Kind == WorldObjectKind.Decoy)
+                {
+                    // 爆発（記録した威力に応じた大きさ）。記録が 0 なら小さな煙だけ。
+                    if (gone.Recorded > 0)
+                    {
+                        float radius = ItemRules.DecoyBlastRadius(gone.Recorded, Tuning);
+                        Burst(gone.LastPosition, new Color(1f, 0.6f, 0.2f, 1f), 24, radius * 3f, 0.55f, 0.4f);
+                        AddRing(gone.LastPosition, radius, new Color(1f, 0.9f, 0.5f, 1f), new Color(1f, 0.35f, 0.1f, 0f));
+                        Play(SoundId.MissileExplode);
+                    }
+                    else
+                    {
+                        Burst(gone.LastPosition, new Color(0.9f, 0.85f, 0.7f, 1f), 10, 2f, 0.45f, 0.3f);
+                        Play(SoundId.Smoke);
+                    }
                 }
                 else if (gone.Kind == WorldObjectKind.ItemBomb)
                 {
@@ -370,6 +390,84 @@ namespace Airerage.Runtime.Presentation
                 }
                 gauge.Draw(shown.Root.transform.position, DropSize * 0.85f, 0.08f, Mathf.Clamp01(remaining / (float)ExpiryWarningTicks), accent, Z - 0.05f);
             }
+        }
+
+        // 身代わり人形の立体の体（わらの色の胴・頭・腕・脚と、持ち主の色の帯）。大きさは箱（item.End）に合わせる。
+        private void BuildDoll(Shown doll, Transform parent, in WorldObject item)
+        {
+            var straw = new Color(0.92f, 0.78f, 0.45f);
+            Color band = item.Owner >= 0 && item.Owner < _feed.CharacterCount ? _feed.ColorOf(item.Owner) : Color.white;
+            float w = item.End.X;
+            float h = item.End.Y;
+            (PrimitiveType type, Vector3 position, Vector3 scale, Vector3 rotation, Color color)[] parts =
+            {
+                (PrimitiveType.Capsule, new Vector3(0f, -0.05f * h, 0f), new Vector3(1.1f * w, 0.62f * h, 0.9f * w), Vector3.zero, straw),
+                (PrimitiveType.Sphere, new Vector3(0f, 0.68f * h, 0f), new Vector3(0.95f * w, 0.95f * w, 0.95f * w), Vector3.zero, straw),
+                (PrimitiveType.Capsule, new Vector3(0f, 0.25f * h, 0f), new Vector3(0.32f * w, 1.25f * w, 0.32f * w), new Vector3(0f, 0f, 90f), straw),
+                (PrimitiveType.Capsule, new Vector3(-0.32f * w, -0.72f * h, 0f), new Vector3(0.34f * w, 0.32f * h, 0.34f * w), new Vector3(0f, 0f, -10f), straw),
+                (PrimitiveType.Capsule, new Vector3(0.32f * w, -0.72f * h, 0f), new Vector3(0.34f * w, 0.32f * h, 0.34f * w), new Vector3(0f, 0f, 10f), straw),
+                (PrimitiveType.Cylinder, new Vector3(0f, -0.1f * h, 0f), new Vector3(1.18f * w, 0.09f * h, 0.98f * w), Vector3.zero, band),
+                (PrimitiveType.Cylinder, new Vector3(0f, 0.5f * h, 0f), new Vector3(0.7f * w, 0.05f * h, 0.7f * w), Vector3.zero, band),
+            };
+            doll.Parts = new Renderer[parts.Length];
+            doll.PartColors = new Color[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                GameObject part = GameObject.CreatePrimitive(parts[i].type);
+                part.name = $"DollPart{i}";
+                Destroy(part.GetComponent<Collider>());
+                part.transform.SetParent(parent, false);
+                part.transform.localPosition = parts[i].position;
+                part.transform.localScale = parts[i].scale;
+                part.transform.localRotation = Quaternion.Euler(parts[i].rotation);
+                Renderer renderer = part.GetComponent<Renderer>();
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                doll.Parts[i] = renderer;
+                doll.PartColors[i] = parts[i].color;
+            }
+            TintDoll(doll, 0f);
+        }
+
+        // 人形の部品に色を付ける（flash は受けたときの白い光 0〜1）。
+        private void TintDoll(Shown doll, float flash)
+        {
+            _dollBlock = _dollBlock ?? new MaterialPropertyBlock();
+            for (int i = 0; i < doll.Parts.Length; i++)
+            {
+                Color color = Color.Lerp(doll.PartColors[i], Color.white, flash);
+                doll.Parts[i].GetPropertyBlock(_dollBlock);
+                _dollBlock.SetColor(BaseColorId, color);
+                _dollBlock.SetColor(ColorId, color);
+                doll.Parts[i].SetPropertyBlock(_dollBlock);
+            }
+        }
+
+        private MaterialPropertyBlock _dollBlock;
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int ColorId = Shader.PropertyToID("_Color");
+
+        // 身代わり人形: 置いた向きを向き、受けた回数だけ傾いて揺れ、受けた瞬間は白く光る。残りの時間が少ないと赤く点滅する。
+        private void RenderDecoy(in WorldObject item, Shown shown, Vector3 position, float time)
+        {
+            shown.Root.transform.position = position;
+            shown.Recorded = item.ChargeMilli;
+            if (item.Damage > shown.Strikes)
+            {
+                shown.Strikes = item.Damage;
+                shown.HitAt = time;
+                Play(SoundId.ShieldBlock);
+                Burst(position, new Color(1f, 0.95f, 0.7f, 1f), 8, 4f, 0.25f, 0.2f);
+            }
+            float facing = item.Stored < 0 ? 180f : 0f;
+            float wobble = item.Damage > 0 ? Mathf.Sin(time * 18f) * 8f * Mathf.Clamp01(1f - (time - shown.HitAt) * 2f) : 0f;
+            shown.Icon.localRotation = Quaternion.Euler(0f, facing + 20f, wobble + item.Damage * 6f);
+            float flash = Mathf.Clamp01(1f - (time - shown.HitAt) / 0.2f);
+            int left = Tuning.DecoyTicks - (_feed.CurrentTick - item.SpawnTick);
+            if (left < 30 && Mathf.Repeat(time * 10f, 1f) < 0.4f)
+            {
+                flash = Mathf.Max(flash, 0.5f);
+            }
+            TintDoll(shown, flash);
         }
 
         // 光の粒を count 個、center から外へ飛ばす（speed m/s、duration 秒、大きさ size m）。
@@ -458,9 +556,12 @@ namespace Airerage.Runtime.Presentation
                     glowObject.transform.localScale = new Vector3(item.End.X * 6f, item.End.Y * 2.4f, 1f);
                     break;
                 case WorldObjectKind.Decoy:
-                    icon.sprite = SpriteOf(ItemId.DecoyDoll);
+                {
                     glow.color = new Color(1f, 1f, 1f, 0f);
-                    break;
+                    var doll = new Shown { Kind = item.Kind, Root = root, Icon = iconObject.transform, Glow = glow };
+                    BuildDoll(doll, iconObject.transform, item);
+                    return doll;
+                }
                 case WorldObjectKind.ThunderCloud:
                     icon.sprite = _glow;
                     icon.color = new Color(0.2f, 0.2f, 0.28f, 0.9f);
@@ -567,6 +668,11 @@ namespace Airerage.Runtime.Presentation
                     if (bag.PickupCount > view.Pickups)
                     {
                         Play(SoundId.ItemPickup);
+                        // 拾った光（拾ったアイテムの色の輪と粒。ユーザーの要望、2026-11-06）。
+                        Color accent = ItemIcons.Accent((ItemId)bag.LastPicked);
+                        AddRing(center, 1.6f, new Color(1f, 1f, 1f, 1f), new Color(accent.r, accent.g, accent.b, 0f));
+                        Burst(center, accent, 14, 3.5f, 0.5f, 0.3f);
+                        Burst(center, Color.white, 6, 1.5f, 0.35f, 0.5f);
                     }
                     if (bag.UseCount > view.Uses)
                     {

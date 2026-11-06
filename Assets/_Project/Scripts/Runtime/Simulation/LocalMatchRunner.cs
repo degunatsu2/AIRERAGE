@@ -155,7 +155,7 @@ namespace Airerage.Runtime.Simulation
                 return false;
             }
             InputSystemAdapter input = _inputs[index];
-            menu = new LocalItemMenu { Held = input.ItemMenuHeld, Choices = input.ItemMenuChoices, Slot = input.ItemMenuSlot, Drop = input.ItemMenuDrop };
+            menu = new LocalItemMenu { Held = input.ItemMenuHeld, Choices = input.ItemMenuChoices, Slot = input.ItemMenuSlot, Drop = input.ItemMenuDrop, DropHeld = input.ItemMenuDropHeld };
             return true;
         }
 

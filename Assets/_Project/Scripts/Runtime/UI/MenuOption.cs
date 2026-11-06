@@ -25,6 +25,9 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Vector2 _selectedShift = new Vector2(18f, 0f);
         [Tooltip("文字が枠の幅より長ければ、1 行のまま字を小さくして収める（待機所の SPLIT など）")]
         [SerializeField] private bool _shrinkToFit;
+        [Tooltip("選んで札が動いても、その場にとどめる子（札の左のチェックの箱など。押しやすいように。2026-11-06）")]
+        [SerializeField] private RectTransform[] _pinned = new RectTransform[0];
+        private Vector2[] _pinnedHomes;
 
         // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。
         private int _baseFontSize;
@@ -171,6 +174,7 @@ namespace Airerage.Runtime.UI
             {
                 _rect.anchoredPosition = _home;
             }
+            PlacePinned(Vector2.zero);
         }
 
         public void OnSelect(BaseEventData eventData)
@@ -219,6 +223,38 @@ namespace Airerage.Runtime.UI
             {
                 _rect.anchoredPosition = _home + (_selected ? _selectedShift : Vector2.zero);
             }
+            PlacePinned(_selected ? _selectedShift : Vector2.zero);
+        }
+
+        // とどめる子を、札の動いた分だけ逆へずらす（画面の上では動かない）。
+        private void PlacePinned(Vector2 shift)
+        {
+            if (_pinned == null || _pinned.Length == 0)
+            {
+                return;
+            }
+            if (_pinnedHomes == null || _pinnedHomes.Length != _pinned.Length)
+            {
+                _pinnedHomes = new Vector2[_pinned.Length];
+                for (int i = 0; i < _pinned.Length; i++)
+                {
+                    _pinnedHomes[i] = _pinned[i] != null ? _pinned[i].anchoredPosition : Vector2.zero;
+                }
+            }
+            for (int i = 0; i < _pinned.Length; i++)
+            {
+                if (_pinned[i] != null)
+                {
+                    _pinned[i].anchoredPosition = _pinnedHomes[i] - shift;
+                }
+            }
+        }
+
+        /// <summary>選んで札が動いても、その場にとどめる子を決める（シーンのビルダー用）。</summary>
+        public void SetPinned(params RectTransform[] children)
+        {
+            _pinned = children ?? new RectTransform[0];
+            _pinnedHomes = null;
         }
     }
 }

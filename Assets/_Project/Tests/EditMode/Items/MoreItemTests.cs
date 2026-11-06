@@ -266,24 +266,66 @@ namespace Airerage.Core.Tests.Items
         }
 
         [Test]
-        public void ThunderCloud_StrikesThreeTimes_AndDecoyBreaksAfterThreeHits()
+        public void ThunderCloud_StrikesThreeTimes()
         {
             SimWorld world = World(PreItem(), new Vector3(0f, GroundY, 0f), new Vector3(4f, GroundY, 0f));
             world.SetItems(0, new[] { ItemId.BottledThunder });
             List<HitRecord> hits = Use(world, 0, Vector2.Normalize(new Vector2(4f, 3f)));
             hits.AddRange(Step(world, new ItemTuning().CloudTicks + 5));
             Assert.That(hits.Count(h => h.Victim == 1 && h.Data.StunTicks > 0), Is.EqualTo(3), "雷が 3 回落ちない");
+        }
 
-            var objects = new WorldObjects();
-            var states = new List<CharacterState> { default, default };
-            objects.Add(new WorldObject { Kind = WorldObjectKind.Decoy, Owner = 1, Position = Vector2.Zero, End = new Vector2(0.4f, 0.9f), ExpireTick = 999 });
+        // 身代わり人形（ユーザーの指定、2026-11-06）: 照準の方向の目の前に置き、攻撃を受けるまではその場にとどまる。何も受けずに 2 秒たつと
+        // 当たらない爆発で消える。
+        [Test]
+        public void Decoy_IsPlacedTowardTheAim_StaysPut_AndVanishesAfterTwoSeconds()
+        {
             var tuning = new ItemTuning();
-            for (int k = 1; k <= 3; k++)
-            {
-                Assert.That(ItemRules.HitDecoys(objects, states, 0, k, Vector2.Zero, Vector2.One, tuning), Is.True);
-            }
-            Assert.That(objects.Items[0].Ended, Is.True, "3 回当てても人形が壊れない");
-            Assert.That(ItemRules.TryGetDecoy(objects, 1, out _), Is.False);
+            SimWorld world = World(PreItem(), new Vector3(0f, GroundY + 2f, 0f), new Vector3(6f, GroundY, 0f));
+            world.SetItems(0, new[] { ItemId.DecoyDoll });
+            Use(world, 0, new Vector2(-1f, 0f));
+            WorldObject[] dolls = ObjectsOf(world, WorldObjectKind.Decoy);
+            Assert.That(dolls.Length, Is.EqualTo(1), "人形を置かない");
+            Assert.That(dolls[0].Position.X, Is.LessThan(-1f), "照準の方向（左）の目の前に置かない");
+            Vector2 placed = dolls[0].Position;
+            Step(world, 30);
+            Assert.That(ObjectsOf(world, WorldObjectKind.Decoy)[0].Position, Is.EqualTo(placed), "攻撃を受ける前に動いた（重力で落ちた）");
+            List<HitRecord> hits = Step(world, tuning.DecoyTicks);
+            Assert.That(ObjectsOf(world, WorldObjectKind.Decoy).Any(d => !d.Ended), Is.False, "2 秒で消えない");
+            Assert.That(hits.Any(h => h.Attacker == 0), Is.False, "記録が 0 なのに爆発が当たった");
+        }
+
+        // 攻撃を受けると威力を記録して吹き飛び、重力で落ちる。3 回で、記録した威力の合計に応じた範囲と威力の爆発を起こす。
+        [Test]
+        public void Decoy_RecordsDamage_FliesWhenHit_AndExplodesAfterThreeHits()
+        {
+            var tuning = new ItemTuning();
+            SimWorld world = World(PreItem(), new Vector3(0f, GroundY + 2f, 0f), new Vector3(5f, GroundY, 0f));
+            world.SetItems(0, new[] { ItemId.DecoyDoll });
+            Use(world, 0, new Vector2(1f, 0f));
+            WorldObject doll = ObjectsOf(world, WorldObjectKind.Decoy)[0];
+            var states = new List<CharacterState> { world.GetState(0), world.GetState(1) };
+            Assert.That(ItemRules.HitDecoys(world.Objects, states, 1, 101, doll.Position, Vector2.One, new Vector2(-4f, 6f), 10, tuning), Is.True);
+            Step(world, 6);
+            WorldObject flying = ObjectsOf(world, WorldObjectKind.Decoy)[0];
+            Assert.That(flying.ChargeMilli, Is.EqualTo(10), "威力を記録しない");
+            Assert.That(flying.Position.X, Is.LessThan(doll.Position.X), "吹き飛ばない");
+            Step(world, 40);
+            Assert.That(ObjectsOf(world, WorldObjectKind.Decoy)[0].Position.Y, Is.LessThan(doll.Position.Y), "重力で落ちない");
+
+            WorldObject now = ObjectsOf(world, WorldObjectKind.Decoy)[0];
+            CharacterState enemy = world.GetState(1);
+            enemy.Position = new Vector3(now.Position.X + 2f, now.Position.Y, 0f);
+            world.SetState(1, enemy);
+            states = new List<CharacterState> { world.GetState(0), world.GetState(1) };
+            ItemRules.HitDecoys(world.Objects, states, 1, 102, now.Position, Vector2.One, Vector2.Zero, 10, tuning);
+            ItemRules.HitDecoys(world.Objects, states, 1, 103, now.Position, Vector2.One, Vector2.Zero, 10, tuning);
+            List<HitRecord> hits = Step(world, 2);
+            Assert.That(ObjectsOf(world, WorldObjectKind.Decoy).Any(d => !d.Ended), Is.False, "3 回で爆発しない");
+            HitRecord blast = hits.FirstOrDefault(h => h.Attacker == 0 && h.Victim == 1);
+            Assert.That(blast.Data, Is.Not.Null, "爆発が近くの相手に当たらない");
+            Assert.That(blast.Data.Damage, Is.EqualTo(ItemRules.DecoyBlastDamage(30, tuning)), "爆発の威力が記録した威力の合計に応じない");
+            Assert.That(ItemRules.DecoyBlastRadius(30, tuning), Is.GreaterThan(ItemRules.DecoyBlastRadius(5, tuning)), "記録が多いほど範囲が広くならない");
         }
 
         [Test]
@@ -313,6 +355,28 @@ namespace Airerage.Core.Tests.Items
             Use(world, 0, new Vector2(1f, 0f));
             Step(world, 10);
             Assert.That(world.GetState(0).Position.X, Is.GreaterThan(4f), "照準の方向へ速く動かない");
+        }
+
+        // アイテムのキャンセル（ユーザーの要望、2026-11-06）: 使っている最中にワイヤーでキャンセルでき（クールタイムが始まる）、
+        // 当たった攻撃はキャンセルしてアイテムを使える（当たっていない攻撃の間は使えない）。
+        [Test]
+        public void Items_CanBeWireCancelled_AndCancelAHitAttack()
+        {
+            SimWorld world = World(PreItem(), new Vector3(0f, GroundY + 3f, 0f));
+            world.SetItems(0, new[] { ItemId.PocketRocket });
+            Use(world, 0, new Vector2(1f, 0f));
+            Assert.That(world.GetState(0).Items.Acting, Is.True, "前提: ロケットで動いている");
+            Step(world, 1, PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(new Vector2(0f, 1f)));
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Items.Acting, Is.False, "ワイヤーでキャンセルできない");
+            Assert.That(state.Combat.WireCancelCooldownTicksLeft, Is.GreaterThan(0), "ワイヤーキャンセルのクールタイムが始まらない");
+            Assert.That(state.Wire.Phase, Is.Not.EqualTo(Airerage.Core.Wire.WirePhase.Ready), "キャンセルしたティックにワイヤーを撃たない");
+
+            var attacking = new CharacterState { Action = new ActionState { Kind = ActionKind.Attack, Attack = AttackSlot.Ground } };
+            Assert.That(ItemRules.CanActivate(attacking), Is.False, "当たっていない攻撃の間に使えてしまう");
+            attacking.Action.Connected = true;
+            attacking.Combat.HitstopTicksLeft = 6;
+            Assert.That(ItemRules.CanActivate(attacking), Is.True, "当たった攻撃をキャンセルして使えない");
         }
 
         [Test]

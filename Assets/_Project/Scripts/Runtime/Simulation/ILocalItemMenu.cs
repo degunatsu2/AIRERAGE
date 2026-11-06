@@ -12,6 +12,9 @@ namespace Airerage.Runtime.Simulation
         public int Choices;
         public int Slot;
         public bool Drop;
+
+        /// <summary>ITEM MENU と一緒に捨てるボタン（A）を押しているか（バッグの左にゴミ箱の印を出す）。</summary>
+        public bool DropHeld;
     }
 
     /// <summary>この PC で操作しているキャラクターの ITEM MENU を読める（SimulationRunner・LocalMatchRunner・OnlineRunner）。</summary>

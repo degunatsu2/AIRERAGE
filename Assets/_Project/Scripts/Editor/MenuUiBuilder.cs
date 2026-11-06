@@ -67,6 +67,17 @@ namespace Airerage.Editor
             return text;
         }
 
+        /// <summary>
+        /// 画面の下の操作の説明（右下に右寄せで置く。左下の札や項目と重ならないように。ユーザーの要望、2026-11-06）。english は英語、
+        /// japanese は日本語の文（LocalizedText）。
+        /// </summary>
+        public static Text CreateHint(Transform parent, string english, string japanese)
+        {
+            Text hint = CreateText(parent, "Hint", english, 22, FontStyle.Bold, TextAnchor.LowerRight, new Vector2(1f, 0f), new Vector2(-48f, 22f),
+                new Vector2(1760f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            return Localize(hint, japanese);
+        }
+
         /// <summary>文字。anchor（0〜1）に pivot を合わせ、position だけずらす。</summary>
         public static Text CreateText(Transform parent, string name, string text, int size, FontStyle style, TextAnchor alignment,
             Vector2 anchor, Vector2 position, Vector2 boxSize, Color color, bool outline = true)

@@ -19,6 +19,9 @@ namespace Airerage.Runtime.UI
     /// RANDOM で選ぶのは、チェックを付けたステージだけ（RandomStagePool。ネットワーク対戦では全員が付けているステージだけ。
     /// ユーザーの要望、2026-10-26）。オプションから開く「RANDOM STAGES」（ShowRandomPool）では、札の左端のチェックを決定で付け外しし、
     /// 戻る操作で PoolClosed（RANDOM の札は出さない。最後の 1 つは外せない）。
+    /// 2026-11-06（ユーザーの要望）: 札はスクロールの中身に 2 列で並べ（実行中に Layout。画面に収まらない分はスクロール。カーソルの札が
+    /// 見える所まで動く ScrollToSelection）、RANDOM STAGES ではいちばん上に CHECK ALL ／ UNCHECK ALL、下に DONE（アイテムを選ぶ画面と同じ形）。
+    /// チェックが 0 個の間は閉じられない（案内を出す）。チェックの箱は、札が選ばれて動いてもその場にとどまる（MenuOption の pinned）。
     /// 説明は、オプションの LANGUAGE（GameSettings.LoadLanguage）の言語で出す（字体はどちらの言語でも日本語の字体 M PLUS 1。句読点を行の頭に置かずに折り返す。2026-10-27、2026-10-29）。
     /// </summary>
     public sealed class StageSelectScreen : MonoBehaviour
@@ -37,6 +40,19 @@ namespace Airerage.Runtime.UI
         [Tooltip("札の左端のチェックの箱と、付いているときの印（_options と同じ順。RANDOM STAGES のときだけ出す。なくてもよい）")]
         [SerializeField] private GameObject[] _checkBoxes = new GameObject[0];
         [SerializeField] private GameObject[] _checkMarks = new GameObject[0];
+        [Tooltip("札を入れるスクロールの中身（なければ、ビルダーが置いた位置のまま）")]
+        [SerializeField] private RectTransform _content;
+        [Tooltip("RANDOM STAGES の、すべてにチェック ／ すべて外す ／ DONE の札（なくてもよい）")]
+        [SerializeField] private MenuOption _checkAll;
+        [SerializeField] private MenuOption _uncheckAll;
+        [SerializeField] private MenuOption _done;
+
+        // 札の並び（スクロールの中身の中の位置。左上から）。アイテムを選ぶ画面と同じ。
+        private const int Columns = 2;
+        private const float PlateLeft = 64f;
+        private const float ColumnStep = 430f;
+        private const float RowStep = 76f;
+        private const float SectionGap = 14f;
 
         // ルーレット: 回る回数、最初と最後の 1 つ進む間隔（秒）、止まってから決めるまで（秒）。
         private const int RouletteLoops = 2;
@@ -100,6 +116,11 @@ namespace Airerage.Runtime.UI
         /// <summary>RANDOM の札（なければ null。テスト用）。</summary>
         public MenuOption RandomOption => _random;
 
+        /// <summary>RANDOM STAGES の札（なければ null。テスト用）。</summary>
+        public MenuOption DoneOption => _done;
+        public MenuOption CheckAllOption => _checkAll;
+        public MenuOption UncheckAllOption => _uncheckAll;
+
         /// <summary>RANDOM にカーソルがあるか。</summary>
         public bool RandomHighlighted { get; private set; }
 
@@ -150,13 +171,44 @@ namespace Airerage.Runtime.UI
                 {
                     if (PoolMode)
                     {
-                        PoolClosed?.Invoke();
+                        ClosePool();
                     }
                     else if (!ReadOnly && !Rolling)
                     {
                         Cancelled?.Invoke();
                     }
                 };
+            }
+            foreach (MenuOption extra in new[] { _checkAll, _uncheckAll, _done })
+            {
+                if (extra != null)
+                {
+                    extra.Cancelled += () =>
+                    {
+                        if (PoolMode)
+                        {
+                            ClosePool();
+                        }
+                    };
+                }
+            }
+            if (_checkAll != null)
+            {
+                _checkAll.Clicked.AddListener(() => SetAllPool(true));
+            }
+            if (_uncheckAll != null)
+            {
+                _uncheckAll.Clicked.AddListener(() => SetAllPool(false));
+            }
+            if (_done != null)
+            {
+                _done.Clicked.AddListener(() =>
+                {
+                    if (PoolMode)
+                    {
+                        ClosePool();
+                    }
+                });
             }
             if (_random != null)
             {
@@ -214,27 +266,88 @@ namespace Airerage.Runtime.UI
         {
             Open(false, false, 0);
             PoolMode = true;
-            if (_random != null)
-            {
-                _random.gameObject.SetActive(false);
-            }
+            Layout();
             RefreshChecks();
-            SetNote(Loc.T("CHECKED STAGES CAN BE PICKED BY RANDOM", "チェックしたステージが RANDOM で選ばれます"));
+            SetNote(PoolNote);
         }
 
-        // RANDOM STAGES: 番号 index のチェックを付け外しする（最後の 1 つは外せない）。
+        private static string PoolNote => Loc.T("CHOOSE THE STAGES RANDOM CAN PICK", "RANDOM で選ばれるステージを選んでください");
+
+        // RANDOM STAGES: 番号 index のチェックを付け外しする（0 個にしてもよいが、そのままでは閉じられない）。
         private void TogglePool(int index)
         {
             StageDefinition stage = _stages[index];
-            bool included = RandomStagePool.IsIncluded(stage);
-            if (included && RandomStagePool.Indices(_stages.Length, RandomStagePool.Mask(_stages)).Count <= 1)
+            RandomStagePool.SetIncluded(stage, !RandomStagePool.IsIncluded(stage));
+            SetNote(PoolNote);
+            RefreshChecks();
+        }
+
+        // RANDOM STAGES: すべてにチェックを付ける・すべて外す。
+        private void SetAllPool(bool on)
+        {
+            if (!PoolMode)
             {
-                SetNote(Loc.T("AT LEAST ONE STAGE MUST STAY CHECKED", "1 つ以上のステージにチェックが必要です"));
                 return;
             }
-            RandomStagePool.SetIncluded(stage, !included);
-            SetNote(Loc.T("CHECKED STAGES CAN BE PICKED BY RANDOM", "チェックしたステージが RANDOM で選ばれます"));
+            foreach (StageDefinition stage in _stages)
+            {
+                RandomStagePool.SetIncluded(stage, on);
+            }
+            SetNote(PoolNote);
             RefreshChecks();
+        }
+
+        // RANDOM STAGES を閉じる（チェックが 0 個なら閉じずに案内を出す）。
+        private void ClosePool()
+        {
+            for (int i = 0; i < _stages.Length; i++)
+            {
+                if (RandomStagePool.IsIncluded(_stages[i]))
+                {
+                    PoolClosed?.Invoke();
+                    return;
+                }
+            }
+            SetNote(Loc.T("CHECK AT LEAST ONE STAGE", "1つ以上のステージにチェックを付けてください"));
+        }
+
+        // 札の並び: ステージの札（2 列）→ RANDOM（ステージ選択）。RANDOM STAGES では、いちばん上に CHECK ALL ／ UNCHECK ALL。
+        private void Layout()
+        {
+            if (_content == null)
+            {
+                return;
+            }
+            float y = 0f;
+            bool pool = PoolMode;
+            foreach (MenuOption extra in new[] { _checkAll, _uncheckAll, _done })
+            {
+                if (extra != null)
+                {
+                    extra.gameObject.SetActive(pool);
+                }
+            }
+            if (_random != null)
+            {
+                _random.gameObject.SetActive(!pool);
+            }
+            if (pool && _checkAll != null && _uncheckAll != null)
+            {
+                _checkAll.SetLabel(Loc.T("CHECK ALL", "すべてチェック"));
+                _uncheckAll.SetLabel(Loc.T("UNCHECK ALL", "すべて外す"));
+                _checkAll.SetHome(new Vector2(PlateLeft, y));
+                _uncheckAll.SetHome(new Vector2(PlateLeft + ColumnStep, y));
+                y -= RowStep + SectionGap;
+            }
+            int count = _options.Length + (!pool && _random != null ? 1 : 0);
+            for (int k = 0; k < count; k++)
+            {
+                MenuOption option = k < _options.Length ? _options[k] : _random;
+                option.SetHome(new Vector2(PlateLeft + (k % Columns) * ColumnStep, y - (k / Columns) * RowStep));
+            }
+            y -= (count + Columns - 1) / Columns * RowStep;
+            _content.sizeDelta = new Vector2(_content.sizeDelta.x, -y + 12f);
+            _content.anchoredPosition = new Vector2(_content.anchoredPosition.x, 0f);
         }
 
         private void RefreshChecks()
@@ -282,6 +395,7 @@ namespace Airerage.Runtime.UI
             {
                 _random.gameObject.SetActive(true);
             }
+            Layout();
             RefreshChecks();
             _remoteIndex = -1;
             _selectIndex = Mathf.Clamp(index, 0, Mathf.Max(0, _stages.Length - 1));

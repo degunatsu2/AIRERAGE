@@ -311,7 +311,6 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateBank(BankSpots, runner, audio, guides);
             SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
             SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
-            SandboxWireSceneBuilder.CreateVersionLabel();
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
 
             SandboxWireSceneBuilder.EnsureFolder(Path.GetDirectoryName(ScenePath));

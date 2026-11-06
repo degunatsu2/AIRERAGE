@@ -135,7 +135,8 @@ namespace Airerage.PlayMode.Tests
                 StageSelectScreen stages = menu.StageSelect;
                 Assert.That(stages.Count, Is.EqualTo(flow.Stages.Count));
                 Assert.That(stages.ShownName, Is.EqualTo(flow.Stages.Get(0).DisplayName));
-                stages.Option(0).OnCancel(null);
+                // 本当の Esc で戻る（ユーザーの指摘、2026-11-06: ステージ選択で Esc が効かない）。
+                yield return Tap(keyboard, Key.Escape);
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "ステージ選択から戻れない");

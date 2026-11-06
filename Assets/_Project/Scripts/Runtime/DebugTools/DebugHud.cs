@@ -20,7 +20,7 @@ namespace Airerage.Runtime.DebugTools
         private const float RowHeight = 38f;
         private const float Padding = 14f;
         private const float HintHeight = 24f;
-        // 画面の右下からの余白（下は、版の表示 VersionLabel の上）。
+        // 画面の右下からの余白。
         private const float RightMargin = 16f;
         private const float BottomMargin = 30f;
 

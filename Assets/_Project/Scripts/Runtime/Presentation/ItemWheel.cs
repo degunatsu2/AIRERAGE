@@ -11,8 +11,10 @@ namespace Airerage.Runtime.Presentation
     /// docs/20_item_plan.md）。SkillHud が持ち、SkillHudFront（ほかの表示より前）で描く。
     /// - 押すとフェードインし、何も選ばずに離すとそのまま全体がフェードアウトする。
     /// - 十字キーで使える枠を選ぶと、ほかの枠は即座に消え、選んだアイテムが光って上昇しながらフェードアウトする（捨てる操作なら下へ落ちる）。
-    /// - 空の枠・パッシブアイテム・クールタイム中のアイテム【仮】を選ぶと、その枠に赤いバツ印が付いてバッグ全体が震える。空の枠で足もとの
+    /// - 空の枠・パッシブアイテム・クールタイム中のアイテムを選ぶと、その枠に赤いバツ印が付いてバッグ全体が震える。空の枠で足もとの
     ///   アイテムを拾ったとき（少し後に拾った数が増える）は、拾ったアイテムが光って上昇する。
+    /// - 捨てるボタン（A）も押している間は、バッグの左にゴミ箱の印を出す（捨てる入力だと分かるように。2026-11-06）。
+    /// - 枠の上の三角は、その枠の十字キーの向き（左・上・右）を指す。
     /// 状態を読むだけで、書き換えない。
     /// </summary>
     public sealed class ItemWheel
@@ -42,6 +44,7 @@ namespace Airerage.Runtime.Presentation
         private int _character = -1;
         private int _choicesSeen;
         private bool _held;
+        private bool _dropHeld;
         private float _alpha;
         private Choice _choice;
         private int _slot;
@@ -55,6 +58,9 @@ namespace Airerage.Runtime.Presentation
         /// <summary>選んだ回数と、赤いバツ印を出した回数（テスト用）。</summary>
         public int ConfirmCount { get; private set; }
         public int DenyCount { get; private set; }
+
+        /// <summary>ゴミ箱の印を出しているか（テスト用）。</summary>
+        public bool TrashShown => _dropHeld && Shown;
 
         /// <summary>バッグを出しているか（テスト用）。</summary>
         public bool Shown => _alpha > 0.01f || _choice == Choice.Confirm;
@@ -73,6 +79,7 @@ namespace Airerage.Runtime.Presentation
             if (index < 0 || !(feed is ILocalItemMenu source) || !source.TryGetItemMenu(index, out LocalItemMenu menu))
             {
                 _held = false;
+                _dropHeld = false;
                 _character = -1;
                 Fade(false);
                 return;
@@ -85,6 +92,7 @@ namespace Airerage.Runtime.Presentation
                 _choice = Choice.None;
             }
             _held = menu.Held;
+            _dropHeld = menu.Held && menu.DropHeld;
             if (menu.Choices != _choicesSeen)
             {
                 _choicesSeen = menu.Choices;
@@ -232,6 +240,10 @@ namespace Airerage.Runtime.Presentation
             GUI.DrawTexture(new Rect(x - 6f, y - 6f, width + 12f, CellSize + 12f), Texture2D.whiteTexture);
             GUI.color = new Color(0.35f, 0.85f, 1f, a);
             GUI.DrawTexture(new Rect(x - 6f, y + CellSize + 4f, width + 12f, 2f), Texture2D.whiteTexture);
+            if (_dropHeld)
+            {
+                DrawTrash(new Rect(x - 12f - CellSize * 0.8f, y + CellSize * 0.1f, CellSize * 0.8f, CellSize * 0.8f), a);
+            }
             for (int i = 0; i < ItemCatalog.BagSlots; i++)
             {
                 var cell = new Rect(x + i * (CellSize + CellGap), y, CellSize, CellSize);
@@ -281,26 +293,52 @@ namespace Airerage.Runtime.Presentation
             GUI.Label(cell, text, _seconds);
         }
 
-        // 枠 slot に対応する十字キーの向き（0 左・1 上・2 右）の三角（線を重ねて描く）。
+        // 枠 slot に対応する十字キーの向き（0 左 ◁・1 上 △・2 右 ▷）の三角（細い線を重ねて描く。先が細い）。
         private static void DrawArrow(Vector2 center, int slot, float alpha)
         {
             GUI.color = new Color(1f, 1f, 1f, 0.75f * alpha);
             for (int k = 0; k < 4; k++)
             {
+                // k = 0 が三角の底（いちばん長い）、k = 3 が先。
                 float length = 8f - k * 2f;
                 switch (slot)
                 {
                     case 0:
-                        GUI.DrawTexture(new Rect(center.x - 4f + k * 2f, center.y - length * 0.5f, 2f, length), Texture2D.whiteTexture);
+                        GUI.DrawTexture(new Rect(center.x + 2f - k * 2f, center.y - length * 0.5f, 2f, length), Texture2D.whiteTexture);
                         break;
                     case 2:
-                        GUI.DrawTexture(new Rect(center.x + 4f - k * 2f - 2f, center.y - length * 0.5f, 2f, length), Texture2D.whiteTexture);
+                        GUI.DrawTexture(new Rect(center.x - 4f + k * 2f, center.y - length * 0.5f, 2f, length), Texture2D.whiteTexture);
                         break;
                     default:
-                        GUI.DrawTexture(new Rect(center.x - length * 0.5f, center.y - 4f + k * 2f, length, 2f), Texture2D.whiteTexture);
+                        GUI.DrawTexture(new Rect(center.x - length * 0.5f, center.y + 2f - k * 2f, length, 2f), Texture2D.whiteTexture);
                         break;
                 }
             }
+        }
+
+        // ゴミ箱の印（ふたと持ち手、縦の筋の入った箱。赤い丸の上に白で描く）。
+        private static void DrawTrash(Rect area, float alpha)
+        {
+            Color previous = GUI.color;
+            GUI.color = new Color(0.85f, 0.15f, 0.12f, 0.9f * alpha);
+            GUI.DrawTexture(new Rect(area.x - 4f, area.y - 4f, area.width + 8f, area.height + 8f), Texture2D.whiteTexture);
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            float w = area.width;
+            float h = area.height;
+            // 持ち手とふた。
+            GUI.DrawTexture(new Rect(area.x + w * 0.38f, area.y + h * 0.04f, w * 0.24f, h * 0.08f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(area.x + w * 0.12f, area.y + h * 0.14f, w * 0.76f, h * 0.1f), Texture2D.whiteTexture);
+            // 箱（縁と縦の筋）。
+            var box = new Rect(area.x + w * 0.2f, area.y + h * 0.3f, w * 0.6f, h * 0.64f);
+            GUI.DrawTexture(new Rect(box.x, box.y, box.width, 3f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(box.x, box.yMax - 3f, box.width, 3f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(box.x, box.y, 3f, box.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(box.xMax - 3f, box.y, 3f, box.height), Texture2D.whiteTexture);
+            for (int i = 1; i <= 2; i++)
+            {
+                GUI.DrawTexture(new Rect(box.x + box.width * i / 3f - 1f, box.y + 5f, 2f, box.height - 10f), Texture2D.whiteTexture);
+            }
+            GUI.color = previous;
         }
 
         // 赤いバツ印（2 本の斜めの太い線）。

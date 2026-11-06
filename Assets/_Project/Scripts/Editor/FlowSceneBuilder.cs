@@ -347,8 +347,7 @@ namespace Airerage.Editor
                 items[i] = MenuUiBuilder.CreateMenuItem(main, labels[i].Replace(" ", string.Empty), labels[i], anchor,
                     new Vector2(110f, -230f - i * 88f), size);
             }
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(main, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
-                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f)), "上下: 選ぶ　　Enter ／ A: 決定　　Esc ／ B: 戻る");
+            MenuUiBuilder.CreateHint(main, "↑↓: select     Enter / A: OK     Esc / B: back", "↑↓:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
             main.gameObject.SetActive(false);
 
             CharacterSelectScreen characterSelect = CharacterSelectUiBuilder.Create(canvas.transform);
@@ -377,7 +376,6 @@ namespace Airerage.Editor
             {
                 SandboxWireSceneBuilder.SetReference(screens, fields[i], items[i]);
             }
-            SandboxWireSceneBuilder.CreateVersionLabel();
             Save(scene, MenuScenePath);
         }
 
@@ -397,8 +395,7 @@ namespace Airerage.Editor
             }
             MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Description", "YOU + 3 CPUs.  The CPUs pick random characters.", 30, FontStyle.Bold,
                 TextAnchor.MiddleLeft, new Vector2(1f, 0.6f), new Vector2(-80f, 0f), new Vector2(900f, 60f), new Color(1f, 1f, 1f, 0.85f)), "自分と CPU 3 体で対戦します。CPU のキャラクターはランダムです。");
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Enter / A: OK     Esc / B: back", 22, FontStyle.Bold,
-                TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f)), "上下: 選ぶ　　Enter ／ A: 決定　　Esc ／ B: 戻る");
+            MenuUiBuilder.CreateHint(panel, "↑↓: select     Enter / A: OK     Esc / B: back", "↑↓:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
             var screen = panel.gameObject.AddComponent<CpuLevelScreen>();
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
             panel.gameObject.SetActive(false);
@@ -414,6 +411,15 @@ namespace Airerage.Editor
             MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.49f, 1f));
             MenuUiBuilder.CreateText(panel, "Title", "STAGE SELECT", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
+            // 札はスクロールの中身に入れる（並びは実行中に StageSelectScreen.Layout が決める。カーソルの札が見える所まで動く。2026-11-06）。
+            var scrollPosition = new Vector2(86f, -176f);
+            var scrollSize = new Vector2(900f, 690f);
+            RectTransform content = OnlineMenuUiBuilder.CreateScrollArea(panel, scrollPosition, scrollSize, out UnityEngine.UI.ScrollRect scroll);
+            scroll.name = "StageScroll";
+            scroll.gameObject.AddComponent<ScrollToSelection>();
+            // RANDOM STAGES の、すべてにチェック ／ すべて外す（いちばん上）と DONE（スクロールの下）。
+            MenuOption checkAll = CreateStagePlate(content, "CheckAll", "CHECK ALL");
+            MenuOption uncheckAll = CreateStagePlate(content, "UncheckAll", "UNCHECK ALL");
             var options = new Object[catalog.Count];
             var stages = new Object[catalog.Count];
             var checkBoxes = new Object[catalog.Count];
@@ -422,14 +428,18 @@ namespace Airerage.Editor
             {
                 StageDefinition stage = catalog.Get(i);
                 stages[i] = stage;
-                MenuOption option = CreateStagePlate(panel, $"Stage{i + 1}", stage.DisplayName, i);
+                MenuOption option = CreateStagePlate(content, $"Stage{i + 1}", stage.DisplayName);
                 options[i] = option;
                 CreateStageCheck(option.transform, out GameObject box, out GameObject mark);
+                // 選んで札が右へ動いても、チェックの箱は動かさない（押しやすいように）。
+                option.SetPinned((RectTransform)box.transform);
                 checkBoxes[i] = box;
                 checkMarks[i] = mark;
             }
             // 最後に RANDOM（ユーザーの要望、2026-10-19）。
-            MenuOption random = CreateStagePlate(panel, "Random", "RANDOM", catalog.Count);
+            MenuOption random = CreateStagePlate(content, "Random", "RANDOM");
+            MenuOption done = CreateStagePlate(panel, "Done", "DONE");
+            ((RectTransform)done.transform).anchoredPosition = new Vector2(150f, scrollPosition.y - scrollSize.y - 16f);
             UnityEngine.UI.Image band = MenuUiBuilder.CreateFill(panel, "Band", new Color(0.35f, 0.85f, 1f, 0.35f),
                 new Vector2(0.45f, 0.55f), new Vector2(1f, 0.75f));
             // 名前と説明は右の帯の側に、右の端から置く（左の札と重ならないように。説明は折り返す）。
@@ -442,11 +452,11 @@ namespace Airerage.Editor
             description.font = GameFonts.JapaneseBold;
             // 句読点を行の頭に置かずに折り返す（枠の幅が変わったら入れ直す）。
             description.gameObject.AddComponent<LineBreakText>();
-            UnityEngine.UI.Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(1f, 0.5f), new Vector2(-80f, -220f), new Vector2(900f, 50f), MenuUiBuilder.Accent);
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down / Left / Right: select     Enter / A: OK     Esc / B: back", 22,
-                FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(900f, 40f), new Color(1f, 1f, 1f, 0.7f)),
-                "上下左右: 選ぶ　　Enter ／ A: 決定　　Esc ／ B: 戻る");
+            // 案内は、見出しとスクロールの上の端の間（アイテムを選ぶ画面と同じ。2026-11-06）。
+            UnityEngine.UI.Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+                new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent);
+            note.font = GameFonts.JapaneseBold;
+            MenuUiBuilder.CreateHint(panel, "↑↓←→: select     Enter / A: OK     Esc / B: back", "↑↓←→:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
 
             var screen = panel.gameObject.AddComponent<StageSelectScreen>();
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
@@ -456,18 +466,20 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_band", band);
             SandboxWireSceneBuilder.SetReference(screen, "_note", note);
             SandboxWireSceneBuilder.SetReference(screen, "_random", random);
+            SandboxWireSceneBuilder.SetReference(screen, "_content", content);
+            SandboxWireSceneBuilder.SetReference(screen, "_checkAll", checkAll);
+            SandboxWireSceneBuilder.SetReference(screen, "_uncheckAll", uncheckAll);
+            SandboxWireSceneBuilder.SetReference(screen, "_done", done);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_checkBoxes", checkBoxes);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_checkMarks", checkMarks);
             panel.gameObject.SetActive(false);
             return screen;
         }
 
-        // ステージの札（2 列。番号の順に左の列から右の列へ、上から下へ）。上下左右の移動は、並びから決める（Automatic）。
-        private static MenuOption CreateStagePlate(RectTransform panel, string name, string label, int index)
+        // ステージの札（2 列。位置は実行中に StageSelectScreen.Layout が決める）。上下左右の移動は、並びから決める（Automatic）。
+        private static MenuOption CreateStagePlate(RectTransform parent, string name, string label)
         {
-            const int columns = 2;
-            var position = new Vector2(130f + (index % columns) * 430f, -200f - (index / columns) * 76f);
-            MenuOption option = MenuUiBuilder.CreateMenuItem(panel, name, label, new Vector2(0f, 1f), position, new Vector2(360f, 64f));
+            MenuOption option = MenuUiBuilder.CreateMenuItem(parent, name, label, new Vector2(0f, 1f), Vector2.zero, new Vector2(360f, 64f));
             option.LabelText.fontSize = 28;
             UnityEngine.UI.Button button = option.Button;
             button.navigation = new UnityEngine.UI.Navigation { mode = UnityEngine.UI.Navigation.Mode.Automatic };
@@ -503,7 +515,11 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(flow, "_stages", catalog);
             var events = new GameObject("EventSystem");
             events.AddComponent<EventSystem>();
-            events.AddComponent<InputSystemUIInputModule>().AssignDefaultActions();
+            var module = events.AddComponent<InputSystemUIInputModule>();
+            module.AssignDefaultActions();
+            // 背景を押しても選んでいる項目を外さない（外れると Esc ／ B の「戻る」が効かない。2026-11-06）。外れたときは選び直す。
+            module.deselectOnBackgroundClick = false;
+            events.AddComponent<SelectionKeeper>();
             // メニューの効果音（決定した直後に画面のシーンを外しても途切れないよう、いつも読み込むシーンに置く）。
             // タイトルとキャラクターの決定は音声ファイル（docs/18 4.3）。
             var sounds = new GameObject("UiSounds").AddComponent<UiSounds>();

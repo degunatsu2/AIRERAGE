@@ -28,6 +28,9 @@ namespace Airerage.Editor
         private const float ControlStep = 44f;
         private const float ControlHeight = 40f;
 
+        // CONTROLS の行を入れるスクロールの高さ（見出しの下から BACK の上まで）。
+        private const float ControlsViewHeight = 548f;
+
         private static readonly string[] ItemLabels = { "ITEM MODE", "START ITEM COUNT", "DROP RATE" };
 
         public static OptionsScreen Create(Transform canvas, InputActionAsset inputActions)
@@ -60,8 +63,14 @@ namespace Airerage.Editor
             MenuOption resetGeneral = MenuUiBuilder.CreateMenuItem(general, "ResetGeneral", "RESET TO DEFAULT", anchor,
                 new Vector2(Left, -235f - (GeneralLabels.Length + 1) * GeneralStep - 8f), new Vector2(Width, RowHeight));
 
-            // CONTROLS: 見出し（キーボード・ゲームパッド）、操作ごとの名前と 2 つの札、元に戻す項目。
+            // CONTROLS: 見出し（キーボード・ゲームパッド）、操作ごとの名前と 2 つの札、元に戻す項目。行と元に戻す項目はスクロールの中
+            // （画面に収まらない分はスクロールで見る。選んだ行が見える所まで動く。BACK と重ならないように。2026-11-06）。
             RectTransform controls = MenuUiBuilder.CreateFull(panel, "Controls");
+            var scrollOrigin = new Vector2(Left - 30f, -244f);
+            RectTransform controlRows = OnlineMenuUiBuilder.CreateScrollArea(controls, scrollOrigin, new Vector2(Width + 70f, ControlsViewHeight),
+                out ScrollRect controlScroll);
+            controlScroll.name = "ControlScroll";
+            controlScroll.gameObject.AddComponent<ScrollToSelection>();
             const float keyX = Left + 330f;
             const float padX = Left + 700f;
             MenuUiBuilder.CreateText(controls, "KeyboardHeader", "KEYBOARD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
@@ -73,13 +82,14 @@ namespace Airerage.Editor
             var padCells = new Object[actions];
             for (int i = 0; i < actions; i++)
             {
-                float y = -258f - i * ControlStep;
-                MenuUiBuilder.CreateText(controls, $"{BindingSettings.Actions[i]}Label", BindingSettings.Labels[i], 26, FontStyle.BoldAndItalic,
-                    TextAnchor.MiddleLeft, anchor, new Vector2(Left + 20f, y), new Vector2(300f, ControlHeight), Color.white);
-                MenuOption key = MenuUiBuilder.CreateMenuItem(controls, $"{BindingSettings.Actions[i]}Key", "-", anchor, new Vector2(keyX, y),
-                    new Vector2(340f, ControlHeight));
-                MenuOption pad = MenuUiBuilder.CreateMenuItem(controls, $"{BindingSettings.Actions[i]}Pad", "-", anchor, new Vector2(padX, y),
-                    new Vector2(280f, ControlHeight));
+                // スクロールの中身の座標（左上から）。
+                float y = -14f - i * ControlStep;
+                MenuUiBuilder.CreateText(controlRows, $"{BindingSettings.Actions[i]}Label", BindingSettings.Labels[i], 26, FontStyle.BoldAndItalic,
+                    TextAnchor.MiddleLeft, anchor, new Vector2(Left + 20f - scrollOrigin.x, y), new Vector2(300f, ControlHeight), Color.white);
+                MenuOption key = MenuUiBuilder.CreateMenuItem(controlRows, $"{BindingSettings.Actions[i]}Key", "-", anchor,
+                    new Vector2(keyX - scrollOrigin.x, y), new Vector2(340f, ControlHeight));
+                MenuOption pad = MenuUiBuilder.CreateMenuItem(controlRows, $"{BindingSettings.Actions[i]}Pad", "-", anchor,
+                    new Vector2(padX - scrollOrigin.x, y), new Vector2(280f, ControlHeight));
                 key.LabelText.fontSize = 26;
                 pad.LabelText.fontSize = 26;
                 key.SetSelectedShift(new Vector2(0f, 3f));
@@ -87,8 +97,9 @@ namespace Airerage.Editor
                 keyCells[i] = key;
                 padCells[i] = pad;
             }
-            MenuOption resetControls = MenuUiBuilder.CreateMenuItem(controls, "ResetControls", "RESET CONTROLS", anchor,
-                new Vector2(Left, -258f - actions * ControlStep - 6f), new Vector2(Width, 52f));
+            MenuOption resetControls = MenuUiBuilder.CreateMenuItem(controlRows, "ResetControls", "RESET CONTROLS", anchor,
+                new Vector2(Left - scrollOrigin.x, -14f - actions * ControlStep - 6f), new Vector2(Width, 52f));
+            controlRows.sizeDelta = new Vector2(controlRows.sizeDelta.x, 14f + actions * ControlStep + 6f + 52f + 16f);
             controls.gameObject.SetActive(false);
 
             // ITEMS: アイテムのモード・初期アイテム数・ドロップ頻度と、初期アイテム・ドロップするアイテムを選ぶ画面へ（ユーザーの要望、2026-11-05）。
@@ -107,21 +118,12 @@ namespace Airerage.Editor
                 new Vector2(Left, -235f - ItemLabels.Length * GeneralStep - 8f), new Vector2(Width, RowHeight));
             MenuOption dropItems = MenuUiBuilder.CreateMenuItem(itemsPage, "DropItems", "DROP ITEMS", anchor,
                 new Vector2(Left, -235f - (ItemLabels.Length + 1) * GeneralStep - 8f), new Vector2(Width, RowHeight));
-            Text itemNote = MenuUiBuilder.Localize(MenuUiBuilder.CreateText(itemsPage, "ItemNote",
-                "Rules for LOCAL VS, SINGLE and TRAINING. START ITEMS and DROP ITEMS are also the defaults in the NETWORK VS waiting room.", 24,
-                FontStyle.Bold, TextAnchor.UpperLeft, anchor, new Vector2(Left + 20f, -235f - (ItemLabels.Length + 2) * GeneralStep - 24f),
-                new Vector2(Width - 40f, 90f), new Color(1f, 1f, 1f, 0.75f)),
-                "ローカル対戦・シングル・トレーニングのルールです。START ITEMS と DROP ITEMS は、ネットワーク対戦の待機所の初めの値にもなります。");
-            itemNote.horizontalOverflow = HorizontalWrapMode.Wrap;
-            itemNote.font = GameFonts.JapaneseBold;
             itemsPage.gameObject.SetActive(false);
 
             MenuOption back = MenuUiBuilder.CreateMenuItem(panel, "Back", "BACK", anchor, new Vector2(Left, -820f), new Vector2(Width, RowHeight));
             Text prompt = MenuUiBuilder.CreateText(panel, "Prompt", string.Empty, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
                 new Vector2(0f, 0f), new Vector2(90f, 125f), new Vector2(1100f, 44f), MenuUiBuilder.Accent);
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Hint", "Up / Down: select     Left / Right: change     Enter / A: OK     Esc / B: back", 22,
-                FontStyle.Bold, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(90f, 50f), new Vector2(1200f, 40f), new Color(1f, 1f, 1f, 0.7f)),
-                "上下: 選ぶ　　左右: 変える　　Enter ／ A: 決定　　Esc ／ B: 戻る");
+            MenuUiBuilder.CreateHint(panel, "↑↓: select     ←→: change     Enter / A: OK     Esc / B: back", "↑↓:選択　←→:変更　　Enter ／ A: 決定　　Esc ／ B: 戻る");
 
             var screen = panel.gameObject.AddComponent<OptionsScreen>();
             SandboxWireSceneBuilder.SetReference(screen, "_inputActions", inputActions);

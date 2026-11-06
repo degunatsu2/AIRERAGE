@@ -14,7 +14,7 @@ namespace Airerage.PlayMode.Tests
 {
     /// <summary>
     /// オプションの RANDOM STAGES（ユーザーの要望、2026-10-26）: ステージ選択と同じ画面が出て、札の左端のチェックを付け外しする。
-    /// チェックを外したステージは、ステージ選択の RANDOM で選ばれない。最後の 1 つは外せない。戻るとオプションへ。
+    /// チェックを外したステージは、ステージ選択の RANDOM で選ばれない。0 個の間は閉じられない。DONE か戻るでオプションへ。
     /// </summary>
     public sealed class RandomStagePoolTests
     {
@@ -68,7 +68,21 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(stages.CheckShown(i), Is.True, $"初めは {i} 番にチェックが付いていない");
             }
 
-            // 2 番だけを残して外す（最後の 1 つは外せない）。
+            // すべて外す・すべてチェック・DONE（2026-11-06）。0 個の間は閉じられない。
+            Assert.That(stages.DoneOption.gameObject.activeSelf && stages.CheckAllOption.gameObject.activeSelf, Is.True,
+                "RANDOM STAGES に DONE とすべてチェックの札がない");
+            stages.UncheckAllOption.Button.onClick.Invoke();
+            for (int i = 0; i < stages.Count; i++)
+            {
+                Assert.That(stages.CheckShown(i), Is.False, $"すべて外すで {i} 番が外れない");
+            }
+            stages.DoneOption.Button.onClick.Invoke();
+            yield return null;
+            Assert.That(menu.ShowingOptions, Is.False, "チェックが 0 個なのに閉じた");
+            stages.CheckAllOption.Button.onClick.Invoke();
+            Assert.That(stages.CheckShown(0) && stages.CheckShown(stages.Count - 1), Is.True, "すべてチェックで付かない");
+
+            // 2 番だけを残して外す。
             const int kept = 2;
             for (int i = 0; i < stages.Count; i++)
             {
@@ -78,14 +92,13 @@ namespace Airerage.PlayMode.Tests
                     Assert.That(stages.CheckShown(i), Is.False, $"{i} 番のチェックが外れない");
                 }
             }
-            stages.Option(kept).Button.onClick.Invoke();
-            Assert.That(stages.CheckShown(kept), Is.True, "最後の 1 つが外れた");
+            Assert.That(stages.CheckShown(kept), Is.True);
             Assert.That(menu.ShowingOptions, Is.False, "決定でオプションに戻った");
 
-            // 戻るとオプションの RANDOM STAGES へ。
-            stages.Option(kept).OnCancel(null);
+            // DONE でオプションの RANDOM STAGES へ。
+            stages.DoneOption.Button.onClick.Invoke();
             yield return null;
-            Assert.That(menu.ShowingOptions, Is.True, "戻るとオプションに戻らない");
+            Assert.That(menu.ShowingOptions, Is.True, "DONE でオプションに戻らない");
             Assert.That(stages.PoolMode, Is.False);
 
             // ステージ選択の RANDOM は、チェックの付いたステージだけから選ぶ。

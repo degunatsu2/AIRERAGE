@@ -76,6 +76,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(tick.IsHeld(item1), Is.True, "X + 左で 1 つ目の枠を押した入力にならない");
                 Assert.That(input.ItemMenuSlot, Is.EqualTo(0));
                 Assert.That(input.ItemMenuDrop, Is.False);
+                Assert.That(input.ItemMenuDropHeld, Is.False, "A を押していないのにゴミ箱の印を出す入力になった");
                 yield return null;
                 tick = Tick(input);
                 Assert.That(tick.IsHeld(item1), Is.False, "十字キーを押し続けると枠を押し続けた入力になる（押した瞬間に使わない）");
@@ -85,6 +86,7 @@ namespace Airerage.PlayMode.Tests
                 tick = Tick(input);
                 Assert.That(tick.IsHeld(InputButtons.Guard), Is.False, "X を押しているのに A でガードした");
                 Assert.That(tick.IsHeld(InputButtons.ItemDrop), Is.True, "X + A が捨てるキーにならない");
+                Assert.That(input.ItemMenuDropHeld, Is.True, "X + A でバッグの左にゴミ箱の印を出す入力にならない");
                 yield return Hold(gamepad, new GamepadState().WithButton(GamepadButton.West).WithButton(GamepadButton.South).WithButton(GamepadButton.DpadUp));
                 tick = Tick(input);
                 Assert.That(tick.IsHeld(item2) && tick.IsHeld(InputButtons.ItemDrop), Is.True, "X + A + 上で 2 つ目の枠を捨てる入力にならない");
@@ -96,6 +98,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(tick.IsHeld(InputButtons.Guard), Is.True, "X を離しても A でガードしない");
                 Assert.That(tick.IsHeld(InputButtons.ItemDrop), Is.False, "X を離しても A が捨てるキーのまま");
                 Assert.That(input.ItemMenuHeld, Is.False);
+                Assert.That(input.ItemMenuDropHeld, Is.False, "X を離してもゴミ箱の印を出す入力のまま");
             }
             finally
             {

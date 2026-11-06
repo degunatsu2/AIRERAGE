@@ -46,10 +46,7 @@ namespace Airerage.Editor
             Text connectMessage = MenuUiBuilder.CreateText(connect, "Message", string.Empty, 26, FontStyle.Bold, TextAnchor.UpperLeft,
                 top, new Vector2(110f, -690f), new Vector2(1500f, 120f), new Color(1f, 0.85f, 0.3f));
             connectMessage.horizontalOverflow = HorizontalWrapMode.Wrap;
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(connect, "Hint",
-                "HOST ONLINE: get a JOIN CODE and tell it to your friends.   JOIN WITH CODE: enter the host's code.   LAN: the host's ADDRESS and PORT.",
-                22, FontStyle.Bold, TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1750f, 40f), new Color(1f, 1f, 1f, 0.7f)),
-                "HOST ONLINE: 参加コードを受け取って友だちに伝える　　JOIN WITH CODE: ホストのコードを入れる　　LAN: ホストのアドレスとポートを入れる");
+            MenuUiBuilder.CreateHint(connect, "HOST ONLINE: get a JOIN CODE and tell it to your friends.   JOIN WITH CODE: enter the host's code.   LAN: the host's ADDRESS and PORT.", "HOST ONLINE: 参加コードを受け取って友だちに伝える　　JOIN WITH CODE: ホストのコードを入れる　　LAN: ホストのアドレスとポートを入れる");
             connect.gameObject.SetActive(false);
 
             // 待機所。
@@ -144,9 +141,7 @@ namespace Airerage.Editor
             MenuOption leave = WaitingItem(waiting, "Leave", "LEAVE", ref rowY, row);
             Text waitingMessage = MenuUiBuilder.CreateText(waiting, "Message", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 top, new Vector2(110f, -800f), new Vector2(1500f, 44f), Color.white);
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(waiting, "Hint", "Up / Down / Left / Right: select     Enter / A: OK     Esc / B: cancel ready, leave", 22, FontStyle.Bold,
-                TextAnchor.LowerLeft, Vector2.zero, new Vector2(90f, 50f), new Vector2(1400f, 40f), new Color(1f, 1f, 1f, 0.7f)),
-                "上下左右: 選ぶ　　Enter ／ A: 決定　　Esc ／ B: 準備完了の取り消し・退室");
+            MenuUiBuilder.CreateHint(waiting, "↑↓←→: select     Enter / A: OK     Esc / B: cancel ready, leave", "↑↓←→:選択　　Enter ／ A: 決定　　Esc ／ B: 準備完了の取り消し・退室");
             waiting.gameObject.SetActive(false);
 
             // 読み込み中。

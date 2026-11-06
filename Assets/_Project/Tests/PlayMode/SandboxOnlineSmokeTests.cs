@@ -122,9 +122,6 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(shown.ShowsFacingMarker, Is.True, "向きの印を見せていない");
                 Assert.That(shown.ShownFacing, Is.EqualTo(feed.GetState(0).Facing < 0 ? -1 : 1), "印の向きがキャラクターの向きと違う");
 
-                var version = Object.FindFirstObjectByType<Airerage.Runtime.DebugTools.VersionLabel>();
-                Assert.That(version, Is.Not.Null, "版の表示がない");
-                Assert.That(version.Text, Does.Contain("@"), "版（ブランチとコミット）を読めない");
             }
             finally
             {
