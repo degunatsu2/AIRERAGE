@@ -98,8 +98,12 @@ namespace Airerage.Core.Items
         /// <summary>フィールドに同時に落ちていられる数（これ以上は落ちてこない）【仮】。</summary>
         public int MaxFieldItems = 16;
 
-        /// <summary>捨てたアイテムが跳ねる速さ（m/s。上向き）と、捨てた人がもう一度拾えるまで（ティック）【仮】。</summary>
+        /// <summary>
+        /// 捨てたアイテムが跳ねる速さ（m/s。上向き）と、向いている方向へ飛び出る速さ（m/s。その場ではなく少し前に落ちる。ユーザーの要望、
+        /// 2026-11-06）、捨てた人がもう一度拾えるまで（ティック）【仮】。
+        /// </summary>
         public float DiscardPopSpeed = 6f;
+        public float DiscardForwardSpeed = 4f;
         public int DiscardPickupDelayTicks = 20;
 
         // ---------------------------------------------------------------- エネルギーショット
@@ -460,6 +464,7 @@ namespace Airerage.Core.Items
             v.Positive(nameof(DropMaxFallSpeed), DropMaxFallSpeed);
             v.Positive(nameof(MaxFieldItems), MaxFieldItems);
             v.NonNegative(nameof(DiscardPickupDelayTicks), DiscardPickupDelayTicks);
+            v.NonNegative(nameof(DiscardForwardSpeed), DiscardForwardSpeed);
             v.Positive(nameof(ShotCooldownTicks), ShotCooldownTicks);
             v.Positive(nameof(ShotSpeed), ShotSpeed);
             v.Positive(nameof(ShotRadius), ShotRadius);

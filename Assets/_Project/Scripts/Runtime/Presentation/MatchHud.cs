@@ -66,7 +66,6 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _plate;
         private GUIStyle _small;
         private PlayerStatusPlate _resultPlate;
-        private GUIStyle _rank;
         private GUIStyle _teamHeader;
         private GUIStyle _teamBank;
 
@@ -422,17 +421,17 @@ namespace Airerage.Runtime.Presentation
             GUI.matrix = baseMatrix;
         }
 
-        // 結果: 右上の表と同じ札（PlayerStatusPlate）を、大きくして順位の順に並べる。左に順位、首位に王冠。
+        // 結果: 右上の表と同じ札（PlayerStatusPlate）を、大きくして順位の順に並べる。順位は札の順位の四角（1 位 金・2 位 銀・3 位 銅）、
+        // 首位に王冠。数は短くせずに正確に書く。
         private void DrawResults()
         {
-            const int plateWidth = 440;
-            const int plateHeight = 64;
             const float rowGap = 10f;
             if (_resultPlate == null)
             {
-                _resultPlate = new PlayerStatusPlate(plateWidth, plateHeight, 1.3f);
-                _rank = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight });
+                _resultPlate = new PlayerStatusPlate(1.3f);
             }
+            int plateWidth = _resultPlate.Width;
+            int plateHeight = _resultPlate.Height;
             float width = 640f;
             bool buttons = _matchControls != null;
             CharacterState[] states = States();
@@ -463,14 +462,11 @@ namespace Airerage.Runtime.Presentation
                 }
                 lastTeam = team;
                 bool crown = ScoreboardHud.IsLeader(_feed, index);
-                if (!teams)
-                {
-                    Color rankColor = i == 0 ? new Color(1f, 0.85f, 0.3f) : Color.white;
-                    float rankRight = plateX - (crown ? _resultPlate.CrownWidth : 0f) - 8f;
-                    Shadowed(new Rect(rankRight - 60f, y, 60f, plateHeight), (i + 1).ToString(), _rank, rankColor);
-                }
-                _resultPlate.Draw(new Rect(plateX, y, plateWidth, plateHeight), index + 1, _feed.LabelOf(index), _feed.ColorOf(index),
-                    states[index], crown, default, new Color(1f, 0.85f, 0.2f), ScoreboardHud.LogoOf(_feed, index));
+                // 個人戦は並びの順（アディショナルタイムで決まった勝者が 1 位）、チーム対戦はチームの順位。
+                int rank = teams ? teamRank : i + 1;
+                bool scored = TeamRules.ScoreOf(states, index) > 0;
+                _resultPlate.Draw(new Rect(plateX, y, plateWidth, plateHeight), rank, scored, _feed.LabelOf(index), _feed.ColorOf(index),
+                    states[index], crown, default, new Color(1f, 0.85f, 0.2f), ScoreboardHud.LogoOf(_feed, index), abbreviate: false);
                 y += plateHeight + rowGap;
             }
             // 順位の決め方（確定コインの数。D-25）の説明の行は出さない（ユーザーの要望、2026-10-30）。

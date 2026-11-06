@@ -304,8 +304,8 @@ namespace Airerage.Core.Tests.Items
             world.SetItems(0, new[] { ItemId.DecoyDoll });
             Use(world, 0, new Vector2(1f, 0f));
             WorldObject doll = ObjectsOf(world, WorldObjectKind.Decoy)[0];
-            var states = new List<CharacterState> { world.GetState(0), world.GetState(1) };
-            Assert.That(ItemRules.HitDecoys(world.Objects, states, 1, 101, doll.Position, Vector2.One, new Vector2(-4f, 6f), 10, tuning), Is.True);
+            var strike = new AttackHit { Damage = 10, KnockbackX = 4f, KnockbackY = 6f };
+            Assert.That(ItemRules.HitDecoys(world.Objects, 101, doll.Position, Vector2.One, strike, -1, AttackPower.Normal), Is.True);
             Step(world, 6);
             WorldObject flying = ObjectsOf(world, WorldObjectKind.Decoy)[0];
             Assert.That(flying.ChargeMilli, Is.EqualTo(10), "威力を記録しない");
@@ -317,15 +317,41 @@ namespace Airerage.Core.Tests.Items
             CharacterState enemy = world.GetState(1);
             enemy.Position = new Vector3(now.Position.X + 2f, now.Position.Y, 0f);
             world.SetState(1, enemy);
-            states = new List<CharacterState> { world.GetState(0), world.GetState(1) };
-            ItemRules.HitDecoys(world.Objects, states, 1, 102, now.Position, Vector2.One, Vector2.Zero, 10, tuning);
-            ItemRules.HitDecoys(world.Objects, states, 1, 103, now.Position, Vector2.One, Vector2.Zero, 10, tuning);
+            var still = new AttackHit { Damage = 10 };
+            ItemRules.HitDecoys(world.Objects, 102, now.Position, Vector2.One, still, 1, AttackPower.Normal);
+            ItemRules.HitDecoys(world.Objects, 103, now.Position, Vector2.One, still, 1, AttackPower.Normal);
             List<HitRecord> hits = Step(world, 2);
             Assert.That(ObjectsOf(world, WorldObjectKind.Decoy).Any(d => !d.Ended), Is.False, "3 回で爆発しない");
             HitRecord blast = hits.FirstOrDefault(h => h.Attacker == 0 && h.Victim == 1);
             Assert.That(blast.Data, Is.Not.Null, "爆発が近くの相手に当たらない");
             Assert.That(blast.Data.Damage, Is.EqualTo(ItemRules.DecoyBlastDamage(30, tuning)), "爆発の威力が記録した威力の合計に応じない");
             Assert.That(ItemRules.DecoyBlastRadius(30, tuning), Is.GreaterThan(ItemRules.DecoyBlastRadius(5, tuning)), "記録が多いほど範囲が広くならない");
+        }
+
+        // 持ち主の攻撃と投射物も受けて記録する（ユーザーの指定、2026-11-06）。投射物は人形に当たって消える。
+        [Test]
+        public void Decoy_TakesTheOwnersOwnAttacksAndProjectiles()
+        {
+            var tuning = new ItemTuning();
+            SimWorld shot = World(PreItem(), new Vector3(0f, GroundY, 0f), new Vector3(30f, GroundY, 0f));
+            shot.SetItems(0, new[] { ItemId.DecoyDoll, ItemId.EnergyShot });
+            Use(shot, 0, new Vector2(1f, 0f));
+            Assert.That(ObjectsOf(shot, WorldObjectKind.Decoy).Length, Is.EqualTo(1), "前提: 人形を置いた");
+            Use(shot, 1, new Vector2(1f, 0f));
+            Step(shot, 20);
+            WorldObject doll = ObjectsOf(shot, WorldObjectKind.Decoy)[0];
+            Assert.That(doll.Damage, Is.EqualTo(1), "自分の投射物が人形に当たらない");
+            Assert.That(doll.ChargeMilli, Is.EqualTo(tuning.ShotHit.Damage), "自分の投射物の威力を記録しない");
+            Assert.That(ObjectsOf(shot, WorldObjectKind.ItemShot).Any(s => !s.Ended), Is.False, "投射物が人形に当たっても消えない");
+
+            SimWorld melee = World(PreItem(), new Vector3(0f, GroundY, 0f), new Vector3(30f, GroundY, 0f));
+            melee.SetItems(0, new[] { ItemId.DecoyDoll });
+            Use(melee, 0, new Vector2(1f, 0f));
+            Step(melee, 1, Keys(InputButtons.Attack));
+            Step(melee, 40);
+            WorldObject struck = ObjectsOf(melee, WorldObjectKind.Decoy)[0];
+            Assert.That(struck.Damage, Is.GreaterThanOrEqualTo(1), "自分の近接攻撃が人形に当たらない");
+            Assert.That(struck.ChargeMilli, Is.GreaterThan(0), "自分の近接攻撃の威力を記録しない");
         }
 
         [Test]

@@ -12,9 +12,10 @@ using UnityEngine;
 namespace Airerage.Runtime.Presentation
 {
     /// <summary>
-    /// 右上の全員の情報（ユーザーの要望、2026-10-14）。1 人 1 枚の札（PlayerStatusPlate）で、縁と斜めの線はプレイヤーの色。
-    /// 左にプレイヤーの色の四角と番号、キャラクターのロゴ（docs/13 T5-8）とプレイヤーネーム、右を 4 つに分けて BANK（確定コイン）/
-    /// COIN（所持コイン）/ K（撃破した数）/ F（撃破された数）。BANK の文字と数だけ黄色。
+    /// 右上の全員の情報（ユーザーの要望、2026-10-14）。1 人 1 枚の札（PlayerStatusPlate）で、縁はプレイヤーの色。2026-11-06 から 2 段の
+    /// 札（上の段に順位の四角・ロゴ・名前・アイテムバッグ、下の段に印つきの BANK（確定コイン）/ COIN（所持コイン）/ K（撃破した数）/
+    /// F（撃破された数）。案 A + C + F + B）。順位の四角は 1 位 金・2 位 銀・3 位 銅・4 位以下 鉄（チーム対戦はチームの順位）。
+    /// BANK が増えたら数を数え上げ、「+増えた数」を浮かべる。
     /// いつも今の順位（MatchResults.Rank。確定コインの順）に並べ、順位が変わると札が滑って入れ替わる。確定コインが最も多い人
     /// （1 枚以上）には、札の左に王冠をつける（同じ数なら全員）。
     /// 撃破されたら（復帰を待っている間）: 札がひび割れて揺れ、灰色に暗くなり、「RESPAWN n」（復帰までの秒）を出す。復帰したら、
@@ -34,8 +35,6 @@ namespace Airerage.Runtime.Presentation
     {
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
-        [SerializeField] private int _width = 300;
-        [SerializeField] private int _rowHeight = 52;
         [SerializeField] private float _rowGap = 6f;
         [Tooltip("チーム対戦のチームの見出しの高さ（画面の点）")]
         [SerializeField] private float _teamHeaderHeight = 24f;
@@ -65,6 +64,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _emphasisSeconds = 1f;
         [Tooltip("赤い強調と「WANTED!」のスタンプが薄くなって消える秒数")]
         [SerializeField] private float _emphasisFadeSeconds = 0.5f;
+        [Tooltip("BANK が増えたときに数え上げる秒数")]
+        [SerializeField] private float _countSeconds = 0.6f;
+        [Tooltip("BANK が増えたときの「+増えた数」が浮かんで消える秒数")]
+        [SerializeField] private float _gainSeconds = 1.6f;
 
         private readonly List<float> _rowY = new List<float>();
         // チームの見出し（チームの番号 1〜4 ごと）の今の位置（-1 なら出していない）と、出す見出し（上から、チームの番号）。
@@ -74,8 +77,15 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _headerBank;
         private ISimulationFeed _feed;
         private PlayerStatusPlate _plate;
-        private int _plateWidth;
         private int[] _order = new int[0];
+        private int[] _ranks = new int[0];
+        private bool[] _scored = new bool[0];
+        // BANK の数え上げ: 数え始めた数、目標（今の確定コイン）、数え始めた時刻、増えた数と増えた時刻。
+        private float[] _bankFrom = new float[0];
+        private int[] _bankTarget = new int[0];
+        private float[] _bankAt = new float[0];
+        private int[] _gain = new int[0];
+        private float[] _gainAt = new float[0];
         private bool[] _waiting = new bool[0];
         private float[] _fellAt = new float[0];
         private float[] _backAt = new float[0];
@@ -108,6 +118,12 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>チームの見出し（上から、チームの番号。個人戦なら空。テスト用）。</summary>
         public IReadOnlyList<int> TeamHeaders => _headers;
+
+        /// <summary>キャラクター index の札の順位の四角に書く順位（1 から。テスト用）。</summary>
+        public int RankOf(int index)
+        {
+            return index >= 0 && index < _ranks.Length ? _ranks[index] : 0;
+        }
 
         /// <summary>今の並び（上から、キャラクターの番号）と、王冠をつけている人の数（テスト用）。</summary>
         public IReadOnlyList<int> Order => _order;
@@ -180,6 +196,8 @@ namespace Airerage.Runtime.Presentation
                 states[i] = _feed.GetState(i);
             }
             _order = MatchResults.Rank(states, _feed.Match.Winner);
+            RankAll(states);
+            TrackBank(states);
             TrackFalls(states);
             TrackJackpot(states);
             TrackWanted(states);
@@ -207,7 +225,7 @@ namespace Airerage.Runtime.Presentation
                 }
                 lastTeam = team;
                 _rowY[index] = _rowY[index] < 0f ? y : Mathf.Lerp(_rowY[index], y, blend);
-                y += _rowHeight + _rowGap;
+                y += PlayerStatusPlate.BaseHeight + _rowGap;
                 crowns += IsLeader(_feed, index) ? 1 : 0;
             }
             for (int t = 0; t < _headerY.Length; t++)
@@ -219,6 +237,103 @@ namespace Airerage.Runtime.Presentation
             }
             CrownCount = crowns;
         }
+
+        /// <summary>
+        /// 順位の四角に書く順位: 確定コイン（チーム対戦はチームの合計。TeamRules.ScoreOf）が自分より多い人（チーム対戦はチーム）の数 + 1。
+        /// 同じ数なら同じ順位。結果の画面でも使う。
+        /// </summary>
+        public static int RankOf(CharacterState[] states, int index)
+        {
+            int mine = TeamRules.ScoreOf(states, index);
+            int higher = 0;
+            for (int i = 0; i < states.Length; i++)
+            {
+                if (TeamRules.ScoreOf(states, i) <= mine)
+                {
+                    continue;
+                }
+                // チーム対戦は、同じチームの人を 1 つに数える（前の番号に同じチームの人がいれば数えない）。
+                int team = states[i].Combat.Team;
+                bool counted = false;
+                for (int j = 0; j < i && team > 0 && !counted; j++)
+                {
+                    counted = states[j].Combat.Team == team;
+                }
+                higher += counted ? 0 : 1;
+            }
+            return higher + 1;
+        }
+
+        private void RankAll(CharacterState[] states)
+        {
+            if (_ranks.Length != states.Length)
+            {
+                _ranks = new int[states.Length];
+                _scored = new bool[states.Length];
+            }
+            for (int i = 0; i < states.Length; i++)
+            {
+                _ranks[i] = RankOf(states, i);
+                _scored[i] = TeamRules.ScoreOf(states, i) > 0;
+            }
+        }
+
+        // BANK が増えたら、今出している数から新しい数へ数え上げ、「+増えた数」を浮かべる（減ったときはすぐに合わせる）。
+        private void TrackBank(CharacterState[] states)
+        {
+            float now = Time.time;
+            if (_bankTarget.Length != states.Length)
+            {
+                _bankFrom = new float[states.Length];
+                _bankTarget = new int[states.Length];
+                _bankAt = new float[states.Length];
+                _gain = new int[states.Length];
+                _gainAt = new float[states.Length];
+                for (int i = 0; i < states.Length; i++)
+                {
+                    _bankFrom[i] = states[i].Coins.Banked;
+                    _bankTarget[i] = states[i].Coins.Banked;
+                    _bankAt[i] = float.NegativeInfinity;
+                    _gainAt[i] = float.NegativeInfinity;
+                }
+                return;
+            }
+            for (int i = 0; i < states.Length; i++)
+            {
+                int banked = states[i].Coins.Banked;
+                if (banked == _bankTarget[i])
+                {
+                    continue;
+                }
+                if (banked > _bankTarget[i])
+                {
+                    // まだ前の「+」が出始めたばかりなら、足して 1 つにする。
+                    bool fresh = now - _gainAt[i] < _gainSeconds * 0.3f;
+                    _gain[i] = (fresh ? _gain[i] : 0) + banked - _bankTarget[i];
+                    _gainAt[i] = now;
+                    _bankFrom[i] = ShownBank(i, now);
+                    _bankAt[i] = now;
+                    BankGains++;
+                }
+                else
+                {
+                    _bankFrom[i] = banked;
+                    _bankAt[i] = float.NegativeInfinity;
+                }
+                _bankTarget[i] = banked;
+            }
+        }
+
+        // 数え上げている途中の BANK の数（なめらかに減速して目標に着く）。
+        private float ShownBank(int index, float now)
+        {
+            float t = Mathf.Clamp01((now - _bankAt[index]) / Mathf.Max(0.01f, _countSeconds));
+            float eased = 1f - (1f - t) * (1f - t);
+            return Mathf.Lerp(_bankFrom[index], _bankTarget[index], eased);
+        }
+
+        /// <summary>BANK が増えて「+増えた数」を浮かべた回数（テスト用）。</summary>
+        public int BankGains { get; private set; }
 
         // 100 枚のコインを取った人を探す: 100 枚のコインが前のフレームにあった（またはこの間に出た）のに今はなく、
         // 確定＋所持が 100 枚以上増えた人。
@@ -350,6 +465,17 @@ namespace Airerage.Runtime.Presentation
         private PlayerStatusPlate.Look CurrentLook(int index)
         {
             var look = new PlayerStatusPlate.Look();
+            if (index < _bankTarget.Length)
+            {
+                look.HasShownBank = true;
+                look.ShownBank = Mathf.RoundToInt(ShownBank(index, Time.time));
+                float age = (Time.time - _gainAt[index]) / Mathf.Max(0.01f, _gainSeconds);
+                if (age < 1f)
+                {
+                    look.Gain = _gain[index];
+                    look.GainAge = Mathf.Max(0f, age);
+                }
+            }
             if (_feed.GetState(index).Combat.HasLeft)
             {
                 // 試合から抜けた人（ネットワーク対戦。docs/15 T6-10）: 灰色のまま「LEFT」。
@@ -448,18 +574,17 @@ namespace Airerage.Runtime.Presentation
         private void OnGUI()
         {
             int count = _feed.CharacterCount;
-            if (count == 0 || _order.Length != count || _waiting.Length != count)
+            if (count == 0 || _order.Length != count || _waiting.Length != count || _ranks.Length != count || _bankTarget.Length != count)
             {
                 return;
             }
-            // アイテムのモードでは、札をアイテムバッグの分だけ広げる（docs/20_item_plan.md）。
+            // アイテムのモードでは、上の段の右にアイテムバッグを出す（札の幅は変わらない。docs/20_item_plan.md）。
             bool bag = _feed.Rules != null && _feed.Rules.ItemMode != Airerage.Core.Items.ItemMode.Default;
-            int width = bag ? _width + Mathf.CeilToInt(PlayerStatusPlate.BagWidth(_rowHeight)) : _width;
-            if (_plate == null || _plateWidth != width)
+            if (_plate == null)
             {
-                _plate = new PlayerStatusPlate(width, _rowHeight);
-                _plateWidth = width;
+                _plate = new PlayerStatusPlate();
             }
+            int width = _plate.Width;
             float x = Screen.width - _margin.x - width;
             if (_headers.Count > 0)
             {
@@ -467,11 +592,11 @@ namespace Airerage.Runtime.Presentation
             }
             foreach (int index in _order)
             {
-                var rect = new Rect(x, _rowY[index], width, _rowHeight);
+                var rect = new Rect(x, _rowY[index], width, _plate.Height);
                 // キャラクターと重なったら透かす（王冠の分を含めて調べる。HudOcclusion）。
                 var area = new Rect(rect.x - _plate.CrownWidth, rect.y, rect.width + _plate.CrownWidth, rect.height);
                 HudFade.Begin(_occlusion.AlphaFor(this, index, area));
-                _plate.Draw(rect, index + 1, _feed.LabelOf(index), _feed.ColorOf(index), _feed.GetState(index),
+                _plate.Draw(rect, _ranks[index], _scored[index], _feed.LabelOf(index), _feed.ColorOf(index), _feed.GetState(index),
                     IsLeader(_feed, index), CurrentLook(index), _bankColor, LogoOf(_feed, index), bag);
                 HudFade.End();
             }

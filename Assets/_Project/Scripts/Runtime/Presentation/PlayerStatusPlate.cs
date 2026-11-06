@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Globalization;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.UI;
 using UnityEngine;
@@ -5,33 +7,78 @@ using UnityEngine;
 namespace Airerage.Runtime.Presentation
 {
     /// <summary>
-    /// 1 人分の情報の札（右上の表 ScoreboardHud と、結果の画面 MatchHud で同じ見た目にする。ユーザーの要望、2026-10-14）。
-    /// 誘導表示の札（GuidePlate）と同じ形で、縁と斜めの線はプレイヤーの色。左にプレイヤーの色の四角と番号、その右にキャラクターの
-    /// ロゴ（docs/13 T5-8。あれば）、下にプレイヤーネーム、右を 4 つに分けて BANK / COIN / K / F（BANK の文字と数だけ黄色）。
-    /// 王冠は札の左に出す。WANTED（所持コインが 100 枚以上。ユーザーの要望、2026-11-02）の人は、キャラクターのロゴの所に手配書の印を押す
+    /// 1 人分の情報の札（右上の表 ScoreboardHud と、結果の画面 MatchHud で同じ見た目にする）。2026-11-06 にユーザーが選んだ形
+    /// （案 A の 2 段 ＋ 案 C の印 ＋ 案 F の順位の金属の色と動き ＋ 案 B の短い書き方）:
+    /// - 札は斜めの辺の平行四辺形。縁はプレイヤーの色（チーム対戦はチームの色）。上の段と下の段の間に、縁と同じ色と太さの直線。
+    /// - 上の段: 順位の四角（1 位 金・2 位 銀・3 位 銅・4 位以下 鉄。確定コインが 0 なら鉄）、キャラクターのロゴ、プレイヤーネーム。
+    ///   アイテムのモードなら、灰色の細い斜め線で区切って右にアイテムバッグ（1 枠が順位の四角と同じ大きさ）。順位の四角は上の縁と
+    ///   区切りの線の真ん中に置く（上と下の隙間が同じ）。
+    /// - 下の段: 金庫の印と BANK（大きく、黄色）、コインの印と COIN、衝撃の印と K（撃破した数）、倒れた人の印と F（撃破された数）。
+    ///   間を灰色の細い斜め線（縁と同じ角度）で区切る。COIN・K・F は同じ大きさ。数が欄に入らなければ字を小さくする（斜め線に重ならない）。
+    ///   10,000 以上は 12.4K、1,000,000 以上は 1.2M と短く書く（abbreviate。結果の画面は正確な数）。
+    /// - 1 位の札は、数秒ごとに光が走る。BANK が増えたら数が数え上がり、上に「+増えた数」が浮かぶ（Look.Gain）。
+    /// 王冠は札の左に出す。WANTED（所持コインが 100 枚以上。2026-11-02）の人は、キャラクターのロゴの所に手配書の印を押す
     /// （その間はロゴを隠す）: 出るときは大きく傾いた印が印鑑を押すように落ちてきて、押した瞬間に朱色の輪が広がって札が揺れる。外れるときは
     /// 光の粒になって散って消え、ロゴが戻る。WANTED の間は札が赤く脈打ち、縁が赤くなり、斜めに大きな「WANTED!」の赤いスタンプを押す
-    /// （Look.WantedEmphasis。1 秒たつか外れると、少しふくらみながら薄くなって消え、印だけが残る。2026-11-02 の要望）。
-    /// 撃破されたときの見た目（Look）: ひび割れ、灰色に暗く、文字（「RESPAWN n」）、白く光る。
+    /// （Look.WantedEmphasis。1 秒たつか外れると、少しふくらみながら薄くなって消え、印だけが残る）。
+    /// 撃破されたときの見た目（Look）: ひび割れ、灰色に暗く、下の段に文字（「RESPAWN n」）、白く光る。
+    /// 札の形（塗り・縁・区切り・光・虹色の縁）は大きさごとに 1 回だけテクスチャに焼き、色は描くときに GUI.color でつける。縁は札の内側に
+    /// 描き、テクスチャには 1 点の余白を取る（斜めの辺と右下の角まで欠けずに出る）。
     /// OnGUI の中で描く。使い終わったら Dispose でテクスチャを消す。
     /// </summary>
     public sealed class PlayerStatusPlate
     {
-        private static readonly string[] Labels = { "BANK", "COIN", "K", "F" };
-        private static readonly Color Gray = new Color(0.5f, 0.5f, 0.52f);
+        // ---------------------------------------------------------------- 形と配置（倍率 1 のときの画面の点）
 
-        private readonly GuidePlate _plate;
-        private readonly Texture2D _crown;
-        private readonly Texture2D _crack;
-        private readonly Texture2D _poster;
-        private readonly float _fontScale;
-        private GUIStyle _label;
-        private GUIStyle _number;
-        private GUIStyle _iconText;
-        private GUIStyle _name;
-        private GUIStyle _overlay;
-        private GUIStyle _wanted;
-        private GUIStyle _stampText;
+        /// <summary>札の幅と高さ（倍率 1）。アイテムのモードでも幅は変わらない。</summary>
+        public const float BaseWidth = 320f;
+        public const float BaseHeight = 64f;
+
+        /// <summary>縁と、上の段と下の段の区切りの線の太さ。</summary>
+        public const float Border = 2f;
+
+        /// <summary>斜めの辺と区切りの斜め線の傾き（縦 1 に対する横）。辺は上ほど右へ寄る。</summary>
+        public const float Slant = 0.22f;
+
+        /// <summary>上の段と下の段の区切りの線の上の端（線の太さは Border）。</summary>
+        public const float DividerY = 32f;
+
+        /// <summary>順位の四角とロゴの大きさ。アイテムバッグの 1 枠も同じ大きさ（ユーザーの指定）。</summary>
+        public const float RankSize = 22f;
+
+        private const float Pad = 1f;
+        private const float LogoGap = 4f;
+        private const float NameGap = 6f;
+        private const float SlotGap = 3f;
+        private const int BagSlots = 3;
+        private const float SeparatorInset = 3f;
+        private const float SeparatorWidth = 1.2f;
+        private const float CellPad = 3.5f;
+        private const float EdgePad = 3f;
+        private static readonly float[] CellWeights = { 0.33f, 0.29f, 0.2f, 0.18f };
+        private const int BankFont = 20;
+        private const int ValueFont = 15;
+        private const float IconSize = 14f;
+        private const float IconGap = 3f;
+        private const int ShineFrames = 16;
+        private const int RainbowFrames = 12;
+        private const float ShineCycle = 3.2f;
+        private const float ShineStart = 0.55f;
+
+        private static readonly Color Gray = new Color(0.5f, 0.5f, 0.52f);
+        private static readonly Color Back = new Color(0.03f, 0.05f, 0.09f, 0.8f);
+        private static readonly Color SeparatorColor = new Color(0.62f, 0.65f, 0.7f, 0.55f);
+        private static readonly Color GainColor = new Color(0.49f, 1f, 0.6f);
+
+        /// <summary>順位の四角の色（中と縁）: 1 位 金・2 位 銀・3 位 銅・4 位以下 鉄。</summary>
+        private static readonly Color[] MetalFill =
+        {
+            new Color(1f, 0.83f, 0.3f), new Color(0.85f, 0.89f, 0.93f), new Color(0.85f, 0.58f, 0.35f), new Color(0.52f, 0.58f, 0.65f),
+        };
+        private static readonly Color[] MetalEdge =
+        {
+            new Color(1f, 0.95f, 0.69f), Color.white, new Color(1f, 0.82f, 0.68f), new Color(0.77f, 0.82f, 0.86f),
+        };
 
         /// <summary>撃破されたときなどの見た目（すべて 0 なら、ふつうの見た目）。</summary>
         public struct Look
@@ -48,10 +95,10 @@ namespace Airerage.Runtime.Presentation
             /// <summary>揺れ（ピクセル）。</summary>
             public Vector2 Shake;
 
-            /// <summary>暗くしたときに右の部分に重ねる文字（なければ null）。</summary>
+            /// <summary>暗くしたときに下の段に重ねる文字（なければ null）。</summary>
             public string Overlay;
 
-            /// <summary>100 枚のコインを取ったときの虹色の光の強さ（0〜1）。縁が虹色になり、右に「JACKPOT!」。</summary>
+            /// <summary>100 枚のコインを取ったときの虹色の光の強さ（0〜1）。縁が虹色になり、下の段に「JACKPOT!」。</summary>
             public float Jackpot;
 
             /// <summary>WANTED の手配書の印を出すか。</summary>
@@ -68,6 +115,35 @@ namespace Airerage.Runtime.Presentation
             /// 1 秒は 1、その後と外れたときは 0 へ下がる（フェードアウト。印 Wanted は残る）。
             /// </summary>
             public float WantedEmphasis;
+
+            /// <summary>数え上げている途中の BANK の数（HasShownBank のときだけ。なければ状態の確定コイン）。</summary>
+            public bool HasShownBank;
+            public int ShownBank;
+
+            /// <summary>BANK が増えた数（0 なら出さない）と、「+増えた数」が浮かんで消える進み（0〜1）。</summary>
+            public int Gain;
+            public float GainAge;
+        }
+
+        /// <summary>札の中の配置（倍率 1、札の左上が原点）。テストと描くときに使う。</summary>
+        public struct Layout
+        {
+            public Rect Rank;
+            public Rect Logo;
+            public Rect Name;
+            public Rect[] Slots;
+
+            /// <summary>上の段の区切りの斜め線（段の真ん中の高さでの x）。</summary>
+            public float[] TopSeparators;
+
+            /// <summary>下の段の区切りの斜め線（段の真ん中の高さでの x）。</summary>
+            public float[] BottomSeparators;
+
+            /// <summary>下の段の 4 つの欄（BANK / COIN / K / F）の、数と印を置ける範囲（斜め線と縁にかからない）。</summary>
+            public Rect[] Cells;
+
+            /// <summary>下の段の全体（重ねる文字・JACKPOT! を置く）。</summary>
+            public Rect BottomRow;
         }
 
         /// <summary>手配書の印の幅と高さ（ロゴの四角の大きさに対する割合）。</summary>
@@ -75,56 +151,271 @@ namespace Airerage.Runtime.Presentation
         private const float PosterHeight = 1.2f;
         private const int DissolveParticles = 22;
 
-        public PlayerStatusPlate(int width, int height, float fontScale = 1f, int crackSeed = 7)
+        // 描くときに使う配置（毎フレーム作らない）。
+        private static readonly Layout BagLayout = LayoutOf(true);
+        private static readonly Layout PlainLayout = LayoutOf(false);
+
+        private readonly float _scale;
+        private readonly Texture2D _fill;
+        private readonly Texture2D _frame;
+        private readonly Texture2D _separatorsBag;
+        private readonly Texture2D _separatorsPlain;
+        private readonly List<Texture2D> _shine = new List<Texture2D>();
+        private readonly List<Texture2D> _rainbow = new List<Texture2D>();
+        private readonly Texture2D _crown;
+        private readonly Texture2D _crack;
+        private readonly Texture2D _poster;
+        private readonly Texture2D[] _icons;
+        private readonly GUIContent _content = new GUIContent();
+        private GUIStyle _rank;
+        private GUIStyle _number;
+        private GUIStyle _name;
+        private GUIStyle _overlay;
+        private GUIStyle _gain;
+        private GUIStyle _wanted;
+        private GUIStyle _stampText;
+
+        /// <param name="scale">大きさの倍率（右上の表は 1、結果の画面は大きく）。</param>
+        public PlayerStatusPlate(float scale = 1f, int crackSeed = 7)
         {
-            Width = width;
-            Height = height;
-            _fontScale = fontScale;
-            _plate = new GuidePlate(width, height);
+            _scale = Mathf.Max(0.25f, scale);
+            Width = Mathf.RoundToInt(BaseWidth * _scale);
+            Height = Mathf.RoundToInt(BaseHeight * _scale);
+            _fill = Bake("StatusPlateFill", (x, y) => White(FillAlpha(x, y, _scale)));
+            _frame = Bake("StatusPlateFrame", (x, y) => White(FrameAlpha(x, y, _scale)));
+            _separatorsBag = Bake("StatusPlateSeparatorsBag", (x, y) => White(SeparatorAlpha(BagLayout, x, y, _scale)));
+            _separatorsPlain = Bake("StatusPlateSeparators", (x, y) => White(SeparatorAlpha(PlainLayout, x, y, _scale)));
             _crown = GuideIcons.Crown(64);
             _poster = GuideIcons.WantedPoster(48, 64);
-            _crack = GuideIcons.Crack(width, height, crackSeed);
+            _crack = GuideIcons.Crack(Width, Height, crackSeed);
+            _icons = new[]
+            {
+                GuideIcons.Bank(48, new Color(1f, 0.85f, 0.2f)), GuideIcons.Coin(48), GuideIcons.Burst(48), GuideIcons.Fallen(48, new Color(1f, 0.5f, 0.48f)),
+            };
         }
 
         public int Width { get; }
         public int Height { get; }
 
         /// <summary>札の左に出す王冠の幅（ピクセル）。</summary>
-        public float CrownWidth => Height * 0.8f + 4f;
+        public float CrownWidth => CrownSize + 4f;
+
+        private float CrownSize => Height * 0.62f;
+
+        // ---------------------------------------------------------------- 形（倍率 1 の座標。テストからも使う）
+
+        /// <summary>高さ y での左の斜めの辺の x（上ほど右）。</summary>
+        public static float LeftAt(float y)
+        {
+            return Slant * (BaseHeight - y);
+        }
+
+        /// <summary>高さ y での右の斜めの辺の x（下ほど左）。</summary>
+        public static float RightAt(float y)
+        {
+            return BaseWidth - Slant * y;
+        }
+
+        // 札の内側までの距離（画面の点。外なら負）。
+        private static float InsideDistance(float x, float y)
+        {
+            float cos = 1f / Mathf.Sqrt(1f + Slant * Slant);
+            float vertical = Mathf.Min(y, BaseHeight - y);
+            float horizontal = Mathf.Min(x - LeftAt(y), RightAt(y) - x) * cos;
+            return Mathf.Min(vertical, horizontal);
+        }
+
+        /// <summary>札の中の塗りの濃さ（x, y は倍率 1 の座標、scale はテクスチャの倍率。境目はなめらか）。</summary>
+        public static float FillAlpha(float x, float y, float scale)
+        {
+            return Mathf.Clamp01(InsideDistance(x, y) * scale + 0.5f);
+        }
 
         /// <summary>
-        /// number は四角に書く番号、name はプレイヤーネーム。bankColor は BANK の文字と数の色。logo はキャラクターのロゴ（なければ
-        /// null。番号の四角だけを出す）。
+        /// 縁と、上の段と下の段の区切りの直線の濃さ。縁は札の内側に太さ Border で描く（斜めの辺も上下の辺も同じ太さ。右下の角まで欠けない）。
+        /// 区切りの線は縁と同じ太さで、左右の斜めの辺の間に引く。
         /// </summary>
-        public void Draw(Rect rect, int number, string name, Color color, in CharacterState state, bool crown, Look look, Color bankColor,
-            Texture2D logo = null, bool showBag = false)
+        public static float FrameAlpha(float x, float y, float scale)
+        {
+            float d = InsideDistance(x, y) * scale;
+            float b = Border * scale;
+            float edge = Mathf.Clamp01(d + 0.5f) - Mathf.Clamp01(d - b + 0.5f);
+            float p = (y - DividerY) * scale;
+            float line = (Mathf.Clamp01(p + 0.5f) - Mathf.Clamp01(p - b + 0.5f)) * Mathf.Clamp01(d + 0.5f);
+            return Mathf.Max(edge, line);
+        }
+
+        // 灰色の細い斜め線（上の段: 名前とアイテムバッグの間、下の段: 数の間）の濃さ。
+        private static float SeparatorAlpha(Layout layout, float x, float y, float scale)
+        {
+            float alpha = 0f;
+            alpha = Mathf.Max(alpha, SeparatorsAlpha(layout.TopSeparators, Border, DividerY, x, y, scale));
+            alpha = Mathf.Max(alpha, SeparatorsAlpha(layout.BottomSeparators, DividerY + Border, BaseHeight - Border, x, y, scale));
+            return alpha;
+        }
+
+        private static float SeparatorsAlpha(float[] centers, float top, float bottom, float x, float y, float scale)
+        {
+            if (centers == null || centers.Length == 0)
+            {
+                return 0f;
+            }
+            float from = top + SeparatorInset;
+            float to = bottom - SeparatorInset;
+            float vertical = Mathf.Clamp01((y - from) * scale + 0.5f) * Mathf.Clamp01((to - y) * scale + 0.5f);
+            if (vertical <= 0f)
+            {
+                return 0f;
+            }
+            float mid = (top + bottom) * 0.5f;
+            float cos = 1f / Mathf.Sqrt(1f + Slant * Slant);
+            float best = 0f;
+            foreach (float center in centers)
+            {
+                float line = center + Slant * (mid - y);
+                float distance = Mathf.Abs(x - line) * cos * scale;
+                best = Mathf.Max(best, Mathf.Clamp01(SeparatorWidth * scale * 0.5f + 0.5f - distance));
+            }
+            return best * vertical;
+        }
+
+        /// <summary>斜め線 center（段の真ん中の高さでの x）の、段の中での左右のふれ幅（線の太さの半分を含む）。</summary>
+        private static float SeparatorReach(float rowHeight)
+        {
+            return Slant * (rowHeight * 0.5f - SeparatorInset) + SeparatorWidth * 0.5f;
+        }
+
+        /// <summary>札の中の配置（倍率 1）。bag はアイテムバッグを出すか。</summary>
+        public static Layout LayoutOf(bool bag)
+        {
+            var layout = new Layout();
+            float topMid = (Border + DividerY) * 0.5f;
+            float rankY = topMid - RankSize * 0.5f;
+            float rankX = LeftAt(rankY) + Border + EdgePad;
+            layout.Rank = new Rect(rankX, rankY, RankSize, RankSize);
+            layout.Logo = new Rect(layout.Rank.xMax + LogoGap, rankY, RankSize, RankSize);
+            float nameRight;
+            if (bag)
+            {
+                // バッグの右下の角が右の斜めの辺にかからないように。
+                float bagRight = RightAt(rankY + RankSize) - Border - EdgePad;
+                float bagWidth = BagSlots * RankSize + (BagSlots - 1) * SlotGap;
+                float bagLeft = bagRight - bagWidth;
+                layout.Slots = new Rect[BagSlots];
+                for (int i = 0; i < BagSlots; i++)
+                {
+                    layout.Slots[i] = new Rect(bagLeft + i * (RankSize + SlotGap), rankY, RankSize, RankSize);
+                }
+                // 斜め線は、バッグの左上の角と名前の右下の角のどちらにもかからない所。
+                float reach = SeparatorReach(DividerY - Border);
+                float center = bagLeft - CellPad - reach;
+                layout.TopSeparators = new[] { center };
+                nameRight = center - reach - CellPad;
+            }
+            else
+            {
+                layout.Slots = new Rect[0];
+                layout.TopSeparators = new float[0];
+                nameRight = RightAt(rankY + RankSize) - Border - EdgePad;
+            }
+            float nameX = layout.Logo.xMax + NameGap;
+            layout.Name = new Rect(nameX, rankY, Mathf.Max(0f, nameRight - nameX), RankSize);
+
+            // 下の段: 4 つの欄を重みで分け、間に斜め線。欄の数と印は、斜め線と縁にかからない範囲に置く。
+            float rowTop = DividerY + Border;
+            float rowBottom = BaseHeight - Border;
+            float rowHeight = rowBottom - rowTop;
+            float left = LeftAt(rowTop + SeparatorInset) + Border + EdgePad;
+            float right = RightAt(rowBottom - SeparatorInset) - Border - EdgePad;
+            float total = 0f;
+            foreach (float weight in CellWeights)
+            {
+                total += weight;
+            }
+            var bounds = new float[CellWeights.Length + 1];
+            bounds[0] = left;
+            for (int i = 0; i < CellWeights.Length; i++)
+            {
+                bounds[i + 1] = bounds[i] + (right - left) * CellWeights[i] / total;
+            }
+            float cellReach = SeparatorReach(rowHeight) + CellPad;
+            layout.BottomSeparators = new float[CellWeights.Length - 1];
+            layout.Cells = new Rect[CellWeights.Length];
+            for (int i = 0; i < CellWeights.Length; i++)
+            {
+                if (i > 0)
+                {
+                    layout.BottomSeparators[i - 1] = bounds[i];
+                }
+                float from = i == 0 ? bounds[i] : bounds[i] + cellReach;
+                float to = i == CellWeights.Length - 1 ? bounds[i + 1] : bounds[i + 1] - cellReach;
+                layout.Cells[i] = new Rect(from, rowTop, to - from, rowHeight);
+            }
+            layout.BottomRow = new Rect(left, rowTop, right - left, rowHeight);
+            return layout;
+        }
+
+        /// <summary>
+        /// 数の書き方（案 B）: abbreviate なら 10,000 以上は 12.4K、100,000 以上は 124K、1,000,000 以上は 1.2M、10,000,000 以上は
+        /// 12.4M のように短く書く（切り捨て。境目で上の単位に繰り上がらない）。それより小さい数と、abbreviate でないときは 3 桁ごとに
+        /// カンマを入れる。
+        /// </summary>
+        public static string FormatCount(int value, bool abbreviate)
+        {
+            if (!abbreviate || value < 10000)
+            {
+                return value.ToString("N0", CultureInfo.InvariantCulture);
+            }
+            if (value < 100000)
+            {
+                return (value / 100 / 10f).ToString("0.0", CultureInfo.InvariantCulture) + "K";
+            }
+            if (value < 1000000)
+            {
+                return (value / 1000).ToString(CultureInfo.InvariantCulture) + "K";
+            }
+            if (value < 100000000)
+            {
+                return (value / 100000 / 10f).ToString("0.0", CultureInfo.InvariantCulture) + "M";
+            }
+            return (value / 1000000).ToString(CultureInfo.InvariantCulture) + "M";
+        }
+
+        // ---------------------------------------------------------------- 描く
+
+        /// <summary>
+        /// rank は順位の四角に書く順位（1 から）、scored は確定コイン（チーム対戦はチームの合計）が 1 枚以上か（0 なら順位の四角は鉄の色）。
+        /// name はプレイヤーネーム、color は縁の色、bankColor は BANK の数の色。logo はキャラクターのロゴ（なければ null）。showBag は
+        /// アイテムバッグを出すか、abbreviate は大きな数を短く書くか（結果の画面は正確な数）。
+        /// </summary>
+        public void Draw(Rect rect, int rank, bool scored, string name, Color color, in CharacterState state, bool crown, Look look, Color bankColor,
+            Texture2D logo = null, bool showBag = false, bool abbreviate = true)
         {
             EnsureStyles();
             rect.position += look.Shake;
             Color previous = GUI.color;
+            Layout layout = showBag ? BagLayout : PlainLayout;
+            float sx = rect.width / BaseWidth;
+            float sy = rect.height / BaseHeight;
+            var drawRect = new Rect(rect.x - Pad * sx, rect.y - Pad * sy, rect.width + Pad * 2f * sx, rect.height + Pad * 2f * sy);
             Color frame = Color.Lerp(color, Gray, look.Gray);
 
-            _plate.DrawBackground(rect);
+            DrawTexture(drawRect, _fill, Back);
             if (look.Gray > 0f)
             {
-                _plate.DrawFill(rect, new Color(0f, 0f, 0f, 0.45f * look.Gray));
+                DrawTexture(drawRect, _fill, new Color(0f, 0f, 0f, 0.45f * look.Gray));
             }
-            _plate.DrawFrame(rect, frame);
+            if (rank == 1 && scored && look.Gray <= 0f)
+            {
+                DrawShine(drawRect);
+            }
+            DrawTexture(drawRect, _frame, frame);
+            DrawTexture(drawRect, showBag ? _separatorsBag : _separatorsPlain, SeparatorColor);
 
-            // 左: プレイヤーの色の四角と番号、その右にキャラクターのロゴ、下にプレイヤーネーム。
-            Rect area = _plate.IconRect(rect);
-            float size = area.height * 0.66f;
-            const float logoGap = 3f;
+            // 上の段: 順位の四角、ロゴ、名前、アイテムバッグ。
+            DrawRank(Map(rect, layout.Rank), rank, scored, look.Gray);
+            Rect logoRect = Map(rect, layout.Logo);
             bool wantedMark = look.Wanted || look.WantedDissolve > 0f;
-            float pair = logo != null || wantedMark ? size * 2f + logoGap : size;
-            var icon = new Rect(area.center.x - pair * 0.5f, area.y, size, size);
-            GUI.color = HudFade.Apply(Color.Lerp(Color.Lerp(color, Color.black, 0.45f), Gray * 0.6f, look.Gray));
-            GUI.DrawTexture(icon, Texture2D.whiteTexture);
-            GUI.color = HudFade.Apply(Color.Lerp(color, Gray, look.Gray));
-            GUI.DrawTexture(new Rect(icon.x + 2f, icon.y + 2f, icon.width - 4f, icon.height - 4f), Texture2D.whiteTexture);
-            GUI.color = previous;
-            GuidePlate.DrawText(icon, number.ToString(), _iconText, Color.white);
-            var logoRect = new Rect(icon.xMax + logoGap, icon.y, size, size);
             // WANTED の間はロゴの代わりに手配書の印（消えていく間は、ロゴが戻ってくる）。
             float logoAlpha = look.Wanted ? 0f : look.WantedDissolve > 0f ? Mathf.Clamp01(look.WantedDissolve * 1.5f - 0.3f) : 1f;
             if (logo != null && logoAlpha > 0f)
@@ -135,41 +426,38 @@ namespace Airerage.Runtime.Presentation
                 GUI.DrawTexture(logoRect, logo, ScaleMode.ScaleToFit);
                 GUI.color = previous;
             }
-            float nameWidth = (area.center.x - rect.x) * 2f - 4f;
-            var nameRect = new Rect(area.center.x - nameWidth * 0.5f, icon.yMax, nameWidth, rect.yMax - icon.yMax - 2f);
-            GuidePlate.DrawText(nameRect, name, _name, Color.Lerp(Color.white, Gray, look.Gray));
-
-            if (crown)
+            GuidePlate.DrawText(Map(rect, layout.Name), name, _name, Color.Lerp(Color.white, Gray, look.Gray));
+            for (int i = 0; i < layout.Slots.Length; i++)
             {
-                float crownSize = rect.height * 0.8f;
-                GUI.DrawTexture(new Rect(rect.x - crownSize - 4f, rect.y + (rect.height - crownSize) * 0.5f, crownSize, crownSize), _crown, ScaleMode.ScaleToFit);
+                DrawSlot(Map(rect, layout.Slots[i]), state.Items, i, look.Gray);
             }
 
-
-            // 右: アイテムのモードなら、まずアイテムバッグの 3 枠（斜めの線で区切る。docs/20_item_plan.md）。残りを 4 つに分けて BANK / COIN / K / F。
-            Rect right = _plate.RightRect(rect);
-            if (showBag)
+            // 下の段: BANK（大きく）・COIN・K・F。
+            int bank = look.HasShownBank ? look.ShownBank : state.Coins.Banked;
+            int[] values = { bank, state.Coins.Held, state.Combat.Knockouts, state.Combat.Falls };
+            Rect bankText = default;
+            for (int c = 0; c < values.Length; c++)
             {
-                float bagWidth = BagWidth(rect.height);
-                DrawBag(new Rect(right.x, right.y, bagWidth, right.height), state.Items, look.Gray);
-                right = new Rect(right.x + bagWidth, right.y, right.width - bagWidth, right.height);
-            }
-            int[] values = { state.Coins.Banked, state.Coins.Held, state.Combat.Knockouts, state.Combat.Falls };
-            float cell = right.width / Labels.Length;
-            for (int c = 0; c < Labels.Length; c++)
-            {
-                var cellRect = new Rect(right.x + c * cell, right.y + 3f, cell, right.height - 6f);
                 Color textColor = Color.Lerp(c == 0 ? bankColor : Color.white, Gray, look.Gray);
-                GuidePlate.DrawText(cellRect, Labels[c], _label, new Color(textColor.r, textColor.g, textColor.b, 0.85f));
-                GuidePlate.DrawText(cellRect, values[c].ToString(), _number, textColor);
-                if (c > 0)
+                string text = c < 2 ? FormatCount(values[c], abbreviate) : values[c].ToString(CultureInfo.InvariantCulture);
+                Rect drawn = DrawCell(Map(rect, layout.Cells[c]), _icons[c], text, Mathf.RoundToInt((c == 0 ? BankFont : ValueFont) * sy), textColor,
+                    look.Gray);
+                if (c == 0)
                 {
-                    GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.18f));
-                    GUI.DrawTexture(new Rect(cellRect.x, cellRect.y + 4f, 1f, cellRect.height - 8f), Texture2D.whiteTexture);
-                    GUI.color = previous;
+                    bankText = drawn;
                 }
             }
 
+            if (crown)
+            {
+                float size = CrownSize;
+                float edge = rect.x + LeftAt(BaseHeight * 0.5f) * sx;
+                GUI.color = HudFade.Apply(Color.white);
+                GUI.DrawTexture(new Rect(edge - size - 2f, rect.y + (rect.height - size) * 0.5f, size, size), _crown, ScaleMode.ScaleToFit);
+                GUI.color = previous;
+            }
+
+            Rect bottom = Map(rect, layout.BottomRow);
             if (look.Crack > 0f)
             {
                 GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.85f * look.Crack));
@@ -178,18 +466,18 @@ namespace Airerage.Runtime.Presentation
             }
             if (look.Gray > 0f && !string.IsNullOrEmpty(look.Overlay))
             {
-                GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.55f * look.Gray));
-                GUI.DrawTexture(new Rect(right.x, right.y + right.height * 0.2f, right.width, right.height * 0.6f), Texture2D.whiteTexture);
+                GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.6f * look.Gray));
+                GUI.DrawTexture(new Rect(bottom.x, bottom.y + bottom.height * 0.12f, bottom.width, bottom.height * 0.76f), Texture2D.whiteTexture);
                 GUI.color = previous;
-                GuidePlate.DrawText(right, look.Overlay, _overlay, new Color(1f, 1f, 1f, look.Gray));
+                GuidePlate.DrawText(bottom, look.Overlay, _overlay, new Color(1f, 1f, 1f, look.Gray));
             }
             if (look.Flash > 0f)
             {
-                _plate.DrawFill(rect, new Color(1f, 1f, 1f, 0.85f * look.Flash));
+                DrawTexture(drawRect, _fill, new Color(1f, 1f, 1f, 0.85f * look.Flash));
             }
             if (look.WantedEmphasis > 0f)
             {
-                DrawWantedEmphasis(rect, look);
+                DrawWantedEmphasis(rect, drawRect, look);
             }
             if (wantedMark)
             {
@@ -197,78 +485,133 @@ namespace Airerage.Runtime.Presentation
             }
             if (look.Jackpot > 0f)
             {
-                // 虹色に光る（中が虹色に脈打ち、縁が虹色になり、右の部分に「JACKPOT!」。ユーザーの要望、2026-10-15）。
+                // 虹色に光る（中が虹色に脈打ち、縁が虹色になり、下の段に「JACKPOT!」。2026-10-15）。
                 float time = Time.time;
                 Color hue = Color.HSVToRGB(Mathf.Repeat(time / 0.9f, 1f), 0.7f, 1f);
-                _plate.DrawFill(rect, new Color(hue.r, hue.g, hue.b, (0.25f + 0.2f * Mathf.Sin(time * 14f)) * look.Jackpot));
-                _plate.DrawRainbowFrame(rect, time, look.Jackpot);
-                Rect jackpotArea = _plate.RightRect(rect);
+                DrawTexture(drawRect, _fill, new Color(hue.r, hue.g, hue.b, (0.25f + 0.2f * Mathf.Sin(time * 14f)) * look.Jackpot));
+                DrawTexture(drawRect, RainbowFrame(time), new Color(1f, 1f, 1f, look.Jackpot));
                 GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.6f * look.Jackpot));
-                GUI.DrawTexture(new Rect(jackpotArea.x, jackpotArea.y + jackpotArea.height * 0.15f, jackpotArea.width, jackpotArea.height * 0.7f), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(bottom.x, bottom.y + bottom.height * 0.12f, bottom.width, bottom.height * 0.76f), Texture2D.whiteTexture);
                 GUI.color = previous;
                 Color text = Color.HSVToRGB(Mathf.Repeat(time / 0.9f + 0.5f, 1f), 0.45f, 1f);
                 text.a = look.Jackpot;
-                GuidePlate.DrawText(jackpotArea, "JACKPOT!", _overlay, text);
+                GuidePlate.DrawText(bottom, "JACKPOT!", _overlay, text);
+            }
+            if (look.Gain > 0 && look.GainAge < 1f && bankText.width > 0f)
+            {
+                // 「+増えた数」: BANK の数の上から浮かび上がって消える。
+                float age = Mathf.Clamp01(look.GainAge);
+                float rise = (1f - (1f - age) * (1f - age)) * 16f * sy;
+                float alpha = 1f - age * age;
+                string gain = "+" + FormatCount(look.Gain, abbreviate);
+                _content.text = gain;
+                float popWidth = _gain.CalcSize(_content).x + 8f * sx;
+                var popRect = new Rect(bankText.x + bankText.width * 0.5f - popWidth * 0.5f, bankText.y - 12f * sy - rise, popWidth, 16f * sy);
+                // 上の段の名前やロゴに重なっても読めるように、暗い下地を敷く。
+                GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.55f * alpha));
+                GUI.DrawTexture(popRect, Texture2D.whiteTexture);
+                GUI.color = previous;
+                Color pop = GainColor;
+                pop.a = alpha;
+                GuidePlate.DrawText(popRect, gain, _gain, pop);
             }
             GUI.color = previous;
         }
 
-        /// <summary>札の高さ height のときのアイテムバッグの幅（3 枠と区切り）。札をこれだけ広げる。</summary>
-        public static float BagWidth(float height)
+        // 倍率 1 の札の中の四角を、画面の四角へ。
+        private static Rect Map(Rect plate, Rect local)
         {
-            return (height - 12f) * 3f + 30f;
+            float sx = plate.width / BaseWidth;
+            float sy = plate.height / BaseHeight;
+            return new Rect(plate.x + local.x * sx, plate.y + local.y * sy, local.width * sx, local.height * sy);
+        }
+
+        private static void DrawTexture(Rect rect, Texture2D texture, Color color)
+        {
+            Color previous = GUI.color;
+            GUI.color = HudFade.Apply(color);
+            GUI.DrawTexture(rect, texture);
+            GUI.color = previous;
+        }
+
+        // 順位の四角: 金属の色の縁と中、真ん中に順位。確定コインが 0 なら鉄の色。
+        private void DrawRank(Rect box, int rank, bool scored, float gray)
+        {
+            int metal = !scored ? 3 : Mathf.Clamp(rank - 1, 0, 3);
+            Color edge = Color.Lerp(MetalEdge[metal], Gray, gray);
+            Color fill = Color.Lerp(MetalFill[metal], Gray * 0.8f, gray);
+            Color previous = GUI.color;
+            GUI.color = HudFade.Apply(edge);
+            GUI.DrawTexture(box, Texture2D.whiteTexture);
+            float inset = Mathf.Max(1f, 1.5f * box.height / RankSize);
+            GUI.color = HudFade.Apply(fill);
+            GUI.DrawTexture(new Rect(box.x + inset, box.y + inset, box.width - inset * 2f, box.height - inset * 2f), Texture2D.whiteTexture);
+            GUI.color = previous;
+            Color text = metal == 3 ? Color.white : new Color(0.04f, 0.07f, 0.1f);
+            _rank.normal.textColor = Color.white;
+            GUI.color = HudFade.Apply(text);
+            GUI.Label(box, rank.ToString(CultureInfo.InvariantCulture), _rank);
+            GUI.color = previous;
+        }
+
+        // 下の段の 1 つの欄: 印と数をまとめて欄の真ん中に置く。入らなければ字を小さくする（斜め線にかからない）。描いた数の四角を返す。
+        private Rect DrawCell(Rect cell, Texture2D icon, string text, int fontSize, Color color, float gray)
+        {
+            float k = cell.height / (BaseHeight - DividerY - Border * 2f);
+            float iconSize = IconSize * k;
+            float gap = IconGap * k;
+            _content.text = text;
+            int size = Mathf.Max(8, fontSize);
+            _number.fontSize = size;
+            float textWidth = _number.CalcSize(_content).x;
+            while (size > 8 && iconSize + gap + textWidth > cell.width)
+            {
+                size--;
+                _number.fontSize = size;
+                textWidth = _number.CalcSize(_content).x;
+            }
+            float total = iconSize + gap + textWidth;
+            float x = Mathf.Max(cell.x, cell.center.x - total * 0.5f);
+            Color previous = GUI.color;
+            GUI.color = HudFade.Apply(Color.Lerp(Color.white, Gray, gray));
+            GUI.DrawTexture(new Rect(x, cell.center.y - iconSize * 0.5f, iconSize, iconSize), icon, ScaleMode.ScaleToFit);
+            GUI.color = previous;
+            var textRect = new Rect(x + iconSize + gap, cell.y, textWidth + 2f, cell.height);
+            GuidePlate.DrawText(textRect, text, _number, color);
+            return textRect;
         }
 
         // 値は全員で同じ（ItemTuning の初めの値）。
         private static readonly Airerage.Core.Items.ItemTuning ItemValues = new Airerage.Core.Items.ItemTuning();
 
-        // アイテムバッグ: 3 つの枠を斜めの線で区切り、入っているアイテムの絵を出す。アクティブアイテムのクールタイムの間は、残りの分だけ
-        // 暗くする（効果が終わるのを待つ間は全部）。
-        private static void DrawBag(Rect area, in Airerage.Core.Items.ItemBag bag, float gray)
+        // アイテムバッグの 1 枠: 入っているアイテムの絵。アクティブアイテムのクールタイムの間は、残りの分だけ暗くして秒数を出す
+        // （効果が終わるのを待つ間は全部暗く）。
+        private static void DrawSlot(Rect cell, in Airerage.Core.Items.ItemBag bag, int slot, float gray)
         {
             Color previous = GUI.color;
-            float size = area.height - 12f;
-            float slot = (area.width - 6f) / 3f;
-            for (int i = 0; i < 3; i++)
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.08f));
+            GUI.DrawTexture(cell, Texture2D.whiteTexture);
+            Airerage.Core.Items.ItemId id = bag.Get(slot);
+            Texture2D icon = ItemIcons.Get(id);
+            if (icon != null)
             {
-                var cell = new Rect(area.x + 3f + i * slot + (slot - size) * 0.5f, area.y + 6f, size, size);
-                GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.07f));
-                GUI.DrawTexture(cell, Texture2D.whiteTexture);
-                Airerage.Core.Items.ItemId id = bag.Get(i);
-                Texture2D icon = ItemIcons.Get(id);
-                if (icon != null)
+                GUI.color = HudFade.Apply(Color.Lerp(Color.white, Gray, gray));
+                GUI.DrawTexture(cell, icon, ScaleMode.ScaleToFit);
+                int cooldown = bag.GetCooldown(slot);
+                if (Airerage.Core.Items.ItemCatalog.IsActive(id) && cooldown != 0
+                    && Airerage.Core.Items.ItemRules.ChargesLeft(bag, slot, ItemValues) == 0)
                 {
-                    GUI.color = HudFade.Apply(Color.Lerp(Color.white, Gray, gray));
-                    GUI.DrawTexture(cell, icon, ScaleMode.ScaleToFit);
-                    int cooldown = bag.GetCooldown(i);
-                    if (Airerage.Core.Items.ItemCatalog.IsActive(id) && cooldown != 0
-                        && Airerage.Core.Items.ItemRules.ChargesLeft(bag, i, ItemValues) == 0)
+                    int full = Mathf.Max(1, ItemValues.CooldownOf(id));
+                    float left = cooldown < 0 ? 1f : Mathf.Clamp01(cooldown / (float)full);
+                    GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.62f));
+                    GUI.DrawTexture(new Rect(cell.x, cell.y, cell.width, cell.height * left), Texture2D.whiteTexture);
+                    if (cooldown > 0)
                     {
-                        int full = Mathf.Max(1, ItemValues.CooldownOf(id));
-                        float left = cooldown < 0 ? 1f : Mathf.Clamp01(cooldown / (float)full);
-                        GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.62f));
-                        GUI.DrawTexture(new Rect(cell.x, cell.y, cell.width, cell.height * left), Texture2D.whiteTexture);
-                        if (cooldown > 0)
-                        {
-                            // 残りの秒数をアイコンの真ん中に（ユーザーの要望、2026-11-05）。
-                            DrawSeconds(cell, cooldown);
-                        }
+                        // 残りの秒数をアイコンの真ん中に（2026-11-05）。
+                        DrawSeconds(cell, cooldown);
                     }
                 }
-                if (i > 0)
-                {
-                    // 斜めの区切り（右上から左下へ）。
-                    Matrix4x4 matrix = GUI.matrix;
-                    var pivot = new Vector2(area.x + 3f + i * slot, area.center.y);
-                    GUIUtility.RotateAroundPivot(20f, pivot);
-                    GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.35f));
-                    GUI.DrawTexture(new Rect(pivot.x - 1f, area.y + 3f, 2f, area.height - 6f), Texture2D.whiteTexture);
-                    GUI.matrix = matrix;
-                }
             }
-            // バッグと右の数の区切り。
-            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, 0.25f));
-            GUI.DrawTexture(new Rect(area.xMax - 1f, area.y + 4f, 1f, area.height - 8f), Texture2D.whiteTexture);
             GUI.color = previous;
         }
 
@@ -281,8 +624,8 @@ namespace Airerage.Runtime.Presentation
             {
                 _seconds = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow });
             }
-            _seconds.fontSize = Mathf.Max(10, Mathf.RoundToInt(cell.height * 0.55f));
-            string text = Mathf.CeilToInt(ticks / (float)Airerage.Core.Common.SimTime.TicksPerSecond).ToString();
+            _seconds.fontSize = Mathf.Max(9, Mathf.RoundToInt(cell.height * 0.6f));
+            string text = Mathf.CeilToInt(ticks / (float)Airerage.Core.Common.SimTime.TicksPerSecond).ToString(CultureInfo.InvariantCulture);
             _seconds.normal.textColor = HudFade.Apply(new Color(0f, 0f, 0f, 0.9f));
             GUI.color = Color.white;
             GUI.Label(new Rect(cell.x + 1.5f, cell.y + 1.5f, cell.width, cell.height), text, _seconds);
@@ -290,14 +633,65 @@ namespace Airerage.Runtime.Presentation
             GUI.Label(cell, text, _seconds);
         }
 
+        // 1 位の札に走る光（ShineCycle 秒ごとに、斜めの帯が左から右へ）。
+        private void DrawShine(Rect drawRect)
+        {
+            float phase = Mathf.Repeat(Time.time / ShineCycle, 1f);
+            if (phase < ShineStart)
+            {
+                return;
+            }
+            float sweep = (phase - ShineStart) / (1f - ShineStart);
+            int frame = Mathf.Clamp(Mathf.FloorToInt(sweep * ShineFrames), 0, ShineFrames - 1);
+            DrawTexture(drawRect, ShineFrame(frame), Color.white);
+        }
+
+        private Texture2D ShineFrame(int frame)
+        {
+            if (_shine.Count == 0)
+            {
+                for (int f = 0; f < ShineFrames; f++)
+                {
+                    float u = (f + 0.5f) / ShineFrames;
+                    float center = Mathf.Lerp(-30f, BaseWidth + 30f, u);
+                    _shine.Add(Bake($"StatusPlateShine{f}", (x, y) =>
+                    {
+                        float line = center + Slant * (BaseHeight * 0.5f - y);
+                        float band = Mathf.Clamp01(1f - Mathf.Abs(x - line) / 22f);
+                        return White(FillAlpha(x, y, _scale) * 0.3f * band * band);
+                    }));
+                }
+            }
+            return _shine[frame];
+        }
+
+        private Texture2D RainbowFrame(float time)
+        {
+            if (_rainbow.Count == 0)
+            {
+                for (int f = 0; f < RainbowFrames; f++)
+                {
+                    float phase = f / (float)RainbowFrames;
+                    _rainbow.Add(Bake($"StatusPlateRainbow{f}", (x, y) =>
+                    {
+                        Color c = Color.HSVToRGB(Mathf.Repeat(phase + (x + y) / (BaseWidth + BaseHeight), 1f), 0.7f, 1f);
+                        c.a = FrameAlpha(x, y, _scale);
+                        return c;
+                    }));
+                }
+            }
+            int index = Mathf.FloorToInt(Mathf.Repeat(time * 0.8f, 1f) * RainbowFrames) % RainbowFrames;
+            return _rainbow[index];
+        }
+
         // WANTED の赤い強調: 札が赤く脈打ち、縁が赤くなり、札の上に斜めの「WANTED!」のスタンプ（二重の枠と文字。押すときは大きくから縮む）。
-        private void DrawWantedEmphasis(Rect rect, Look look)
+        private void DrawWantedEmphasis(Rect rect, Rect drawRect, Look look)
         {
             float strength = Mathf.Clamp01(look.WantedEmphasis);
             float time = Time.time;
             var red = new Color(0.95f, 0.12f, 0.08f);
-            _plate.DrawFill(rect, new Color(red.r, red.g, red.b, (0.16f + 0.1f * (0.5f + 0.5f * Mathf.Sin(time * 5f))) * strength));
-            _plate.DrawFrame(rect, red, strength);
+            DrawTexture(drawRect, _fill, new Color(red.r, red.g, red.b, (0.16f + 0.1f * (0.5f + 0.5f * Mathf.Sin(time * 5f))) * strength));
+            DrawTexture(drawRect, _frame, new Color(red.r, red.g, red.b, strength));
             // スタンプ: 押す動きの初め（WantedStamp が 0.35 まで）は大きくから縮み、消えるとき（強さが 1 より下がる）は少しふくらみながら薄くなる。
             float stamp = Mathf.Clamp01(look.WantedStamp);
             float fall = look.Wanted ? Mathf.Clamp01(stamp / 0.35f) : 1f;
@@ -308,7 +702,7 @@ namespace Airerage.Runtime.Presentation
             Color previous = GUI.color;
             GUIUtility.RotateAroundPivot(-11f, center);
             GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), center);
-            var box = new Rect(center.x - rect.width * 0.36f, center.y - rect.height * 0.36f, rect.width * 0.72f, rect.height * 0.72f);
+            var box = new Rect(center.x - rect.width * 0.32f, center.y - rect.height * 0.3f, rect.width * 0.64f, rect.height * 0.6f);
             var ink = new Color(0.92f, 0.08f, 0.06f, 0.78f * alpha);
             GUI.color = HudFade.Apply(ink);
             DrawOutline(box, 2.5f);
@@ -418,38 +812,93 @@ namespace Airerage.Runtime.Presentation
 
         public void Dispose()
         {
-            _plate.Dispose();
+            Object.Destroy(_fill);
+            Object.Destroy(_frame);
+            Object.Destroy(_separatorsBag);
+            Object.Destroy(_separatorsPlain);
+            foreach (Texture2D texture in _shine)
+            {
+                Object.Destroy(texture);
+            }
+            foreach (Texture2D texture in _rainbow)
+            {
+                Object.Destroy(texture);
+            }
+            _shine.Clear();
+            _rainbow.Clear();
             Object.Destroy(_crown);
             Object.Destroy(_poster);
             Object.Destroy(_crack);
+            foreach (Texture2D icon in _icons)
+            {
+                Object.Destroy(icon);
+            }
+        }
+
+        private static Color White(float alpha)
+        {
+            return new Color(1f, 1f, 1f, alpha);
+        }
+
+        // 札の形を焼く: テクスチャの点 (i, j) を、倍率 1 の座標（余白 Pad の分ずらす）にして color を呼ぶ（j は上から）。
+        private Texture2D Bake(string name, System.Func<float, float, Color> color)
+        {
+            int width = Mathf.CeilToInt((BaseWidth + Pad * 2f) * _scale);
+            int height = Mathf.CeilToInt((BaseHeight + Pad * 2f) * _scale);
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = name,
+                hideFlags = HideFlags.HideAndDontSave,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+            };
+            float sx = width / (BaseWidth + Pad * 2f);
+            float sy = height / (BaseHeight + Pad * 2f);
+            var pixels = new Color[width * height];
+            for (int j = 0; j < height; j++)
+            {
+                float y = (j + 0.5f) / sy - Pad;
+                int row = (height - 1 - j) * width;
+                for (int i = 0; i < width; i++)
+                {
+                    pixels[row + i] = color((i + 0.5f) / sx - Pad, y);
+                }
+            }
+            texture.SetPixels(pixels);
+            texture.Apply();
+            return texture;
         }
 
         private void EnsureStyles()
         {
-            if (_label != null)
+            if (_rank != null)
             {
                 return;
             }
-            _label = Style(11, TextAnchor.UpperCenter);
-            _number = Style(19, TextAnchor.LowerCenter);
-            _iconText = Style(13, TextAnchor.MiddleCenter);
-            _name = Style(11, TextAnchor.MiddleCenter);
+            _rank = Style(13, TextAnchor.MiddleCenter);
+            _number = Style(ValueFont, TextAnchor.MiddleLeft);
+            _number.clipping = TextClipping.Overflow;
+            _name = Style(13, TextAnchor.MiddleLeft);
             _name.clipping = TextClipping.Clip;
             _overlay = Style(16, TextAnchor.MiddleCenter);
+            _gain = Style(13, TextAnchor.MiddleCenter);
+            _gain.clipping = TextClipping.Overflow;
             _wanted = Style(7, TextAnchor.MiddleCenter);
-            _stampText = Style(24, TextAnchor.MiddleCenter);
+            _stampText = Style(22, TextAnchor.MiddleCenter);
             _stampText.fontStyle = FontStyle.BoldAndItalic;
         }
 
         private GUIStyle Style(int size, TextAnchor anchor)
         {
-            return GameFonts.Use(new GUIStyle(GUI.skin.label)
+            GUIStyle style = GameFonts.Use(new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.RoundToInt(size * _fontScale),
+                fontSize = Mathf.RoundToInt(size * _scale),
                 fontStyle = FontStyle.Bold,
                 alignment = anchor,
                 wordWrap = false,
             });
+            style.padding = new RectOffset(0, 0, 0, 0);
+            return style;
         }
     }
 }

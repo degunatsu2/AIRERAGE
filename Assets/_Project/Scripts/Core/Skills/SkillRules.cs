@@ -126,16 +126,16 @@ namespace Airerage.Core.Skills
                         PastryRules.StepCreamShot(ref item, ground, bounds, owner.Skills.Cream, tick);
                         break;
                     case WorldObjectKind.Macaron:
-                        PastryRules.StepMacaron(ref item, ground, states, configs, bounds, owner.Skills.TeaParty, hits, tick);
+                        PastryRules.StepMacaron(ref item, objects, ground, states, configs, bounds, owner.Skills.TeaParty, hits, tick);
                         break;
                     case WorldObjectKind.Scale:
-                        PastryRules.StepScale(ref item, ground, states, configs, bounds, owner.Skills.Scale, hits, tick);
+                        PastryRules.StepScale(ref item, objects, ground, states, configs, bounds, owner.Skills.Scale, hits, tick);
                         break;
                     case WorldObjectKind.ShockWave:
                         ElectricRules.StepShockWave(ref item, states, configs, tick);
                         break;
                     case WorldObjectKind.BallLightning:
-                        ElectricRules.StepBall(ref item, ground, states, configs, bounds, hits, tick);
+                        ElectricRules.StepBall(ref item, objects, ground, states, configs, bounds, hits, tick);
                         break;
                 }
                 objects[o] = item;
@@ -447,6 +447,14 @@ namespace Airerage.Core.Skills
                     shot.Ended = true;
                     return;
                 }
+            }
+            // 身代わり人形（アイテム）に触れたら、だれの人形でも当てて消える（ユーザーの指定、2026-11-06）。
+            int side = shot.Velocity.X > 0f ? 1 : shot.Velocity.X < 0f ? -1 : states[shot.Owner].Facing;
+            if (Airerage.Core.Items.ItemRules.HitDecoys(objects, shot, tuning.Radius, tuning.Hit, side,
+                    AttackPower.OfProjectile(shot.BonusPercent, PowerSource.HeldCoins)))
+            {
+                shot.Ended = true;
+                return;
             }
 
             for (int o = 0; o < objects.Count; o++)

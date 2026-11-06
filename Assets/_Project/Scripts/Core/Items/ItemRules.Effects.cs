@@ -302,6 +302,8 @@ namespace Airerage.Core.Items
                     {
                         Kind = WorldObjectKind.Decoy, Owner = index, Position = position, End = half, SpawnTick = tick,
                         ExpireTick = int.MaxValue, Variant = (byte)id, Stored = aim.X < 0f ? -1 : 1,
+                        // 攻撃で飛ばされる割合（%）。技の投射物からも当たるので、ItemTuning を持たない所でも使えるように人形に持たせる。
+                        BonusPercent = (int)MathF.Round(tuning.DecoyKnockScale * 100f),
                     });
                     break;
                 }
@@ -515,13 +517,13 @@ namespace Airerage.Core.Items
         // ---------------------------------------------------------------- アクティブ（置く物・飛ばす物）
 
         // 追加のアイテムの物を 1 ティック進める（扱った物なら true）。
-        private static bool StepMore(ref WorldObject item, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+        private static bool StepMore(ref WorldObject item, WorldObjects objects, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
             ICollisionQuery collision, StageBounds? bounds, ItemTuning tuning, int tick, List<HitRecord> hits)
         {
             switch (item.Kind)
             {
                 case WorldObjectKind.ItemBomb:
-                    StepBomb(ref item, states, configs, collision, bounds, tuning, tick, hits);
+                    StepBomb(ref item, objects, states, configs, collision, bounds, tuning, tick, hits);
                     return true;
                 case WorldObjectKind.ChainHook:
                     StepHook(ref item, states, configs, collision, bounds, tuning, hits);
@@ -660,7 +662,7 @@ namespace Airerage.Core.Items
         }
 
         // グラップリングボム: 山なりに飛び、地形か相手に刺さり、時間が来たら爆発する。
-        private static void StepBomb(ref WorldObject bomb, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+        private static void StepBomb(ref WorldObject bomb, WorldObjects objects, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
             ICollisionQuery collision, StageBounds? bounds, ItemTuning tuning, int tick, List<HitRecord> hits)
         {
             float dt = SimTime.DeltaTime;
@@ -681,7 +683,14 @@ namespace Airerage.Core.Items
                 else
                 {
                     bomb.Position += delta;
-                    for (int v = 0; v < states.Count; v++)
+                    if (TouchesDecoy(objects, bomb.Position, tuning.BombRadius))
+                    {
+                        // 身代わり人形（だれの人形でも）に触れた: その場に刺さって、時間が来たら爆発する（ユーザーの指定、2026-11-06）。
+                        bomb.Velocity = Vector2.Zero;
+                        bomb.Stored = 1;
+                        bomb.ChargeMilli = tick + tuning.BombFuseTicks;
+                    }
+                    for (int v = 0; v < states.Count && bomb.Stored == 0; v++)
                     {
                         if (IsTarget(states, bomb.Owner, v)
                             && Overlaps(bomb.Position, new Vector2(tuning.BombRadius, tuning.BombRadius), states[v], configs[v]))
@@ -715,15 +724,17 @@ namespace Airerage.Core.Items
             }
             if (tick >= bomb.ChargeMilli)
             {
-                Explode(bomb, states, configs, tuning, hits);
+                Explode(bomb, objects, states, configs, tuning, hits);
                 bomb.Ended = true;
             }
         }
 
         // 爆発: 半径の中の相手に当てる（中心から外向きに吹き飛ばす）。
-        private static void Explode(in WorldObject bomb, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, ItemTuning tuning,
-            List<HitRecord> hits)
+        private static void Explode(in WorldObject bomb, WorldObjects objects, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+            ItemTuning tuning, List<HitRecord> hits)
         {
+            // 範囲の身代わり人形（だれの人形でも）にも当たる（ユーザーの指定、2026-11-06）。
+            HitDecoys(objects, bomb, tuning.BombBlastRadius, tuning.BombHit, 0, AttackPower.Normal);
             for (int v = 0; v < states.Count; v++)
             {
                 if (!IsTarget(states, bomb.Owner, v))
@@ -923,23 +934,46 @@ namespace Airerage.Core.Items
         }
 
         /// <summary>
-        /// 攻撃 attacker の判定（中心 center、半分の大きさ half）が重なった相手の身代わり人形に、攻撃を 1 回当てる（同じ攻撃の同じ判定は 1 回。key）。
-        /// 人形は攻撃の威力 damage を記録し（ChargeMilli）、吹き飛び knockback で飛ぶ（それからは重力で落ちる）。決まった回数で爆発する
-        /// （StepDecoy）。当てたら true。
+        /// 身代わり人形に当てる、投射物・爆発の攻撃の鍵（同じ投射物は 1 回だけ当たる）。近接攻撃の鍵（HitResolver.ObjectHitKey。正の数）と
+        /// 重ならないように、物の番号の負の数にする。
         /// </summary>
-        public static bool HitDecoys(WorldObjects objects, List<CharacterState> states, int attacker, int key, Vector2 center, Vector2 half,
-            Vector2 knockback, int damage, ItemTuning tuning)
+        public static int ProjectileDecoyKey(in WorldObject projectile)
         {
-            if (objects == null || tuning == null)
+            return -projectile.Id;
+        }
+
+        /// <summary>点 point（半径 radius）が身代わり人形に触れているか（投射物が人形に当たって止まる・爆発するか）。</summary>
+        public static bool TouchesDecoy(WorldObjects objects, Vector2 point, float radius)
+        {
+            for (int i = 0; objects != null && i < objects.Count; i++)
+            {
+                WorldObject decoy = objects[i];
+                if (decoy.Kind == WorldObjectKind.Decoy && !decoy.Ended
+                    && MathF.Abs(decoy.Position.X - point.X) < radius + decoy.End.X && MathF.Abs(decoy.Position.Y - point.Y) < radius + decoy.End.Y)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 攻撃 hit（強さ power、向き facing。0 なら範囲の中心から離れる向き）の範囲（中心 center、半分の大きさ half）に重なった身代わり人形に、
+        /// 攻撃を 1 回当てる（同じ攻撃の同じ判定は 1 回。key）。人形は持ち主・味方・相手を問わず、近接攻撃・投射物・爆発のどれも受ける
+        /// （ユーザーの指定、2026-11-06）。威力を記録し（ChargeMilli）、吹き飛びの割合（BonusPercent）で飛ぶ（それからは重力で落ちる）。
+        /// 決まった回数で爆発する（StepDecoy）。当てたら true。
+        /// </summary>
+        public static bool HitDecoys(WorldObjects objects, int key, Vector2 center, Vector2 half, AttackHit hit, int facing, AttackPower power)
+        {
+            if (objects == null || hit == null)
             {
                 return false;
             }
-            bool hit = false;
+            bool struck = false;
             for (int i = 0; i < objects.Count; i++)
             {
                 WorldObject decoy = objects[i];
-                if (decoy.Kind != WorldObjectKind.Decoy || decoy.Ended || decoy.Owner == attacker || decoy.HasHitKey(key)
-                    || (decoy.Owner >= 0 && decoy.Owner < states.Count && TeamRules.Allies(states, attacker, decoy.Owner)))
+                if (decoy.Kind != WorldObjectKind.Decoy || decoy.Ended || decoy.HasHitKey(key))
                 {
                     continue;
                 }
@@ -947,14 +981,21 @@ namespace Airerage.Core.Items
                 {
                     continue;
                 }
+                int side = facing != 0 ? facing : decoy.Position.X >= center.X ? 1 : -1;
                 decoy.AddHitKey(key);
                 decoy.Damage++;
-                decoy.ChargeMilli += Math.Max(0, damage);
-                decoy.Velocity = knockback * tuning.DecoyKnockScale;
+                decoy.ChargeMilli += Math.Max(0, AttackPower.Damage(hit.Damage, power.Multiplier, power.BonusPercent));
+                decoy.Velocity = new Vector2(hit.KnockbackX * side, hit.KnockbackY) * power.KnockbackScale * (decoy.BonusPercent / 100f);
                 objects[i] = decoy;
-                hit = true;
+                struck = true;
             }
-            return hit;
+            return struck;
+        }
+
+        /// <summary>投射物 projectile（半径 radius）の攻撃 hit を、触れた身代わり人形に当てる（HitDecoys）。当てたら true（投射物は止まる）。</summary>
+        public static bool HitDecoys(WorldObjects objects, in WorldObject projectile, float radius, AttackHit hit, int facing, AttackPower power)
+        {
+            return HitDecoys(objects, ProjectileDecoyKey(projectile), projectile.Position, new Vector2(radius, radius), hit, facing, power);
         }
     }
 }

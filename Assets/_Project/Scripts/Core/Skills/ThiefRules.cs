@@ -239,7 +239,14 @@ namespace Airerage.Core.Skills
             IReadOnlyList<CharacterConfig> configs, StageBounds? bounds, List<HitRecord> hits, int tick)
         {
             ThiefTuning tuning = configs[ball.Owner].Skills.Thief;
-            if (!Sweep(ref ball, terrain, states, configs, tuning.SmokeBallRadius, out bool reached, out _))
+            bool burst = Sweep(ref ball, terrain, states, configs, tuning.SmokeBallRadius, out bool reached, out _);
+            // 身代わり人形（アイテム。だれの人形でも）に触れても弾ける（ユーザーの指定、2026-11-06）。
+            if (!burst && Airerage.Core.Items.ItemRules.TouchesDecoy(objects, ball.Position, tuning.SmokeBallRadius))
+            {
+                burst = true;
+                reached = true;
+            }
+            if (!burst)
             {
                 if (bounds.HasValue && !bounds.Value.Contains(new Vector3(ball.Position.X, ball.Position.Y, 0f)))
                 {
@@ -268,6 +275,7 @@ namespace Airerage.Core.Skills
                     hits.Add(new HitRecord(ball.Owner, v, ball.Slot, 0, tuning.SmokeHit, facing, AttackPower.Normal, fromObject: true));
                 }
             }
+            Airerage.Core.Items.ItemRules.HitDecoys(objects, ball, tuning.ExplosionRadius, tuning.SmokeHit, 0, AttackPower.Normal);
             AddSmoke(objects, ball.Owner, ball.Slot, ball.Position, tuning.SmokeRadius, tuning.SmokeTicks, tick, 0);
         }
 

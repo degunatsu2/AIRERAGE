@@ -10,7 +10,8 @@ namespace Airerage.Runtime.Presentation
     /// ゲームパッドで ITEM MENU（X）を押している間に、操作しているキャラクターの頭上に出すアイテムバッグ（ユーザーの指定、2026-11-05。
     /// docs/20_item_plan.md）。SkillHud が持ち、SkillHudFront（ほかの表示より前）で描く。
     /// - 押すとフェードインし、何も選ばずに離すとそのまま全体がフェードアウトする。
-    /// - 十字キーで使える枠を選ぶと、ほかの枠は即座に消え、選んだアイテムが光って上昇しながらフェードアウトする（捨てる操作なら下へ落ちる）。
+    /// - 十字キーで使える枠を選ぶと、ほかの枠は即座に消え、選んだアイテムが光って上昇しながらフェードアウトする。捨てる操作では演出を出さず、
+    ///   バッグを出したまま枠が空になる（落ちていく絵を、実際に落としたアイテムと見間違えるため。2026-11-06）。
     /// - 空の枠・パッシブアイテム・クールタイム中のアイテムを選ぶと、その枠に赤いバツ印が付いてバッグ全体が震える。空の枠で足もとの
     ///   アイテムを拾ったとき（少し後に拾った数が増える）は、拾ったアイテムが光って上昇する。
     /// - 捨てるボタン（A）も押している間は、バッグの左にゴミ箱の印を出す（捨てる入力だと分かるように。2026-11-06）。
@@ -48,7 +49,6 @@ namespace Airerage.Runtime.Presentation
         private float _alpha;
         private Choice _choice;
         private int _slot;
-        private bool _drop;
         private ItemId _item;
         private float _choiceAt = -10f;
         private int _pickupsBefore;
@@ -137,7 +137,6 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             _slot = slot;
-            _drop = drop;
             _choiceAt = now;
             ItemId id = bag.Get(slot);
             _item = id;
@@ -152,7 +151,14 @@ namespace Airerage.Runtime.Presentation
                 _pickupsBefore = bag.PickupCount;
                 return;
             }
-            bool usable = drop || (ItemCatalog.IsActive(id) && (ItemRules.ChargesLeft(bag, slot, ItemValues) > 0 || ItemRules.CanRecall(bag, id)));
+            if (drop)
+            {
+                // 捨てるときは演出を出さない（バッグはそのまま。落ちたアイテムは地面に出る）。
+                _choice = Choice.None;
+                ConfirmCount++;
+                return;
+            }
+            bool usable = ItemCatalog.IsActive(id) && (ItemRules.ChargesLeft(bag, slot, ItemValues) > 0 || ItemRules.CanRecall(bag, id));
             if (usable)
             {
                 Confirm(now);
@@ -201,10 +207,10 @@ namespace Airerage.Runtime.Presentation
             ItemBag bag = state.Items;
             if (_choice == Choice.Confirm)
             {
-                // ほかの枠は即座に消え、選んだアイテムは光って上昇（捨てるなら下降）しながら消える。
+                // ほかの枠は即座に消え、選んだアイテムは光って上昇しながら消える。
                 float t = Mathf.Clamp01(since / ConfirmSeconds);
                 float alpha = 1f - t * t;
-                float offset = (_drop ? 1f : -1f) * RiseHeight * (1f - (1f - t) * (1f - t));
+                float offset = -RiseHeight * (1f - (1f - t) * (1f - t));
                 var cell = new Rect(x + _slot * (CellSize + CellGap), y + offset, CellSize, CellSize);
                 Color accent = ItemIcons.Accent(_item);
                 float glow = 1f + 0.6f * (1f - t);

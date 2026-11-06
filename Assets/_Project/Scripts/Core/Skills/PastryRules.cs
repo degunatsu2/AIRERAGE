@@ -316,7 +316,7 @@ namespace Airerage.Core.Skills
         /// マカロン: 投げるまでは持ち主の頭上で待つ。投げた後は重力で落ち、地形で跳ね返る（床で跳ねたときに遅ければ止まる）。止まるか
         /// ステージの外に出たら点滅を始める。点滅していなければ、持ち主以外に相手ごとに 1 回だけ当たる（hits に加える）。
         /// </summary>
-        public static void StepMacaron(ref WorldObject macaron, ICollisionQuery terrain, List<CharacterState> states,
+        public static void StepMacaron(ref WorldObject macaron, WorldObjects objects, ICollisionQuery terrain, List<CharacterState> states,
             IReadOnlyList<CharacterConfig> configs, StageBounds? bounds, TeaPartyTuning tuning, List<HitRecord> hits, int tick)
         {
             if (!IsLaunched(macaron, tick))
@@ -379,6 +379,10 @@ namespace Airerage.Core.Skills
                     macaron.HitMask |= 1u << v;
                 }
             }
+            // 身代わり人形（アイテム。だれの人形でも）にも 1 回ずつ当たる（相手と同じく、通り抜けて飛び続ける。ユーザーの指定、2026-11-06）。
+            int side = macaron.Velocity.X > 0f ? 1 : macaron.Velocity.X < 0f ? -1 : 0;
+            Airerage.Core.Items.ItemRules.HitDecoys(objects, macaron, tuning.Radius, tuning.Hit, side,
+                new AttackPower(1f, macaron.BonusPercent, macaron.BonusPercent, jackpot: macaron.Variant == (byte)MacaronColor.Rainbow));
         }
 
         // 点滅を始める（その場で止まり、BlinkTicks で消える）。
@@ -408,8 +412,8 @@ namespace Airerage.Core.Skills
         /// デジタルスケール: 真下へ自由落下する。持ち主以外の相手に触れたら当てて（落ちていた時間で威力と吹き飛びが増え、FatalGrams 以上なら
         /// FATAL）消える。地形に当たるか、ステージの外に出ても消える。
         /// </summary>
-        public static void StepScale(ref WorldObject scale, ICollisionQuery terrain, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
-            StageBounds? bounds, ScaleTuning tuning, List<HitRecord> hits, int tick)
+        public static void StepScale(ref WorldObject scale, WorldObjects objects, ICollisionQuery terrain, List<CharacterState> states,
+            IReadOnlyList<CharacterConfig> configs, StageBounds? bounds, ScaleTuning tuning, List<HitRecord> hits, int tick)
         {
             scale.Velocity.X = 0f;
             scale.Velocity.Y = MathF.Max(scale.Velocity.Y - tuning.Gravity * SimTime.DeltaTime, -tuning.MaxFallSpeed);
@@ -451,6 +455,15 @@ namespace Airerage.Core.Skills
                     scale.Ended = true;
                     return;
                 }
+            }
+            // 身代わり人形（アイテム。だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
+            int scaleGrams = ScaleGrams(scale, tuning, tick);
+            int scaleBonus = tuning.BonusPercentAt(scaleGrams);
+            if (Airerage.Core.Items.ItemRules.HitDecoys(objects, Airerage.Core.Items.ItemRules.ProjectileDecoyKey(scale), scale.Position,
+                    new Vector2(tuning.HalfWidth, tuning.HalfHeight), tuning.Hit, 0,
+                    new AttackPower(1f, scaleBonus, scaleBonus, fatal: scaleGrams >= tuning.FatalGrams, sources: PowerSource.FallTime)))
+            {
+                scale.Ended = true;
             }
         }
 

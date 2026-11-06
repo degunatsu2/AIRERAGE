@@ -63,8 +63,8 @@ namespace Airerage.Core.Skills
         /// TravelDistance 進むと止まって TrapTicks の間残る。持ち主以外に触れたら攻撃が当たり（BallLightningTuning.Hit。追加効果で
         /// のけぞりの後に感電）、球は消える（ユーザーの要望、2026-10-22）。
         /// </summary>
-        public static void StepBall(ref WorldObject ball, ICollisionQuery terrain, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
-            StageBounds? bounds, List<HitRecord> hits, int tick)
+        public static void StepBall(ref WorldObject ball, WorldObjects objects, ICollisionQuery terrain, List<CharacterState> states,
+            IReadOnlyList<CharacterConfig> configs, StageBounds? bounds, List<HitRecord> hits, int tick)
         {
             CharacterConfig ownerConfig = configs[ball.Owner];
             BallLightningTuning tuning = ownerConfig.Skills.BallLightning;
@@ -106,6 +106,12 @@ namespace Airerage.Core.Skills
                     ball.Ended = true;
                     return;
                 }
+            }
+            // 身代わり人形（アイテム。だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
+            int side = ball.Velocity.X > 0f ? 1 : ball.Velocity.X < 0f ? -1 : 0;
+            if (Airerage.Core.Items.ItemRules.HitDecoys(objects, ball, tuning.Radius, tuning.Hit, side, AttackPower.Normal))
+            {
+                ball.Ended = true;
             }
         }
 

@@ -231,7 +231,15 @@ namespace Airerage.Core.Tests.Items
             Step(world, 1, Keys(InputButtons.Item1));
             Step(world, 1);
             Assert.That(world.GetState(0).Items.Get(0), Is.EqualTo(ItemId.None), "捨ててすぐに拾い直した");
+
+            // その場ではなく、向いている方向（右）へ少し飛び出て落ちる（ユーザーの要望、2026-11-06）。
             Step(world, 60);
+            WorldObject landed = ObjectsOf(world, WorldObjectKind.DroppedItem).Single();
+            Assert.That(landed.Position.X, Is.GreaterThan(1f), "向いている方向へ飛び出ない");
+            Assert.That(landed.Position.X, Is.LessThan(3f), "飛び出しすぎ（少し前に落ちる）");
+            CharacterState walked = world.GetState(0);
+            walked.Position = new Vector3(landed.Position.X, GroundY, 0f);
+            world.SetState(0, walked);
             Step(world, 1, Keys(InputButtons.Item1));
             Step(world, 1);
             Assert.That(world.GetState(0).Items.Get(0), Is.EqualTo(ItemId.EnergyShot), "しばらくしても拾い直せない");

@@ -222,8 +222,8 @@ namespace Airerage.Runtime.Presentation
                     return Loc.T("Places a jump pad at your feet for 5 s. Anyone can use it.",
                         "足元にジャンプ台を置く。5秒で消え、だれでも使える。");
                 case ItemId.DecoyDoll:
-                    return Loc.T("Places a doll toward the pointer for 2 s. It absorbs hits and records their damage, then explodes after 3 hits or at time-out, scaled by the total. Hits knock it away.",
-                        "照準の方向の目の前に2秒間、身代わり人形を置く。人形は攻撃を吸収して威力を記録し、3回受けるか時間が来ると、記録した威力の合計に応じた範囲と威力の爆発を起こす。攻撃を受けると吹き飛んで落ちる。");
+                    return Loc.T("Places a doll toward the pointer for 2 s. It absorbs any hit, including your own attacks and projectiles, and records the damage, then explodes after 3 hits or at time-out, scaled by the total. Hits knock it away.",
+                        "照準の方向の目の前に2秒間、身代わり人形を置く。人形は自分の攻撃や投射物も含めてあらゆる攻撃を吸収して威力を記録し、3回受けるか時間が来ると、記録した威力の合計に応じた範囲と威力の爆発を起こす。攻撃を受けると吹き飛んで落ちる。");
                 case ItemId.BottledThunder:
                     return Loc.T("Makes a thundercloud toward the pointer for 3 s. Strikes opponents below 3 times (2 each) with shock.",
                         "照準の先に3秒の雷雲を出し、下にいる相手を3回感電させる（威力2ずつ）。");

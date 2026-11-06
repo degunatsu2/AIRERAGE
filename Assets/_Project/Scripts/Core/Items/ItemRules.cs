@@ -576,7 +576,7 @@ namespace Airerage.Core.Items
             bag.ActHitMask = 0;
         }
 
-        // 枠 slot のアイテムを足もとに捨てる（クールタイムと使ったスタックはアイテムに残す）。
+        // 枠 slot のアイテムを捨てる。向いている方向へ少し飛び出て落ちる（クールタイムと使ったスタックはアイテムに残す）。
         private static void Discard(in CharacterState state, ref ItemBag bag, int slot, int index, CharacterConfig config, WorldObjects objects,
             ItemTuning tuning, int tick)
         {
@@ -587,7 +587,7 @@ namespace Airerage.Core.Items
                 Kind = WorldObjectKind.DroppedItem,
                 Owner = index,
                 Position = new Vector2(state.Position.X, state.Position.Y),
-                Velocity = new Vector2(0f, tuning.DiscardPopSpeed),
+                Velocity = new Vector2(state.Facing * tuning.DiscardForwardSpeed, tuning.DiscardPopSpeed),
                 SpawnTick = tick,
                 ExpireTick = int.MaxValue,
                 Variant = (byte)id,
@@ -905,13 +905,13 @@ namespace Airerage.Core.Items
                         StepDropped(ref item, collision, bounds, tuning, tick);
                         break;
                     case WorldObjectKind.ItemShot:
-                        StepShot(ref item, states, configs, collision, bounds, tuning, hits);
+                        StepShot(ref item, objects, states, configs, collision, bounds, tuning, hits);
                         break;
                     case WorldObjectKind.SandBall:
-                        StepBall(ref item, states, configs, collision, bounds, tuning, tick, hits);
+                        StepBall(ref item, objects, states, configs, collision, bounds, tuning, tick, hits);
                         break;
                     default:
-                        if (!StepMore(ref item, states, configs, collision, bounds, tuning, tick, hits))
+                        if (!StepMore(ref item, objects, states, configs, collision, bounds, tuning, tick, hits))
                         {
                             continue;
                         }
@@ -1186,7 +1186,7 @@ namespace Airerage.Core.Items
         }
 
         // エネルギーショット: まっすぐ飛び、最初に当たった相手に当たって消える。地形・届く距離・ステージの外で消える。
-        private static void StepShot(ref WorldObject shot, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+        private static void StepShot(ref WorldObject shot, WorldObjects objects, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
             ICollisionQuery collision, StageBounds? bounds, ItemTuning tuning, List<HitRecord> hits)
         {
             Vector2 delta = shot.Velocity * SimTime.DeltaTime;
@@ -1223,10 +1223,15 @@ namespace Airerage.Core.Items
                     return;
                 }
             }
+            // 身代わり人形（だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
+            if (HitDecoys(objects, shot, tuning.ShotRadius, tuning.ShotHit, shot.Velocity.X >= 0f ? 1 : -1, AttackPower.Normal))
+            {
+                shot.Ended = true;
+            }
         }
 
         // 砂岩ボール: 重力で落ち、地形で跳ね返る。速く動いているときに触れた人に当たる。5 秒で消え、持ち主のクールタイムが始まる。
-        private static void StepBall(ref WorldObject ball, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+        private static void StepBall(ref WorldObject ball, WorldObjects objects, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
             ICollisionQuery collision, StageBounds? bounds, ItemTuning tuning, int tick, List<HitRecord> hits)
         {
             if (tick - ball.SpawnTick >= tuning.BallLifetimeTicks
@@ -1280,22 +1285,34 @@ namespace Airerage.Core.Items
                 {
                     continue;
                 }
-                Vector2 dir = velocity / speed;
-                float knockback = speed * tuning.BallKnockbackPerSpeed;
-                var data = new AttackHit
-                {
-                    Damage = Math.Max(1, (int)MathF.Round(speed * tuning.BallDamagePerSpeed)),
-                    Gauge = tuning.BallGauge,
-                    HitstopTicks = tuning.BallHitstopTicks,
-                    HitstunTicks = tuning.BallHitstunTicks,
-                    KnockbackX = MathF.Abs(dir.X) * knockback,
-                    KnockbackY = dir.Y * knockback,
-                };
-                hits.Add(new HitRecord(attacker, v, AttackSlot.Ground, 0, data, dir.X >= 0f ? 1 : -1, AttackPower.Normal, fromObject: true));
+                hits.Add(new HitRecord(attacker, v, AttackSlot.Ground, 0, BallHit(velocity, speed, tuning), velocity.X >= 0f ? 1 : -1,
+                    AttackPower.Normal, fromObject: true));
                 ball.HitMask |= 1u << v;
                 // 当たったら勢いが落ちる【仮】。
                 ball.Velocity *= 0.5f;
             }
+            // 身代わり人形（だれの人形でも）にも 1 回当たる（ユーザーの指定、2026-11-06）。
+            if (TouchesDecoy(objects, ball.Position, radius)
+                && HitDecoys(objects, ball, radius, BallHit(velocity, speed, tuning), velocity.X >= 0f ? 1 : -1, AttackPower.Normal))
+            {
+                ball.Velocity *= 0.5f;
+            }
+        }
+
+        // 砂岩ボールの攻撃: 速さ speed（向き velocity）に応じた威力と吹き飛び。
+        private static AttackHit BallHit(Vector2 velocity, float speed, ItemTuning tuning)
+        {
+            Vector2 dir = velocity / speed;
+            float knockback = speed * tuning.BallKnockbackPerSpeed;
+            return new AttackHit
+            {
+                Damage = Math.Max(1, (int)MathF.Round(speed * tuning.BallDamagePerSpeed)),
+                Gauge = tuning.BallGauge,
+                HitstopTicks = tuning.BallHitstopTicks,
+                HitstunTicks = tuning.BallHitstunTicks,
+                KnockbackX = MathF.Abs(dir.X) * knockback,
+                KnockbackY = dir.Y * knockback,
+            };
         }
 
         /// <summary>

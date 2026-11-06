@@ -176,6 +176,28 @@ namespace Airerage.Runtime.Presentation
             });
         }
 
+        /// <summary>コイン 1 枚（右上の札の COIN の印。2026-11-06）: 金色の円と、濃い金色の縁と、真ん中の縦の線。</summary>
+        public static Texture2D Coin(int size)
+        {
+            var gold = new Color(1f, 0.81f, 0.23f, 1f);
+            var rim = new Color(0.78f, 0.58f, 0.06f, 1f);
+            return Draw("IconCoin", size, (u, v) =>
+            {
+                float dx = u - 0.5f;
+                float dy = v - 0.5f;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                if (r > 0.46f)
+                {
+                    return Color.clear;
+                }
+                if (r > 0.35f)
+                {
+                    return rim;
+                }
+                return Mathf.Abs(dx) < 0.06f && Mathf.Abs(dy) < 0.2f ? rim : gold;
+            });
+        }
+
         /// <summary>撃破ドロップのかたまり: 金色のコインが 3 枚重なった山。</summary>
         public static Texture2D CoinPile(int size)
         {
