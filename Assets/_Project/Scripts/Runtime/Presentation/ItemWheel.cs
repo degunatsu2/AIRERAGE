@@ -158,7 +158,8 @@ namespace Airerage.Runtime.Presentation
                 ConfirmCount++;
                 return;
             }
-            bool usable = ItemCatalog.IsActive(id) && (ItemRules.ChargesLeft(bag, slot, ItemValues) > 0 || ItemRules.CanRecall(bag, id));
+            bool usable = ItemCatalog.IsActive(id)
+                && (ItemRules.ChargesLeft(bag, slot, ItemValues) > 0 || ItemRules.CanRecall(bag, id) || ItemRules.CanDetonate(bag, slot));
             if (usable)
             {
                 Confirm(now);

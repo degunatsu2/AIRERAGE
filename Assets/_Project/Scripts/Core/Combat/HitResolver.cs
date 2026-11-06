@@ -111,7 +111,7 @@ namespace Airerage.Core.Combat
                     Airerage.Core.Items.ItemRules.StrikeBalls(objects, a, ObjectHitKey(a, attacker.Combat.AttackSerial, h), center,
                         HitShapes.Bounds(half, angle),
                         new Vector2(hitData.KnockbackX * attacker.Facing, hitData.KnockbackY) * power.KnockbackScale, tick, Items);
-                    // 身代わり人形（アイテム）にも当たる（自分・味方の人形にも。威力を記録して吹き飛ぶ。3 回で爆発）。
+                    // 身代わり爆弾（アイテム）にも当たる（自分・味方の人形にも。威力を記録して吹き飛ぶ。3 回で爆発）。
                     bool decoy = Airerage.Core.Items.ItemRules.HitDecoys(objects, ObjectHitKey(a, attacker.Combat.AttackSerial, h), center,
                         HitShapes.Bounds(half, angle), hitData, attacker.Facing, power);
                     if (objects != null && (DamageObjects(objects, configs, a, attacker.Combat.AttackSerial, h, center, HitShapes.Bounds(half, angle),

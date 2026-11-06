@@ -16,7 +16,9 @@ namespace Airerage.Runtime.Presentation
     /// - 下の段: 金庫の印と BANK（大きく、黄色）、コインの印と COIN、衝撃の印と K（撃破した数）、倒れた人の印と F（撃破された数）。
     ///   間を灰色の細い斜め線（縁と同じ角度）で区切る。COIN・K・F は同じ大きさ。数が欄に入らなければ字を小さくする（斜め線に重ならない）。
     ///   10,000 以上は 12.4K、1,000,000 以上は 1.2M と短く書く（abbreviate。結果の画面は正確な数）。
-    /// - 1 位の札は、数秒ごとに光が走る。BANK が増えたら数が数え上がり、上に「+増えた数」が浮かぶ（Look.Gain）。
+    /// - 1 位の札は、LeaderPulseSeconds ごとに、画面の外の誘導表示（拠点の移動・ホットエリア。EdgeGuideLayer）と同じ光り方をする: 札が白く光り、
+    ///   札の周りに縁の色の枠（札と同じ斜めの形）が広がって消える（2026-11-06。前の斜めに走る光はカクついて見えた）。BANK が増えたら数が
+    ///   数え上がり、上に「+増えた数」が浮かぶ（Look.Gain）。
     /// 王冠は札の左に出す。WANTED（所持コインが 100 枚以上。2026-11-02）の人は、キャラクターのロゴの所に手配書の印を押す
     /// （その間はロゴを隠す）: 出るときは大きく傾いた印が印鑑を押すように落ちてきて、押した瞬間に朱色の輪が広がって札が揺れる。外れるときは
     /// 光の粒になって散って消え、ロゴが戻る。WANTED の間は札が赤く脈打ち、縁が赤くなり、斜めに大きな「WANTED!」の赤いスタンプを押す
@@ -60,10 +62,10 @@ namespace Airerage.Runtime.Presentation
         private const int ValueFont = 15;
         private const float IconSize = 14f;
         private const float IconGap = 3f;
-        private const int ShineFrames = 16;
         private const int RainbowFrames = 12;
-        private const float ShineCycle = 3.2f;
-        private const float ShineStart = 0.55f;
+
+        /// <summary>1 位の札が光る間隔（秒）。画面の外の誘導表示は 1 秒ごとだが、ずっと出ている札なので間を空ける【仮】。</summary>
+        public const float LeaderPulseSeconds = 3f;
 
         private static readonly Color Gray = new Color(0.5f, 0.5f, 0.52f);
         private static readonly Color Back = new Color(0.03f, 0.05f, 0.09f, 0.8f);
@@ -160,7 +162,6 @@ namespace Airerage.Runtime.Presentation
         private readonly Texture2D _frame;
         private readonly Texture2D _separatorsBag;
         private readonly Texture2D _separatorsPlain;
-        private readonly List<Texture2D> _shine = new List<Texture2D>();
         private readonly List<Texture2D> _rainbow = new List<Texture2D>();
         private readonly Texture2D _crown;
         private readonly Texture2D _crack;
@@ -405,10 +406,6 @@ namespace Airerage.Runtime.Presentation
             {
                 DrawTexture(drawRect, _fill, new Color(0f, 0f, 0f, 0.45f * look.Gray));
             }
-            if (rank == 1 && scored && look.Gray <= 0f)
-            {
-                DrawShine(drawRect);
-            }
             DrawTexture(drawRect, _frame, frame);
             DrawTexture(drawRect, showBag ? _separatorsBag : _separatorsPlain, SeparatorColor);
 
@@ -474,6 +471,10 @@ namespace Airerage.Runtime.Presentation
             if (look.Flash > 0f)
             {
                 DrawTexture(drawRect, _fill, new Color(1f, 1f, 1f, 0.85f * look.Flash));
+            }
+            if (rank == 1 && scored && look.Gray <= 0f)
+            {
+                DrawLeaderPulse(rect, drawRect, frame);
             }
             if (look.WantedEmphasis > 0f)
             {
@@ -633,36 +634,62 @@ namespace Airerage.Runtime.Presentation
             GUI.Label(cell, text, _seconds);
         }
 
-        // 1 位の札に走る光（ShineCycle 秒ごとに、斜めの帯が左から右へ）。
-        private void DrawShine(Rect drawRect)
+        /// <summary>
+        /// 1 位の札の光の進み（0〜1。光っていなければ 1）。LeaderPulseSeconds ごとに、画面の外の誘導表示と同じ長さ（EdgeGuideLayer.AppearSeconds）
+        /// で白く光って枠が広がる。
+        /// </summary>
+        public static float LeaderPulse(float time)
         {
-            float phase = Mathf.Repeat(Time.time / ShineCycle, 1f);
-            if (phase < ShineStart)
+            return Mathf.Clamp01(Mathf.Repeat(time, LeaderPulseSeconds) / EdgeGuideLayer.AppearSeconds);
+        }
+
+        // 1 位の札の光（EdgeGuideLayer の光り方と同じ: 白く光ってから戻り、縁の色の枠が広がって消える）。
+        private void DrawLeaderPulse(Rect rect, Rect drawRect, Color color)
+        {
+            float flash = LeaderPulse(Time.time);
+            if (flash >= 1f)
             {
                 return;
             }
-            float sweep = (phase - ShineStart) / (1f - ShineStart);
-            int frame = Mathf.Clamp(Mathf.FloorToInt(sweep * ShineFrames), 0, ShineFrames - 1);
-            DrawTexture(drawRect, ShineFrame(frame), Color.white);
+            DrawTexture(drawRect, _fill, new Color(1f, 1f, 1f, 0.55f * Mathf.Clamp01(1f - flash / 0.5f)));
+            DrawSpreadingOutline(rect, color, flash);
         }
 
-        private Texture2D ShineFrame(int frame)
+        // 札の周りに広がって消える枠（札と同じ平行四辺形。広がり方・太さ・薄くなり方は EdgeGuideLayer の枠と同じ）。
+        private static void DrawSpreadingOutline(Rect rect, Color color, float progress)
         {
-            if (_shine.Count == 0)
-            {
-                for (int f = 0; f < ShineFrames; f++)
-                {
-                    float u = (f + 0.5f) / ShineFrames;
-                    float center = Mathf.Lerp(-30f, BaseWidth + 30f, u);
-                    _shine.Add(Bake($"StatusPlateShine{f}", (x, y) =>
-                    {
-                        float line = center + Slant * (BaseHeight * 0.5f - y);
-                        float band = Mathf.Clamp01(1f - Mathf.Abs(x - line) / 22f);
-                        return White(FillAlpha(x, y, _scale) * 0.3f * band * band);
-                    }));
-                }
-            }
-            return _shine[frame];
+            float t = 1f - (1f - progress) * (1f - progress) * (1f - progress);
+            float spread = 6f + 34f * t;
+            float thickness = Mathf.Lerp(4f, 1f, progress);
+            float sx = rect.width / BaseWidth;
+            float slant = Slant * sx * BaseHeight / rect.height;
+            float secant = Mathf.Sqrt(1f + slant * slant);
+            float top = rect.y - spread;
+            float bottom = rect.yMax + spread;
+            float height = bottom - top;
+            // 外へ spread だけ離した平行四辺形の 4 つの角（左の辺は上ほど右）。
+            float leftBottom = rect.x - slant * spread - spread * secant;
+            float leftTop = leftBottom + slant * height;
+            float rightTop = rect.xMax + slant * spread + spread * secant;
+            float rightBottom = rightTop - slant * height;
+            Color previous = GUI.color;
+            GUI.color = HudFade.Apply(new Color(color.r, color.g, color.b, (1f - progress) * 0.9f));
+            GUI.DrawTexture(new Rect(leftTop, top, rightTop - leftTop, thickness), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(leftBottom, bottom - thickness, rightBottom - leftBottom, thickness), Texture2D.whiteTexture);
+            float angle = Mathf.Atan(slant) * Mathf.Rad2Deg;
+            float length = height * secant;
+            DrawSlantedLine(new Vector2((leftTop + leftBottom) * 0.5f, (top + bottom) * 0.5f), length, thickness, angle);
+            DrawSlantedLine(new Vector2((rightTop + rightBottom) * 0.5f, (top + bottom) * 0.5f), length, thickness, angle);
+            GUI.color = previous;
+        }
+
+        // 中心 center・長さ length・太さ thickness の縦の線を、angle 度だけ時計回りに傾けて描く（上が右へ寄る）。色は GUI.color。
+        private static void DrawSlantedLine(Vector2 center, float length, float thickness, float angle)
+        {
+            Matrix4x4 matrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(angle, center);
+            GUI.DrawTexture(new Rect(center.x - thickness * 0.5f, center.y - length * 0.5f, thickness, length), Texture2D.whiteTexture);
+            GUI.matrix = matrix;
         }
 
         private Texture2D RainbowFrame(float time)
@@ -816,15 +843,10 @@ namespace Airerage.Runtime.Presentation
             Object.Destroy(_frame);
             Object.Destroy(_separatorsBag);
             Object.Destroy(_separatorsPlain);
-            foreach (Texture2D texture in _shine)
-            {
-                Object.Destroy(texture);
-            }
             foreach (Texture2D texture in _rainbow)
             {
                 Object.Destroy(texture);
             }
-            _shine.Clear();
             _rainbow.Clear();
             Object.Destroy(_crown);
             Object.Destroy(_poster);

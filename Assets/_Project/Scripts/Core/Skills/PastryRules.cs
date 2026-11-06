@@ -379,7 +379,7 @@ namespace Airerage.Core.Skills
                     macaron.HitMask |= 1u << v;
                 }
             }
-            // 身代わり人形（アイテム。だれの人形でも）にも 1 回ずつ当たる（相手と同じく、通り抜けて飛び続ける。ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（アイテム。だれの人形でも）にも 1 回ずつ当たる（相手と同じく、通り抜けて飛び続ける。ユーザーの指定、2026-11-06）。
             int side = macaron.Velocity.X > 0f ? 1 : macaron.Velocity.X < 0f ? -1 : 0;
             Airerage.Core.Items.ItemRules.HitDecoys(objects, macaron, tuning.Radius, tuning.Hit, side,
                 new AttackPower(1f, macaron.BonusPercent, macaron.BonusPercent, jackpot: macaron.Variant == (byte)MacaronColor.Rainbow));
@@ -456,7 +456,7 @@ namespace Airerage.Core.Skills
                     return;
                 }
             }
-            // 身代わり人形（アイテム。だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（アイテム。だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
             int scaleGrams = ScaleGrams(scale, tuning, tick);
             int scaleBonus = tuning.BonusPercentAt(scaleGrams);
             if (Airerage.Core.Items.ItemRules.HitDecoys(objects, Airerage.Core.Items.ItemRules.ProjectileDecoyKey(scale), scale.Position,

@@ -367,7 +367,7 @@ namespace Airerage.Core.Skills
                 }
                 return;
             }
-            // 身代わり人形（アイテム。だれの人形でも）: フラックは触れたら爆発し、空中横の砲弾は当てて消える（ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（アイテム。だれの人形でも）: フラックは触れたら爆発し、空中横の砲弾は当てて消える（ユーザーの指定、2026-11-06）。
             if (flak)
             {
                 if (Airerage.Core.Items.ItemRules.TouchesDecoy(objects, shell.Position, radius))
@@ -500,7 +500,7 @@ namespace Airerage.Core.Skills
                     objects[o] = other;
                 }
             }
-            // 範囲の身代わり人形（アイテム。だれの人形でも）にも当たる（中心から離れる向きへ飛ぶ）。
+            // 範囲の身代わり爆弾（アイテム。だれの人形でも）にも当たる（中心から離れる向きへ飛ぶ）。
             Airerage.Core.Items.ItemRules.HitDecoys(objects, item, radius, hit, 0, AttackPower.Normal);
             item.Variant = blast;
             item.Velocity = Vector2.Zero;

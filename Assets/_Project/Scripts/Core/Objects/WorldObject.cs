@@ -150,7 +150,7 @@ namespace Airerage.Core.Objects
         /// <summary>携帯トランポリン（アイテム）。End は半分の大きさ。乗った人（だれでも）を跳ね上げる。Damage は跳ね上げた回数。</summary>
         Trampoline = 29,
 
-        /// <summary>身代わり人形（アイテム）。End は持ち主の箱の半分の大きさ。Damage は受けた攻撃の回数（決まった回数で壊れる）。</summary>
+        /// <summary>身代わり爆弾（アイテム）。End は持ち主の箱の半分の大きさ。Damage は受けた攻撃の回数（決まった回数で壊れる）。</summary>
         Decoy = 30,
 
         /// <summary>瓶詰めの雷雲（アイテム）。End は（雷の届く幅の半分、下への長さ）。Damage は落とした雷の数。</summary>

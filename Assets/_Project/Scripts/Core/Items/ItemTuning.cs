@@ -291,15 +291,16 @@ namespace Airerage.Core.Items
         public float TrampolineHalfHeight = 0.25f;
         public float TrampolineLaunchSpeed = 24f;
 
-        // ---------------------------------------------------------------- 身代わり人形
+        // ---------------------------------------------------------------- 身代わり爆弾（ItemId.DecoyDoll。2026-11-06 に「身代わり爆弾」から改名）
 
         /// <summary>
-        /// 身代わり人形（ユーザーの指定、2026-11-06）: クールタイム（15 秒）、爆発するまでに受けられる攻撃の回数（3 回）、置いておく長さ（2 秒）、
-        /// 置く距離（照準の方向。m）、大きさ（キャラクターの箱にかける数）【仮】。
+        /// 身代わり爆弾（ユーザーの指定、2026-11-06）: クールタイム（15 秒。爆発するか消えてから数える）、爆発するまでに受けられる攻撃の回数
+        /// （3 回）、爆発するまでの長さ（5 秒。同じキーをもう一度押すとすぐに爆発する）、置く距離（照準の方向。m）、大きさ（キャラクターの箱に
+        /// かける数）【仮】。
         /// </summary>
         public int DecoyCooldownTicks = 900;
         public int DecoyHits = 3;
-        public int DecoyTicks = 120;
+        public int DecoyTicks = 300;
         public float DecoyDistance = 1.8f;
         public float DecoySizeScale = 1.3f;
 

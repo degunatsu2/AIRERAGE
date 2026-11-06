@@ -325,7 +325,7 @@ namespace Airerage.Core.Ai
                 }
                 if (Items.ItemRules.TryGetDecoy(world.Objects, other, out Vector2 decoy))
                 {
-                    // 身代わり人形（アイテム）があれば、人形のほうを狙う。
+                    // 身代わり爆弾（アイテム）があれば、人形のほうを狙う。
                     opponent.Position = new Vector3(decoy.X, decoy.Y, 0f);
                 }
                 Vector3 opponentHalf = world.GetConfig(other).Movement.HalfExtents;

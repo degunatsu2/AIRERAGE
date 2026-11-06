@@ -146,7 +146,7 @@ namespace Airerage.Core.Skills
                     return;
                 }
             }
-            // 身代わり人形（アイテム。だれの人形でも）に触れても爆発する（ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（アイテム。だれの人形でも）に触れても爆発する（ユーザーの指定、2026-11-06）。
             if (Airerage.Core.Items.ItemRules.TouchesDecoy(objects, missile.Position, tuning.Radius))
             {
                 Explode(ref missile, objects, states, configs, tuning, hits, tick);
@@ -396,7 +396,7 @@ namespace Airerage.Core.Skills
                     hits.Add(new HitRecord(missile.Owner, v, missile.Slot, 0, tuning.Hit, facing, power, fromObject: true));
                 }
             }
-            // 範囲の身代わり人形（アイテム）にも当たる（中心から離れる向きへ飛ぶ）。
+            // 範囲の身代わり爆弾（アイテム）にも当たる（中心から離れる向きへ飛ぶ）。
             Airerage.Core.Items.ItemRules.HitDecoys(objects, missile, reach, tuning.Hit, 0, power);
             for (int o = 0; o < objects.Count; o++)
             {

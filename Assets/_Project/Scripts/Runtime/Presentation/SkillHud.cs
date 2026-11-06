@@ -466,7 +466,9 @@ namespace Airerage.Runtime.Presentation
             alpha = Mathf.Clamp01(alpha);
             // フェードインの間は少し下からせり上がる。
             float rise = (1f - Mathf.Clamp01(age / PickupInSeconds)) * 10f;
-            var rect = new Rect(center - width * 0.5f, bottom - PickupHeight + rise, width, PickupHeight);
+            // 画面からはみ出さない所に置く（ローカル対戦の端の人の札など）。
+            float left = Mathf.Clamp(center - width * 0.5f, 4f, Mathf.Max(4f, Screen.width - width - 4f));
+            var rect = new Rect(left, bottom - PickupHeight + rise, width, PickupHeight);
             Color accent = ItemIcons.Accent(_pickupItem);
             Color previous = GUI.color;
             GUI.color = HudFade.Apply(new Color(Fill.r, Fill.g, Fill.b, Fill.a * alpha));
@@ -475,6 +477,8 @@ namespace Airerage.Runtime.Presentation
             GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 2f), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2f, rect.width, 2f), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(rect.x, rect.y, 4f, rect.height), Texture2D.whiteTexture);
+            // 右の縁（なかったので、縁の右側が切れて見えた。2026-11-06 の指摘）。
+            GUI.DrawTexture(new Rect(rect.xMax - 2f, rect.y, 2f, rect.height), Texture2D.whiteTexture);
             float icon = PickupHeight - 16f;
             Texture2D texture = ItemIcons.Get(_pickupItem);
             if (texture != null)

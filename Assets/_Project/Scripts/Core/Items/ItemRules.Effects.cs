@@ -295,7 +295,8 @@ namespace Airerage.Core.Items
                 case ItemId.DecoyDoll:
                 {
                     // 照準の方向の目の前に置く（ユーザーの指定、2026-11-06）。消えるのは爆発したとき（StepDecoy）なので、ExpireTick では消さない。
-                    Spend(ref bag, slot, tuning.DecoyCooldownTicks, false);
+                    // クールタイムは爆発するか消えてから数える（ReleaseDecoy）。置いている間に同じキーを押すと、すぐに爆発する（DetonateDecoys）。
+                    Spend(ref bag, slot, tuning.DecoyCooldownTicks, true);
                     var half = new Vector2(body.X, body.Y) * tuning.DecoySizeScale * size;
                     Vector2 position = PlacementRules.FreePosition(collision, center + aim * tuning.DecoyDistance, half, center);
                     objects.Add(new WorldObject
@@ -545,15 +546,65 @@ namespace Airerage.Core.Items
             }
         }
 
-        // 身代わり人形: 置いた所にとどまり、一度でも攻撃を受けたら吹き飛んで重力で落ちる。決まった回数の攻撃を受けるか時間が来たら、
-        // 記録した威力の合計に応じた爆発を起こして消える（ユーザーの指定、2026-11-06）。
+        /// <summary>身代わり爆弾の、持ち主がもう一度キーを押して爆発させる印（WorldObject.HitMask。人形は HitMask をほかに使わない）。</summary>
+        public const uint DecoyDetonateMark = 1u;
+
+        /// <summary>
+        /// 枠 slot の身代わり爆弾を置いている間か（もう一度キーを押すと爆発させる。クールタイムは爆発してから数えるので、その間は
+        /// CombatState.CooldownWhileActive）。
+        /// </summary>
+        public static bool CanDetonate(in ItemBag bag, int slot)
+        {
+            return bag.Get(slot) == ItemId.DecoyDoll && bag.GetCooldown(slot) == CombatState.CooldownWhileActive;
+        }
+
+        // 持ち主 owner の置いている身代わり爆弾に、爆発させる印を付ける（次の StepDecoy で爆発する）。印を付けたら true。
+        private static bool DetonateDecoys(WorldObjects objects, int owner)
+        {
+            bool marked = false;
+            for (int i = 0; objects != null && i < objects.Count; i++)
+            {
+                WorldObject decoy = objects[i];
+                if (decoy.Kind == WorldObjectKind.Decoy && !decoy.Ended && decoy.Owner == owner)
+                {
+                    decoy.HitMask |= DecoyDetonateMark;
+                    objects[i] = decoy;
+                    marked = true;
+                }
+            }
+            return marked;
+        }
+
+        // 身代わり爆弾が爆発したか消えた: 持ち主 owner の、爆弾を待っている枠のクールタイムを数え始める。
+        private static void ReleaseDecoy(List<CharacterState> states, int owner, ItemTuning tuning)
+        {
+            if (owner < 0 || owner >= states.Count)
+            {
+                return;
+            }
+            CharacterState state = states[owner];
+            for (int slot = 0; slot < ItemCatalog.BagSlots; slot++)
+            {
+                if (CanDetonate(state.Items, slot))
+                {
+                    state.Items.SetCooldown(slot, tuning.DecoyCooldownTicks);
+                    states[owner] = state;
+                    return;
+                }
+            }
+        }
+
+        // 身代わり爆弾: 置いた所にとどまり、一度でも攻撃を受けたら吹き飛んで重力で落ちる。決まった回数の攻撃を受けるか、時間が来るか、
+        // 持ち主がもう一度キーを押したら、記録した威力の合計に応じた爆発を起こして消える（ユーザーの指定、2026-11-06）。
+        // 爆発するか消えたら、持ち主のクールタイムが始まる。
         private static void StepDecoy(ref WorldObject decoy, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
             ICollisionQuery collision, StageBounds? bounds, ItemTuning tuning, int tick, List<HitRecord> hits)
         {
-            if (decoy.Damage >= tuning.DecoyHits || tick - decoy.SpawnTick >= tuning.DecoyTicks)
+            if (decoy.Damage >= tuning.DecoyHits || tick - decoy.SpawnTick >= tuning.DecoyTicks || (decoy.HitMask & DecoyDetonateMark) != 0)
             {
                 ExplodeDecoy(decoy, states, configs, tuning, hits);
                 decoy.Ended = true;
+                ReleaseDecoy(states, decoy.Owner, tuning);
                 return;
             }
             if (decoy.Damage == 0)
@@ -598,16 +649,17 @@ namespace Airerage.Core.Items
             {
                 // ステージの外へ飛んだ: 爆発せずに消える。
                 decoy.Ended = true;
+                ReleaseDecoy(states, decoy.Owner, tuning);
             }
         }
 
-        /// <summary>身代わり人形が記録した威力の合計 recorded での、爆発の半径（m）。</summary>
+        /// <summary>身代わり爆弾が記録した威力の合計 recorded での、爆発の半径（m）。</summary>
         public static float DecoyBlastRadius(long recorded, ItemTuning tuning)
         {
             return Math.Min(tuning.DecoyBlastRadiusMax, tuning.DecoyBlastRadiusBase + tuning.DecoyBlastRadiusPerDamage * Math.Max(0L, recorded));
         }
 
-        /// <summary>身代わり人形が記録した威力の合計 recorded での、爆発の威力（0 なら当たらない）。</summary>
+        /// <summary>身代わり爆弾が記録した威力の合計 recorded での、爆発の威力（0 なら当たらない）。</summary>
         public static int DecoyBlastDamage(long recorded, ItemTuning tuning)
         {
             long damage = Math.Max(0L, recorded) * tuning.DecoyBlastDamagePercent / 100;
@@ -685,7 +737,7 @@ namespace Airerage.Core.Items
                     bomb.Position += delta;
                     if (TouchesDecoy(objects, bomb.Position, tuning.BombRadius))
                     {
-                        // 身代わり人形（だれの人形でも）に触れた: その場に刺さって、時間が来たら爆発する（ユーザーの指定、2026-11-06）。
+                        // 身代わり爆弾（だれの人形でも）に触れた: その場に刺さって、時間が来たら爆発する（ユーザーの指定、2026-11-06）。
                         bomb.Velocity = Vector2.Zero;
                         bomb.Stored = 1;
                         bomb.ChargeMilli = tick + tuning.BombFuseTicks;
@@ -733,7 +785,7 @@ namespace Airerage.Core.Items
         private static void Explode(in WorldObject bomb, WorldObjects objects, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
             ItemTuning tuning, List<HitRecord> hits)
         {
-            // 範囲の身代わり人形（だれの人形でも）にも当たる（ユーザーの指定、2026-11-06）。
+            // 範囲の身代わり爆弾（だれの人形でも）にも当たる（ユーザーの指定、2026-11-06）。
             HitDecoys(objects, bomb, tuning.BombBlastRadius, tuning.BombHit, 0, AttackPower.Normal);
             for (int v = 0; v < states.Count; v++)
             {
@@ -912,9 +964,9 @@ namespace Airerage.Core.Items
             }
         }
 
-        // ---------------------------------------------------------------- 身代わり人形（CPU と攻撃）
+        // ---------------------------------------------------------------- 身代わり爆弾（CPU と攻撃）
 
-        /// <summary>キャラクター owner の身代わり人形の位置（なければ false）。CPU は人形のほうを狙う。</summary>
+        /// <summary>キャラクター owner の身代わり爆弾の位置（なければ false）。CPU は人形のほうを狙う。</summary>
         public static bool TryGetDecoy(WorldObjects objects, int owner, out Vector2 position)
         {
             if (objects != null)
@@ -934,7 +986,7 @@ namespace Airerage.Core.Items
         }
 
         /// <summary>
-        /// 身代わり人形に当てる、投射物・爆発の攻撃の鍵（同じ投射物は 1 回だけ当たる）。近接攻撃の鍵（HitResolver.ObjectHitKey。正の数）と
+        /// 身代わり爆弾に当てる、投射物・爆発の攻撃の鍵（同じ投射物は 1 回だけ当たる）。近接攻撃の鍵（HitResolver.ObjectHitKey。正の数）と
         /// 重ならないように、物の番号の負の数にする。
         /// </summary>
         public static int ProjectileDecoyKey(in WorldObject projectile)
@@ -942,7 +994,7 @@ namespace Airerage.Core.Items
             return -projectile.Id;
         }
 
-        /// <summary>点 point（半径 radius）が身代わり人形に触れているか（投射物が人形に当たって止まる・爆発するか）。</summary>
+        /// <summary>点 point（半径 radius）が身代わり爆弾に触れているか（投射物が人形に当たって止まる・爆発するか）。</summary>
         public static bool TouchesDecoy(WorldObjects objects, Vector2 point, float radius)
         {
             for (int i = 0; objects != null && i < objects.Count; i++)
@@ -958,7 +1010,7 @@ namespace Airerage.Core.Items
         }
 
         /// <summary>
-        /// 攻撃 hit（強さ power、向き facing。0 なら範囲の中心から離れる向き）の範囲（中心 center、半分の大きさ half）に重なった身代わり人形に、
+        /// 攻撃 hit（強さ power、向き facing。0 なら範囲の中心から離れる向き）の範囲（中心 center、半分の大きさ half）に重なった身代わり爆弾に、
         /// 攻撃を 1 回当てる（同じ攻撃の同じ判定は 1 回。key）。人形は持ち主・味方・相手を問わず、近接攻撃・投射物・爆発のどれも受ける
         /// （ユーザーの指定、2026-11-06）。威力を記録し（ChargeMilli）、吹き飛びの割合（BonusPercent）で飛ぶ（それからは重力で落ちる）。
         /// 決まった回数で爆発する（StepDecoy）。当てたら true。
@@ -992,7 +1044,7 @@ namespace Airerage.Core.Items
             return struck;
         }
 
-        /// <summary>投射物 projectile（半径 radius）の攻撃 hit を、触れた身代わり人形に当てる（HitDecoys）。当てたら true（投射物は止まる）。</summary>
+        /// <summary>投射物 projectile（半径 radius）の攻撃 hit を、触れた身代わり爆弾に当てる（HitDecoys）。当てたら true（投射物は止まる）。</summary>
         public static bool HitDecoys(WorldObjects objects, in WorldObject projectile, float radius, AttackHit hit, int facing, AttackPower power)
         {
             return HitDecoys(objects, ProjectileDecoyKey(projectile), projectile.Position, new Vector2(radius, radius), hit, facing, power);

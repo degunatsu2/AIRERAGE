@@ -448,7 +448,7 @@ namespace Airerage.Core.Skills
                     return;
                 }
             }
-            // 身代わり人形（アイテム）に触れたら、だれの人形でも当てて消える（ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（アイテム）に触れたら、だれの人形でも当てて消える（ユーザーの指定、2026-11-06）。
             int side = shot.Velocity.X > 0f ? 1 : shot.Velocity.X < 0f ? -1 : states[shot.Owner].Facing;
             if (Airerage.Core.Items.ItemRules.HitDecoys(objects, shot, tuning.Radius, tuning.Hit, side,
                     AttackPower.OfProjectile(shot.BonusPercent, PowerSource.HeldCoins)))

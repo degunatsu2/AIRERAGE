@@ -500,6 +500,12 @@ namespace Airerage.Core.Items
                                 break;
                             }
                         }
+                        else if (CanDetonate(bag, slot))
+                        {
+                            // 身代わり爆弾を置いている間にもう一度押した: すぐに爆発させる（押した瞬間。ユーザーの指定、2026-11-06）。
+                            DetonateDecoys(objects, index);
+                            break;
+                        }
                         else if (ItemCatalog.IsActive(id) && (ChargesLeft(bag, slot, tuning) > 0 || CanRecall(bag, id)) && !bag.Acting)
                         {
                             // 押した: 狙い始める（離したら使う）。照準がなければ向いている方向。
@@ -1223,7 +1229,7 @@ namespace Airerage.Core.Items
                     return;
                 }
             }
-            // 身代わり人形（だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
             if (HitDecoys(objects, shot, tuning.ShotRadius, tuning.ShotHit, shot.Velocity.X >= 0f ? 1 : -1, AttackPower.Normal))
             {
                 shot.Ended = true;
@@ -1291,7 +1297,7 @@ namespace Airerage.Core.Items
                 // 当たったら勢いが落ちる【仮】。
                 ball.Velocity *= 0.5f;
             }
-            // 身代わり人形（だれの人形でも）にも 1 回当たる（ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（だれの人形でも）にも 1 回当たる（ユーザーの指定、2026-11-06）。
             if (TouchesDecoy(objects, ball.Position, radius)
                 && HitDecoys(objects, ball, radius, BallHit(velocity, speed, tuning), velocity.X >= 0f ? 1 : -1, AttackPower.Normal))
             {

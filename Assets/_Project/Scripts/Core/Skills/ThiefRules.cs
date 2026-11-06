@@ -240,7 +240,7 @@ namespace Airerage.Core.Skills
         {
             ThiefTuning tuning = configs[ball.Owner].Skills.Thief;
             bool burst = Sweep(ref ball, terrain, states, configs, tuning.SmokeBallRadius, out bool reached, out _);
-            // 身代わり人形（アイテム。だれの人形でも）に触れても弾ける（ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（アイテム。だれの人形でも）に触れても弾ける（ユーザーの指定、2026-11-06）。
             if (!burst && Airerage.Core.Items.ItemRules.TouchesDecoy(objects, ball.Position, tuning.SmokeBallRadius))
             {
                 burst = true;

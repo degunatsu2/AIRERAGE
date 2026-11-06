@@ -430,14 +430,15 @@ namespace Airerage.Runtime.Simulation
                 System.Numerics.Vector3 simOrigin = origin.ToNumerics();
                 SimInput shown = InputOverride != null ? LastInput : _input.Peek(simOrigin);
                 var frame = new InputFrame(shown, current.PreviousButtons);
-                // 強化（キャッスルインジエアーの空中への接続など）も含めた調整値で予測する。
-                WireTuning wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, PlayerConfig).Wire;
+                // 強化（キャッスルインジエアーの空中への接続など）とパッシブアイテム（ロングフックの射程）も含めた、今のティックの調整値で
+                // 予測する（もとの調整値ではアイテムの射程が照準に出なかった。2026-11-06）。
+                WireTuning wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, _world.GetConfig(_player)).Wire;
                 // 置かれた物のアンカー（ミラーボール）も含めて予測する。
                 WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _world.Collision);
                 // 結果の画面（試合が終わった後）では出さない。始まる前のカウントダウンでは出す（動き出しの計画を立てやすい）。
                 // 照準を技に使っている間（Q の構え・R の場所選び・長押しの矢印）も出さない。
                 bool hidden = current.Combat.InvisibleTicksLeft > 0 || _world.Phase == Airerage.Core.Match.MatchPhase.Finished
-                    || Airerage.Core.Skills.SkillRules.AimsWithCursor(current, PlayerConfig);
+                    || Airerage.Core.Skills.SkillRules.AimsWithCursor(current, _world.GetConfig(_player));
                 _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, hidden);
             }
         }

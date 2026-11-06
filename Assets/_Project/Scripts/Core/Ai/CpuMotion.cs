@@ -210,7 +210,7 @@ namespace Airerage.Core.Ai
             }
         }
 
-        // 相手 other を狙う位置（身代わり人形があれば人形の位置。アイテム）。
+        // 相手 other を狙う位置（身代わり爆弾があれば爆弾の位置。アイテム）。
         private static Vector2 TargetPosition(SimWorld world, int other, in CharacterState opponent)
         {
             return Items.ItemRules.TryGetDecoy(world.Objects, other, out Vector2 decoy) ? decoy : Flat(opponent.Position);

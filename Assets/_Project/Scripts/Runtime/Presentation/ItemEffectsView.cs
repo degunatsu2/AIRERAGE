@@ -18,7 +18,7 @@ namespace Airerage.Runtime.Presentation
     /// - 詠唱: キャラクターの下に棒のゲージ（以降、詠唱するものはすべてこれを出す。ユーザーの指示、2026-11-05）。
     /// - 音: 拾った・使った・捨てた・振った・一閃・風。
     /// 追加のアイテム（2026-11-05）: グラップリングボム（刺さると赤く点滅、消えたら爆発の光）、折りたたみの足場、携帯トランポリン、
-    /// 身代わり人形、瓶詰めの雷雲（雷の線）、チェーンフック（持ち主からの鎖）、凍らせた壁、反射板の盾、シャボンのバリア、砂時計で遅い人の
+    /// 身代わり爆弾、瓶詰めの雷雲（雷の線）、チェーンフック（持ち主からの鎖）、凍らせた壁、反射板の盾、シャボンのバリア、砂時計で遅い人の
     /// 紫の光、大きな磁石の赤い光、帰還のリモコンの印、ポケットロケットの炎。
     /// 落ちているアイテム: 出た瞬間に強い光を放ってフェードインし、着地して消える 5 秒前から点滅して円形ゲージと残りの秒数を出し、消えると
     /// 光の粒になる（ユーザーの要望、2026-11-05）。
@@ -86,7 +86,7 @@ namespace Airerage.Runtime.Presentation
             public int Owner;
             public int Strikes;
             public LineRenderer Chain;
-            // 身代わり人形: 立体の体の部品（色を付ける）、記録した威力、受けた回数、受けたときの白い光。
+            // 身代わり爆弾: 立体の体の部品（色を付ける）、記録した威力、受けた回数、受けたときの白い光。
             public Renderer[] Parts;
             public Color[] PartColors;
             public long Recorded;
@@ -392,7 +392,7 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        // 身代わり人形の立体の体（わらの色の胴・頭・腕・脚と、持ち主の色の帯）。大きさは箱（item.End）に合わせる。
+        // 身代わり爆弾の立体の体（わらの色の胴・頭・腕・脚と、持ち主の色の帯）。大きさは箱（item.End）に合わせる。
         private void BuildDoll(Shown doll, Transform parent, in WorldObject item)
         {
             var straw = new Color(0.92f, 0.78f, 0.45f);
@@ -446,7 +446,7 @@ namespace Airerage.Runtime.Presentation
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int ColorId = Shader.PropertyToID("_Color");
 
-        // 身代わり人形: 置いた向きを向き、受けた回数だけ傾いて揺れ、受けた瞬間は白く光る。残りの時間が少ないと赤く点滅する。
+        // 身代わり爆弾: 置いた向きを向き、受けた回数だけ傾いて揺れ、受けた瞬間は白く光る。残りの時間が少ないと赤く点滅する。
         private void RenderDecoy(in WorldObject item, Shown shown, Vector3 position, float time)
         {
             shown.Root.transform.position = position;

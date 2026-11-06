@@ -107,7 +107,7 @@ namespace Airerage.Core.Skills
                     return;
                 }
             }
-            // 身代わり人形（アイテム。だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
+            // 身代わり爆弾（アイテム。だれの人形でも）に触れたら、当てて消える（ユーザーの指定、2026-11-06）。
             int side = ball.Velocity.X > 0f ? 1 : ball.Velocity.X < 0f ? -1 : 0;
             if (Airerage.Core.Items.ItemRules.HitDecoys(objects, ball, tuning.Radius, tuning.Hit, side, AttackPower.Normal))
             {

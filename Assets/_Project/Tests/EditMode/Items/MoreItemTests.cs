@@ -275,10 +275,10 @@ namespace Airerage.Core.Tests.Items
             Assert.That(hits.Count(h => h.Victim == 1 && h.Data.StunTicks > 0), Is.EqualTo(3), "雷が 3 回落ちない");
         }
 
-        // 身代わり人形（ユーザーの指定、2026-11-06）: 照準の方向の目の前に置き、攻撃を受けるまではその場にとどまる。何も受けずに 2 秒たつと
+        // 身代わり爆弾（ユーザーの指定、2026-11-06）: 照準の方向の目の前に置き、攻撃を受けるまではその場にとどまる。何も受けずに 2 秒たつと
         // 当たらない爆発で消える。
         [Test]
-        public void Decoy_IsPlacedTowardTheAim_StaysPut_AndVanishesAfterTwoSeconds()
+        public void Decoy_IsPlacedTowardTheAim_StaysPut_AndVanishesAfterFiveSeconds()
         {
             var tuning = new ItemTuning();
             SimWorld world = World(PreItem(), new Vector3(0f, GroundY + 2f, 0f), new Vector3(6f, GroundY, 0f));
@@ -290,9 +290,11 @@ namespace Airerage.Core.Tests.Items
             Vector2 placed = dolls[0].Position;
             Step(world, 30);
             Assert.That(ObjectsOf(world, WorldObjectKind.Decoy)[0].Position, Is.EqualTo(placed), "攻撃を受ける前に動いた（重力で落ちた）");
+            Assert.That(world.GetState(0).Items.GetCooldown(0), Is.EqualTo(CombatState.CooldownWhileActive), "置いている間にクールタイムを数えた");
             List<HitRecord> hits = Step(world, tuning.DecoyTicks);
-            Assert.That(ObjectsOf(world, WorldObjectKind.Decoy).Any(d => !d.Ended), Is.False, "2 秒で消えない");
+            Assert.That(ObjectsOf(world, WorldObjectKind.Decoy).Any(d => !d.Ended), Is.False, "5 秒で消えない");
             Assert.That(hits.Any(h => h.Attacker == 0), Is.False, "記録が 0 なのに爆発が当たった");
+            Assert.That(world.GetState(0).Items.GetCooldown(0), Is.GreaterThan(0), "消えてもクールタイムが始まらない");
         }
 
         // 攻撃を受けると威力を記録して吹き飛び、重力で落ちる。3 回で、記録した威力の合計に応じた範囲と威力の爆発を起こす。
@@ -326,6 +328,31 @@ namespace Airerage.Core.Tests.Items
             Assert.That(blast.Data, Is.Not.Null, "爆発が近くの相手に当たらない");
             Assert.That(blast.Data.Damage, Is.EqualTo(ItemRules.DecoyBlastDamage(30, tuning)), "爆発の威力が記録した威力の合計に応じない");
             Assert.That(ItemRules.DecoyBlastRadius(30, tuning), Is.GreaterThan(ItemRules.DecoyBlastRadius(5, tuning)), "記録が多いほど範囲が広くならない");
+        }
+
+        // 身代わり爆弾（2026-11-06 の 2 回目の要望）: 置いている間に同じキーをもう一度押すと、すぐに爆発する。クールタイムは爆発してから数える。
+        [Test]
+        public void DecoyBomb_SecondPressDetonates_AndTheCooldownStartsAtTheBlast()
+        {
+            var tuning = new ItemTuning();
+            SimWorld world = World(PreItem(), new Vector3(0f, GroundY, 0f), new Vector3(3f, GroundY, 0f));
+            world.SetItems(0, new[] { ItemId.DecoyDoll });
+            Use(world, 0, new Vector2(1f, 0f));
+            Step(world, 30);
+            WorldObject[] placed = ObjectsOf(world, WorldObjectKind.Decoy).Where(d => !d.Ended).ToArray();
+            Assert.That(placed.Length, Is.EqualTo(1), "前提: 爆弾を置いた");
+            Assert.That(world.GetState(0).Items.GetCooldown(0), Is.EqualTo(CombatState.CooldownWhileActive), "置いている間にクールタイムを数えた");
+            Assert.That(ItemRules.CanDetonate(world.GetState(0).Items, 0), Is.True);
+            ItemRules.HitDecoys(world.Objects, 201, placed[0].Position, Vector2.One, new AttackHit { Damage = 10 }, 1, AttackPower.Normal);
+
+            List<HitRecord> hits = Use(world, 0, new Vector2(1f, 0f));
+            Assert.That(ObjectsOf(world, WorldObjectKind.Decoy).Any(d => !d.Ended), Is.False, "もう一度押しても爆発しない");
+            Assert.That(hits.Any(h => h.Attacker == 0 && h.Victim == 1), Is.True, "爆発が近くの相手に当たらない");
+            int cooldown = world.GetState(0).Items.GetCooldown(0);
+            Assert.That(cooldown, Is.GreaterThan(tuning.DecoyCooldownTicks - 5).And.LessThanOrEqualTo(tuning.DecoyCooldownTicks),
+                "クールタイムが爆発したときから始まらない");
+            Assert.That(ItemRules.CanDetonate(world.GetState(0).Items, 0), Is.False);
+            Assert.That(ObjectsOf(world, WorldObjectKind.Decoy).Count(d => !d.Ended), Is.Zero, "もう一度押して新しい爆弾を置いた");
         }
 
         // 持ち主の攻撃と投射物も受けて記録する（ユーザーの指定、2026-11-06）。投射物は人形に当たって消える。

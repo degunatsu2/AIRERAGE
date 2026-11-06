@@ -72,6 +72,17 @@ namespace Airerage.PlayMode.Tests
             float expected = 2f * composer.CameraDistance * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad) / 1080f;
             Assert.That(aim.MetersPerPixel, Is.EqualTo(expected).Within(expected * 0.1f), "太さが画面の大きさに合っていない");
             Assert.That(aim.GetComponent<MeshFilter>().sharedMesh.vertexCount, Is.GreaterThan(0), "照準の形がない");
+
+            // パッシブアイテムのロングフックで射程が伸びたら、射程の弧も同じだけ伸びる（2026-11-06 の指摘。もとの調整値で描いていた）。
+            Airerage.Core.Simulation.CharacterState hooked = runner.PlayerState;
+            hooked.Items = Airerage.Core.Items.ItemRules.StartingBag(new[] { Airerage.Core.Items.ItemId.LongHook }, 1);
+            runner.SetPlayerState(hooked);
+            for (int i = 0; i < 5; i++)
+            {
+                yield return null;
+            }
+            float longer = runner.PlayerConfig.Wire.MaxLength * (1f + new Airerage.Core.Items.ItemTuning().LongHookPercent / 100f);
+            Assert.That(aim.RangeRadius, Is.EqualTo(longer).Within(0.001f), "ロングフックの射程が照準の弧に出ない");
         }
     }
 }
