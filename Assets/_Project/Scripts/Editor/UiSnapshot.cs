@@ -80,6 +80,23 @@ namespace Airerage.Editor
             CaptureAll(screens, "StageSelect");
         }
 
+        /// <summary>
+        /// ステージ選択だけ（ステージの絵は撮らない）: 試合の前の選択と、オプションの RANDOM STAGES（チェック・すべてチェック・DONE。
+        /// docs/20 の 3 回目の要望）。
+        /// </summary>
+        public static void CaptureStageSelect()
+        {
+            MenuScreens screens = OpenMenu();
+            Transform select = screens.transform.Find("StageSelect");
+            ShowOnly(screens, select);
+            var screen = select.GetComponent<StageSelectScreen>();
+            // いちばん長い名前（ORBITAL STATION）で、名前と説明がスクロールバーと重ならないかを見る。
+            screen.ShowNetwork(true, 5);
+            CaptureAll(screens, "StageSelect");
+            screen.ShowRandomPool();
+            CaptureAll(screens, "StageSelect_RandomPool");
+        }
+
         /// <summary>オプションの画面（docs/15 T6-9）の 2 つのページ。</summary>
         public static void CaptureOptions()
         {

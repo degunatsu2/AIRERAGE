@@ -441,12 +441,12 @@ namespace Airerage.Editor
             MenuOption done = CreateStagePlate(panel, "Done", "DONE");
             ((RectTransform)done.transform).anchoredPosition = new Vector2(150f, scrollPosition.y - scrollSize.y - 16f);
             UnityEngine.UI.Image band = MenuUiBuilder.CreateFill(panel, "Band", new Color(0.35f, 0.85f, 1f, 0.35f),
-                new Vector2(0.45f, 0.55f), new Vector2(1f, 0.75f));
-            // 名前と説明は右の帯の側に、右の端から置く（左の札と重ならないように。説明は折り返す）。
+                new Vector2(0.52f, 0.55f), new Vector2(1f, 0.75f));
+            // 名前と説明は右の帯の側に、右の端から置く（左の札とスクロールバーに重ならないように。帯もスクロールバーの右から。説明は折り返す）。
             UnityEngine.UI.Text name = MenuUiBuilder.CreateText(panel, "Name", string.Empty, 72, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(1f, 0.65f), new Vector2(-80f, 0f), new Vector2(900f, 100f), Color.white);
+                new Vector2(1f, 0.65f), new Vector2(-80f, 0f), new Vector2(820f, 100f), Color.white);
             UnityEngine.UI.Text description = MenuUiBuilder.CreateText(panel, "Description", string.Empty, 28, FontStyle.Bold, TextAnchor.UpperLeft,
-                new Vector2(1f, 0.5f), new Vector2(-80f, 0f), new Vector2(900f, 200f), new Color(1f, 1f, 1f, 0.85f));
+                new Vector2(1f, 0.5f), new Vector2(-80f, 0f), new Vector2(820f, 200f), new Color(1f, 1f, 1f, 0.85f));
             description.horizontalOverflow = HorizontalWrapMode.Wrap;
             // 説明は文なので、英語でも読みやすい日本語の字体（M PLUS 1。英字も入っている。D-77）。
             description.font = GameFonts.JapaneseBold;
