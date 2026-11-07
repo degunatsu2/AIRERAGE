@@ -1517,7 +1517,13 @@ namespace Airerage.Net
             HandleEvents();
             if (_allReadySince >= 0f && State == SessionState.Lobby)
             {
+                // 全員そろった帯を見せ終わったら進め、段階が変わったことを全員へ知らせる。
+                LobbyPhase before = _phase;
                 CheckLobbyProgress();
+                if (_phase != before)
+                {
+                    BroadcastLobby();
+                }
             }
         }
 
