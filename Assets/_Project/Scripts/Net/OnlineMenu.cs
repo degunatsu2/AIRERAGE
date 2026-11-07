@@ -721,7 +721,9 @@ namespace Airerage.Net
             {
                 TransitionKind kind = previous == Panel.Waiting && panel == Panel.CharacterSelect ? TransitionKind.SlantCascade : TransitionKind.Gust;
                 int direction = Order(panel) >= Order(previous) ? 1 : -1;
-                _transition.Run(kind, direction, null, () => ShowNow(panel, session), "CHARACTER SELECT");
+                // 斜めの札の 1 枚目は NETWORK のイメージカラー（メインメニューの NETWORK の項目の色。2026-11-07）。
+                Color? accent = _menu != null && _menu.Network != null ? _menu.Network.Accent : (Color?)null;
+                _transition.Run(kind, direction, null, () => ShowNow(panel, session), "CHARACTER SELECT", accent);
                 return;
             }
             ShowNow(panel, session);

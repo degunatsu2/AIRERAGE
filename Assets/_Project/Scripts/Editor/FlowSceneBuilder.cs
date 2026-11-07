@@ -342,12 +342,8 @@ namespace Airerage.Editor
             var size = new Vector2(560f, 72f);
             // LOCAL VS ・ NETWORK VS は、右の大きな名前が札にかかるので短くした（ユーザーの要望、2026-11-07）。
             string[] labels = { "SINGLE", "LOCAL", "NETWORK", "TRAINING", "OPTIONS", "QUIT" };
-            // 項目の色（札の縁・裏の札・残像・縁を回る光・右の大きな名前の縁取り。2026-11-07）。
-            Color[] accents =
-            {
-                new Color(0.38f, 0.62f, 1f), new Color(1f, 0.58f, 0.3f), new Color(0.2f, 0.86f, 0.78f),
-                new Color(0.62f, 0.86f, 0.3f), new Color(0.68f, 0.56f, 1f), new Color(1f, 0.38f, 0.5f),
-            };
+            // 項目の色（札の縁・裏の札・残像・縁を回る光・左の絵・右の大きな名前。2026-11-07）。
+            Color[] accents = MenuUiBuilder.MainAccents;
             var items = new MenuOption[labels.Length];
             // 項目の左の小さな絵（D-88 の B12）と、選んでいない項目を暗く下げる（B13）。
             MenuIcon.Shape[] shapes =

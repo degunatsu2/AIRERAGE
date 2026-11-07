@@ -52,6 +52,18 @@ namespace Airerage.Runtime.UI
 
         private const float DetailsSeconds = 0.2f;
 
+        /// <summary>
+        /// トレーニング・シングルモードで決めてから次の画面へ進むまでの秒数（決定の演出を見せる。D-89。その間にもう一度決定を押すと
+        /// すぐ進み、戻るを押すと取り消す）。
+        /// </summary>
+        public const float SingleHoldSeconds = 0.55f;
+
+        /// <summary>ローカル対戦で全員が READY になってから次の画面へ進むまでの秒数（全員そろった帯を見せる。D-89 の C17）。</summary>
+        public const float AllReadyHoldSeconds = 1f;
+
+        /// <summary>RANDOM のルーレットで、カーソルがアイコンを移る回数（D-89 の C18）。</summary>
+        public const int RollHops = 12;
+
         [SerializeField] private CharacterRoster _roster;
         [Tooltip("キャラクターのアイコン（一覧と同じ順。左上から横に並べる）")]
         [SerializeField] private CharacterIcon[] _icons = new CharacterIcon[0];
@@ -99,6 +111,12 @@ namespace Airerage.Runtime.UI
         private GameLanguage _language = GameLanguage.Japanese;
         private int _detailsSlot = -1;
         private float _detailsOpen;
+        // 決定の演出の待ち（トレーニング・シングルモードの決定、ローカル対戦の全員 READY。D-89）。
+        private float _confirmAt = -1f;
+        private float _allReadySince = -1f;
+        // アイコンの置き場所（演出で動かしても、カーソルはここに置く）と、四隅の枠に出している名前（文字の演出の途中でも本来の名前）。
+        private Vector2[] _iconHomes = new Vector2[0];
+        private readonly string[] _shownNames = new string[MaxPlayers];
 
         /// <summary>トレーニング: 決定した（キャラクターの番号）。</summary>
         public event Action<int> Confirmed;
@@ -309,9 +327,64 @@ namespace Airerage.Runtime.UI
         public bool IsJoined(int slot) => _slots[slot].Joined;
 
         /// <summary>四隅の枠 slot に出している名前・ハッシュタグ・状態（テスト用）。</summary>
-        public string ShownName(int slot) => _cornerNames[slot].text;
+        public string ShownName(int slot) => _shownNames[slot] ?? _cornerNames[slot].text;
         public string ShownTags(int slot) => _cornerTags[slot].text;
         public string ShownState(int slot) => _cornerStates[slot].text;
+
+        // ---- 演出（CharacterSelectMotion。D-89）が読む値 ----------------------------------------------------------------------
+
+        /// <summary>アイコンの数（キャラクター＋RANDOM）。</summary>
+        public int IconCount => _icons.Length;
+
+        /// <summary>index のアイコンの置き場所（演出でずらしても変わらない）。</summary>
+        public Vector2 IconHome(int index) => index < _iconHomes.Length ? _iconHomes[index] : _icons[index].Rect.anchoredPosition;
+
+        /// <summary>index のアイコンのキャラクター（RANDOM なら null）。</summary>
+        public CharacterConfigAsset CharacterAt(int index) => _roster != null && index < _roster.Count ? _roster.Get(index) : null;
+
+        /// <summary>slot の人のカーソルが今いるアイコン（RANDOM のルーレットの途中は、ルーレットが今いるアイコン）。</summary>
+        public int CursorIndex(int slot) => _slots[slot].Rolling ? _slots[slot].RollShown : _slots[slot].Character;
+
+        /// <summary>slot の人が RANDOM のルーレットの途中か。</summary>
+        public bool IsRolling(int slot) => _slots[slot].Rolling;
+
+        /// <summary>slot の人のカーソルを出しているか。</summary>
+        public bool CursorShown(int slot) => _cursors[slot].gameObject.activeSelf;
+
+        /// <summary>slot の人の四隅の枠を出しているか。</summary>
+        public bool CornerShown(int slot) => _corners[slot].activeSelf;
+
+        public RectTransform CursorRect(int slot) => _cursors[slot];
+        public RectTransform CornerRect(int slot) => (RectTransform)_corners[slot].transform;
+        public SlantedPlate CornerPlate(int slot) => _cornerPlates[slot];
+        public RawImage CornerLogo(int slot) => _cornerLogos[slot];
+        public Text CornerName(int slot) => _cornerNames[slot];
+        public Text CornerTags(int slot) => _cornerTags[slot];
+
+        /// <summary>slot の人の色（ローカル対戦のチーム対戦ならチームの色）。</summary>
+        public Color PlayerColor(int slot)
+        {
+            if (Mode == SelectMode.Local && _teamMode && _slots[slot].Joined)
+            {
+                return Airerage.Runtime.Presentation.TeamColors.Of(_slots[slot].Team);
+            }
+            return slot < _colors.Length ? _colors[slot] : Color.white;
+        }
+
+        /// <summary>
+        /// 全員そろったか（ローカル対戦・ネットワーク対戦で、参加している人が全員 READY。ローカル対戦は始められる人数のとき。D-89 の C17）。
+        /// </summary>
+        public bool AllReady
+        {
+            get
+            {
+                if (Mode == SelectMode.Single || JoinedCount == 0)
+                {
+                    return false;
+                }
+                return AllJoinedReady() && (Mode != SelectMode.Local || CanStartLocal);
+            }
+        }
 
         /// <summary>技の説明を出しているか（せり出している途中も含む）と、そのキャラクター（テスト用）。</summary>
         public bool DetailsOpen => _detailsSlot >= 0;
@@ -337,6 +410,13 @@ namespace Airerage.Runtime.UI
             public string DeviceName = string.Empty;
             public int Character;
             public bool Ready;
+
+            // RANDOM のルーレット（D-89 の C18）: 回っている途中か、行き先、今いるアイコン、移った回数、次に移る時刻。
+            public bool Rolling;
+            public int RollResult;
+            public int RollShown;
+            public int RollHop;
+            public float RollNextAt;
 
             // チーム対戦のチーム（ローカル対戦。1〜4。T9-6）。
             public byte Team = 1;
@@ -376,6 +456,11 @@ namespace Airerage.Runtime.UI
             {
                 icon.Hovered += OnIconHovered;
                 icon.Clicked += OnIconClicked;
+            }
+            _iconHomes = new Vector2[_icons.Length];
+            for (int i = 0; i < _icons.Length; i++)
+            {
+                _iconHomes[i] = _icons[i].Rect.anchoredPosition;
             }
             UseJapaneseFont();
         }
@@ -555,6 +640,8 @@ namespace Airerage.Runtime.UI
             _detailsSlot = -1;
             _detailsOpen = 0f;
             _networkMessage = string.Empty;
+            _confirmAt = -1f;
+            _allReadySince = -1f;
             _activeFromFrame = Time.frameCount + 1;
             if (UnityEngine.EventSystems.EventSystem.current != null)
             {
@@ -573,6 +660,7 @@ namespace Airerage.Runtime.UI
                 slot.DeviceName = string.Empty;
                 slot.Character = 0;
                 slot.Ready = false;
+                slot.Rolling = false;
             }
         }
 
@@ -592,9 +680,77 @@ namespace Airerage.Runtime.UI
             {
                 Handle(gamepad, ReadGamepad(gamepad));
             }
+            UpdateRolls();
+            if (_confirmAt >= 0f && Time.unscaledTime >= _confirmAt)
+            {
+                FireSingle();
+            }
+            // ローカル対戦: 全員が READY になったら、全員そろった帯を見せてから進む（その間に戻ると取り消し。D-89 の C17）。
             if (isActiveAndEnabled && Mode == SelectMode.Local && CanStartLocal && AllJoinedReady())
             {
-                LocalConfirmed?.Invoke(LocalPlayers(), _timed);
+                if (_allReadySince < 0f)
+                {
+                    _allReadySince = Time.unscaledTime;
+                }
+                else if (Time.unscaledTime - _allReadySince >= AllReadyHoldSeconds)
+                {
+                    _allReadySince = -1f;
+                    LocalConfirmed?.Invoke(LocalPlayers(), _timed);
+                }
+            }
+            else
+            {
+                _allReadySince = -1f;
+            }
+        }
+
+        // RANDOM のルーレット（D-89 の C18）: カーソルがアイコンの上を速く回ってから、だんだん遅くなって、先に決めたキャラクターで止まる。
+        private void UpdateRolls()
+        {
+            float now = Time.unscaledTime;
+            bool changed = false;
+            for (int i = 0; i < MaxPlayers; i++)
+            {
+                Slot slot = _slots[i];
+                if (!slot.Rolling || now < slot.RollNextAt)
+                {
+                    continue;
+                }
+                slot.RollHop++;
+                changed = true;
+                if (slot.RollHop > RollHops)
+                {
+                    slot.Rolling = false;
+                    SetCharacter(i, slot.RollResult, quiet: true);
+                    Lock(i);
+                    continue;
+                }
+                if (slot.RollHop == RollHops)
+                {
+                    slot.RollShown = slot.RollResult;
+                }
+                else
+                {
+                    int next = UnityEngine.Random.Range(0, Count - 1);
+                    slot.RollShown = next >= slot.RollShown ? next + 1 : next;
+                }
+                float k = (float)slot.RollHop / RollHops;
+                slot.RollNextAt = now + 0.05f + 0.19f * k * k;
+                UiSounds.Find().Play(SoundId.UiMove);
+            }
+            if (changed)
+            {
+                Refresh();
+            }
+        }
+
+        // トレーニング・シングルモード: 決定の演出を見せた後で（または、もう一度決定を押したら）次の画面へ。
+        private void FireSingle()
+        {
+            _confirmAt = -1f;
+            if (Mode == SelectMode.Single && _slots[0].Ready)
+            {
+                Confirmed?.Invoke(_slots[0].Character);
             }
         }
 
@@ -685,9 +841,18 @@ namespace Airerage.Runtime.UI
             {
                 Back(slotIndex);
             }
+            else if (slot.Rolling)
+            {
+                // ルーレットの途中は、戻る（取り消し）だけ。
+            }
             else if (intent.Confirm && !slot.Ready)
             {
                 Confirm(slotIndex);
+            }
+            else if (intent.Confirm && Mode == SelectMode.Single && _confirmAt >= 0f)
+            {
+                // 決定の演出の途中にもう一度押したら、すぐ進む。
+                FireSingle();
             }
             else if ((intent.Dx != 0 || intent.Dy != 0) && !slot.Ready)
             {
@@ -750,34 +915,64 @@ namespace Airerage.Runtime.UI
         private void Confirm(int slotIndex)
         {
             Slot slot = _slots[slotIndex];
-            UiSounds.Find().Play(SoundId.UiCharacterDecide);
+            if (slot.Rolling)
+            {
+                return;
+            }
+            if (slot.Character == RandomIndex && Count > 1)
+            {
+                // RANDOM: 行き先をここで決めて、ルーレットを回す（D-89 の C18）。止まったら決める（ネットワーク対戦では、止まってから
+                // 決めたキャラクターをほかの人へ知らせ、準備完了にする）。
+                slot.Rolling = true;
+                slot.RollResult = UnityEngine.Random.Range(0, Count);
+                slot.RollHop = 0;
+                slot.RollShown = RandomIndex;
+                slot.RollNextAt = Time.unscaledTime;
+                UiSounds.Find().Play(SoundId.UiConfirm);
+                return;
+            }
             if (slot.Character == RandomIndex)
             {
-                // RANDOM: ここでキャラクターを決める（ネットワーク対戦では、決めたキャラクターをほかの人へ知らせてから準備完了にする）。
                 SetCharacter(slotIndex, UnityEngine.Random.Range(0, Count), quiet: true);
             }
+            Lock(slotIndex);
+        }
+
+        // 決める（READY）。トレーニング・シングルモードは、決定の演出を見せてから次の画面へ（SingleHoldSeconds）。
+        private void Lock(int slotIndex)
+        {
+            Slot slot = _slots[slotIndex];
+            UiSounds.Find().Play(SoundId.UiCharacterDecide);
+            slot.Ready = true;
             switch (Mode)
             {
                 case SelectMode.Single:
-                    Confirmed?.Invoke(slot.Character);
-                    break;
-                case SelectMode.Local:
-                    slot.Ready = true;
+                    _confirmAt = Time.unscaledTime + SingleHoldSeconds;
                     break;
                 case SelectMode.Network:
-                    slot.Ready = true;
                     NetworkReadyChanged?.Invoke(true);
                     break;
             }
+            Refresh();
         }
 
         private void Back(int slotIndex)
         {
             Slot slot = _slots[slotIndex];
             UiSounds.Find().Play(SoundId.UiMove);
+            if (slot.Rolling)
+            {
+                // ルーレットを止める（RANDOM のまま）。
+                slot.Rolling = false;
+                return;
+            }
             if (slot.Ready)
             {
                 slot.Ready = false;
+                if (Mode == SelectMode.Single)
+                {
+                    _confirmAt = -1f;
+                }
                 if (Mode == SelectMode.Network)
                 {
                     NetworkReadyChanged?.Invoke(false);
@@ -858,7 +1053,7 @@ namespace Airerage.Runtime.UI
         private void OnIconHovered(int character)
         {
             int slotIndex = MouseSlot();
-            if (slotIndex < 0 || _slots[slotIndex].Ready || Time.frameCount < _activeFromFrame)
+            if (slotIndex < 0 || _slots[slotIndex].Ready || _slots[slotIndex].Rolling || Time.frameCount < _activeFromFrame)
             {
                 return;
             }
@@ -869,7 +1064,7 @@ namespace Airerage.Runtime.UI
         private void OnIconClicked(int character)
         {
             int slotIndex = MouseSlot();
-            if (slotIndex < 0 || _slots[slotIndex].Ready || Time.frameCount < _activeFromFrame)
+            if (slotIndex < 0 || _slots[slotIndex].Ready || _slots[slotIndex].Rolling || Time.frameCount < _activeFromFrame)
             {
                 return;
             }
@@ -1028,6 +1223,7 @@ namespace Airerage.Runtime.UI
                 _cornerDevices[i].text = string.Empty;
                 _cornerLogos[i].enabled = false;
                 _cornerNames[i].text = string.Empty;
+                _shownNames[i] = string.Empty;
                 _cornerTags[i].text = string.Empty;
                 _cornerStates[i].text = Mode == SelectMode.Local ? Loc.T("PRESS ENTER / A", "Enter ／ A で参加") : "EMPTY";
                 _cornerStates[i].color = new Color(1f, 1f, 1f, 0.5f);
@@ -1047,6 +1243,7 @@ namespace Airerage.Runtime.UI
             {
                 _cornerLogos[i].enabled = false;
                 _cornerNames[i].text = "RANDOM";
+                _shownNames[i] = "RANDOM";
                 _cornerTags[i].text = _language == GameLanguage.Japanese ? "#？？？" : "#???";
             }
             else
@@ -1055,6 +1252,7 @@ namespace Airerage.Runtime.UI
                 _cornerLogos[i].texture = character.Logo;
                 _cornerLogos[i].enabled = character.Logo != null;
                 _cornerNames[i].text = character.DisplayName;
+                _shownNames[i] = character.DisplayName;
                 _cornerTags[i].text = TagsText(character.TagsIn(_language));
             }
             _cornerStates[i].text = slot.Ready ? "READY!" : "SELECTING";
@@ -1071,14 +1269,15 @@ namespace Airerage.Runtime.UI
             {
                 return;
             }
-            RectTransform icon = _icons[slot.Character].Rect;
+            int index = CursorIndex(i);
+            RectTransform icon = _icons[index].Rect;
             RectTransform cursor = _cursors[i];
             cursor.SetParent(icon.parent, false);
             cursor.SetAsLastSibling();
             cursor.anchorMin = icon.anchorMin;
             cursor.anchorMax = icon.anchorMax;
             cursor.pivot = icon.pivot;
-            cursor.anchoredPosition = icon.anchoredPosition;
+            cursor.anchoredPosition = IconHome(index);
             float grow = 8f + i * 7f;
             cursor.sizeDelta = icon.sizeDelta + new Vector2(grow, grow) * 2f;
             Color color = i < _colors.Length ? _colors[i] : Color.white;

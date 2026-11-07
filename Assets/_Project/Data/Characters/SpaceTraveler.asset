@@ -1130,3 +1130,5 @@ MonoBehaviour:
       touches the bank, your held coins are banked.
     CooldownNoteEn: 
   _costume: 3
+  _themeColor: {r: 0.66, g: 0.4, b: 1, a: 1}
+  _logoMotion: 4

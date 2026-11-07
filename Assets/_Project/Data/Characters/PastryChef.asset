@@ -1209,3 +1209,5 @@ MonoBehaviour:
       hit opponents. Power depends on the color, and rainbow ones are very strong.
     CooldownNoteEn: 
   _costume: 4
+  _themeColor: {r: 1, g: 0.72, b: 0.82, a: 1}
+  _logoMotion: 5

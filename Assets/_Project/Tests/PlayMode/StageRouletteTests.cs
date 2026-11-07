@@ -39,8 +39,7 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 yield return Tap(keyboard, Key.Enter);
-                yield return null;
-                Assert.That(menu.ShowingStageSelect, Is.True, "前提: ステージ選択");
+                                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "前提: ステージ選択（決定の演出の後）");
                 StageSelectScreen stages = menu.StageSelect;
                 Assert.That(stages.RandomOption, Is.Not.Null, "RANDOM の札がない");
 

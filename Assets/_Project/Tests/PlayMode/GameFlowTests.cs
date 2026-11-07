@@ -130,10 +130,11 @@ namespace Airerage.PlayMode.Tests
                 yield return Tap(keyboard, Key.Enter);
                 Assert.That(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0), Is.EqualTo(3), "選んだキャラクターを覚えない");
                 Assert.That(sounds.History, Does.Contain(SoundId.UiCharacterDecide), "キャラクターを決めてもキャラクターの決定の音が鳴らない");
-                yield return null;
+                // 決定の演出（D-89）を見せてから進む。
+                Assert.That(characters.IsReady(0), Is.True, "決めても READY にならない");
+                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "キャラクターを決めてもステージ選択を出さない");
 
                 // ステージ選択（T6-4）: 戻るとキャラクター選択、決定でトレーニング。
-                Assert.That(menu.ShowingStageSelect, Is.True, "キャラクターを決めてもステージ選択を出さない");
                 yield return WaitFor(() => music.Current == music.SelectMusic, 3f, "ステージ選択で選択の曲を鳴らさない");
                 int selectPlays = music.PlayCount;
                 StageSelectScreen stages = menu.StageSelect;
@@ -148,7 +149,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(music.PlayCount, Is.EqualTo(selectPlays), "ステージ選択とキャラクター選択を行き来すると、曲を頭からやり直す");
                 Assert.That(characters.CharacterOf(0), Is.EqualTo(3), "戻ったときに選んだキャラクターにいない");
                 yield return Tap(keyboard, Key.Enter);
-                yield return null;
+                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "もう一度決めてもステージ選択を出さない");
                 stages.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
                 Assert.That(flow.CurrentStage, Is.SameAs(flow.Stages.Get(0)), "選んだステージでない");

@@ -137,6 +137,14 @@ namespace Airerage.Runtime.UI
         {
             _accent = accent;
             _accentFuse = fuse;
+            // 左の絵（B12）も項目の色に（選んでいないときは少し薄く。2026-11-07）。
+            MenuIcon icon = GetComponentInChildren<MenuIcon>(true);
+            if (icon != null)
+            {
+                Color idle = Color.Lerp(accent, Color.white, 0.2f);
+                idle.a = 0.85f;
+                icon.SetColors(idle, Color.Lerp(accent, Color.white, 0.1f));
+            }
             Refresh();
         }
 

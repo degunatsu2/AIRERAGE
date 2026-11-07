@@ -63,6 +63,15 @@ namespace Airerage.PlayMode.Tests
             yield return Wait(0.3f);
             Capture(menu, "Menu_CharacterSelect");
 
+            // キャラクター選択の決定（D-89）: ロゴが枠へ飛び、判が押される。
+            CharacterSelectScreen characters = menu.CharacterSelect;
+            characters.Icon(characters.CursorIndex(0)).OnPointerClick(new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left });
+            yield return null;
+            Capture(menu, "Menu_CharacterLock_A");
+            yield return Wait(0.25f);
+            Capture(menu, "Menu_CharacterLock_B");
+            yield return Wait(0.6f);
+
             // 戻る（逆向きの風）。
             var back = typeof(MenuScreens).GetMethod("ShowMain", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             Assert.That(back, Is.Not.Null);

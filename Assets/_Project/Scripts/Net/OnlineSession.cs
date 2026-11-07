@@ -142,6 +142,11 @@ namespace Airerage.Net
         // 途中から入った人の知らせ（名前と、知らせを受けた時刻。画面の左下に少しの間だけ出す）と、Update で進める時計（秒）。
         private readonly List<JoinNotice> _joinNotices = new List<JoinNotice>();
         private float _clock;
+        // キャラクター選択で全員が決めた時刻（ホスト。全員そろった帯を見せてからステージ選択へ進む。D-89 の C17。まだなら -1）。
+        private float _allReadySince = -1f;
+
+        /// <summary>キャラクター選択で全員が決めてから、ステージ選択へ進むまでの秒数（全員そろった帯を見せる。D-89 の C17）。</summary>
+        public const float AllReadyHoldSeconds = 1f;
 
         // 観戦の人: 確定した入力で進めるワールド（試合を見ている間だけ）。
         private SpectatorSession _spectator;
@@ -1172,6 +1177,7 @@ namespace Airerage.Net
                 ClearLate();
             }
             _phase = phase;
+            _allReadySince = -1f;
             for (int p = 0; p < MaxPlayers; p++)
             {
                 _lobbyReady[p] = false;
@@ -1183,6 +1189,7 @@ namespace Airerage.Net
         {
             if (!IsHost || State != SessionState.Lobby)
             {
+                _allReadySince = -1f;
                 return;
             }
             int players = LobbyParticipantCount;
@@ -1194,12 +1201,27 @@ namespace Airerage.Net
             }
             if (players < 2 || _phase == LobbyPhase.StageSelect || (_phase == LobbyPhase.Waiting && WaitingProblem != null))
             {
+                _allReadySince = -1f;
                 return;
             }
             for (int p = 0; p < MaxPlayers; p++)
             {
                 // 観戦の人は準備完了を待たない。
                 if (IsPresent(p) && !_lobbySpectators[p] && !_lobbyLate[p] && !_lobbyReady[p])
+                {
+                    _allReadySince = -1f;
+                    return;
+                }
+            }
+            if (_phase == LobbyPhase.CharacterSelect)
+            {
+                // 全員が決めたら、全員そろった帯を見せてから進む（Update が時間を見て、もう一度ここへ来る）。
+                if (_allReadySince < 0f)
+                {
+                    _allReadySince = _clock;
+                    return;
+                }
+                if (_clock - _allReadySince < AllReadyHoldSeconds)
                 {
                     return;
                 }
@@ -1493,6 +1515,10 @@ namespace Airerage.Net
             }
             _link.Update(_events);
             HandleEvents();
+            if (_allReadySince >= 0f && State == SessionState.Lobby)
+            {
+                CheckLobbyProgress();
+            }
         }
 
         public void Dispose()

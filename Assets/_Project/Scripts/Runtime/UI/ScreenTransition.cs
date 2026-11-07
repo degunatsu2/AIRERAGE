@@ -14,7 +14,10 @@ namespace Airerage.Runtime.UI
         /// <summary>T1 ガストアウト: 札が風に吹かれたように流れて消え、次の札が反対側から吹き込む（ほとんどの画面。戻るときは向きが逆）。</summary>
         Gust,
 
-        /// <summary>T2 スラントワイプ → T9 ロスターカスケード: 斜めの札 3 枚が画面を覆って開き、キャラクター選択のアイコンが順にめくれて並ぶ。</summary>
+        /// <summary>
+        /// T2 スラントワイプ → T9 ロスターカスケード: 斜めの札 3 枚（1 枚目は選んだモードの色）が画面を覆って開き、キャラクター選択の
+        /// アイコンが順にめくれて並ぶ。キャラクター選択からメインメニューへ戻るときも（「MAIN MENU」、水色、逆向き。2026-11-07）。
+        /// </summary>
         SlantCascade,
 
         /// <summary>T4 スカイダイブ: タイトルが手前へ抜け、速さの線と白い光とともに空の中のメインメニューへ（カメラも前へ突進する）。</summary>
@@ -106,6 +109,7 @@ namespace Airerage.Runtime.UI
         private bool _skip;
         private int _dir = 1;
         private string _label;
+        private Color _accent = BandCyan;
         private IDisposable _anyButton;
         private bool _frozen;
 
@@ -149,9 +153,10 @@ namespace Airerage.Runtime.UI
 
         /// <summary>
         /// 画面を入れ替え、kind の演出をする。direction は 1 なら進む（右から入る）、-1 なら戻る（左から入る）。origin は決定した札
-        /// （B10 の衝撃を出してから写す）。label は斜めの札に出す行き先の名前（SlantCascade）。
+        /// （B10 の衝撃を出してから写す）。label は斜めの札に出す行き先の名前（SlantCascade）。accent は斜めの札の 1 枚目の色（なければ
+        /// 決定した札の項目の色、それもなければ水色。選んだモードのイメージカラー。2026-11-07）。
         /// </summary>
-        public void Run(TransitionKind kind, int direction, RectTransform origin, Action swap, string label = null)
+        public void Run(TransitionKind kind, int direction, RectTransform origin, Action swap, string label = null, Color? accent = null)
         {
             if (_inSwap)
             {
@@ -178,6 +183,7 @@ namespace Airerage.Runtime.UI
             {
                 decided.Punch();
             }
+            _accent = accent ?? (decided != null ? decided.Accent : BandCyan);
 
             _before.Clear();
             CollectActive(_before);
@@ -328,7 +334,7 @@ namespace Airerage.Runtime.UI
                     }
                     // 札は画面の 1.6 倍の幅（画面の大きさに合わせて伸びる）。動く量も、そのときの画面の幅から決める。
                     var bands = new RectTransform[3];
-                    Color[] colors = { BandCyan, BandWhite, BandNavy };
+                    Color[] colors = { _accent, BandWhite, BandNavy };
                     for (int k = 0; k < 3; k++)
                     {
                         RectTransform band = CreateBand(colors[k], k == 2 ? _label : null);
@@ -808,7 +814,7 @@ namespace Airerage.Runtime.UI
                 barRect.anchorMin = barRect.anchorMax = barRect.pivot = new Vector2(0.5f, 0.5f);
                 barRect.sizeDelta = new Vector2(60f, 14f);
                 var barPlate = bar.AddComponent<SlantedPlate>();
-                barPlate.Configure(1.2f, 0f, BandCyan, Color.clear);
+                barPlate.Configure(1.2f, 0f, _accent, Color.clear);
                 barPlate.raycastTarget = false;
                 var text = new GameObject("Label", typeof(RectTransform));
                 var textRect = (RectTransform)text.transform;

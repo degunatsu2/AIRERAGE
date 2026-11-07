@@ -1086,3 +1086,5 @@ MonoBehaviour:
       it carries you there. You can't be hit meanwhile.
     CooldownNoteEn: 
   _costume: 7
+  _themeColor: {r: 0.5, g: 0.64, b: 0.3, a: 1}
+  _logoMotion: 8

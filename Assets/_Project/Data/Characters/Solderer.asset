@@ -1255,3 +1255,5 @@ MonoBehaviour:
       it hits, then vanishes.
     CooldownNoteEn: 
   _costume: 5
+  _themeColor: {r: 0.36, g: 0.88, b: 1, a: 1}
+  _logoMotion: 6

@@ -7,13 +7,16 @@ namespace Airerage.Runtime.UI
     /// <summary>
     /// メインメニューの背景の連動（D-88 の B7。ユーザーの選択、2026-11-07）: 右側に、選んでいる項目の名前を大きな縁取りの文字で出し、
     /// その下に説明（日本語 ／ 英語は言語の設定に従う）。項目を変えると、前の名前は左へ流れて消え、新しい名前が右から入る。
-    /// 名前の中は白、縁取りは項目の色（MenuOption.Accent。札の縁・裏の札・縁を回る光と同じ色。背景の色の光は出さない。2026-11-07）。
+    /// 名前の中は項目の色を白に寄せた色、縁取りは項目の色（MenuOption.Accent。札の縁・裏の札・縁を回る光・左の絵と同じ色。背景の色の
+    /// 光は出さない。2026-11-07）。
     /// </summary>
     public sealed class MainMenuBackdrop : MonoBehaviour
     {
         private const float OutSeconds = 0.22f;
         private const float InSeconds = 0.38f;
         private const float OutlineAlpha = 0.95f;
+        // 名前の中の色: 項目の色をこの割合だけ白に寄せる（2026-11-07）。
+        private const float FillWhiten = 0.6f;
 
         [SerializeField] private MenuOption[] _items = new MenuOption[0];
         [SerializeField] private string[] _english = new string[0];
@@ -38,6 +41,9 @@ namespace Airerage.Runtime.UI
 
         /// <summary>今出している説明（テスト用）。</summary>
         public string Description => _description != null ? _description.text : string.Empty;
+
+        /// <summary>今出している名前の中の色（テスト用）。</summary>
+        public Color WordFill => _current != null ? _current.color : Color.clear;
 
         /// <summary>今出している名前の縁取りの色（テスト用）。</summary>
         public Color WordOutline
@@ -116,8 +122,11 @@ namespace Airerage.Runtime.UI
             if (_current != null)
             {
                 _current.text = _items[index] != null ? _items[index].Label : string.Empty;
-                // 縁取りは項目の色。
+                // 縁取りは項目の色、中はその色を白に寄せた色（2026-11-07）。
                 Color outline = _items[index] != null ? _items[index].Accent : Color.white;
+                Color fill = Color.Lerp(outline, Color.white, FillWhiten);
+                fill.a = _current.color.a;
+                _current.color = fill;
                 outline.a = OutlineAlpha;
                 foreach (Outline effect in _current.GetComponents<Outline>())
                 {

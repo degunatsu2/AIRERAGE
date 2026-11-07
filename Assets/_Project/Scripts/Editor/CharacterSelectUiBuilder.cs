@@ -130,6 +130,8 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_timeLimit", timeLimit);
             SandboxWireSceneBuilder.SetReference(screen, "_message", message);
             SandboxOnlineSceneBuilder.SetColors(screen, "_colors", colors);
+            // 選んだとき・決めたときの演出（D-89。ユーザーの決定、2026-11-07）。
+            panel.gameObject.AddComponent<CharacterSelectMotion>();
             panel.gameObject.SetActive(false);
             return screen;
         }

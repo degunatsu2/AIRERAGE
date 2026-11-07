@@ -110,8 +110,7 @@ namespace Airerage.PlayMode.Tests
             yield return null;
             yield return null;
             yield return Tap(_keyboard, Key.Enter);
-            yield return null;
-            Assert.That(menu.ShowingStageSelect, Is.True, "前提: ステージ選択");
+                        yield return WaitFor(() => menu.ShowingStageSelect, 3f, "前提: ステージ選択（決定の演出の後）");
             Assert.That(stages.PoolMode, Is.False);
             for (int i = 0; i < stages.Count; i++)
             {

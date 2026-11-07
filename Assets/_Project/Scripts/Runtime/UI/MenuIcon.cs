@@ -6,7 +6,8 @@ namespace Airerage.Runtime.UI
     /// <summary>
     /// メインメニューの項目の小さな絵（D-88 の B12。ユーザーの選択、2026-11-07）。線で描き、項目を選んでいる間だけ動く:
     /// SINGLE は人が跳ね、LOCAL は 2 つのコントローラーが交互に揺れ、NETWORK は地球が回り、TRAINING は的から輪が広がり、
-    /// OPTIONS は歯車が回り、QUIT は扉が開いて矢印が入っていく。選んでいる間は水色、選んでいないときは白。
+    /// OPTIONS は歯車が回り、QUIT は扉が開いて矢印が入っていく。色は項目のイメージカラー（SetColors。選んでいないときは少し薄く。
+    /// 2026-11-07。設定しなければ、選んでいる間は水色、選んでいないときは白）。
     /// 札（MenuOption）が Selected を決める（画面の切り替えで写しを動かしている間も、写しのまま動き続ける）。
     /// </summary>
     [RequireComponent(typeof(CanvasRenderer))]
@@ -28,6 +29,8 @@ namespace Airerage.Runtime.UI
         private const float DesignSize = 28f;
 
         [SerializeField] private Shape _shape;
+        [SerializeField] private Color _idleColor = IdleColor;
+        [SerializeField] private Color _activeColor = ActiveColor;
         [SerializeField, HideInInspector] private bool _selected;
         [SerializeField, HideInInspector] private float _selectedAt;
 
@@ -47,6 +50,17 @@ namespace Airerage.Runtime.UI
                 }
             }
         }
+
+        /// <summary>選んでいないとき・選んでいるときの色を変える（項目のイメージカラー）。</summary>
+        public void SetColors(Color idle, Color active)
+        {
+            _idleColor = idle;
+            _activeColor = active;
+            SetVerticesDirty();
+        }
+
+        /// <summary>今の線の色（テスト用）。</summary>
+        public Color Ink => _selected ? _activeColor : _idleColor;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(Shape shape)
@@ -74,7 +88,7 @@ namespace Airerage.Runtime.UI
             Rect r = GetPixelAdjustedRect();
             _unit = Mathf.Min(r.width, r.height) / DesignSize;
             _center = r.center;
-            _ink = _selected ? ActiveColor : IdleColor;
+            _ink = _selected ? _activeColor : _idleColor;
             _ink.a *= color.a;
             float t = _selected && Application.isPlaying ? Time.unscaledTime - _selectedAt : 0f;
             const float w = 1.9f;

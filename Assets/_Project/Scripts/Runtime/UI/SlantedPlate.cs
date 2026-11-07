@@ -53,6 +53,9 @@ namespace Airerage.Runtime.UI
         [SerializeField, HideInInspector] private Vector2 _lean;
         [SerializeField, HideInInspector] private Vector3 _sheen;
 
+        /// <summary>傾き（高さに対する、上の辺の右へのずれの割合）。</summary>
+        public float Slant => _slant;
+
         public Color BorderColor
         {
             get => _borderColor;

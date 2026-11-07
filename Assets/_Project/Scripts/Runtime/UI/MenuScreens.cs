@@ -275,13 +275,14 @@ namespace Airerage.Runtime.UI
             _characterSelect.Cancelled += () =>
             {
                 // ネットワーク対戦のキャラクター選択の「戻る」は、ネットワーク対戦のメニューが受け持つ。
+                // メインメニューへ戻るときも、入ってきたときと同じ斜めの札（「MAIN MENU」、水色、逆向き。2026-11-07）。
                 if (_characterSelect.Mode == CharacterSelectScreen.SelectMode.Single)
                 {
-                    Go(TransitionKind.Gust, -1, null, () => ShowMain(_mode == PlayMode.Single ? _single : _training));
+                    Go(TransitionKind.SlantCascade, -1, null, () => ShowMain(_mode == PlayMode.Single ? _single : _training), MainMenuLabel);
                 }
                 else if (_characterSelect.Mode == CharacterSelectScreen.SelectMode.Local)
                 {
-                    Go(TransitionKind.Gust, -1, null, () => ShowMain(_local));
+                    Go(TransitionKind.SlantCascade, -1, null, () => ShowMain(_local), MainMenuLabel);
                 }
             };
             // カーソルのあるステージをメニューの背景に映す（ユーザーの要望、2026-10-19）。
@@ -439,6 +440,7 @@ namespace Airerage.Runtime.UI
 
         // 画面の切り替えの見出し（キャラクター選択へ入るときの、斜めの札の文字）。
         private const string CharacterSelectLabel = "CHARACTER SELECT";
+        private const string MainMenuLabel = "MAIN MENU";
 
         /// <summary>画面の切り替えの演出（なければ null）。</summary>
         public ScreenTransition Transition => _transition;

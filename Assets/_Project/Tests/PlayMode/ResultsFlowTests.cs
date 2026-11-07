@@ -51,8 +51,7 @@ namespace Airerage.PlayMode.Tests
                 int p2 = join.CharacterOf(1);
                 yield return Tap(keyboard, Key.Enter);
                 yield return Press(gamepad, GamepadButton.South);
-                yield return null;
-                Assert.That(menu.ShowingStageSelect, Is.True, "全員が READY でステージ選択に進まない");
+                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "全員が READY でステージ選択に進まない");
                 menu.StageSelect.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Local && !flow.IsLoading, 10f, "ローカル対戦にならない");
 
@@ -102,7 +101,7 @@ namespace Airerage.PlayMode.Tests
                 // 同じ人でもう一度始め、終わったらキーボードで MAIN MENU（右へ 2 つ、Enter）。
                 yield return Tap(keyboard, Key.Enter);
                 yield return Press(gamepad, GamepadButton.South);
-                yield return null;
+                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "2 回目: 全員が READY でステージ選択に進まない");
                 menu.StageSelect.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Local && !flow.IsLoading, 10f, "ローカル対戦にならない");
                 runner = UnityEngine.Object.FindFirstObjectByType<LocalMatchRunner>();

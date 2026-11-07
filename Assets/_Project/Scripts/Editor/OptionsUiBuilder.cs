@@ -146,6 +146,11 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_back", back);
             SandboxWireSceneBuilder.SetReference(screen, "_prompt", prompt);
             panel.gameObject.SetActive(false);
+            // 設定の画面の札（タブ・行・ボタン）の縁と裏の札は OPTIONS のイメージカラー（2026-11-07）。
+            foreach (MenuOption option in panel.GetComponentsInChildren<MenuOption>(true))
+            {
+                option.SetAccent(MenuUiBuilder.OptionsAccent, true);
+            }
             return screen;
         }
 

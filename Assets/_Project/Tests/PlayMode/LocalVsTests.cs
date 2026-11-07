@@ -71,8 +71,9 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(join.IsReady(0), Is.True, "Enter で READY にならない");
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "全員が READY になる前に進んだ");
                 yield return Press(gamepad, GamepadButton.South);
-                yield return null;
-                Assert.That(menu.ShowingStageSelect, Is.True, "全員が READY でステージ選択に進まない");
+                // 全員そろった帯（D-89 の C17）を見せてから進む。
+                Assert.That(menu.CharacterSelect.AllReady, Is.True, "全員が READY なのに、全員そろったことにならない");
+                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "全員が READY でステージ選択に進まない");
 
                 // ステージ選択から戻ると、参加した人はそのまま（READY だけ外す）。
                 menu.StageSelect.Option(0).OnCancel(null);
@@ -83,8 +84,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(join.CharacterOf(1), Is.EqualTo(character), "戻ったらキャラクターが変わった");
                 yield return Tap(keyboard, Key.Enter);
                 yield return Press(gamepad, GamepadButton.South);
-                yield return null;
-                Assert.That(menu.ShowingStageSelect, Is.True);
+                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "2 回目: 全員が READY でステージ選択に進まない");
                 menu.StageSelect.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Local && !flow.IsLoading, 10f, "ローカル対戦にならない");
                 Assert.That(flow.LoadedScenes, Is.EqualTo(new[] { "Stage_Athletic", "Match_Local" }), "ステージに試合の仕組みを重ねていない");
@@ -238,8 +238,7 @@ namespace Airerage.PlayMode.Tests
 
                 yield return Tap(keyboard, Key.Enter);
                 yield return Press(gamepad, GamepadButton.South);
-                yield return null;
-                Assert.That(menu.ShowingStageSelect, Is.True, "全員が READY でステージ選択に進まない");
+                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "全員が READY でステージ選択に進まない");
                 menu.StageSelect.Option(0).Button.onClick.Invoke();
                 yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Local && !flow.IsLoading, 10f, "ローカル対戦にならない");
                 var runner = UnityEngine.Object.FindFirstObjectByType<LocalMatchRunner>();

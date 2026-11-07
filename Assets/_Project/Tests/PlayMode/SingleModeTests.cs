@@ -54,8 +54,8 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "SINGLE でキャラクター選択を出さない");
                 Assert.That(menu.CharacterSelect.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Single));
                 yield return Tap(keyboard, Key.Enter);
-                yield return null;
-                Assert.That(menu.ShowingCpuLevel, Is.True, "キャラクターを決めても CPU の強さを出さない");
+                // 決定の演出（D-89）を見せてから進む。
+                yield return WaitFor(() => menu.ShowingCpuLevel, 3f, "キャラクターを決めても CPU の強さを出さない");
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.CpuLevel.Option(CpuLevel.Normal).gameObject),
                     "前に選んだ強さ（NORMAL）を選んでいない");
 
@@ -65,7 +65,7 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "CPU の強さから戻れない");
                 yield return Tap(keyboard, Key.Enter);
-                yield return null;
+                yield return WaitFor(() => menu.ShowingCpuLevel, 3f, "もう一度決めても CPU の強さを出さない");
                 menu.CpuLevel.Option(CpuLevel.Hell).Button.onClick.Invoke();
                 yield return null;
                 Assert.That(menu.ShowingStageSelect, Is.True, "強さを決めてもステージ選択を出さない");

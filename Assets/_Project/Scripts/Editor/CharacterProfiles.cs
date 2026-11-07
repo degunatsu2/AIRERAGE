@@ -29,6 +29,8 @@ namespace Airerage.Editor
                         new SkillText("バースト", "その場でためてから、周りを大きく吹き飛ばす。")
                             .English("BURST", "Charge up in place, then blast everyone around you far away."));
                     character.SetCostume(CharacterCostume.Standard);
+                    // キャラクター選択の色とロゴの動き（D-89 の C2・C3・C14）。
+                    character.SetSelectLook(new UnityEngine.Color(0.86f, 0.91f, 1f), LogoMotion.Hop);
                     break;
                 case CharacterPresets.RiskTakerName:
                     character.SetProfile(new[] { "#コイン重視", "#大器晩成" }, new[] { "#CoinFocused", "#LateBloomer" },
@@ -41,6 +43,8 @@ namespace Airerage.Editor
                         new SkillText("フィーバータイム", "しばらくの間、手に入るコインとゲージが増える。")
                             .English("FEVER TIME", "For a while, you earn more coins and gauge."));
                     character.SetCostume(CharacterCostume.RiskTaker);
+                    // キャラクター選択の色とロゴの動き（D-89 の C2・C3・C14）。
+                    character.SetSelectLook(CharacterLogoPainter.RiskTakerColor, LogoMotion.Flip);
                     break;
                 case CharacterPresets.StormRunnerName:
                     character.SetProfile(new[] { "#高速", "#高機動", "#風" }, new[] { "#Fast", "#Agile", "#Wind" },
@@ -53,6 +57,8 @@ namespace Airerage.Editor
                         new SkillText("キャッスルインジエアー", "しばらくの間、すべての行動が大きく速くなり、ワイヤーを空中やどこにでもつなげる。")
                             .English("CASTLE IN THE AIR", "For a while, all your actions get much faster, and your wire can attach to thin air or anything at all."));
                     character.SetCostume(CharacterCostume.StormRunner);
+                    // キャラクター選択の色とロゴの動き（D-89 の C2・C3・C14）。
+                    character.SetSelectLook(CharacterLogoPainter.StormRunnerColor, LogoMotion.Sway);
                     break;
                 case CharacterPresets.SpaceTravelerName:
                     character.SetProfile(new[] { "#変則的", "#遠距離" }, new[] { "#Tricky", "#LongRange" },
@@ -63,6 +69,8 @@ namespace Airerage.Editor
                         new SkillText("コズミックレイ", "2つのポータルの間を、壁を貫くビームで攻撃する。ビームが拠点に触れると手持ちのコインを確定する。")
                             .English("COSMIC RAY", "Fire a wall-piercing beam between your two portals. If the beam touches the bank, your held coins are banked."));
                     character.SetCostume(CharacterCostume.SpaceTraveler);
+                    // キャラクター選択の色とロゴの動き（D-89 の C2・C3・C14）。
+                    character.SetSelectLook(CharacterLogoPainter.SpaceTravelerColor, LogoMotion.Orbit);
                     break;
                 case CharacterPresets.PastryChefName:
                     character.SetProfile(new[] { "#設置", "#罠", "#お菓子" }, new[] { "#Setups", "#Traps", "#Sweets" },
@@ -73,6 +81,8 @@ namespace Airerage.Editor
                         new SkillText("ティーパーティ", "上へマカロンを次々と投げる。跳ね返りながら相手に当たる。色で威力が違い、虹色はとても強い。")
                             .English("TEA PARTY", "Toss macarons upward one after another. They bounce around and hit opponents. Power depends on the color, and rainbow ones are very strong."));
                     character.SetCostume(CharacterCostume.PastryChef);
+                    // キャラクター選択の色とロゴの動き（D-89 の C2・C3・C14）。
+                    character.SetSelectLook(new UnityEngine.Color(1f, 0.72f, 0.82f), LogoMotion.Puff);
                     break;
                 case CharacterPresets.SoldererName:
                     character.SetProfile(new[] { "#高速", "#ヒット＆アウェイ", "#電気" }, new[] { "#Fast", "#HitAndRun", "#Electric" },
@@ -83,6 +93,8 @@ namespace Airerage.Editor
                         new SkillText("ボールライトニング", "大きな電気の球を3つ、それぞれ放つ瞬間の照準の方向へ撃つ。ゆっくり進んで壁で跳ね返り、止まった後もしばらく残る。当たった相手を感電させて消える。")
                             .English("BALL LIGHTNING", "Fire three big electric balls, each toward your aim as it is released. They drift, bounce off walls and linger after stopping. Each shocks the opponent it hits, then vanishes."));
                     character.SetCostume(CharacterCostume.Solderer);
+                    // キャラクター選択の色とロゴの動き（D-89 の C2・C3・C14）。
+                    character.SetSelectLook(CharacterLogoPainter.SoldererColor, LogoMotion.Zap);
                     break;
                 case CharacterPresets.ThiefName:
                     character.SetProfile(new[] { "#盗む", "#コイン重視", "#変則的" }, new[] { "#Steal", "#CoinFocused", "#Tricky" },
@@ -95,6 +107,8 @@ namespace Airerage.Editor
                         new SkillText("バンクハイスト", "拠点の近くでだけ使える。その場で止まって盗み続け、もう一度押すと、続けた長さに応じてコインを得る。長いほど大きく増える。攻撃を受けると失敗する。")
                             .English("BANK HEIST", "Only near the bank. Stand still and keep stealing, then press again to collect coins for how long you kept at it. The longer, the bigger the haul. Getting hit ruins it."));
                     character.SetCostume(CharacterCostume.Thief);
+                    // キャラクター選択の色とロゴの動き（D-89 の C2・C3・C14）。
+                    character.SetSelectLook(CharacterLogoPainter.ThiefColor, LogoMotion.Peek);
                     break;
                 case CharacterPresets.JuggernautName:
                     character.SetProfile(new[] { "#地上戦", "#鈍重" }, new[] { "#GroundFighter", "#Heavy" },
@@ -105,6 +119,8 @@ namespace Airerage.Editor
                         new SkillText("メーデー", "ジェット機に吊られて飛び去り、ステージ全体から空いた場所を選んで運んでもらう。その間は攻撃を受けない。")
                             .English("MAYDAY", "A jet lifts you away; pick any open spot on the whole stage and it carries you there. You can't be hit meanwhile."));
                     character.SetCostume(CharacterCostume.Juggernaut);
+                    // キャラクター選択の色とロゴの動き（D-89 の C2・C3・C14）。
+                    character.SetSelectLook(CharacterLogoPainter.JuggernautColor, LogoMotion.Recoil);
                     break;
             }
         }

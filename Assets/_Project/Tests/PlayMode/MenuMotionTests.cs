@@ -86,6 +86,12 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.Training.Plate.FuseColor, Is.Not.EqualTo(Color.white), "縁を回る光が項目の色でない");
                 Color outline = backdrop.WordOutline;
                 Assert.That(new Vector3(outline.r, outline.g, outline.b), Is.EqualTo(new Vector3(accent.r, accent.g, accent.b)), "右の名前の縁取りが項目の色でない");
+                // 右の名前の中は項目の色を白に寄せた色、左の絵は項目の色（2026-11-07）。
+                Color fill = backdrop.WordFill;
+                Assert.That(fill.r + fill.g + fill.b, Is.GreaterThan(accent.r + accent.g + accent.b), "右の名前の中が項目の色より白くない");
+                Assert.That(fill.r == fill.g && fill.g == fill.b, Is.False, "右の名前の中が白のまま");
+                Color ink = menu.Training.GetComponentInChildren<MenuIcon>().Ink;
+                Assert.That(Mathf.Abs(ink.g - accent.g) < 0.2f && Mathf.Abs(ink.b - accent.b) < 0.2f, Is.True, "左の絵が項目の色でない");
                 Assert.That(backdrop.transform.Find("Backdrop/Tint"), Is.Null, "背景の色の光が残っている");
                 Assert.That(menu.Local.Label, Is.EqualTo("LOCAL"), "LOCAL VS を LOCAL に縮めていない");
                 Assert.That(menu.Network.Label, Is.EqualTo("NETWORK"), "NETWORK VS を NETWORK に縮めていない");
@@ -108,20 +114,45 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 yield return null;
-                Assert.That(GameObject.Find("Band"), Is.Not.Null, "斜めの札がない");
+                GameObject band = GameObject.Find("Band");
+                Assert.That(band, Is.Not.Null, "斜めの札がない");
+                // 斜めの札の 1 枚目は選んだモードのイメージカラー（2026-11-07）。
+                bool modeColored = false;
+                foreach (SlantedPlate plate in band.transform.parent.GetComponentsInChildren<SlantedPlate>())
+                {
+                    modeColored |= plate.name == "Band" && plate.color == accent;
+                }
+                Assert.That(modeColored, Is.True, "斜めの札がモードの色でない");
                 yield return WaitFor(() => !transition.Running, 3f, "キャラクター選択への切り替えが終わらない");
                 yield return null;
                 Assert.That(CopiesLeft(), Is.Zero, "演出が終わっても写しが残っている");
                 var group = menu.CharacterSelect.GetComponent<CanvasGroup>();
                 Assert.That(group == null || group.alpha >= 0.999f, Is.True, "演出が終わってもキャラクター選択が透明のまま");
 
-                // 戻る: 逆向きの風。
+                // キャラクター選択の演出（D-89）: 演出の部品があり、カーソルの枠が光り、乗せたアイコンのロゴが持ち上がり色が流れ込む。
+                var motion = menu.CharacterSelect.GetComponent<CharacterSelectMotion>();
+                Assert.That(motion, Is.Not.Null, "キャラクター選択の演出がない");
+                int hovered = menu.CharacterSelect.CursorIndex(0);
+                yield return WaitSeconds(0.35f);
+                Assert.That(motion.PopOf(hovered), Is.GreaterThan(0.8f), "乗せたアイコンのロゴが持ち上がらない（C1）");
+                Assert.That(motion.FloodOf(hovered), Is.GreaterThan(0.8f), "乗せたアイコンに色が流れ込まない（C2）");
+                Assert.That(menu.CharacterSelect.CursorRect(0).GetComponent<SlantedPlate>().Glow, Is.True, "カーソルの枠が光らない（C4 の代わり）");
+
+                // 戻る: メインメニューへも斜めの札（「MAIN MENU」、水色、逆向き。2026-11-07）。
                 yield return Tap(keyboard, Key.Escape);
                 Assert.That(menu.ShowingMain, Is.True, "キャラクター選択から戻れない");
-                Assert.That(transition.LastKind, Is.EqualTo(TransitionKind.Gust));
+                Assert.That(transition.LastKind, Is.EqualTo(TransitionKind.SlantCascade), "メインメニューへ戻るときに斜めの札でない");
                 Assert.That(transition.LastDirection, Is.EqualTo(-1), "戻るときに向きが逆にならない");
                 Assert.That(sounds.History, Does.Contain(SoundId.UiWhooshBack), "戻るときに戻る風の音が鳴らない");
-                Assert.That(GameObject.Find("WindStreaks"), Is.Null, "風の線を出している");
+                yield return null;
+                yield return null;
+                yield return null;
+                bool mainLabel = false;
+                foreach (UnityEngine.UI.Text label in Object.FindObjectsByType<UnityEngine.UI.Text>(FindObjectsSortMode.None))
+                {
+                    mainLabel |= label.name == "Label" && label.text == "MAIN MENU";
+                }
+                Assert.That(mainLabel, Is.True, "戻るときの斜めの札に MAIN MENU がない");
                 yield return WaitFor(() => !transition.Running, 3f, "戻る切り替えが終わらない");
 
                 // 動いている途中に押すと、最後まで早送りする（押した入力は画面がそのまま受け取る）。
@@ -142,6 +173,93 @@ namespace Airerage.PlayMode.Tests
                 InputSystem.settings.editorInputBehaviorInPlayMode = savedBehavior;
                 InputSystem.settings.backgroundBehavior = savedBackground;
             }
+        }
+
+        [UnityTest]
+        public IEnumerator CharacterSelect_LockRollAndCancel_PlayTheirEffects()
+        {
+            InputSettings.EditorInputBehaviorInPlayMode savedBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSettings.BackgroundBehavior savedBackground = InputSystem.settings.backgroundBehavior;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                SceneManager.LoadScene("App");
+                yield return null;
+                var flow = Object.FindFirstObjectByType<GameFlow>();
+                yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+                var menu = Object.FindFirstObjectByType<MenuScreens>();
+                menu.ContinueFromTitle();
+                menu.Transition.Complete();
+                menu.Training.Button.onClick.Invoke();
+                menu.Transition.Complete();
+                yield return null;
+                yield return null;
+                CharacterSelectScreen characters = menu.CharacterSelect;
+                var motion = characters.GetComponent<CharacterSelectMotion>();
+
+                // 決める: ロゴが枠へ飛び、判が押される（C12・C13）。決定の演出の間はまだキャラクター選択のまま。
+                yield return Tap(keyboard, Key.Enter);
+                Assert.That(characters.IsReady(0), Is.True, "決めても READY にならない");
+                Assert.That(menu.ShowingCharacterSelect, Is.True, "決定の演出を見せずにすぐ進んだ");
+                Assert.That(motion.FlyingLogos, Is.GreaterThan(0), "ロゴが枠へ飛ばない（C13）");
+                Assert.That(motion.StampShown(0), Is.True, "READY! の判を出さない（C12）");
+
+                // 取り消す: 判がはがれ、ロゴが戻る（C20）。進まない。
+                yield return Tap(keyboard, Key.Escape);
+                Assert.That(characters.IsReady(0), Is.False, "取り消せない");
+                Assert.That(motion.FlyingLogos, Is.GreaterThan(0), "取り消してもロゴが札へ戻らない（C20）");
+                yield return WaitSeconds(CharacterSelectScreen.SingleHoldSeconds + 0.3f);
+                Assert.That(menu.ShowingCharacterSelect, Is.True, "取り消したのに次の画面へ進んだ");
+                Assert.That(motion.StampShown(0), Is.False, "取り消しても判が残っている");
+
+                // RANDOM: カーソルがアイコンの上を回ってから止まり、そのキャラクターで決まる（C18）。
+                for (int i = 0; i < 4; i++)
+                {
+                    yield return Tap(keyboard, Key.DownArrow);
+                    if (characters.CharacterOf(0) == characters.RandomIndex)
+                    {
+                        break;
+                    }
+                }
+                Assert.That(characters.CharacterOf(0), Is.EqualTo(characters.RandomIndex), "前提: RANDOM にいる");
+                yield return Tap(keyboard, Key.Enter);
+                Assert.That(characters.IsRolling(0), Is.True, "RANDOM で決めてもルーレットが回らない");
+                yield return WaitFor(() => !characters.IsRolling(0), 5f, "ルーレットが止まらない");
+                Assert.That(characters.CharacterOf(0), Is.LessThan(characters.RandomIndex), "ルーレットが止まってもキャラクターが決まらない");
+                Assert.That(characters.IsReady(0), Is.True, "ルーレットが止まっても READY にならない");
+                yield return WaitFor(() => menu.ShowingStageSelect, 3f, "ルーレットで決めてもステージ選択へ進まない");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keyboard);
+                InputSystem.settings.editorInputBehaviorInPlayMode = savedBehavior;
+                InputSystem.settings.backgroundBehavior = savedBackground;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Options_UseTheOptionsColor()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            var menu = Object.FindFirstObjectByType<MenuScreens>();
+            menu.ContinueFromTitle();
+            menu.Transition.Complete();
+            Color optionsColor = menu.Options.Accent;
+            menu.Options.Button.onClick.Invoke();
+            menu.Transition.Complete();
+            yield return null;
+            int count = 0;
+            foreach (MenuOption option in Object.FindFirstObjectByType<OptionsScreen>().GetComponentsInChildren<MenuOption>(true))
+            {
+                Assert.That(option.Accent, Is.EqualTo(optionsColor), $"{option.name} が OPTIONS の色でない");
+                count++;
+            }
+            Assert.That(count, Is.GreaterThan(3), "オプションの札がない");
         }
 
         [UnityTest]

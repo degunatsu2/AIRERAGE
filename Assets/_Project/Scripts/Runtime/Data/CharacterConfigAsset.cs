@@ -35,6 +35,40 @@ namespace Airerage.Runtime.Data
     }
 
     /// <summary>
+    /// キャラクター選択でカーソルを乗せている間のロゴの動き（D-89 の C3「小さな見せ場」。ユーザーの決定、2026-11-07）。キャラクターごとの
+    /// コードは書かず、どの動きにするかをデータで持つ。
+    /// </summary>
+    public enum LogoMotion
+    {
+        /// <summary>動かない。</summary>
+        None = 0,
+
+        /// <summary>跳ねる（つぶれて伸びる）。</summary>
+        Hop = 1,
+
+        /// <summary>コインのように横に回る。</summary>
+        Flip = 2,
+
+        /// <summary>風に揺れる。</summary>
+        Sway = 3,
+
+        /// <summary>傾きながらふわりと浮く。</summary>
+        Orbit = 4,
+
+        /// <summary>ふくらんで縮む。</summary>
+        Puff = 5,
+
+        /// <summary>電気のようにちらつく。</summary>
+        Zap = 6,
+
+        /// <summary>左右をのぞく。</summary>
+        Peek = 7,
+
+        /// <summary>砲撃の反動。</summary>
+        Recoil = 8,
+    }
+
+    /// <summary>
     /// キャラクター 1 体のアセット（docs/03_architecture.md 4.4、docs/13 T5-5）。シミュレーションの調整値（Core の CharacterConfig。
     /// 移動、ワイヤー、攻撃と技）と、表示だけに使う値（名前、ロゴ、技の絵、ハッシュタグと技の説明）を持つ。仮値は CharacterConfig の初期値にある。
     /// シミュレーションはこの CharacterConfig を参照で持つので、プレイ中にインスペクターで変えた値は次のティックから反映される
@@ -63,11 +97,21 @@ namespace Airerage.Runtime.Data
         [SerializeField] private SkillText _superText = new SkillText();
         [Tooltip("仮の見た目（衣装。CostumeView）")]
         [SerializeField] private CharacterCostume _costume;
+        [Tooltip("キャラクターの色（キャラクター選択の色の流れ込み・衝撃波。D-89）")]
+        [SerializeField] private Color _themeColor = new Color(0.85f, 0.9f, 1f);
+        [Tooltip("キャラクター選択でカーソルを乗せている間のロゴの動き（D-89 の C3）")]
+        [SerializeField] private LogoMotion _logoMotion = LogoMotion.Hop;
 
         public CharacterConfig Config => _config;
 
         /// <summary>仮の見た目（衣装）。</summary>
         public CharacterCostume Costume => _costume;
+
+        /// <summary>キャラクターの色（キャラクター選択の演出に使う）。</summary>
+        public Color ThemeColor => _themeColor;
+
+        /// <summary>キャラクター選択でカーソルを乗せている間のロゴの動き。</summary>
+        public LogoMotion LogoMotion => _logoMotion;
 
         public string DisplayName => string.IsNullOrEmpty(_displayName) ? name : _displayName;
 
@@ -128,6 +172,13 @@ namespace Airerage.Runtime.Data
         public void SetCostume(CharacterCostume costume)
         {
             _costume = costume;
+        }
+
+        /// <summary>シーンのビルダー用: キャラクター選択での色とロゴの動きを設定する（D-89）。</summary>
+        public void SetSelectLook(Color themeColor, LogoMotion logoMotion)
+        {
+            _themeColor = themeColor;
+            _logoMotion = logoMotion;
         }
 
         /// <summary>シーンのビルダー用: ロゴを設定する。</summary>

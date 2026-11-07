@@ -46,6 +46,19 @@ namespace Airerage.Editor
         }
 
         /// <summary>
+        /// メインメニューの項目のイメージカラー（SINGLE・LOCAL・NETWORK・TRAINING・OPTIONS・QUIT の順。2026-11-07）。札の縁・裏の札・
+        /// 縁を回る光・左の絵・右の大きな名前、キャラクター選択へ入る斜めの札、オプションの画面の札に使う。
+        /// </summary>
+        public static readonly Color[] MainAccents =
+        {
+            new Color(0.38f, 0.62f, 1f), new Color(1f, 0.58f, 0.3f), new Color(0.2f, 0.86f, 0.78f),
+            new Color(0.62f, 0.86f, 0.3f), new Color(0.68f, 0.56f, 1f), new Color(1f, 0.38f, 0.5f),
+        };
+
+        /// <summary>OPTIONS のイメージカラー（オプションの画面の札の縁と裏の札。2026-11-07）。</summary>
+        public static Color OptionsAccent => MainAccents[4];
+
+        /// <summary>
         /// クリックした所の火花の層（ClickSparks。2026-11-07）。parent の最後の子として画面いっぱいに置く（クリックは受け止めない）。
         /// </summary>
         public static ClickSparks CreateClickSparks(Transform parent)

@@ -1323,3 +1323,5 @@ MonoBehaviour:
       the haul. Getting hit ruins it.
     CooldownNoteEn: 
   _costume: 6
+  _themeColor: {r: 0.74, g: 0.47, b: 0.24, a: 1}
+  _logoMotion: 7
