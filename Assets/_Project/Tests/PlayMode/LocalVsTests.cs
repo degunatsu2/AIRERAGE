@@ -45,6 +45,12 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "LOCAL VS でキャラクター選択を出さない");
                 CharacterSelectScreen join = menu.CharacterSelect;
                 Assert.That(join.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Local));
+                yield return null;
+                // 参加の案内は「C ／ LB」の前で 2 行に分け、句点は使わない（白い背景に収まるように。2026-11-08）。
+                string[] lines = join.ShownMessage.Split('\n');
+                Assert.That(lines.Length, Is.EqualTo(2), "参加の案内が 2 行でない");
+                Assert.That(lines[1].StartsWith("C ／ LB") || lines[1].StartsWith("OR ADD CPUs WITH C / LB"), Is.True, "2 行目が C ／ LB から始まらない");
+                Assert.That(join.ShownMessage, Does.Not.Contain("。"), "参加の案内に句点がある");
 
                 // 機器ごとに参加する（キーボードが P1、ゲームパッドが P2）。
                 yield return Tap(keyboard, Key.Enter);

@@ -403,6 +403,38 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        /// <summary>
+        /// NETWORK からメインメニューへ戻るときも、ほかの画面と同じ逆向きの風で切り替わる（出ていく接続の画面の写しが動く。2026-11-08 の指摘）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Network_BackToMain_UsesTheBackTransition()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            var menu = Object.FindFirstObjectByType<MenuScreens>();
+            ScreenTransition transition = menu.Transition;
+            menu.ContinueFromTitle();
+            transition.Complete();
+            yield return null;
+            menu.Network.Button.onClick.Invoke();
+            transition.Complete();
+            yield return null;
+            var online = Object.FindFirstObjectByType<Airerage.Net.OnlineMenu>();
+            Assert.That(online.IsOpen, Is.True, "前提: ネットワーク対戦の画面が開いている");
+            online.BackButton.Button.onClick.Invoke();
+            Assert.That(menu.ShowingMain, Is.True, "BACK でメインメニューへ戻らない");
+            Assert.That(online.IsOpen, Is.False, "BACK でネットワーク対戦の画面が閉じない");
+            Assert.That(transition.Running, Is.True, "メインメニューへ戻るときに画面の切り替えが動かない");
+            Assert.That(transition.LastKind, Is.EqualTo(TransitionKind.Gust), "戻るときに風でない");
+            Assert.That(transition.LastDirection, Is.EqualTo(-1), "戻るときに向きが逆にならない");
+            Assert.That(GameObject.Find("OnlineConnect (Transition)"), Is.Not.Null, "出ていく接続の画面の写しがない");
+            yield return WaitFor(() => !transition.Running, 3f, "切り替えが終わらない");
+            yield return null;
+            Assert.That(CopiesLeft(), Is.Zero, "演出が終わっても写しが残っている");
+        }
+
         // 色の RGB が同じか（濃さは問わない）。
         private static bool SameHue(Color a, Color b)
         {

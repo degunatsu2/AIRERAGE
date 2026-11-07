@@ -499,10 +499,17 @@ namespace Airerage.Runtime.UI
 
         private IOnlineMenu Online => _online as IOnlineMenu;
 
-        /// <summary>ネットワーク対戦のメニューから、メインメニューの NETWORK へ戻る。</summary>
-        public void ShowMainFromOnline()
+        /// <summary>
+        /// ネットワーク対戦のメニューから、メインメニューの NETWORK へ戻る。ほかの画面から戻るときと同じ逆向きの風で切り替える（hideOnline は
+        /// 入れ替えの瞬間にネットワーク対戦の画面を隠す処理。切り替えの前に隠すと、出ていく画面の写しが作れない。2026-11-08 の指摘）。
+        /// </summary>
+        public void ShowMainFromOnline(Action hideOnline = null)
         {
-            ShowMain(_network);
+            Go(TransitionKind.Gust, -1, null, () =>
+            {
+                hideOnline?.Invoke();
+                ShowMain(_network);
+            });
         }
 
         /// <summary>ほかの画面（ネットワーク対戦のメニュー）が使う前に、メニューの画面を全部隠す。</summary>

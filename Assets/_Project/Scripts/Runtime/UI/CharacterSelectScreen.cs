@@ -92,6 +92,9 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Text _hint;
         [SerializeField] private Text _timeLimit;
         [SerializeField] private Text _message;
+
+        /// <summary>アイコンの並びの下の知らせ（テスト用）。</summary>
+        public string ShownMessage => _message != null ? _message.text : string.Empty;
         [Tooltip("プレイヤーごとの色（1P〜4P）")]
         [SerializeField] private Color[] _colors = new Color[0];
 
@@ -1175,8 +1178,9 @@ namespace Airerage.Runtime.UI
                 case SelectMode.Local:
                     if (JoinedCount + _cpuCount < 2)
                     {
-                        return Loc.T("JOIN WITH ENTER (KEYBOARD) OR A (GAMEPAD), OR ADD CPUs WITH C / LB",
-                            "Enter（キーボード）か A（ゲームパッド）で参加。C ／ LB で CPU も入れられます");
+                        // 白い背景に収まるように、「C ／ LB」の前で 2 行に分ける（句点は使わない。2026-11-08 の指摘）。
+                        return Loc.T("JOIN WITH ENTER (KEYBOARD) OR A (GAMEPAD)\nOR ADD CPUs WITH C / LB",
+                            "Enter（キーボード）か A（ゲームパッド）で参加\nC ／ LB で CPU も入れられます");
                     }
                     return LocalProblem() ?? string.Empty;
                 case SelectMode.Network:

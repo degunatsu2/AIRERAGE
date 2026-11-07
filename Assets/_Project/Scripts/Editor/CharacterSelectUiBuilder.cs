@@ -30,9 +30,9 @@ namespace Airerage.Editor
             CharacterRoster roster = SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(SandboxWireSceneBuilder.LoadOrCreateCharacterConfig());
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CharacterSelect");
             MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, Vector2.one);
-            // 見出しとアイコンの並びが収まる、メインメニューと同じ白い背景（四隅の枠の間。左右の端は札と同じ向きに傾ける。帯は入ってきた
-            // モードの色。2026-11-08）。下の辺だけ黒い帯にして操作の説明を見やすく（四隅の枠より奥）。
-            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Backdrop", new Vector2(470f / 1920f, 240f / 1080f), new Vector2(1450f / 1920f, 1f),
+            // 見出しとアイコンの並びが収まる、メインメニューと同じ白い背景（四隅の枠の間で、画面の上から下まで。左右の端は札と同じ向きに
+            // 傾ける。帯は入ってきたモードの色。2026-11-08）。下の辺だけ黒い帯にして操作の説明を見やすく（白い背景より手前、四隅の枠より奥）。
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Backdrop", new Vector2(470f / 1920f, 0f), new Vector2(1450f / 1920f, 1f),
                 0.74f, 0.68f, 0.08f, MenuUiBuilder.Accent));
             MenuUiBuilder.CreateHintStrip(panel, HintStripHeight);
             MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 50, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
@@ -78,8 +78,9 @@ namespace Airerage.Editor
                 cursors[p] = cursor;
                 cursorTags[p] = tag;
             }
+            // 知らせは 2 行まで（ローカル対戦の参加の案内。2026-11-08）。
             Text message = MenuUiBuilder.CreateText(panel, "Message", string.Empty, 24, FontStyle.Bold, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -gridRect.sizeDelta.y * 0.5f - 40f), new Vector2(1000f, 40f), MenuUiBuilder.Ink, false);
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -gridRect.sizeDelta.y * 0.5f - 52f), new Vector2(900f, 72f), MenuUiBuilder.Ink, false);
 
             // 四隅の枠。
             var corners = new Object[CharacterSelectScreen.MaxPlayers];

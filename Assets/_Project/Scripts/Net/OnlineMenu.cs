@@ -173,6 +173,9 @@ namespace Airerage.Net
         public MenuOption HostOnlineButton => _hostOnline;
         public MenuOption JoinOnlineButton => _joinOnline;
         public MenuOption CopyCodeButton => _copyCode;
+
+        /// <summary>接続の画面の BACK（テスト用）。</summary>
+        public MenuOption BackButton => _back;
         public InputField CodeField => _code;
 
         /// <summary>今の接続の画面の文（テスト用）。</summary>
@@ -522,9 +525,12 @@ namespace Airerage.Net
         {
             Connection?.Leave();
             _open = false;
-            HidePanels();
-            _shown = Panel.None;
-            _menu.ShowMainFromOnline();
+            // 画面は切り替えの入れ替えの瞬間に隠す（逆向きの風で戻る。2026-11-08 の指摘）。
+            _menu.ShowMainFromOnline(() =>
+            {
+                HidePanels();
+                _shown = Panel.None;
+            });
         }
 
         /// <summary>参加コードでホストになる（Relay。docs/15 T6-10。テスト用にも公開）。</summary>
