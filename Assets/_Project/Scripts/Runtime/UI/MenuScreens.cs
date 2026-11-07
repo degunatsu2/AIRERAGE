@@ -54,6 +54,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private ItemSelectScreen _itemSelect;
         [Tooltip("ネットワーク対戦のメニュー（IOnlineMenu。なければ、NETWORK VS は今のオンラインの検証用のシーンを開く）")]
         [SerializeField] private MonoBehaviour _online;
+        [Tooltip("画面の切り替えの演出（D-87。なければすぐ切り替える）")]
+        [SerializeField] private ScreenTransition _transition;
 
         private GameFlow _flow;
         private IDisposable _anyButton;
@@ -147,50 +149,52 @@ namespace Airerage.Runtime.UI
                 enabled = false;
                 return;
             }
-            _single.Clicked.AddListener(() =>
+            // 画面の切り替えの演出（D-87。ユーザーの決定、2026-11-07）: キャラクター選択へは斜めの札とアイコンのめくれ（SlantCascade）、
+            // ほかは風（Gust。戻るときは向きが逆）。タイトルからはスカイダイブ（ContinueFromTitle）。
+            _single.Clicked.AddListener(() => Go(TransitionKind.SlantCascade, 1, _single, () =>
             {
                 _mode = PlayMode.Single;
                 ShowCharacterSelect();
-            });
-            _cpuLevel.Confirmed += level =>
+            }, CharacterSelectLabel));
+            _cpuLevel.Confirmed += level => Go(TransitionKind.Gust, 1, null, () =>
             {
                 _level = level;
                 ShowStageSelect();
-            };
-            _cpuLevel.Cancelled += ShowCharacterSelect;
-            _options.Clicked.AddListener(() =>
+            });
+            _cpuLevel.Cancelled += () => Go(TransitionKind.Gust, -1, null, ShowCharacterSelect);
+            _options.Clicked.AddListener(() => Go(TransitionKind.Gust, 1, _options, () =>
             {
                 HideAll();
                 _optionsScreen.Show();
-            });
-            _optionsScreen.Closed += () => ShowMain(_options);
+            }));
+            _optionsScreen.Closed += () => Go(TransitionKind.Gust, -1, null, () => ShowMain(_options));
             // RANDOM で選ぶステージ（ステージ選択と同じ画面。閉じたらオプションの RANDOM STAGES へ戻る。ユーザーの要望、2026-10-26）。
-            _optionsScreen.RandomStagesRequested += () =>
+            _optionsScreen.RandomStagesRequested += () => Go(TransitionKind.Gust, 1, null, () =>
             {
                 HideAll();
                 _stageSelect.ShowRandomPool();
-            };
-            _stageSelect.PoolClosed += () =>
+            });
+            _stageSelect.PoolClosed += () => Go(TransitionKind.Gust, -1, null, () =>
             {
                 HideAll();
                 _optionsScreen.ShowAtRandomStages();
-            };
+            });
             if (_itemSelect != null)
             {
                 // 初期アイテムとドロップするアイテム（オプションの ITEMS。ユーザーの要望、2026-11-05）。
-                _optionsScreen.StartItemsRequested += () =>
+                _optionsScreen.StartItemsRequested += () => Go(TransitionKind.Gust, 1, null, () =>
                 {
                     HideAll();
                     Airerage.Runtime.Settings.ItemSettings items = Airerage.Runtime.Settings.ItemSettings.Load();
                     _itemsFromOptions = true;
                     _itemSelect.ShowPick(items.StartCount, items.StartItems);
-                };
-                _optionsScreen.DropItemsRequested += () =>
+                });
+                _optionsScreen.DropItemsRequested += () => Go(TransitionKind.Gust, 1, null, () =>
                 {
                     HideAll();
                     _itemsFromOptions = true;
                     _itemSelect.ShowPool(Airerage.Runtime.Settings.ItemSettings.Load().DropPool);
-                };
+                });
                 _itemSelect.PicksChanged += picks =>
                 {
                     if (_itemsFromOptions)
@@ -217,40 +221,46 @@ namespace Airerage.Runtime.UI
                         return;
                     }
                     bool start = _itemSelect.LastMode == ItemSelectScreen.SelectMode.Pick;
-                    _itemsFromOptions = false;
-                    HideAll();
-                    _optionsScreen.ShowAtItems(start);
+                    Go(TransitionKind.Gust, -1, null, () =>
+                    {
+                        _itemsFromOptions = false;
+                        HideAll();
+                        _optionsScreen.ShowAtItems(start);
+                    });
                 };
             }
             _network.Clicked.AddListener(() =>
             {
                 if (Online != null)
                 {
-                    HideAll();
-                    Online.Open();
+                    Go(TransitionKind.Gust, 1, _network, () =>
+                    {
+                        HideAll();
+                        Online.Open();
+                    });
                 }
                 else
                 {
                     Run(flow => flow.StartOnline());
                 }
             });
-            _training.Clicked.AddListener(() =>
+            _training.Clicked.AddListener(() => Go(TransitionKind.SlantCascade, 1, _training, () =>
             {
                 _mode = PlayMode.Training;
                 ShowCharacterSelect();
-            });
-            _local.Clicked.AddListener(() =>
+            }, CharacterSelectLabel));
+            _local.Clicked.AddListener(() => Go(TransitionKind.SlantCascade, 1, _local, () =>
             {
                 _mode = PlayMode.Local;
                 ShowLocalJoin(true);
-            });
-            _characterSelect.LocalConfirmed += (players, timed) =>
+            }, CharacterSelectLabel));
+            _characterSelect.LocalConfirmed += (players, timed) => Go(TransitionKind.Gust, 1, null, () =>
             {
                 _localPlayers = players;
                 _localTimed = timed;
                 ShowStageSelect();
-            };
-            _characterSelect.Confirmed += index =>
+            });
+            _characterSelect.Confirmed += index => Go(TransitionKind.Gust, 1, null, () =>
             {
                 PlayerPrefs.SetInt(CharacterRoster.SelectedPreferenceKey, index);
                 if (_mode == PlayMode.Single)
@@ -261,17 +271,17 @@ namespace Airerage.Runtime.UI
                 {
                     ShowStageSelect();
                 }
-            };
+            });
             _characterSelect.Cancelled += () =>
             {
                 // ネットワーク対戦のキャラクター選択の「戻る」は、ネットワーク対戦のメニューが受け持つ。
                 if (_characterSelect.Mode == CharacterSelectScreen.SelectMode.Single)
                 {
-                    ShowMain(_mode == PlayMode.Single ? _single : _training);
+                    Go(TransitionKind.Gust, -1, null, () => ShowMain(_mode == PlayMode.Single ? _single : _training));
                 }
                 else if (_characterSelect.Mode == CharacterSelectScreen.SelectMode.Local)
                 {
-                    ShowMain(_local);
+                    Go(TransitionKind.Gust, -1, null, () => ShowMain(_local));
                 }
             };
             // カーソルのあるステージをメニューの背景に映す（ユーザーの要望、2026-10-19）。
@@ -302,24 +312,27 @@ namespace Airerage.Runtime.UI
                 {
                     return;
                 }
-                switch (_mode)
+                Go(TransitionKind.Gust, -1, null, () =>
                 {
-                    case PlayMode.Local:
-                        ShowLocalJoin(false);
-                        break;
-                    case PlayMode.Single:
-                        ShowCpuLevel();
-                        break;
-                    default:
-                        ShowCharacterSelect();
-                        break;
-                }
+                    switch (_mode)
+                    {
+                        case PlayMode.Local:
+                            ShowLocalJoin(false);
+                            break;
+                        case PlayMode.Single:
+                            ShowCpuLevel();
+                            break;
+                        default:
+                            ShowCharacterSelect();
+                            break;
+                    }
+                });
             };
             _quit.Clicked.AddListener(() => _quitDialog.Show(() => ShowMain(_quit)));
             _quitDialog.Confirmed += () => Run(flow => flow.QuitGame());
             foreach (MenuOption item in new[] { _single, _local, _network, _training, _options, _quit })
             {
-                item.Cancelled += ShowTitle;
+                item.Cancelled += () => Go(TransitionKind.Gust, -1, null, ShowTitle);
             }
         }
 
@@ -421,7 +434,26 @@ namespace Airerage.Runtime.UI
             _anyButton?.Dispose();
             _anyButton = null;
             UiSounds.Find().Play(SoundId.UiTitleStart);
-            ShowMain();
+            Go(TransitionKind.SkyDive, 1, null, () => ShowMain());
+        }
+
+        // 画面の切り替えの見出し（キャラクター選択へ入るときの、斜めの札の文字）。
+        private const string CharacterSelectLabel = "CHARACTER SELECT";
+
+        /// <summary>画面の切り替えの演出（なければ null）。</summary>
+        public ScreenTransition Transition => _transition;
+
+        // swap（画面を入れ替える処理）を、kind の演出つきで行う（演出がなければすぐ）。origin は決定した項目。
+        private void Go(TransitionKind kind, int direction, MenuOption origin, Action swap, string label = null)
+        {
+            if (_transition != null)
+            {
+                _transition.Run(kind, direction, origin != null ? (RectTransform)origin.transform : null, swap, label);
+            }
+            else
+            {
+                swap();
+            }
         }
 
         // メインメニューを出す（focus の項目、なければ使える最初の項目を選ぶ）。

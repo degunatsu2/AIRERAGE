@@ -183,6 +183,29 @@ namespace Airerage.Editor
         }
 
         /// <summary>
+        /// 項目の左に小さな絵（MenuIcon。D-88 の B12。選んでいる間だけ動く）を足し、名前を絵の分だけ右へずらす（メインメニュー）。
+        /// </summary>
+        public static MenuIcon AddMenuIcon(MenuOption option, MenuIcon.Shape shape)
+        {
+            var rect = (RectTransform)option.transform;
+            float height = rect.sizeDelta.y;
+            float size = height * 0.62f;
+            var go = new GameObject("Icon", typeof(RectTransform));
+            go.transform.SetParent(option.transform, false);
+            var iconRect = (RectTransform)go.transform;
+            iconRect.anchorMin = iconRect.anchorMax = new Vector2(0f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.sizeDelta = new Vector2(size, size);
+            iconRect.anchoredPosition = new Vector2(height * 0.35f + 26f + size * 0.5f, 0f);
+            var icon = go.AddComponent<MenuIcon>();
+            icon.Configure(shape);
+            RectTransform label = option.LabelText.rectTransform;
+            label.anchoredPosition += new Vector2(size + 18f, 0f);
+            label.sizeDelta -= new Vector2(size + 18f, 0f);
+            return icon;
+        }
+
+        /// <summary>
         /// ゲームを終了する前の確認（QuitConfirmDialog。ユーザーの要望、2026-10-20）: 画面全体を暗くし（クリックを通さない）、真ん中の
         /// 斜めの札に「ゲームを終了します。本当によろしいですか？」と、「はい」「いいえ」の 2 つの札。ほかの画面より手前に出すため、
         /// Canvas の最後に作る。
@@ -286,6 +309,8 @@ namespace Airerage.Editor
                 // 上で右上の EXIT へ移れるように、向きは自動（押せない札は飛ばす）。
                 option.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
                 option.SetSelectedShift(new Vector2(0f, 12f));
+                // 選んでいない項目は暗く下げる（D-88 の B13）。
+                option.SetRecede(true);
             }
             // 右上の EXIT（ネットワーク対戦だけ。自分だけ部屋を出る。2026-11-03 のユーザーの要望）: 左に印（ドアと矢印）、右に EXIT。
             var exitSize = new Vector2(250f, 64f);
@@ -337,6 +362,11 @@ namespace Airerage.Editor
             MenuOption resume = CreateMenuItem(panel, "Resume", "RESUME", center, new Vector2(-260f, 110f), size);
             MenuOption reset = CreateMenuItem(panel, "ResetPosition", "RESET POSITION", center, new Vector2(-260f, 20f), size);
             MenuOption menu = CreateMenuItem(panel, "BackToMenu", "BACK TO MENU", center, new Vector2(-260f, -70f), size);
+            foreach (MenuOption option in new[] { resume, reset, menu })
+            {
+                // 選んでいない項目は暗く下げる（D-88 の B13）。
+                option.SetRecede(true);
+            }
             Localize(CreateText(panel, "Hint", "Esc / Start: close    Enter / A: OK", 20, FontStyle.Bold, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -190f), new Vector2(800f, 40f), new Color(1f, 1f, 1f, 0.7f)),
                 "Esc ／ Start: 閉じる　　Enter ／ A: 決定");

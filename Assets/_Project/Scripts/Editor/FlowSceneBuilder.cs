@@ -342,11 +342,19 @@ namespace Airerage.Editor
             var size = new Vector2(560f, 72f);
             string[] labels = { "SINGLE", "LOCAL VS", "NETWORK VS", "TRAINING", "OPTIONS", "QUIT" };
             var items = new MenuOption[labels.Length];
+            // 項目の左の小さな絵（D-88 の B12）と、選んでいない項目を暗く下げる（B13）。
+            MenuIcon.Shape[] shapes =
+            {
+                MenuIcon.Shape.Person, MenuIcon.Shape.Pads, MenuIcon.Shape.Globe, MenuIcon.Shape.Target, MenuIcon.Shape.Gear, MenuIcon.Shape.Door,
+            };
             for (int i = 0; i < labels.Length; i++)
             {
                 items[i] = MenuUiBuilder.CreateMenuItem(main, labels[i].Replace(" ", string.Empty), labels[i], anchor,
                     new Vector2(110f, -230f - i * 88f), size);
+                MenuUiBuilder.AddMenuIcon(items[i], shapes[i]);
+                items[i].SetRecede(true);
             }
+            CreateMainBackdrop(main, items);
             MenuUiBuilder.CreateHint(main, "↑↓: select     Enter / A: OK     Esc / B: back", "↑↓:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
             main.gameObject.SetActive(false);
 
@@ -367,7 +375,14 @@ namespace Airerage.Editor
                 itemSelect);
             SandboxWireSceneBuilder.SetReference(screens, "_online", online);
             // 終了の確認（いちばん手前に出すため、ほかの画面の後に作る）。
-            SandboxWireSceneBuilder.SetReference(screens, "_quitDialog", MenuUiBuilder.CreateQuitDialog(canvas.transform));
+            QuitConfirmDialog quitDialog = MenuUiBuilder.CreateQuitDialog(canvas.transform);
+            SandboxWireSceneBuilder.SetReference(screens, "_quitDialog", quitDialog);
+            // 画面の切り替えの演出（D-87。いちばん最後の子。画面の写しはこの直前に置く）。
+            RectTransform transitionLayer = MenuUiBuilder.CreateFull(canvas.transform, "Transition");
+            var transition = transitionLayer.gameObject.AddComponent<ScreenTransition>();
+            transition.Configure((RectTransform)canvas.transform, new[] { quitDialog.gameObject }, camera.GetComponent<MenuCameraDrift>());
+            SandboxWireSceneBuilder.SetReference(screens, "_transition", transition);
+            SandboxWireSceneBuilder.SetReference(online, "_transition", transition);
             SandboxWireSceneBuilder.SetReference(screens, "_title", title.gameObject);
             SandboxWireSceneBuilder.SetReference(screens, "_pressAnyButton", press);
             SandboxWireSceneBuilder.SetReference(screens, "_main", main.gameObject);
@@ -377,6 +392,71 @@ namespace Airerage.Editor
                 SandboxWireSceneBuilder.SetReference(screens, fields[i], items[i]);
             }
             Save(scene, MenuScenePath);
+        }
+
+        // メインメニューの背景の連動（D-88 の B7。ユーザーの選択、2026-11-07）: 右側に、選んでいる項目の名前の大きな縁取りの文字と説明、
+        // 項目ごとの色の柔らかい光。左の暗い面の後ろ（ロゴと項目より奥）に置く。
+        private static void CreateMainBackdrop(RectTransform main, MenuOption[] items)
+        {
+            RectTransform root = MenuUiBuilder.CreateFull(main, "Backdrop");
+            root.SetSiblingIndex(1);
+            var tintGo = new GameObject("Tint", typeof(RectTransform));
+            tintGo.transform.SetParent(root, false);
+            var tintRect = (RectTransform)tintGo.transform;
+            tintRect.anchorMin = tintRect.anchorMax = tintRect.pivot = new Vector2(0.74f, 0.56f);
+            tintRect.sizeDelta = new Vector2(1500f, 980f);
+            var tint = tintGo.AddComponent<UnityEngine.UI.Image>();
+            tint.color = new Color(0f, 0f, 0f, 0f);
+            tint.raycastTarget = false;
+            var wordColor = new Color(0.02f, 0.04f, 0.08f, 0.55f);
+            UnityEngine.UI.Text wordA = CreateBackdropWord(root, "WordA", wordColor);
+            UnityEngine.UI.Text wordB = CreateBackdropWord(root, "WordB", wordColor);
+            UnityEngine.UI.Text description = MenuUiBuilder.CreateText(root, "Description", string.Empty, 30, FontStyle.Bold, TextAnchor.UpperRight,
+                new Vector2(1f, 0.47f), new Vector2(-100f, 0f), new Vector2(900f, 120f), new Color(1f, 1f, 1f, 0.92f));
+            description.font = GameFonts.JapaneseBold;
+            description.horizontalOverflow = HorizontalWrapMode.Wrap;
+            string[] english =
+            {
+                "Battle 3 CPUs. Four difficulty levels.",
+                "Up to 4 players on one PC, 8 with CPUs.",
+                "Online with a join code, or on your LAN. Up to 8 players.",
+                "Practice with any character on any stage.",
+                "Volume, screen, controls, items and language.",
+                "Close the game.",
+            };
+            string[] japanese =
+            {
+                "CPU3体と対戦する。強さは4段階。",
+                "1台のPCで最大4人。CPUと合わせて8人まで。",
+                "参加コードかLANで、最大8人で対戦する。",
+                "好きなキャラクターとステージで練習する。",
+                "音量・画面・操作・アイテム・言語の設定。",
+                "ゲームを終了する。",
+            };
+            Color[] tints =
+            {
+                new Color(0.24f, 0.48f, 1f, 0.32f), new Color(1f, 0.54f, 0.3f, 0.32f), new Color(0.18f, 0.84f, 0.76f, 0.32f),
+                new Color(0.6f, 0.83f, 0.29f, 0.32f), new Color(0.55f, 0.49f, 1f, 0.32f), new Color(1f, 0.35f, 0.47f, 0.32f),
+            };
+            var backdrop = main.gameObject.AddComponent<MainMenuBackdrop>();
+            backdrop.Configure(items, english, japanese, tints, wordA, wordB, description, tint);
+        }
+
+        // 背景の大きな名前（暗い塗りに白い縁取り。斜体）。
+        private static UnityEngine.UI.Text CreateBackdropWord(RectTransform parent, string name, Color color)
+        {
+            UnityEngine.UI.Text word = MenuUiBuilder.CreateText(parent, name, string.Empty, 150, FontStyle.Italic, TextAnchor.MiddleRight,
+                new Vector2(1f, 0.66f), new Vector2(-96f, 0f), new Vector2(1250f, 200f), color, false);
+            word.font = GameFonts.LatinBlack;
+            var outline = word.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = new Color(1f, 1f, 1f, 0.75f);
+            outline.effectDistance = new Vector2(2.2f, 2.2f);
+            outline.useGraphicAlpha = false;
+            var outlineSide = word.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            outlineSide.effectColor = new Color(1f, 1f, 1f, 0.75f);
+            outlineSide.effectDistance = new Vector2(3f, 0.01f);
+            outlineSide.useGraphicAlpha = false;
+            return word;
         }
 
         // シングルモードの CPU の強さ（docs/16 T7-2）: 左に EASY・NORMAL・HARD・HELL の札（CpuLevel の順）、右に説明。
@@ -390,8 +470,11 @@ namespace Airerage.Editor
             var options = new Object[labels.Length];
             for (int i = 0; i < labels.Length; i++)
             {
-                options[i] = MenuUiBuilder.CreateMenuItem(panel, $"Level{labels[i]}", labels[i], new Vector2(0f, 1f),
+                MenuOption option = MenuUiBuilder.CreateMenuItem(panel, $"Level{labels[i]}", labels[i], new Vector2(0f, 1f),
                     new Vector2(110f, -230f - i * 88f), new Vector2(560f, 72f));
+                // 選んでいない項目は暗く下げる（D-88 の B13）。
+                option.SetRecede(true);
+                options[i] = option;
             }
             MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Description", "YOU + 3 CPUs.  The CPUs pick random characters.", 30, FontStyle.Bold,
                 TextAnchor.MiddleLeft, new Vector2(1f, 0.6f), new Vector2(-80f, 0f), new Vector2(900f, 60f), new Color(1f, 1f, 1f, 0.85f)), "自分と CPU 3 体で対戦します。CPU のキャラクターはランダムです。");
@@ -417,6 +500,9 @@ namespace Airerage.Editor
             RectTransform content = OnlineMenuUiBuilder.CreateScrollArea(panel, scrollPosition, scrollSize, out UnityEngine.UI.ScrollRect scroll);
             scroll.name = "StageScroll";
             scroll.gameObject.AddComponent<ScrollToSelection>();
+            // 画面の切り替えで、札を 1 枚ずつ動かす（D-87）。
+            scroll.gameObject.AddComponent<TransitionGroup>();
+            content.gameObject.AddComponent<TransitionGroup>();
             // RANDOM STAGES の、すべてにチェック ／ すべて外す（いちばん上）と DONE（スクロールの下）。
             MenuOption checkAll = CreateStagePlate(content, "CheckAll", "CHECK ALL");
             MenuOption uncheckAll = CreateStagePlate(content, "UncheckAll", "UNCHECK ALL");
@@ -507,14 +593,33 @@ namespace Airerage.Editor
             box.SetActive(false);
         }
 
+        // 試合へ入るときの黒い帯（D-87 の T10。いつも読み込む App のシーンに置き、ほかの画面より手前に出す）。
+        private static ScreenCurtain CreateCurtain()
+        {
+            Canvas canvas = MenuUiBuilder.CreateCanvas("Curtain", 900);
+            Object.DestroyImmediate(canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>());
+            RectTransform root = MenuUiBuilder.CreateFull(canvas.transform, "Bars");
+            var bars = root.gameObject.AddComponent<CurtainGraphic>();
+            UnityEngine.UI.Text label = MenuUiBuilder.CreateText(root, "Label", string.Empty, 48, FontStyle.Italic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 150f), new Vector2(1600f, 90f), Color.white, false);
+            label.font = GameFonts.LatinBlack;
+            var curtain = canvas.gameObject.AddComponent<ScreenCurtain>();
+            curtain.Configure(root.gameObject, bars, label);
+            root.gameObject.SetActive(false);
+            return curtain;
+        }
+
         private static void BuildApp()
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             StageCatalog catalog = LoadOrCreateStages();
             var flow = new GameObject("GameFlow").AddComponent<GameFlow>();
             SandboxWireSceneBuilder.SetReference(flow, "_stages", catalog);
+            SandboxWireSceneBuilder.SetReference(flow, "_curtain", CreateCurtain());
             var events = new GameObject("EventSystem");
             events.AddComponent<EventSystem>();
+            // 画面の切り替えと試合へ入る黒い帯の間、選択と決定を止める仕組み（D-87）。
+            events.AddComponent<NavigationGate>();
             var module = events.AddComponent<InputSystemUIInputModule>();
             module.AssignDefaultActions();
             // 背景を押しても選んでいる項目を外さない（外れると Esc ／ B の「戻る」が効かない。2026-11-06）。外れたときは選び直す。
@@ -525,6 +630,9 @@ namespace Airerage.Editor
             var sounds = new GameObject("UiSounds").AddComponent<UiSounds>();
             SandboxWireSceneBuilder.SetReference(sounds, "_titleStartOverride", MusicAssets.LoadSe(MusicAssets.TitleStartSePath));
             SandboxWireSceneBuilder.SetReference(sounds, "_characterDecideOverride", MusicAssets.LoadSe(MusicAssets.CharacterDecideSePath));
+            // カーソル（ダイヤルのカチッ）とボタンの決定も音声ファイル（2026-11-07。docs/18 4.18）。
+            SandboxWireSceneBuilder.SetReference(sounds, "_moveOverride", MusicAssets.LoadSe(MusicAssets.UiCursorSePath));
+            SandboxWireSceneBuilder.SetReference(sounds, "_confirmOverride", MusicAssets.LoadSe(MusicAssets.UiConfirmSePath));
             // メニューの BGM（タイトルの曲と、キャラクター・ステージの選択の曲。ループの位置は曲のファイルのタグから。docs/18 6 章）。
             // 2 曲のラウドネスはそろっている（-16 LUFS ほど）ので、曲ごとの音量はどちらも 1。
             var music = new GameObject("MusicPlayer").AddComponent<MusicPlayer>();

@@ -1,7 +1,9 @@
 using System;
+using System.Text;
 using Airerage.Runtime.Audio;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace Airerage.Runtime.UI
@@ -12,10 +14,28 @@ namespace Airerage.Runtime.UI
     /// 戻る操作（Esc、ゲームパッドの B）は Cancelled で知らせる。
     /// 選んだときにカーソルの音、決定したときに決定の音（UiSounds。ユーザーの要望、2026-10-16）。画面を開いたときに最初の項目を
     /// 選ぶ（SelectQuietly）ときは鳴らさない。
+    /// 選んだとき・決定したときの演出（D-88。ユーザーが選んだ B1・B2・B3・B5・B9・B10・B12・B13。2026-11-07）:
+    /// - B1 導火線の縁・B3 裏の札・B9 の札の傾きと光・B10 の白い光は札（SlantedPlate）が描く。
+    /// - B2: 選んだ所へ少し行きすぎてから戻って止まり、残像が追いかける。
+    /// - B5: 英字の名前は、選んだ瞬間に文字がばらばらに変わってから左から順に決まる（日本語の名前は変えない）。
+    /// - B9: マウスを札に乗せている間、マウスの方へ札がわずかに傾き、光の反射が付いてくる（ゲームパッドでは動かない）。
+    /// - B10: 決定した瞬間に札がつぶれて戻り、白く光り、輪と金色の火花が散る（UiBurst）。
+    /// - B12: 子に絵（MenuIcon）があれば、選んでいる間だけ動かす。
+    /// - B13（Recede をつけた一覧だけ）: 同じ親のほかの項目を選んでいる間は、暗くして少し下げる。
     /// </summary>
     [RequireComponent(typeof(Button))]
     public sealed class MenuOption : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, ICancelHandler
     {
+        /// <summary>英字の名前がばらばらに変わってから決まるまでの秒数（B5）。</summary>
+        public const float DecodeSeconds = 0.28f;
+        /// <summary>決定してつぶれて戻るまでの秒数（B10）。</summary>
+        public const float PunchSeconds = 0.22f;
+        /// <summary>ほかの項目を選んでいるときの濃さ（B13）。</summary>
+        public const float RecedeAlpha = 0.5f;
+
+        private const float BackSeconds = 0.18f;
+        private const string DecodeLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@";
+
         [SerializeField] private SlantedPlate _plate;
         [SerializeField] private Text _label;
         [Tooltip("使えないときの理由（なければ出さない）")]
@@ -27,6 +47,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private bool _shrinkToFit;
         [Tooltip("選んで札が動いても、その場にとどめる子（札の左のチェックの箱など。押しやすいように。2026-11-06）")]
         [SerializeField] private RectTransform[] _pinned = new RectTransform[0];
+        [Tooltip("同じ親のほかの項目を選んでいる間は、暗くして少し下げる（B13。メインメニューなどの一覧）")]
+        [SerializeField] private bool _recede;
         private Vector2[] _pinnedHomes;
 
         // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。
@@ -44,6 +66,22 @@ namespace Airerage.Runtime.UI
         private bool _selected;
         private bool _quiet;
         private UiSounds _sounds;
+        private MenuIcon _icon;
+        private UiBurst _burst;
+        private CanvasGroup _group;
+
+        // 札の位置の動き（B2・B13）: 今の位置（home からのずれ）と、動きの始まりと行き先。
+        private Vector2 _shiftNow;
+        private Vector2 _shiftFrom;
+        private Vector2 _shiftTo;
+        private float _shiftAt = -10f;
+        private bool _shiftOvershoot;
+        private bool _receded;
+        private float _punchAt = -10f;
+        private float _decodeAt = -10f;
+        private string _decodeText;
+        private Vector2 _lean;
+        private float _sheenX = 0.5f;
 
         /// <summary>選ばれた（決定した）とき。</summary>
         public Button.ButtonClickedEvent Clicked => Button.onClick;
@@ -57,12 +95,25 @@ namespace Airerage.Runtime.UI
         /// <summary>今選んでいるか（テスト用）。</summary>
         public bool IsSelected => _selected;
 
+        /// <summary>ほかの項目を選んでいるので、暗く下げているか（B13。テスト用）。</summary>
+        public bool IsReceded => _receded;
+
+        /// <summary>名前の文字がばらばらに変わっている途中か（B5。テスト用）。</summary>
+        public bool Decoding => _decodeText != null;
+
         public Button Button => _button != null ? _button : _button = GetComponent<Button>();
 
-        public string Label => _label != null ? _label.text : string.Empty;
+        /// <summary>名前（ばらばらに変わっている途中でも、本来の名前）。</summary>
+        public string Label => _decodeText ?? (_label != null ? _label.text : string.Empty);
 
         /// <summary>名前の文字（字体を変えるときに使う）。</summary>
         public Text LabelText => _label;
+
+        /// <summary>札（テスト用）。</summary>
+        public SlantedPlate Plate => _plate;
+
+        /// <summary>決定の輪と火花（まだ決定していなければ null。テスト用）。</summary>
+        public UiBurst Burst => _burst;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(SlantedPlate plate, Text label, Text note, Color accent)
@@ -73,9 +124,19 @@ namespace Airerage.Runtime.UI
             _accent = accent;
         }
 
+        /// <summary>同じ親のほかの項目を選んでいる間、暗く下げるか（B13。シーンのビルダー用）。</summary>
+        public void SetRecede(bool recede)
+        {
+            _recede = recede;
+        }
+
         /// <summary>項目の文字を変える（READY ／ CANCEL READY など）。</summary>
         public void SetLabel(string text)
         {
+            if (_decodeText != null)
+            {
+                _decodeText = text;
+            }
             if (_label != null && _label.text != text)
             {
                 _label.text = text;
@@ -120,7 +181,7 @@ namespace Airerage.Runtime.UI
                 _rect = (RectTransform)transform;
             }
             _home = position;
-            _rect.anchoredPosition = _home + (_selected ? _selectedShift : Vector2.zero);
+            Place();
         }
 
         /// <summary>選んでいるときに動かす量を変える（シーンのビルダー用）。</summary>
@@ -154,6 +215,39 @@ namespace Airerage.Runtime.UI
             _quiet = false;
         }
 
+        /// <summary>
+        /// 決定の衝撃（B10）: つぶれて戻り、札が白く光り、輪と金色の火花が散る。決定したときに自分で出す（画面を切り替える決定では、
+        /// 画面の切り替えが写しを作る前にも呼ぶ。同じフレームに 2 回呼んでも 1 回だけ）。
+        /// </summary>
+        public void Punch()
+        {
+            float now = Time.unscaledTime;
+            if (now - _punchAt < 0.05f)
+            {
+                return;
+            }
+            _punchAt = now;
+            if (_plate != null)
+            {
+                _plate.Flash();
+            }
+            if (_burst == null)
+            {
+                var go = new GameObject("Burst", typeof(RectTransform));
+                go.transform.SetParent(transform, false);
+                var rect = (RectTransform)go.transform;
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                // 札の中の並び（LayoutGroup）に入れない。
+                go.AddComponent<LayoutElement>().ignoreLayout = true;
+                _burst = go.AddComponent<UiBurst>();
+            }
+            _burst.transform.SetAsLastSibling();
+            _burst.Play();
+        }
+
         private void Awake()
         {
             _rect = (RectTransform)transform;
@@ -162,17 +256,51 @@ namespace Airerage.Runtime.UI
             {
                 _baseFontSize = _label.fontSize;
             }
+            _icon = GetComponentInChildren<MenuIcon>(true);
+            if (_recede)
+            {
+                _group = GetComponent<CanvasGroup>();
+                if (_group == null)
+                {
+                    _group = gameObject.AddComponent<CanvasGroup>();
+                }
+            }
             FitLabel();
-            Button.onClick.AddListener(() => Sounds.Play(SoundId.UiConfirm));
+            Button.onClick.AddListener(() =>
+            {
+                Sounds.Play(SoundId.UiConfirm);
+                Punch();
+            });
             Refresh();
         }
 
         private void OnDisable()
         {
             _selected = false;
+            _receded = false;
+            _shiftNow = Vector2.zero;
+            _shiftFrom = Vector2.zero;
+            _shiftTo = Vector2.zero;
+            _shiftAt = -10f;
+            _punchAt = -10f;
+            _lean = Vector2.zero;
+            EndDecode();
             if (_rect != null)
             {
                 _rect.anchoredPosition = _home;
+                _rect.localScale = Vector3.one;
+            }
+            if (_plate != null)
+            {
+                _plate.ResetEffects();
+            }
+            if (_group != null)
+            {
+                _group.alpha = 1f;
+            }
+            if (_icon != null)
+            {
+                _icon.Selected = false;
             }
             PlacePinned(Vector2.zero);
         }
@@ -183,6 +311,11 @@ namespace Airerage.Runtime.UI
             if (!_quiet)
             {
                 Sounds.Play(SoundId.UiMove);
+                BeginDecode();
+            }
+            if (_plate != null)
+            {
+                _plate.RunFuse();
             }
             Refresh();
             Selected?.Invoke();
@@ -207,6 +340,161 @@ namespace Airerage.Runtime.UI
             Cancelled?.Invoke();
         }
 
+        private void Update()
+        {
+            float now = Time.unscaledTime;
+            float dt = Time.unscaledDeltaTime;
+
+            // B13: 同じ親のほかの項目を選んでいる間は、暗く下げる。
+            if (_recede)
+            {
+                bool receded = !_selected && SiblingSelected();
+                if (receded != _receded)
+                {
+                    _receded = receded;
+                    Retarget();
+                }
+                if (_group != null)
+                {
+                    _group.alpha = Mathf.MoveTowards(_group.alpha, _receded ? RecedeAlpha : 1f, dt / 0.2f * (1f - RecedeAlpha));
+                }
+            }
+
+            // B2: 選んだ所へ、少し行きすぎてから戻る（選ぶのをやめたときは、行きすぎずに戻る）。
+            float moveSeconds = _shiftOvershoot ? SlantedPlate.MoveSeconds : BackSeconds;
+            float m = (now - _shiftAt) / moveSeconds;
+            Vector2 shift = m >= 1f ? _shiftTo
+                : Vector2.LerpUnclamped(_shiftFrom, _shiftTo, _shiftOvershoot ? SlantedPlate.MoveEase(m) : UiEase.OutCubic(m));
+            bool moved = shift != _shiftNow;
+            _shiftNow = shift;
+
+            // B10: 決定した瞬間につぶれて戻る（札の真ん中を中心に）。
+            float punch = (now - _punchAt) / PunchSeconds;
+            Vector2 scale = Vector2.one;
+            if (punch >= 0f && punch < 1f)
+            {
+                scale = punch < 0.3f ? Vector2.Lerp(Vector2.one, new Vector2(1.07f, 0.84f), punch / 0.3f)
+                    : punch < 0.65f ? Vector2.Lerp(new Vector2(1.07f, 0.84f), new Vector2(0.97f, 1.05f), (punch - 0.3f) / 0.35f)
+                    : Vector2.Lerp(new Vector2(0.97f, 1.05f), Vector2.one, (punch - 0.65f) / 0.35f);
+            }
+            if (moved || (Vector2)_rect.localScale != scale)
+            {
+                _rect.localScale = new Vector3(scale.x, scale.y, 1f);
+                Place();
+            }
+
+            // B5: 英字の名前がばらばらに変わってから、左から順に決まる。
+            if (_decodeText != null)
+            {
+                float p = (now - _decodeAt) / DecodeSeconds;
+                if (p >= 1f)
+                {
+                    EndDecode();
+                }
+                else if (_label != null)
+                {
+                    int settled = Mathf.FloorToInt(p * (_decodeText.Length + 4)) - 4;
+                    var text = new StringBuilder(_decodeText.Length);
+                    for (int i = 0; i < _decodeText.Length; i++)
+                    {
+                        char c = _decodeText[i];
+                        text.Append(c == ' ' || i < settled ? c : DecodeLetters[UnityEngine.Random.Range(0, DecodeLetters.Length)]);
+                    }
+                    _label.text = text.ToString();
+                }
+            }
+
+            // B9: マウスを乗せている間、マウスの方へわずかに傾き、光の反射が付いてくる。
+            if (_plate != null)
+            {
+                Vector2 target = Vector2.zero;
+                float sheen = 0f;
+                if (_selected && PointerOver(out Vector2 local))
+                {
+                    Rect r = _rect.rect;
+                    target = new Vector2(Mathf.Clamp((local.x - r.center.x) / (r.width * 0.5f), -1f, 1f),
+                        Mathf.Clamp((local.y - r.center.y) / (r.height * 0.5f), -1f, 1f));
+                    sheen = 1f;
+                    _sheenX = Mathf.InverseLerp(r.xMin, r.xMax, local.x);
+                }
+                _lean = Vector2.Lerp(_lean, target, 1f - Mathf.Exp(-dt * 14f));
+                if (_lean.sqrMagnitude < 0.00001f && target == Vector2.zero)
+                {
+                    _lean = Vector2.zero;
+                }
+                // 光の反射は、マウスが離れたら傾きと一緒に薄れる。
+                _plate.SetLean(_lean, _sheenX, sheen > 0f ? 1f : Mathf.Clamp01(_lean.magnitude * 3f));
+            }
+        }
+
+        // マウスがこの札の上にあるか（local はこの札の中の位置）。
+        private bool PointerOver(out Vector2 local)
+        {
+            local = Vector2.zero;
+            Mouse mouse = Mouse.current;
+            if (mouse == null)
+            {
+                return false;
+            }
+            Canvas canvas = GetComponentInParent<Canvas>();
+            Camera cam = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            Vector2 screen = mouse.position.ReadValue();
+            return RectTransformUtility.ScreenPointToLocalPointInRectangle(_rect, screen, cam, out local) && _rect.rect.Contains(local);
+        }
+
+        // 同じ親のほかの項目を選んでいるか。
+        private bool SiblingSelected()
+        {
+            GameObject current = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            return current != null && current != gameObject && current.transform.parent == transform.parent && current.activeInHierarchy
+                && current.GetComponent<MenuOption>() != null;
+        }
+
+        /// <summary>名前の文字がばらばらに変わっている途中なら、すぐ本来の名前に戻す（画面の切り替えで写す前）。</summary>
+        public void FinishDecode()
+        {
+            EndDecode();
+        }
+
+        private void BeginDecode()
+        {
+            if (_label == null || _decodeText != null || !IsLatin(_label.text))
+            {
+                return;
+            }
+            _decodeText = _label.text;
+            _decodeAt = Time.unscaledTime;
+        }
+
+        private void EndDecode()
+        {
+            if (_decodeText == null)
+            {
+                return;
+            }
+            if (_label != null)
+            {
+                _label.text = _decodeText;
+            }
+            _decodeText = null;
+        }
+
+        private static bool IsLatin(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return false;
+            }
+            foreach (char c in text)
+            {
+                if (c > 0x7e)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private void Refresh()
         {
             bool available = Button.interactable;
@@ -214,16 +502,63 @@ namespace Airerage.Runtime.UI
             {
                 _plate.color = _selected ? SelectedFill : IdleFill;
                 _plate.BorderColor = _selected ? _accent : IdleBorder;
+                _plate.AccentColor = _accent;
+                _plate.Glow = _selected;
+                _plate.BackTarget = _selected ? 1f : 0f;
             }
             if (_label != null)
             {
                 _label.color = !available ? DisabledText : _selected ? Color.white : new Color(1f, 1f, 1f, 0.85f);
             }
-            if (_rect != null)
+            if (_icon != null)
             {
-                _rect.anchoredPosition = _home + (_selected ? _selectedShift : Vector2.zero);
+                _icon.Selected = _selected;
             }
-            PlacePinned(_selected ? _selectedShift : Vector2.zero);
+            Retarget();
+        }
+
+        // 札の行き先（選んでいれば右へ、ほかを選んでいて Recede なら少し下げる）を決め、変わったら動き始める。
+        private void Retarget()
+        {
+            Vector2 target = _selected ? _selectedShift : _receded ? -_selectedShift * 0.45f : Vector2.zero;
+            if (target == _shiftTo)
+            {
+                return;
+            }
+            bool overshoot = _selected;
+            if (!isActiveAndEnabled || _rect == null)
+            {
+                // 画面を出す前（まだ動かない）: すぐその位置に置く。
+                _shiftNow = target;
+                _shiftFrom = target;
+                _shiftTo = target;
+                _shiftAt = -10f;
+                Place();
+                return;
+            }
+            _shiftFrom = _shiftNow;
+            _shiftTo = target;
+            _shiftAt = Time.unscaledTime;
+            _shiftOvershoot = overshoot;
+            if (overshoot && _plate != null)
+            {
+                _plate.Trail(target - _shiftFrom);
+            }
+        }
+
+        // 位置（置き場所＋ずれ。決定でつぶれている間は、札の真ん中が動かないように直す）。
+        private void Place()
+        {
+            if (_rect == null)
+            {
+                return;
+            }
+            Vector2 size = _rect.rect.size;
+            Vector2 pivot = _rect.pivot;
+            Vector3 scale = _rect.localScale;
+            var squash = new Vector2((1f - scale.x) * size.x * (0.5f - pivot.x), (1f - scale.y) * size.y * (0.5f - pivot.y));
+            _rect.anchoredPosition = _home + _shiftNow + squash;
+            PlacePinned(_shiftNow);
         }
 
         // とどめる子を、札の動いた分だけ逆へずらす（画面の上では動かない）。

@@ -49,6 +49,8 @@ namespace Airerage.Editor
             gridRect.anchorMin = gridRect.anchorMax = gridRect.pivot = new Vector2(0.5f, 0.5f);
             gridRect.anchoredPosition = new Vector2(0f, 20f);
             gridRect.sizeDelta = new Vector2(columns * IconSize + (columns - 1) * IconGap, rows * IconSize + (rows - 1) * IconGap);
+            // 画面の切り替えで、アイコンを 1 つずつめくって並べる（D-87 の T9）。
+            grid.AddComponent<TransitionGroup>();
             var icons = new Object[count];
             for (int i = 0; i < count; i++)
             {

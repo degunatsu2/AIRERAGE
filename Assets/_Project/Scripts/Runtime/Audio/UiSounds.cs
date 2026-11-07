@@ -5,8 +5,9 @@ using UnityEngine;
 namespace Airerage.Runtime.Audio
 {
     /// <summary>
-    /// メニューの効果音（仮の音。ユーザーの要望、2026-10-16）: カーソルの移動（UiMove）、決定（UiConfirm）、一時停止を開く（UiPause）、
-    /// タイトルの決定（UiTitleStart）、キャラクターの決定（UiCharacterDecide。この 2 つは tools/audio で作った音声ファイル。docs/18 4.3）。
+    /// メニューの効果音（ユーザーの要望、2026-10-16）: カーソルの移動（UiMove）、決定（UiConfirm）、一時停止を開く（UiPause）、
+    /// タイトルの決定（UiTitleStart）、キャラクターの決定（UiCharacterDecide）。一時停止のほかは tools/audio で作った音声ファイル
+    /// （カーソルはダイヤルを回したときのカチッという控えめな音、決定の 3 つはメニューの演出に合わせた音。2026-11-07。docs/18 4.18）。
     /// いつも読み込んでおく App のシーンに 1 つ置く（決定した直後に画面のシーンを外しても、音が途切れないように）。検証用のシーンを
     /// 直接再生したときは、Find が今のシーンに作る。音は ProceduralAudio が合成する（差し替えの音声ファイルがあればそれを使う）。
     /// 音量はオプションの効果音の音量（GameSettings。docs/15 T6-9）を掛ける。
@@ -57,6 +58,9 @@ namespace Airerage.Runtime.Audio
         {
             _scale = settings.Se01;
         }
+
+        /// <summary>鳴らす音（テスト用。メニューの効果音でなければ null）。</summary>
+        public AudioClip ClipOf(SoundId id) => _clips.TryGetValue(id, out AudioClip clip) ? clip : null;
 
         /// <summary>メニューの効果音を鳴らす（UiMove、UiConfirm、UiPause、UiTitleStart、UiCharacterDecide のどれか）。</summary>
         public void Play(SoundId id)

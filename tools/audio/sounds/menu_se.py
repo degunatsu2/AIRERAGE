@@ -8,7 +8,9 @@ from typing import Callable, Dict
 
 import numpy as np
 
-from airerage_audio import mix
+import scipy.signal as ss
+
+from airerage_audio import SAMPLE_RATE, mix
 from airerage_audio.sfx import boom, finish, noise_sweep, place, silence, synth
 
 
@@ -71,6 +73,62 @@ def character_c3() -> np.ndarray:
     return finish(_room(out))
 
 
+# ---- 2026-11-07: メニューの演出（D-87・D-88）に合わせた音 ----------------------------------------------------------------
+# ユーザーの要望: カーソルを合わせたときは「ダイヤルを回したときのようなカチッという音（あまり主張させない）」、タイトルの決定・
+# ボタンの決定・キャラクターの決定は、新しい演出に合わせた瀟洒な音に。ゲームに入れるのは下の 4 つ（se_ui_cursor など）。
+
+
+def ui_cursor() -> np.ndarray:
+    """カーソル: ダイヤルの爪が溝に落ちる短いカチッ（0.06 秒）。鋭いクリックと小さな金属の鳴り、8ms 後に小さな跳ね返り。"""
+    sr = SAMPLE_RATE
+    n = int(0.06 * sr)
+    t = np.arange(n) / sr
+    rng = np.random.default_rng(7)
+    b, a = ss.butter(2, [2500 / (sr / 2), 9000 / (sr / 2)], "band")
+    click = ss.lfilter(b, a, rng.standard_normal(n)) * np.exp(-t / 0.0035) * np.minimum(1.0, t / 0.0003)
+    click /= np.abs(click).max() + 1e-9
+    ping = (np.sin(2 * np.pi * 3400 * t) * 0.6 + np.sin(2 * np.pi * 5150 * t) * 0.3) * np.exp(-t / 0.006)
+    body = np.sin(2 * np.pi * 900 * t) * np.exp(-t / 0.005)
+    x = click + ping * 0.35 + body * 0.3
+    d = int(0.008 * sr)
+    x[d:] += click[: n - d] * 0.2 + ping[: n - d] * 0.07
+    x *= np.minimum(1.0, t / 0.0002)
+    stereo = np.stack([x, x], axis=1).astype(np.float32)
+    return finish(stereo, peak_db=-9.0, fade_out=0.01)
+
+
+def ui_confirm() -> np.ndarray:
+    """ボタンの決定: 柔らかい押し込みの低いコツと、ガラスのような 2 音（E6・B6）、少し遅れて高いきらめき 1 音。短い余韻。"""
+    out = silence(0.9)
+    place(out, boom(0.09, 420, 180, 40.0), 0.0, -20)
+    place(out, mix.to_loudness(synth("Plucks/Bell 2", [(0.0, 0.22, 88, 100), (0.0, 0.22, 95, 92)], 0.9), -21), 0.0)
+    place(out, mix.to_loudness(synth("Plucks/Diamonds", [(0.04, 0.18, 100, 88)], 0.9), -29), 0.0)
+    return finish(_room(out, 0.12), peak_db=-3.0)
+
+
+def title_start() -> np.ndarray:
+    """タイトルの決定: 空へ吸い込まれる風（0.42 秒）が強まり、白い閃光の瞬間（0.36 秒）に Emaj9 の和音を軽くかき鳴らし、高いきらめきが上る。"""
+    out = silence(2.0)
+    # 押した瞬間に小さな高い 1 音（すぐ鳴ったと分かるように）。風はそれに続いて強まる。
+    place(out, mix.to_loudness(synth("Plucks/Diamonds", [(0.0, 0.1, 95, 70)], 2.0), -32), 0.0)
+    place(out, noise_sweep(0.42, 500, 7000, 1.0, 0.15, 0.04, seed=11), 0.0, -24)
+    chord = [(0.36 + i * 0.012, 1.1, p, 96 + i * 3) for i, p in enumerate((64, 71, 75, 78, 83))]  # E4 B4 D#5 F#5 B5
+    place(out, mix.to_loudness(synth("Keys/Soft Suitcase", chord, 2.0), -22), 0.0)
+    sparkle = [(0.36 + i * 0.03, 0.4, p, 90) for i, p in enumerate((88, 92, 95, 99))]  # E6 G#6 B6 D#7
+    place(out, mix.to_loudness(synth("Plucks/Diamonds", sparkle, 2.0), -27), 0.0)
+    return finish(_room(out, 0.3))
+
+
+def character_decide() -> np.ndarray:
+    """キャラクターの決定: 札が空を切る小さな風に、上がる 3 音のベル（B5・E6・G#6）と、下で支えるエレピの 2 音（E5・G#5）。"""
+    out = silence(1.4)
+    place(out, noise_sweep(0.12, 7000, 2500, 0.7, 0.002, 0.08, seed=5), 0.0, -26)
+    chime = [(0.0, 0.1, 83, 104), (0.06, 0.1, 88, 110), (0.12, 0.6, 92, 116)]
+    place(out, mix.to_loudness(synth("Plucks/Bell 2", chime, 1.4), -20), 0.0)
+    place(out, mix.to_loudness(synth("Keys/Soft Suitcase", [(0.12, 0.7, 76, 90), (0.12, 0.7, 80, 86)], 1.4), -26), 0.0)
+    return finish(_room(out, 0.22))
+
+
 SOUNDS: Dict[str, Callable[[], np.ndarray]] = {
     "se_title_start_b1": title_b1,
     "se_title_start_b2": title_b2,
@@ -78,4 +136,8 @@ SOUNDS: Dict[str, Callable[[], np.ndarray]] = {
     "se_character_decide_c1": character_c1,
     "se_character_decide_c2": character_c2,
     "se_character_decide_c3": character_c3,
+    "se_ui_cursor": ui_cursor,
+    "se_ui_confirm": ui_confirm,
+    "se_title_start": title_start,
+    "se_character_decide": character_decide,
 }

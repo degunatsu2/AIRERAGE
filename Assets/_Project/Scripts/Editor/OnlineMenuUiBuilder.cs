@@ -43,6 +43,11 @@ namespace Airerage.Editor
             InputField port = MenuUiBuilder.CreateInputField(connect, "Port", "PORT", top, new Vector2(960f, -400f), fieldSize);
             MenuOption host = MenuUiBuilder.CreateMenuItem(connect, "Host", "HOST (LAN)", top, new Vector2(960f, -480f), small);
             MenuOption join = MenuUiBuilder.CreateMenuItem(connect, "Join", "JOIN (LAN)", top, new Vector2(960f, -558f), small);
+            foreach (MenuOption option in new[] { hostOnline, joinOnline, back, host, join })
+            {
+                // 選んでいない項目は暗く下げる（D-88 の B13）。
+                option.SetRecede(true);
+            }
             Text connectMessage = MenuUiBuilder.CreateText(connect, "Message", string.Empty, 26, FontStyle.Bold, TextAnchor.UpperLeft,
                 top, new Vector2(110f, -690f), new Vector2(1500f, 120f), new Color(1f, 0.85f, 0.3f));
             connectMessage.horizontalOverflow = HorizontalWrapMode.Wrap;

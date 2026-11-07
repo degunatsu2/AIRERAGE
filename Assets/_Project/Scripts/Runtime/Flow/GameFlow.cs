@@ -38,6 +38,8 @@ namespace Airerage.Runtime.Flow
         [SerializeField] private string _localScene = "Match_Local";
         [SerializeField] private string _onlineScene = "Sandbox_Online";
         [SerializeField] private string _onlineMatchScene = "Match_Online";
+        [Tooltip("試合へ入るときの黒い帯（D-87 の T10。なければすぐ読み込む）")]
+        [SerializeField] private Airerage.Runtime.UI.ScreenCurtain _curtain;
 
         private readonly List<string> _loaded = new List<string>();
         private readonly List<LocalPlayerSetup> _localPlayers = new List<LocalPlayerSetup>();
@@ -275,10 +277,17 @@ namespace Airerage.Runtime.Flow
         }
 
         // 今の画面のシーンをすべて外してから、新しいシーンを順に重ねて読み込む（最初のシーンを有効にする。光と空のため）。
+        // 試合へ入るときは、先に黒い帯を閉じ（行き先のステージの名前）、読み込みが済んだら開く（D-87 の T10。2026-11-07）。
         private IEnumerator Load(FlowScreen screen, StageDefinition stage, string[] scenes)
         {
             IsLoading = true;
             _previewWanted = null;
+            bool curtain = _curtain != null
+                && (screen == FlowScreen.Training || screen == FlowScreen.Local || screen == FlowScreen.OnlineMatch);
+            if (curtain)
+            {
+                yield return _curtain.Close(stage != null ? stage.DisplayName : string.Empty);
+            }
             while (_previewLoading)
             {
                 // 背景のステージを入れ替えている途中（済んでから外す）。
@@ -311,6 +320,12 @@ namespace Airerage.Runtime.Flow
             Current = screen;
             CurrentStage = stage;
             IsLoading = false;
+            if (curtain)
+            {
+                // 試合のシーンの最初のフレームが描かれてから開く。
+                yield return null;
+                _curtain.Open();
+            }
         }
     }
 }

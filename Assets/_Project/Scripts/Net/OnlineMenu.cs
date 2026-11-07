@@ -40,6 +40,8 @@ namespace Airerage.Net
         }
 
         [SerializeField] private MenuScreens _menu;
+        [Tooltip("画面の切り替えの演出（D-87。なければすぐ切り替える）")]
+        [SerializeField] private ScreenTransition _transition;
         [SerializeField] private CharacterSelectScreen _characterSelect;
         [SerializeField] private StageSelectScreen _stageSelect;
         [SerializeField] private StageCatalog _stages;
@@ -710,7 +712,44 @@ namespace Airerage.Net
             }
         }
 
+        // 画面の切り替え（D-87。2026-11-07）: 待機所からキャラクター選択へは斜めの札とアイコンのめくれ、ほかは風。前の段階へ戻るときは
+        // 向きが逆。メインメニューから開いたとき（前の画面がない）は、メインメニューの切り替えの中で出す。
         private void Show(Panel panel, OnlineSession session)
+        {
+            Panel previous = _shown;
+            if (_transition != null && previous != Panel.None && previous != panel && !_transition.InSwap)
+            {
+                TransitionKind kind = previous == Panel.Waiting && panel == Panel.CharacterSelect ? TransitionKind.SlantCascade : TransitionKind.Gust;
+                int direction = Order(panel) >= Order(previous) ? 1 : -1;
+                _transition.Run(kind, direction, null, () => ShowNow(panel, session), "CHARACTER SELECT");
+                return;
+            }
+            ShowNow(panel, session);
+        }
+
+        // 画面の流れの順（進むか戻るかを決める）。
+        private static int Order(Panel panel)
+        {
+            switch (panel)
+            {
+                case Panel.Connect:
+                    return 0;
+                case Panel.Waiting:
+                    return 1;
+                case Panel.Items:
+                    return 2;
+                case Panel.CharacterSelect:
+                    return 3;
+                case Panel.StageSelect:
+                    return 4;
+                case Panel.Loading:
+                    return 5;
+                default:
+                    return 0;
+            }
+        }
+
+        private void ShowNow(Panel panel, OnlineSession session)
         {
             HidePanels();
             _shown = panel;
