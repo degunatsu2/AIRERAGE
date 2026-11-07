@@ -128,11 +128,11 @@ namespace Airerage.PlayMode.Tests
                 yield return Tap(keyboard, Key.RightArrow);
                 yield return Tap(keyboard, Key.RightArrow);
                 yield return Tap(keyboard, Key.Enter);
-                Assert.That(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0), Is.EqualTo(3), "選んだキャラクターを覚えない");
                 Assert.That(sounds.History, Does.Contain(SoundId.UiCharacterDecide), "キャラクターを決めてもキャラクターの決定の音が鳴らない");
-                // 決定の演出（D-89）を見せてから進む。
+                // 決定の演出（D-89）を見せてから進む（選んだキャラクターは進むときに覚える）。
                 Assert.That(characters.IsReady(0), Is.True, "決めても READY にならない");
                 yield return WaitFor(() => menu.ShowingStageSelect, 3f, "キャラクターを決めてもステージ選択を出さない");
+                Assert.That(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0), Is.EqualTo(3), "選んだキャラクターを覚えない");
 
                 // ステージ選択（T6-4）: 戻るとキャラクター選択、決定でトレーニング。
                 yield return WaitFor(() => music.Current == music.SelectMusic, 3f, "ステージ選択で選択の曲を鳴らさない");
