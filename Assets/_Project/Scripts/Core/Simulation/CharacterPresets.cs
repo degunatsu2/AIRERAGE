@@ -30,8 +30,9 @@ namespace Airerage.Core.Simulation
         /// <summary>
         /// RISK TAKER（docs/14 1.3。ユーザーの案、2026-10-15）。コインで勝負するキャラクター。
         /// - 地上技 ALL IN: 長押しでためて、離すと大きく踏み込む一撃（ユーザーの要望、2026-10-16）。ためている間はその場から動かず、
-        ///   ためた長さで威力と吹き飛びが上がる（白 +0% → 緑 +20% → 青 +50% → 紫 +100% → 金 +200% → 虹 +500%。吹き飛びは
-        ///   ユーザーの要望、2026-10-16）。虹で当てると JACKPOT。
+        ///   ためた長さで威力と吹き飛びが上がる。威力は基礎 2 に 白 +0%（2）→ 緑 +50%（3）→ 青 +150%（5）→ 紫 +400%（10）→
+        ///   金 +900%（20）→ 虹 +2400%（50）（ユーザーの指定、2026-11-07。最大までためると当たりにくいので大きく）。吹き飛びは
+        ///   白 +0% → 緑 +20% → 青 +50% → 紫 +100% → 金 +200% → 虹 +500%（ユーザーの要望、2026-10-16）。虹で当てると JACKPOT。
         ///   当たると斜め上へ飛び出す。外すと隙が大きい。
         /// - 空中・上 COIN TOSS: コインを投げ上げて頭上を攻撃する（投射物。Claude の案）。撃ったときの手持ちのコイン 3 枚ごとに
         ///   威力 +1%（300 枚で +100% が最大。ユーザーの要望、2026-10-16）。
@@ -59,18 +60,18 @@ namespace Airerage.Core.Simulation
                 ChargeLevels = new[]
                 {
                     new ChargeLevel { FromTicks = 0, BonusPercent = 0, KnockbackPercent = 0 },
-                    new ChargeLevel { FromTicks = 24, BonusPercent = 20, KnockbackPercent = 20 },
-                    new ChargeLevel { FromTicks = 48, BonusPercent = 50, KnockbackPercent = 50 },
-                    new ChargeLevel { FromTicks = 78, BonusPercent = 100, KnockbackPercent = 100 },
-                    new ChargeLevel { FromTicks = 120, BonusPercent = 200, KnockbackPercent = 200 },
-                    new ChargeLevel { FromTicks = 180, BonusPercent = 500, KnockbackPercent = 500 },
+                    new ChargeLevel { FromTicks = 24, BonusPercent = 50, KnockbackPercent = 20 },
+                    new ChargeLevel { FromTicks = 48, BonusPercent = 150, KnockbackPercent = 50 },
+                    new ChargeLevel { FromTicks = 78, BonusPercent = 400, KnockbackPercent = 100 },
+                    new ChargeLevel { FromTicks = 120, BonusPercent = 900, KnockbackPercent = 200 },
+                    new ChargeLevel { FromTicks = 180, BonusPercent = 2400, KnockbackPercent = 500 },
                 },
                 Hits = new[]
                 {
                     new AttackHit
                     {
                         StartTick = 8, ActiveTicks = 8, OffsetX = 1.8f, HalfWidth = 2f, HalfHeight = 1.6f,
-                        Damage = 3, Gauge = 90, HitstopTicks = 14, HitstunTicks = 26, KnockbackX = 14f, KnockbackY = 9f,
+                        Damage = 2, Gauge = 90, HitstopTicks = 14, HitstunTicks = 26, KnockbackX = 14f, KnockbackY = 9f,
                     },
                 },
                 Motions = new[]

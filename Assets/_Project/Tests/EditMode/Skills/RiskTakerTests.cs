@@ -73,7 +73,10 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(Risk.Combat.AirDown.Roulette, Is.True);
             Assert.That(CharacterPresets.Standard().Combat.SuperGaugeCost, Is.EqualTo(70 * CombatTuning.GaugePerPercent));
             Assert.That(Risk.Combat.Special1CooldownTicks, Is.EqualTo(15 * SimTime.TicksPerSecond), "LIGHT のクールタイムが 15 秒でない");
-            Assert.That(Risk.Combat.Ground.ChargeLevels.Select(l => l.BonusPercent), Is.EqualTo(new[] { 0, 20, 50, 100, 200, 500 }));
+            // 威力の上乗せは 2026-11-07 のユーザーの指定（基礎 2 で 2・3・5・10・20・50）、吹き飛びは 2026-10-16 のまま。
+            Assert.That(Risk.Combat.Ground.Hits[0].Damage, Is.EqualTo(2));
+            Assert.That(Risk.Combat.Ground.ChargeLevels.Select(l => l.BonusPercent), Is.EqualTo(new[] { 0, 50, 150, 400, 900, 2400 }));
+            Assert.That(Risk.Combat.Ground.ChargeLevels.Select(l => l.KnockbackPercent), Is.EqualTo(new[] { 0, 20, 50, 100, 200, 500 }));
         }
 
         [Test]
@@ -381,13 +384,14 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(hitRise, Is.GreaterThan(5f), "当たったのに飛び出さない");
         }
 
-        [TestCase(0, 0)]
-        [TestCase(30, 20)]
-        [TestCase(50, 50)]
-        [TestCase(100, 100)]
-        [TestCase(130, 200)]
-        [TestCase(400, 500)]
-        public void AllIn_HoldingRaisesThePower_AndTheTopLevelIsAJackpot(int holdTicks, int bonus)
+        // ためた長さの段階ごとの、威力の上乗せ・吹き飛びの上乗せ・威力（基礎 2。ユーザーの指定、2026-11-07: 白 2・緑 3・青 5・紫 10・金 20・虹 50）。
+        [TestCase(0, 0, 0, 2)]
+        [TestCase(30, 50, 20, 3)]
+        [TestCase(50, 150, 50, 5)]
+        [TestCase(100, 400, 100, 10)]
+        [TestCase(130, 900, 200, 20)]
+        [TestCase(400, 2400, 500, 50)]
+        public void AllIn_HoldingRaisesThePower_AndTheTopLevelIsAJackpot(int holdTicks, int bonus, int knockback, int damage)
         {
             var world = new SimWorld(TestArenas.Ground());
             world.AddCharacter(CharacterPresets.RiskTaker(), new Vector3(0f, GroundY, 0f));
@@ -409,12 +413,12 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(hit.HasValue, Is.True, "離しても当たらない");
             Assert.That(hit.Value.Attack, Is.EqualTo(AttackSlot.Ground));
             Assert.That(hit.Value.BonusPercent, Is.EqualTo(bonus), "ためた長さの上乗せでない");
-            Assert.That(hit.Value.Damage, Is.EqualTo(AttackPower.Damage(Risk.Combat.Ground.Hits[0].Damage, 1f, bonus)));
+            Assert.That(hit.Value.Damage, Is.EqualTo(damage), "ためた段階の威力でない");
             Assert.That(hit.Value.Multiplier, Is.EqualTo(1f));
-            Assert.That(hit.Value.KnockbackBonusPercent, Is.EqualTo(bonus), "ためても吹き飛びが強くならない（ユーザーの要望、2026-10-16）");
+            Assert.That(hit.Value.KnockbackBonusPercent, Is.EqualTo(knockback), "ためても吹き飛びが強くならない（ユーザーの要望、2026-10-16）");
             AttackHit data = Risk.Combat.Ground.Hits[0];
-            Assert.That(hit.Value.Knockback.Length(), Is.EqualTo(new Vector2(data.KnockbackX, data.KnockbackY).Length() * (1f + bonus / 100f)).Within(1e-3f));
-            bool top = bonus == 500;
+            Assert.That(hit.Value.Knockback.Length(), Is.EqualTo(new Vector2(data.KnockbackX, data.KnockbackY).Length() * (1f + knockback / 100f)).Within(1e-3f));
+            bool top = knockback == 500;
             Assert.That(hit.Value.Jackpot, Is.EqualTo(top), "虹（最後の段階）だけが JACKPOT");
             Assert.That(world.GetState(1).Combat.JackpotHitCount, Is.EqualTo(top ? 1 : 0));
         }

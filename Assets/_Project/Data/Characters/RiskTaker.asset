@@ -106,19 +106,19 @@ MonoBehaviour:
           BonusPercent: 0
           KnockbackPercent: 0
         - FromTicks: 24
-          BonusPercent: 20
+          BonusPercent: 50
           KnockbackPercent: 20
         - FromTicks: 48
-          BonusPercent: 50
+          BonusPercent: 150
           KnockbackPercent: 50
         - FromTicks: 78
-          BonusPercent: 100
+          BonusPercent: 400
           KnockbackPercent: 100
         - FromTicks: 120
-          BonusPercent: 200
+          BonusPercent: 900
           KnockbackPercent: 200
         - FromTicks: 180
-          BonusPercent: 500
+          BonusPercent: 2400
           KnockbackPercent: 500
         Roulette: 0
         ChargedFromTicks: 0
@@ -143,7 +143,7 @@ MonoBehaviour:
           OffsetY: 0
           HalfWidth: 2
           HalfHeight: 1.6
-          Damage: 3
+          Damage: 2
           Gauge: 90
           HitstopTicks: 14
           HitstunTicks: 26

@@ -91,7 +91,18 @@ namespace Airerage.Runtime.Presentation
             public Color[] PartColors;
             public long Recorded;
             public float HitAt = -10f;
+            // 身代わり爆弾: あと何回で爆発するかの線（BarrierEdges の順。線と、その下の太く薄い光）。
+            public LineRenderer[] Barrier;
+            public LineRenderer[] BarrierGlow;
         }
+
+        /// <summary>
+        /// 身代わり爆弾の周りの線（ユーザーの指定、2026-11-07）: 上辺が平らな六角形のうち、上辺・右下辺・左下辺を消した 3 本（左上・右上・下）。
+        /// 攻撃を受けるたびに、後ろから 1 本ずつ消える（下 → 右上 → 左上。3 回目で爆発）。辺は六角形の頂点の番号の組（0 が右、反時計回り）。
+        /// </summary>
+        private static readonly int[][] BarrierEdges = { new[] { 2, 3 }, new[] { 0, 1 }, new[] { 4, 5 } };
+        private static readonly Color BarrierColor = new Color(0.45f, 0.9f, 1f);
+        private const float BarrierBreakSeconds = 0.3f;
 
         private sealed class Character
         {
@@ -428,6 +439,82 @@ namespace Airerage.Runtime.Presentation
             TintDoll(doll, 0f);
         }
 
+        // あと何回で爆発するかの線（バリアのような半透明の線と、その下の太く薄い光）。爆弾と一緒に消えるように、爆弾の下に置く。
+        private void BuildBarrier(Shown doll)
+        {
+            doll.Barrier = new LineRenderer[BarrierEdges.Length];
+            doll.BarrierGlow = new LineRenderer[BarrierEdges.Length];
+            for (int e = 0; e < BarrierEdges.Length; e++)
+            {
+                doll.BarrierGlow[e] = NewLine(2, 0.26f);
+                doll.BarrierGlow[e].transform.SetParent(doll.Root.transform, true);
+                doll.Barrier[e] = NewLine(2, 0.07f);
+                doll.Barrier[e].transform.SetParent(doll.Root.transform, true);
+            }
+        }
+
+        // 上辺が平らな六角形の頂点 k（0 が右、反時計回りに 60 度ずつ）。横の半径 rx、縦の半径 ry。
+        private static Vector3 HexVertex(Vector3 center, int k, float rx, float ry)
+        {
+            float angle = k * Mathf.PI / 3f;
+            return new Vector3(center.x + Mathf.Cos(angle) * rx, center.y + Mathf.Sin(angle) * ry, center.z);
+        }
+
+        // 線を描く: 残っている辺は少し脈打つ半透明、いま消えた辺は白く光りながら外へ広がって消える。
+        private void RenderBarrier(in WorldObject item, Shown shown, Vector3 position, float time)
+        {
+            if (shown.Barrier == null)
+            {
+                return;
+            }
+            int remaining = Mathf.Clamp(Tuning.DecoyHits - item.Damage, 0, BarrierEdges.Length);
+            float since = time - shown.HitAt;
+            float pulse = 0.8f + 0.2f * Mathf.Sin(time * 4f);
+            var center = new Vector3(position.x, position.y, Z - 0.05f);
+            for (int e = 0; e < BarrierEdges.Length; e++)
+            {
+                bool breaking = e == remaining && since < BarrierBreakSeconds;
+                float progress = breaking ? since / BarrierBreakSeconds : 0f;
+                float alpha = e < remaining ? pulse : breaking ? 1f - progress : 0f;
+                float grow = 1f + 0.3f * progress;
+                Color color = breaking ? Color.Lerp(Color.white, BarrierColor, progress) : BarrierColor;
+                float rx = item.End.X * 2.3f * grow;
+                float ry = item.End.Y * 1.3f * grow;
+                Vector3 from = HexVertex(center, BarrierEdges[e][0], rx, ry);
+                Vector3 to = HexVertex(center, BarrierEdges[e][1], rx, ry);
+                SetBarrierLine(shown.Barrier[e], from, to, new Color(color.r, color.g, color.b, 0.75f * alpha));
+                SetBarrierLine(shown.BarrierGlow[e], from, to, new Color(color.r, color.g, color.b, 0.22f * alpha));
+            }
+        }
+
+        private static void SetBarrierLine(LineRenderer line, Vector3 from, Vector3 to, Color color)
+        {
+            line.enabled = color.a > 0.01f;
+            if (!line.enabled)
+            {
+                return;
+            }
+            line.SetPosition(0, from);
+            line.SetPosition(1, to);
+            line.startColor = color;
+            line.endColor = color;
+        }
+
+        /// <summary>身代わり爆弾 id の周りに出している線の数（テスト用。爆弾がなければ -1）。</summary>
+        public int BarrierLinesShown(int id)
+        {
+            if (!_shown.TryGetValue(id, out Shown shown) || shown.Barrier == null)
+            {
+                return -1;
+            }
+            int count = 0;
+            foreach (LineRenderer line in shown.Barrier)
+            {
+                count += line.enabled && line.startColor.a > 0.3f ? 1 : 0;
+            }
+            return count;
+        }
+
         // 人形の部品に色を付ける（flash は受けたときの白い光 0〜1）。
         private void TintDoll(Shown doll, float flash)
         {
@@ -468,6 +555,7 @@ namespace Airerage.Runtime.Presentation
                 flash = Mathf.Max(flash, 0.5f);
             }
             TintDoll(shown, flash);
+            RenderBarrier(item, shown, position, time);
         }
 
         // 光の粒を count 個、center から外へ飛ばす（speed m/s、duration 秒、大きさ size m）。
@@ -560,6 +648,7 @@ namespace Airerage.Runtime.Presentation
                     glow.color = new Color(1f, 1f, 1f, 0f);
                     var doll = new Shown { Kind = item.Kind, Root = root, Icon = iconObject.transform, Glow = glow };
                     BuildDoll(doll, iconObject.transform, item);
+                    BuildBarrier(doll);
                     return doll;
                 }
                 case WorldObjectKind.ThunderCloud:

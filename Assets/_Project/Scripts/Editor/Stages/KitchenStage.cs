@@ -56,6 +56,7 @@ namespace Airerage.Editor.Stages
             return new StageLayout
             {
                 Id = "Kitchen",
+                Music = "Kitchen",
                 DisplayName = "SWEET KITCHEN",
                 Description = "The oven blasts fire every 40 seconds. Ride the roll cakes across the sky, and dive into the sink drain to be flushed up to the shelf.",
                 DescriptionJa = "40秒ごとにオーブンから火柱が噴き出す。空を渡るロールケーキに乗り、シンクの排水溝に飛び込めば棚の上まで流される。",
