@@ -188,8 +188,20 @@ namespace Airerage.PlayMode.Tests
                 // メニューのシーンを読み込み直したので、画面を探し直す。
                 menu = UnityEngine.Object.FindFirstObjectByType<MenuScreens>();
                 online = UnityEngine.Object.FindFirstObjectByType<OnlineMenu>();
-                yield return WaitFor(() => online.ShownPanel == "CharacterSelect" && bot.State == OnlineSession.SessionState.Lobby
-                    && bot.Phase == LobbyPhase.CharacterSelect, 10f, "全員がキャラクター選択へ戻らない");
+                float returnStart = Time.realtimeSinceStartup;
+                while (!(online.ShownPanel == "CharacterSelect" && bot.State == OnlineSession.SessionState.Lobby
+                    && bot.Phase == LobbyPhase.CharacterSelect))
+                {
+                    if (Time.realtimeSinceStartup - returnStart > 10f)
+                    {
+                        Assert.Fail($"全員がキャラクター選択へ戻らない（ホストの画面 {online.ShownPanel}・開いている {online.IsOpen}・"
+                            + $"つながっている {online.IsConnected}・メインメニュー {menu.ShowingMain}・タイトル {menu.ShowingTitle}・"
+                            + $"接続の数 {UnityEngine.Object.FindObjectsByType<OnlineConnection>(FindObjectsSortMode.None).Length}・"
+                            + $"ネットワーク対戦のメニューの数 {UnityEngine.Object.FindObjectsByType<OnlineMenu>(FindObjectsSortMode.None).Length}・"
+                            + $"段階 {host.Phase}・状態 {host.State}、相手の状態 {bot.State}・段階 {bot.Phase}）");
+                    }
+                    yield return null;
+                }
                 Assert.That(connection.IsConnected, Is.True, "接続が切れた");
                 Assert.That(host.LobbyPlayerCount, Is.EqualTo(2), "相手がロビーにいない");
                 Assert.That(menu.CharacterSelect.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Network));

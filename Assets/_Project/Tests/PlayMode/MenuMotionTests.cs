@@ -288,6 +288,9 @@ namespace Airerage.PlayMode.Tests
         {
             SceneManager.LoadScene("App");
             yield return null;
+            // メニューの読み込みが済むまで待つ（読み込みの途中で終えると、次のテストの App の上に前のメニューのシーンが残る）。
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
             var sounds = Object.FindFirstObjectByType<UiSounds>();
             Assert.That(sounds, Is.Not.Null);
             Assert.That(sounds.ClipOf(SoundId.UiMove).name, Is.EqualTo("UiCursor"), "カーソルの音がダイヤルのカチッでない");
