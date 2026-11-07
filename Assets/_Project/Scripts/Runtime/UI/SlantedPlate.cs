@@ -10,10 +10,10 @@ namespace Airerage.Runtime.UI
     /// （画面の切り替えで札の写しを動かすときも、演出が途中で止まらないように。動きの時刻は写しにも引き継ぐ）:
     /// - 導火線の縁（B1）: 選んだ瞬間、白い光（FuseColor）が縁を 1 周する（RunFuse）。選んでいる間は縁がゆっくり明滅する（Glow）。
     /// - 残像（B2）: 札が動いたとき、2 枚の水色の残像が遅れて追いかけて消える（Trail）。
-    /// - 裏の札（B3）: 選んでいる間、項目の色の札が左下へずれて出る（BackTarget）。表の札から少し角度をずらし（端が BackPeek だけ
-    ///   はみ出す角度）、選んだ瞬間に鋭く跳ねて 1 回だけ少し戻りすぎ、ぴたりと止まる（SwingBack）。選んでいる間は止まったまま、2.6 秒ごとに
-    ///   小さく跳ねる（ペルソナ 3 リロード・5 ザ・ロイヤルのメニューを参考に。ユーザーの要望、2026-11-08。揺れに弾力がありすぎたので、止めと
-    ///   跳ねにメリハリをつけた）。見出しの札（HeadingPlate）は裏の札をいつも出して、同じように跳ねさせる（Sway）。
+    /// - 裏の札（B3）: 選んでいる間、項目の色の札が左下へずれて、表の札から少し時計回りに回って出る（BackTarget）。動きは、ユーザーが
+    ///   「理想に近い」と言った文字の演出の見本のページの裏の札と同じ（2026-11-08）: 札の左から 20%・上から 60% の点を中心に、横 0.4 倍に
+    ///   縮んだ所から 0.26 秒で伸び、少し行きすぎて戻る（CSS の cubic-bezier(.34,1.7,.5,1)）。濃さは 0.14 秒で 0.95 に。0.3 秒たったら
+    ///   2.3 秒の周期でゆっくり揺れる（ずれが 1 ピクセルほど、角度が 1.44 倍まで）。見出しの札（HeadingPlate）も同じ動き。
     /// - チルト（B9）: マウスの位置へ札がわずかに傾き（Lean）、光の反射が付いてくる（Sheen）。
     /// - 決定の光（B10）: 決定した瞬間、札が白く光ってから本来の色へ戻る（Flash）。
     /// </summary>
@@ -31,16 +31,18 @@ namespace Airerage.Runtime.UI
 
         private const float TrailSeconds = 0.42f;
         private const float TrailLag = 0.045f;
-        private const float BackSeconds = 0.18f;
         private const float GlowPeriod = 1.8f;
-        /// <summary>選んだ瞬間に裏の札が跳ねてから止まるまでの秒数。</summary>
-        public const float SwingSeconds = 0.24f;
-        // 跳ねの大きさ（度）、選んでいる間の小さな跳ねの間隔（秒）と大きさ（選んだ瞬間の跳ねに対する割合）、裏の札の角度の範囲（度。札の幅から決める）。
-        private const float SwingDegrees = 8f;
-        private const float BeatPeriod = 2.6f;
-        private const float BeatScale = 0.3f;
-        private const float MinBackTilt = 1.2f;
-        private const float MaxBackTilt = 4f;
+        /// <summary>裏の札が出る・引っ込む秒数（見本のページの transition .26s）。</summary>
+        public const float BackSeconds = 0.26f;
+        /// <summary>裏の札がゆっくり揺れる周期（秒。見本のページの sway 2.3s）。</summary>
+        public const float SwayPeriod = 2.3f;
+        // 濃さが変わる秒数、揺れ始めるまでの秒数、出きったときの濃さ、縮んだときの横の大きさ、揺れの角度（出きった角度に対する割合）とずれ（ピクセル）。
+        private const float BackFadeSeconds = 0.14f;
+        private const float SwayDelay = 0.3f;
+        private const float BackOpacity = 0.95f;
+        private const float BackStartScale = 0.4f;
+        private const float SwayAngleRatio = 0.44f;
+        private static readonly Vector2 SwayShift = new Vector2(1.2f, -1.2f);
         private const int SheenSlices = 20;
 
         [Tooltip("傾き（高さに対する、上の辺の右へのずれの割合）")]
@@ -52,10 +54,10 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Color _accentColor = new Color(0.35f, 0.85f, 1f);
         [Tooltip("導火線の光の芯の色（ふつうは白。メインメニューは項目の色。2026-11-07）")]
         [SerializeField] private Color _fuseColor = Color.white;
-        [Tooltip("裏の札の端が表の札からはみ出す量（ピクセル）。この量になるように、裏の札を表の札から少し回す（2026-11-08）")]
-        [SerializeField] private float _backPeek = 11f;
+        [Tooltip("裏の札を表の札から時計回りに回す角度（度。2026-11-08）")]
+        [SerializeField] private float _backAngle = 1.6f;
         [Tooltip("裏の札のずれ（ピクセル。左下へ）")]
-        [SerializeField] private Vector2 _backOffset = new Vector2(-9f, -7f);
+        [SerializeField] private Vector2 _backOffset = new Vector2(-10f, -7.5f);
 
         // 演出の状態（写しにも引き継ぐため保存する値にする。時刻は Time.unscaledTime）。
         [SerializeField, HideInInspector] private float _fuseAt = -10f;
@@ -63,12 +65,13 @@ namespace Airerage.Runtime.UI
         [SerializeField, HideInInspector] private float _trailAt = -10f;
         [SerializeField, HideInInspector] private Vector2 _trailDelta;
         [SerializeField, HideInInspector] private bool _glow;
-        [SerializeField, HideInInspector] private float _back;
         [SerializeField, HideInInspector] private float _backTarget;
+        [SerializeField, HideInInspector] private float _backSetAt = -10f;
+        [SerializeField, HideInInspector] private float _backFromPose;
+        [SerializeField, HideInInspector] private float _backFromShown;
+        [SerializeField, HideInInspector] private float _backFromSway;
         [SerializeField, HideInInspector] private Vector2 _lean;
         [SerializeField, HideInInspector] private Vector3 _sheen;
-        [SerializeField, HideInInspector] private float _swingAt = -10f;
-        [SerializeField, HideInInspector] private bool _sway;
 
         /// <summary>傾き（高さに対する、上の辺の右へのずれの割合）。</summary>
         public float Slant => _slant;
@@ -125,24 +128,40 @@ namespace Airerage.Runtime.UI
         public float BackTarget
         {
             get => _backTarget;
-            set => _backTarget = Mathf.Clamp01(value);
+            set
+            {
+                float target = Mathf.Clamp01(value);
+                if (target == _backTarget)
+                {
+                    return;
+                }
+                StartBack(Now);
+                _backTarget = target;
+            }
         }
 
-        /// <summary>裏の札の今の出かた（0〜1。テスト用）。</summary>
-        public float Back => _back;
-
-        /// <summary>裏の札を、選んでいなくてもゆっくり揺らすか（見出しの札。2026-11-08）。</summary>
-        public bool Sway
+        /// <summary>裏の札の今の濃さ（0〜1。テスト用）。</summary>
+        public float Back
         {
-            get => _sway;
-            set => _sway = value;
+            get
+            {
+                BackPose(Now, out _, out float shown, out _);
+                return shown;
+            }
         }
 
-        /// <summary>裏の札の今の角度（度。左回りが正。表の札との角度の差。テスト用）。</summary>
-        public float BackAngle => BackAngleAt(GetPixelAdjustedRect(), Now) * UiEase.OutCubic(_back);
+        /// <summary>裏の札の今の角度（度。左回りが正なので、時計回りに回った裏の札は負。表の札との角度の差。テスト用）。</summary>
+        public float BackAngle
+        {
+            get
+            {
+                BackPose(Now, out float pose, out _, out float sway);
+                return -BackDegrees(pose, sway);
+            }
+        }
 
-        /// <summary>裏の札が振れている途中か（テスト用）。</summary>
-        public bool Swinging => Now - _swingAt >= 0f && Now - _swingAt < SwingSeconds;
+        /// <summary>裏の札が出る・引っ込む動きの途中か（テスト用）。</summary>
+        public bool Swinging => Now - _backSetAt >= 0f && Now - _backSetAt < BackSeconds;
 
         /// <summary>導火線の光が縁を回っている途中か（テスト用）。</summary>
         public bool FuseRunning => Now - _fuseAt < FuseSeconds;
@@ -162,10 +181,10 @@ namespace Airerage.Runtime.UI
             SetVerticesDirty();
         }
 
-        /// <summary>裏の札のはみ出す量と、ずれ（シーンのビルダー・見出しの札用）。</summary>
-        public void ConfigureBack(float peek, Vector2 offset)
+        /// <summary>裏の札の角度（度。時計回り）と、ずれ（シーンのビルダー・見出しの札用）。</summary>
+        public void ConfigureBack(float angle, Vector2 offset)
         {
-            _backPeek = peek;
+            _backAngle = angle;
             _backOffset = offset;
             SetVerticesDirty();
         }
@@ -174,16 +193,64 @@ namespace Airerage.Runtime.UI
         public void SetBackNow(float target)
         {
             _backTarget = Mathf.Clamp01(target);
-            _back = _backTarget;
+            _backFromPose = _backTarget;
+            _backFromShown = _backTarget;
+            _backFromSway = 0f;
+            _backSetAt = -10f;
             SetVerticesDirty();
         }
 
-        /// <summary>裏の札を大きく振らせてから止める（選んだ瞬間。delay 秒後から。2026-11-08）。</summary>
+        /// <summary>裏の札の出る動きを、今の形から delay 秒後にやり直す（選んだ瞬間。見出しの札は札が入ってくるのに合わせて少し遅らせる）。</summary>
         public void SwingBack(float delay = 0f)
         {
-            _swingAt = Now + delay;
+            StartBack(Now + delay);
+        }
+
+        // 今の形を出発点にして、at から出る・引っ込む動きを始める。
+        private void StartBack(float at)
+        {
+            BackPose(Now, out float pose, out float shown, out float sway);
+            _backFromPose = pose;
+            _backFromShown = shown;
+            _backFromSway = sway;
+            _backSetAt = at;
             SetVerticesDirty();
         }
+
+        /// <summary>
+        /// 裏の札の形（now の時刻）。pose は 0（横に縮んで重なった所）〜1（出きった所。少し行きすぎることもある）、shown は濃さ 0〜1、
+        /// sway はゆっくりした揺れ 0〜1。
+        /// </summary>
+        private void BackPose(float now, out float pose, out float shown, out float sway)
+        {
+            float t = now - _backSetAt;
+            if (t < 0f)
+            {
+                pose = _backFromPose;
+                shown = _backFromShown;
+                sway = _backFromSway;
+                return;
+            }
+            float k = t >= BackSeconds ? 1f : UiEase.CubicBezier(0.34f, 1.7f, 0.5f, 1f, t / BackSeconds);
+            pose = _backFromPose + (_backTarget - _backFromPose) * k;
+            float f = t >= BackFadeSeconds ? 1f : UiEase.CssEase(t / BackFadeSeconds);
+            shown = _backFromShown + (_backTarget - _backFromShown) * f;
+            sway = _backFromSway * (1f - UiEase.Clamp01(t / BackSeconds));
+            if (_backTarget > 0.5f && t >= SwayDelay)
+            {
+                sway += SwayAt(t - SwayDelay);
+            }
+        }
+
+        /// <summary>ゆっくりした揺れ（t は揺れ始めてからの秒数）: 0 から SwayPeriod の半分で 1 へ、残りの半分で 0 へ（CSS の ease-in-out）。</summary>
+        public static float SwayAt(float t)
+        {
+            float phase = Mathf.Repeat(t, SwayPeriod) / SwayPeriod;
+            return phase < 0.5f ? UiEase.CssEaseInOut(phase * 2f) : 1f - UiEase.CssEaseInOut((phase - 0.5f) * 2f);
+        }
+
+        // 裏の札の角度（度。時計回り）。
+        private float BackDegrees(float pose, float sway) => _backAngle * (pose + SwayAngleRatio * sway);
 
         /// <summary>
         /// other の色と演出の状態をそのまま写す（画面の切り替えの写しを、動いている本物に合わせ続ける。選んだ項目が変わったときや、ほかの項目が
@@ -204,13 +271,14 @@ namespace Airerage.Runtime.UI
             _trailAt = other._trailAt;
             _trailDelta = other._trailDelta;
             _glow = other._glow;
-            _back = other._back;
             _backTarget = other._backTarget;
+            _backSetAt = other._backSetAt;
+            _backFromPose = other._backFromPose;
+            _backFromShown = other._backFromShown;
+            _backFromSway = other._backFromSway;
             _lean = other._lean;
             _sheen = other._sheen;
-            _swingAt = other._swingAt;
-            _sway = other._sway;
-            _backPeek = other._backPeek;
+            _backAngle = other._backAngle;
             _backOffset = other._backOffset;
             SetVerticesDirty();
         }
@@ -256,24 +324,22 @@ namespace Airerage.Runtime.UI
             _flashAt = -10f;
             _trailAt = -10f;
             _glow = false;
-            _back = 0f;
             _backTarget = 0f;
+            _backSetAt = -10f;
+            _backFromPose = 0f;
+            _backFromShown = 0f;
+            _backFromSway = 0f;
             _lean = Vector2.zero;
             _sheen = Vector3.zero;
-            _swingAt = -10f;
             SetVerticesDirty();
         }
 
         private void Update()
         {
             float now = Now;
+            // 裏の札は、出ている間はいつも揺れているので毎フレーム描き直す。
             bool dirty = _glow || now - _fuseAt < FuseSeconds + 0.05f || now - _flashAt < FlashSeconds + 0.05f
-                || now - _trailAt < TrailSeconds + 0.05f || now - _swingAt < SwingSeconds + 0.05f || (_sway && _back > 0.001f);
-            if (!Mathf.Approximately(_back, _backTarget))
-            {
-                _back = Mathf.MoveTowards(_back, _backTarget, Time.unscaledDeltaTime / BackSeconds);
-                dirty = true;
-            }
+                || now - _trailAt < TrailSeconds + 0.05f || now - _backSetAt < BackSeconds + 0.05f || _backTarget > 0f;
             if (dirty)
             {
                 SetVerticesDirty();
@@ -309,30 +375,26 @@ namespace Airerage.Runtime.UI
                 }
             }
 
-            // 裏の札（B3）: 左下へずれた項目の色の札。出るときは左から伸びる。表の札から少し回し（2026-11-08）、選んだ瞬間は大きく振れて
-            // 少し遠くへずれてから戻り、選んでいる間（見出しの札はいつも）はゆっくり揺れる。
-            if (_back > 0.001f)
+            // 裏の札（B3）: 左下へずれ、時計回りに少し回った項目の色の札（見本のページの transform と同じ順: 札の左から 20%・上から 60% の
+            // 点を中心に、横に縮め、回し、ずらす）。
+            BackPose(now, out float pose, out float shown, out float sway);
+            if (shown > 0.001f)
             {
-                float a = UiEase.OutCubic(_back);
                 var back = new Vector2[4];
-                float stretch = 0.4f + 0.6f * a;
-                Vector2 offset = _backOffset * a * (1f + 0.8f * Mathf.Max(0f, Hop(now)));
-                Vector2 center = Vector2.zero;
-                for (int i = 0; i < 4; i++)
-                {
-                    back[i] = new Vector2(r.xMin + (outer[i].x - r.xMin) * stretch, outer[i].y) + offset;
-                    center += back[i] * 0.25f;
-                }
-                float angle = BackAngleAt(r, now) * a * Mathf.Deg2Rad;
+                float stretch = BackStartScale + (1f - BackStartScale) * pose;
+                var origin = new Vector2(r.xMin + r.width * 0.2f, r.yMin + r.height * 0.4f);
+                Vector2 offset = _backOffset * pose + SwayShift * sway;
+                float angle = -BackDegrees(pose, sway) * Mathf.Deg2Rad;
                 float cos = Mathf.Cos(angle);
                 float sin = Mathf.Sin(angle);
                 for (int i = 0; i < 4; i++)
                 {
-                    Vector2 d = back[i] - center;
-                    back[i] = center + new Vector2(d.x * cos - d.y * sin, d.x * sin + d.y * cos);
+                    Vector2 d = outer[i] - origin;
+                    d.x *= stretch;
+                    back[i] = origin + new Vector2(d.x * cos - d.y * sin, d.x * sin + d.y * cos) + offset;
                 }
                 Color c = _accentColor;
-                c.a = 0.95f * a;
+                c.a = BackOpacity * Mathf.Clamp01(shown);
                 AddQuad(vh, r, back, Uniform(c));
             }
 
@@ -420,50 +482,6 @@ namespace Airerage.Runtime.UI
                 clearGlow.a = 0f;
                 AddFuse(vh, r, pathOut, path, head, 0.12f, clearGlow, glowColor);
             }
-        }
-
-        // 裏の札の角度（度。左回りが正）: 端が _backPeek だけはみ出す角度に、跳ね（Hop）を足す。
-        private float BackAngleAt(Rect r, float now)
-        {
-            float half = Mathf.Max(1f, r.width * 0.5f);
-            float tilt = Mathf.Clamp(Mathf.Atan2(_backPeek, half) * Mathf.Rad2Deg, MinBackTilt, MaxBackTilt);
-            return tilt + SwingDegrees * Hop(now);
-        }
-
-        // 跳ねの形（1 が跳ねきった所）: 選んだ瞬間の跳ねと、選んでいる間（見出しの札はいつも）BeatPeriod ごとの小さな跳ね。
-        private float Hop(float now)
-        {
-            float hop = Snap(now - _swingAt);
-            if (_glow || _sway)
-            {
-                float since = now - _swingAt;
-                if (since > SwingSeconds)
-                {
-                    hop += BeatScale * Snap((since - SwingSeconds) % BeatPeriod - (BeatPeriod - SwingSeconds));
-                }
-            }
-            return hop;
-        }
-
-        /// <summary>
-        /// 1 回の跳ね（t は跳ね始めてからの秒数）: 0.06 秒で鋭く跳ね（1）、0.09 秒で少し戻りすぎ（-0.15）、0.09 秒でぴたりと止まる（0）。
-        /// その後は動かない（止めと跳ねのメリハリ。2026-11-08）。
-        /// </summary>
-        public static float Snap(float t)
-        {
-            if (t < 0f || t >= SwingSeconds)
-            {
-                return 0f;
-            }
-            if (t < 0.06f)
-            {
-                return UiEase.OutCubic(t / 0.06f);
-            }
-            if (t < 0.15f)
-            {
-                return Mathf.Lerp(1f, -0.15f, UiEase.InOutCubic((t - 0.06f) / 0.09f));
-            }
-            return Mathf.Lerp(-0.15f, 0f, UiEase.OutCubic((t - 0.15f) / 0.09f));
         }
 
         private Color SheenColor(float u)

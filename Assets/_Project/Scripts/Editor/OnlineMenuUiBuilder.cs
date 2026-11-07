@@ -45,8 +45,9 @@ namespace Airerage.Editor
             MenuOption join = MenuUiBuilder.CreateMenuItem(connect, "Join", "JOIN (LAN)", top, new Vector2(960f, -558f), small);
             foreach (MenuOption option in new[] { hostOnline, joinOnline, back, host, join })
             {
-                // 選んでいない項目は暗く下げる（D-88 の B13）。
+                // 選んでいない項目は暗く下げる（D-88 の B13）。名前の前の「›››」（W17）。
                 option.SetRecede(true);
+                MenuUiBuilder.AddTextMotion(option, true);
             }
             Text connectMessage = MenuUiBuilder.CreateText(connect, "Message", string.Empty, 26, FontStyle.Bold, TextAnchor.UpperLeft,
                 top, new Vector2(110f, -690f), new Vector2(1500f, 120f), new Color(1f, 0.85f, 0.3f));

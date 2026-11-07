@@ -84,7 +84,8 @@ namespace Airerage.Editor
                 rect.sizeDelta = new Vector2(maxWidth, height);
                 var plate = face.AddComponent<SlantedPlate>();
                 plate.Configure(0.22f, 5f, new Color(0.97f, 0.98f, 1f, 1f), Accent);
-                plate.ConfigureBack(16f, new Vector2(-15f, -12f));
+                // 見本のページの見出しの裏の札（高さ 96 で左へ 13・下へ 11、時計回りに 1.3°）を、札の高さに合わせて大きくする（2026-11-08）。
+                plate.ConfigureBack(1.3f, new Vector2(-13f, -11f) * (height / 96f));
                 plate.raycastTarget = false;
                 face.AddComponent<CanvasGroup>().alpha = 0f;
                 Text word = CreateText(rect, "Word", string.Empty, fontSize, FontStyle.Italic, TextAnchor.MiddleCenter,
@@ -270,6 +271,40 @@ namespace Airerage.Editor
         }
 
         /// <summary>
+        /// 文字の演出（D-90。2026-11-08）の W17（chevrons なら、名前の前に項目の色の「›››」を出し、名前を右へ寄せる）と W16（subJapanese が
+        /// 空でなければ、札の右に小さな説明をすべり出させる。英語の設定では subEnglish）を付ける。W1・W2 はどの項目にも MenuOption が付ける。
+        /// 大きさは見本のページの札（高さ 58）を基準に、札の高さに合わせる。
+        /// </summary>
+        public static void AddTextMotion(MenuOption option, bool chevrons, string subEnglish = "", string subJapanese = "")
+        {
+            var rect = (RectTransform)option.transform;
+            float height = rect.sizeDelta.y;
+            float unit = height / 58f;
+            ChevronMarks marks = null;
+            if (chevrons)
+            {
+                var go = new GameObject("Chevrons", typeof(RectTransform));
+                go.transform.SetParent(option.transform, false);
+                var marksRect = (RectTransform)go.transform;
+                marksRect.anchorMin = marksRect.anchorMax = new Vector2(0f, 0.5f);
+                marksRect.pivot = new Vector2(0f, 0.5f);
+                marksRect.sizeDelta = new Vector2(ChevronMarks.WidthFor(height), height);
+                // 名前の書き出しより少し左から（名前は ›› の分だけ右へ寄る）。
+                marksRect.anchoredPosition = new Vector2(option.LabelText.rectTransform.anchoredPosition.x - 12f * unit, 0f);
+                marks = go.AddComponent<ChevronMarks>();
+                marks.raycastTarget = false;
+                marks.color = option.Accent;
+            }
+            Text sub = null;
+            if (!string.IsNullOrEmpty(subJapanese))
+            {
+                sub = Localize(CreateText(option.transform, "Sub", subEnglish, 18, FontStyle.Bold, TextAnchor.MiddleRight, new Vector2(1f, 0.5f),
+                    new Vector2(-30f * unit, 0f), new Vector2(300f, height), option.Accent, false), subJapanese);
+            }
+            option.ConfigureTextMotion(marks, sub);
+        }
+
+        /// <summary>
         /// ゲームを終了する前の確認（QuitConfirmDialog。ユーザーの要望、2026-10-20）: 画面全体を暗くし（クリックを通さない）、真ん中の
         /// 斜めの札に「ゲームを終了します。本当によろしいですか？」と、「はい」「いいえ」の 2 つの札。ほかの画面より手前に出すため、
         /// Canvas の最後に作る。
@@ -285,11 +320,10 @@ namespace Airerage.Editor
             panelRect.anchorMin = panelRect.anchorMax = panelRect.pivot = new Vector2(0.5f, 0.5f);
             panelRect.sizeDelta = new Vector2(1060f, 360f);
             var plate = panel.AddComponent<SlantedPlate>();
-            // 中は不透明にする（線形の色空間では、半透明の暗い色を重ねても後ろの文字が透けて見える）。
-            // 縁は QUIT のイメージカラー（2026-11-08）。
-            plate.Configure(0.12f, 4f, new Color(0.03f, 0.05f, 0.09f, 1f), MenuAccents.Quit);
+            // 中は不透明な白、文字は黒（ユーザーの要望、2026-11-08。「はい」「いいえ」の札はそのまま）。縁は QUIT のイメージカラー。
+            plate.Configure(0.12f, 4f, new Color(0.97f, 0.98f, 1f, 1f), MenuAccents.Quit);
             Text message = CreateText(panel.transform, "Message", QuitConfirmDialog.MessageJapanese, 40, FontStyle.Bold,
-                TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(980f, 90f), Color.white);
+                TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(980f, 90f), new Color(0.05f, 0.06f, 0.09f), false);
             MenuOption yes = CreateMenuItem(panel.transform, "Yes", "はい", new Vector2(0.5f, 0f), new Vector2(-330f, 150f), new Vector2(300f, 76f));
             MenuOption no = CreateMenuItem(panel.transform, "No", "いいえ", new Vector2(0.5f, 0f), new Vector2(50f, 150f), new Vector2(300f, 76f));
             yes.SetSelectedShift(new Vector2(0f, 6f));
@@ -434,8 +468,9 @@ namespace Airerage.Editor
             MenuOption menu = CreateMenuItem(panel, "BackToMenu", "BACK TO MENU", center, new Vector2(-260f, -70f), size);
             foreach (MenuOption option in new[] { resume, reset, menu })
             {
-                // 選んでいない項目は暗く下げる（D-88 の B13）。
+                // 選んでいない項目は暗く下げる（D-88 の B13）。名前の前の「›››」（W17）。
                 option.SetRecede(true);
+                AddTextMotion(option, true);
             }
             Localize(CreateText(panel, "Hint", "Esc / Start: close    Enter / A: OK", 20, FontStyle.Bold, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -190f), new Vector2(800f, 40f), new Color(1f, 1f, 1f, 0.7f)),

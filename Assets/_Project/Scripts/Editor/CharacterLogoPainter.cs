@@ -49,6 +49,8 @@ namespace Airerage.Editor
             public Shape Shape;
             public Color Color;
             public bool Cut;
+            // 暗い縁取りを敷かない（SPACE TRAVELER の輪と切れ込み。2026-11-08）。
+            public bool Plain;
         }
 
         /// <summary>STANDARD: 頭と肩の、ふつうの人型（白）。</summary>
@@ -63,7 +65,10 @@ namespace Airerage.Editor
             return Rasterize(layers);
         }
 
-        /// <summary>SPACE TRAVELER: 惑星の真ん中に斜めの切れ込み。切れ込みの向きに、惑星の外へ輪が出る（紫）。</summary>
+        /// <summary>
+        /// SPACE TRAVELER: 惑星の真ん中に斜めの切れ込み。切れ込みの向きに、惑星の外へ輪が出る（紫）。切れ込みは黒く塗り、輪には暗い縁取りを
+        /// 敷かず薄紫にする（キャラクター選択の背景に埋もれないように。ユーザーの要望、2026-11-08）。
+        /// </summary>
         public static Color[] SpaceTraveler()
         {
             var center = new Vector2(0.5f, 0.5f);
@@ -71,16 +76,21 @@ namespace Airerage.Editor
             const float angle = 26f;
             var layers = new List<Layer>();
             Fill(layers, p => Circle(p, center, radius), SpaceTravelerColor);
-            Cut(layers, p => Mathf.Abs(Rotate(p - center, angle).y) - 0.032f);
-            Fill(layers, p =>
+            FillPlain(layers, p => Mathf.Max(Mathf.Abs(Rotate(p - center, angle).y) - 0.032f, Circle(p, center, radius)), SlitColor);
+            FillPlain(layers, p =>
             {
                 Vector2 q = Rotate(p - center, angle);
                 float ring = Mathf.Abs(Ellipse(q, new Vector2(0.47f, 0.1f))) - 0.024f;
                 // 惑星の後ろに回る部分は描かない（惑星の縁から少し離す）。
                 return Mathf.Max(ring, -(Circle(p, center, radius) - 0.035f));
-            }, SpaceTravelerColor);
+            }, RingColor);
             return Rasterize(layers);
         }
+
+        // SPACE TRAVELER の切れ込みの色（不透明な黒）と、輪の色（暗い縁取りをやめても、乗せたときに流れ込む同じ紫の上で見えるように、
+        // 白に寄せた薄紫。2026-11-08）。
+        private static readonly Color SlitColor = new Color(0.02f, 0.03f, 0.06f, 1f);
+        private static readonly Color RingColor = Color.Lerp(SpaceTravelerColor, Color.white, 0.5f);
 
         /// <summary>STORM RUNNER: 先が渦を巻く 3 本の風の線（黄緑）。</summary>
         public static Color[] StormRunner()
@@ -246,6 +256,11 @@ namespace Airerage.Editor
             layers.Add(new Layer { Shape = shape, Color = color });
         }
 
+        private static void FillPlain(List<Layer> layers, Shape shape, Color color)
+        {
+            layers.Add(new Layer { Shape = shape, Color = color, Plain = true });
+        }
+
         private static void Cut(List<Layer> layers, Shape shape)
         {
             layers.Add(new Layer { Shape = shape, Cut = true });
@@ -271,7 +286,10 @@ namespace Airerage.Editor
                             sum *= 1f - Coverage(d, pixel);
                             continue;
                         }
-                        sum = Over(sum, OutlineColor, Coverage(d - Outline, pixel) * OutlineColor.a);
+                        if (!layer.Plain)
+                        {
+                            sum = Over(sum, OutlineColor, Coverage(d - Outline, pixel) * OutlineColor.a);
+                        }
                         sum = Over(sum, layer.Color, Coverage(d, pixel) * layer.Color.a);
                     }
                     Color result = sum.a > 1e-5f ? new Color(sum.r / sum.a, sum.g / sum.a, sum.b / sum.a, sum.a) : Color.clear;

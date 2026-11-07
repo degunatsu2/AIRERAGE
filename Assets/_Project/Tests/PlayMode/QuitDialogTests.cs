@@ -43,6 +43,11 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.QuitDialog.Message, Does.Contain(Loc.T("QUIT THE GAME", "ゲームを終了します")));
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.QuitDialog.No.gameObject), "最初に「いいえ」を選んでいない");
                 Assert.That(menu.ShowingTitle, Is.True, "確認の後ろのタイトルが消えた");
+                // 確認の札は白地に黒の文字（ユーザーの要望、2026-11-08）。
+                SlantedPlate dialogPlate = menu.QuitDialog.transform.Find("Panel").GetComponent<SlantedPlate>();
+                Assert.That(dialogPlate.color.r + dialogPlate.color.g + dialogPlate.color.b, Is.GreaterThan(2.7f), "確認の札が白地でない");
+                UnityEngine.UI.Text message = dialogPlate.transform.Find("Message").GetComponent<UnityEngine.UI.Text>();
+                Assert.That(message.color.r + message.color.g + message.color.b, Is.LessThan(0.5f), "確認の文字が黒でない");
                 yield return WaitSeconds(0.3f);
 
                 // いいえでタイトルへ戻り、もう一度ボタンを押すとメインメニューへ。

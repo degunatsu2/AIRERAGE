@@ -78,20 +78,41 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiMove), "カーソルの音が鳴らない");
                 Assert.That(menu.Training.Plate.FuseRunning, Is.True, "選んでも縁に光が走らない（B1）");
                 Assert.That(menu.Training.LabelText.text, Is.EqualTo("TRAINING"), "選んだ名前の文字が変わった（デコードはなくした）");
-                Assert.That(menu.Training.Plate.Swinging, Is.True, "選んでも裏の札が振れない（2026-11-08）");
+                Assert.That(menu.Training.Plate.Swinging, Is.True, "選んでも裏の札が出る動きを始めない（2026-11-08）");
+                Assert.That(menu.Training.Rise != null && menu.Training.Rise.Playing, Is.True, "選んでも名前の文字がはねない（W2）");
                 Assert.That(menu.Training.GetComponentInChildren<MenuIcon>().Selected, Is.True, "絵が動かない（B12）");
                 yield return WaitSeconds(0.45f);
                 Assert.That(menu.Training.Label, Is.EqualTo("TRAINING"));
                 Assert.That(menu.Training.Plate.Back, Is.GreaterThan(0.9f), "裏の札が出ない（B3）");
-                Assert.That(Mathf.Abs(menu.Training.Plate.BackAngle), Is.GreaterThan(0.5f), "裏の札が表の札と同じ角度（2026-11-08）");
-                // 跳ねたらぴたりと止まる（揺れに弾力がありすぎたので、止めと跳ねにメリハリ。2026-11-08）。
-                float rest = menu.Training.Plate.BackAngle;
+                // 見本のページの裏の札の動き（2026-11-08）: 時計回りに少し回って出て、少し行きすぎてから戻り、0.3 秒たったらゆっくり揺れる。
+                Assert.That(menu.Training.Plate.BackAngle, Is.LessThan(-0.5f).And.GreaterThan(-3f), "裏の札が時計回りに少し回っていない");
+                Assert.That(UiEase.CubicBezier(0.34f, 1.7f, 0.5f, 1f, 0.5f), Is.GreaterThan(1f), "出るときに少し行きすぎない");
+                float before = menu.Training.Plate.BackAngle;
                 yield return WaitSeconds(0.2f);
-                Assert.That(menu.Training.Plate.BackAngle, Is.EqualTo(rest).Within(0.01f), "跳ねた後に裏の札が止まらない");
-                Assert.That(SlantedPlate.Snap(0.06f), Is.EqualTo(1f).Within(0.01f), "跳ねが鋭くない");
-                Assert.That(SlantedPlate.Snap(0.15f), Is.LessThan(0f), "1 回だけ少し戻りすぎない");
-                Assert.That(SlantedPlate.Snap(SlantedPlate.SwingSeconds), Is.Zero, "跳ねの後に止まらない");
+                Assert.That(Mathf.Abs(menu.Training.Plate.BackAngle - before), Is.LessThan(0.4f), "揺れがゆっくりでない");
+                Assert.That(SlantedPlate.SwayAt(0f), Is.EqualTo(0f).Within(0.001f), "揺れが止まった形から始まらない");
+                Assert.That(SlantedPlate.SwayAt(SlantedPlate.SwayPeriod * 0.5f), Is.EqualTo(1f).Within(0.001f), "揺れが 2.3 秒の周期でない");
                 Assert.That(menu.Single.IsReceded, Is.True, "ほかの項目が暗く下がらない（B13）");
+                // 文字の演出（D-90）: 名前の前に ›››、名前が右へ寄る（W17）、札の右に小さな説明（W16）。選んでいない項目には出ない。
+                Assert.That(menu.Training.Chevrons != null && menu.Training.Chevrons.Shown, Is.True, "名前の前に ››› が出ない（W17）");
+                Assert.That(menu.Training.LabelOffset.x, Is.GreaterThan(20f), "名前が右へ寄らない（W17）");
+                Assert.That(menu.Training.Sub, Is.Not.Null, "札の右に説明がない（W16）");
+                Assert.That(menu.Training.Sub.canvasRenderer.GetAlpha(), Is.GreaterThan(0.9f), "札の右に説明が出ない（W16）");
+                Assert.That(menu.Single.Sub.canvasRenderer.GetAlpha(), Is.LessThan(0.1f), "選んでいない項目の説明が出ている（W16）");
+                Assert.That(menu.Single.Chevrons.Shown, Is.False, "選んでいない項目に ››› が出ている（W17）");
+                Assert.That(menu.Single.LabelOffset.magnitude, Is.LessThan(0.5f), "選んでいない項目の名前が戻らない");
+                Assert.That(LetterRise.Rise(LetterRise.RiseSeconds * 0.4f), Is.EqualTo(1f).Within(0.01f), "文字がはね上がりきらない（W2）");
+                Assert.That(LetterRise.Rise(LetterRise.RiseSeconds), Is.Zero, "文字が元の位置に戻らない（W2）");
+                // 左の背景（D-91 の M2 を白地に）: 白地に、選んだ項目の色の斜めの帯。ロゴは黒。
+                MainMenuPanel panel = backdrop.Panel;
+                Assert.That(panel, Is.Not.Null, "左の背景がない（M2）");
+                Assert.That(panel.Paper.r + panel.Paper.g + panel.Paper.b, Is.GreaterThan(2.7f), "左の背景が白地でない");
+                Assert.That(panel.Index, Is.EqualTo(3), "左の背景の帯が選んだ項目に合わない");
+                Color bandColor = panel.BandColor;
+                Assert.That(new Vector3(bandColor.r, bandColor.g, bandColor.b),
+                    Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "左の背景の帯が項目の色でない");
+                UnityEngine.UI.Text logo = backdrop.transform.Find("Logo").GetComponent<UnityEngine.UI.Text>();
+                Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.LessThan(0.5f), "左のロゴが黒でない");
                 Assert.That(menu.Single.Plate.Back, Is.LessThan(0.1f), "選んでいない項目の裏の札が残っている");
                 Assert.That(backdrop.Word, Is.EqualTo("TRAINING"), "背景の名前が変わらない（B7）");
                 Assert.That(backdrop.Description, Is.Not.Empty, "背景に説明を出さない（B7）");

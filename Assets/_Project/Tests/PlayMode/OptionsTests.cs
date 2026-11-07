@@ -198,6 +198,23 @@ namespace Airerage.PlayMode.Tests
             yield return OpenRandomStages(options);
             Assert.That(stages.Highlighted, Is.Not.Null, "前提: ステージにカーソルがある");
             Assert.That(stages.ShownDescription, Is.EqualTo(stages.Highlighted.DescriptionJa), "ステージの説明が日本語でない");
+            // 説明は専用の白い札の上に黒の文字（縁はステージのイメージカラー。高さは文に合わせる。2026-11-08）。
+            SlantedPlate descriptionPlate = stages.DescriptionPlate;
+            Assert.That(descriptionPlate, Is.Not.Null, "説明の札がない");
+            Assert.That(descriptionPlate.color.r + descriptionPlate.color.g + descriptionPlate.color.b, Is.GreaterThan(2.7f), "説明の札が白地でない");
+            Color stageColor = stages.Highlighted.Color;
+            Assert.That(new Vector3(descriptionPlate.BorderColor.r, descriptionPlate.BorderColor.g, descriptionPlate.BorderColor.b),
+                Is.EqualTo(new Vector3(stageColor.r, stageColor.g, stageColor.b)), "説明の札の縁がステージの色でない");
+            UnityEngine.UI.Text descriptionText = descriptionPlate.GetComponentInChildren<UnityEngine.UI.Text>();
+            Assert.That(descriptionText.color.r + descriptionText.color.g + descriptionText.color.b, Is.LessThan(0.5f), "説明の文字が黒でない");
+            Assert.That(descriptionPlate.rectTransform.rect.height, Is.GreaterThanOrEqualTo(descriptionText.preferredHeight), "説明の札に文が収まらない");
+            // 札はチェックの箱を付ける前と同じ所（画面の左から 130）。チェックの箱も画面の中。
+            var firstPlate = (RectTransform)stages.Option(0).transform;
+            Vector3[] corners = new Vector3[4];
+            firstPlate.GetWorldCorners(corners);
+            var panelRect = (RectTransform)stages.transform;
+            Vector2 local = panelRect.InverseTransformPoint(corners[0]);
+            Assert.That(local.x - panelRect.rect.xMin, Is.EqualTo(130f).Within(20f), "ステージの札が右に寄っている");
             stages.Option(0).OnCancel(null);
             yield return null;
 

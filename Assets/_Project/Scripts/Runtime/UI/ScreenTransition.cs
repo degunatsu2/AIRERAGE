@@ -632,8 +632,29 @@ namespace Airerage.Runtime.UI
                     ((MenuIcon)copy).Selected = icon.Selected;
                     copy.color = icon.color;
                     break;
+                case MainMenuPanel panel:
+                    ((MainMenuPanel)copy).CopyState(panel);
+                    break;
+                case ChevronMarks marks:
+                    ((ChevronMarks)copy).CopyState(marks);
+                    break;
                 case Text text:
                     var copyText = (Text)copy;
+                    // 文字の演出（W1 の濃さ・W16 の説明の濃さ・W2 のはね。2026-11-08）。
+                    float alpha = text.canvasRenderer.GetAlpha();
+                    if (!Mathf.Approximately(copyText.canvasRenderer.GetAlpha(), alpha))
+                    {
+                        copyText.canvasRenderer.SetAlpha(alpha);
+                    }
+                    LetterRise rise = text.GetComponent<LetterRise>();
+                    if (rise != null)
+                    {
+                        LetterRise copyRise = copyText.GetComponent<LetterRise>();
+                        if (copyRise != null)
+                        {
+                            copyRise.CopyState(rise);
+                        }
+                    }
                     if (copyText.text != text.text)
                     {
                         copyText.text = text.text;

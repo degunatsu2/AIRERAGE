@@ -23,6 +23,11 @@ namespace Airerage.Runtime.UI
     ///   所に ClickSparks が出す。2026-11-07）。
     /// - B12: 子に絵（MenuIcon）があれば、選んでいる間だけ動かす。
     /// - B13（Recede をつけた一覧だけ）: 同じ親のほかの項目を選んでいる間は、暗くして少し下げる。
+    /// 文字の演出（D-90。ユーザーが選んだ W1・W2・W16・W17。2026-11-08。動きは見本のページと同じ。距離は札の高さ 58 を基準に大きくする）:
+    /// - W1 スラントイン: 選んだ瞬間、名前が左下から札の傾きに沿ってすべり込み、0.16 秒で濃くなる。
+    /// - W2 レターライズ: 選んだ瞬間、名前の文字が 1 文字ずつ順にはね上がって戻る（LetterRise。文字の網だけを動かす）。
+    /// - W16 サブラベル（_sub がある項目。メインメニュー）: 札の右に、日本語の小さな説明が左からすべり出る。
+    /// - W17 シェブロン（_chevrons がある項目。メインメニューなどの一覧）: 名前が右へ寄り、前に項目の色の「›››」が順に光る（ChevronMarks）。
     /// </summary>
     [RequireComponent(typeof(Button))]
     public sealed class MenuOption : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, ICancelHandler
@@ -33,6 +38,15 @@ namespace Airerage.Runtime.UI
         public const float RecedeAlpha = 0.5f;
 
         private const float BackSeconds = 0.18f;
+        // 文字の演出の大きさの基準（見本のページの札の高さ）と、W1・W16・W17 の秒数と距離（基準の札でのピクセル）。
+        private const float MotionUnitHeight = 58f;
+        private const float SlantSeconds = 0.16f;
+        private static readonly Vector2 SlantFrom = new Vector2(-14f, -3f);
+        private const float ChevronShift = 26f;
+        private const float ChevronShiftSeconds = 0.18f;
+        private const float SubTravel = 10f;
+        private const float SubFadeSeconds = 0.16f;
+        private const float SubMoveSeconds = 0.2f;
 
         [SerializeField] private SlantedPlate _plate;
         [SerializeField] private Text _label;
@@ -47,8 +61,14 @@ namespace Airerage.Runtime.UI
         [SerializeField] private RectTransform[] _pinned = new RectTransform[0];
         [Tooltip("同じ親のほかの項目を選んでいる間は、暗くして少し下げる（B13。メインメニューなどの一覧）")]
         [SerializeField] private bool _recede;
+        [Tooltip("下げている間の濃さ（B13。白い背景の上では薄くしすぎると読めないので、メインメニューは濃いめ。2026-11-08）")]
+        [SerializeField] private float _recedeAlpha = RecedeAlpha;
         [Tooltip("導火線の光も項目の色（_accent）にする（メインメニュー。2026-11-07）")]
         [SerializeField] private bool _accentFuse;
+        [Tooltip("選んでいる間、名前の前に出す「›››」（W17。なければ名前は寄らない）")]
+        [SerializeField] private ChevronMarks _chevrons;
+        [Tooltip("選んでいる間、札の右にすべり出る小さな説明（W16。なければ出さない）")]
+        [SerializeField] private Text _sub;
         private Vector2[] _pinnedHomes;
 
         // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。
@@ -82,6 +102,21 @@ namespace Airerage.Runtime.UI
         private Vector2 _lean;
         private float _sheenX = 0.5f;
 
+        // 文字の演出（W1・W2・W16・W17）: 名前の置き場所と今のずれ、W17 の右へ寄る動き、W1 の始まり、W16 の説明の動き。
+        private float _unit = 1f;
+        private Vector2 _labelHome;
+        private Vector2 _subHome;
+        private LetterRise _rise;
+        private float _labelShiftNow;
+        private float _labelShiftFrom;
+        private float _labelShiftTo;
+        private float _labelShiftAt = -10f;
+        private float _slantAt = -10f;
+        private float _subShown;
+        private float _subFrom;
+        private float _subTo;
+        private float _subAt = -10f;
+
         /// <summary>選ばれた（決定した）とき。</summary>
         public Button.ButtonClickedEvent Clicked => Button.onClick;
 
@@ -110,6 +145,26 @@ namespace Airerage.Runtime.UI
 
         /// <summary>決定の輪と火花（まだ決定していなければ null。テスト用）。</summary>
         public UiBurst Burst => _burst;
+
+        /// <summary>名前の文字のはね（W2。テスト用）。</summary>
+        public LetterRise Rise => _rise;
+
+        /// <summary>名前の前の「›››」（W17。なければ null。テスト用）。</summary>
+        public ChevronMarks Chevrons => _chevrons;
+
+        /// <summary>札の右の小さな説明（W16。なければ null。テスト用）。</summary>
+        public Text Sub => _sub;
+
+        /// <summary>名前が置き場所からずれている量（W1・W17。テスト用）。</summary>
+        public Vector2 LabelOffset => _label != null ? _label.rectTransform.anchoredPosition - _labelHome : Vector2.zero;
+
+        /// <summary>文字の演出の W17 の印と W16 の説明を付ける（シーンのビルダー用。どちらも null でよい）。</summary>
+        public void ConfigureTextMotion(ChevronMarks chevrons, Text sub)
+        {
+            _chevrons = chevrons;
+            _sub = sub;
+            Refresh();
+        }
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(SlantedPlate plate, Text label, Text note, Color accent)
@@ -141,10 +196,11 @@ namespace Airerage.Runtime.UI
             Refresh();
         }
 
-        /// <summary>同じ親のほかの項目を選んでいる間、暗く下げるか（B13。シーンのビルダー用）。</summary>
-        public void SetRecede(bool recede)
+        /// <summary>同じ親のほかの項目を選んでいる間、暗く下げるか（B13。シーンのビルダー用）。alpha は下げている間の濃さ。</summary>
+        public void SetRecede(bool recede, float alpha = RecedeAlpha)
         {
             _recede = recede;
+            _recedeAlpha = alpha;
         }
 
         /// <summary>項目の文字を変える（READY ／ CANCEL READY など）。</summary>
@@ -282,6 +338,21 @@ namespace Airerage.Runtime.UI
                 _baseFontSize = _label.fontSize;
             }
             _icon = GetComponentInChildren<MenuIcon>(true);
+            _unit = Mathf.Max(0.5f, _rect.rect.height / MotionUnitHeight);
+            if (_label != null)
+            {
+                _labelHome = _label.rectTransform.anchoredPosition;
+                _rise = _label.GetComponent<LetterRise>();
+                if (_rise == null)
+                {
+                    _rise = _label.gameObject.AddComponent<LetterRise>();
+                }
+            }
+            if (_sub != null)
+            {
+                _subHome = _sub.rectTransform.anchoredPosition;
+                _sub.canvasRenderer.SetAlpha(0f);
+            }
             if (_recede)
             {
                 _group = GetComponent<CanvasGroup>();
@@ -327,6 +398,39 @@ namespace Airerage.Runtime.UI
                 _icon.Selected = false;
             }
             PlacePinned(Vector2.zero);
+            ResetTextMotion();
+        }
+
+        // 文字の演出を止めて元に戻す（画面を閉じたとき）。
+        private void ResetTextMotion()
+        {
+            _labelShiftNow = 0f;
+            _labelShiftFrom = 0f;
+            _labelShiftTo = 0f;
+            _labelShiftAt = -10f;
+            _slantAt = -10f;
+            _subShown = 0f;
+            _subFrom = 0f;
+            _subTo = 0f;
+            _subAt = -10f;
+            if (_label != null && _rect != null)
+            {
+                _label.rectTransform.anchoredPosition = _labelHome;
+                _label.canvasRenderer.SetAlpha(1f);
+            }
+            if (_rise != null)
+            {
+                _rise.Stop();
+            }
+            if (_chevrons != null)
+            {
+                _chevrons.Show(false);
+            }
+            if (_sub != null && _rect != null)
+            {
+                _sub.rectTransform.anchoredPosition = _subHome + new Vector2(-SubTravel * _unit, 0f);
+                _sub.canvasRenderer.SetAlpha(0f);
+            }
         }
 
         public void OnSelect(BaseEventData eventData)
@@ -339,8 +443,14 @@ namespace Airerage.Runtime.UI
             if (_plate != null)
             {
                 _plate.RunFuse();
-                // 裏の札が振れてから揺れる（ペルソナ 3 リロード・5 ザ・ロイヤルのメニューを参考に。2026-11-08）。
+                // 裏の札が伸びて出てから、ゆっくり揺れる（文字の演出の見本のページと同じ動き。2026-11-08）。
                 _plate.SwingBack();
+            }
+            // 名前が左下からすべり込み（W1）、1 文字ずつはね上がる（W2）。
+            _slantAt = Time.unscaledTime;
+            if (_rise != null)
+            {
+                _rise.Play();
             }
             Refresh();
             Selected?.Invoke();
@@ -381,7 +491,7 @@ namespace Airerage.Runtime.UI
                 }
                 if (_group != null)
                 {
-                    _group.alpha = Mathf.MoveTowards(_group.alpha, _receded ? RecedeAlpha : 1f, dt / 0.2f * (1f - RecedeAlpha));
+                    _group.alpha = Mathf.MoveTowards(_group.alpha, _receded ? _recedeAlpha : 1f, dt / 0.2f * Mathf.Max(0.05f, 1f - _recedeAlpha));
                 }
             }
 
@@ -408,6 +518,8 @@ namespace Airerage.Runtime.UI
                 Place();
             }
 
+            AnimateText(now);
+
             // B9: マウスを乗せている間、マウスの方へわずかに傾き、光の反射が付いてくる。
             if (_plate != null)
             {
@@ -428,6 +540,84 @@ namespace Airerage.Runtime.UI
                 }
                 // 光の反射は、マウスが離れたら傾きと一緒に薄れる。
                 _plate.SetLean(_lean, _sheenX, sheen > 0f ? 1f : Mathf.Clamp01(_lean.magnitude * 3f));
+            }
+        }
+
+        // 文字の演出（W1・W17 の名前のずれと濃さ、W16 の説明）。
+        private void AnimateText(float now)
+        {
+            if (_label != null)
+            {
+                float c = (now - _labelShiftAt) / ChevronShiftSeconds;
+                _labelShiftNow = c >= 1f ? _labelShiftTo : Mathf.LerpUnclamped(_labelShiftFrom, _labelShiftTo, EaseOut(c));
+                var offset = new Vector2(_labelShiftNow, 0f);
+                float alpha = 1f;
+                float w = (now - _slantAt) / SlantSeconds;
+                if (w >= 0f && w < 1f)
+                {
+                    float e = EaseOut(w);
+                    offset = Vector2.LerpUnclamped(SlantFrom * _unit, offset, e);
+                    alpha = Mathf.Clamp01(e);
+                }
+                RectTransform rect = _label.rectTransform;
+                if (rect.anchoredPosition != _labelHome + offset)
+                {
+                    rect.anchoredPosition = _labelHome + offset;
+                }
+                if (!Mathf.Approximately(_label.canvasRenderer.GetAlpha(), alpha))
+                {
+                    _label.canvasRenderer.SetAlpha(alpha);
+                }
+            }
+            if (_sub != null)
+            {
+                float t = now - _subAt;
+                _subShown = t >= SubFadeSeconds ? _subTo : Mathf.Lerp(_subFrom, _subTo, UiEase.CssEase(t / SubFadeSeconds));
+                float move = t >= SubMoveSeconds ? 1f : EaseOut(t / SubMoveSeconds);
+                float from = (_subTo > 0.5f ? -SubTravel : 0f) * _unit;
+                float to = (_subTo > 0.5f ? 0f : -SubTravel) * _unit;
+                var position = _subHome + new Vector2(Mathf.LerpUnclamped(from, to, move), 0f);
+                if (_sub.rectTransform.anchoredPosition != position)
+                {
+                    _sub.rectTransform.anchoredPosition = position;
+                }
+                _sub.canvasRenderer.SetAlpha(_subShown);
+            }
+        }
+
+        private static float EaseOut(float t) => UiEase.SnapOut(t);
+
+        // 名前の右へ寄る量（W17）と説明（W16）の行き先を決め、変わったら動き始める。
+        private void RetargetText()
+        {
+            float now = Time.unscaledTime;
+            bool live = isActiveAndEnabled && _rect != null && Application.isPlaying;
+            float shift = _chevrons != null && _selected ? ChevronShift * _unit : 0f;
+            if (!Mathf.Approximately(shift, _labelShiftTo))
+            {
+                _labelShiftFrom = live ? _labelShiftNow : shift;
+                _labelShiftTo = shift;
+                _labelShiftAt = live ? now : -10f;
+            }
+            float sub = _sub != null && _selected ? 1f : 0f;
+            if (!Mathf.Approximately(sub, _subTo))
+            {
+                _subFrom = live ? _subShown : sub;
+                _subTo = sub;
+                _subAt = live ? now : -10f;
+            }
+            if (_chevrons != null)
+            {
+                Color mark = _accent;
+                mark.a = 1f;
+                _chevrons.color = mark;
+                _chevrons.Show(_selected && live);
+            }
+            if (_sub != null)
+            {
+                Color text = _accent;
+                text.a = 1f;
+                _sub.color = text;
             }
         }
 
@@ -475,6 +665,7 @@ namespace Airerage.Runtime.UI
                 _icon.Selected = _selected;
             }
             Retarget();
+            RetargetText();
         }
 
         // 札の行き先（選んでいれば右へ、ほかを選んでいて Recede なら少し下げる）を決め、変わったら動き始める。

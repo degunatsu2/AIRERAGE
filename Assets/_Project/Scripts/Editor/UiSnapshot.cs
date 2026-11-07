@@ -592,6 +592,10 @@ namespace Airerage.Editor
                 {
                     text.Refresh();
                 }
+                foreach (StageSelectScreen stages in canvas.GetComponentsInChildren<StageSelectScreen>(true))
+                {
+                    stages.RefitDescription();
+                }
                 foreach (var group in canvas.GetComponentsInChildren<LayoutGroup>(true))
                 {
                     LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)group.transform);

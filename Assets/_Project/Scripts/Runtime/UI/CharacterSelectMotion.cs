@@ -82,6 +82,7 @@ namespace Airerage.Runtime.UI
             public int ReelDir = 1;
             public RawImage ReelLogo;
             public Text ReelName;
+            public LetterRise NameRise;
             public Text ReelTags;
             public CanvasGroup LogoGroup;
             public CanvasGroup NameGroup;
@@ -246,6 +247,12 @@ namespace Airerage.Runtime.UI
             fx.ReelLogo.gameObject.SetActive(false);
             fx.ReelName.gameObject.SetActive(false);
             fx.ReelTags.gameObject.SetActive(false);
+            // 名前が変わったら 1 文字ずつはね上がる（文字の演出 W2。D-90。2026-11-08）。出ていく前の名前にははねさせない。
+            fx.NameRise = name.GetComponent<LetterRise>();
+            if (fx.NameRise == null)
+            {
+                fx.NameRise = name.gameObject.AddComponent<LetterRise>();
+            }
             BuildStamp(fx, slot);
             return fx;
         }
@@ -374,7 +381,7 @@ namespace Airerage.Runtime.UI
                 icon.Hovered = Hovered(i);
                 icon.Pop = icon.Hovered ? 1f : 0f;
                 icon.PopFrom = icon.Pop;
-                icon.Flood01 = icon.Pop;
+                icon.Flood01 = icon.Hovered && _screen.CharacterAt(i) != null ? 1f : 0f;
                 icon.FloodFrom = icon.Flood01;
                 icon.ChangedAt = now - 1f;
                 icon.HoverStart = now;
@@ -410,6 +417,11 @@ namespace Airerage.Runtime.UI
                 {
                     // C10: 枠のロゴと名前が入れ替わる（動いた向きから入る）。
                     StartReel(fx, character >= fx.Character ? 1 : -1, now);
+                }
+                if (shown && name != fx.Name && !string.IsNullOrEmpty(name))
+                {
+                    // W2: 新しい名前が 1 文字ずつはね上がる。
+                    fx.NameRise.Play();
                 }
                 fx.Name = name;
                 fx.Character = character;
@@ -545,7 +557,9 @@ namespace Airerage.Runtime.UI
                 icon.Pop = hovered
                     ? Mathf.LerpUnclamped(icon.PopFrom, 1f, UiEase.OutBack(Mathf.Clamp01(t / PopUpSeconds), 1.7f))
                     : Mathf.Lerp(icon.PopFrom, 0f, UiEase.OutCubic(t / PopDownSeconds));
-                icon.Flood01 = hovered
+                // RANDOM の札には色を流し込まない（ユーザーの要望、2026-11-08）。
+                bool floods = hovered && _screen.CharacterAt(i) != null;
+                icon.Flood01 = floods
                     ? Mathf.Lerp(icon.FloodFrom, 1f, UiEase.OutCubic(t / FloodInSeconds))
                     : Mathf.Lerp(icon.FloodFrom, 0f, UiEase.OutCubic(t / FloodOutSeconds));
                 // 流れ込む色はグラデーションなしの不透明なキャラクターの色（ユーザーの要望、2026-11-08）。

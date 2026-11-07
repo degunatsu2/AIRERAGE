@@ -6,8 +6,8 @@ namespace Airerage.Runtime.UI
     /// <summary>
     /// 見出しの札（2026-11-08 のユーザーの要望）: 白地に黒の文字の斜めの札に、イメージカラーの縁と、表の札から少し角度のずれた裏の札
     /// （SlantedPlate の裏の札。いつも出して、ゆっくり揺らす）。メインメニューの右の見出しと、ステージ選択の右の見出し。
-    /// Show で文字と色を変えると、前の札は左へ抜けて消え、新しい札が右から伸びて入り、裏の札が少し遅れて大きく振れてから止まり、縁を光が
-    /// 1 周し、文字が少し遅れて滑り込む（ペルソナ 3 リロード・5 ザ・ロイヤルのメニューを参考に）。
+    /// Show で文字と色を変えると、前の札は左へ抜けて消え、新しい札が右から伸びて入り、裏の札が少し遅れて伸びて出てからゆっくり揺れ、縁を
+    /// 光が 1 周し、文字が少し遅れて左下からすべり込み（W1）、1 文字ずつはね上がる（W2。D-90。2026-11-08。見本のページと同じ動き）。
     /// 札は 2 枚（_faces）を交互に使う。札の幅は文字に合わせ、_maxWidth を超えるなら字を小さくする。
     /// </summary>
     public sealed class HeadingPlate : MonoBehaviour
@@ -18,10 +18,12 @@ namespace Airerage.Runtime.UI
         public const float OutSeconds = 0.2f;
 
         private const float TextDelay = 0.07f;
-        private const float TextSeconds = 0.28f;
         private const float EnterTravel = 140f;
         private const float LeaveTravel = 70f;
-        private const float TextTravel = 46f;
+        // W1: 見本のページの見出し（高さ 96）で、左へ 14・下へ 3 ピクセルの所から 0.16 秒ですべり込む。
+        private const float SlantSeconds = 0.16f;
+        private const float SlantUnitHeight = 96f;
+        private static readonly Vector2 SlantFrom = new Vector2(-14f, -3f);
 
         [SerializeField] private RectTransform[] _faces = new RectTransform[0];
         [SerializeField] private SlantedPlate[] _plates = new SlantedPlate[0];
@@ -37,6 +39,7 @@ namespace Airerage.Runtime.UI
         private Vector2[] _homes = new Vector2[0];
         private Vector2[] _textHomes = new Vector2[0];
         private Color[] _textColors = new Color[0];
+        private LetterRise[] _rises = new LetterRise[0];
         private int _current = -1;
         private int _previous = -1;
         private float _changedAt = -10f;
@@ -85,8 +88,18 @@ namespace Airerage.Runtime.UI
             _homes = new Vector2[count];
             _textHomes = new Vector2[count];
             _textColors = new Color[count];
+            _rises = new LetterRise[count];
             for (int i = 0; i < count; i++)
             {
+                if (_texts[i] != null)
+                {
+                    _rises[i] = _texts[i].GetComponent<LetterRise>();
+                    if (_rises[i] == null)
+                    {
+                        _rises[i] = _texts[i].gameObject.AddComponent<LetterRise>();
+                    }
+                    _rises[i].Ratio = LetterRise.HeadingRatio;
+                }
                 _groups[i] = _faces[i].GetComponent<CanvasGroup>();
                 if (_groups[i] == null)
                 {
@@ -151,10 +164,13 @@ namespace Airerage.Runtime.UI
             plate.BorderColor = accent;
             plate.AccentColor = accent;
             plate.FuseColor = Color.Lerp(accent, Color.white, 0.35f);
-            plate.Sway = true;
             plate.BackTarget = 1f;
             plate.RunFuse();
             plate.SwingBack(0.08f);
+            if (_rises[_current] != null)
+            {
+                _rises[_current].Play(TextDelay);
+            }
             _changedAt = Time.unscaledTime;
             if (!Application.isPlaying)
             {
@@ -196,7 +212,7 @@ namespace Airerage.Runtime.UI
                 _faces[_previous].anchoredPosition = _homes[_previous] + new Vector2(-LeaveTravel * UiEase.InCubic(p), 0f);
                 _faces[_previous].localScale = Vector3.one;
                 _groups[_previous].alpha = 1f - p;
-                SetTextAlpha(_previous, 1f - p, 0f);
+                SetTextAlpha(_previous, 1f - p, Vector2.zero);
             }
             if (_current >= 0)
             {
@@ -205,12 +221,14 @@ namespace Airerage.Runtime.UI
                 _faces[_current].anchoredPosition = _homes[_current] + new Vector2(EnterTravel * (1f - UiEase.OutBack(p, 1.2f)), 0f);
                 _faces[_current].localScale = new Vector3(Mathf.Lerp(0.6f, 1f, UiEase.OutCubic(p)), 1f, 1f);
                 _groups[_current].alpha = UiEase.Clamp01(t / 0.1f);
-                float q = UiEase.Clamp01((t - TextDelay) / TextSeconds);
-                SetTextAlpha(_current, q, TextTravel * (1f - UiEase.OutCubic(q)));
+                // W1: 左下から札の傾きに沿ってすべり込み、濃くなる。
+                float q = UiEase.SnapOut((t - TextDelay) / SlantSeconds);
+                float unit = _faces[_current].sizeDelta.y / SlantUnitHeight;
+                SetTextAlpha(_current, q, SlantFrom * unit * (1f - q));
             }
         }
 
-        private void SetTextAlpha(int index, float alpha, float offset)
+        private void SetTextAlpha(int index, float alpha, Vector2 offset)
         {
             Text text = _texts[index];
             if (text == null)
@@ -220,7 +238,7 @@ namespace Airerage.Runtime.UI
             Color c = _textColors[index];
             c.a *= alpha;
             text.color = c;
-            text.rectTransform.anchoredPosition = _textHomes[index] + new Vector2(offset, 0f);
+            text.rectTransform.anchoredPosition = _textHomes[index] + offset;
         }
     }
 }

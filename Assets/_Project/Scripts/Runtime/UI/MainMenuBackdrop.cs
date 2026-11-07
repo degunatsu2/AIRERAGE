@@ -9,6 +9,7 @@ namespace Airerage.Runtime.UI
     /// その下に説明（日本語 ／ 英語は言語の設定に従う）。項目を変えると、前の札は左へ抜けて消え、新しい札が右から入る。
     /// 見出しの札は白地に黒の文字で、縁と裏の札は項目の色（MenuOption.Accent。札の縁・裏の札・縁を回る光・左の絵と同じ色。2026-11-08 の
     /// ユーザーの要望。それまでは項目の色の縁取りの大きな文字）。
+    /// 左の白い背景（MainMenuPanel。D-91）の斜めの帯も、選んでいる項目の色にする。
     /// </summary>
     public sealed class MainMenuBackdrop : MonoBehaviour
     {
@@ -18,6 +19,8 @@ namespace Airerage.Runtime.UI
         [Tooltip("名前の見出しの札")]
         [SerializeField] private HeadingPlate _heading;
         [SerializeField] private Text _description;
+        [Tooltip("左の背景（項目の色の帯。D-91）")]
+        [SerializeField] private MainMenuPanel _panel;
 
         private Vector2 _descriptionHome;
         private float _changedAt = -10f;
@@ -32,12 +35,16 @@ namespace Airerage.Runtime.UI
         /// <summary>名前の見出しの札（テスト用）。</summary>
         public HeadingPlate Heading => _heading;
 
+        /// <summary>左の背景（テスト用）。</summary>
+        public MainMenuPanel Panel => _panel;
+
         /// <summary>今出している説明（テスト用）。</summary>
         public string Description => _description != null ? _description.text : string.Empty;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(MenuOption[] items, string[] english, string[] japanese, HeadingPlate heading, Text description)
+        public void Configure(MenuOption[] items, string[] english, string[] japanese, HeadingPlate heading, Text description, MainMenuPanel panel)
         {
+            _panel = panel;
             _items = items;
             _english = english;
             _japanese = japanese;
@@ -82,6 +89,10 @@ namespace Airerage.Runtime.UI
             if (_heading != null && _items[index] != null)
             {
                 _heading.Show(_items[index].Label, _items[index].Accent);
+            }
+            if (_panel != null && _items[index] != null)
+            {
+                _panel.Select(index, _items[index].Accent);
             }
             if (_description != null)
             {
