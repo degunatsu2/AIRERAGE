@@ -336,12 +336,9 @@ namespace Airerage.Editor
             // メインメニュー: 左に縦に並んだ斜めの札。
             RectTransform main = MenuUiBuilder.CreateFull(canvas.transform, "Main");
             // 左の背景は、白地に選んでいる項目の色の斜めの帯（D-91 の M2 を白地に。2026-11-08）。ロゴは黒。
-            RectTransform side = MenuUiBuilder.CreateFull(main, "Side");
-            side.anchorMax = new Vector2(0.42f, 1f);
-            var panel = side.gameObject.AddComponent<MainMenuPanel>();
-            panel.raycastTarget = false;
+            MainMenuPanel panel = MenuUiBuilder.CreateWhitePanel(main, "Side", Vector2.zero, new Vector2(0.42f, 1f), 0.5f, 0.43f, 0f, MenuAccents.Single);
             MenuUiBuilder.CreateText(main, "Logo", "AIRERAGE", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(700f, 90f), new Color(0.05f, 0.06f, 0.09f), false).font = GameFonts.LatinBlack;
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(700f, 90f), MenuUiBuilder.Ink, false).font = GameFonts.LatinBlack;
             var anchor = new Vector2(0f, 1f);
             var size = new Vector2(560f, 72f);
             // LOCAL VS ・ NETWORK VS は、右の大きな名前が札にかかるので短くした（ユーザーの要望、2026-11-07）。
@@ -417,10 +414,9 @@ namespace Airerage.Editor
             root.SetSiblingIndex(1);
             HeadingPlate heading = MenuUiBuilder.CreateHeadingPlate(root, "Heading", new Vector2(1f, 0.66f), new Vector2(1f, 0.5f),
                 new Vector2(-96f, 0f), 170f, 112, 980f, 60f);
-            UnityEngine.UI.Text description = MenuUiBuilder.CreateText(root, "Description", string.Empty, 30, FontStyle.Bold, TextAnchor.UpperRight,
-                new Vector2(1f, 0.47f), new Vector2(-100f, 0f), new Vector2(900f, 120f), new Color(1f, 1f, 1f, 0.92f));
-            description.font = GameFonts.JapaneseBold;
-            description.horizontalOverflow = HorizontalWrapMode.Wrap;
+            // 説明は見出しの下の説明の札（白地に黒の文字。縁と裏の札は項目の色。ステージ選択と同じ。2026-11-08）。
+            DescriptionPlate description = MenuUiBuilder.CreateDescriptionPlate(root, "DescriptionPlate", new Vector2(1f, 0.5f),
+                new Vector2(-100f, 40f), 900f, 28);
             string[] english =
             {
                 "Battle 3 CPUs. Four difficulty levels.",
@@ -447,9 +443,10 @@ namespace Airerage.Editor
         private static CpuLevelScreen CreateCpuLevel(Transform canvas)
         {
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CpuLevel");
-            MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.42f, 1f));
+            // 左はメインメニューと同じ白い背景（帯は SINGLE の色）、見出しは黒（2026-11-08）。
+            MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.42f, 1f), 0.5f, 0.43f, 0f, MenuAccents.Single);
             MenuUiBuilder.CreateText(panel, "Title", "CPU LEVEL", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false);
             string[] labels = System.Array.ConvertAll(System.Enum.GetNames(typeof(Airerage.Core.Ai.CpuLevel)), n => n.ToUpperInvariant());
             var options = new Object[labels.Length];
             for (int i = 0; i < labels.Length; i++)
@@ -461,8 +458,12 @@ namespace Airerage.Editor
                 MenuUiBuilder.AddTextMotion(option, true);
                 options[i] = option;
             }
-            MenuUiBuilder.Localize(MenuUiBuilder.CreateText(panel, "Description", "YOU + 3 CPUs.  The CPUs pick random characters.", 30, FontStyle.Bold,
-                TextAnchor.MiddleLeft, new Vector2(1f, 0.6f), new Vector2(-80f, 0f), new Vector2(900f, 60f), new Color(1f, 1f, 1f, 0.85f)), "自分と CPU 3 体で対戦します。CPU のキャラクターはランダムです。");
+            // 説明はメインメニューと同じ説明の札（白地に黒の文字。縁と裏の札は SINGLE の色。2026-11-08）。
+            DescriptionPlate description = MenuUiBuilder.CreateDescriptionPlate(panel, "DescriptionPlate", new Vector2(1f, 0.6f), new Vector2(-80f, 40f),
+                900f, 28, false);
+            description.Text.text = "YOU + 3 CPUs. The CPUs pick random characters.";
+            MenuUiBuilder.Localize(description.Text, "自分とCPU3体で対戦します。CPUのキャラクターはランダムです。");
+            description.SetAccent(MenuAccents.Single);
             MenuUiBuilder.CreateHint(panel, "↑↓: select     Enter / A: OK     Esc / B: back", "↑↓:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
             var screen = panel.gameObject.AddComponent<CpuLevelScreen>();
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
@@ -476,11 +477,13 @@ namespace Airerage.Editor
         {
             StageCatalog catalog = LoadOrCreateStages();
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "StageSelect");
-            MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.4f), Vector2.zero, new Vector2(0.49f, 1f));
+            // 左はメインメニューと同じ白い背景（帯はカーソルのステージの色）、見出しは黒（2026-11-08）。
+            MainMenuPanel side = MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.49f, 1f), 0.5f, 0.43f, 0f, MenuAccents.Random);
             MenuUiBuilder.CreateText(panel, "Title", "STAGE SELECT", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), Color.white);
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false);
             // 札はスクロールの中身に入れる（並びは実行中に StageSelectScreen.Layout が決める。カーソルの札が見える所まで動く。2026-11-06）。
-            var scrollPosition = new Vector2(86f, -176f);
+            // 札の左の縁を見出しの 1 文字目の線にそろえるため、スクロールの左端は 44（チェックの箱が切れないように。2026-11-08）。
+            var scrollPosition = new Vector2(44f, -176f);
             var scrollSize = new Vector2(900f, 690f);
             RectTransform content = OnlineMenuUiBuilder.CreateScrollArea(panel, scrollPosition, scrollSize, out UnityEngine.UI.ScrollRect scroll);
             scroll.name = "StageScroll";
@@ -513,41 +516,19 @@ namespace Airerage.Editor
             MenuOption random = CreateStagePlate(content, "Random", "RANDOM");
             random.SetAccent(MenuAccents.Random, true);
             MenuOption done = CreateStagePlate(panel, "Done", "DONE");
-            // 札の左端（画面の左から 130。StageSelectScreen の札の並びと同じ）にそろえる（2026-11-08）。
-            ((RectTransform)done.transform).anchoredPosition = new Vector2(130f, scrollPosition.y - scrollSize.y - 16f);
+            // 札の左端（見出しの 1 文字目の線。StageSelectScreen の札の並びと同じ）にそろえる（2026-11-08）。
+            ((RectTransform)done.transform).anchoredPosition = new Vector2(scrollPosition.x + StageSelectScreen.PlateLeft, scrollPosition.y - scrollSize.y - 16f);
             // 名前は右の見出しの札（白地に黒の文字、縁と裏の札はステージのイメージカラー。帯はやめた。2026-11-08）、説明はその下に、右の
             // 端から置く（左の札とスクロールバーに重ならないように。説明は折り返す）。
             HeadingPlate heading = MenuUiBuilder.CreateHeadingPlate(panel, "Heading", new Vector2(1f, 0.65f), new Vector2(1f, 0.5f),
                 new Vector2(-80f, 0f), 112f, 64, 840f, 44f);
-            // 説明は専用の白い札の上に黒の文字（縁と裏の札はステージのイメージカラー。高さは文に合わせる。ユーザーの要望、2026-11-08）。
-            var descriptionPlateObject = new GameObject("DescriptionPlate", typeof(RectTransform));
-            descriptionPlateObject.transform.SetParent(panel, false);
-            var descriptionPlateRect = (RectTransform)descriptionPlateObject.transform;
-            descriptionPlateRect.anchorMin = descriptionPlateRect.anchorMax = new Vector2(1f, 0.5f);
-            descriptionPlateRect.pivot = new Vector2(1f, 1f);
-            descriptionPlateRect.anchoredPosition = new Vector2(-80f, 68f);
-            // 幅は前の説明の枠と同じ 820（左のスクロールバーに重ならない）。
-            descriptionPlateRect.sizeDelta = new Vector2(820f, 160f);
-            var descriptionPlate = descriptionPlateObject.AddComponent<SlantedPlate>();
-            descriptionPlate.Configure(0.12f, 4f, new Color(0.97f, 0.98f, 1f, 1f), MenuUiBuilder.Accent);
-            descriptionPlate.ConfigureBack(1f, new Vector2(-12f, -10f));
-            descriptionPlate.raycastTarget = false;
-            UnityEngine.UI.Text description = MenuUiBuilder.CreateText(descriptionPlateRect, "Description", string.Empty, 28, FontStyle.Bold, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), Vector2.zero, Vector2.zero, new Color(0.05f, 0.06f, 0.09f), false);
-            RectTransform descriptionRect = description.rectTransform;
-            descriptionRect.anchorMin = Vector2.zero;
-            descriptionRect.anchorMax = Vector2.one;
-            descriptionRect.pivot = new Vector2(0.5f, 0.5f);
-            // 札の左の傾きの分と、上下の余白（StageSelectScreen.DescriptionPadding と同じ 22）。
-            descriptionRect.offsetMin = new Vector2(44f, 22f);
-            descriptionRect.offsetMax = new Vector2(-34f, -22f);
-            description.horizontalOverflow = HorizontalWrapMode.Wrap;
-            // 説明は文なので、英語でも読みやすい日本語の字体（M PLUS 1。英字も入っている。D-77）。
-            description.font = GameFonts.JapaneseBold;
-            // 句読点を行の頭に置かずに折り返す（枠の幅が変わったら入れ直す）。
-            description.gameObject.AddComponent<LineBreakText>();
+            // 説明は専用の白い札の上に黒の文字（縁と裏の札はステージのイメージカラー。高さは文に合わせる。幅は前の説明の枠と同じ 820 で、
+            // 左のスクロールバーに重ならない。ユーザーの要望、2026-11-08）。
+            DescriptionPlate descriptionPlate = MenuUiBuilder.CreateDescriptionPlate(panel, "DescriptionPlate", new Vector2(1f, 0.5f),
+                new Vector2(-80f, 68f), 820f, 28);
+            UnityEngine.UI.Text description = descriptionPlate.Text;
             // 案内は、見出しとスクロールの上の端の間（アイテムを選ぶ画面と同じ。2026-11-06）。
-            UnityEngine.UI.Text note = AccentTint.Mark(MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic,
+            UnityEngine.UI.Text note = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic,
                 TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent));
             note.font = GameFonts.JapaneseBold;
             MenuUiBuilder.CreateHint(panel, "↑↓←→: select     Enter / A: OK     Esc / B: back", "↑↓←→:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
@@ -558,6 +539,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_heading", heading);
             SandboxWireSceneBuilder.SetReference(screen, "_description", description);
             SandboxWireSceneBuilder.SetReference(screen, "_descriptionPlate", descriptionPlate);
+            SandboxWireSceneBuilder.SetReference(screen, "_panel", side);
             SandboxWireSceneBuilder.SetReference(screen, "_note", note);
             SandboxWireSceneBuilder.SetReference(screen, "_random", random);
             SandboxWireSceneBuilder.SetReference(screen, "_content", content);

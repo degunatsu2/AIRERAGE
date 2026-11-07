@@ -97,8 +97,8 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.Training.Chevrons != null && menu.Training.Chevrons.Shown, Is.True, "名前の前に ››› が出ない（W17）");
                 Assert.That(menu.Training.LabelOffset.x, Is.GreaterThan(20f), "名前が右へ寄らない（W17）");
                 Assert.That(menu.Training.Sub, Is.Not.Null, "札の右に説明がない（W16）");
-                Assert.That(menu.Training.Sub.canvasRenderer.GetAlpha(), Is.GreaterThan(0.9f), "札の右に説明が出ない（W16）");
-                Assert.That(menu.Single.Sub.canvasRenderer.GetAlpha(), Is.LessThan(0.1f), "選んでいない項目の説明が出ている（W16）");
+                Assert.That(menu.Training.Sub.color.a, Is.GreaterThan(0.9f), "札の右に説明が出ない（W16）");
+                Assert.That(menu.Single.Sub.color.a, Is.LessThan(0.1f), "選んでいない項目の説明が出ている（W16）");
                 Assert.That(menu.Single.Chevrons.Shown, Is.False, "選んでいない項目に ››› が出ている（W17）");
                 Assert.That(menu.Single.LabelOffset.magnitude, Is.LessThan(0.5f), "選んでいない項目の名前が戻らない");
                 Assert.That(LetterRise.Rise(LetterRise.RiseSeconds * 0.4f), Is.EqualTo(1f).Within(0.01f), "文字がはね上がりきらない（W2）");
@@ -116,6 +116,13 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.Single.Plate.Back, Is.LessThan(0.1f), "選んでいない項目の裏の札が残っている");
                 Assert.That(backdrop.Word, Is.EqualTo("TRAINING"), "背景の名前が変わらない（B7）");
                 Assert.That(backdrop.Description, Is.Not.Empty, "背景に説明を出さない（B7）");
+                // 説明は白地に黒の文字の説明の札。縁は項目の色（ステージ選択と同じ。2026-11-08）。
+                SlantedPlate descriptionPlate = backdrop.DescriptionPlate.Plate;
+                Assert.That(descriptionPlate.color.r + descriptionPlate.color.g + descriptionPlate.color.b, Is.GreaterThan(2.7f), "説明の札が白地でない");
+                Assert.That(new Vector3(descriptionPlate.BorderColor.r, descriptionPlate.BorderColor.g, descriptionPlate.BorderColor.b),
+                    Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "説明の札の縁が項目の色でない");
+                Color descriptionInk = backdrop.DescriptionPlate.Text.color;
+                Assert.That(descriptionInk.r + descriptionInk.g + descriptionInk.b, Is.LessThan(0.5f), "説明の文字が黒でない");
                 // 項目の色（2026-11-07）: 札の縁・裏の札・縁を回る光、右の見出しの札の縁と裏の札が項目の色。背景の色の光はない。
                 Color accent = menu.Training.Accent;
                 Assert.That(accent, Is.Not.EqualTo(menu.Single.Accent), "項目ごとに色が違わない");
@@ -155,6 +162,18 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "決定ですぐにキャラクター選択へ入れ替わらない");
                 Assert.That(transition.LastKind, Is.EqualTo(TransitionKind.SlantCascade));
                 Assert.That(menu.Training.Burst, Is.Not.Null, "決定しても輪と火花が出ない（B10）");
+                // 出ていくメインメニューの写しでも、小さな説明（W16）は選んでいた TRAINING の札にだけ出る（2026-11-08 の指摘）。
+                GameObject leaving = GameObject.Find("Main (Transition)");
+                Assert.That(leaving, Is.Not.Null, "メインメニューの写しがない");
+                int subsShown = 0;
+                foreach (UnityEngine.UI.Text text in leaving.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+                {
+                    if (text.name == "Sub" && text.color.a > 0.5f)
+                    {
+                        subsShown++;
+                    }
+                }
+                Assert.That(subsShown, Is.LessThanOrEqualTo(1), "切り替えの写しで、選んでいない札にも小さな説明が出ている（W16）");
                 yield return null;
                 yield return null;
                 yield return null;
@@ -309,7 +328,8 @@ namespace Airerage.PlayMode.Tests
             {
                 if (text.name == "KeyboardHeader" || text.name == "GamepadHeader" || text.name == "Prompt")
                 {
-                    Assert.That(SameHue(text.color, optionsColor), Is.True, $"{text.name} の文字が OPTIONS の色でない");
+                    // 白い背景の上なので、OPTIONS の色を黒に寄せた色（2026-11-08）。
+                    Assert.That(SameHue(text.color, AccentTint.OnWhite(optionsColor)), Is.True, $"{text.name} の文字が OPTIONS の色でない");
                 }
             }
         }
@@ -345,7 +365,10 @@ namespace Airerage.PlayMode.Tests
                 int tinted = 0;
                 foreach (AccentTint tint in characters.GetComponentsInChildren<AccentTint>(true))
                 {
-                    Assert.That(SameHue(tint.GetComponent<UnityEngine.UI.Graphic>().color, training), Is.True, $"{tint.name} がモードの色でない");
+                    // 白い背景は帯の色、白い背景の上の文字はモードの色を黒に寄せた色（2026-11-08）。
+                    MainMenuPanel white = tint.GetComponent<MainMenuPanel>();
+                    Color actual = white != null ? white.BandColor : tint.GetComponent<UnityEngine.UI.Graphic>().color;
+                    Assert.That(SameHue(actual, tint.Expected(training)), Is.True, $"{tint.name} がモードの色でない");
                     tinted++;
                 }
                 Assert.That(tinted, Is.GreaterThan(3), "キャラクター選択に色を変える文字がない");

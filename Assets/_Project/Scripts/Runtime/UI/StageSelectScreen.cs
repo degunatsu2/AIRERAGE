@@ -34,7 +34,9 @@ namespace Airerage.Runtime.UI
         [SerializeField] private HeadingPlate _heading;
         [SerializeField] private Text _description;
         [Tooltip("説明の後ろの白い札（縁と裏の札はステージのイメージカラー。高さは説明の文に合わせる。2026-11-08）")]
-        [SerializeField] private SlantedPlate _descriptionPlate;
+        [SerializeField] private DescriptionPlate _descriptionPlate;
+        [Tooltip("左の白い背景（帯はカーソルのステージの色。2026-11-08）")]
+        [SerializeField] private MainMenuPanel _panel;
         [Tooltip("ネットワーク対戦の案内（ホストが選んでいる、など。なくてもよい）")]
         [SerializeField] private Text _note;
         [Tooltip("RANDOM の札（ステージの札の後ろ。なくてもよい）")]
@@ -51,12 +53,10 @@ namespace Airerage.Runtime.UI
 
         // 札の並び（スクロールの中身の中の位置。左上から）。アイテムを選ぶ画面と同じ。
         private const int Columns = 2;
-        // 札の左のチェックの箱（幅 34、札から 8 離す）が入るだけの余白。札は、チェックの箱を付ける前と同じ所（画面の左から 130）に来る
-        // （スクロールの左端が 86。チェックの箱の分だけ右に寄っていた。ユーザーの指摘、2026-11-08）。
-        private const float PlateLeft = 44f;
-        // 説明の札の上下の余白と、いちばん低い高さ。
-        private const float DescriptionPadding = 22f;
-        private const float DescriptionMinHeight = 84f;
+        // 札の左のチェックの箱（幅 34、札から 8 離す）が入るだけの余白。札の左の縁が、見出し「STAGE SELECT」の 1 文字目の線にそろう
+        // （画面の左から 91。スクロールの左端は 44。ユーザーの要望、2026-11-08）。
+        public const float PlateLeft = 47f;
+
         private const float ColumnStep = 430f;
         private const float RowStep = 76f;
         private const float SectionGap = 14f;
@@ -487,8 +487,6 @@ namespace Airerage.Runtime.UI
 
         private void Update()
         {
-            // 画面の大きさが変わって説明を折り返し直したときも、札の高さを文に合わせる。
-            RefitDescription();
             if (Rolling)
             {
                 UpdateRoulette();
@@ -534,42 +532,32 @@ namespace Airerage.Runtime.UI
         }
 
         /// <summary>説明の後ろの札（テスト用。なければ null）。</summary>
-        public SlantedPlate DescriptionPlate => _descriptionPlate;
+        public SlantedPlate DescriptionPlate => _descriptionPlate != null ? _descriptionPlate.Plate : null;
 
-        /// <summary>説明の札の高さを文に合わせる（上の端はそのまま、下へ伸びる。画面を撮る道具も、折り返しを入れ直した後に呼ぶ）。</summary>
+        /// <summary>説明の札の高さを文に合わせる（画面を撮る道具も、折り返しを入れ直した後に呼ぶ）。</summary>
         public void RefitDescription()
         {
-            if (_descriptionPlate == null || _description == null)
+            if (_descriptionPlate != null)
             {
-                return;
-            }
-            var rect = _descriptionPlate.rectTransform;
-            float height = Mathf.Max(DescriptionMinHeight, _description.preferredHeight + DescriptionPadding * 2f);
-            if (!Mathf.Approximately(rect.sizeDelta.y, height))
-            {
-                rect.sizeDelta = new Vector2(rect.sizeDelta.x, height);
+                _descriptionPlate.Refit();
             }
         }
 
-        // 説明の札の縁と裏の札を、見出しと同じイメージカラーにする。
+        // 説明の札の縁と裏の札・左の白い背景の帯を、見出しと同じイメージカラーにする。
         private void TintDescriptionPlate(Color accent)
         {
-            if (_descriptionPlate == null)
+            if (_descriptionPlate != null)
             {
-                return;
+                _descriptionPlate.SetAccent(accent);
             }
-            _descriptionPlate.BorderColor = accent;
-            _descriptionPlate.AccentColor = accent;
-            if (!Application.isPlaying)
+            if (_panel != null)
             {
-                // 再生していないとき（画面を撮る道具）は、裏の札を出しきった形で見せる。
-                _descriptionPlate.SetBackNow(1f);
-            }
-            else if (_descriptionPlate.BackTarget < 1f)
-            {
-                _descriptionPlate.BackTarget = 1f;
+                _panel.SetAccent(accent);
             }
         }
+
+        /// <summary>左の白い背景（テスト用）。</summary>
+        public MainMenuPanel Panel => _panel;
 
         // 番号 index の札（RandomIndex なら RANDOM の札。範囲の外なら null）。
         private MenuOption OptionAt(int index)

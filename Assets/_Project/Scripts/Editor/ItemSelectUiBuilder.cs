@@ -19,17 +19,18 @@ namespace Airerage.Editor
         private const float PlateWidth = 360f;
         private const float PlateHeight = 64f;
         private const float IconSize = 50f;
-        private static readonly Vector2 ScrollPosition = new Vector2(86f, -176f);
+        private static readonly Vector2 ScrollPosition = new Vector2(36f, -176f);
         private static readonly Vector2 ScrollSize = new Vector2(900f, 690f);
 
         public static ItemSelectScreen Create(Transform canvas, InputActionAsset inputActions)
         {
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "ItemSelect");
-            MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.45f), Vector2.zero, new Vector2(0.49f, 1f));
+            // 左はメインメニューと同じ白い背景（帯は入ってきた画面の色。AccentTint）、見出しは黒（2026-11-08）。
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.49f, 1f), 0.5f, 0.43f, 0f, MenuUiBuilder.Accent));
             Text title = MenuUiBuilder.CreateText(panel, "Title", "START ITEMS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -50f), new Vector2(1200f, 90f), Color.white);
+                new Vector2(0f, 1f), new Vector2(90f, -50f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false);
             // 案内は、見出しとスクロールの上の端のちょうど間（2026-11-06）。
-            Text note = AccentTint.Mark(MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+            Text note = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
                 new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent));
             note.font = GameFonts.JapaneseBold;
 
@@ -68,7 +69,7 @@ namespace Airerage.Editor
             }
             // DONE はスクロールの下に固定（いつでも見える）。
             MenuOption done = CreatePlate(panel, "Done", "DONE");
-            ((RectTransform)done.transform).anchoredPosition = new Vector2(150f, ScrollPosition.y - ScrollSize.y - 16f);
+            ((RectTransform)done.transform).anchoredPosition = new Vector2(ScrollPosition.x + ItemSelectScreen.PlateLeft, ScrollPosition.y - ScrollSize.y - 16f);
 
             // 効果のポップアップ（右。カーソルの札の高さに動く）。
             var popupObject = new GameObject("Popup", typeof(RectTransform));
@@ -140,7 +141,7 @@ namespace Airerage.Editor
         // 区切りの見出し（PASSIVE ／ ACTIVE。水色の斜めの文字と下の線）。位置は実行中に決める。
         private static Text CreateHeader(RectTransform content, string name, string label)
         {
-            Text header = AccentTint.Mark(MenuUiBuilder.CreateText(content, name, label, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft, new Vector2(0f, 1f),
+            Text header = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(content, name, label, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft, new Vector2(0f, 1f),
                 Vector2.zero, new Vector2(820f, 40f), MenuUiBuilder.Accent));
             header.rectTransform.pivot = new Vector2(0f, 1f);
             header.font = GameFonts.JapaneseBold;

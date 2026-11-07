@@ -36,7 +36,9 @@ namespace Airerage.Runtime.UI
 
         // 札の並び（スクロールの中身の中の位置。左上から）。
         private const int Columns = 2;
-        private const float PlateLeft = 64f;
+        // 札の左の縁を見出しの 1 文字目の線にそろえる（ステージ選択と同じ画面の左から 91。左のキーの箱（幅 46）が切れないように、スクロールの
+        // 左端は 36。2026-11-08）。
+        public const float PlateLeft = 55f;
         private const float ColumnStep = 430f;
         private const float RowStep = 76f;
         private const float HeaderHeight = 48f;
@@ -343,7 +345,7 @@ namespace Airerage.Runtime.UI
         private float LayoutSection(Text header, int first, int count, float y)
         {
             var rect = header.rectTransform;
-            rect.anchoredPosition = new Vector2(PlateLeft - 40f, y);
+            rect.anchoredPosition = new Vector2(PlateLeft, y);
             y -= HeaderHeight;
             for (int k = 0; k < count; k++)
             {

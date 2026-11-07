@@ -15,6 +15,10 @@ namespace Airerage.Editor
     /// </summary>
     internal static class OnlineMenuUiBuilder
     {
+        // 全面の白い背景の帯と細い帯の左端（地の幅に対する割合。右の端に寄せて、文字や項目の後ろにかからないように。2026-11-08）。
+        private const float FullBandLeft = 0.88f;
+        private const float FullStripLeft = 0.83f;
+
         public static OnlineMenu Create(Transform canvas, MenuScreens screens, CharacterSelectScreen characterSelect,
             StageSelectScreen stageSelect, StageCatalog stages, ItemSelectScreen itemSelect)
         {
@@ -22,15 +26,16 @@ namespace Airerage.Editor
 
             // 接続の画面。
             RectTransform connect = MenuUiBuilder.CreateFull(canvas, "OnlineConnect");
-            MenuUiBuilder.CreateFill(connect, "Side", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, new Vector2(0.92f, 1f));
+            // 全面の白い背景（帯は NETWORK の色で右の端に。ボタンの外の文字は黒。2026-11-08）。
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(connect, "Side", Vector2.zero, Vector2.one, FullBandLeft, FullStripLeft, 0f, MenuAccents.Network));
             MenuUiBuilder.CreateText(connect, "Title", "NETWORK VS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(90f, -60f), new Vector2(900f, 90f), Color.white);
+                top, new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false);
             // 左の列: 名前と、参加コード（インターネット越し。Relay）と BACK。右の列: IP アドレスとポート（同じ LAN）。
             var fieldSize = new Vector2(700f, 60f);
             var small = new Vector2(560f, 66f);
             InputField name = MenuUiBuilder.CreateInputField(connect, "Name", "NAME", top, new Vector2(110f, -190f), fieldSize);
             MenuUiBuilder.CreateText(connect, "OnlineTitle", "ONLINE (JOIN CODE)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(110f, -280f), new Vector2(700f, 44f), MenuAccents.Network);
+                top, new Vector2(110f, -280f), new Vector2(700f, 44f), AccentTint.OnWhite(MenuAccents.Network), false);
             InputField code = MenuUiBuilder.CreateInputField(connect, "Code", "JOIN CODE", top, new Vector2(110f, -330f), fieldSize);
             code.characterLimit = JoinCodes.MaxLength;
             code.contentType = InputField.ContentType.Alphanumeric;
@@ -38,30 +43,34 @@ namespace Airerage.Editor
             MenuOption joinOnline = MenuUiBuilder.CreateMenuItem(connect, "JoinOnline", "JOIN WITH CODE", top, new Vector2(110f, -488f), small);
             MenuOption back = MenuUiBuilder.CreateMenuItem(connect, "Back", "BACK", top, new Vector2(110f, -586f), small);
             MenuUiBuilder.CreateText(connect, "LanTitle", "SAME NETWORK (LAN)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(960f, -280f), new Vector2(700f, 44f), MenuAccents.Network);
+                top, new Vector2(960f, -280f), new Vector2(700f, 44f), AccentTint.OnWhite(MenuAccents.Network), false);
             InputField address = MenuUiBuilder.CreateInputField(connect, "Address", "ADDRESS", top, new Vector2(960f, -330f), fieldSize);
             InputField port = MenuUiBuilder.CreateInputField(connect, "Port", "PORT", top, new Vector2(960f, -400f), fieldSize);
             MenuOption host = MenuUiBuilder.CreateMenuItem(connect, "Host", "HOST (LAN)", top, new Vector2(960f, -480f), small);
             MenuOption join = MenuUiBuilder.CreateMenuItem(connect, "Join", "JOIN (LAN)", top, new Vector2(960f, -558f), small);
             foreach (MenuOption option in new[] { hostOnline, joinOnline, back, host, join })
             {
-                // 選んでいない項目は暗く下げる（D-88 の B13）。名前の前の「›››」（W17）。
-                option.SetRecede(true);
+                // 選んでいない項目は暗く下げる（D-88 の B13。白い背景の上なので濃いめ）。名前の前の「›››」（W17）。縁と裏の札は NETWORK の色
+                // （2026-11-08）。
+                option.SetRecede(true, 0.82f);
+                option.SetAccent(MenuAccents.Network, true);
                 MenuUiBuilder.AddTextMotion(option, true);
             }
+            // 知らせは白い背景の上で読める濃い橙（2026-11-08）。
             Text connectMessage = MenuUiBuilder.CreateText(connect, "Message", string.Empty, 26, FontStyle.Bold, TextAnchor.UpperLeft,
-                top, new Vector2(110f, -690f), new Vector2(1500f, 120f), new Color(1f, 0.85f, 0.3f));
+                top, new Vector2(110f, -690f), new Vector2(1500f, 120f), OnlineMenu.ProblemOnWhite, false);
             connectMessage.horizontalOverflow = HorizontalWrapMode.Wrap;
             MenuUiBuilder.CreateHint(connect, "HOST ONLINE: get a JOIN CODE and tell it to your friends.   JOIN WITH CODE: enter the host's code.   LAN: the host's ADDRESS and PORT.", "HOST ONLINE: 参加コードを受け取って友だちに伝える　　JOIN WITH CODE: ホストのコードを入れる　　LAN: ホストのアドレスとポートを入れる");
             connect.gameObject.SetActive(false);
 
             // 待機所。
             RectTransform waiting = MenuUiBuilder.CreateFull(canvas, "OnlineWaiting");
-            MenuUiBuilder.CreateFill(waiting, "Dim", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, Vector2.one);
+            // 全面の白い背景（帯は NETWORK の色で右の端に。ボタンの外の文字は黒。2026-11-08）。
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(waiting, "Side", Vector2.zero, Vector2.one, FullBandLeft, FullStripLeft, 0f, MenuAccents.Network));
             MenuUiBuilder.CreateText(waiting, "Title", "WAITING ROOM", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(90f, -60f), new Vector2(900f, 90f), Color.white);
+                top, new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false);
             Text info = MenuUiBuilder.CreateText(waiting, "Info", string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft,
-                top, new Vector2(94f, -150f), new Vector2(1400f, 40f), MenuAccents.Network);
+                top, new Vector2(94f, -150f), new Vector2(1400f, 40f), AccentTint.OnWhite(MenuAccents.Network), false);
             // 札を並べる場所（左。はみ出す分は縦にスクロールする。2026-11-03 のユーザーの要望）。札の位置は実行中に OnlineMenu が決める
             // （個人戦は PLAYERS の下に 1 列、チーム対戦は 4 色のチームを縦に並べ、人が入ったチームはその分だけ下へ広がる）。
             RectTransform slotContent = CreateScrollArea(waiting, new Vector2(110f, -200f), new Vector2(800f, 580f), out ScrollRect slotScroll);
@@ -86,7 +95,8 @@ namespace Airerage.Editor
                 rect.anchoredPosition = new Vector2(110f, -200f - p * 72f);
                 rect.sizeDelta = new Vector2(780f, 64f);
                 var plate = slot.AddComponent<SlantedPlate>();
-                plate.Configure(0.2f, 3f, new Color(0.03f, 0.05f, 0.09f, 0.45f), new Color(1f, 1f, 1f, 0.2f));
+                // 札の中は不透明（白い背景の上でも名前が読めるように。色は実行中に OnlineMenu が決める。2026-11-08）。
+                plate.Configure(0.2f, 3f, new Color(0.08f, 0.1f, 0.14f, 1f), new Color(1f, 1f, 1f, 0.2f));
                 plates[p] = plate;
                 var button = slot.AddComponent<Button>();
                 button.transition = Selectable.Transition.None;
@@ -146,7 +156,7 @@ namespace Airerage.Editor
             MenuOption copyCode = WaitingItem(waiting, "CopyCode", "COPY JOIN CODE", ref rowY, row);
             MenuOption leave = WaitingItem(waiting, "Leave", "LEAVE", ref rowY, row);
             Text waitingMessage = MenuUiBuilder.CreateText(waiting, "Message", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(110f, -800f), new Vector2(1500f, 44f), Color.white);
+                top, new Vector2(110f, -800f), new Vector2(1500f, 44f), MenuUiBuilder.Ink, false);
             MenuUiBuilder.CreateHint(waiting, "↑↓←→: select     Enter / A: OK     Esc / B: cancel ready, leave", "↑↓←→:選択　　Enter ／ A: 決定　　Esc ／ B: 準備完了の取り消し・退室");
             waiting.gameObject.SetActive(false);
 
@@ -295,7 +305,7 @@ namespace Airerage.Editor
             rect.anchoredPosition = position;
             rect.sizeDelta = size;
             plate = header.AddComponent<SlantedPlate>();
-            plate.Configure(0.2f, 3f, new Color(color.r * 0.35f, color.g * 0.35f, color.b * 0.35f, 0.9f), color);
+            plate.Configure(0.2f, 3f, new Color(color.r * 0.35f, color.g * 0.35f, color.b * 0.35f, 1f), color);
             var selectable = header.AddComponent<Button>();
             selectable.transition = Selectable.Transition.None;
             selectable.targetGraphic = plate;
@@ -315,6 +325,8 @@ namespace Airerage.Editor
         {
             MenuOption item = MenuUiBuilder.CreateMenuItem(parent, name, label, new Vector2(0f, 1f), new Vector2(990f, y), size);
             item.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+            // 縁と裏の札は NETWORK の色（2026-11-08）。
+            item.SetAccent(MenuAccents.Network, true);
             // 長い項目（SPLIT: 2 VS 2 VS 2 VS 2 など）も 1 行のまま枠に収める（2026-11-03 の指摘）。
             item.SetShrinkToFit(true);
             y -= size.y + 10f;

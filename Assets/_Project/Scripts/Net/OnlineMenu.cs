@@ -100,8 +100,15 @@ namespace Airerage.Net
         [SerializeField] private Color[] _colors = new Color[0];
         [SerializeField] private GameObject _loadingPanel;
 
-        private static readonly Color EmptyFill = new Color(0.03f, 0.05f, 0.09f, 0.45f);
-        private static readonly Color JoinedFill = new Color(0.03f, 0.05f, 0.09f, 0.85f);
+        // 札の中は不透明（白い背景の上でも名前が読めるように。空いている札は少し明るい灰色。2026-11-08）。
+        private static readonly Color EmptyFill = new Color(0.2f, 0.22f, 0.27f, 1f);
+        private static readonly Color JoinedFill = new Color(0.03f, 0.05f, 0.09f, 1f);
+
+        /// <summary>白い背景の上の知らせ（問題があるとき）の色（濃い橙。2026-11-08）。</summary>
+        public static readonly Color ProblemOnWhite = new Color(0.78f, 0.33f, 0.02f);
+
+        // 白い背景の上の文字の色（黒に近い紺）。
+        private static readonly Color Ink = new Color(0.05f, 0.06f, 0.09f);
         private static readonly Color EmptyBorder = new Color(1f, 1f, 1f, 0.2f);
 
         private OnlineConnection _connection;
@@ -497,8 +504,15 @@ namespace Airerage.Net
         {
             _open = true;
             _shown = Panel.None;
-            // 待機所のスクロールの印などは NETWORK のイメージカラー（2026-11-08）。
-            Airerage.Runtime.UI.AccentTint.Apply(this, NetworkAccent);
+            // 接続の画面・待機所の印と白い背景の帯は NETWORK のイメージカラー（2026-11-08）。ほかの画面（オプションなど。同じ Canvas の中）の
+            // 色は変えない（キャラクター選択・ステージ選択・アイテムを選ぶ画面は、出すときにそれぞれ SetAccent で決める）。
+            foreach (GameObject root in new[] { _connectPanel, _waitingPanel, _loadingPanel })
+            {
+                if (root != null)
+                {
+                    Airerage.Runtime.UI.AccentTint.Apply(root.transform, NetworkAccent);
+                }
+            }
             _menu.HideMenus();
             UpdatePanels();
         }
@@ -1150,7 +1164,7 @@ namespace Airerage.Net
                     : Loc.T($"CONNECTED AS {session.LocalPlayer + 1}P.", $"{session.LocalPlayer + 1}P として参加中");
             }
             _waitingMessage.text = ComposeWaitingMessage(session, teamMode, waiting, running, players, out bool problem);
-            _waitingMessage.color = problem ? new Color(1f, 0.85f, 0.3f) : Color.white;
+            _waitingMessage.color = problem ? ProblemOnWhite : Ink;
         }
 
         // アイテムの項目の文字と、ホストだけが選べる項目（ほかの人は見るだけ）。
@@ -1272,7 +1286,7 @@ namespace Airerage.Net
             rect.anchoredPosition = new Vector2(0f, y);
             rect.sizeDelta = new Vector2(RowWidth, HeaderHeight);
             bool selected = _teamHeaderButtons[index].IsSelected;
-            _teamHeaderPlates[index].color = new Color(color.r * 0.35f, color.g * 0.35f, color.b * 0.35f, selected ? 1f : 0.9f);
+            _teamHeaderPlates[index].color = new Color(color.r * 0.35f, color.g * 0.35f, color.b * 0.35f, 1f);
             _teamHeaderPlates[index].BorderColor = selected ? Color.white : color;
             _teamHeaderTexts[index].color = color;
             ((RectTransform)_teamHeaderTexts[index].transform).sizeDelta = new Vector2(RowWidth - 20f, HeaderHeight - 4f);

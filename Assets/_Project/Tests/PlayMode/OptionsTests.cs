@@ -208,13 +208,13 @@ namespace Airerage.PlayMode.Tests
             UnityEngine.UI.Text descriptionText = descriptionPlate.GetComponentInChildren<UnityEngine.UI.Text>();
             Assert.That(descriptionText.color.r + descriptionText.color.g + descriptionText.color.b, Is.LessThan(0.5f), "説明の文字が黒でない");
             Assert.That(descriptionPlate.rectTransform.rect.height, Is.GreaterThanOrEqualTo(descriptionText.preferredHeight), "説明の札に文が収まらない");
-            // 札はチェックの箱を付ける前と同じ所（画面の左から 130）。チェックの箱も画面の中。
+            // 札の左の縁は見出しの 1 文字目の線（画面の左から 91。2026-11-08）。チェックの箱も画面の中。
             var firstPlate = (RectTransform)stages.Option(0).transform;
             Vector3[] corners = new Vector3[4];
             firstPlate.GetWorldCorners(corners);
             var panelRect = (RectTransform)stages.transform;
             Vector2 local = panelRect.InverseTransformPoint(corners[0]);
-            Assert.That(local.x - panelRect.rect.xMin, Is.EqualTo(130f).Within(20f), "ステージの札が右に寄っている");
+            Assert.That(local.x - panelRect.rect.xMin, Is.EqualTo(91f).Within(4f), "ステージの札の左の縁が見出しの 1 文字目にそろっていない");
             stages.Option(0).OnCancel(null);
             yield return null;
 

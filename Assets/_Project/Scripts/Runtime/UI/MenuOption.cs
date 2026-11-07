@@ -351,7 +351,7 @@ namespace Airerage.Runtime.UI
             if (_sub != null)
             {
                 _subHome = _sub.rectTransform.anchoredPosition;
-                _sub.canvasRenderer.SetAlpha(0f);
+                SetSubAlpha(0f);
             }
             if (_recede)
             {
@@ -429,7 +429,7 @@ namespace Airerage.Runtime.UI
             if (_sub != null && _rect != null)
             {
                 _sub.rectTransform.anchoredPosition = _subHome + new Vector2(-SubTravel * _unit, 0f);
-                _sub.canvasRenderer.SetAlpha(0f);
+                SetSubAlpha(0f);
             }
         }
 
@@ -581,7 +581,19 @@ namespace Airerage.Runtime.UI
                 {
                     _sub.rectTransform.anchoredPosition = position;
                 }
-                _sub.canvasRenderer.SetAlpha(_subShown);
+                SetSubAlpha(_subShown);
+            }
+        }
+
+        // 説明の濃さは文字の色に持つ（画面の切り替えの写しは色を引き継ぐ。描く側の濃さ CanvasRenderer.alpha は写しに引き継がれず、決定した
+        // 瞬間の写しで全部の札に説明が出ていた。ユーザーの指摘、2026-11-08）。
+        private void SetSubAlpha(float alpha)
+        {
+            Color c = _sub.color;
+            if (!Mathf.Approximately(c.a, alpha))
+            {
+                c.a = alpha;
+                _sub.color = c;
             }
         }
 
@@ -616,7 +628,7 @@ namespace Airerage.Runtime.UI
             if (_sub != null)
             {
                 Color text = _accent;
-                text.a = 1f;
+                text.a = _sub.color.a;
                 _sub.color = text;
             }
         }

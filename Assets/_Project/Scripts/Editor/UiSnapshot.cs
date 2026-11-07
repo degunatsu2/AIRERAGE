@@ -592,9 +592,9 @@ namespace Airerage.Editor
                 {
                     text.Refresh();
                 }
-                foreach (StageSelectScreen stages in canvas.GetComponentsInChildren<StageSelectScreen>(true))
+                foreach (DescriptionPlate plate in canvas.GetComponentsInChildren<DescriptionPlate>(true))
                 {
-                    stages.RefitDescription();
+                    plate.Refit();
                 }
                 foreach (var group in canvas.GetComponentsInChildren<LayoutGroup>(true))
                 {

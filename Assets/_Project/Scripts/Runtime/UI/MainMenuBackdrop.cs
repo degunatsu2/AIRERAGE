@@ -9,7 +9,8 @@ namespace Airerage.Runtime.UI
     /// その下に説明（日本語 ／ 英語は言語の設定に従う）。項目を変えると、前の札は左へ抜けて消え、新しい札が右から入る。
     /// 見出しの札は白地に黒の文字で、縁と裏の札は項目の色（MenuOption.Accent。札の縁・裏の札・縁を回る光・左の絵と同じ色。2026-11-08 の
     /// ユーザーの要望。それまでは項目の色の縁取りの大きな文字）。
-    /// 左の白い背景（MainMenuPanel。D-91）の斜めの帯も、選んでいる項目の色にする。
+    /// 左の白い背景（MainMenuPanel。D-91）の斜めの帯も、選んでいる項目の色にする。説明は白地に黒の文字の説明の札（DescriptionPlate。縁と
+    /// 裏の札は項目の色。ステージ選択と同じ。2026-11-08）。
     /// </summary>
     public sealed class MainMenuBackdrop : MonoBehaviour
     {
@@ -18,7 +19,7 @@ namespace Airerage.Runtime.UI
         [SerializeField] private string[] _japanese = new string[0];
         [Tooltip("名前の見出しの札")]
         [SerializeField] private HeadingPlate _heading;
-        [SerializeField] private Text _description;
+        [SerializeField] private DescriptionPlate _description;
         [Tooltip("左の背景（項目の色の帯。D-91）")]
         [SerializeField] private MainMenuPanel _panel;
 
@@ -39,10 +40,13 @@ namespace Airerage.Runtime.UI
         public MainMenuPanel Panel => _panel;
 
         /// <summary>今出している説明（テスト用）。</summary>
-        public string Description => _description != null ? _description.text : string.Empty;
+        public string Description => _description != null ? _description.Value : string.Empty;
+
+        /// <summary>説明の札（テスト用）。</summary>
+        public DescriptionPlate DescriptionPlate => _description;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(MenuOption[] items, string[] english, string[] japanese, HeadingPlate heading, Text description, MainMenuPanel panel)
+        public void Configure(MenuOption[] items, string[] english, string[] japanese, HeadingPlate heading, DescriptionPlate description, MainMenuPanel panel)
         {
             _panel = panel;
             _items = items;
@@ -56,7 +60,7 @@ namespace Airerage.Runtime.UI
         {
             if (_description != null)
             {
-                _descriptionHome = _description.rectTransform.anchoredPosition;
+                _descriptionHome = ((RectTransform)_description.transform).anchoredPosition;
             }
             for (int i = 0; i < _items.Length; i++)
             {
@@ -74,7 +78,8 @@ namespace Airerage.Runtime.UI
             _shown = -1;
             if (_description != null)
             {
-                _description.text = string.Empty;
+                // 項目を選ぶまで説明の札は見せない。
+                DescriptionGroup().alpha = 0f;
             }
         }
 
@@ -94,9 +99,9 @@ namespace Airerage.Runtime.UI
             {
                 _panel.Select(index, _items[index].Accent);
             }
-            if (_description != null)
+            if (_description != null && _items[index] != null)
             {
-                _description.text = Loc.T(At(_english, index), At(_japanese, index));
+                _description.Show(Loc.T(At(_english, index), At(_japanese, index)), _items[index].Accent);
             }
             _changedAt = Time.unscaledTime;
             Animate();
@@ -117,7 +122,12 @@ namespace Airerage.Runtime.UI
             }
             float t = Time.unscaledTime - _changedAt;
             float p = UiEase.Clamp01((t - 0.1f) / 0.32f);
-            _description.rectTransform.anchoredPosition = _descriptionHome + new Vector2(0f, -10f * (1f - UiEase.OutCubic(p)));
+            ((RectTransform)_description.transform).anchoredPosition = _descriptionHome + new Vector2(0f, -10f * (1f - UiEase.OutCubic(p)));
+            DescriptionGroup().alpha = p;
+        }
+
+        private CanvasGroup DescriptionGroup()
+        {
             CanvasGroup group = _description.GetComponent<CanvasGroup>();
             if (group == null)
             {
@@ -125,7 +135,7 @@ namespace Airerage.Runtime.UI
                 group.interactable = false;
                 group.blocksRaycasts = false;
             }
-            group.alpha = p;
+            return group;
         }
     }
 }

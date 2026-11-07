@@ -36,9 +36,10 @@ namespace Airerage.Editor
         public static OptionsScreen Create(Transform canvas, InputActionAsset inputActions)
         {
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "Options");
-            MenuUiBuilder.CreateFill(panel, "Side", new Color(0f, 0f, 0f, 0.55f), Vector2.zero, new Vector2(0.62f, 1f));
+            // 左はメインメニューと同じ白い背景（帯は OPTIONS の色）、ボタンの外の文字は黒（2026-11-08）。
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.62f, 1f), 0.5f, 0.43f, 0f, MenuUiBuilder.OptionsAccent));
             MenuUiBuilder.CreateText(panel, "Title", "OPTIONS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(900f, 90f), Color.white);
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false);
             var anchor = new Vector2(0f, 1f);
 
             MenuOption page = MenuUiBuilder.CreateMenuItem(panel, "Page", "PAGE", anchor, new Vector2(Left, -150f), new Vector2(Width, RowHeight));
@@ -74,9 +75,9 @@ namespace Airerage.Editor
             const float keyX = Left + 330f;
             const float padX = Left + 700f;
             MenuUiBuilder.CreateText(controls, "KeyboardHeader", "KEYBOARD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
-                new Vector2(keyX + 30f, -222f), new Vector2(320f, 36f), MenuUiBuilder.OptionsAccent);
+                new Vector2(keyX + 30f, -222f), new Vector2(320f, 36f), AccentTint.OnWhite(MenuUiBuilder.OptionsAccent), false);
             MenuUiBuilder.CreateText(controls, "GamepadHeader", "GAMEPAD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
-                new Vector2(padX + 30f, -222f), new Vector2(280f, 36f), MenuUiBuilder.OptionsAccent);
+                new Vector2(padX + 30f, -222f), new Vector2(280f, 36f), AccentTint.OnWhite(MenuUiBuilder.OptionsAccent), false);
             int actions = BindingSettings.Actions.Length;
             var keyCells = new Object[actions];
             var padCells = new Object[actions];
@@ -85,7 +86,7 @@ namespace Airerage.Editor
                 // スクロールの中身の座標（左上から）。
                 float y = -14f - i * ControlStep;
                 MenuUiBuilder.CreateText(controlRows, $"{BindingSettings.Actions[i]}Label", BindingSettings.Labels[i], 26, FontStyle.BoldAndItalic,
-                    TextAnchor.MiddleLeft, anchor, new Vector2(Left + 20f - scrollOrigin.x, y), new Vector2(300f, ControlHeight), Color.white);
+                    TextAnchor.MiddleLeft, anchor, new Vector2(Left + 20f - scrollOrigin.x, y), new Vector2(300f, ControlHeight), MenuUiBuilder.Ink, false);
                 MenuOption key = MenuUiBuilder.CreateMenuItem(controlRows, $"{BindingSettings.Actions[i]}Key", "-", anchor,
                     new Vector2(keyX - scrollOrigin.x, y), new Vector2(340f, ControlHeight));
                 MenuOption pad = MenuUiBuilder.CreateMenuItem(controlRows, $"{BindingSettings.Actions[i]}Pad", "-", anchor,
@@ -122,7 +123,7 @@ namespace Airerage.Editor
 
             MenuOption back = MenuUiBuilder.CreateMenuItem(panel, "Back", "BACK", anchor, new Vector2(Left, -820f), new Vector2(Width, RowHeight));
             Text prompt = MenuUiBuilder.CreateText(panel, "Prompt", string.Empty, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0f, 0f), new Vector2(90f, 125f), new Vector2(1100f, 44f), MenuUiBuilder.OptionsAccent);
+                new Vector2(0f, 0f), new Vector2(90f, 125f), new Vector2(1100f, 44f), AccentTint.OnWhite(MenuUiBuilder.OptionsAccent), false);
             MenuUiBuilder.CreateHint(panel, "↑↓: select     ←→: change     Enter / A: OK     Esc / B: back", "↑↓:選択　←→:変更　　Enter ／ A: 決定　　Esc ／ B: 戻る");
 
             var screen = panel.gameObject.AddComponent<OptionsScreen>();

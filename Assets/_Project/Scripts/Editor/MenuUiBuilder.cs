@@ -101,6 +101,49 @@ namespace Airerage.Editor
         }
 
         /// <summary>
+        /// 説明の札（DescriptionPlate。2026-11-08）: 白地に黒の文字の斜めの札。anchor を基準に、札の右上の角を position に置く。幅 width、
+        /// 高さは文に合わせる（実行中）。縁と裏の札の色は出すときに決める。文は M PLUS 1 で、句読点を行の頭に置かずに折り返す。
+        /// </summary>
+        public static DescriptionPlate CreateDescriptionPlate(Transform parent, string name, Vector2 anchor, Vector2 position, float width, int fontSize,
+            bool wrapRules = true)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(width, 120f);
+            var plate = go.AddComponent<SlantedPlate>();
+            plate.Configure(0.12f, 4f, new Color(0.97f, 0.98f, 1f, 1f), Accent);
+            plate.ConfigureBack(1f, new Vector2(-12f, -10f));
+            plate.raycastTarget = false;
+            Text text = CreateText(rect, "Description", string.Empty, fontSize, FontStyle.Bold, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), Vector2.zero, Vector2.zero, Ink, false);
+            RectTransform textRect = text.rectTransform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.pivot = new Vector2(0.5f, 0.5f);
+            // 札の左の傾きの分と、上下の余白（DescriptionPlate の余白と同じ 22）。
+            textRect.offsetMin = new Vector2(44f, 22f);
+            textRect.offsetMax = new Vector2(-34f, -22f);
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            // 説明は文なので、英語でも読みやすい日本語の字体（M PLUS 1。英字も入っている。D-77）。
+            text.font = GameFonts.JapaneseBold;
+            if (wrapRules)
+            {
+                // 実行中に文を入れる札は、句読点を行の頭に置かずに折り返す（決まった文を LocalizedText で出す札には付けない）。
+                text.gameObject.AddComponent<LineBreakText>();
+            }
+            var description = go.AddComponent<DescriptionPlate>();
+            description.Configure(text, 22f, 84f);
+            return description;
+        }
+
+        /// <summary>白い背景の上の文字の色（黒に近い紺。2026-11-08）。</summary>
+        public static readonly Color Ink = new Color(0.05f, 0.06f, 0.09f);
+
+        /// <summary>
         /// クリックした所の火花の層（ClickSparks。2026-11-07）。parent の最後の子として画面いっぱいに置く（クリックは受け止めない）。
         /// </summary>
         public static ClickSparks CreateClickSparks(Transform parent)
@@ -138,9 +181,39 @@ namespace Airerage.Editor
         /// </summary>
         public static Text CreateHint(Transform parent, string english, string japanese)
         {
-            Text hint = CreateText(parent, "Hint", english, 22, FontStyle.Bold, TextAnchor.LowerRight, new Vector2(1f, 0f), new Vector2(-48f, 22f),
-                new Vector2(1760f, 40f), new Color(1f, 1f, 1f, 0.7f));
+            // 下の辺だけ黒い帯にして、操作の説明を不透明な白の文字で読みやすく（ユーザーの要望、2026-11-08）。
+            CreateHintStrip(parent, HintStripHeight);
+            Text hint = CreateText(parent, "Hint", english, 22, FontStyle.Bold, TextAnchor.LowerRight, new Vector2(1f, 0f), new Vector2(-48f, 18f),
+                new Vector2(1760f, 40f), Color.white);
             return Localize(hint, japanese);
+        }
+
+        /// <summary>操作の説明の後ろの黒い帯の高さ（ピクセル）。</summary>
+        public const float HintStripHeight = 64f;
+
+        /// <summary>画面の下の辺の黒い帯（操作の説明の後ろ。2026-11-08）。parent の今の最後の子として置く。</summary>
+        public static Image CreateHintStrip(Transform parent, float height)
+        {
+            Image strip = CreateFill(parent, "HintStrip", new Color(0.02f, 0.03f, 0.05f, 1f), Vector2.zero, new Vector2(1f, 0f));
+            strip.rectTransform.offsetMax = new Vector2(0f, height);
+            return strip;
+        }
+
+        /// <summary>
+        /// 白い背景（MainMenuPanel。D-91 の M2 を白地に。2026-11-08）を anchorMin〜anchorMax に広げて置く。bandLeft・stripLeft は帯と細い帯の
+        /// 左端（地の幅に対する割合）、slant は地の左右の端の傾き。帯の色は accent（実行中に AccentTint や項目の選択で変わる）。
+        /// </summary>
+        public static MainMenuPanel CreateWhitePanel(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, float bandLeft, float stripLeft,
+            float slant, Color accent)
+        {
+            RectTransform rect = CreateFull(parent, name);
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            var panel = rect.gameObject.AddComponent<MainMenuPanel>();
+            panel.raycastTarget = false;
+            panel.Configure(bandLeft, stripLeft, slant);
+            panel.SetAccent(accent);
+            return panel;
         }
 
         /// <summary>文字。anchor（0〜1）に pivot を合わせ、position だけずらす。</summary>
@@ -187,8 +260,9 @@ namespace Airerage.Editor
             rowRect.pivot = new Vector2(0f, 1f);
             rowRect.anchoredPosition = position;
             rowRect.sizeDelta = size;
+            // 見出しは白い背景の上なので黒（ネットワーク対戦の接続の画面。2026-11-08）。
             CreateText(row.transform, "Label", label, 26, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0f, 0.5f), Vector2.zero, new Vector2(170f, size.y), Color.white);
+                new Vector2(0f, 0.5f), Vector2.zero, new Vector2(170f, size.y), Ink, false);
 
             var box = new GameObject("Field", typeof(RectTransform));
             box.transform.SetParent(row.transform, false);
@@ -298,8 +372,11 @@ namespace Airerage.Editor
             Text sub = null;
             if (!string.IsNullOrEmpty(subJapanese))
             {
+                // 初めは見えない（濃さは文字の色に持つ。選んだときに MenuOption が濃くする）。
+                Color hidden = option.Accent;
+                hidden.a = 0f;
                 sub = Localize(CreateText(option.transform, "Sub", subEnglish, 18, FontStyle.Bold, TextAnchor.MiddleRight, new Vector2(1f, 0.5f),
-                    new Vector2(-30f * unit, 0f), new Vector2(300f, height), option.Accent, false), subJapanese);
+                    new Vector2(-30f * unit, 0f), new Vector2(300f, height), hidden, false), subJapanese);
             }
             option.ConfigureTextMotion(marks, sub);
         }

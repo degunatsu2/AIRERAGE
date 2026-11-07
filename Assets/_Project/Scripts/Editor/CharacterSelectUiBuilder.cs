@@ -22,15 +22,22 @@ namespace Airerage.Editor
         private const float IconGap = 18f;
         private static readonly Vector2 CornerSize = new Vector2(430f, 290f);
         private const float CornerMargin = 24f;
+        // 操作の説明（2 行まで）の後ろの黒い帯の高さ。
+        private const float HintStripHeight = 72f;
 
         public static CharacterSelectScreen Create(Transform canvas)
         {
             CharacterRoster roster = SandboxWireSceneBuilder.LoadOrCreateCharacterRoster(SandboxWireSceneBuilder.LoadOrCreateCharacterConfig());
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CharacterSelect");
             MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, Vector2.one);
+            // 見出しとアイコンの並びが収まる、メインメニューと同じ白い背景（四隅の枠の間。左右の端は札と同じ向きに傾ける。帯は入ってきた
+            // モードの色。2026-11-08）。下の辺だけ黒い帯にして操作の説明を見やすく（四隅の枠より奥）。
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Backdrop", new Vector2(470f / 1920f, 240f / 1080f), new Vector2(1450f / 1920f, 1f),
+                0.74f, 0.68f, 0.08f, MenuUiBuilder.Accent));
+            MenuUiBuilder.CreateHintStrip(panel, HintStripHeight);
             MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 50, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(900f, 70f), Color.white);
-            Text timeLimit = AccentTint.Mark(MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(900f, 70f), MenuUiBuilder.Ink, false);
+            Text timeLimit = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(1500f, 40f), MenuUiBuilder.Accent));
 
             var colors = new Color[CharacterSelectScreen.MaxPlayers];
@@ -72,7 +79,7 @@ namespace Airerage.Editor
                 cursorTags[p] = tag;
             }
             Text message = MenuUiBuilder.CreateText(panel, "Message", string.Empty, 24, FontStyle.Bold, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -gridRect.sizeDelta.y * 0.5f - 40f), new Vector2(1000f, 40f), Color.white);
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -gridRect.sizeDelta.y * 0.5f - 40f), new Vector2(1000f, 40f), MenuUiBuilder.Ink, false);
 
             // 四隅の枠。
             var corners = new Object[CharacterSelectScreen.MaxPlayers];
@@ -102,7 +109,7 @@ namespace Airerage.Editor
             }
             // 操作の説明は 2 行まで（ローカル対戦の MODE・CPU・チームの操作。T9-6）。
             Text hint = MenuUiBuilder.CreateText(panel, "Hint", string.Empty, 19, FontStyle.Bold, TextAnchor.LowerCenter,
-                new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(1500f, 56f), new Color(1f, 1f, 1f, 0.75f));
+                new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(1500f, 56f), Color.white);
 
             CharacterDetailsParts details = CreateDetails(panel);
 
