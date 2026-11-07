@@ -361,6 +361,19 @@ namespace Airerage.Runtime.UI
         public Text CornerName(int slot) => _cornerNames[slot];
         public Text CornerTags(int slot) => _cornerTags[slot];
 
+        /// <summary>この画面のイメージカラー（入ってきた項目の色。2026-11-08）。</summary>
+        public Color Accent { get; private set; } = MenuAccents.Default;
+
+        /// <summary>
+        /// この画面のイメージカラーを accent にする（以前は水色だった文字と線: 時間の制限、ハッシュタグ、技の説明の Q・E・R と見出しの線、
+        /// RANDOM の「?」。入ってきた項目 SINGLE・LOCAL・NETWORK・TRAINING の色。2026-11-08 のユーザーの要望）。
+        /// </summary>
+        public void SetAccent(Color accent)
+        {
+            Accent = accent;
+            AccentTint.Apply(this, accent);
+        }
+
         /// <summary>slot の人の色（ローカル対戦のチーム対戦ならチームの色）。</summary>
         public Color PlayerColor(int slot)
         {

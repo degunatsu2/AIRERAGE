@@ -74,9 +74,9 @@ namespace Airerage.Editor
             const float keyX = Left + 330f;
             const float padX = Left + 700f;
             MenuUiBuilder.CreateText(controls, "KeyboardHeader", "KEYBOARD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
-                new Vector2(keyX + 30f, -222f), new Vector2(320f, 36f), MenuUiBuilder.Accent);
+                new Vector2(keyX + 30f, -222f), new Vector2(320f, 36f), MenuUiBuilder.OptionsAccent);
             MenuUiBuilder.CreateText(controls, "GamepadHeader", "GAMEPAD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
-                new Vector2(padX + 30f, -222f), new Vector2(280f, 36f), MenuUiBuilder.Accent);
+                new Vector2(padX + 30f, -222f), new Vector2(280f, 36f), MenuUiBuilder.OptionsAccent);
             int actions = BindingSettings.Actions.Length;
             var keyCells = new Object[actions];
             var padCells = new Object[actions];
@@ -122,7 +122,7 @@ namespace Airerage.Editor
 
             MenuOption back = MenuUiBuilder.CreateMenuItem(panel, "Back", "BACK", anchor, new Vector2(Left, -820f), new Vector2(Width, RowHeight));
             Text prompt = MenuUiBuilder.CreateText(panel, "Prompt", string.Empty, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0f, 0f), new Vector2(90f, 125f), new Vector2(1100f, 44f), MenuUiBuilder.Accent);
+                new Vector2(0f, 0f), new Vector2(90f, 125f), new Vector2(1100f, 44f), MenuUiBuilder.OptionsAccent);
             MenuUiBuilder.CreateHint(panel, "↑↓: select     ←→: change     Enter / A: OK     Esc / B: back", "↑↓:選択　←→:変更　　Enter ／ A: 決定　　Esc ／ B: 戻る");
 
             var screen = panel.gameObject.AddComponent<OptionsScreen>();
@@ -151,6 +151,8 @@ namespace Airerage.Editor
             {
                 option.SetAccent(MenuUiBuilder.OptionsAccent, true);
             }
+            // スクロールの印なども OPTIONS のイメージカラー（2026-11-08）。
+            AccentTint.Apply(panel, MenuUiBuilder.OptionsAccent);
             return screen;
         }
 
@@ -166,11 +168,11 @@ namespace Airerage.Editor
             rect.anchoredPosition = new Vector2(-40f, 0f);
             rect.sizeDelta = new Vector2(boxWidth, RowHeight);
             MenuUiBuilder.CreateText(box.transform, "Left", "<", 30, FontStyle.Bold, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f),
-                new Vector2(10f, 0f), new Vector2(40f, RowHeight), MenuUiBuilder.Accent);
+                new Vector2(10f, 0f), new Vector2(40f, RowHeight), MenuUiBuilder.OptionsAccent);
             MenuUiBuilder.CreateText(box.transform, "Right", ">", 30, FontStyle.Bold, TextAnchor.MiddleRight, new Vector2(1f, 0.5f),
-                new Vector2(-10f, 0f), new Vector2(40f, RowHeight), MenuUiBuilder.Accent);
+                new Vector2(-10f, 0f), new Vector2(40f, RowHeight), MenuUiBuilder.OptionsAccent);
             Text value = MenuUiBuilder.CreateText(box.transform, "Value", text, 30, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(boxWidth - 100f, RowHeight), MenuUiBuilder.Accent);
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(boxWidth - 100f, RowHeight), MenuUiBuilder.OptionsAccent);
             var stepper = row.GetComponent<OptionStepper>();
             for (int side = 0; side < 2; side++)
             {

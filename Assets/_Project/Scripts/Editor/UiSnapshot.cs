@@ -90,9 +90,11 @@ namespace Airerage.Editor
             Transform select = screens.transform.Find("StageSelect");
             ShowOnly(screens, select);
             var screen = select.GetComponent<StageSelectScreen>();
-            // いちばん長い名前（ORBITAL STATION）で、名前と説明がスクロールバーと重ならないかを見る。
+            // いちばん長い名前（ORBITAL STATION）で、名前と説明がスクロールバーと重ならないかを見る。画面の色は NETWORK（2026-11-08）。
+            screen.SetAccent(MenuAccents.Network);
             screen.ShowNetwork(true, 5);
             CaptureAll(screens, "StageSelect");
+            screen.SetAccent(MenuAccents.Options);
             screen.ShowRandomPool();
             CaptureAll(screens, "StageSelect_RandomPool");
         }
@@ -465,6 +467,8 @@ namespace Airerage.Editor
         {
             MenuScreens screens = OpenMenu();
             CharacterSelectScreen screen = PrepareSelect(screens);
+            // TRAINING から入ったときの色（2026-11-08）。
+            screen.SetAccent(MenuAccents.Training);
             for (int index = 0; index < screen.Count; index++)
             {
                 screen.ShowSingle(index);

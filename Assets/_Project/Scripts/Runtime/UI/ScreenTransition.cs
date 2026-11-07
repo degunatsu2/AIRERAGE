@@ -28,6 +28,8 @@ namespace Airerage.Runtime.UI
     /// メニューの画面の切り替えの演出（D-87）。画面を入れ替える処理（swap）はすぐに行い、見た目だけを動かす:
     /// 1. 出ていく画面の写しを作り（操作に反応する部品を外した、絵と文字だけの写し）、写しを動かして消す。
     /// 2. 出てくる画面は、動きが終わるまで透明にしておき、その写しを動かして出す。終わったら写しを消して本物を見せる。
+    ///    出てくる画面の写しは、動いている本物に毎フレーム合わせる（札の位置・濃さ・色・演出の状態。選んだ項目が変わったときや、ほかの項目が
+    ///    暗く下がる B13 が、切り替えの途中でも見えるように。2026-11-08）。
     /// 出てくる画面は入れ替えた瞬間から操作できる（演出で待たせない。今までの切り替えと同じ）。動いている間にキー・ボタンを押すと、
     /// 演出を最後まで早送りして本物の画面を見せる（押した入力は、今までどおり画面が受け取る）。
     /// 動かす単位は、画面の直下の子（TransitionGroup の印のある入れ物は、その子を 1 つずつ）。画面の 35% より大きい背景は動かさずに
@@ -58,6 +60,26 @@ namespace Airerage.Runtime.UI
             public Vector2 Center;
             public bool Tile;
             public bool Backdrop;
+            // 写した元の本物（出てくる画面の写しは、本物の動きに合わせる。2026-11-08）。
+            public RectTransform Source;
+            public Vector2 SourceHome;
+            public CanvasGroup SourceGroup;
+            public bool Live;
+            public bool Posed;
+            public Vector2 LastOffset;
+            public Vector2 LastScale;
+            public float LastAlpha;
+        }
+
+        // 写しの中の物と、その元の本物（出てくる画面の写しを、本物に合わせ続けるため）。
+        private sealed class Mirror
+        {
+            public RectTransform Source;
+            public RectTransform Copy;
+            public CanvasGroup SourceGroup;
+            public CanvasGroup CopyGroup;
+            public Graphic SourceGraphic;
+            public Graphic CopyGraphic;
         }
 
         private sealed class Ghost
@@ -66,6 +88,7 @@ namespace Airerage.Runtime.UI
             public RectTransform Root;
             public CanvasGroup Group;
             public readonly List<Part> Parts = new List<Part>();
+            public readonly List<Mirror> Mirrors = new List<Mirror>();
         }
 
         private sealed class Track
@@ -407,6 +430,10 @@ namespace Airerage.Runtime.UI
             {
                 Ghost g = ghost;
                 g.Group.alpha = 0f;
+                foreach (Part part in g.Parts)
+                {
+                    part.Live = part.Source != null;
+                }
                 switch (LastKind)
                 {
                     case TransitionKind.SkyDive:
@@ -527,6 +554,113 @@ namespace Airerage.Runtime.UI
                     track.Done = true;
                 }
             }
+            foreach (Ghost ghost in _incoming)
+            {
+                Follow(ghost);
+            }
+        }
+
+        // 出てくる画面の写しを、動いている本物に合わせる（札は今の演出の形のまま、本物の動いた分・濃さ・色・演出の状態を当てる）。
+        private static void Follow(Ghost ghost)
+        {
+            foreach (Part part in ghost.Parts)
+            {
+                if (part.Live && part.Posed)
+                {
+                    Pose(part, part.LastOffset, part.LastScale, part.LastAlpha);
+                }
+            }
+            foreach (Mirror mirror in ghost.Mirrors)
+            {
+                if (mirror.Source != null && mirror.Copy != null)
+                {
+                    bool active = mirror.Source.gameObject.activeSelf;
+                    if (mirror.Copy.gameObject.activeSelf != active)
+                    {
+                        mirror.Copy.gameObject.SetActive(active);
+                    }
+                    if (!active)
+                    {
+                        continue;
+                    }
+                    FollowTransform(mirror);
+                }
+                FollowGraphic(mirror.SourceGraphic, mirror.CopyGraphic);
+            }
+        }
+
+        private static void FollowTransform(Mirror mirror)
+        {
+            if (mirror.Copy.anchoredPosition != mirror.Source.anchoredPosition)
+            {
+                mirror.Copy.anchoredPosition = mirror.Source.anchoredPosition;
+            }
+            if (mirror.Copy.sizeDelta != mirror.Source.sizeDelta)
+            {
+                mirror.Copy.sizeDelta = mirror.Source.sizeDelta;
+            }
+            if (mirror.Copy.localScale != mirror.Source.localScale)
+            {
+                mirror.Copy.localScale = mirror.Source.localScale;
+            }
+            if (mirror.Copy.localRotation != mirror.Source.localRotation)
+            {
+                mirror.Copy.localRotation = mirror.Source.localRotation;
+            }
+            if (mirror.SourceGroup != null && mirror.CopyGroup != null && mirror.CopyGroup.alpha != mirror.SourceGroup.alpha)
+            {
+                mirror.CopyGroup.alpha = mirror.SourceGroup.alpha;
+            }
+        }
+
+        private static void FollowGraphic(Graphic source, Graphic copy)
+        {
+            if (source == null || copy == null)
+            {
+                return;
+            }
+            if (copy.enabled != source.enabled)
+            {
+                copy.enabled = source.enabled;
+            }
+            switch (source)
+            {
+                case SlantedPlate plate:
+                    ((SlantedPlate)copy).CopyEffects(plate);
+                    break;
+                case MenuIcon icon:
+                    ((MenuIcon)copy).Selected = icon.Selected;
+                    copy.color = icon.color;
+                    break;
+                case Text text:
+                    var copyText = (Text)copy;
+                    if (copyText.text != text.text)
+                    {
+                        copyText.text = text.text;
+                    }
+                    if (copyText.color != text.color)
+                    {
+                        copyText.color = text.color;
+                    }
+                    break;
+                case RawImage image:
+                    var copyImage = (RawImage)copy;
+                    if (copyImage.texture != image.texture)
+                    {
+                        copyImage.texture = image.texture;
+                    }
+                    if (copyImage.color != image.color)
+                    {
+                        copyImage.color = image.color;
+                    }
+                    break;
+                default:
+                    if (copy.color != source.color)
+                    {
+                        copy.color = source.color;
+                    }
+                    break;
+            }
         }
 
         private float EndTime()
@@ -587,11 +721,6 @@ namespace Airerage.Runtime.UI
         // 画面（root）の写し: 操作に反応する部品と画面の仕組みを外し、絵と文字と並べ方だけを残す。この部品の直前に置く。
         private Ghost MakeGhost(RectTransform source)
         {
-            // 名前の文字がばらばらに変わっている途中なら、先に本来の名前に戻す（写しの中で止まって見えないように）。
-            foreach (MenuOption option in source.GetComponentsInChildren<MenuOption>())
-            {
-                option.FinishDecode();
-            }
             GameObject copy = Instantiate(source.gameObject, _workshop, false);
             copy.name = source.name + " (Transition)";
             Strip(copy);
@@ -608,7 +737,11 @@ namespace Airerage.Runtime.UI
             group.blocksRaycasts = false;
             var ghost = new Ghost { Source = source, Root = root, Group = group };
             float screenArea = Mathf.Max(1f, _screens.rect.width * _screens.rect.height);
-            CollectParts(root, ghost.Parts, false, screenArea);
+            CollectParts(root, source, ghost.Parts, false, screenArea);
+            foreach (Part part in ghost.Parts)
+            {
+                AddMirrors(ghost, part.Source, part.Rect);
+            }
             ghost.Parts.Sort((a, b) =>
             {
                 int rowA = Mathf.RoundToInt(-a.Center.y / 30f);
@@ -618,7 +751,7 @@ namespace Airerage.Runtime.UI
             return ghost;
         }
 
-        private void CollectParts(RectTransform node, List<Part> parts, bool tiles, float screenArea)
+        private void CollectParts(RectTransform node, RectTransform sourceNode, List<Part> parts, bool tiles, float screenArea)
         {
             for (int i = 0; i < node.childCount; i++)
             {
@@ -626,9 +759,11 @@ namespace Airerage.Runtime.UI
                 {
                     continue;
                 }
+                // 写しは本物と同じ並び（写した直後）。同じ順の子が元の本物。
+                RectTransform sourceChild = sourceNode != null && i < sourceNode.childCount ? sourceNode.GetChild(i) as RectTransform : null;
                 if (child.GetComponent<TransitionGroup>() != null)
                 {
-                    CollectParts(child, parts, true, screenArea);
+                    CollectParts(child, sourceChild, parts, true, screenArea);
                     continue;
                 }
                 CanvasGroup group = child.GetComponent<CanvasGroup>();
@@ -647,19 +782,83 @@ namespace Airerage.Runtime.UI
                     Center = bounds.center,
                     Tile = tiles,
                     Backdrop = !tiles && bounds.size.x * bounds.size.y >= screenArea * BackdropArea,
+                    Source = sourceChild,
+                    SourceHome = sourceChild != null ? sourceChild.anchoredPosition : Vector2.zero,
+                    SourceGroup = sourceChild != null ? sourceChild.GetComponent<CanvasGroup>() : null,
                 });
             }
         }
 
+        // 札（part）の中の物を、元の本物と組にする（同じ並びの子どうし）。
+        private static void AddMirrors(Ghost ghost, RectTransform source, RectTransform copy)
+        {
+            if (source == null || copy == null)
+            {
+                return;
+            }
+            Graphic sourceGraphic = source.GetComponent<Graphic>();
+            Graphic copyGraphic = copy.GetComponent<Graphic>();
+            if (sourceGraphic != null && copyGraphic != null && sourceGraphic.GetType() == copyGraphic.GetType())
+            {
+                // 札そのもの（part の根）は位置と濃さを Pose が決めるので、絵と演出の状態だけを合わせる。
+                ghost.Mirrors.Add(new Mirror { SourceGraphic = sourceGraphic, CopyGraphic = copyGraphic });
+            }
+            AddDescendants(ghost, source, copy);
+        }
+
+        // 中の物を、同じ並びの子どうしで組にする（孫より下も）。
+        private static void AddDescendants(Ghost ghost, RectTransform source, RectTransform copy)
+        {
+            int count = Mathf.Min(source.childCount, copy.childCount);
+            for (int i = 0; i < count; i++)
+            {
+                if (!(source.GetChild(i) is RectTransform s) || !(copy.GetChild(i) is RectTransform c))
+                {
+                    continue;
+                }
+                Graphic sg = s.GetComponent<Graphic>();
+                Graphic cg = c.GetComponent<Graphic>();
+                bool sameGraphic = sg != null && cg != null && sg.GetType() == cg.GetType();
+                ghost.Mirrors.Add(new Mirror
+                {
+                    Source = s,
+                    Copy = c,
+                    SourceGroup = s.GetComponent<CanvasGroup>(),
+                    CopyGroup = c.GetComponent<CanvasGroup>(),
+                    SourceGraphic = sameGraphic ? sg : null,
+                    CopyGraphic = sameGraphic ? cg : null,
+                });
+                AddDescendants(ghost, s, c);
+            }
+        }
+
+        // 札を、置き場所から offset だけずらし、scale 倍・alpha 倍にする。出てくる画面の写しは、本物の今の位置のずれ（選んで右へ出る・
+        // ほかを選んで下がる）と大きさ・濃さを元にする（2026-11-08）。
         private static void Pose(Part part, Vector2 offset, Vector2 scale, float alpha)
         {
             if (part.Rect == null)
             {
                 return;
             }
-            part.Rect.anchoredPosition = part.Home + offset;
-            part.Rect.localScale = new Vector3(part.Scale.x * scale.x, part.Scale.y * scale.y, part.Scale.z);
-            part.Group.alpha = part.BaseAlpha * alpha;
+            part.Posed = true;
+            part.LastOffset = offset;
+            part.LastScale = scale;
+            part.LastAlpha = alpha;
+            Vector2 live = Vector2.zero;
+            Vector3 baseScale = part.Scale;
+            float baseAlpha = part.BaseAlpha;
+            if (part.Live && part.Source != null)
+            {
+                live = part.Source.anchoredPosition - part.SourceHome;
+                baseScale = part.Source.localScale;
+                if (part.SourceGroup != null)
+                {
+                    baseAlpha = part.SourceGroup.alpha;
+                }
+            }
+            part.Rect.anchoredPosition = part.Home + live + offset;
+            part.Rect.localScale = new Vector3(baseScale.x * scale.x, baseScale.y * scale.y, baseScale.z);
+            part.Group.alpha = baseAlpha * alpha;
         }
 
         // 写しから外す部品（画面の仕組み・操作に反応する部品）。残すのは絵・文字・マスク・並べ方と、この演出の印だけ。

@@ -400,14 +400,14 @@ namespace Airerage.Editor
             Save(scene, MenuScenePath);
         }
 
-        // メインメニューの背景の連動（D-88 の B7。ユーザーの選択、2026-11-07）: 右側に、選んでいる項目の名前の大きな縁取りの文字
-        // （中は白、縁取りは項目の色）と説明。左の暗い面の後ろ（ロゴと項目より奥）に置く。背景の色の光は出さない（2026-11-07）。
+        // メインメニューの背景の連動（D-88 の B7。ユーザーの選択、2026-11-07）: 右側に、選んでいる項目の名前の見出しの札（白地に黒の
+        // 文字、縁と裏の札は項目の色。2026-11-08）と説明。左の暗い面の後ろ（ロゴと項目より奥）に置く。
         private static void CreateMainBackdrop(RectTransform main, MenuOption[] items)
         {
             RectTransform root = MenuUiBuilder.CreateFull(main, "Backdrop");
             root.SetSiblingIndex(1);
-            UnityEngine.UI.Text wordA = CreateBackdropWord(root, "WordA", Color.white);
-            UnityEngine.UI.Text wordB = CreateBackdropWord(root, "WordB", Color.white);
+            HeadingPlate heading = MenuUiBuilder.CreateHeadingPlate(root, "Heading", new Vector2(1f, 0.66f), new Vector2(1f, 0.5f),
+                new Vector2(-96f, 0f), 170f, 112, 980f, 60f);
             UnityEngine.UI.Text description = MenuUiBuilder.CreateText(root, "Description", string.Empty, 30, FontStyle.Bold, TextAnchor.UpperRight,
                 new Vector2(1f, 0.47f), new Vector2(-100f, 0f), new Vector2(900f, 120f), new Color(1f, 1f, 1f, 0.92f));
             description.font = GameFonts.JapaneseBold;
@@ -431,24 +431,7 @@ namespace Airerage.Editor
                 "ゲームを終了する。",
             };
             var backdrop = main.gameObject.AddComponent<MainMenuBackdrop>();
-            backdrop.Configure(items, english, japanese, wordA, wordB, description);
-        }
-
-        // 背景の大きな名前（白い塗りに縁取り。縁取りの色は選んでいる項目の色に変わる。斜体）。
-        private static UnityEngine.UI.Text CreateBackdropWord(RectTransform parent, string name, Color color)
-        {
-            UnityEngine.UI.Text word = MenuUiBuilder.CreateText(parent, name, string.Empty, 150, FontStyle.Italic, TextAnchor.MiddleRight,
-                new Vector2(1f, 0.66f), new Vector2(-96f, 0f), new Vector2(1250f, 200f), color, false);
-            word.font = GameFonts.LatinBlack;
-            var outline = word.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = new Color(1f, 1f, 1f, 0.95f);
-            outline.effectDistance = new Vector2(3f, 3f);
-            outline.useGraphicAlpha = false;
-            var outlineSide = word.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            outlineSide.effectColor = new Color(1f, 1f, 1f, 0.95f);
-            outlineSide.effectDistance = new Vector2(4f, 0.01f);
-            outlineSide.useGraphicAlpha = false;
-            return word;
+            backdrop.Configure(items, english, japanese, heading, description);
         }
 
         // シングルモードの CPU の強さ（docs/16 T7-2）: 左に EASY・NORMAL・HARD・HELL の札（CpuLevel の順）、右に説明。
@@ -507,6 +490,8 @@ namespace Airerage.Editor
                 StageDefinition stage = catalog.Get(i);
                 stages[i] = stage;
                 MenuOption option = CreateStagePlate(content, $"Stage{i + 1}", stage.DisplayName);
+                // 札の縁と裏の札は、ステージのイメージカラー（2026-11-08）。
+                option.SetAccent(new Color(stage.Color.r, stage.Color.g, stage.Color.b, 1f), true);
                 options[i] = option;
                 CreateStageCheck(option.transform, out GameObject box, out GameObject mark);
                 // 選んで札が右へ動いても、チェックの箱は動かさない（押しやすいように）。
@@ -516,32 +501,31 @@ namespace Airerage.Editor
             }
             // 最後に RANDOM（ユーザーの要望、2026-10-19）。
             MenuOption random = CreateStagePlate(content, "Random", "RANDOM");
+            random.SetAccent(MenuAccents.Random, true);
             MenuOption done = CreateStagePlate(panel, "Done", "DONE");
             ((RectTransform)done.transform).anchoredPosition = new Vector2(150f, scrollPosition.y - scrollSize.y - 16f);
-            UnityEngine.UI.Image band = MenuUiBuilder.CreateFill(panel, "Band", new Color(0.35f, 0.85f, 1f, 0.35f),
-                new Vector2(0.52f, 0.55f), new Vector2(1f, 0.75f));
-            // 名前と説明は右の帯の側に、右の端から置く（左の札とスクロールバーに重ならないように。帯もスクロールバーの右から。説明は折り返す）。
-            UnityEngine.UI.Text name = MenuUiBuilder.CreateText(panel, "Name", string.Empty, 72, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(1f, 0.65f), new Vector2(-80f, 0f), new Vector2(820f, 100f), Color.white);
+            // 名前は右の見出しの札（白地に黒の文字、縁と裏の札はステージのイメージカラー。帯はやめた。2026-11-08）、説明はその下に、右の
+            // 端から置く（左の札とスクロールバーに重ならないように。説明は折り返す）。
+            HeadingPlate heading = MenuUiBuilder.CreateHeadingPlate(panel, "Heading", new Vector2(1f, 0.65f), new Vector2(1f, 0.5f),
+                new Vector2(-80f, 0f), 112f, 64, 840f, 44f);
             UnityEngine.UI.Text description = MenuUiBuilder.CreateText(panel, "Description", string.Empty, 28, FontStyle.Bold, TextAnchor.UpperLeft,
-                new Vector2(1f, 0.5f), new Vector2(-80f, 0f), new Vector2(820f, 200f), new Color(1f, 1f, 1f, 0.85f));
+                new Vector2(1f, 0.5f), new Vector2(-80f, -22f), new Vector2(820f, 200f), new Color(1f, 1f, 1f, 0.85f));
             description.horizontalOverflow = HorizontalWrapMode.Wrap;
             // 説明は文なので、英語でも読みやすい日本語の字体（M PLUS 1。英字も入っている。D-77）。
             description.font = GameFonts.JapaneseBold;
             // 句読点を行の頭に置かずに折り返す（枠の幅が変わったら入れ直す）。
             description.gameObject.AddComponent<LineBreakText>();
             // 案内は、見出しとスクロールの上の端の間（アイテムを選ぶ画面と同じ。2026-11-06）。
-            UnityEngine.UI.Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent);
+            UnityEngine.UI.Text note = AccentTint.Mark(MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic,
+                TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent));
             note.font = GameFonts.JapaneseBold;
             MenuUiBuilder.CreateHint(panel, "↑↓←→: select     Enter / A: OK     Esc / B: back", "↑↓←→:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
 
             var screen = panel.gameObject.AddComponent<StageSelectScreen>();
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_stages", stages);
-            SandboxWireSceneBuilder.SetReference(screen, "_name", name);
+            SandboxWireSceneBuilder.SetReference(screen, "_heading", heading);
             SandboxWireSceneBuilder.SetReference(screen, "_description", description);
-            SandboxWireSceneBuilder.SetReference(screen, "_band", band);
             SandboxWireSceneBuilder.SetReference(screen, "_note", note);
             SandboxWireSceneBuilder.SetReference(screen, "_random", random);
             SandboxWireSceneBuilder.SetReference(screen, "_content", content);
@@ -564,7 +548,7 @@ namespace Airerage.Editor
             return option;
         }
 
-        // 札の左端のチェック（白い枠の箱と、付いているときの水色の印）。
+        // 札の左端のチェック（白い枠の箱と、付いているときの印。印は画面のイメージカラー）。
         internal static void CreateStageCheck(Transform plate, out GameObject box, out GameObject mark)
         {
             box = new GameObject("Check", typeof(RectTransform));
@@ -578,7 +562,7 @@ namespace Airerage.Editor
             UnityEngine.UI.Image inner = MenuUiBuilder.CreateFill(rect, "Inner", new Color(0.08f, 0.09f, 0.12f, 1f), Vector2.zero, Vector2.one);
             inner.rectTransform.offsetMin = new Vector2(3f, 3f);
             inner.rectTransform.offsetMax = new Vector2(-3f, -3f);
-            UnityEngine.UI.Image check = MenuUiBuilder.CreateFill(rect, "Mark", MenuUiBuilder.Accent, Vector2.zero, Vector2.one);
+            UnityEngine.UI.Image check = AccentTint.Mark(MenuUiBuilder.CreateFill(rect, "Mark", MenuUiBuilder.Accent, Vector2.zero, Vector2.one));
             check.rectTransform.offsetMin = new Vector2(8f, 8f);
             check.rectTransform.offsetMax = new Vector2(-8f, -8f);
             mark = check.gameObject;

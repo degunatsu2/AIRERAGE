@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using Airerage.Runtime.Data;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,15 +6,15 @@ using UnityEngine.UI;
 namespace Airerage.Runtime.UI
 {
     /// <summary>
-    /// キャラクター選択の演出（D-89。ユーザーが選んだ C1・C2・C3・C5・C10・C11・C12・C13・C14・C17・C18・C19・C20 と、C4 の代わりの
-    /// カーソルの光。2026-11-07）。画面（CharacterSelectScreen）の状態を毎フレーム見て、変わったときに演出を出す（入力や通信の処理には
+    /// キャラクター選択の演出（D-89。ユーザーが選んだ C1・C2・C3・C10・C12・C13・C14・C17・C18・C20 と、C4 の代わりの
+    /// カーソルの光。2026-11-07。C5 周りの札の波・C11 名前のデコード・C19 光の掃きは、思っていたものと違ったので消した。2026-11-08）。画面（CharacterSelectScreen）の状態を毎フレーム見て、変わったときに演出を出す（入力や通信の処理には
     /// 手を入れない。ネットワーク対戦のほかの人の動きにも同じ演出が出る）:
     /// - 乗せたとき: C1 ロゴが札から少し飛び出す、C2 キャラクターの色が斜めに流れ込む、C3 キャラクターごとのロゴの動き
-    ///   （CharacterConfigAsset.LogoMotion）、C5 周りの札が押しのけられて戻る、C10 四隅の枠のロゴと名前がスロットのように入れ替わる、
-    ///   C11 枠の名前がばらばらの文字から決まる、C18 RANDOM のロゴが全員の顔を回る（ルーレットは CharacterSelectScreen）。
+    ///   （CharacterConfigAsset.LogoMotion）、C10 四隅の枠のロゴと名前がスロットのように入れ替わる、C18 RANDOM のロゴが全員の顔を
+    ///   回る（ルーレットは CharacterSelectScreen）。
     /// - 決めたとき: C13 ロゴが弧を描いて自分の枠へ飛び、着くと枠が光る、C12 枠に「READY!」の判が叩きつけられ、枠が揺れて火花が散る、
     ///   C14 キャラクターの色の輪が広がり、輪が通った札が光る、C17 全員そろうと「ALL READY」の帯が横切る。
-    /// - そのほか: C19 ときどき光が札の上を斜めに走る、C20 取り消すと判がはがれ、ロゴが札へ戻る、カーソル（プレイヤーの色の枠）は
+    /// - そのほか: C20 取り消すと判がはがれ、ロゴが札へ戻る、カーソル（プレイヤーの色の枠）は
     ///   メインメニューの札と同じ導火線の光が一定の周期で縁を回り、縁がゆっくり明滅する。
     /// 画面の切り替えの写しでは動かない（写しにはこの部品を写さない）。
     /// </summary>
@@ -28,12 +27,8 @@ namespace Airerage.Runtime.UI
         private const float PopScale = 0.18f;
         private const float FloodInSeconds = 0.24f;
         private const float FloodOutSeconds = 0.16f;
-        private const float RippleSeconds = 0.36f;
-        private const float RippleAmplitude = 12f;
-        private const float RippleReach = 220f;
         private const float ReelSeconds = 0.2f;
         private const float ReelTravel = 34f;
-        private const float DecodeSeconds = 0.28f;
         private const float FlySeconds = 0.32f;
         private const float FlyBackSeconds = 0.28f;
         private const float StampDelay = 0.24f;
@@ -44,11 +39,8 @@ namespace Airerage.Runtime.UI
         private const float ShockRadius = 1100f;
         private const float TintSeconds = 0.3f;
         private const float BandSeconds = 1.4f;
-        private const float ShimmerPeriod = 4.5f;
-        private const float ShimmerSeconds = 0.5f;
         private const float CursorFusePeriod = 1.6f;
         private const float RandomFaceSeconds = 0.09f;
-        private const string DecodeLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@";
         private static readonly Color FloodDark = new Color(0.04f, 0.07f, 0.12f, 0.92f);
 
         private sealed class IconFx
@@ -60,7 +52,6 @@ namespace Airerage.Runtime.UI
             public Graphic LogoGraphic;
             public SlantedFill Flood;
             public SlantedFill Tint;
-            public SlantedFill Shine;
             public Color Theme;
             public LogoMotion Motion;
             public bool Hovered;
@@ -72,7 +63,6 @@ namespace Airerage.Runtime.UI
             public float FloodFrom;
             public float TintAt = -10f;
             public Color TintColor;
-            public float ShineAt = -10f;
             public RawImage Face;
             public Text Question;
             public int FaceIndex;
@@ -100,8 +90,6 @@ namespace Airerage.Runtime.UI
             public Vector2 LogoHome;
             public Vector2 NameHome;
             public Vector2 TagsHome;
-            public float DecodeAt = -10f;
-            public string DecodeTarget;
             public RectTransform Stamp;
             public CanvasGroup StampGroup;
             public UiBurst StampBurst;
@@ -129,24 +117,16 @@ namespace Airerage.Runtime.UI
             public float Alpha;
         }
 
-        private sealed class Ripple
-        {
-            public int Origin;
-            public float At;
-        }
-
         private CharacterSelectScreen _screen;
         private RectTransform _fx;
         private IconFx[] _icons = new IconFx[0];
         private SlotFx[] _slots = new SlotFx[0];
         private readonly List<Flyer> _flyers = new List<Flyer>();
-        private readonly List<Ripple> _ripples = new List<Ripple>();
         private readonly List<GameObject> _temps = new List<GameObject>();
         private RectTransform _band;
         private float _bandAt = -10f;
         private bool _allReady;
         private bool _synced;
-        private float _nextShimmer;
         private readonly Vector3[] _corners = new Vector3[4];
 
         /// <summary>「ALL READY」の帯が横切っている途中か（テスト用）。</summary>
@@ -203,7 +183,7 @@ namespace Airerage.Runtime.UI
             CharacterIcon icon = _screen.Icon(index);
             var fx = new IconFx { Root = icon.Rect, Home = _screen.IconHome(index) };
             CharacterConfigAsset character = _screen.CharacterAt(index);
-            fx.Theme = character != null ? character.ThemeColor : MenuAccent;
+            fx.Theme = character != null ? character.ThemeColor : _screen.Accent;
             fx.Motion = character != null ? character.LogoMotion : LogoMotion.None;
             fx.Logo = icon.Rect.Find("Logo") as RectTransform;
             if (fx.Logo != null)
@@ -214,8 +194,7 @@ namespace Airerage.Runtime.UI
             }
             SlantedPlate plate = icon.GetComponent<SlantedPlate>();
             float slant = plate != null ? plate.Slant : 0.1f;
-            // 札の中（札の色の上、ロゴと名前の下）に、色の流れ込み・衝撃波の光・光の掃きを重ねる。
-            fx.Shine = AddFill(icon.Rect, "Shine", slant, true);
+            // 札の中（札の色の上、ロゴと名前の下）に、色の流れ込みと衝撃波の光を重ねる。
             fx.Tint = AddFill(icon.Rect, "Tint", slant, false);
             fx.Flood = AddFill(icon.Rect, "Flood", slant, false);
             if (character == null && fx.Logo != null)
@@ -231,8 +210,6 @@ namespace Airerage.Runtime.UI
             }
             return fx;
         }
-
-        private static readonly Color MenuAccent = new Color(0.35f, 0.85f, 1f);
 
         private static SlantedFill AddFill(RectTransform parent, string name, float slant, bool soft)
         {
@@ -325,7 +302,7 @@ namespace Airerage.Runtime.UI
             rect.sizeDelta = new Vector2(2300f, 92f);
             rect.anchoredPosition = new Vector2(4000f, 150f);
             var plate = go.AddComponent<SlantedPlate>();
-            plate.Configure(0.4f, 4f, new Color(0.95f, 0.98f, 1f, 0.96f), MenuAccent);
+            plate.Configure(0.4f, 4f, new Color(0.95f, 0.98f, 1f, 0.96f), MenuAccents.Default);
             plate.raycastTarget = false;
             var textGo = new GameObject("Text", typeof(RectTransform));
             textGo.transform.SetParent(rect, false);
@@ -360,20 +337,22 @@ namespace Airerage.Runtime.UI
             AnimateFlyers(now);
             AnimateBand(now);
             AnimateCursors(now);
-            if (now >= _nextShimmer)
-            {
-                // C19: ときどき光が札の上を、左上から右下へ順に走る。
-                _nextShimmer = now + ShimmerPeriod;
-                foreach (IconFx icon in _icons)
-                {
-                    icon.ShineAt = now + (icon.Home.x - icon.Home.y) * 0.0007f;
-                }
-            }
         }
 
-        // 画面を出した最初のフレーム: 今の状態を覚えるだけ（演出は出さない）。
+        // 画面を出した最初のフレーム: 今の状態を覚えるだけ（演出は出さない）。RANDOM の色と「ALL READY」の帯の縁は、画面のイメージカラー
+        // （入ってきた項目の色。2026-11-08）。
         private void Sync(float now)
         {
+            for (int i = 0; i < _icons.Length; i++)
+            {
+                if (_screen.CharacterAt(i) == null)
+                {
+                    _icons[i].Theme = _screen.Accent;
+                }
+            }
+            SlantedPlate bandPlate = _band.GetComponent<SlantedPlate>();
+            bandPlate.BorderColor = _screen.Accent;
+            bandPlate.AccentColor = _screen.Accent;
             for (int p = 0; p < _slots.Length; p++)
             {
                 SlotFx fx = _slots[p];
@@ -402,7 +381,6 @@ namespace Airerage.Runtime.UI
                 icon.HoverStart = now;
             }
             _allReady = _screen.AllReady;
-            _nextShimmer = now + 1.2f;
             _synced = true;
         }
 
@@ -426,22 +404,13 @@ namespace Airerage.Runtime.UI
                 SlotFx fx = _slots[p];
                 bool shown = _screen.CornerShown(p) && _screen.IsJoined(p);
                 int cursor = _screen.CursorShown(p) ? _screen.CursorIndex(p) : -1;
-                if (cursor != fx.Cursor)
-                {
-                    // C5: カーソルが移ったら、移った先から波が広がる（ルーレットの途中は出さない）。
-                    if (cursor >= 0 && fx.Cursor >= 0 && !_screen.IsRolling(p))
-                    {
-                        _ripples.Add(new Ripple { Origin = cursor, At = now });
-                    }
-                    fx.Cursor = cursor;
-                }
+                fx.Cursor = cursor;
                 int character = shown ? _screen.CharacterOf(p) : -1;
                 string name = shown ? _screen.ShownName(p) : string.Empty;
                 if (shown && name != fx.Name && !string.IsNullOrEmpty(fx.Name) && !string.IsNullOrEmpty(name))
                 {
-                    // C10・C11: 枠のロゴと名前が入れ替わる（動いた向きから入る）。名前はばらばらの文字から決まる。
+                    // C10: 枠のロゴと名前が入れ替わる（動いた向きから入る）。
                     StartReel(fx, character >= fx.Character ? 1 : -1, now);
-                    StartDecode(fx, name, now);
                 }
                 fx.Name = name;
                 fx.Character = character;
@@ -485,20 +454,6 @@ namespace Airerage.Runtime.UI
             fx.ReelName.gameObject.SetActive(true);
             fx.ReelTags.text = fx.LastTags;
             fx.ReelTags.gameObject.SetActive(true);
-        }
-
-        private static void StartDecode(SlotFx fx, string name, float now)
-        {
-            foreach (char c in name)
-            {
-                if (c > 0x7e)
-                {
-                    fx.DecodeTarget = null;
-                    return;
-                }
-            }
-            fx.DecodeAt = now;
-            fx.DecodeTarget = name;
         }
 
         // 決めたとき: C13 ロゴが自分の枠へ飛ぶ、C14 色の輪、C12 判（ロゴが着く少し前から）。
@@ -571,34 +526,6 @@ namespace Airerage.Runtime.UI
 
         private void AnimateIcons(float now)
         {
-            var offsets = new Vector2[_icons.Length];
-            for (int r = _ripples.Count - 1; r >= 0; r--)
-            {
-                Ripple ripple = _ripples[r];
-                if (now - ripple.At > 1.5f)
-                {
-                    _ripples.RemoveAt(r);
-                    continue;
-                }
-                Vector2 origin = _icons[ripple.Origin].Home;
-                for (int j = 0; j < _icons.Length; j++)
-                {
-                    if (j == ripple.Origin)
-                    {
-                        continue;
-                    }
-                    Vector2 delta = _icons[j].Home - origin;
-                    float distance = delta.magnitude;
-                    float u = (now - ripple.At - distance * 0.0011f) / RippleSeconds;
-                    if (u <= 0f || u >= 1f || distance < 1f)
-                    {
-                        continue;
-                    }
-                    float f = u < 0.35f ? UiEase.OutCubic(u / 0.35f) : 1f - UiEase.InOutCubic((u - 0.35f) / 0.65f);
-                    offsets[j] += delta / distance * RippleAmplitude * Mathf.Exp(-distance / RippleReach) * f;
-                }
-            }
-
             for (int i = 0; i < _icons.Length; i++)
             {
                 IconFx icon = _icons[i];
@@ -642,23 +569,9 @@ namespace Airerage.Runtime.UI
                     icon.Tint.Set(0f, 0f, Color.clear, Color.clear);
                 }
 
-                // C19: 光の掃き。
-                float shine = (now - icon.ShineAt) / ShimmerSeconds;
-                if (shine >= 0f && shine < 1f)
+                if (icon.Root.anchoredPosition != icon.Home)
                 {
-                    float center = Mathf.Lerp(-0.4f, 1.4f, UiEase.InOutCubic(shine));
-                    var white = new Color(1f, 1f, 1f, 0.5f);
-                    icon.Shine.Set(center - 0.22f, center + 0.22f, white, white);
-                }
-                else
-                {
-                    icon.Shine.Set(0f, 0f, Color.clear, Color.clear);
-                }
-
-                Vector2 position = icon.Home + offsets[i];
-                if (icon.Root.anchoredPosition != position)
-                {
-                    icon.Root.anchoredPosition = position;
+                    icon.Root.anchoredPosition = icon.Home;
                 }
                 AnimateLogo(icon, hovered, now);
             }
@@ -824,30 +737,6 @@ namespace Airerage.Runtime.UI
                         fx.ReelName.gameObject.SetActive(false);
                         fx.ReelTags.gameObject.SetActive(false);
                         fx.ReelAt = -10f;
-                    }
-                }
-
-                // C11: 名前がばらばらの文字から、左から順に決まる。
-                if (fx.DecodeTarget != null)
-                {
-                    Text name = _screen.CornerName(p);
-                    float d = (now - fx.DecodeAt) / DecodeSeconds;
-                    if (d >= 1f || name.text.Length == 0)
-                    {
-                        name.text = fx.DecodeTarget;
-                        fx.DecodeTarget = null;
-                    }
-                    else
-                    {
-                        string target = fx.DecodeTarget;
-                        int settled = Mathf.FloorToInt(d * (target.Length + 4)) - 4;
-                        var text = new StringBuilder(target.Length);
-                        for (int k = 0; k < target.Length; k++)
-                        {
-                            char c = target[k];
-                            text.Append(c == ' ' || k < settled ? c : DecodeLetters[Random.Range(0, DecodeLetters.Length)]);
-                        }
-                        name.text = text.ToString();
                     }
                 }
 
@@ -1145,9 +1034,7 @@ namespace Airerage.Runtime.UI
                 icon.Flood01 = 0f;
                 icon.Flood?.Set(0f, 0f, Color.clear, Color.clear);
                 icon.Tint?.Set(0f, 0f, Color.clear, Color.clear);
-                icon.Shine?.Set(0f, 0f, Color.clear, Color.clear);
                 icon.TintAt = -10f;
-                icon.ShineAt = -10f;
                 if (icon.Face != null)
                 {
                     icon.Face.enabled = false;
@@ -1176,11 +1063,6 @@ namespace Airerage.Runtime.UI
                 _screen.CornerName(p).rectTransform.anchoredPosition = fx.NameHome;
                 _screen.CornerTags(p).rectTransform.anchoredPosition = fx.TagsHome;
                 _screen.CornerRect(p).anchoredPosition = fx.CornerHome;
-                if (fx.DecodeTarget != null)
-                {
-                    _screen.CornerName(p).text = fx.DecodeTarget;
-                    fx.DecodeTarget = null;
-                }
                 fx.ReelAt = -10f;
                 fx.PeelAt = -10f;
                 fx.LandAt = -10f;
@@ -1202,7 +1084,6 @@ namespace Airerage.Runtime.UI
                 }
             }
             _temps.Clear();
-            _ripples.Clear();
             if (_band != null)
             {
                 _band.gameObject.SetActive(false);

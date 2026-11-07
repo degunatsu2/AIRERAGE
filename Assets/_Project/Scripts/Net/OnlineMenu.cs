@@ -139,7 +139,12 @@ namespace Airerage.Net
         private const float LaneSlotHeight = 58f;
         private const float SpectatorLaneLeft = 1600f;
         private const float SpectatorLaneWidth = 280f;
-        private static readonly Color PlayersColor = new Color(0.35f, 0.85f, 1f);
+        // 個人戦の見出しは NETWORK のイメージカラー（以前は水色。2026-11-08）。
+        private Color PlayersColor => NetworkAccent;
+
+        // NETWORK のイメージカラー（メインメニューの NETWORK の項目の色。この画面と、ここから出すキャラクター選択・ステージ選択・アイテムを
+        // 選ぶ画面の文字の色。2026-11-08）。
+        private Color NetworkAccent => _menu != null && _menu.Network != null ? _menu.Network.Accent : Airerage.Runtime.UI.MenuAccents.Network;
         private static readonly Color SpectatorColor = new Color(0.75f, 0.75f, 0.8f);
         private static readonly Color YouColor = new Color(0.35f, 0.85f, 1f);
         private Texture2D _hostTexture;
@@ -492,6 +497,8 @@ namespace Airerage.Net
         {
             _open = true;
             _shown = Panel.None;
+            // 待機所のスクロールの印などは NETWORK のイメージカラー（2026-11-08）。
+            Airerage.Runtime.UI.AccentTint.Apply(this, NetworkAccent);
             _menu.HideMenus();
             UpdatePanels();
         }
@@ -722,7 +729,7 @@ namespace Airerage.Net
                 TransitionKind kind = previous == Panel.Waiting && panel == Panel.CharacterSelect ? TransitionKind.SlantCascade : TransitionKind.Gust;
                 int direction = Order(panel) >= Order(previous) ? 1 : -1;
                 // 斜めの札の 1 枚目は NETWORK のイメージカラー（メインメニューの NETWORK の項目の色。2026-11-07）。
-                Color? accent = _menu != null && _menu.Network != null ? _menu.Network.Accent : (Color?)null;
+                Color? accent = NetworkAccent;
                 _transition.Run(kind, direction, null, () => ShowNow(panel, session), "CHARACTER SELECT", accent);
                 return;
             }
@@ -773,17 +780,21 @@ namespace Airerage.Net
                 case Panel.Items:
                     if (_itemsPool)
                     {
+                        _itemSelect.SetAccent(NetworkAccent);
                         _itemSelect.ShowPool(session.Items.Pool);
                     }
                     else
                     {
+                        _itemSelect.SetAccent(NetworkAccent);
                         _itemSelect.ShowPick(session.Items.StartCount, session.LocalStartItems);
                     }
                     break;
                 case Panel.CharacterSelect:
+                    _characterSelect.SetAccent(NetworkAccent);
                     _characterSelect.ShowNetwork(session.LocalPlayer, session.LocalCharacter);
                     break;
                 case Panel.StageSelect:
+                    _stageSelect.SetAccent(NetworkAccent);
                     _stageSelect.ShowNetwork(session.IsHost, session.StageCursor, session.IsHost ? session.CommonStagePool : ulong.MaxValue);
                     break;
                 case Panel.Loading:

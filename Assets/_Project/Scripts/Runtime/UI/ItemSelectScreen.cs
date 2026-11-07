@@ -103,6 +103,16 @@ namespace Airerage.Runtime.UI
         public event Action Closed;
 
         public bool IsShowing => gameObject.activeSelf;
+
+        /// <summary>この画面のイメージカラー（オプションから開けば OPTIONS、待機所から開けば NETWORK の色。2026-11-08）。</summary>
+        public Color Accent { get; private set; } = MenuAccents.Default;
+
+        /// <summary>この画面のイメージカラーを accent にする（以前は水色だった文字・線・印。2026-11-08 のユーザーの要望）。</summary>
+        public void SetAccent(Color accent)
+        {
+            Accent = accent;
+            AccentTint.Apply(this, accent);
+        }
         public int Count => _options.Length;
         public MenuOption Option(int index) => _options[index];
         public MenuOption Done => _done;
@@ -531,7 +541,7 @@ namespace Airerage.Runtime.UI
             {
                 _popupKind.text = random ? Loc.T($"{_limit} ITEMS", $"{_limit}個") : Presentation.ItemTexts.Kind(id);
                 // 暗い色のアイテム（臙脂色の刀など）でも読めるように、白に寄せる。
-                _popupKind.color = random ? MenuAccent : Color.Lerp(Presentation.ItemIcons.Accent(id), Color.white, 0.45f);
+                _popupKind.color = random ? Accent : Color.Lerp(Presentation.ItemIcons.Accent(id), Color.white, 0.45f);
             }
             if (_popupDescription != null)
             {
@@ -552,7 +562,6 @@ namespace Airerage.Runtime.UI
         /// <summary>Highlight の、ランダムセレクトの札の番号（アイテムの札は 0〜、DONE は -1）。</summary>
         private const int RandomIndex = -2;
 
-        private static readonly Color MenuAccent = new Color(0.35f, 0.85f, 1f, 1f);
 
         private void Update()
         {

@@ -30,7 +30,7 @@ namespace Airerage.Editor
             var small = new Vector2(560f, 66f);
             InputField name = MenuUiBuilder.CreateInputField(connect, "Name", "NAME", top, new Vector2(110f, -190f), fieldSize);
             MenuUiBuilder.CreateText(connect, "OnlineTitle", "ONLINE (JOIN CODE)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(110f, -280f), new Vector2(700f, 44f), MenuUiBuilder.Accent);
+                top, new Vector2(110f, -280f), new Vector2(700f, 44f), MenuAccents.Network);
             InputField code = MenuUiBuilder.CreateInputField(connect, "Code", "JOIN CODE", top, new Vector2(110f, -330f), fieldSize);
             code.characterLimit = JoinCodes.MaxLength;
             code.contentType = InputField.ContentType.Alphanumeric;
@@ -38,7 +38,7 @@ namespace Airerage.Editor
             MenuOption joinOnline = MenuUiBuilder.CreateMenuItem(connect, "JoinOnline", "JOIN WITH CODE", top, new Vector2(110f, -488f), small);
             MenuOption back = MenuUiBuilder.CreateMenuItem(connect, "Back", "BACK", top, new Vector2(110f, -586f), small);
             MenuUiBuilder.CreateText(connect, "LanTitle", "SAME NETWORK (LAN)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(960f, -280f), new Vector2(700f, 44f), MenuUiBuilder.Accent);
+                top, new Vector2(960f, -280f), new Vector2(700f, 44f), MenuAccents.Network);
             InputField address = MenuUiBuilder.CreateInputField(connect, "Address", "ADDRESS", top, new Vector2(960f, -330f), fieldSize);
             InputField port = MenuUiBuilder.CreateInputField(connect, "Port", "PORT", top, new Vector2(960f, -400f), fieldSize);
             MenuOption host = MenuUiBuilder.CreateMenuItem(connect, "Host", "HOST (LAN)", top, new Vector2(960f, -480f), small);
@@ -60,7 +60,7 @@ namespace Airerage.Editor
             MenuUiBuilder.CreateText(waiting, "Title", "WAITING ROOM", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 top, new Vector2(90f, -60f), new Vector2(900f, 90f), Color.white);
             Text info = MenuUiBuilder.CreateText(waiting, "Info", string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft,
-                top, new Vector2(94f, -150f), new Vector2(1400f, 40f), MenuUiBuilder.Accent);
+                top, new Vector2(94f, -150f), new Vector2(1400f, 40f), MenuAccents.Network);
             // 札を並べる場所（左。はみ出す分は縦にスクロールする。2026-11-03 のユーザーの要望）。札の位置は実行中に OnlineMenu が決める
             // （個人戦は PLAYERS の下に 1 列、チーム対戦は 4 色のチームを縦に並べ、人が入ったチームはその分だけ下へ広がる）。
             RectTransform slotContent = CreateScrollArea(waiting, new Vector2(110f, -200f), new Vector2(800f, 580f), out ScrollRect slotScroll);
@@ -261,7 +261,8 @@ namespace Airerage.Editor
             handleGo.transform.SetParent(handleArea.transform, false);
             var handle = (RectTransform)handleGo.transform;
             handle.offsetMin = handle.offsetMax = Vector2.zero;
-            var handleImage = handleGo.AddComponent<Image>();
+            // スクロールの印は画面のイメージカラー（画面を出すときに AccentTint.Apply で塗る。2026-11-08）。
+            var handleImage = AccentTint.Mark(handleGo.AddComponent<Image>());
             handleImage.color = new Color(MenuUiBuilder.Accent.r, MenuUiBuilder.Accent.g, MenuUiBuilder.Accent.b, 0.8f);
             var scrollbar = barGo.AddComponent<Scrollbar>();
             scrollbar.direction = Scrollbar.Direction.BottomToTop;

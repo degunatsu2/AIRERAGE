@@ -30,8 +30,8 @@ namespace Airerage.Editor
             MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, Vector2.one);
             MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 50, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(900f, 70f), Color.white);
-            Text timeLimit = MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(1500f, 40f), MenuUiBuilder.Accent);
+            Text timeLimit = AccentTint.Mark(MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(1500f, 40f), MenuUiBuilder.Accent));
 
             var colors = new Color[CharacterSelectScreen.MaxPlayers];
             for (int i = 0; i < colors.Length; i++)
@@ -162,8 +162,8 @@ namespace Airerage.Editor
             }
             else
             {
-                MenuUiBuilder.CreateText(logoGo.transform, "Question", "?", 72, FontStyle.Bold, TextAnchor.MiddleCenter,
-                    new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(IconSize * 0.62f, IconSize * 0.62f), MenuUiBuilder.Accent);
+                AccentTint.Mark(MenuUiBuilder.CreateText(logoGo.transform, "Question", "?", 72, FontStyle.Bold, TextAnchor.MiddleCenter,
+                    new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(IconSize * 0.62f, IconSize * 0.62f), MenuUiBuilder.Accent));
             }
             BestFit(MenuUiBuilder.CreateText(go.transform, "Name", character != null ? character.DisplayName : "RANDOM", 16, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(IconSize - 16f, 26f), Color.white), 10);
@@ -224,8 +224,8 @@ namespace Airerage.Editor
             logo.enabled = false;
             name = BestFit(MenuUiBuilder.CreateText(go.transform, "Name", string.Empty, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
                 new Vector2(0f, 1f), new Vector2(184f, -84f), new Vector2(226f, 44f), Color.white), 16);
-            tags = MenuUiBuilder.CreateText(go.transform, "Tags", string.Empty, 20, FontStyle.Bold, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(184f, -126f), new Vector2(226f, 80f), MenuUiBuilder.Accent);
+            tags = AccentTint.Mark(MenuUiBuilder.CreateText(go.transform, "Tags", string.Empty, 20, FontStyle.Bold, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(184f, -126f), new Vector2(226f, 80f), MenuUiBuilder.Accent));
             tags.horizontalOverflow = HorizontalWrapMode.Wrap;
             state = MenuUiBuilder.CreateText(go.transform, "State", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
                 new Vector2(0f, 0f), new Vector2(34f, 18f), new Vector2(380f, 40f), Color.white);
@@ -253,7 +253,7 @@ namespace Airerage.Editor
             info.offsetMin = new Vector2(0f, 0f);
             info.offsetMax = new Vector2(0f, 450f);
             MenuUiBuilder.CreateFill(info, "Band", new Color(0.01f, 0.02f, 0.04f, 0.92f), Vector2.zero, Vector2.one);
-            MenuUiBuilder.CreateFill(info, "Edge", MenuUiBuilder.Accent, new Vector2(0f, 1f), new Vector2(1f, 1f)).rectTransform.offsetMin =
+            AccentTint.Mark(MenuUiBuilder.CreateFill(info, "Edge", MenuUiBuilder.Accent, new Vector2(0f, 1f), new Vector2(1f, 1f))).rectTransform.offsetMin =
                 new Vector2(0f, -3f);
 
             var logoGo = new GameObject("Logo", typeof(RectTransform));
@@ -281,8 +281,8 @@ namespace Airerage.Editor
             row.childForceExpandHeight = false;
             Text name = MenuUiBuilder.CreateText(header.transform, "Name", string.Empty, 60, FontStyle.BoldAndItalic,
                 TextAnchor.LowerLeft, new Vector2(0f, 0f), Vector2.zero, new Vector2(500f, 84f), Color.white);
-            Text tags = MenuUiBuilder.CreateText(header.transform, "Tags", string.Empty, 30, FontStyle.Bold,
-                TextAnchor.LowerLeft, new Vector2(0f, 0f), Vector2.zero, new Vector2(500f, 52f), MenuUiBuilder.Accent);
+            Text tags = AccentTint.Mark(MenuUiBuilder.CreateText(header.transform, "Tags", string.Empty, 30, FontStyle.Bold,
+                TextAnchor.LowerLeft, new Vector2(0f, 0f), Vector2.zero, new Vector2(500f, 52f), MenuUiBuilder.Accent));
             MenuUiBuilder.Localize(MenuUiBuilder.CreateText(info, "Close", "F1 / SELECT: CLOSE", 18, FontStyle.Bold, TextAnchor.UpperRight,
                 new Vector2(1f, 1f), new Vector2(-40f, -16f), new Vector2(400f, 28f), new Color(1f, 1f, 1f, 0.6f)), "F1 ／ SELECT: 閉じる");
 
@@ -311,8 +311,8 @@ namespace Airerage.Editor
                 var plate = column.gameObject.AddComponent<SlantedPlate>();
                 plate.Configure(0.06f, 2f, new Color(0.03f, 0.05f, 0.09f, 0.7f), new Color(1f, 1f, 1f, 0.25f));
                 plate.raycastTarget = false;
-                MenuUiBuilder.CreateText(column, "Key", keys[i], 36, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                    new Vector2(0f, 1f), new Vector2(26f, -12f), new Vector2(50f, 48f), MenuUiBuilder.Accent);
+                AccentTint.Mark(MenuUiBuilder.CreateText(column, "Key", keys[i], 36, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+                    new Vector2(0f, 1f), new Vector2(26f, -12f), new Vector2(50f, 48f), MenuUiBuilder.Accent));
                 Text skillName = MenuUiBuilder.CreateText(column, "Name", string.Empty, 32, FontStyle.Bold, TextAnchor.MiddleLeft,
                     new Vector2(0f, 1f), Vector2.zero, Vector2.zero, Color.white);
                 StretchTop(skillName, 80f, 20f, 12f, 48f);

@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using Airerage.Runtime.Audio;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -14,10 +13,11 @@ namespace Airerage.Runtime.UI
     /// 戻る操作（Esc、ゲームパッドの B）は Cancelled で知らせる。
     /// 選んだときにカーソルの音、決定したときに決定の音（UiSounds。ユーザーの要望、2026-10-16）。画面を開いたときに最初の項目を
     /// 選ぶ（SelectQuietly）ときは鳴らさない。
-    /// 選んだとき・決定したときの演出（D-88。ユーザーが選んだ B1・B2・B3・B5・B9・B10・B12・B13。2026-11-07）:
-    /// - B1 導火線の縁・B3 裏の札・B9 の札の傾きと光・B10 の白い光は札（SlantedPlate）が描く。
+    /// 選んだとき・決定したときの演出（D-88。ユーザーが選んだ B1・B2・B3・B9・B10・B12・B13。2026-11-07）:
+    /// - B1 導火線の縁・B3 裏の札（表の札と少し角度をずらし、選んだ瞬間に振れてから揺れる。2026-11-08）・B9 の札の傾きと光・B10 の白い光は
+    ///   札（SlantedPlate）が描く。
     /// - B2: 選んだ所へ少し行きすぎてから戻って止まり、残像が追いかける。
-    /// - B5: 英字の名前は、選んだ瞬間に文字がばらばらに変わってから左から順に決まる（日本語の名前は変えない）。
+    /// - B5（英字の名前のデコード）は、長く遊ぶと読みにくいので消した（ユーザーの要望、2026-11-08）。
     /// - B9: マウスを札に乗せている間、マウスの方へ札がわずかに傾き、光の反射が付いてくる（ゲームパッドでは動かない）。
     /// - B10: 決定した瞬間に札がつぶれて戻り、白く光り、輪と金色の火花が散る（UiBurst。マウスで決定したときの輪と火花は、クリックした
     ///   所に ClickSparks が出す。2026-11-07）。
@@ -27,15 +27,12 @@ namespace Airerage.Runtime.UI
     [RequireComponent(typeof(Button))]
     public sealed class MenuOption : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, ICancelHandler
     {
-        /// <summary>英字の名前がばらばらに変わってから決まるまでの秒数（B5）。</summary>
-        public const float DecodeSeconds = 0.28f;
         /// <summary>決定してつぶれて戻るまでの秒数（B10）。</summary>
         public const float PunchSeconds = 0.22f;
         /// <summary>ほかの項目を選んでいるときの濃さ（B13）。</summary>
         public const float RecedeAlpha = 0.5f;
 
         private const float BackSeconds = 0.18f;
-        private const string DecodeLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@";
 
         [SerializeField] private SlantedPlate _plate;
         [SerializeField] private Text _label;
@@ -81,8 +78,6 @@ namespace Airerage.Runtime.UI
         private bool _shiftOvershoot;
         private bool _receded;
         private float _punchAt = -10f;
-        private float _decodeAt = -10f;
-        private string _decodeText;
         private Vector2 _lean;
         private float _sheenX = 0.5f;
 
@@ -101,13 +96,10 @@ namespace Airerage.Runtime.UI
         /// <summary>ほかの項目を選んでいるので、暗く下げているか（B13。テスト用）。</summary>
         public bool IsReceded => _receded;
 
-        /// <summary>名前の文字がばらばらに変わっている途中か（B5。テスト用）。</summary>
-        public bool Decoding => _decodeText != null;
-
         public Button Button => _button != null ? _button : _button = GetComponent<Button>();
 
-        /// <summary>名前（ばらばらに変わっている途中でも、本来の名前）。</summary>
-        public string Label => _decodeText ?? (_label != null ? _label.text : string.Empty);
+        /// <summary>名前。</summary>
+        public string Label => _label != null ? _label.text : string.Empty;
 
         /// <summary>名前の文字（字体を変えるときに使う）。</summary>
         public Text LabelText => _label;
@@ -157,10 +149,6 @@ namespace Airerage.Runtime.UI
         /// <summary>項目の文字を変える（READY ／ CANCEL READY など）。</summary>
         public void SetLabel(string text)
         {
-            if (_decodeText != null)
-            {
-                _decodeText = text;
-            }
             if (_label != null && _label.text != text)
             {
                 _label.text = text;
@@ -320,7 +308,6 @@ namespace Airerage.Runtime.UI
             _shiftAt = -10f;
             _punchAt = -10f;
             _lean = Vector2.zero;
-            EndDecode();
             if (_rect != null)
             {
                 _rect.anchoredPosition = _home;
@@ -347,11 +334,12 @@ namespace Airerage.Runtime.UI
             if (!_quiet)
             {
                 Sounds.Play(SoundId.UiMove);
-                BeginDecode();
             }
             if (_plate != null)
             {
                 _plate.RunFuse();
+                // 裏の札が振れてから揺れる（ペルソナ 3 リロード・5 ザ・ロイヤルのメニューを参考に。2026-11-08）。
+                _plate.SwingBack();
             }
             Refresh();
             Selected?.Invoke();
@@ -419,27 +407,6 @@ namespace Airerage.Runtime.UI
                 Place();
             }
 
-            // B5: 英字の名前がばらばらに変わってから、左から順に決まる。
-            if (_decodeText != null)
-            {
-                float p = (now - _decodeAt) / DecodeSeconds;
-                if (p >= 1f)
-                {
-                    EndDecode();
-                }
-                else if (_label != null)
-                {
-                    int settled = Mathf.FloorToInt(p * (_decodeText.Length + 4)) - 4;
-                    var text = new StringBuilder(_decodeText.Length);
-                    for (int i = 0; i < _decodeText.Length; i++)
-                    {
-                        char c = _decodeText[i];
-                        text.Append(c == ' ' || i < settled ? c : DecodeLetters[UnityEngine.Random.Range(0, DecodeLetters.Length)]);
-                    }
-                    _label.text = text.ToString();
-                }
-            }
-
             // B9: マウスを乗せている間、マウスの方へわずかに傾き、光の反射が付いてくる。
             if (_plate != null)
             {
@@ -484,51 +451,6 @@ namespace Airerage.Runtime.UI
             GameObject current = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             return current != null && current != gameObject && current.transform.parent == transform.parent && current.activeInHierarchy
                 && current.GetComponent<MenuOption>() != null;
-        }
-
-        /// <summary>名前の文字がばらばらに変わっている途中なら、すぐ本来の名前に戻す（画面の切り替えで写す前）。</summary>
-        public void FinishDecode()
-        {
-            EndDecode();
-        }
-
-        private void BeginDecode()
-        {
-            if (_label == null || _decodeText != null || !IsLatin(_label.text))
-            {
-                return;
-            }
-            _decodeText = _label.text;
-            _decodeAt = Time.unscaledTime;
-        }
-
-        private void EndDecode()
-        {
-            if (_decodeText == null)
-            {
-                return;
-            }
-            if (_label != null)
-            {
-                _label.text = _decodeText;
-            }
-            _decodeText = null;
-        }
-
-        private static bool IsLatin(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return false;
-            }
-            foreach (char c in text)
-            {
-                if (c > 0x7e)
-                {
-                    return false;
-                }
-            }
-            return true;
         }
 
         private void Refresh()

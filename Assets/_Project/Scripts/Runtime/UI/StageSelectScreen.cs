@@ -30,9 +30,9 @@ namespace Airerage.Runtime.UI
         [SerializeField] private MenuOption[] _options = new MenuOption[0];
         [Tooltip("札のステージ（_options と同じ順）")]
         [SerializeField] private StageDefinition[] _stages = new StageDefinition[0];
-        [SerializeField] private Text _name;
+        [Tooltip("右の見出しの札（ステージの名前。白地に黒の文字、縁と裏の札はステージのイメージカラー。2026-11-08。それまでは帯と白い文字）")]
+        [SerializeField] private HeadingPlate _heading;
         [SerializeField] private Text _description;
-        [SerializeField] private Image _band;
         [Tooltip("ネットワーク対戦の案内（ホストが選んでいる、など。なくてもよい）")]
         [SerializeField] private Text _note;
         [Tooltip("RANDOM の札（ステージの札の後ろ。なくてもよい）")]
@@ -130,7 +130,30 @@ namespace Airerage.Runtime.UI
         public MenuOption Option(int index) => _options[index];
 
         /// <summary>右に出している名前（テスト用）。</summary>
-        public string ShownName => _name != null ? _name.text : string.Empty;
+        public string ShownName => _heading != null ? _heading.Word : string.Empty;
+
+        /// <summary>右の見出しの札（テスト用）。</summary>
+        public HeadingPlate Heading => _heading;
+
+        /// <summary>この画面のイメージカラー（入ってきた項目の色。2026-11-08）。</summary>
+        public Color Accent { get; private set; } = MenuAccents.Default;
+
+        /// <summary>
+        /// この画面のイメージカラーを accent にする（以前は水色だった文字・チェックの印・スクロールの印と、CHECK ALL・UNCHECK ALL・DONE の
+        /// 札。ステージの札はステージのイメージカラー、RANDOM は MenuAccents.Random のまま。2026-11-08 のユーザーの要望）。
+        /// </summary>
+        public void SetAccent(Color accent)
+        {
+            Accent = accent;
+            AccentTint.Apply(this, accent);
+            foreach (MenuOption extra in new[] { _checkAll, _uncheckAll, _done })
+            {
+                if (extra != null)
+                {
+                    extra.SetAccent(accent, true);
+                }
+            }
+        }
 
         private void Awake()
         {
@@ -521,27 +544,19 @@ namespace Airerage.Runtime.UI
             }
             if (stage == null)
             {
-                // RANDOM。
-                if (_name != null)
+                // RANDOM（イメージカラーは以前の帯の灰色）。
+                if (_heading != null)
                 {
-                    _name.text = "RANDOM";
+                    _heading.Show("RANDOM", MenuAccents.Random);
                 }
                 ShowDescription(RandomDescription, RandomDescriptionJa);
-                if (_band != null)
-                {
-                    _band.color = new Color(0.7f, 0.7f, 0.75f, 0.35f);
-                }
                 return;
             }
-            if (_name != null)
+            if (_heading != null)
             {
-                _name.text = stage.DisplayName;
+                _heading.Show(stage.DisplayName, new Color(stage.Color.r, stage.Color.g, stage.Color.b, 1f));
             }
             ShowDescription(stage.Description, stage.DescriptionJa);
-            if (_band != null)
-            {
-                _band.color = new Color(stage.Color.r, stage.Color.g, stage.Color.b, 0.35f);
-            }
         }
     }
 }

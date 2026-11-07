@@ -46,17 +46,57 @@ namespace Airerage.Editor
         }
 
         /// <summary>
-        /// メインメニューの項目のイメージカラー（SINGLE・LOCAL・NETWORK・TRAINING・OPTIONS・QUIT の順。2026-11-07）。札の縁・裏の札・
-        /// 縁を回る光・左の絵・右の大きな名前、キャラクター選択へ入る斜めの札、オプションの画面の札に使う。
+        /// メインメニューの項目のイメージカラー（SINGLE・LOCAL・NETWORK・TRAINING・OPTIONS・QUIT の順。2026-11-07。値は MenuAccents）。
+        /// 札の縁・裏の札・縁を回る光・左の絵・右の見出しの札、キャラクター選択へ入る斜めの札、その項目から入った画面の文字に使う。
         /// </summary>
-        public static readonly Color[] MainAccents =
-        {
-            new Color(0.38f, 0.62f, 1f), new Color(1f, 0.58f, 0.3f), new Color(0.2f, 0.86f, 0.78f),
-            new Color(0.62f, 0.86f, 0.3f), new Color(0.68f, 0.56f, 1f), new Color(1f, 0.38f, 0.5f),
-        };
+        public static Color[] MainAccents => MenuAccents.MainItems();
 
-        /// <summary>OPTIONS のイメージカラー（オプションの画面の札の縁と裏の札。2026-11-07）。</summary>
-        public static Color OptionsAccent => MainAccents[4];
+        /// <summary>OPTIONS のイメージカラー（オプションの画面の札の縁と裏の札・文字。2026-11-07）。</summary>
+        public static Color OptionsAccent => MenuAccents.Options;
+
+        /// <summary>
+        /// 見出しの札（HeadingPlate。白地に黒の文字、イメージカラーの縁と少し角度のずれた裏の札。2026-11-08 のユーザーの要望）。札は
+        /// anchor を基準に、pivot（札の右端なら (1, 0.5)）を position に置く。高さ height、文字の大きさ fontSize（幅が maxWidth を超えるなら
+        /// 小さくする）。メインメニューとステージ選択の右の見出し。
+        /// </summary>
+        public static HeadingPlate CreateHeadingPlate(Transform parent, string name, Vector2 anchor, Vector2 pivot, Vector2 position,
+            float height, int fontSize, float maxWidth, float padding)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var root = (RectTransform)go.transform;
+            root.anchorMin = root.anchorMax = anchor;
+            root.pivot = pivot;
+            root.anchoredPosition = position;
+            root.sizeDelta = new Vector2(maxWidth, height);
+            var faces = new RectTransform[2];
+            var plates = new SlantedPlate[2];
+            var texts = new Text[2];
+            for (int i = 0; i < 2; i++)
+            {
+                var face = new GameObject(i == 0 ? "PlateA" : "PlateB", typeof(RectTransform));
+                face.transform.SetParent(root, false);
+                var rect = (RectTransform)face.transform;
+                rect.anchorMin = rect.anchorMax = pivot;
+                rect.pivot = pivot;
+                rect.anchoredPosition = Vector2.zero;
+                rect.sizeDelta = new Vector2(maxWidth, height);
+                var plate = face.AddComponent<SlantedPlate>();
+                plate.Configure(0.22f, 5f, new Color(0.97f, 0.98f, 1f, 1f), Accent);
+                plate.ConfigureBack(16f, new Vector2(-15f, -12f));
+                plate.raycastTarget = false;
+                face.AddComponent<CanvasGroup>().alpha = 0f;
+                Text word = CreateText(rect, "Word", string.Empty, fontSize, FontStyle.Italic, TextAnchor.MiddleCenter,
+                    new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(maxWidth, height), new Color(0.05f, 0.06f, 0.09f), false);
+                word.font = GameFonts.LatinBlack;
+                faces[i] = rect;
+                plates[i] = plate;
+                texts[i] = word;
+            }
+            var heading = go.AddComponent<HeadingPlate>();
+            heading.Configure(faces, plates, texts, padding, maxWidth, fontSize);
+            return heading;
+        }
 
         /// <summary>
         /// クリックした所の火花の層（ClickSparks。2026-11-07）。parent の最後の子として画面いっぱいに置く（クリックは受け止めない）。
@@ -245,13 +285,16 @@ namespace Airerage.Editor
             panelRect.sizeDelta = new Vector2(1060f, 360f);
             var plate = panel.AddComponent<SlantedPlate>();
             // 中は不透明にする（線形の色空間では、半透明の暗い色を重ねても後ろの文字が透けて見える）。
-            plate.Configure(0.12f, 4f, new Color(0.03f, 0.05f, 0.09f, 1f), Accent);
+            // 縁は QUIT のイメージカラー（2026-11-08）。
+            plate.Configure(0.12f, 4f, new Color(0.03f, 0.05f, 0.09f, 1f), MenuAccents.Quit);
             Text message = CreateText(panel.transform, "Message", QuitConfirmDialog.MessageJapanese, 40, FontStyle.Bold,
                 TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(980f, 90f), Color.white);
             MenuOption yes = CreateMenuItem(panel.transform, "Yes", "はい", new Vector2(0.5f, 0f), new Vector2(-330f, 150f), new Vector2(300f, 76f));
             MenuOption no = CreateMenuItem(panel.transform, "No", "いいえ", new Vector2(0.5f, 0f), new Vector2(50f, 150f), new Vector2(300f, 76f));
             yes.SetSelectedShift(new Vector2(0f, 6f));
             no.SetSelectedShift(new Vector2(0f, 6f));
+            yes.SetAccent(MenuAccents.Quit, true);
+            no.SetAccent(MenuAccents.Quit, true);
             var dialog = root.gameObject.AddComponent<QuitConfirmDialog>();
             SandboxWireSceneBuilder.SetReference(dialog, "_message", message);
             SandboxWireSceneBuilder.SetReference(dialog, "_yes", yes);
@@ -351,8 +394,9 @@ namespace Airerage.Editor
             iconRect.sizeDelta = new Vector2(46f, 46f);
             var exitIcon = iconObject.AddComponent<RawImage>();
             exitIcon.raycastTarget = false;
-            Text note = CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                bottom, new Vector2(0f, 46f), new Vector2(1400f, 40f), Accent);
+            // 案内の文字は、遊んでいるモードのイメージカラー（ResultsMenu が開くときに塗る。2026-11-08）。
+            Text note = AccentTint.Mark(CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                bottom, new Vector2(0f, 46f), new Vector2(1400f, 40f), Accent));
             CreateClickSparks(panel);
 
             var results = canvas.gameObject.AddComponent<ResultsMenu>();

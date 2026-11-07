@@ -172,6 +172,7 @@ namespace Airerage.Runtime.UI
             _optionsScreen.RandomStagesRequested += () => Go(TransitionKind.Gust, 1, null, () =>
             {
                 HideAll();
+                _stageSelect.SetAccent(_options.Accent);
                 _stageSelect.ShowRandomPool();
             });
             _stageSelect.PoolClosed += () => Go(TransitionKind.Gust, -1, null, () =>
@@ -187,12 +188,14 @@ namespace Airerage.Runtime.UI
                     HideAll();
                     Airerage.Runtime.Settings.ItemSettings items = Airerage.Runtime.Settings.ItemSettings.Load();
                     _itemsFromOptions = true;
+                    _itemSelect.SetAccent(_options.Accent);
                     _itemSelect.ShowPick(items.StartCount, items.StartItems);
                 });
                 _optionsScreen.DropItemsRequested += () => Go(TransitionKind.Gust, 1, null, () =>
                 {
                     HideAll();
                     _itemsFromOptions = true;
+                    _itemSelect.SetAccent(_options.Accent);
                     _itemSelect.ShowPool(Airerage.Runtime.Settings.ItemSettings.Load().DropPool);
                 });
                 _itemSelect.PicksChanged += picks =>
@@ -369,6 +372,7 @@ namespace Airerage.Runtime.UI
                 {
                     EventSystem.current.SetSelectedGameObject(null);
                 }
+                _characterSelect.SetAccent(ModeAccent);
                 _characterSelect.ShowLocal(_flow.LocalPlayers, _flow.LocalTimed);
             }
             else if (_flow != null && _flow.TitlePassed)
@@ -469,9 +473,27 @@ namespace Airerage.Runtime.UI
             _selectAtFrame = Time.frameCount + 1;
         }
 
+        // 今のモード（ステージ選択の後に始めるもの）のイメージカラー。キャラクター選択・ステージ選択の文字をこの色にする（2026-11-08）。
+        private Color ModeAccent
+        {
+            get
+            {
+                switch (_mode)
+                {
+                    case PlayMode.Local:
+                        return _local.Accent;
+                    case PlayMode.Single:
+                        return _single.Accent;
+                    default:
+                        return _training.Accent;
+                }
+            }
+        }
+
         private void ShowCharacterSelect()
         {
             HideAll();
+            _characterSelect.SetAccent(ModeAccent);
             _characterSelect.ShowSingle(PlayerPrefs.GetInt(CharacterRoster.SelectedPreferenceKey, 0));
         }
 
@@ -496,6 +518,7 @@ namespace Airerage.Runtime.UI
             {
                 EventSystem.current.SetSelectedGameObject(null);
             }
+            _characterSelect.SetAccent(ModeAccent);
             _characterSelect.ShowLocal(reset);
         }
 
@@ -547,6 +570,7 @@ namespace Airerage.Runtime.UI
         private void ShowStageSelect()
         {
             HideAll();
+            _stageSelect.SetAccent(ModeAccent);
             _stageSelect.Show();
         }
 

@@ -173,6 +173,20 @@ namespace Airerage.Runtime.UI
             }
         }
 
+        // 遊んでいるモードのイメージカラー（ネットワーク対戦・シングルモード・ローカル対戦）。
+        private Color ModeAccent()
+        {
+            if (_target.HasRoom)
+            {
+                return MenuAccents.Network;
+            }
+            Airerage.Runtime.Flow.GameFlow flow = FindFirstObjectByType<Airerage.Runtime.Flow.GameFlow>();
+            return flow != null && flow.LocalSingle ? MenuAccents.Single : MenuAccents.Local;
+        }
+
+        /// <summary>結果の案内の文字の色（テスト用）。</summary>
+        public Color NoteColor => _note != null ? _note.color : Color.clear;
+
         /// <summary>結果を出している間に止めている表示の数（テスト用）。</summary>
         public int HiddenCount => _hidden.Count;
 
@@ -192,6 +206,8 @@ namespace Airerage.Runtime.UI
             _canReturn = !_target.CanReturnToCharacterSelect;
             _canBack = !CanBack;
             _menu.SetLabel(_target.HasRoom ? "BACK ROOM" : "MAIN MENU");
+            // 案内の文字は、遊んでいるモードのイメージカラー（以前は水色。2026-11-08 のユーザーの要望）。
+            AccentTint.Apply(_panel.transform, ModeAccent());
             if (_exit != null)
             {
                 // ローカル対戦とシングルモードは 3 つ目の MAIN MENU で抜けられるので、出さない。

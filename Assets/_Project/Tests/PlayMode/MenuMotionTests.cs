@@ -56,40 +56,56 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(transition.GhostCount, Is.GreaterThan(0), "画面の写しを動かしていない");
                 Assert.That(camera.Diving, Is.True, "背景のカメラが前へ突進しない");
                 Assert.That(GameObject.Find("SpeedLines"), Is.Not.Null, "速さの線がない");
+                // 切り替えの途中でも、写しは本物の動きに合わせる（選んだ SINGLE は右へ出て、ほかの項目は下がる B13。2026-11-08）。
+                yield return WaitSeconds(0.45f);
+                Assert.That(transition.Running, Is.True, "前提: まだ切り替えの途中");
+                GameObject ghostMain = GameObject.Find("Main (Transition)");
+                Assert.That(ghostMain, Is.Not.Null, "メインメニューの写しがない");
+                var ghostSingle = (RectTransform)ghostMain.transform.Find("SINGLE");
+                var ghostLocal = (RectTransform)ghostMain.transform.Find("LOCAL");
+                Assert.That(ghostSingle.anchoredPosition.x - ghostLocal.anchoredPosition.x, Is.GreaterThan(15f),
+                    "切り替えの途中で、選んだ項目が出ず、ほかの項目が下がらない（B13）");
                 yield return WaitFor(() => !transition.Running, 3f, "スカイダイブが終わらない");
                 yield return null;
                 Assert.That(CopiesLeft(), Is.Zero, "演出が終わっても写しが残っている");
                 Assert.That(menu.GetComponentInChildren<MainMenuBackdrop>(), Is.Not.Null);
 
-                // ボタンの演出: 選ぶと導火線の縁・裏の札・文字のデコード・背景の名前・アイコン、ほかの項目は暗く下がる。カーソルの音。
+                // ボタンの演出: 選ぶと導火線の縁・裏の札（振れてから揺れる）・背景の見出し・アイコン、ほかの項目は暗く下がる。カーソルの音。
+                // 文字のデコード（B5）はなくした（2026-11-08）。
                 var backdrop = Object.FindFirstObjectByType<MainMenuBackdrop>();
                 Assert.That(backdrop.Word, Is.EqualTo("SINGLE"), "最初の項目の名前を背景に出さない（B7）");
                 EventSystem.current.SetSelectedGameObject(menu.Training.gameObject);
                 Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiMove), "カーソルの音が鳴らない");
                 Assert.That(menu.Training.Plate.FuseRunning, Is.True, "選んでも縁に光が走らない（B1）");
-                Assert.That(menu.Training.Decoding, Is.True, "選んでも名前がばらばらに変わらない（B5）");
+                Assert.That(menu.Training.LabelText.text, Is.EqualTo("TRAINING"), "選んだ名前の文字が変わった（デコードはなくした）");
+                Assert.That(menu.Training.Plate.Swinging, Is.True, "選んでも裏の札が振れない（2026-11-08）");
                 Assert.That(menu.Training.GetComponentInChildren<MenuIcon>().Selected, Is.True, "絵が動かない（B12）");
                 yield return WaitSeconds(0.45f);
-                Assert.That(menu.Training.Decoding, Is.False, "名前が決まらない（B5）");
                 Assert.That(menu.Training.Label, Is.EqualTo("TRAINING"));
-                Assert.That(menu.Training.LabelText.text, Is.EqualTo("TRAINING"), "ばらばらにした名前が元に戻らない");
                 Assert.That(menu.Training.Plate.Back, Is.GreaterThan(0.9f), "裏の札が出ない（B3）");
+                Assert.That(Mathf.Abs(menu.Training.Plate.BackAngle), Is.GreaterThan(0.5f), "裏の札が表の札と同じ角度（2026-11-08）");
                 Assert.That(menu.Single.IsReceded, Is.True, "ほかの項目が暗く下がらない（B13）");
                 Assert.That(menu.Single.Plate.Back, Is.LessThan(0.1f), "選んでいない項目の裏の札が残っている");
                 Assert.That(backdrop.Word, Is.EqualTo("TRAINING"), "背景の名前が変わらない（B7）");
                 Assert.That(backdrop.Description, Is.Not.Empty, "背景に説明を出さない（B7）");
-                // 項目の色（2026-11-07）: 札の縁・裏の札・縁を回る光、右の大きな名前の縁取りが項目の色。背景の色の光はない。
+                // 項目の色（2026-11-07）: 札の縁・裏の札・縁を回る光、右の見出しの札の縁と裏の札が項目の色。背景の色の光はない。
                 Color accent = menu.Training.Accent;
                 Assert.That(accent, Is.Not.EqualTo(menu.Single.Accent), "項目ごとに色が違わない");
                 Assert.That(menu.Training.Plate.AccentColor, Is.EqualTo(accent), "裏の札が項目の色でない");
                 Assert.That(menu.Training.Plate.BorderColor, Is.EqualTo(accent), "選んだ札の縁が項目の色でない");
                 Assert.That(menu.Training.Plate.FuseColor, Is.Not.EqualTo(Color.white), "縁を回る光が項目の色でない");
-                Color outline = backdrop.WordOutline;
-                Assert.That(new Vector3(outline.r, outline.g, outline.b), Is.EqualTo(new Vector3(accent.r, accent.g, accent.b)), "右の名前の縁取りが項目の色でない");
-                // 右の名前の中は項目の色を白に寄せた色、左の絵は項目の色（2026-11-07）。
-                Color fill = backdrop.WordFill;
-                Assert.That(fill.r + fill.g + fill.b, Is.GreaterThan(accent.r + accent.g + accent.b), "右の名前の中が項目の色より白くない");
-                Assert.That(fill.r == fill.g && fill.g == fill.b, Is.False, "右の名前の中が白のまま");
+                // 右の見出しは白地に黒の文字の札、縁と裏の札は項目の色（2026-11-08）。
+                HeadingPlate heading = backdrop.Heading;
+                Assert.That(heading, Is.Not.Null, "右の見出しの札がない");
+                Color outline = heading.Plate.BorderColor;
+                Assert.That(new Vector3(outline.r, outline.g, outline.b), Is.EqualTo(new Vector3(accent.r, accent.g, accent.b)), "見出しの札の縁が項目の色でない");
+                Assert.That(heading.Plate.AccentColor, Is.EqualTo(heading.Plate.BorderColor), "見出しの裏の札が項目の色でない");
+                Assert.That(heading.Plate.Back, Is.GreaterThan(0.9f), "見出しの裏の札が出ない");
+                Color face = heading.Plate.color;
+                Assert.That(face.r + face.g + face.b, Is.GreaterThan(2.7f), "見出しの札が白地でない");
+                Color word = heading.TextColor;
+                Assert.That(word.r + word.g + word.b, Is.LessThan(0.5f), "見出しの文字が黒でない");
+                // 左の絵は項目の色（2026-11-07）。
                 Color ink = menu.Training.GetComponentInChildren<MenuIcon>().Ink;
                 Assert.That(Mathf.Abs(ink.g - accent.g) < 0.2f && Mathf.Abs(ink.b - accent.b) < 0.2f, Is.True, "左の絵が項目の色でない");
                 Assert.That(backdrop.transform.Find("Backdrop/Tint"), Is.Null, "背景の色の光が残っている");
@@ -260,6 +276,86 @@ namespace Airerage.PlayMode.Tests
                 count++;
             }
             Assert.That(count, Is.GreaterThan(3), "オプションの札がない");
+            // 以前は水色だった文字も OPTIONS の色（2026-11-08）。
+            foreach (UnityEngine.UI.Text text in Object.FindFirstObjectByType<OptionsScreen>().GetComponentsInChildren<UnityEngine.UI.Text>(true))
+            {
+                if (text.name == "KeyboardHeader" || text.name == "GamepadHeader" || text.name == "Prompt")
+                {
+                    Assert.That(SameHue(text.color, optionsColor), Is.True, $"{text.name} の文字が OPTIONS の色でない");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 画面のイメージカラー（2026-11-08）: TRAINING から入ったキャラクター選択・ステージ選択の、以前は水色だった文字は TRAINING の色。
+        /// ステージ選択の見出しは白地に黒の文字の札で、縁と裏の札はカーソルのあるステージの色。ステージの札の縁はそのステージの色。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Screens_UseTheColorOfTheModeTheyCameFrom()
+        {
+            InputSettings.EditorInputBehaviorInPlayMode savedBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSettings.BackgroundBehavior savedBackground = InputSystem.settings.backgroundBehavior;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                SceneManager.LoadScene("App");
+                yield return null;
+                var flow = Object.FindFirstObjectByType<GameFlow>();
+                yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+                var menu = Object.FindFirstObjectByType<MenuScreens>();
+                menu.ContinueFromTitle();
+                menu.Transition.Complete();
+                Color training = menu.Training.Accent;
+                menu.Training.Button.onClick.Invoke();
+                menu.Transition.Complete();
+                yield return null;
+                yield return null;
+                CharacterSelectScreen characters = menu.CharacterSelect;
+                Assert.That(characters.Accent, Is.EqualTo(training), "キャラクター選択がモードの色でない");
+                int tinted = 0;
+                foreach (AccentTint tint in characters.GetComponentsInChildren<AccentTint>(true))
+                {
+                    Assert.That(SameHue(tint.GetComponent<UnityEngine.UI.Graphic>().color, training), Is.True, $"{tint.name} がモードの色でない");
+                    tinted++;
+                }
+                Assert.That(tinted, Is.GreaterThan(3), "キャラクター選択に色を変える文字がない");
+
+                yield return Tap(keyboard, Key.Enter);
+                yield return WaitFor(() => menu.ShowingStageSelect, CharacterSelectScreen.SingleHoldSeconds + 3f, "ステージ選択へ進まない");
+                menu.Transition.Complete();
+                yield return null;
+                yield return null;
+                StageSelectScreen stages = menu.StageSelect;
+                Assert.That(stages.Accent, Is.EqualTo(training), "ステージ選択がモードの色でない");
+                Assert.That(stages.transform.Find("Band"), Is.Null, "ステージ選択の見出しの帯が残っている");
+                HeadingPlate heading = stages.Heading;
+                Assert.That(heading, Is.Not.Null, "ステージ選択の見出しの札がない");
+                Assert.That(stages.Highlighted, Is.Not.Null, "前提: ステージにカーソルがある");
+                Color stageColor = stages.Highlighted.Color;
+                Assert.That(heading.Word, Is.EqualTo(stages.Highlighted.DisplayName));
+                Assert.That(SameHue(heading.Plate.BorderColor, stageColor), Is.True, "見出しの札の縁がステージの色でない");
+                Color word = heading.TextColor;
+                Assert.That(word.r + word.g + word.b, Is.LessThan(0.5f), "見出しの文字が黒でない");
+                for (int i = 0; i < stages.Count; i++)
+                {
+                    Color own = flow.Stages.Get(i).Color;
+                    Assert.That(SameHue(stages.Option(i).Accent, own), Is.True, $"{stages.Option(i).name} の縁がステージの色でない");
+                }
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keyboard);
+                InputSystem.settings.editorInputBehaviorInPlayMode = savedBehavior;
+                InputSystem.settings.backgroundBehavior = savedBackground;
+            }
+        }
+
+        // 色の RGB が同じか（濃さは問わない）。
+        private static bool SameHue(Color a, Color b)
+        {
+            return Mathf.Abs(a.r - b.r) < 0.01f && Mathf.Abs(a.g - b.g) < 0.01f && Mathf.Abs(a.b - b.b) < 0.01f;
         }
 
         [UnityTest]

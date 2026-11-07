@@ -29,8 +29,8 @@ namespace Airerage.Editor
             Text title = MenuUiBuilder.CreateText(panel, "Title", "START ITEMS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 new Vector2(0f, 1f), new Vector2(90f, -50f), new Vector2(1200f, 90f), Color.white);
             // 案内は、見出しとスクロールの上の端のちょうど間（2026-11-06）。
-            Text note = MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent);
+            Text note = AccentTint.Mark(MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
+                new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent));
             note.font = GameFonts.JapaneseBold;
 
             RectTransform content = OnlineMenuUiBuilder.CreateScrollArea(panel, ScrollPosition, ScrollSize, out ScrollRect scroll);
@@ -80,9 +80,9 @@ namespace Airerage.Editor
             Image back = popupObject.AddComponent<Image>();
             back.color = new Color(0.03f, 0.05f, 0.09f, 0.9f);
             back.raycastTarget = false;
-            MenuUiBuilder.CreateFill(popup, "TopLine", MenuUiBuilder.Accent, new Vector2(0f, 1f), new Vector2(1f, 1f)).rectTransform.offsetMin =
+            AccentTint.Mark(MenuUiBuilder.CreateFill(popup, "TopLine", MenuUiBuilder.Accent, new Vector2(0f, 1f), new Vector2(1f, 1f))).rectTransform.offsetMin =
                 new Vector2(0f, -4f);
-            MenuUiBuilder.CreateFill(popup, "LeftLine", MenuUiBuilder.Accent, new Vector2(0f, 0f), new Vector2(0f, 1f)).rectTransform.offsetMax =
+            AccentTint.Mark(MenuUiBuilder.CreateFill(popup, "LeftLine", MenuUiBuilder.Accent, new Vector2(0f, 0f), new Vector2(0f, 1f))).rectTransform.offsetMax =
                 new Vector2(6f, 0f);
             var popupIcon = new GameObject("Icon", typeof(RectTransform)).AddComponent<RawImage>();
             popupIcon.transform.SetParent(popup, false);
@@ -95,8 +95,8 @@ namespace Airerage.Editor
             popupName.resizeTextForBestFit = true;
             popupName.resizeTextMinSize = 24;
             popupName.resizeTextMaxSize = 40;
-            Text popupKind = MenuUiBuilder.CreateText(popup, "Kind", string.Empty, 24, FontStyle.Bold, TextAnchor.MiddleLeft,
-                new Vector2(0f, 1f), new Vector2(204f, -96f), new Vector2(610f, 40f), MenuUiBuilder.Accent);
+            Text popupKind = AccentTint.Mark(MenuUiBuilder.CreateText(popup, "Kind", string.Empty, 24, FontStyle.Bold, TextAnchor.MiddleLeft,
+                new Vector2(0f, 1f), new Vector2(204f, -96f), new Vector2(610f, 40f), MenuUiBuilder.Accent));
             popupKind.font = GameFonts.JapaneseBold;
             Text description = MenuUiBuilder.CreateText(popup, "Description", string.Empty, 25, FontStyle.Bold, TextAnchor.UpperLeft,
                 new Vector2(0f, 1f), new Vector2(30f, -192f), new Vector2(780f, 128f), new Color(1f, 1f, 1f, 0.9f));
@@ -140,12 +140,12 @@ namespace Airerage.Editor
         // 区切りの見出し（PASSIVE ／ ACTIVE。水色の斜めの文字と下の線）。位置は実行中に決める。
         private static Text CreateHeader(RectTransform content, string name, string label)
         {
-            Text header = MenuUiBuilder.CreateText(content, name, label, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft, new Vector2(0f, 1f),
-                Vector2.zero, new Vector2(820f, 40f), MenuUiBuilder.Accent);
+            Text header = AccentTint.Mark(MenuUiBuilder.CreateText(content, name, label, 28, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft, new Vector2(0f, 1f),
+                Vector2.zero, new Vector2(820f, 40f), MenuUiBuilder.Accent));
             header.rectTransform.pivot = new Vector2(0f, 1f);
             header.font = GameFonts.JapaneseBold;
-            Image line = MenuUiBuilder.CreateFill(header.rectTransform, "Line", new Color(MenuUiBuilder.Accent.r, MenuUiBuilder.Accent.g, MenuUiBuilder.Accent.b, 0.5f),
-                new Vector2(0f, 0f), new Vector2(1f, 0f));
+            Image line = AccentTint.Mark(MenuUiBuilder.CreateFill(header.rectTransform, "Line", new Color(MenuUiBuilder.Accent.r, MenuUiBuilder.Accent.g, MenuUiBuilder.Accent.b, 0.5f),
+                new Vector2(0f, 0f), new Vector2(1f, 0f)));
             line.rectTransform.offsetMin = new Vector2(0f, -2f);
             line.rectTransform.offsetMax = new Vector2(0f, 0f);
             return header;
@@ -194,7 +194,7 @@ namespace Airerage.Editor
             rect.pivot = new Vector2(1f, 0.5f);
             rect.anchoredPosition = new Vector2(-6f, 0f);
             rect.sizeDelta = new Vector2(46f, 46f);
-            box.AddComponent<Image>().color = MenuUiBuilder.Accent;
+            AccentTint.Mark(box.AddComponent<Image>()).color = MenuUiBuilder.Accent;
             key = MenuUiBuilder.CreateText(rect, "Text", "Z", 26, FontStyle.Bold, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), Vector2.zero,
                 new Vector2(46f, 46f), new Color(0.03f, 0.05f, 0.09f));
             key.resizeTextForBestFit = true;
