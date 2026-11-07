@@ -8,7 +8,7 @@ namespace Airerage.Runtime.UI
     /// 上の辺が下の辺より Slant（高さに対する割合）だけ右にずれる。
     /// 選んだときと決定したときの演出（D-88。ユーザーが選んだ B1・B2・B3・B9・B10。2026-11-07）も、この札が自分で描いて動かす
     /// （画面の切り替えで札の写しを動かすときも、演出が途中で止まらないように。動きの時刻は写しにも引き継ぐ）:
-    /// - 導火線の縁（B1）: 選んだ瞬間、白い光が縁を 1 周する（RunFuse）。選んでいる間は縁がゆっくり明滅する（Glow）。
+    /// - 導火線の縁（B1）: 選んだ瞬間、白い光（FuseColor）が縁を 1 周する（RunFuse）。選んでいる間は縁がゆっくり明滅する（Glow）。
     /// - 残像（B2）: 札が動いたとき、2 枚の水色の残像が遅れて追いかけて消える（Trail）。
     /// - 裏の札（B3）: 選んでいる間、水色の札が左下へずれて出る（BackTarget）。
     /// - チルト（B9）: マウスの位置へ札がわずかに傾き（Lean）、光の反射が付いてくる（Sheen）。
@@ -39,6 +39,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Color _borderColor = new Color(1f, 1f, 1f, 0.6f);
         [Tooltip("裏の札・残像・縁の明滅の色")]
         [SerializeField] private Color _accentColor = new Color(0.35f, 0.85f, 1f);
+        [Tooltip("導火線の光の芯の色（ふつうは白。メインメニューは項目の色。2026-11-07）")]
+        [SerializeField] private Color _fuseColor = Color.white;
 
         // 演出の状態（写しにも引き継ぐため保存する値にする。時刻は Time.unscaledTime）。
         [SerializeField, HideInInspector] private float _fuseAt = -10f;
@@ -70,6 +72,17 @@ namespace Airerage.Runtime.UI
             set
             {
                 _accentColor = value;
+                SetVerticesDirty();
+            }
+        }
+
+        /// <summary>導火線の光の芯の色（B1）。</summary>
+        public Color FuseColor
+        {
+            get => _fuseColor;
+            set
+            {
+                _fuseColor = value;
                 SetVerticesDirty();
             }
         }
@@ -299,7 +312,9 @@ namespace Airerage.Runtime.UI
                 Vector2[] path = Clockwise(outer);
                 Vector2[] pathIn = Clockwise(Inset(r, shift, Mathf.Max(3.5f, _borderWidth + 0.5f)));
                 Vector2[] pathOut = Clockwise(Inset(r, shift, -7f));
-                AddFuse(vh, r, path, pathIn, head, 0.12f, new Color(1f, 1f, 1f, alpha), new Color(1f, 1f, 1f, alpha));
+                Color core = _fuseColor;
+                core.a = alpha;
+                AddFuse(vh, r, path, pathIn, head, 0.12f, core, core);
                 Color glowColor = Color.Lerp(_accentColor, Color.white, 0.5f);
                 glowColor.a = 0.45f * alpha;
                 Color clearGlow = glowColor;

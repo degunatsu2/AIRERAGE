@@ -45,6 +45,16 @@ namespace Airerage.Editor
             return rect;
         }
 
+        /// <summary>
+        /// クリックした所の火花の層（ClickSparks。2026-11-07）。parent の最後の子として画面いっぱいに置く（クリックは受け止めない）。
+        /// </summary>
+        public static ClickSparks CreateClickSparks(Transform parent)
+        {
+            RectTransform rect = CreateFull(parent, "ClickSparks");
+            rect.SetAsLastSibling();
+            return rect.gameObject.AddComponent<ClickSparks>();
+        }
+
         /// <summary>色を塗った四角（暗くする背景など）。anchorMin〜anchorMax の範囲に広げる。</summary>
         public static Image CreateFill(Transform parent, string name, Color color, Vector2 anchorMin, Vector2 anchorMax)
         {
@@ -330,6 +340,7 @@ namespace Airerage.Editor
             exitIcon.raycastTarget = false;
             Text note = CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
                 bottom, new Vector2(0f, 46f), new Vector2(1400f, 40f), Accent);
+            CreateClickSparks(panel);
 
             var results = canvas.gameObject.AddComponent<ResultsMenu>();
             SandboxWireSceneBuilder.SetReference(results, "_controls", controls);
@@ -370,6 +381,7 @@ namespace Airerage.Editor
             Localize(CreateText(panel, "Hint", "Esc / Start: close    Enter / A: OK", 20, FontStyle.Bold, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -190f), new Vector2(800f, 40f), new Color(1f, 1f, 1f, 0.7f)),
                 "Esc ／ Start: 閉じる　　Enter ／ A: 決定");
+            CreateClickSparks(panel);
 
             var pause = canvas.gameObject.AddComponent<PauseMenu>();
             SandboxWireSceneBuilder.SetReference(pause, "_runner", runner);

@@ -108,6 +108,45 @@ namespace Airerage.Runtime.Audio
             }
         }
 
+        /// <summary>
+        /// 今鳴っているサンプルの位置（曲の中。止めていれば -1）。予約した時刻と速さから計算で求める。続きから鳴らす（PlayFrom）ときに使う。
+        /// </summary>
+        public int Position
+        {
+            get
+            {
+                if (Cue == null || Cue.Clip == null || _parts[_playing] == null)
+                {
+                    return -1;
+                }
+                double now = _clock();
+                Part part = _parts[_playing];
+                Part next = _queued ? _parts[1 - _playing] : null;
+                if (next != null && now >= next.Start)
+                {
+                    part = next;
+                }
+                double position = now < part.Start ? part.From : part.PositionAt(now, Cue.Clip.frequency);
+                LoopRange(Cue, out int loopStart, out int loopEnd);
+                return Wrap(position, loopStart, loopEnd);
+            }
+        }
+
+        // 位置をループの区間に収める（ループの終わりを過ぎていれば、くり返した先の位置）。
+        private static int Wrap(double position, int loopStart, int loopEnd)
+        {
+            if (position < 0)
+            {
+                return 0;
+            }
+            if (position < loopEnd)
+            {
+                return (int)position;
+            }
+            int length = loopEnd - loopStart;
+            return length > 0 ? loopStart + (int)((position - loopEnd) % length) : loopStart;
+        }
+
         /// <summary>今の AudioSource の音量（曲ごとの音量を掛けたもの。テスト用）。</summary>
         public float SourceVolume => _sources[0].volume;
 
@@ -121,6 +160,15 @@ namespace Airerage.Runtime.Audio
         /// </summary>
         public void Play(MusicCue cue, double delay = StartDelay)
         {
+            PlayFrom(cue, 0, delay);
+        }
+
+        /// <summary>
+        /// 曲を from のサンプルから鳴らす（続きから。0 なら頭から）。その後はループの区間をくり返す。from がループの終わりより後なら、
+        /// くり返した先の位置から。
+        /// </summary>
+        public void PlayFrom(MusicCue cue, int from, double delay = StartDelay)
+        {
             Stop();
             if (cue == null || cue.Clip == null)
             {
@@ -133,8 +181,8 @@ namespace Airerage.Runtime.Audio
             }
             Cue = cue;
             ApplyVolume();
-            LoopRange(cue, out int loopStart, out _);
-            Part intro = Queue(0, 0, _clock() + delay);
+            LoopRange(cue, out int loopStart, out int loopEnd);
+            Part intro = Queue(0, Wrap(from, loopStart, loopEnd), _clock() + delay);
             Queue(1, loopStart, intro.End);
             _playing = 0;
             _queued = true;

@@ -6,8 +6,9 @@ namespace Airerage.Runtime.Audio
 {
     /// <summary>
     /// メニューの効果音（ユーザーの要望、2026-10-16）: カーソルの移動（UiMove）、決定（UiConfirm）、一時停止を開く（UiPause）、
-    /// タイトルの決定（UiTitleStart）、キャラクターの決定（UiCharacterDecide）。一時停止のほかは tools/audio で作った音声ファイル
-    /// （カーソルはダイヤルを回したときのカチッという控えめな音、決定の 3 つはメニューの演出に合わせた音。2026-11-07。docs/18 4.18）。
+    /// タイトルの決定（UiTitleStart）、キャラクターの決定（UiCharacterDecide）、画面を進む風（UiWhoosh）と戻る風（UiWhooshBack）。
+    /// 一時停止のほかは tools/audio で作った音声ファイル（カーソルはダイヤルを回したときのカチッという控えめな音、決定の 3 つはメニューの
+    /// 演出に合わせた音。2026-11-07。docs/18 4.18。風は画面の切り替え（ScreenTransition）と試合へ入る帯（ScreenCurtain）で鳴らす。4.19）。
     /// いつも読み込んでおく App のシーンに 1 つ置く（決定した直後に画面のシーンを外しても、音が途切れないように）。検証用のシーンを
     /// 直接再生したときは、Find が今のシーンに作る。音は ProceduralAudio が合成する（差し替えの音声ファイルがあればそれを使う）。
     /// 音量はオプションの効果音の音量（GameSettings。docs/15 T6-9）を掛ける。
@@ -23,6 +24,8 @@ namespace Airerage.Runtime.Audio
         [SerializeField] private AudioClip _pauseOverride;
         [SerializeField] private AudioClip _titleStartOverride;
         [SerializeField] private AudioClip _characterDecideOverride;
+        [SerializeField] private AudioClip _whooshOverride;
+        [SerializeField] private AudioClip _whooshBackOverride;
 
         private readonly Dictionary<SoundId, AudioClip> _clips = new Dictionary<SoundId, AudioClip>();
         private readonly List<SoundId> _history = new List<SoundId>();
@@ -50,6 +53,8 @@ namespace Airerage.Runtime.Audio
             _clips[SoundId.UiCharacterDecide] = _characterDecideOverride != null
                 ? _characterDecideOverride
                 : ProceduralAudio.CreateClip(SoundId.UiCharacterDecide);
+            _clips[SoundId.UiWhoosh] = _whooshOverride != null ? _whooshOverride : ProceduralAudio.CreateClip(SoundId.UiWhoosh);
+            _clips[SoundId.UiWhooshBack] = _whooshBackOverride != null ? _whooshBackOverride : ProceduralAudio.CreateClip(SoundId.UiWhooshBack);
             ApplySettings(GameSettings.Load());
         }
 
@@ -62,7 +67,7 @@ namespace Airerage.Runtime.Audio
         /// <summary>鳴らす音（テスト用。メニューの効果音でなければ null）。</summary>
         public AudioClip ClipOf(SoundId id) => _clips.TryGetValue(id, out AudioClip clip) ? clip : null;
 
-        /// <summary>メニューの効果音を鳴らす（UiMove、UiConfirm、UiPause、UiTitleStart、UiCharacterDecide のどれか）。</summary>
+        /// <summary>メニューの効果音を鳴らす（UiMove、UiConfirm、UiPause、UiTitleStart、UiCharacterDecide、UiWhoosh、UiWhooshBack のどれか）。</summary>
         public void Play(SoundId id)
         {
             if (!_clips.TryGetValue(id, out AudioClip clip))

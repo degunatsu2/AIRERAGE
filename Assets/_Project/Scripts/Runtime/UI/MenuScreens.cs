@@ -16,13 +16,13 @@ namespace Airerage.Runtime.UI
     /// メニューのシーンの画面（docs/15 T6-1。D-54、D-65、D-69）:
     /// - タイトル: 「AIRERAGE」と「PRESS ANY BUTTON」（どれかのキー・ボタンでメインメニューへ。最初の 1 回だけ）。Esc では終了の確認
     ///   （QuitConfirmDialog。ユーザーの要望、2026-10-20）を出す。メインメニューの QUIT も、終了の確認で「はい」を選んだら終える。
-    /// - メインメニュー: SINGLE、LOCAL VS、NETWORK VS、TRAINING、OPTIONS、QUIT。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
+    /// - メインメニュー: SINGLE、LOCAL、NETWORK、TRAINING、OPTIONS、QUIT（LOCAL ・ NETWORK は 2026-11-07 まで LOCAL VS ・ NETWORK VS）。キーボード（矢印・Enter・Esc）、ゲームパッド（スティック・十字キー・A・B）、マウスで選ぶ。戻るとタイトル。
     /// - TRAINING → キャラクター選択（T6-3）→ ステージ選択（T6-4）→ トレーニング。戻る操作で 1 つ前の画面へ。選んだキャラクターは
     ///   覚えておき（PlayerPrefs。オンラインの待機所と同じ）、トレーニングの試合の仕組みがそのキャラクターで始める。
     /// - キャラクター選択はアイコンを選ぶ形（CharacterSelectScreen。トレーニングは 1P だけ、ローカル対戦は機器ごとに参加。docs/15 6.9）。
-    /// - NETWORK VS → ネットワーク対戦のメニュー（IOnlineMenu。Net のアセンブリにある。ホスト・参加 → 待機所 → キャラクター選択 →
+    /// - NETWORK → ネットワーク対戦のメニュー（IOnlineMenu。Net のアセンブリにある。ホスト・参加 → 待機所 → キャラクター選択 →
     ///   ステージ選択 → 試合。docs/15 T6-7）。つながったまま試合から戻ったときは、最初からネットワーク対戦のメニューを開く。
-    /// - LOCAL VS → 参加とキャラクター選択（T6-5）→ ステージ選択 → ローカル対戦。ステージ選択から戻ると、参加した人は
+    /// - LOCAL → 参加とキャラクター選択（T6-5）→ ステージ選択 → ローカル対戦。ステージ選択から戻ると、参加した人は
     ///   そのまま（READY だけ外す）。
     /// - OPTIONS → オプションの画面（OptionsScreen。音量・画面・キーの割り当て。docs/15 T6-9）。閉じるとメインメニューの OPTIONS へ。
     ///   RANDOM STAGES → ステージ選択の画面で、RANDOM で選ぶステージのチェックを付け外し（閉じるとオプションへ）。
@@ -52,7 +52,7 @@ namespace Airerage.Runtime.UI
         [SerializeField] private CpuLevelScreen _cpuLevel;
         [Tooltip("アイテムを選ぶ画面（オプションの START ITEMS ／ DROP ITEMS と、ネットワーク対戦の待機所。なくてもよい）")]
         [SerializeField] private ItemSelectScreen _itemSelect;
-        [Tooltip("ネットワーク対戦のメニュー（IOnlineMenu。なければ、NETWORK VS は今のオンラインの検証用のシーンを開く）")]
+        [Tooltip("ネットワーク対戦のメニュー（IOnlineMenu。なければ、NETWORK は今のオンラインの検証用のシーンを開く）")]
         [SerializeField] private MonoBehaviour _online;
         [Tooltip("画面の切り替えの演出（D-87。なければすぐ切り替える）")]
         [SerializeField] private ScreenTransition _transition;
@@ -475,7 +475,7 @@ namespace Airerage.Runtime.UI
 
         private IOnlineMenu Online => _online as IOnlineMenu;
 
-        /// <summary>ネットワーク対戦のメニューから、メインメニューの NETWORK VS へ戻る。</summary>
+        /// <summary>ネットワーク対戦のメニューから、メインメニューの NETWORK へ戻る。</summary>
         public void ShowMainFromOnline()
         {
             ShowMain(_network);

@@ -5,8 +5,8 @@ namespace Airerage.Runtime.UI
 {
     /// <summary>
     /// 決定の衝撃（D-88 の B10。ユーザーの選択、2026-11-07）: 札の中心から広がって消える水色の輪と、札の右から上へ散って落ちる金色の
-    /// 火花（コインの火花）。札（MenuOption）の子に置き、決定したときに Play する。自分で動くので、画面の切り替えで札の写しを
-    /// 動かしている間も続く。
+    /// 火花（コインの火花）。札（MenuOption）の子に置き、キーボード・ゲームパッドで決定したときに Play する（マウスで決定したときは、
+    /// クリックした所に ClickSparks が同じ輪と火花を出す）。自分で動くので、画面の切り替えで札の写しを動かしている間も続く。
     /// </summary>
     [RequireComponent(typeof(CanvasRenderer))]
     public sealed class UiBurst : MaskableGraphic
@@ -57,29 +57,46 @@ namespace Airerage.Runtime.UI
             Vector2 center = r.center;
 
             // 輪（横長の楕円。広がりながら細く薄くなる）。
-            if (t < RingSeconds)
-            {
-                float p = UiEase.OutCubic(t / RingSeconds);
-                float rx = r.width * Mathf.Lerp(0.47f, 0.9f, p);
-                float ry = r.height * Mathf.Lerp(0.55f, 1.8f, p);
-                float width = Mathf.Lerp(4f, 1.2f, p);
-                Color c = RingColor;
-                c.a = 1f - p;
-                for (int i = 0; i < RingSegments; i++)
-                {
-                    float a0 = Mathf.PI * 2f * i / RingSegments;
-                    float a1 = Mathf.PI * 2f * (i + 1) / RingSegments;
-                    var o0 = new Vector2(Mathf.Cos(a0) * rx, Mathf.Sin(a0) * ry);
-                    var o1 = new Vector2(Mathf.Cos(a1) * rx, Mathf.Sin(a1) * ry);
-                    var i0 = new Vector2(Mathf.Cos(a0) * (rx - width), Mathf.Sin(a0) * (ry - width));
-                    var i1 = new Vector2(Mathf.Cos(a1) * (rx - width), Mathf.Sin(a1) * (ry - width));
-                    Quad(vh, center + i0, center + i1, center + o1, center + o0, c);
-                }
-            }
+            DrawRing(vh, center, new Vector2(r.width * 0.47f, r.height * 0.55f), new Vector2(r.width * 0.9f, r.height * 1.8f), t);
+            // 火花は札の右寄りから。
+            DrawSparks(vh, new Vector2(r.xMax - r.height * 0.8f, center.y), t, _seed);
+        }
 
-            // 火花（菱形。上へ散って、重さで落ちながら小さく消える）。
-            var rng = new System.Random(_seed);
-            var origin = new Vector2(r.xMax - r.height * 0.8f, center.y);
+        /// <summary>
+        /// 輪を描く（t 秒目。半径は from から to へ広がりながら、細く薄くなる）。クリックした所の火花（ClickSparks）でも使う。
+        /// </summary>
+        public static void DrawRing(VertexHelper vh, Vector2 center, Vector2 from, Vector2 to, float t)
+        {
+            if (t < 0f || t >= RingSeconds)
+            {
+                return;
+            }
+            float p = UiEase.OutCubic(t / RingSeconds);
+            float rx = Mathf.Lerp(from.x, to.x, p);
+            float ry = Mathf.Lerp(from.y, to.y, p);
+            float width = Mathf.Lerp(4f, 1.2f, p);
+            Color c = RingColor;
+            c.a = 1f - p;
+            for (int i = 0; i < RingSegments; i++)
+            {
+                float a0 = Mathf.PI * 2f * i / RingSegments;
+                float a1 = Mathf.PI * 2f * (i + 1) / RingSegments;
+                var o0 = new Vector2(Mathf.Cos(a0) * rx, Mathf.Sin(a0) * ry);
+                var o1 = new Vector2(Mathf.Cos(a1) * rx, Mathf.Sin(a1) * ry);
+                var i0 = new Vector2(Mathf.Cos(a0) * (rx - width), Mathf.Sin(a0) * (ry - width));
+                var i1 = new Vector2(Mathf.Cos(a1) * (rx - width), Mathf.Sin(a1) * (ry - width));
+                Quad(vh, center + i0, center + i1, center + o1, center + o0, c);
+            }
+        }
+
+        /// <summary>金色の火花を描く（菱形。origin から上へ散って、重さで落ちながら小さく消える。seed で散り方を決める）。</summary>
+        public static void DrawSparks(VertexHelper vh, Vector2 origin, float t, int seed)
+        {
+            if (t < 0f || t >= Seconds)
+            {
+                return;
+            }
+            var rng = new System.Random(seed);
             for (int k = 0; k < Sparks; k++)
             {
                 double angle = (10.0 + rng.NextDouble() * 160.0) * Mathf.Deg2Rad;

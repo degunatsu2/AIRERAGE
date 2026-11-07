@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace Airerage.Net
 {
     /// <summary>
-    /// ネットワーク対戦のメニュー（docs/15 T6-7。ユーザーの要望、2026-10-19）。メニューのシーンに置き、メインメニューの NETWORK VS から開く
+    /// ネットワーク対戦のメニュー（docs/15 T6-7。ユーザーの要望、2026-10-19）。メニューのシーンに置き、メインメニューの NETWORK から開く
     /// （IOnlineMenu）。接続は App のシーンの OnlineConnection が持ち、ここは画面だけを受け持つ。接続の段階に合わせて画面を出す:
     /// - 接続: 名前・参加コード・アドレス・ポートの入力と、HOST ONLINE ／ JOIN WITH CODE（Unity の Relay の参加コード。docs/15 T6-10）、
     ///   HOST (LAN) ／ JOIN (LAN)（IP アドレスとポート）、BACK。参加コードのサービスに問い合わせている間はボタンを押せない。
@@ -496,7 +496,7 @@ namespace Airerage.Net
             UpdatePanels();
         }
 
-        // メインメニューの NETWORK VS へ戻る（接続はしない・もうない）。
+        // メインメニューの NETWORK へ戻る（接続はしない・もうない）。
         private void Close()
         {
             Connection?.Leave();
@@ -1123,8 +1123,8 @@ namespace Airerage.Net
             if (session.JoinCode.Length > 0)
             {
                 _waitingInfo.text = session.IsHost
-                    ? Loc.T($"JOIN CODE: {session.JoinCode}   SHARE IT WITH YOUR FRIENDS (NETWORK VS > JOIN WITH CODE).",
-                        $"参加コード: {session.JoinCode}　友だちに伝えてください（NETWORK VS > JOIN WITH CODE で入力）")
+                    ? Loc.T($"JOIN CODE: {session.JoinCode}   SHARE IT WITH YOUR FRIENDS (NETWORK > JOIN WITH CODE).",
+                        $"参加コード: {session.JoinCode}　友だちに伝えてください（NETWORK > JOIN WITH CODE で入力）")
                     : Loc.T($"CONNECTED AS {session.LocalPlayer + 1}P.   JOIN CODE: {session.JoinCode}",
                         $"{session.LocalPlayer + 1}P として参加中　参加コード: {session.JoinCode}");
                 _copyCode.SetLabel(_copiedCode == session.JoinCode ? "CODE COPIED!" : "COPY JOIN CODE");

@@ -129,6 +129,35 @@ def character_decide() -> np.ndarray:
     return finish(_room(out, 0.22))
 
 
+# ---- 2026-11-07（2 回目）: 画面の切り替えの風の音 ---------------------------------------------------------------------------
+# ユーザーの要望: タイトルの決定の「風を切るような音」をほかのボタンの決定（画面が進むとき）にも鳴らし、戻るとき（Esc など）は
+# 「後ろに下がるようなイメージ」の逆の風の音を鳴らす。
+
+
+def ui_whoosh() -> np.ndarray:
+    """進む風: タイトルの決定と同じ、空へ吸い込まれる風（低い所から高い所へ上がりながら強まり、すっと切れる）。0.36 秒。"""
+    out = silence(0.5)
+    place(out, noise_sweep(0.36, 500, 7000, 1.0, 0.13, 0.04, seed=11), 0.0, -6)
+    return finish(out, peak_db=-11.0, fade_out=0.03)
+
+
+def ui_whoosh_back() -> np.ndarray:
+    """戻る風: 進む風の逆。高い所から低い所へ下がりながら、遠ざかるように弱まって消える（頭は速く立ち上がり、尾は長い）。0.42 秒。"""
+    sr = SAMPLE_RATE
+    out = silence(0.55)
+    w = noise_sweep(0.42, 6500, 450, 1.0, 0.012, 0.3, seed=12)
+    n = len(w)
+    t = np.arange(n) / sr
+    # 遠ざかる: 後半ほど弱く、左右の広がりも狭まる（真ん中へ吸い込まれて消える）。
+    w = w * (np.exp(-t / 0.22))[:, None]
+    mid = (w[:, 0] + w[:, 1]) * 0.5
+    side = (w[:, 0] - w[:, 1]) * 0.5 * np.exp(-t / 0.15)
+    w = np.stack([mid + side, mid - side], axis=1)
+    place(out, w.astype(np.float32), 0.0, -6)
+    # 頭が鋭いぶん、ピークを高めにして進む風と同じくらいの大きさに聞こえるようにする。
+    return finish(out, peak_db=-6.5, fade_out=0.05)
+
+
 SOUNDS: Dict[str, Callable[[], np.ndarray]] = {
     "se_title_start_b1": title_b1,
     "se_title_start_b2": title_b2,
@@ -140,4 +169,6 @@ SOUNDS: Dict[str, Callable[[], np.ndarray]] = {
     "se_ui_confirm": ui_confirm,
     "se_title_start": title_start,
     "se_character_decide": character_decide,
+    "se_ui_whoosh": ui_whoosh,
+    "se_ui_whoosh_back": ui_whoosh_back,
 }

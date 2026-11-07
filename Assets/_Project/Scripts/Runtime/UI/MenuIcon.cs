@@ -5,7 +5,7 @@ namespace Airerage.Runtime.UI
 {
     /// <summary>
     /// メインメニューの項目の小さな絵（D-88 の B12。ユーザーの選択、2026-11-07）。線で描き、項目を選んでいる間だけ動く:
-    /// SINGLE は人が跳ね、LOCAL VS は 2 つのコントローラーが交互に揺れ、NETWORK VS は地球が回り、TRAINING は的から輪が広がり、
+    /// SINGLE は人が跳ね、LOCAL は 2 つのコントローラーが交互に揺れ、NETWORK は地球が回り、TRAINING は的から輪が広がり、
     /// OPTIONS は歯車が回り、QUIT は扉が開いて矢印が入っていく。選んでいる間は水色、選んでいないときは白。
     /// 札（MenuOption）が Selected を決める（画面の切り替えで写しを動かしている間も、写しのまま動き続ける）。
     /// </summary>

@@ -248,6 +248,12 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>刀を振った（櫓落としの振り。短い風切り）。</summary>
         ItemSlash,
+
+        /// <summary>メニューで次の画面へ進んだ（空へ吸い込まれる風。音声ファイル。2026-11-07。docs/18 4.19）。</summary>
+        UiWhoosh,
+
+        /// <summary>メニューで前の画面へ戻った（後ろへ遠ざかる風。音声ファイル。2026-11-07。docs/18 4.19）。</summary>
+        UiWhooshBack,
     }
 
     /// <summary>
@@ -731,6 +737,16 @@ namespace Airerage.Runtime.Audio
                     AddTone(b, r, 0f, 0.1f, NoteFrequency(79), NoteFrequency(79), Wave.Pulse25, 0.22f, 0.002f, 0.05f);
                     AddTone(b, r, 0.07f, 0.2f, NoteFrequency(86), NoteFrequency(86), Wave.Pulse25, 0.22f, 0.002f, 0.08f);
                     AddTone(b, r, 0.07f, 0.2f, NoteFrequency(98), NoteFrequency(98), Wave.Sine, 0.1f, 0.002f, 0.08f);
+                    break;
+                case SoundId.UiWhoosh:
+                    // 音声ファイルがないときの仮の音: 上がる風。
+                    b = new float[Samples(0.4f, r)];
+                    AddNoise(b, r, rng, 0f, 0.36f, 0.25f, 0.13f, 0.04f, 900f, 7000f, 400f);
+                    break;
+                case SoundId.UiWhooshBack:
+                    // 音声ファイルがないときの仮の音: 下がって消える風。
+                    b = new float[Samples(0.45f, r)];
+                    AddNoise(b, r, rng, 0f, 0.42f, 0.25f, 0.01f, 0.3f, 7000f, 900f, 300f);
                     break;
                 case SoundId.UiPause:
                     b = new float[Samples(0.32f, r)];

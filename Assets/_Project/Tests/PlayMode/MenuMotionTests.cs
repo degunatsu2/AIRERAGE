@@ -20,7 +20,8 @@ namespace Airerage.PlayMode.Tests
     ///   アイコンのめくれ、戻るときは逆向きの風。画面はすぐ入れ替わり、演出は写しで動き、終わると写しは残らない。押すと早送り。
     /// - ボタンの演出（D-88）: 導火線の縁・行きすぎと残像・裏の札・文字のデコード・背景の連動・決定の衝撃・アイコン・周りが引く。
     /// - 試合へ入るときは黒い帯が閉じ、読み込みが済むと開く（T10）。
-    /// - 効果音: カーソルはダイヤルのカチッ、決定は新しい音（音声ファイル）。
+    /// - 効果音: カーソルはダイヤルのカチッ、決定は新しい音（音声ファイル）。画面を進むと進む風、戻ると戻る風（2026-11-07）。
+    /// - クリックした所の火花、メインメニューの項目の色・右の名前の縁取り・短い名前（2026-11-07）。
     /// </summary>
     public sealed class MenuMotionTests
     {
@@ -77,10 +78,30 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.Single.Plate.Back, Is.LessThan(0.1f), "選んでいない項目の裏の札が残っている");
                 Assert.That(backdrop.Word, Is.EqualTo("TRAINING"), "背景の名前が変わらない（B7）");
                 Assert.That(backdrop.Description, Is.Not.Empty, "背景に説明を出さない（B7）");
+                // 項目の色（2026-11-07）: 札の縁・裏の札・縁を回る光、右の大きな名前の縁取りが項目の色。背景の色の光はない。
+                Color accent = menu.Training.Accent;
+                Assert.That(accent, Is.Not.EqualTo(menu.Single.Accent), "項目ごとに色が違わない");
+                Assert.That(menu.Training.Plate.AccentColor, Is.EqualTo(accent), "裏の札が項目の色でない");
+                Assert.That(menu.Training.Plate.BorderColor, Is.EqualTo(accent), "選んだ札の縁が項目の色でない");
+                Assert.That(menu.Training.Plate.FuseColor, Is.Not.EqualTo(Color.white), "縁を回る光が項目の色でない");
+                Color outline = backdrop.WordOutline;
+                Assert.That(new Vector3(outline.r, outline.g, outline.b), Is.EqualTo(new Vector3(accent.r, accent.g, accent.b)), "右の名前の縁取りが項目の色でない");
+                Assert.That(backdrop.transform.Find("Backdrop/Tint"), Is.Null, "背景の色の光が残っている");
+                Assert.That(menu.Local.Label, Is.EqualTo("LOCAL"), "LOCAL VS を LOCAL に縮めていない");
+                Assert.That(menu.Network.Label, Is.EqualTo("NETWORK"), "NETWORK VS を NETWORK に縮めていない");
+
+                // クリックした所の火花（2026-11-07）: メニューの最前面の層が、押した所に輪と火花を出す（何もない所でも）。
+                ClickSparks sparks = menu.GetComponentInChildren<ClickSparks>();
+                Assert.That(sparks, Is.Not.Null, "クリックの火花の層がない");
+                Assert.That(sparks.transform.GetSiblingIndex(), Is.EqualTo(sparks.transform.parent.childCount - 1), "クリックの火花が最前面にない");
+                Assert.That(sparks.raycastTarget, Is.False, "クリックの火花の層がクリックを受け止める");
+                sparks.Spawn(new Vector2(Screen.width * 0.7f, Screen.height * 0.3f));
+                Assert.That(sparks.Playing, Is.EqualTo(1), "クリックした所に火花を出さない");
 
                 // メイン → キャラクター選択: 決定の衝撃と、斜めの札とアイコンのめくれ。
                 menu.Training.Button.onClick.Invoke();
-                Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiConfirm), "決定の音が鳴らない");
+                Assert.That(new[] { sounds.History[sounds.History.Count - 2], sounds.History[sounds.History.Count - 1] },
+                    Is.EquivalentTo(new[] { SoundId.UiConfirm, SoundId.UiWhoosh }), "決定の音と進む風の音が鳴らない");
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "決定ですぐにキャラクター選択へ入れ替わらない");
                 Assert.That(transition.LastKind, Is.EqualTo(TransitionKind.SlantCascade));
                 Assert.That(menu.Training.Burst, Is.Not.Null, "決定しても輪と火花が出ない（B10）");
@@ -99,6 +120,8 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.ShowingMain, Is.True, "キャラクター選択から戻れない");
                 Assert.That(transition.LastKind, Is.EqualTo(TransitionKind.Gust));
                 Assert.That(transition.LastDirection, Is.EqualTo(-1), "戻るときに向きが逆にならない");
+                Assert.That(sounds.History, Does.Contain(SoundId.UiWhooshBack), "戻るときに戻る風の音が鳴らない");
+                Assert.That(GameObject.Find("WindStreaks"), Is.Null, "風の線を出している");
                 yield return WaitFor(() => !transition.Running, 3f, "戻る切り替えが終わらない");
 
                 // 動いている途中に押すと、最後まで早送りする（押した入力は画面がそのまま受け取る）。
@@ -154,6 +177,8 @@ namespace Airerage.PlayMode.Tests
             Assert.That(sounds.ClipOf(SoundId.UiTitleStart).name, Is.EqualTo("TitleStart"));
             Assert.That(sounds.ClipOf(SoundId.UiCharacterDecide).name, Is.EqualTo("CharacterDecide"));
             Assert.That(sounds.ClipOf(SoundId.UiMove).length, Is.LessThan(0.1f), "カーソルの音が長い");
+            Assert.That(sounds.ClipOf(SoundId.UiWhoosh).name, Is.EqualTo("UiWhoosh"), "進む風の音がない");
+            Assert.That(sounds.ClipOf(SoundId.UiWhooshBack).name, Is.EqualTo("UiWhooshBack"), "戻る風の音がない");
         }
 
         // 演出の写し（名前の終わりが「(Transition)」）の数。

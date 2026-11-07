@@ -19,7 +19,8 @@ namespace Airerage.Runtime.UI
     /// - B2: 選んだ所へ少し行きすぎてから戻って止まり、残像が追いかける。
     /// - B5: 英字の名前は、選んだ瞬間に文字がばらばらに変わってから左から順に決まる（日本語の名前は変えない）。
     /// - B9: マウスを札に乗せている間、マウスの方へ札がわずかに傾き、光の反射が付いてくる（ゲームパッドでは動かない）。
-    /// - B10: 決定した瞬間に札がつぶれて戻り、白く光り、輪と金色の火花が散る（UiBurst）。
+    /// - B10: 決定した瞬間に札がつぶれて戻り、白く光り、輪と金色の火花が散る（UiBurst。マウスで決定したときの輪と火花は、クリックした
+    ///   所に ClickSparks が出す。2026-11-07）。
     /// - B12: 子に絵（MenuIcon）があれば、選んでいる間だけ動かす。
     /// - B13（Recede をつけた一覧だけ）: 同じ親のほかの項目を選んでいる間は、暗くして少し下げる。
     /// </summary>
@@ -49,6 +50,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private RectTransform[] _pinned = new RectTransform[0];
         [Tooltip("同じ親のほかの項目を選んでいる間は、暗くして少し下げる（B13。メインメニューなどの一覧）")]
         [SerializeField] private bool _recede;
+        [Tooltip("導火線の光も項目の色（_accent）にする（メインメニュー。2026-11-07）")]
+        [SerializeField] private bool _accentFuse;
         private Vector2[] _pinnedHomes;
 
         // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。
@@ -122,6 +125,19 @@ namespace Airerage.Runtime.UI
             _label = label;
             _note = note;
             _accent = accent;
+        }
+
+        /// <summary>項目の色（選んでいるときの縁・裏の札・残像・縁の光の色）。</summary>
+        public Color Accent => _accent;
+
+        /// <summary>
+        /// 項目の色を変える（シーンのビルダー用）。fuse なら、選んだ瞬間に縁を回る光も項目の色にする（メインメニュー。2026-11-07）。
+        /// </summary>
+        public void SetAccent(Color accent, bool fuse)
+        {
+            _accent = accent;
+            _accentFuse = fuse;
+            Refresh();
         }
 
         /// <summary>同じ親のほかの項目を選んでいる間、暗く下げるか（B13。シーンのビルダー用）。</summary>
@@ -231,6 +247,11 @@ namespace Airerage.Runtime.UI
             {
                 _plate.Flash();
             }
+            // マウスで決定したときは、クリックした所にクリックの火花（ClickSparks）が出ているので、札からは出さない（2026-11-07）。
+            if (DecidedWithMouse() && ClickSparks.Covers(this))
+            {
+                return;
+            }
             if (_burst == null)
             {
                 var go = new GameObject("Burst", typeof(RectTransform));
@@ -246,6 +267,13 @@ namespace Airerage.Runtime.UI
             }
             _burst.transform.SetAsLastSibling();
             _burst.Play();
+        }
+
+        // この決定がマウスのクリックか（uGUI はマウスのボタンを離したフレームに決定する）。
+        private static bool DecidedWithMouse()
+        {
+            Mouse mouse = Mouse.current;
+            return mouse != null && mouse.leftButton.wasReleasedThisFrame;
         }
 
         private void Awake()
@@ -503,6 +531,7 @@ namespace Airerage.Runtime.UI
                 _plate.color = _selected ? SelectedFill : IdleFill;
                 _plate.BorderColor = _selected ? _accent : IdleBorder;
                 _plate.AccentColor = _accent;
+                _plate.FuseColor = _accentFuse ? Color.Lerp(_accent, Color.white, 0.35f) : Color.white;
                 _plate.Glow = _selected;
                 _plate.BackTarget = _selected ? 1f : 0f;
             }

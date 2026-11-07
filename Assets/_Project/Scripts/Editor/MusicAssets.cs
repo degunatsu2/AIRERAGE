@@ -29,6 +29,8 @@ namespace Airerage.Editor
         // カーソルの音（ダイヤルのカチッ）とボタンの決定の音（2026-11-07。docs/18 4.18）。大きさはファイルのまま（読み込みで正規化しない）。
         public const string UiCursorSePath = SeFolder + "/UiCursor.wav";
         public const string UiConfirmSePath = SeFolder + "/UiConfirm.wav";
+        public const string UiWhooshSePath = SeFolder + "/UiWhoosh.wav";
+        public const string UiWhooshBackSePath = SeFolder + "/UiWhooshBack.wav";
 
         /// <summary>曲の MusicCue を作り直す（読み込みの設定、ループの位置）。ループのタグがない・曲の外にあるときはエラーを出す。</summary>
         public static MusicCue LoadOrCreateCue(string musicPath, string cuePath, float volume)

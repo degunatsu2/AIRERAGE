@@ -1,4 +1,5 @@
 using System.Collections;
+using Airerage.Runtime.Audio;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -67,6 +68,8 @@ namespace Airerage.Runtime.UI
                 _label.text = label ?? string.Empty;
             }
             _root.SetActive(true);
+            // 帯が閉じるのに合わせて、進む風の音（2026-11-07。docs/18 4.19）。
+            UiSounds.Find().Play(SoundId.UiWhoosh);
             _closeAt = Time.unscaledTime;
             _opening = false;
             Closed = false;

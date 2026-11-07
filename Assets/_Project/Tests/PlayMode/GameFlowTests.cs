@@ -69,13 +69,15 @@ namespace Airerage.PlayMode.Tests
                 EventSystem.current.SetSelectedGameObject(menu.Training.gameObject);
                 Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiMove), "カーソルを動かしても音が鳴らない");
                 Assert.That(menu.Single.Button.interactable, Is.True, "SINGLE を選べない（docs/16 T7-2）");
-                Assert.That(menu.Local.Button.interactable, Is.True, "LOCAL VS を選べない（T6-5）");
+                Assert.That(menu.Local.Button.interactable, Is.True, "LOCAL を選べない（T6-5）");
                 Assert.That(menu.Options.Button.interactable, Is.True, "OPTIONS を選べない（T6-9）");
                 Assert.That(menu.Training.Button.interactable && menu.Quit.Button.interactable, Is.True);
 
                 // TRAINING → キャラクター選択（T6-3）。
                 menu.Training.Button.onClick.Invoke();
-                Assert.That(sounds.History[sounds.History.Count - 1], Is.EqualTo(SoundId.UiConfirm), "決定しても音が鳴らない");
+                // 決定の音と、画面を進む風の音（2026-11-07。どちらが先でもよい）。
+                Assert.That(new[] { sounds.History[sounds.History.Count - 2], sounds.History[sounds.History.Count - 1] },
+                    Is.EquivalentTo(new[] { SoundId.UiConfirm, SoundId.UiWhoosh }), "決定しても決定の音と進む風の音が鳴らない");
                 yield return null;
                 yield return null;
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "TRAINING でキャラクター選択を出さない");
@@ -118,6 +120,8 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.ShowingMain, Is.True, "キャラクター選択から戻れない");
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(menu.Training.gameObject), "戻ったときに TRAINING を選んでいない");
                 yield return WaitFor(() => music.Current == music.MenuMusic, 3f, "メインメニューに戻ってもタイトルの曲に戻らない");
+                // キャラクター選択から戻ったときだけ、タイトルの曲は止めた所の続きから（2026-11-07）。
+                Assert.That(music.ResumeCount, Is.EqualTo(1), "キャラクター選択から戻っても、タイトルの曲を続きから鳴らさない");
                 menu.Training.Button.onClick.Invoke();
                 yield return null;
                 yield return null;

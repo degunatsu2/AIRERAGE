@@ -340,7 +340,14 @@ namespace Airerage.Editor
                 new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(700f, 90f), white).font = GameFonts.LatinBlack;
             var anchor = new Vector2(0f, 1f);
             var size = new Vector2(560f, 72f);
-            string[] labels = { "SINGLE", "LOCAL VS", "NETWORK VS", "TRAINING", "OPTIONS", "QUIT" };
+            // LOCAL VS ・ NETWORK VS は、右の大きな名前が札にかかるので短くした（ユーザーの要望、2026-11-07）。
+            string[] labels = { "SINGLE", "LOCAL", "NETWORK", "TRAINING", "OPTIONS", "QUIT" };
+            // 項目の色（札の縁・裏の札・残像・縁を回る光・右の大きな名前の縁取り。2026-11-07）。
+            Color[] accents =
+            {
+                new Color(0.38f, 0.62f, 1f), new Color(1f, 0.58f, 0.3f), new Color(0.2f, 0.86f, 0.78f),
+                new Color(0.62f, 0.86f, 0.3f), new Color(0.68f, 0.56f, 1f), new Color(1f, 0.38f, 0.5f),
+            };
             var items = new MenuOption[labels.Length];
             // 項目の左の小さな絵（D-88 の B12）と、選んでいない項目を暗く下げる（B13）。
             MenuIcon.Shape[] shapes =
@@ -353,6 +360,7 @@ namespace Airerage.Editor
                     new Vector2(110f, -230f - i * 88f), size);
                 MenuUiBuilder.AddMenuIcon(items[i], shapes[i]);
                 items[i].SetRecede(true);
+                items[i].SetAccent(accents[i], true);
             }
             CreateMainBackdrop(main, items);
             MenuUiBuilder.CreateHint(main, "↑↓: select     Enter / A: OK     Esc / B: back", "↑↓:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
@@ -383,6 +391,8 @@ namespace Airerage.Editor
             transition.Configure((RectTransform)canvas.transform, new[] { quitDialog.gameObject }, camera.GetComponent<MenuCameraDrift>());
             SandboxWireSceneBuilder.SetReference(screens, "_transition", transition);
             SandboxWireSceneBuilder.SetReference(online, "_transition", transition);
+            // クリックした所の火花（2026-11-07）: 画面の切り替えの写しより手前。
+            MenuUiBuilder.CreateClickSparks(canvas.transform);
             SandboxWireSceneBuilder.SetReference(screens, "_title", title.gameObject);
             SandboxWireSceneBuilder.SetReference(screens, "_pressAnyButton", press);
             SandboxWireSceneBuilder.SetReference(screens, "_main", main.gameObject);
@@ -394,23 +404,14 @@ namespace Airerage.Editor
             Save(scene, MenuScenePath);
         }
 
-        // メインメニューの背景の連動（D-88 の B7。ユーザーの選択、2026-11-07）: 右側に、選んでいる項目の名前の大きな縁取りの文字と説明、
-        // 項目ごとの色の柔らかい光。左の暗い面の後ろ（ロゴと項目より奥）に置く。
+        // メインメニューの背景の連動（D-88 の B7。ユーザーの選択、2026-11-07）: 右側に、選んでいる項目の名前の大きな縁取りの文字
+        // （中は白、縁取りは項目の色）と説明。左の暗い面の後ろ（ロゴと項目より奥）に置く。背景の色の光は出さない（2026-11-07）。
         private static void CreateMainBackdrop(RectTransform main, MenuOption[] items)
         {
             RectTransform root = MenuUiBuilder.CreateFull(main, "Backdrop");
             root.SetSiblingIndex(1);
-            var tintGo = new GameObject("Tint", typeof(RectTransform));
-            tintGo.transform.SetParent(root, false);
-            var tintRect = (RectTransform)tintGo.transform;
-            tintRect.anchorMin = tintRect.anchorMax = tintRect.pivot = new Vector2(0.74f, 0.56f);
-            tintRect.sizeDelta = new Vector2(1500f, 980f);
-            var tint = tintGo.AddComponent<UnityEngine.UI.Image>();
-            tint.color = new Color(0f, 0f, 0f, 0f);
-            tint.raycastTarget = false;
-            var wordColor = new Color(0.02f, 0.04f, 0.08f, 0.55f);
-            UnityEngine.UI.Text wordA = CreateBackdropWord(root, "WordA", wordColor);
-            UnityEngine.UI.Text wordB = CreateBackdropWord(root, "WordB", wordColor);
+            UnityEngine.UI.Text wordA = CreateBackdropWord(root, "WordA", Color.white);
+            UnityEngine.UI.Text wordB = CreateBackdropWord(root, "WordB", Color.white);
             UnityEngine.UI.Text description = MenuUiBuilder.CreateText(root, "Description", string.Empty, 30, FontStyle.Bold, TextAnchor.UpperRight,
                 new Vector2(1f, 0.47f), new Vector2(-100f, 0f), new Vector2(900f, 120f), new Color(1f, 1f, 1f, 0.92f));
             description.font = GameFonts.JapaneseBold;
@@ -433,28 +434,23 @@ namespace Airerage.Editor
                 "音量・画面・操作・アイテム・言語の設定。",
                 "ゲームを終了する。",
             };
-            Color[] tints =
-            {
-                new Color(0.24f, 0.48f, 1f, 0.32f), new Color(1f, 0.54f, 0.3f, 0.32f), new Color(0.18f, 0.84f, 0.76f, 0.32f),
-                new Color(0.6f, 0.83f, 0.29f, 0.32f), new Color(0.55f, 0.49f, 1f, 0.32f), new Color(1f, 0.35f, 0.47f, 0.32f),
-            };
             var backdrop = main.gameObject.AddComponent<MainMenuBackdrop>();
-            backdrop.Configure(items, english, japanese, tints, wordA, wordB, description, tint);
+            backdrop.Configure(items, english, japanese, wordA, wordB, description);
         }
 
-        // 背景の大きな名前（暗い塗りに白い縁取り。斜体）。
+        // 背景の大きな名前（白い塗りに縁取り。縁取りの色は選んでいる項目の色に変わる。斜体）。
         private static UnityEngine.UI.Text CreateBackdropWord(RectTransform parent, string name, Color color)
         {
             UnityEngine.UI.Text word = MenuUiBuilder.CreateText(parent, name, string.Empty, 150, FontStyle.Italic, TextAnchor.MiddleRight,
                 new Vector2(1f, 0.66f), new Vector2(-96f, 0f), new Vector2(1250f, 200f), color, false);
             word.font = GameFonts.LatinBlack;
             var outline = word.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = new Color(1f, 1f, 1f, 0.75f);
-            outline.effectDistance = new Vector2(2.2f, 2.2f);
+            outline.effectColor = new Color(1f, 1f, 1f, 0.95f);
+            outline.effectDistance = new Vector2(3f, 3f);
             outline.useGraphicAlpha = false;
             var outlineSide = word.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            outlineSide.effectColor = new Color(1f, 1f, 1f, 0.75f);
-            outlineSide.effectDistance = new Vector2(3f, 0.01f);
+            outlineSide.effectColor = new Color(1f, 1f, 1f, 0.95f);
+            outlineSide.effectDistance = new Vector2(4f, 0.01f);
             outlineSide.useGraphicAlpha = false;
             return word;
         }
@@ -633,6 +629,9 @@ namespace Airerage.Editor
             // カーソル（ダイヤルのカチッ）とボタンの決定も音声ファイル（2026-11-07。docs/18 4.18）。
             SandboxWireSceneBuilder.SetReference(sounds, "_moveOverride", MusicAssets.LoadSe(MusicAssets.UiCursorSePath));
             SandboxWireSceneBuilder.SetReference(sounds, "_confirmOverride", MusicAssets.LoadSe(MusicAssets.UiConfirmSePath));
+            // 画面を進む風と戻る風（2026-11-07。docs/18 4.19）。
+            SandboxWireSceneBuilder.SetReference(sounds, "_whooshOverride", MusicAssets.LoadSe(MusicAssets.UiWhooshSePath));
+            SandboxWireSceneBuilder.SetReference(sounds, "_whooshBackOverride", MusicAssets.LoadSe(MusicAssets.UiWhooshBackSePath));
             // メニューの BGM（タイトルの曲と、キャラクター・ステージの選択の曲。ループの位置は曲のファイルのタグから。docs/18 6 章）。
             // 2 曲のラウドネスはそろっている（-16 LUFS ほど）ので、曲ごとの音量はどちらも 1。
             var music = new GameObject("MusicPlayer").AddComponent<MusicPlayer>();

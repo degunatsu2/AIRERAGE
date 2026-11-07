@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Airerage.Runtime.Audio;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Utilities;
@@ -166,6 +167,12 @@ namespace Airerage.Runtime.UI
             LastKind = kind;
             _dir = direction >= 0 ? 1 : -1;
             _label = label;
+            // 風の音（2026-11-07。docs/18 4.19）: 進むときは空へ吸い込まれる風、戻るときは後ろへ遠ざかる風。スカイダイブはタイトルの
+            // 決定の音に風が入っているので鳴らさない。
+            if (kind != TransitionKind.SkyDive)
+            {
+                UiSounds.Find().Play(_dir > 0 ? SoundId.UiWhoosh : SoundId.UiWhooshBack);
+            }
             MenuOption decided = origin != null ? origin.GetComponent<MenuOption>() : null;
             if (decided != null)
             {
@@ -342,9 +349,7 @@ namespace Airerage.Runtime.UI
                 }
                 default:
                 {
-                    var streaks = NewFull("WindStreaks").gameObject.AddComponent<WindStreaks>();
-                    streaks.Configure(_dir, UnityEngine.Random.Range(1, int.MaxValue));
-                    AddTrack(0f, 0.75f, false, p => streaks.Elapsed = p >= 1f ? -1f : p * 0.75f);
+                    // 風の線は出さない（札の動きだけ。ユーザーの要望、2026-11-07）。
                     float end = 0f;
                     foreach (Ghost ghost in _outgoing)
                     {
@@ -706,7 +711,8 @@ namespace Airerage.Runtime.UI
                 {
                     continue;
                 }
-                if (IsGhost(child) || Array.IndexOf(_ignore, child.gameObject) >= 0)
+                // クリックの火花の層は画面ではない（ずっと出ている）。
+                if (IsGhost(child) || Array.IndexOf(_ignore, child.gameObject) >= 0 || child.GetComponent<ClickSparks>() != null)
                 {
                     continue;
                 }
