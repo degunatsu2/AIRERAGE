@@ -84,6 +84,13 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(menu.Training.Label, Is.EqualTo("TRAINING"));
                 Assert.That(menu.Training.Plate.Back, Is.GreaterThan(0.9f), "裏の札が出ない（B3）");
                 Assert.That(Mathf.Abs(menu.Training.Plate.BackAngle), Is.GreaterThan(0.5f), "裏の札が表の札と同じ角度（2026-11-08）");
+                // 跳ねたらぴたりと止まる（揺れに弾力がありすぎたので、止めと跳ねにメリハリ。2026-11-08）。
+                float rest = menu.Training.Plate.BackAngle;
+                yield return WaitSeconds(0.2f);
+                Assert.That(menu.Training.Plate.BackAngle, Is.EqualTo(rest).Within(0.01f), "跳ねた後に裏の札が止まらない");
+                Assert.That(SlantedPlate.Snap(0.06f), Is.EqualTo(1f).Within(0.01f), "跳ねが鋭くない");
+                Assert.That(SlantedPlate.Snap(0.15f), Is.LessThan(0f), "1 回だけ少し戻りすぎない");
+                Assert.That(SlantedPlate.Snap(SlantedPlate.SwingSeconds), Is.Zero, "跳ねの後に止まらない");
                 Assert.That(menu.Single.IsReceded, Is.True, "ほかの項目が暗く下がらない（B13）");
                 Assert.That(menu.Single.Plate.Back, Is.LessThan(0.1f), "選んでいない項目の裏の札が残っている");
                 Assert.That(backdrop.Word, Is.EqualTo("TRAINING"), "背景の名前が変わらない（B7）");

@@ -55,8 +55,9 @@ namespace Airerage.Runtime.UI
         private int _baseFontSize;
         private const int MinFitFontSize = 16;
 
-        private static readonly Color IdleFill = new Color(0.03f, 0.05f, 0.09f, 0.78f);
-        private static readonly Color SelectedFill = new Color(0.08f, 0.16f, 0.24f, 0.9f);
+        // 表の札の中は不透明（半透明だと、後ろに重なる裏の札が透けて見えた。ユーザーの指摘、2026-11-08）。
+        private static readonly Color IdleFill = new Color(0.03f, 0.05f, 0.09f, 1f);
+        private static readonly Color SelectedFill = new Color(0.08f, 0.16f, 0.24f, 1f);
         private static readonly Color IdleBorder = new Color(1f, 1f, 1f, 0.35f);
         private static readonly Color DisabledText = new Color(1f, 1f, 1f, 0.35f);
 

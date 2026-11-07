@@ -14,7 +14,8 @@ namespace Airerage.Editor
     internal static class MenuUiBuilder
     {
         public static readonly Color Accent = new Color(0.35f, 0.85f, 1f);
-        private static readonly Color PlateFill = new Color(0.03f, 0.05f, 0.09f, 0.78f);
+        // 札の中は不透明（裏の札が透けないように。2026-11-08）。
+        private static readonly Color PlateFill = new Color(0.03f, 0.05f, 0.09f, 1f);
         private static readonly Color PlateBorder = new Color(1f, 1f, 1f, 0.35f);
 
         /// <summary>画面いっぱいの Canvas（画面に重ねる。大きさは 1920×1080 を基準に合わせる）。</summary>
@@ -420,7 +421,8 @@ namespace Airerage.Editor
         /// </summary>
         public static PauseMenu CreatePauseMenu(MonoBehaviour runner, InputActionAsset inputActions)
         {
-            Canvas canvas = CreateCanvas("PauseMenu", 20);
+            // ほかのすべての画面（結果の画面・試合の表示）より手前（2026-11-08）。
+            Canvas canvas = CreateCanvas("PauseMenu", 100);
             RectTransform panel = CreateFull(canvas.transform, "Panel");
             CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.55f), Vector2.zero, Vector2.one);
             CreateText(panel, "Title", "PAUSE", 72, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,

@@ -9,7 +9,7 @@ namespace Airerage.Runtime.UI
     /// キャラクター選択の演出（D-89。ユーザーが選んだ C1・C2・C3・C10・C12・C13・C14・C17・C18・C20 と、C4 の代わりの
     /// カーソルの光。2026-11-07。C5 周りの札の波・C11 名前のデコード・C19 光の掃きは、思っていたものと違ったので消した。2026-11-08）。画面（CharacterSelectScreen）の状態を毎フレーム見て、変わったときに演出を出す（入力や通信の処理には
     /// 手を入れない。ネットワーク対戦のほかの人の動きにも同じ演出が出る）:
-    /// - 乗せたとき: C1 ロゴが札から少し飛び出す、C2 キャラクターの色が斜めに流れ込む、C3 キャラクターごとのロゴの動き
+    /// - 乗せたとき: C1 ロゴが札から少し飛び出す、C2 キャラクターの色（不透明でグラデーションなし。2026-11-08）が斜めに流れ込む、C3 キャラクターごとのロゴの動き
     ///   （CharacterConfigAsset.LogoMotion）、C10 四隅の枠のロゴと名前がスロットのように入れ替わる、C18 RANDOM のロゴが全員の顔を
     ///   回る（ルーレットは CharacterSelectScreen）。
     /// - 決めたとき: C13 ロゴが弧を描いて自分の枠へ飛び、着くと枠が光る、C12 枠に「READY!」の判が叩きつけられ、枠が揺れて火花が散る、
@@ -41,7 +41,6 @@ namespace Airerage.Runtime.UI
         private const float BandSeconds = 1.4f;
         private const float CursorFusePeriod = 1.6f;
         private const float RandomFaceSeconds = 0.09f;
-        private static readonly Color FloodDark = new Color(0.04f, 0.07f, 0.12f, 0.92f);
 
         private sealed class IconFx
         {
@@ -549,11 +548,10 @@ namespace Airerage.Runtime.UI
                 icon.Flood01 = hovered
                     ? Mathf.Lerp(icon.FloodFrom, 1f, UiEase.OutCubic(t / FloodInSeconds))
                     : Mathf.Lerp(icon.FloodFrom, 0f, UiEase.OutCubic(t / FloodOutSeconds));
-                Color dark = Color.Lerp(icon.Theme, FloodDark, 0.55f);
-                Color left = icon.Theme;
-                left.a = 0.92f;
-                dark.a = 0.92f;
-                icon.Flood.Set(0f, icon.Flood01, left, dark);
+                // 流れ込む色はグラデーションなしの不透明なキャラクターの色（ユーザーの要望、2026-11-08）。
+                Color solid = icon.Theme;
+                solid.a = 1f;
+                icon.Flood.Set(0f, icon.Flood01, solid, solid);
 
                 // C14: 色の輪が通ったときに光る。
                 float tint = now - icon.TintAt;

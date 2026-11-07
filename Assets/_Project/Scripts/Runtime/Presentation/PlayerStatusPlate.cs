@@ -19,6 +19,8 @@ namespace Airerage.Runtime.Presentation
     /// - 1 位の札は、LeaderPulseSeconds ごとに、画面の外の誘導表示（拠点の移動・ホットエリア。EdgeGuideLayer）と同じ光り方をする: 札が白く光り、
     ///   札の周りに縁の色の枠（札と同じ斜めの形）が広がって消える（2026-11-06。前の斜めに走る光はカクついて見えた）。BANK が増えたら数が
     ///   数え上がり、上に「+増えた数」が浮かぶ（Look.Gain）。
+    /// - 札の後ろに、縁の色の裏の札を少し角度をずらして重ねる（メニューの札と同じ見た目。2026-11-08 のユーザーの要望。札の中は裏の札が
+    ///   透けないように不透明）。
     /// 王冠は札の左に出す。WANTED（所持コインが 100 枚以上。2026-11-02）の人は、キャラクターのロゴの所に手配書の印を押す
     /// （その間はロゴを隠す）: 出るときは大きく傾いた印が印鑑を押すように落ちてきて、押した瞬間に朱色の輪が広がって札が揺れる。外れるときは
     /// 光の粒になって散って消え、ロゴが戻る。WANTED の間は札が赤く脈打ち、縁が赤くなり、斜めに大きな「WANTED!」の赤いスタンプを押す
@@ -68,7 +70,10 @@ namespace Airerage.Runtime.Presentation
         public const float LeaderPulseSeconds = 3f;
 
         private static readonly Color Gray = new Color(0.5f, 0.5f, 0.52f);
-        private static readonly Color Back = new Color(0.03f, 0.05f, 0.09f, 0.8f);
+        private static readonly Color Back = new Color(0.03f, 0.05f, 0.09f, 1f);
+        // 裏の札のずれ（倍率 1 の画面の点。左下へ）と、端がはみ出す量（倍率 1 の画面の点。この量になるように回す）。
+        private static readonly Vector2 BackPlateOffset = new Vector2(-6f, 5f);
+        private const float BackPlatePeek = 4f;
         private static readonly Color SeparatorColor = new Color(0.62f, 0.65f, 0.7f, 0.55f);
         private static readonly Color GainColor = new Color(0.49f, 1f, 0.6f);
 
@@ -401,6 +406,8 @@ namespace Airerage.Runtime.Presentation
             var drawRect = new Rect(rect.x - Pad * sx, rect.y - Pad * sy, rect.width + Pad * 2f * sx, rect.height + Pad * 2f * sy);
             Color frame = Color.Lerp(color, Gray, look.Gray);
 
+            // 裏の札（縁の色。札の真ん中を中心に少し回して、左下へずらす）。
+            DrawBackPlate(drawRect, frame, sx, sy);
             DrawTexture(drawRect, _fill, Back);
             if (look.Gray > 0f)
             {
@@ -525,6 +532,20 @@ namespace Airerage.Runtime.Presentation
             float sx = plate.width / BaseWidth;
             float sy = plate.height / BaseHeight;
             return new Rect(plate.x + local.x * sx, plate.y + local.y * sy, local.width * sx, local.height * sy);
+        }
+
+        /// <summary>裏の札の角度（度。画面で時計回りが正。札の端が BackPlatePeek だけはみ出す角度。テスト用にも公開）。</summary>
+        public static float BackPlateAngle => -Mathf.Atan2(BackPlatePeek, BaseWidth * 0.5f) * Mathf.Rad2Deg;
+
+        private void DrawBackPlate(Rect drawRect, Color color, float sx, float sy)
+        {
+            Matrix4x4 previous = GUI.matrix;
+            var rect = new Rect(drawRect.x + BackPlateOffset.x * sx, drawRect.y + BackPlateOffset.y * sy, drawRect.width, drawRect.height);
+            GUIUtility.RotateAroundPivot(BackPlateAngle, rect.center);
+            Color c = color;
+            c.a *= 0.95f;
+            DrawTexture(rect, _fill, c);
+            GUI.matrix = previous;
         }
 
         private static void DrawTexture(Rect rect, Texture2D texture, Color color)

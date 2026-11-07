@@ -8,7 +8,8 @@ namespace Airerage.Runtime.Presentation
     /// 光る先端とグラデーションの導火線。D-76、2026-10-29）。上（12 時）から時計回りに残りの分だけ光り、減っていく。
     /// ワイヤーキャンセルのクールタイム（キャラクターの周り。「WIRE CANCEL」）、ワイヤーの接続の残り時間（接続点の周り）、
     /// 撃破された後の復帰までの残り（出現位置の周りに大きく。「RESPAWN」。docs/12 T4-2）などに使う。
-    /// 名前は、ゲージの右上の斜めの札に出す（右上の札と同じ形）。
+    /// 名前は、ゲージの右上の斜めの札に出す（右上の札と同じ形）。札の後ろに、ゲージの色の裏の札を少し角度をずらして重ねる（メニューの札と
+    /// 同じ見た目。2026-11-08 のユーザーの要望。札の中は裏の札が透けないように不透明）。
     /// 呼ぶ側が毎フレーム Show（出すとき）か Hide を呼ぶ。同じキャラクターの周りのゲージは RingGaugeStack にまとめ、重ならないように
     /// 並べる（古いゲージほど外側、文字は上。その場合は Show で描かず、RingGaugeStack.Arrange で描く）。状態は読むだけ。
     /// </summary>
@@ -34,7 +35,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private int _fontSize = 20;
         [SerializeField] private int _sortingOrder = 5;
 
-        private static readonly Color PlateColor = new Color(0.06f, 0.05f, 0.1f, 0.88f);
+        private static readonly Color PlateColor = new Color(0.06f, 0.05f, 0.1f, 1f);
+        // 裏の札のずれ（画面の点。左下へ）と、端がはみ出す量（画面の点。この量になるように回す）。
+        private static readonly Vector2 BackOffset = new Vector2(-4f, 3.5f);
+        private const float BackPeek = 3.5f;
 
         private SlantedRingGauge _gauge;
         private GUIStyle _style;
@@ -53,7 +57,7 @@ namespace Airerage.Runtime.Presentation
         /// <summary>今表示しているか。</summary>
         public bool IsShowing { get; private set; }
 
-        /// <summary>縁（区切りごとの暗い縁と外側の線）を描いているか（テスト用）。</summary>
+        /// <summary>縁（区切りごとの暗い縁）を描いているか（テスト用）。</summary>
         public bool ShowsFrame => _gauge != null && _gauge.ShowsFrame;
 
         /// <summary>表示している残りの割合（0〜1）。</summary>
@@ -241,6 +245,9 @@ namespace Airerage.Runtime.Presentation
             text.a = 0.95f;
             Color edge = _color;
             edge.a = 0.95f;
+            // 裏の札（ゲージの色。表の札から少し回して、左下へずらす）。
+            float back = -Mathf.Clamp(Mathf.Atan2(BackPeek, plate.width * 0.5f) * Mathf.Rad2Deg, 1.5f, 4f);
+            DrawSlanted(new Rect(plate.x + BackOffset.x, plate.y + BackOffset.y, plate.width, plate.height), edge, back);
             DrawSlanted(new Rect(plate.x - 1.5f, plate.y - 1.5f, plate.width + 3f, plate.height + 3f), edge);
             DrawSlanted(plate, PlateColor);
             Color previous = GUI.color;
@@ -249,17 +256,22 @@ namespace Airerage.Runtime.Presentation
             GUI.color = previous;
         }
 
-        // 斜めの札（右上の札と同じ向き: 上の辺が右へずれた平行四辺形）。
-        private static void DrawSlanted(Rect rect, Color color)
+        // 斜めの札（右上の札と同じ向き: 上の辺が右へずれた平行四辺形）。angle は札の真ん中を中心に回す角度（度。画面で時計回りが正）。
+        private static void DrawSlanted(Rect rect, Color color, float angle = 0f)
         {
             Matrix4x4 previousMatrix = GUI.matrix;
             Color previousColor = GUI.color;
+            if (angle != 0f)
+            {
+                GUIUtility.RotateAroundPivot(angle, rect.center);
+            }
+            Matrix4x4 rotated = GUI.matrix;
             float centerY = rect.y + rect.height * 0.5f;
             // x' = x − shear × (y − 中央の y)（上ほど右へ）。
             Matrix4x4 shear = Matrix4x4.identity;
             shear.m01 = -PlateShear;
             shear.m03 = PlateShear * centerY;
-            GUI.matrix = previousMatrix * shear;
+            GUI.matrix = rotated * shear;
             GUI.color = color;
             GUI.DrawTexture(rect, Texture2D.whiteTexture);
             GUI.matrix = previousMatrix;

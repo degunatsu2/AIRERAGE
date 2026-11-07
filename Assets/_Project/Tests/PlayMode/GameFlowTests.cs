@@ -251,12 +251,15 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 Assert.That(EventSystem.current.currentSelectedGameObject, Is.SameAs(pause.Resume.gameObject), "RESUME を選んでいない");
+                // 開いている間は OnGUI で描く試合の表示を止める（メニューより手前に描かれるので。2026-11-08）。
+                Assert.That(pause.HiddenHudCount, Is.GreaterThan(0), "開いても試合の表示がメニューの上に残る");
                 var sounds = UnityEngine.Object.FindFirstObjectByType<UiSounds>();
                 int opened = CountOf(sounds, SoundId.UiPause);
 
                 yield return Tap(keyboard, Key.Escape);
                 yield return null;
                 Assert.That(pause.IsOpen, Is.False, "もう一度 Esc を押しても閉じない");
+                Assert.That(pause.HiddenHudCount, Is.Zero, "閉じても試合の表示が戻らない");
                 Assert.That(runner.SpeedScale, Is.EqualTo(1f), "閉じた後に動き出さない");
                 Assert.That(CountOf(sounds, SoundId.UiPause), Is.EqualTo(opened), "閉じた直後に開き直した");
 

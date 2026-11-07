@@ -11,8 +11,9 @@ namespace Airerage.Runtime.UI
     /// - 導火線の縁（B1）: 選んだ瞬間、白い光（FuseColor）が縁を 1 周する（RunFuse）。選んでいる間は縁がゆっくり明滅する（Glow）。
     /// - 残像（B2）: 札が動いたとき、2 枚の水色の残像が遅れて追いかけて消える（Trail）。
     /// - 裏の札（B3）: 選んでいる間、項目の色の札が左下へずれて出る（BackTarget）。表の札から少し角度をずらし（端が BackPeek だけ
-    ///   はみ出す角度）、選んだ瞬間に大きく振れてから止まり（SwingBack）、選んでいる間はゆっくり揺れる（ペルソナ 3 リロード・5 ザ・ロイヤルの
-    ///   メニューを参考に。ユーザーの要望、2026-11-08）。見出しの札（HeadingPlate）は裏の札をいつも出して揺らす（Sway）。
+    ///   はみ出す角度）、選んだ瞬間に鋭く跳ねて 1 回だけ少し戻りすぎ、ぴたりと止まる（SwingBack）。選んでいる間は止まったまま、2.6 秒ごとに
+    ///   小さく跳ねる（ペルソナ 3 リロード・5 ザ・ロイヤルのメニューを参考に。ユーザーの要望、2026-11-08。揺れに弾力がありすぎたので、止めと
+    ///   跳ねにメリハリをつけた）。見出しの札（HeadingPlate）は裏の札をいつも出して、同じように跳ねさせる（Sway）。
     /// - チルト（B9）: マウスの位置へ札がわずかに傾き（Lean）、光の反射が付いてくる（Sheen）。
     /// - 決定の光（B10）: 決定した瞬間、札が白く光ってから本来の色へ戻る（Flash）。
     /// </summary>
@@ -32,10 +33,12 @@ namespace Airerage.Runtime.UI
         private const float TrailLag = 0.045f;
         private const float BackSeconds = 0.18f;
         private const float GlowPeriod = 1.8f;
-        /// <summary>選んだ瞬間に裏の札が振れてから止まるまでの秒数。</summary>
-        public const float SwingSeconds = 0.6f;
-        // 振れの大きさ（度）と、裏の札の角度の範囲（度。札の幅から決める）。
-        private const float SwingDegrees = 9f;
+        /// <summary>選んだ瞬間に裏の札が跳ねてから止まるまでの秒数。</summary>
+        public const float SwingSeconds = 0.24f;
+        // 跳ねの大きさ（度）、選んでいる間の小さな跳ねの間隔（秒）と大きさ（選んだ瞬間の跳ねに対する割合）、裏の札の角度の範囲（度。札の幅から決める）。
+        private const float SwingDegrees = 8f;
+        private const float BeatPeriod = 2.6f;
+        private const float BeatScale = 0.3f;
         private const float MinBackTilt = 1.2f;
         private const float MaxBackTilt = 4f;
         private const int SheenSlices = 20;
@@ -313,13 +316,7 @@ namespace Airerage.Runtime.UI
                 float a = UiEase.OutCubic(_back);
                 var back = new Vector2[4];
                 float stretch = 0.4f + 0.6f * a;
-                float swing = now - _swingAt;
-                float kick = swing >= 0f && swing < SwingSeconds ? Mathf.Exp(-8f * swing) : 0f;
-                Vector2 offset = _backOffset * a * (1f + 0.8f * kick);
-                if (_glow || _sway)
-                {
-                    offset += new Vector2(1.5f * Mathf.Sin(now * Mathf.PI * 2f / 1.9f), 1.2f * Mathf.Sin(now * Mathf.PI * 2f / 2.6f + 1f)) * a;
-                }
+                Vector2 offset = _backOffset * a * (1f + 0.8f * Mathf.Max(0f, Hop(now)));
                 Vector2 center = Vector2.zero;
                 for (int i = 0; i < 4; i++)
                 {
@@ -425,21 +422,48 @@ namespace Airerage.Runtime.UI
             }
         }
 
-        // 裏の札の角度（度。左回りが正）: 端が _backPeek だけはみ出す角度に、選んだ瞬間の振れと、選んでいる間の揺れを足す。
+        // 裏の札の角度（度。左回りが正）: 端が _backPeek だけはみ出す角度に、跳ね（Hop）を足す。
         private float BackAngleAt(Rect r, float now)
         {
             float half = Mathf.Max(1f, r.width * 0.5f);
             float tilt = Mathf.Clamp(Mathf.Atan2(_backPeek, half) * Mathf.Rad2Deg, MinBackTilt, MaxBackTilt);
-            float swing = now - _swingAt;
-            if (swing >= 0f && swing < SwingSeconds)
-            {
-                tilt += SwingDegrees * Mathf.Exp(-6.5f * swing) * Mathf.Cos(swing * Mathf.PI * 2f * 2.4f);
-            }
+            return tilt + SwingDegrees * Hop(now);
+        }
+
+        // 跳ねの形（1 が跳ねきった所）: 選んだ瞬間の跳ねと、選んでいる間（見出しの札はいつも）BeatPeriod ごとの小さな跳ね。
+        private float Hop(float now)
+        {
+            float hop = Snap(now - _swingAt);
             if (_glow || _sway)
             {
-                tilt += 0.7f * Mathf.Sin(now * Mathf.PI * 2f / 2.3f);
+                float since = now - _swingAt;
+                if (since > SwingSeconds)
+                {
+                    hop += BeatScale * Snap((since - SwingSeconds) % BeatPeriod - (BeatPeriod - SwingSeconds));
+                }
             }
-            return tilt;
+            return hop;
+        }
+
+        /// <summary>
+        /// 1 回の跳ね（t は跳ね始めてからの秒数）: 0.06 秒で鋭く跳ね（1）、0.09 秒で少し戻りすぎ（-0.15）、0.09 秒でぴたりと止まる（0）。
+        /// その後は動かない（止めと跳ねのメリハリ。2026-11-08）。
+        /// </summary>
+        public static float Snap(float t)
+        {
+            if (t < 0f || t >= SwingSeconds)
+            {
+                return 0f;
+            }
+            if (t < 0.06f)
+            {
+                return UiEase.OutCubic(t / 0.06f);
+            }
+            if (t < 0.15f)
+            {
+                return Mathf.Lerp(1f, -0.15f, UiEase.InOutCubic((t - 0.06f) / 0.09f));
+            }
+            return Mathf.Lerp(-0.15f, 0f, UiEase.OutCubic((t - 0.15f) / 0.09f));
         }
 
         private Color SheenColor(float u)

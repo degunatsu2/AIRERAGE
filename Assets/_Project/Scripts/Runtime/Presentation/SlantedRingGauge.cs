@@ -7,7 +7,7 @@ namespace Airerage.Runtime.Presentation
     /// <summary>
     /// 円形ゲージの見た目（ユーザーの決定、2026-10-29。D-76: 「斜めの区切り」の輪に「光る先端（導火線）」とグラデーションを重ねる。
     /// すべての円形ゲージで同じ見た目）。
-    /// - 輪: 斜めに切った台形の区切り 16 個。区切りごとに暗い縁と、外側に細い線（残っている区切りは明るく。同じ色のオーラと見分けられるように）。
+    /// - 輪: 斜めに切った台形の区切り 16 個。区切りごとに暗い縁（外側の白い細い線は、ユーザーの要望でなくした。2026-11-08）。
     /// - 残り: 上（12 時）から時計回りに、残りの分だけ区切りが光る。尾は薄く暗く、先端へ向かって明るくなる。残っていない所は薄い影。
     /// - 先端: 光の玉と、後ろへ流れる小さな粒。残り 25% を切ると、先端が赤みを帯びて脈打ち、光る区切りも明滅する（数え下げのゲージだけ）。
     /// - 出る瞬間は少し大きく出て縮み（0.2 秒）、0 近くまで減って消えるときは白い輪が外へ広がって消える（0.4 秒）。
@@ -20,7 +20,6 @@ namespace Airerage.Runtime.Presentation
         private const float GapRadians = 0.05f;
         private const float SkewRadians = 0.08f;
         private const float FrameExtra = 0.08f;
-        private const float RimWidth = 0.03f;
         private const float LowFraction = 0.25f;
         private const float AppearSeconds = 0.2f;
         private const float BurstSeconds = 0.4f;
@@ -28,7 +27,6 @@ namespace Airerage.Runtime.Presentation
         private const int GlowPoints = 14;
 
         private static readonly Color FrameColor = new Color(0.04f, 0.04f, 0.07f, 0.85f);
-        private static readonly Color RimColor = new Color(1f, 1f, 1f, 0.55f);
         private static readonly Color WarmHead = new Color(1f, 0.55f, 0.5f, 1f);
 
         private readonly GameObject _object;
@@ -72,7 +70,7 @@ namespace Airerage.Runtime.Presentation
         /// <summary>ゲージを出しているか（終わりの白い輪だけのときは false）。</summary>
         public bool Showing => _showing;
 
-        /// <summary>縁（区切りごとの暗い縁と外側の線）を描いているか（ゲージを出していれば、いつも描く）。</summary>
+        /// <summary>縁（区切りごとの暗い縁）を描いているか（ゲージを出していれば、いつも描く）。</summary>
         public bool ShowsFrame => _showing && Visible;
 
         /// <summary>最後に描いた先端の位置。</summary>
@@ -188,10 +186,6 @@ namespace Airerage.Runtime.Presentation
             bright.a = alpha * pulse;
             Color frame = FrameColor;
             frame.a *= alpha;
-            Color rim = RimColor;
-            rim.a *= alpha;
-            Color faintRim = rim;
-            faintRim.a *= 0.3f;
 
             // 1. 区切りごとの暗い縁（全部の区切り。輪の形を見せる）。
             for (int i = 0; i < Segments; i++)
@@ -218,9 +212,6 @@ namespace Airerage.Runtime.Presentation
                     Color c1 = Gradient(dim, bright, litEnd > 0f ? to / litEnd : 1f);
                     AddSegment(center, radius - half, radius + half, a0, to, c0, c1, z - 0.002f);
                 }
-                // 外側の明るい細い線（残っている区切りだけ明るく）。
-                Color edge = amount > 0.5f ? rim : faintRim;
-                AddSegment(center, radius + half, radius + half + RimWidth, a0, a1, edge, edge, z - 0.004f);
             }
             // 3. 先端の光の玉と、後ろへ流れる粒。
             if (fraction > 0f)

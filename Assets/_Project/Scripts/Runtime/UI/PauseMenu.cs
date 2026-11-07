@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Reflection;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Simulation;
@@ -14,6 +16,8 @@ namespace Airerage.Runtime.UI
     /// RESET POSITION（出現位置に戻す。Backspace と同じ。対戦では出さない）、BACK TO MENU（App のシーンから始めたときだけ）。もう一度 Pause か、戻る操作で閉じる（RESUME と同じ）。Esc は Pause でも UI の戻る操作でもあるので、
     /// 1 回の押下で開け閉めは 1 回だけにする（戻る操作で閉じた同じフレームに、Pause で開き直さない。ユーザーの指摘、2026-10-17）。
     /// 検証用のシーンを直接再生したときは EventSystem がないので、開くときに作る。
+    /// 開いている間は、OnGUI で描く試合の表示（右上の札・円形ゲージの名前・技の札・トレーニングの表示など）を止める。IMGUI は uGUI の
+    /// メニューより手前に描かれるので、メニューの上に重なっていた（ユーザーの指摘、2026-11-08。メニューはすべてより手前に出す）。閉じたら戻す。
     /// </summary>
     public sealed class PauseMenu : MonoBehaviour
     {
@@ -33,6 +37,13 @@ namespace Airerage.Runtime.UI
         private float _speedBefore = 1f;
         private int _selectAtFrame = -1;
         private int _toggledAtFrame = -1;
+        private readonly List<Behaviour> _hiddenHuds = new List<Behaviour>();
+
+        // 開いている間に止める表示の名前空間（OnGUI で描く試合の表示と、トレーニングの表示）。
+        private static readonly string[] HudNamespaces = { "Airerage.Runtime.Presentation", "Airerage.Runtime.DebugTools" };
+
+        /// <summary>開いている間に止めている表示の数（テスト用）。</summary>
+        public int HiddenHudCount => _hiddenHuds.Count;
 
         /// <summary>開いているか。</summary>
         public bool IsOpen => _panel != null && _panel.activeSelf;
@@ -88,6 +99,7 @@ namespace Airerage.Runtime.UI
         private void OnDisable()
         {
             _pause?.Disable();
+            ShowHuds();
         }
 
         private void Update()
@@ -127,6 +139,7 @@ namespace Airerage.Runtime.UI
             _cameraWasEnabled = _camera.enabled;
             _camera.Disable();
             UiSounds.Find().Play(SoundId.UiPause);
+            HideHuds();
             _panel.SetActive(true);
             // 開いたボタン（Esc は戻る操作でもある）で、そのまま閉じないよう、項目を選ぶのは次のフレーム。
             EventSystem.current.SetSelectedGameObject(null);
@@ -141,6 +154,7 @@ namespace Airerage.Runtime.UI
                 return;
             }
             _panel.SetActive(false);
+            ShowHuds();
             _selectAtFrame = -1;
             _toggledAtFrame = Time.frameCount;
             _target.SpeedScale = _speedBefore > 0f ? _speedBefore : 1f;
@@ -153,6 +167,41 @@ namespace Airerage.Runtime.UI
             {
                 EventSystem.current.SetSelectedGameObject(null);
             }
+        }
+
+        // OnGUI で描く表示を止める（動いているものだけ。閉じたら、止めたものだけを戻す）。
+        private void HideHuds()
+        {
+            _hiddenHuds.Clear();
+            foreach (MonoBehaviour behaviour in FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
+            {
+                if (behaviour.enabled && DrawsHud(behaviour.GetType()))
+                {
+                    behaviour.enabled = false;
+                    _hiddenHuds.Add(behaviour);
+                }
+            }
+        }
+
+        private void ShowHuds()
+        {
+            foreach (Behaviour hud in _hiddenHuds)
+            {
+                if (hud != null)
+                {
+                    hud.enabled = true;
+                }
+            }
+            _hiddenHuds.Clear();
+        }
+
+        private static bool DrawsHud(System.Type type)
+        {
+            if (System.Array.IndexOf(HudNamespaces, type.Namespace) < 0)
+            {
+                return false;
+            }
+            return type.GetMethod("OnGUI", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) != null;
         }
 
         /// <summary>EventSystem がなければ作る（検証用のシーン・試合のシーンを直接再生したとき。App のシーンにはある）。</summary>
