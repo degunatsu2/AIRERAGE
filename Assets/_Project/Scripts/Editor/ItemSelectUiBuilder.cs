@@ -26,9 +26,9 @@ namespace Airerage.Editor
         {
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "ItemSelect");
             // 左はメインメニューと同じ白い背景（帯は入ってきた画面の色。AccentTint）、見出しは黒（2026-11-08）。
-            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.49f, 1f), 0.5f, 0.43f, 0f, MenuUiBuilder.Accent));
-            Text title = MenuUiBuilder.CreateText(panel, "Title", "START ITEMS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -50f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false);
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.49f, 1f), 0.5f, 0.43f, MenuUiBuilder.Accent));
+            Text title = MenuUiBuilder.StyleTitle(MenuUiBuilder.CreateText(panel, "Title", "START ITEMS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -50f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false), MenuUiBuilder.Accent);
             // 案内は、見出しとスクロールの上の端のちょうど間（2026-11-06）。
             Text note = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
                 new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent));
@@ -145,6 +145,8 @@ namespace Airerage.Editor
                 Vector2.zero, new Vector2(820f, 40f), MenuUiBuilder.Accent));
             header.rectTransform.pivot = new Vector2(0f, 1f);
             header.font = GameFonts.JapaneseBold;
+            // 左に「//」の印（D-92 の T7。2026-11-09）。
+            MenuUiBuilder.MarkHeader(header, MenuUiBuilder.Accent);
             Image line = AccentTint.Mark(MenuUiBuilder.CreateFill(header.rectTransform, "Line", new Color(MenuUiBuilder.Accent.r, MenuUiBuilder.Accent.g, MenuUiBuilder.Accent.b, 0.5f),
                 new Vector2(0f, 0f), new Vector2(1f, 0f)));
             line.rectTransform.offsetMin = new Vector2(0f, -2f);

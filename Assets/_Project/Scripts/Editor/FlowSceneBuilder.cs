@@ -336,9 +336,12 @@ namespace Airerage.Editor
             // メインメニュー: 左に縦に並んだ斜めの札。
             RectTransform main = MenuUiBuilder.CreateFull(canvas.transform, "Main");
             // 左の背景は、白地に選んでいる項目の色の斜めの帯（D-91 の M2 を白地に。2026-11-08）。ロゴは黒。
-            MainMenuPanel panel = MenuUiBuilder.CreateWhitePanel(main, "Side", Vector2.zero, new Vector2(0.42f, 1f), 0.5f, 0.43f, 0f, MenuAccents.Single);
-            MenuUiBuilder.CreateText(main, "Logo", "AIRERAGE", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(700f, 90f), MenuUiBuilder.Ink, false).font = GameFonts.LatinBlack;
+            MainMenuPanel panel = MenuUiBuilder.CreateWhitePanel(main, "Side", Vector2.zero, new Vector2(0.42f, 1f), 0.5f, 0.43f, MenuAccents.Single);
+            UnityEngine.UI.Text logo = MenuUiBuilder.CreateText(main, "Logo", "AIRERAGE", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(700f, 90f), MenuUiBuilder.Ink, false);
+            logo.font = GameFonts.LatinBlack;
+            // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7。縁の色は選んだ項目の色に移る。2026-11-09）。
+            MenuUiBuilder.StyleTitle(logo, MenuAccents.Single);
             var anchor = new Vector2(0f, 1f);
             var size = new Vector2(560f, 72f);
             // LOCAL VS ・ NETWORK VS は、右の大きな名前が札にかかるので短くした（ユーザーの要望、2026-11-07）。
@@ -364,7 +367,7 @@ namespace Airerage.Editor
                 items[i].SetAccent(accents[i], true);
                 MenuUiBuilder.AddTextMotion(items[i], true, subsEnglish[i], subsJapanese[i]);
             }
-            CreateMainBackdrop(main, items, panel);
+            CreateMainBackdrop(main, items, panel, logo.GetComponent<TitleStroke>());
             MenuUiBuilder.CreateHint(main, "↑↓: select     Enter / A: OK     Esc / B: back", "↑↓:選択　　Enter ／ A: 決定　　Esc ／ B: 戻る");
             main.gameObject.SetActive(false);
 
@@ -408,7 +411,7 @@ namespace Airerage.Editor
 
         // メインメニューの背景の連動（D-88 の B7。ユーザーの選択、2026-11-07）: 右側に、選んでいる項目の名前の見出しの札（白地に黒の
         // 文字、縁と裏の札は項目の色。2026-11-08）と説明。左の暗い面の後ろ（ロゴと項目より奥）に置く。
-        private static void CreateMainBackdrop(RectTransform main, MenuOption[] items, MainMenuPanel panel)
+        private static void CreateMainBackdrop(RectTransform main, MenuOption[] items, MainMenuPanel panel, TitleStroke logo)
         {
             RectTransform root = MenuUiBuilder.CreateFull(main, "Backdrop");
             root.SetSiblingIndex(1);
@@ -436,7 +439,7 @@ namespace Airerage.Editor
                 "ゲームを終了する。",
             };
             var backdrop = main.gameObject.AddComponent<MainMenuBackdrop>();
-            backdrop.Configure(items, english, japanese, heading, description, panel);
+            backdrop.Configure(items, english, japanese, heading, description, panel, logo);
         }
 
         // シングルモードの CPU の強さ（docs/16 T7-2）: 左に EASY・NORMAL・HARD・HELL の札（CpuLevel の順）、右に説明。
@@ -444,9 +447,9 @@ namespace Airerage.Editor
         {
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CpuLevel");
             // 左はメインメニューと同じ白い背景（帯は SINGLE の色）、見出しは黒（2026-11-08）。
-            MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.42f, 1f), 0.5f, 0.43f, 0f, MenuAccents.Single);
-            MenuUiBuilder.CreateText(panel, "Title", "CPU LEVEL", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false);
+            MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.42f, 1f), 0.5f, 0.43f, MenuAccents.Single);
+            MenuUiBuilder.StyleTitle(MenuUiBuilder.CreateText(panel, "Title", "CPU LEVEL", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false), MenuAccents.Single);
             string[] labels = System.Array.ConvertAll(System.Enum.GetNames(typeof(Airerage.Core.Ai.CpuLevel)), n => n.ToUpperInvariant());
             var options = new Object[labels.Length];
             for (int i = 0; i < labels.Length; i++)
@@ -478,9 +481,9 @@ namespace Airerage.Editor
             StageCatalog catalog = LoadOrCreateStages();
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "StageSelect");
             // 左はメインメニューと同じ白い背景（帯はカーソルのステージの色）、見出しは黒（2026-11-08）。
-            MainMenuPanel side = MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.49f, 1f), 0.5f, 0.43f, 0f, MenuAccents.Random);
-            MenuUiBuilder.CreateText(panel, "Title", "STAGE SELECT", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false);
+            MainMenuPanel side = MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.49f, 1f), 0.5f, 0.43f, MenuAccents.Random);
+            MenuUiBuilder.StyleTitle(MenuUiBuilder.CreateText(panel, "Title", "STAGE SELECT", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(1200f, 90f), MenuUiBuilder.Ink, false), MenuAccents.Random);
             // 札はスクロールの中身に入れる（並びは実行中に StageSelectScreen.Layout が決める。カーソルの札が見える所まで動く。2026-11-06）。
             // 札の左の縁を見出しの 1 文字目の線にそろえるため、スクロールの左端は 44（チェックの箱が切れないように。2026-11-08）。
             var scrollPosition = new Vector2(44f, -176f);

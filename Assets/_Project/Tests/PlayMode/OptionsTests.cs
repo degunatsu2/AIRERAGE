@@ -206,7 +206,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(new Vector3(descriptionPlate.BorderColor.r, descriptionPlate.BorderColor.g, descriptionPlate.BorderColor.b),
                 Is.EqualTo(new Vector3(stageColor.r, stageColor.g, stageColor.b)), "説明の札の縁がステージの色でない");
             UnityEngine.UI.Text descriptionText = descriptionPlate.GetComponentInChildren<UnityEngine.UI.Text>();
-            Assert.That(descriptionText.color.r + descriptionText.color.g + descriptionText.color.b, Is.LessThan(0.5f), "説明の文字が黒でない");
+            Assert.That(descriptionText.color.r + descriptionText.color.g + descriptionText.color.b, Is.InRange(0.3f, 0.75f), "説明の文字が墨色でない（D-92 の T1）");
             Assert.That(descriptionPlate.rectTransform.rect.height, Is.GreaterThanOrEqualTo(descriptionText.preferredHeight), "説明の札に文が収まらない");
             // 札の左の縁は見出しの 1 文字目の線（画面の左から 91。2026-11-08）。チェックの箱も画面の中。
             var firstPlate = (RectTransform)stages.Option(0).transform;

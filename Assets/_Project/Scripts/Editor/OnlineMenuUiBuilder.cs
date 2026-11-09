@@ -27,23 +27,23 @@ namespace Airerage.Editor
             // 接続の画面。
             RectTransform connect = MenuUiBuilder.CreateFull(canvas, "OnlineConnect");
             // 全面の白い背景（帯は NETWORK の色で右の端に。ボタンの外の文字は黒。2026-11-08）。
-            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(connect, "Side", Vector2.zero, Vector2.one, FullBandLeft, FullStripLeft, 0f, MenuAccents.Network));
-            MenuUiBuilder.CreateText(connect, "Title", "NETWORK VS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false);
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(connect, "Side", Vector2.zero, Vector2.one, FullBandLeft, FullStripLeft, MenuAccents.Network));
+            MenuUiBuilder.StyleTitle(MenuUiBuilder.CreateText(connect, "Title", "NETWORK VS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                top, new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false), MenuAccents.Network);
             // 左の列: 名前と、参加コード（インターネット越し。Relay）と BACK。右の列: IP アドレスとポート（同じ LAN）。
             var fieldSize = new Vector2(700f, 60f);
             var small = new Vector2(560f, 66f);
             InputField name = MenuUiBuilder.CreateInputField(connect, "Name", "NAME", top, new Vector2(110f, -190f), fieldSize);
-            MenuUiBuilder.CreateText(connect, "OnlineTitle", "ONLINE (JOIN CODE)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(110f, -280f), new Vector2(700f, 44f), AccentTint.OnWhite(MenuAccents.Network), false);
+            MenuUiBuilder.MarkHeader(MenuUiBuilder.CreateText(connect, "OnlineTitle", "ONLINE (JOIN CODE)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                top, new Vector2(110f, -280f), new Vector2(700f, 44f), AccentTint.OnWhite(MenuAccents.Network), false), MenuAccents.Network);
             InputField code = MenuUiBuilder.CreateInputField(connect, "Code", "JOIN CODE", top, new Vector2(110f, -330f), fieldSize);
             code.characterLimit = JoinCodes.MaxLength;
             code.contentType = InputField.ContentType.Alphanumeric;
             MenuOption hostOnline = MenuUiBuilder.CreateMenuItem(connect, "HostOnline", "HOST ONLINE", top, new Vector2(110f, -410f), small);
             MenuOption joinOnline = MenuUiBuilder.CreateMenuItem(connect, "JoinOnline", "JOIN WITH CODE", top, new Vector2(110f, -488f), small);
             MenuOption back = MenuUiBuilder.CreateMenuItem(connect, "Back", "BACK", top, new Vector2(110f, -586f), small);
-            MenuUiBuilder.CreateText(connect, "LanTitle", "SAME NETWORK (LAN)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(960f, -280f), new Vector2(700f, 44f), AccentTint.OnWhite(MenuAccents.Network), false);
+            MenuUiBuilder.MarkHeader(MenuUiBuilder.CreateText(connect, "LanTitle", "SAME NETWORK (LAN)", 30, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                top, new Vector2(960f, -280f), new Vector2(700f, 44f), AccentTint.OnWhite(MenuAccents.Network), false), MenuAccents.Network);
             InputField address = MenuUiBuilder.CreateInputField(connect, "Address", "ADDRESS", top, new Vector2(960f, -330f), fieldSize);
             InputField port = MenuUiBuilder.CreateInputField(connect, "Port", "PORT", top, new Vector2(960f, -400f), fieldSize);
             MenuOption host = MenuUiBuilder.CreateMenuItem(connect, "Host", "HOST (LAN)", top, new Vector2(960f, -480f), small);
@@ -66,9 +66,9 @@ namespace Airerage.Editor
             // 待機所。
             RectTransform waiting = MenuUiBuilder.CreateFull(canvas, "OnlineWaiting");
             // 全面の白い背景（帯は NETWORK の色で右の端に。ボタンの外の文字は黒。2026-11-08）。
-            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(waiting, "Side", Vector2.zero, Vector2.one, FullBandLeft, FullStripLeft, 0f, MenuAccents.Network));
-            MenuUiBuilder.CreateText(waiting, "Title", "WAITING ROOM", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false);
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(waiting, "Side", Vector2.zero, Vector2.one, FullBandLeft, FullStripLeft, MenuAccents.Network));
+            MenuUiBuilder.StyleTitle(MenuUiBuilder.CreateText(waiting, "Title", "WAITING ROOM", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                top, new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false), MenuAccents.Network);
             Text info = MenuUiBuilder.CreateText(waiting, "Info", string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft,
                 top, new Vector2(94f, -150f), new Vector2(1400f, 40f), AccentTint.OnWhite(MenuAccents.Network), false);
             // 札を並べる場所（左。はみ出す分は縦にスクロールする。2026-11-03 のユーザーの要望）。札の位置は実行中に OnlineMenu が決める
@@ -158,7 +158,7 @@ namespace Airerage.Editor
             MenuOption copyCode = WaitingItem(waiting, "CopyCode", "COPY JOIN CODE", ref rowY, row, "CLIPBOARD", "コピー");
             MenuOption leave = WaitingItem(waiting, "Leave", "LEAVE", ref rowY, row, "EXIT ROOM", "退室");
             Text waitingMessage = MenuUiBuilder.CreateText(waiting, "Message", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                top, new Vector2(110f, -800f), new Vector2(1500f, 44f), MenuUiBuilder.Ink, false);
+                top, new Vector2(110f, -800f), new Vector2(1500f, 44f), MenuUiBuilder.InkSoft, false);
             MenuUiBuilder.CreateHint(waiting, "↑↓←→: select     Enter / A: OK     Esc / B: cancel ready, leave", "↑↓←→:選択　　Enter ／ A: 決定　　Esc ／ B: 準備完了の取り消し・退室");
             waiting.gameObject.SetActive(false);
 

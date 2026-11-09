@@ -111,8 +111,28 @@ namespace Airerage.PlayMode.Tests
                 Color bandColor = panel.BandColor;
                 Assert.That(new Vector3(bandColor.r, bandColor.g, bandColor.b),
                     Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "左の背景の帯が項目の色でない");
+                // 白い背景と試合の画面の境目は傾けて、段々の帯と菱形のドットでほどけさせる（D-92 の E2 + E3。2026-11-09）。
+                Assert.That(panel.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Right), "メインメニューの白い背景の右の端が境目になっていない");
+                float rhythmMin = 1f;
+                float rhythmMax = 0f;
+                for (float depth = 0f; depth < 1080f; depth += 5f)
+                {
+                    rhythmMin = Mathf.Min(rhythmMin, MainMenuPanel.DotRhythm(depth));
+                    rhythmMax = Mathf.Max(rhythmMax, MainMenuPanel.DotRhythm(depth));
+                }
+                Assert.That(rhythmMax - rhythmMin, Is.GreaterThan(0.5f), "ドットの大きさが高さで変わらない（縦の緩急がない）");
+                // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7）。縁の色は選んだ項目の色へ移る。
                 UnityEngine.UI.Text logo = backdrop.transform.Find("Logo").GetComponent<UnityEngine.UI.Text>();
-                Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.LessThan(0.5f), "左のロゴが黒でない");
+                Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.GreaterThan(2.9f), "左のロゴが白でない");
+                Assert.That(backdrop.Logo, Is.Not.Null, "左のロゴに縁取りがない");
+                yield return new WaitForSecondsRealtime(TitleStroke.AccentSeconds + 0.05f);
+                Color logoAccent = backdrop.Logo.Accent;
+                Assert.That(new Vector3(logoAccent.r, logoAccent.g, logoAccent.b),
+                    Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "ロゴの縁が選んだ項目の色に移らない");
+                TitleMark logoMark = logo.GetComponentInChildren<TitleMark>();
+                Assert.That(logoMark != null && logoMark.Kind == TitleMark.Shape.Diamond, Is.True, "ロゴの前に菱形の印がない");
+                Assert.That(logoMark.TryGetTextStart(out float logoLeft, out _), Is.True);
+                Assert.That(logoLeft, Is.EqualTo(logo.rectTransform.rect.xMin).Within(12f), "菱形の印の基準がロゴの左端にない（文字が動いた）");
                 Assert.That(menu.Single.Plate.Back, Is.LessThan(0.1f), "選んでいない項目の裏の札が残っている");
                 Assert.That(backdrop.Word, Is.EqualTo("TRAINING"), "背景の名前が変わらない（B7）");
                 Assert.That(backdrop.Description, Is.Not.Empty, "背景に説明を出さない（B7）");
@@ -122,7 +142,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(new Vector3(descriptionPlate.BorderColor.r, descriptionPlate.BorderColor.g, descriptionPlate.BorderColor.b),
                     Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "説明の札の縁が項目の色でない");
                 Color descriptionInk = backdrop.DescriptionPlate.Text.color;
-                Assert.That(descriptionInk.r + descriptionInk.g + descriptionInk.b, Is.LessThan(0.5f), "説明の文字が黒でない");
+                Assert.That(descriptionInk.r + descriptionInk.g + descriptionInk.b, Is.InRange(0.3f, 0.75f), "説明の文字が墨色でない（D-92 の T1）");
                 // 項目の色（2026-11-07）: 札の縁・裏の札・縁を回る光、右の見出しの札の縁と裏の札が項目の色。背景の色の光はない。
                 Color accent = menu.Training.Accent;
                 Assert.That(accent, Is.Not.EqualTo(menu.Single.Accent), "項目ごとに色が違わない");
@@ -139,7 +159,7 @@ namespace Airerage.PlayMode.Tests
                 Color face = heading.Plate.color;
                 Assert.That(face.r + face.g + face.b, Is.GreaterThan(2.7f), "見出しの札が白地でない");
                 Color word = heading.TextColor;
-                Assert.That(word.r + word.g + word.b, Is.LessThan(0.5f), "見出しの文字が黒でない");
+                Assert.That(word.r + word.g + word.b, Is.InRange(0.3f, 0.75f), "見出しの文字が墨色でない（D-92 の T1）");
                 // 左の絵は項目の色（2026-11-07）。
                 Color ink = menu.Training.GetComponentInChildren<MenuIcon>().Ink;
                 Assert.That(Mathf.Abs(ink.g - accent.g) < 0.2f && Mathf.Abs(ink.b - accent.b) < 0.2f, Is.True, "左の絵が項目の色でない");
@@ -366,12 +386,17 @@ namespace Airerage.PlayMode.Tests
                 foreach (AccentTint tint in characters.GetComponentsInChildren<AccentTint>(true))
                 {
                     // 白い背景は帯の色、白い背景の上の文字はモードの色を黒に寄せた色（2026-11-08）。
+                    // 縁取りした見出し（D-92 の T2）は、縁の色がモードの色（文字は白のまま）。
                     MainMenuPanel white = tint.GetComponent<MainMenuPanel>();
-                    Color actual = white != null ? white.BandColor : tint.GetComponent<UnityEngine.UI.Graphic>().color;
+                    TitleStroke stroke = tint.GetComponent<TitleStroke>();
+                    Color actual = white != null ? white.BandColor : stroke != null ? stroke.TargetAccent : tint.GetComponent<UnityEngine.UI.Graphic>().color;
                     Assert.That(SameHue(actual, tint.Expected(training)), Is.True, $"{tint.name} がモードの色でない");
                     tinted++;
                 }
                 Assert.That(tinted, Is.GreaterThan(3), "キャラクター選択に色を変える文字がない");
+                Assert.That(characters.GetComponentInChildren<TitleStroke>(true), Is.Not.Null, "キャラクター選択の見出しに縁取りがない");
+                MainMenuPanel backdrop = characters.GetComponentInChildren<MainMenuPanel>(true);
+                Assert.That(backdrop.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Both), "キャラクター選択の白い背景の左右の端が境目になっていない");
 
                 yield return Tap(keyboard, Key.Enter);
                 yield return WaitFor(() => menu.ShowingStageSelect, CharacterSelectScreen.SingleHoldSeconds + 3f, "ステージ選択へ進まない");
@@ -388,7 +413,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(heading.Word, Is.EqualTo(stages.Highlighted.DisplayName));
                 Assert.That(SameHue(heading.Plate.BorderColor, stageColor), Is.True, "見出しの札の縁がステージの色でない");
                 Color word = heading.TextColor;
-                Assert.That(word.r + word.g + word.b, Is.LessThan(0.5f), "見出しの文字が黒でない");
+                Assert.That(word.r + word.g + word.b, Is.InRange(0.3f, 0.75f), "見出しの文字が墨色でない（D-92 の T1）");
                 for (int i = 0; i < stages.Count; i++)
                 {
                     Color own = flow.Stages.Get(i).Color;

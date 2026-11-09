@@ -107,8 +107,8 @@ namespace Airerage.Net
         /// <summary>白い背景の上の知らせ（問題があるとき）の色（濃い橙。2026-11-08）。</summary>
         public static readonly Color ProblemOnWhite = new Color(0.78f, 0.33f, 0.02f);
 
-        // 白い背景の上の文字の色（黒に近い紺）。
-        private static readonly Color Ink = new Color(0.05f, 0.06f, 0.09f);
+        // 白い背景の上の説明の文の色（D-92 の T1。灰色に寄せた墨色。MenuUiBuilder.InkSoft と同じ。2026-11-09）。
+        private static readonly Color Ink = new Color(0.373f, 0.392f, 0.502f);
         private static readonly Color EmptyBorder = new Color(1f, 1f, 1f, 0.2f);
 
         private OnlineConnection _connection;

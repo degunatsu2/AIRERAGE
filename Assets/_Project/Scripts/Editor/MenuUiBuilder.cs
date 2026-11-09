@@ -89,7 +89,7 @@ namespace Airerage.Editor
                 plate.raycastTarget = false;
                 face.AddComponent<CanvasGroup>().alpha = 0f;
                 Text word = CreateText(rect, "Word", string.Empty, fontSize, FontStyle.Italic, TextAnchor.MiddleCenter,
-                    new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(maxWidth, height), new Color(0.05f, 0.06f, 0.09f), false);
+                    new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(maxWidth, height), Ink, false);
                 word.font = GameFonts.LatinBlack;
                 faces[i] = rect;
                 plates[i] = plate;
@@ -140,8 +140,54 @@ namespace Airerage.Editor
             return description;
         }
 
-        /// <summary>白い背景の上の文字の色（黒に近い紺。2026-11-08）。</summary>
-        public static readonly Color Ink = new Color(0.05f, 0.06f, 0.09f);
+        /// <summary>
+        /// 白い背景の上の文字の色（D-92 の T1。真っ黒をやめた、青みのある深い墨色。2026-11-09）。項目名・見出しの札・説明の札の文字。
+        /// </summary>
+        public static readonly Color Ink = new Color(0.165f, 0.173f, 0.263f);
+
+        /// <summary>白い背景の上の説明の文の色（D-92 の T1。灰色に寄せた墨色。待機所・キャラクター選択の案内）。</summary>
+        public static readonly Color InkSoft = new Color(0.373f, 0.392f, 0.502f);
+
+        /// <summary>
+        /// 白い背景の上の大きな見出し・ロゴ（D-92 の T2 + T7 の印。2026-11-09）: 文字を白にし、画面の色の太い縁取りと淡い色の影（TitleStroke）、
+        /// 文字の左に菱形の印（TitleMark）を付ける。画面の色は AccentTint で塗る（初めは accent）。同じ文字を返す。
+        /// </summary>
+        public static Text StyleTitle(Text title, Color accent)
+        {
+            title.color = Color.white;
+            var stroke = title.gameObject.AddComponent<TitleStroke>();
+            stroke.Configure(Mathf.Round(title.fontSize * 0.1f), Mathf.Round(title.fontSize * 0.13f), accent);
+            AddTitleMark(title, TitleMark.Shape.Diamond);
+            AccentTint.Mark(title);
+            return title;
+        }
+
+        /// <summary>白い背景の上の小見出しの左に「//」の印（D-92 の T7。画面の色。AccentTint で塗る）を付ける。同じ文字を返す。</summary>
+        public static Text MarkHeader(Text header, Color accent)
+        {
+            TitleMark mark = AddTitleMark(header, TitleMark.Shape.Slashes);
+            accent.a = 1f;
+            mark.color = accent;
+            AccentTint.Mark(mark);
+            return header;
+        }
+
+        // 文字の子に、親と同じ大きさの印を置く（印は文字の左の余白に描く）。
+        private static TitleMark AddTitleMark(Text text, TitleMark.Shape shape)
+        {
+            var go = new GameObject("Mark", typeof(RectTransform));
+            go.transform.SetParent(text.transform, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = text.rectTransform.pivot;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            var mark = go.AddComponent<TitleMark>();
+            mark.raycastTarget = false;
+            mark.Configure(text, shape);
+            return mark;
+        }
 
         /// <summary>
         /// クリックした所の火花の層（ClickSparks。2026-11-07）。parent の最後の子として画面いっぱいに置く（クリックは受け止めない）。
@@ -201,17 +247,21 @@ namespace Airerage.Editor
 
         /// <summary>
         /// 白い背景（MainMenuPanel。D-91 の M2 を白地に。2026-11-08）を anchorMin〜anchorMax に広げて置く。bandLeft・stripLeft は帯と細い帯の
-        /// 左端（地の幅に対する割合）、slant は地の左右の端の傾き。帯の色は accent（実行中に AccentTint や項目の選択で変わる）。
+        /// 左端（地の幅に対する割合）。帯の色は accent（実行中に AccentTint や項目の選択で変わる）。画面の端に付いていない側が試合の画面との
+        /// 境目になり、傾けて段々の帯と菱形のドットでほどけさせる（D-92。2026-11-09）。
         /// </summary>
         public static MainMenuPanel CreateWhitePanel(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, float bandLeft, float stripLeft,
-            float slant, Color accent)
+            Color accent)
         {
             RectTransform rect = CreateFull(parent, name);
             rect.anchorMin = anchorMin;
             rect.anchorMax = anchorMax;
             var panel = rect.gameObject.AddComponent<MainMenuPanel>();
             panel.raycastTarget = false;
-            panel.Configure(bandLeft, stripLeft, slant);
+            bool leftOpen = anchorMin.x > 0.001f;
+            bool rightOpen = anchorMax.x < 0.999f;
+            MainMenuPanel.EdgeSides edges = leftOpen ? MainMenuPanel.EdgeSides.Both : rightOpen ? MainMenuPanel.EdgeSides.Right : MainMenuPanel.EdgeSides.None;
+            panel.Configure(bandLeft, stripLeft, edges);
             panel.SetAccent(accent);
             return panel;
         }
@@ -402,7 +452,7 @@ namespace Airerage.Editor
             // 中は不透明な白、文字は黒（ユーザーの要望、2026-11-08。「はい」「いいえ」の札はそのまま）。縁は QUIT のイメージカラー。
             plate.Configure(0.12f, 4f, new Color(0.97f, 0.98f, 1f, 1f), MenuAccents.Quit);
             Text message = CreateText(panel.transform, "Message", QuitConfirmDialog.MessageJapanese, 40, FontStyle.Bold,
-                TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(980f, 90f), new Color(0.05f, 0.06f, 0.09f), false);
+                TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(980f, 90f), Ink, false);
             MenuOption yes = CreateMenuItem(panel.transform, "Yes", "はい", new Vector2(0.5f, 0f), new Vector2(-330f, 150f), new Vector2(300f, 76f));
             MenuOption no = CreateMenuItem(panel.transform, "No", "いいえ", new Vector2(0.5f, 0f), new Vector2(50f, 150f), new Vector2(300f, 76f));
             yes.SetSelectedShift(new Vector2(0f, 6f));

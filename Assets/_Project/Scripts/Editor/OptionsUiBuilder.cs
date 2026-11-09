@@ -37,9 +37,9 @@ namespace Airerage.Editor
         {
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "Options");
             // 左はメインメニューと同じ白い背景（帯は OPTIONS の色）、ボタンの外の文字は黒（2026-11-08）。
-            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.62f, 1f), 0.5f, 0.43f, 0f, MenuUiBuilder.OptionsAccent));
-            MenuUiBuilder.CreateText(panel, "Title", "OPTIONS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
-                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false);
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Side", Vector2.zero, new Vector2(0.62f, 1f), 0.5f, 0.43f, MenuUiBuilder.OptionsAccent));
+            MenuUiBuilder.StyleTitle(MenuUiBuilder.CreateText(panel, "Title", "OPTIONS", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(900f, 90f), MenuUiBuilder.Ink, false), MenuUiBuilder.OptionsAccent);
             var anchor = new Vector2(0f, 1f);
 
             MenuOption page = MenuUiBuilder.CreateMenuItem(panel, "Page", "PAGE", anchor, new Vector2(Left, -150f), new Vector2(Width, RowHeight));
@@ -74,10 +74,11 @@ namespace Airerage.Editor
             controlScroll.gameObject.AddComponent<ScrollToSelection>();
             const float keyX = Left + 330f;
             const float padX = Left + 700f;
-            MenuUiBuilder.CreateText(controls, "KeyboardHeader", "KEYBOARD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
-                new Vector2(keyX + 30f, -222f), new Vector2(320f, 36f), AccentTint.OnWhite(MenuUiBuilder.OptionsAccent), false);
-            MenuUiBuilder.CreateText(controls, "GamepadHeader", "GAMEPAD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
-                new Vector2(padX + 30f, -222f), new Vector2(280f, 36f), AccentTint.OnWhite(MenuUiBuilder.OptionsAccent), false);
+            // 列の小見出しの左に「//」の印（D-92 の T7。2026-11-09）。
+            MenuUiBuilder.MarkHeader(MenuUiBuilder.CreateText(controls, "KeyboardHeader", "KEYBOARD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
+                new Vector2(keyX + 30f, -222f), new Vector2(320f, 36f), AccentTint.OnWhite(MenuUiBuilder.OptionsAccent), false), MenuUiBuilder.OptionsAccent);
+            MenuUiBuilder.MarkHeader(MenuUiBuilder.CreateText(controls, "GamepadHeader", "GAMEPAD", 24, FontStyle.Bold, TextAnchor.MiddleLeft, anchor,
+                new Vector2(padX + 30f, -222f), new Vector2(280f, 36f), AccentTint.OnWhite(MenuUiBuilder.OptionsAccent), false), MenuUiBuilder.OptionsAccent);
             int actions = BindingSettings.Actions.Length;
             var keyCells = new Object[actions];
             var padCells = new Object[actions];

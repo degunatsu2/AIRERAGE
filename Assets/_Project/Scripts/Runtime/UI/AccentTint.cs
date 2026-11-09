@@ -79,6 +79,13 @@ namespace Airerage.Runtime.UI
                 panel.SetAccent(accent);
                 return;
             }
+            // 縁取りした見出し（D-92 の T2）は、文字は白のまま縁と影の色を変える（前の印もこの色に合わせる。2026-11-09）。
+            TitleStroke stroke = GetComponent<TitleStroke>();
+            if (stroke != null)
+            {
+                stroke.SetAccent(accent);
+                return;
+            }
             Graphic graphic = GetComponent<Graphic>();
             if (graphic == null)
             {

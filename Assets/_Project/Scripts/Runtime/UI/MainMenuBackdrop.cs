@@ -22,6 +22,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private DescriptionPlate _description;
         [Tooltip("左の背景（項目の色の帯。D-91）")]
         [SerializeField] private MainMenuPanel _panel;
+        [Tooltip("左上のロゴの縁取り（縁の色を選んだ項目の色に移す。D-92 の T2。2026-11-09）")]
+        [SerializeField] private TitleStroke _logo;
 
         private Vector2 _descriptionHome;
         private float _changedAt = -10f;
@@ -39,6 +41,9 @@ namespace Airerage.Runtime.UI
         /// <summary>左の背景（テスト用）。</summary>
         public MainMenuPanel Panel => _panel;
 
+        /// <summary>左上のロゴの縁取り（テスト用）。</summary>
+        public TitleStroke Logo => _logo;
+
         /// <summary>今出している説明（テスト用）。</summary>
         public string Description => _description != null ? _description.Value : string.Empty;
 
@@ -46,9 +51,11 @@ namespace Airerage.Runtime.UI
         public DescriptionPlate DescriptionPlate => _description;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(MenuOption[] items, string[] english, string[] japanese, HeadingPlate heading, DescriptionPlate description, MainMenuPanel panel)
+        public void Configure(MenuOption[] items, string[] english, string[] japanese, HeadingPlate heading, DescriptionPlate description, MainMenuPanel panel,
+            TitleStroke logo = null)
         {
             _panel = panel;
+            _logo = logo;
             _items = items;
             _english = english;
             _japanese = japanese;
@@ -98,6 +105,10 @@ namespace Airerage.Runtime.UI
             if (_panel != null && _items[index] != null)
             {
                 _panel.Select(index, _items[index].Accent);
+            }
+            if (_logo != null && _items[index] != null)
+            {
+                _logo.SetAccent(_items[index].Accent);
             }
             if (_description != null && _items[index] != null)
             {

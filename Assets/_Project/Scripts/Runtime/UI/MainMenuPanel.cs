@@ -10,8 +10,11 @@ namespace Airerage.Runtime.UI
     /// 項目ごとに少し右へずれる（0.35 秒）。見本のページ（メインメニューの背景の案）と同じ割合で描く。
     /// 帯は項目の色を白に寄せた淡い色にし、左の端だけ項目の色そのものの線を引く（項目の色の裏の札が帯に溶けて一部しか見えなかったので、
     /// 帯を淡くして裏の札を浮かせた。ユーザーの指摘、2026-11-08）。
-    /// メインメニューのほか、オプション・ステージ選択・アイテムを選ぶ画面・CPU LEVEL の左、ネットワークの画面と待機所の全面、キャラクター
-    /// 選択の真ん中にも置く（帯の位置と、左右の端の傾きを変えられる）。
+    /// 試合の画面との境目（D-92。ユーザーが選んだ E2 + E3。2026-11-09）: 境目の端を帯と同じ向きに傾け（高さの真ん中が元の位置）、その外に
+    /// 細くなっていく帯を 3 本、さらにその外に菱形のドットを斜めの格子に並べ、外へ行くほど小さくして試合の画面へほどけさせる。ドットの
+    /// 大きさは高さでもゆるやかに変わり、間隔に緩急が付く。帯とドットの色は、その端の地の色（右の端は帯の淡い色、左の端は白）。
+    /// メインメニューのほか、オプション・ステージ選択・アイテムを選ぶ画面・CPU LEVEL の左（右の端だけ）、キャラクター選択の真ん中（左右の
+    /// 端）、ネットワークの画面と待機所の全面（端なし）に置く。
     /// </summary>
     [RequireComponent(typeof(CanvasRenderer))]
     public sealed class MainMenuPanel : MaskableGraphic
@@ -33,14 +36,38 @@ namespace Airerage.Runtime.UI
         private const float StripeWidth = 3f;
         private const float StripeLean = 0.4663f;
 
+        /// <summary>試合の画面との境目の傾き（帯と同じ。高さ 1 に対する横のずれ）。</summary>
+        public const float EdgeLean = Skew;
+        // 境目の外の段々の帯（端からの距離・幅・濃さ。ピクセル）。
+        private static readonly Vector3[] EdgeStrips = { new Vector3(14f, 30f, 0.85f), new Vector3(56f, 18f, 0.62f), new Vector3(88f, 9f, 0.42f) };
+        // 菱形のドット: 端からの始まり、横の間隔（縦は半分ずつずらした斜めの格子）、列の数、濃さ。
+        private const float DotStart = 114f;
+        private const float DotStep = 20f;
+        private const int DotColumns = 13;
+        private const float DotAlpha = 0.8f;
+        // 高さでの大きさの緩急（2 つの波を重ねて、規則正しすぎない変化にする。周期はピクセル）。
+        private const float RhythmLong = 470f;
+        private const float RhythmShort = 190f;
+
+        /// <summary>試合の画面との境目がどこにあるか。</summary>
+        public enum EdgeSides
+        {
+            /// <summary>画面いっぱい（境目なし）。</summary>
+            None,
+            /// <summary>右の端だけ（左は画面の端）。</summary>
+            Right,
+            /// <summary>左右の端（キャラクター選択の真ん中）。</summary>
+            Both,
+        }
+
         [SerializeField] private Color _paper = new Color(0.95f, 0.96f, 0.975f, 1f);
         [SerializeField] private Color _stripe = new Color(0f, 0f, 0f, 0.05f);
         [Tooltip("帯の左端（地の幅に対する割合。真ん中の高さで）")]
         [SerializeField] private float _bandLeft = 0.5f;
         [Tooltip("細い帯の左端（地の幅に対する割合）")]
         [SerializeField] private float _stripLeft = 0.43f;
-        [Tooltip("地の左右の端の傾き（高さに対する、上の端の右へのずれの割合。0 なら四角）")]
-        [SerializeField] private float _slant;
+        [Tooltip("試合の画面との境目（傾けて、段々の帯と菱形のドットでほどけさせる端）")]
+        [SerializeField] private EdgeSides _edges;
 
         // 帯の今の状態（画面の切り替えの写しにも引き継ぐため、保存する値にする）。
         [SerializeField, HideInInspector] private int _index = -1;
@@ -66,12 +93,15 @@ namespace Airerage.Runtime.UI
         /// <summary>地の色（テスト用）。</summary>
         public Color Paper => _paper;
 
-        /// <summary>帯の左端・細い帯の左端（地の幅に対する割合）と、地の左右の端の傾き（シーンのビルダー用）。</summary>
-        public void Configure(float bandLeft, float stripLeft, float slant)
+        /// <summary>境目（テスト用）。</summary>
+        public EdgeSides Edges => _edges;
+
+        /// <summary>帯の左端・細い帯の左端（地の幅に対する割合）と、試合の画面との境目（シーンのビルダー用）。</summary>
+        public void Configure(float bandLeft, float stripLeft, EdgeSides edges)
         {
             _bandLeft = bandLeft;
             _stripLeft = stripLeft;
-            _slant = slant;
+            _edges = edges;
             _fromLeft = bandLeft;
             _toLeft = bandLeft;
             SetVerticesDirty();
@@ -150,17 +180,22 @@ namespace Airerage.Runtime.UI
             Rect r = GetPixelAdjustedRect();
             float now = Application.isPlaying ? Time.unscaledTime : 100000f;
             float tint = color.a;
+            bool right = _edges != EdgeSides.None;
+            bool left = _edges == EdgeSides.Both;
+            // 傾いた端は高さの真ん中で元の位置を通り、上は外へ、下は内へずれる。
+            float reach = r.height * 0.5f * EdgeLean;
+            float xMin = r.xMin - (left ? reach : 0f);
+            float xMax = r.xMax + (right ? reach : 0f);
 
             Color paper = _paper;
             paper.a *= tint;
-            AddPolygon(vh, r, new[] { new Vector2(r.xMin, r.yMin), new Vector2(r.xMin, r.yMax), new Vector2(r.xMax, r.yMax), new Vector2(r.xMax, r.yMin) }, paper);
-            // 左右の端が傾いているときは、地の外へ出た分を切る（下の AddPolygon が端で切る）。
+            AddPolygon(vh, r, new[] { new Vector2(xMin, r.yMin), new Vector2(xMin, r.yMax), new Vector2(xMax, r.yMax), new Vector2(xMax, r.yMin) }, paper);
 
             // 斜線の地模様（札と同じ向きに、上が右へ傾いた細い線）。
             Color stripe = _stripe;
             stripe.a *= tint;
             float rise = r.height * StripeLean;
-            for (float x = r.xMin - rise; x < r.xMax; x += StripePeriod)
+            for (float x = xMin - rise; x < xMax; x += StripePeriod)
             {
                 AddPolygon(vh, r, new[]
                 {
@@ -168,24 +203,81 @@ namespace Airerage.Runtime.UI
                 }, stripe);
             }
 
-            if (_index < 0)
+            Color band = paper;
+            if (_index >= 0)
             {
-                return;
+                Color accent = CurrentColor(now);
+                accent.a *= tint;
+                float half = r.height * 0.5f * Skew;
+                // 細い帯。
+                Color strip = accent;
+                strip.a *= StripAlpha;
+                float stripLeft = r.xMin + r.width * _stripLeft;
+                float stripRight = stripLeft + r.width * StripWidth;
+                AddPolygon(vh, r, Slanted(r, stripLeft, stripRight, half), strip);
+                // 大きな帯（右は地の外まで）。項目の色を白に寄せた淡い色で、左の端だけ項目の色そのものの線。
+                band = Color.Lerp(accent, new Color(1f, 1f, 1f, accent.a), BandTint);
+                float bandLeft = r.xMin + r.width * CurrentLeft(now);
+                AddPolygon(vh, r, Slanted(r, bandLeft, xMax + r.width + half, half), band);
+                AddPolygon(vh, r, Slanted(r, bandLeft, bandLeft + EdgeWidth, half), accent);
             }
-            Color accent = CurrentColor(now);
-            accent.a *= tint;
-            float half = r.height * 0.5f * Skew;
-            // 細い帯。
-            Color strip = accent;
-            strip.a *= StripAlpha;
-            float stripLeft = r.xMin + r.width * _stripLeft;
-            float stripRight = stripLeft + r.width * StripWidth;
-            AddPolygon(vh, r, Slanted(r, stripLeft, stripRight, half), strip);
-            // 大きな帯（右は地の外まで）。項目の色を白に寄せた淡い色で、左の端だけ項目の色そのものの線。
-            Color band = Color.Lerp(accent, new Color(1f, 1f, 1f, accent.a), BandTint);
-            float left = r.xMin + r.width * CurrentLeft(now);
-            AddPolygon(vh, r, Slanted(r, left, r.xMax + r.width + half, half), band);
-            AddPolygon(vh, r, Slanted(r, left, left + EdgeWidth, half), accent);
+
+            // 試合の画面との境目: 段々の帯と、ほどけていく菱形のドット（右の端は帯の色、左の端は地の色）。
+            if (right)
+            {
+                AddEdge(vh, r, r.xMax, 1f, _index >= 0 ? band : paper);
+            }
+            if (left)
+            {
+                AddEdge(vh, r, r.xMin, -1f, paper);
+            }
+        }
+
+        // 高さの真ん中で x = edge を通る傾いた端の外（side が 1 なら右、-1 なら左）に、段々の帯と菱形のドットを描く。
+        private static void AddEdge(VertexHelper vh, Rect r, float edge, float side, Color c)
+        {
+            float mid = r.center.y;
+            float half = r.height * 0.5f * EdgeLean;
+            foreach (Vector3 s in EdgeStrips)
+            {
+                float a = edge + side * s.x;
+                float b = edge + side * (s.x + s.y);
+                float lo = Mathf.Min(a, b);
+                float hi = Mathf.Max(a, b);
+                Color strip = c;
+                strip.a *= s.z;
+                AddRaw(vh, new[] { new Vector2(lo - half, r.yMin), new Vector2(lo + half, r.yMax), new Vector2(hi + half, r.yMax), new Vector2(hi - half, r.yMin) }, strip);
+            }
+            float rowStep = DotStep * 0.5f;
+            int row = 0;
+            for (float y = r.yMin + rowStep * 0.5f; y < r.yMax; y += rowStep, row++)
+            {
+                float edgeX = edge + EdgeLean * (y - mid);
+                float rhythm = DotRhythm(r.yMax - y);
+                for (int col = 0; col < DotColumns; col++)
+                {
+                    float fade = Mathf.Pow(1f - (float)col / DotColumns, 1.15f);
+                    float size = DotStep * 0.5f * fade * (0.35f + 0.65f * rhythm);
+                    if (size < 0.7f)
+                    {
+                        continue;
+                    }
+                    float x = edgeX + side * (DotStart + col * DotStep + (row % 2 == 1 ? DotStep * 0.5f : 0f));
+                    Color dot = c;
+                    dot.a *= DotAlpha * (0.6f + 0.4f * fade);
+                    AddRaw(vh, new[] { new Vector2(x, y + size), new Vector2(x + size, y), new Vector2(x, y - size), new Vector2(x - size, y) }, dot);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 菱形のドットの、高さでの大きさの緩急（0〜1。depth は上の端からのピクセル）。長い波と短い波を重ねて、ところどころ大きく
+        /// （詰まって）、ところどころ小さく（まばらに）なる。
+        /// </summary>
+        public static float DotRhythm(float depth)
+        {
+            float wave = 0.55f + 0.3f * Mathf.Cos(2f * Mathf.PI * depth / RhythmLong + 0.6f) + 0.2f * Mathf.Cos(2f * Mathf.PI * depth / RhythmShort + 2.1f);
+            return Mathf.Clamp01(wave);
         }
 
         // 真ん中の高さで left〜right の、上が右へ half だけずれた平行四辺形。
@@ -197,24 +289,37 @@ namespace Airerage.Runtime.UI
             };
         }
 
-        // 地の左右の端（傾いていることもある）で切ってから、凸の多角形として足す。
+        // 地の左右の端（境目なら傾いた線、画面の端ならまっすぐな線）で切ってから、凸の多角形として足す。
         private void AddPolygon(VertexHelper vh, Rect r, Vector2[] points, Color c)
         {
             Polygon.Clear();
             Polygon.AddRange(points);
-            float shift = r.height * _slant;
-            ClipX(Polygon, r.xMin, shift / Mathf.Max(1f, r.height), r.yMin, true);
-            ClipX(Polygon, r.xMax - shift, shift / Mathf.Max(1f, r.height), r.yMin, false);
+            float mid = r.center.y;
+            ClipX(Polygon, r.xMin, _edges == EdgeSides.Both ? EdgeLean : 0f, mid, true);
+            ClipX(Polygon, r.xMax, _edges != EdgeSides.None ? EdgeLean : 0f, mid, false);
             if (Polygon.Count < 3)
             {
                 return;
             }
+            AddConvex(vh, Polygon, c);
+        }
+
+        // 切らずに、凸の多角形として足す（境目の外の飾り）。
+        private static void AddRaw(VertexHelper vh, Vector2[] points, Color c)
+        {
+            Polygon.Clear();
+            Polygon.AddRange(points);
+            AddConvex(vh, Polygon, c);
+        }
+
+        private static void AddConvex(VertexHelper vh, List<Vector2> points, Color c)
+        {
             int start = vh.currentVertCount;
-            for (int i = 0; i < Polygon.Count; i++)
+            for (int i = 0; i < points.Count; i++)
             {
-                vh.AddVert(Polygon[i], c, Vector2.zero);
+                vh.AddVert(points[i], c, Vector2.zero);
             }
-            for (int i = 1; i + 1 < Polygon.Count; i++)
+            for (int i = 1; i + 1 < points.Count; i++)
             {
                 vh.AddTriangle(start, start + i, start + i + 1);
             }
