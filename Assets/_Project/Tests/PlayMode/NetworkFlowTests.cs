@@ -112,6 +112,18 @@ namespace Airerage.PlayMode.Tests
                 online.TeamHeader(3).Button.onClick.Invoke();
                 Assert.That(host.LocalSpectator, Is.False, "チームの見出しで観戦から戻れない");
                 Assert.That(host.LocalTeam, Is.EqualTo(4));
+                // 待機所の項目の「›››」（W17）と札の右の小さな説明（W16）。いちばん長い MY TEAM: YELLOW も、選んで右へ寄り説明が出ても
+                // 重ならずに収まる（2026-11-09 のユーザーの要望）。アイテムのモードを一巡して、DROP・PRESET の項目も確かめる。
+                yield return null;
+                Assert.That(online.TeamButton.LabelText.text, Is.EqualTo("MY TEAM: YELLOW"));
+                Assert.That(online.ModeButton.LabelText.text, Is.EqualTo("MODE: TEAM"));
+                for (int i = 0; i < 3; i++)
+                {
+                    AssertWaitingButtonsFit(online, $"アイテムのモード {host.Items.Mode}");
+                    online.ItemModeButton.Button.onClick.Invoke();
+                    yield return null;
+                    yield return null;
+                }
                 bot.LocalSpectator = true;
                 yield return WaitFor(() => host.Roster[1].Spectator, 10f, "相手が観戦の待機所に入らない");
                 yield return null;
@@ -121,6 +133,8 @@ namespace Airerage.PlayMode.Tests
                 yield return WaitFor(() => !host.Roster[1].Spectator && host.Roster[1].Team == 1, 10f, "観戦から見出しのチームに戻れない");
                 online.ModeButton.Button.onClick.Invoke();
                 yield return WaitFor(() => !bot.TeamMode, 10f, "個人戦に戻らない");
+                yield return null;
+                Assert.That(online.ModeButton.LabelText.text, Is.EqualTo("MODE: SOLO"), "個人戦の MODE の名前が SOLO でない");
 
                 // 待機所: 全員が READY でキャラクター選択へ。
                 online.ReadyButton.Button.onClick.Invoke();
@@ -247,6 +261,29 @@ namespace Airerage.PlayMode.Tests
             yield return null;
             InputSystem.QueueStateEvent(keyboard, new KeyboardState());
             yield return null;
+        }
+
+        // 待機所の出ている項目に「›››」と説明があり、名前が説明に重ならずに収まり、名前が短い表記になっているか（2026-11-09）。
+        private static void AssertWaitingButtonsFit(OnlineMenu online, string when)
+        {
+            string[] allowed = { "READY", "CANCEL READY", "MY TEAM: ", "MODE: ", "SPLIT: ", "RANDOM SPLIT", "ITEM: ", "QTY: ", "CUSTOM (", "DROP: ",
+                "TIME LIMIT: ", "COPY JOIN CODE", "CODE COPIED!", "LEAVE" };
+            int shown = 0;
+            foreach (MenuOption option in online.WaitingButtons)
+            {
+                if (!option.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+                shown++;
+                string label = option.LabelText.text;
+                Assert.That(option.Chevrons, Is.Not.Null, $"{label} に「›››」がない（{when}）");
+                Assert.That(option.Sub, Is.Not.Null, $"{label} に説明がない（{when}）");
+                Assert.That(option.Sub.text, Is.Not.Empty, $"{label} の説明が空（{when}）");
+                Assert.That(Array.Exists(allowed, a => label.StartsWith(a)), Is.True, $"{label} は短い表記でない（{when}）");
+                Assert.That(option.LabelFitsBesideSub, Is.True, $"{label} が説明「{option.Sub.text}」に重なる（{when}）");
+            }
+            Assert.That(shown, Is.GreaterThan(4), $"待機所の項目が少ない（{when}）");
         }
 
         private static IEnumerator WaitFor(Func<bool> condition, float seconds, string message)

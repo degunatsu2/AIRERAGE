@@ -95,6 +95,61 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        /// <summary>
+        /// 待機所の項目の「›››」と札の右の小さな説明（2026-11-09）: ホストとして待機所を開き、チーム対戦・アイテムのモードを変えながら
+        /// 項目を選んで撮る（Logs/Snapshots/Waiting_*.png）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureWaitingRoom()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            var menu = Object.FindFirstObjectByType<MenuScreens>();
+            menu.ContinueFromTitle();
+            menu.Transition.Complete();
+            yield return null;
+            menu.Network.Button.onClick.Invoke();
+            menu.Transition.Complete();
+            yield return null;
+            var online = Object.FindFirstObjectByType<Airerage.Net.OnlineMenu>();
+            online.PortField.text = "0";
+            online.NameField.text = "DEGU";
+            online.Host();
+            float start = Time.realtimeSinceStartup;
+            while (online.ShownPanel != "Waiting" && Time.realtimeSinceStartup - start < 5f)
+            {
+                yield return null;
+            }
+            menu.Transition.Complete();
+            yield return Wait(0.4f);
+            yield return Shoot(menu, online.ReadyButton, "Waiting_Ready");
+            online.ModeButton.Button.onClick.Invoke();
+            yield return null;
+            online.TeamHeader(3).Button.onClick.Invoke();
+            yield return Wait(0.2f);
+            yield return Shoot(menu, online.TeamButton, "Waiting_Team");
+            online.ItemModeButton.Button.onClick.Invoke();
+            yield return Wait(0.2f);
+            yield return Shoot(menu, online.DropPoolButton, "Waiting_Drop");
+            online.ItemModeButton.Button.onClick.Invoke();
+            yield return Wait(0.2f);
+            yield return Shoot(menu, online.ItemPickButton, "Waiting_Preset");
+            Object.FindFirstObjectByType<Airerage.Net.OnlineConnection>().Leave();
+            yield return null;
+        }
+
+        private static IEnumerator Shoot(MenuScreens menu, MenuOption option, string name)
+        {
+            EventSystem.current.SetSelectedGameObject(option.gameObject);
+            yield return Wait(0.6f);
+            Capture(menu, name);
+        }
+
         private static void Capture(MenuScreens menu, string name)
         {
             Camera camera = Object.FindFirstObjectByType<MenuCameraDrift>().GetComponent<Camera>();

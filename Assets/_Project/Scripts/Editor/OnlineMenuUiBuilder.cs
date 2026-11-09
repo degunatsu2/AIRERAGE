@@ -141,20 +141,22 @@ namespace Airerage.Editor
             // 参加コードのコピー、LEAVE。左のプレイヤーの札へも動けるように、上下左右で動く。
             var row = new Vector2(560f, 64f);
             float rowY = -200f;
-            MenuOption ready = WaitingItem(waiting, "Ready", "READY", ref rowY, row);
-            MenuOption team = WaitingItem(waiting, "Team", "MY TEAM: RED", ref rowY, row);
-            MenuOption mode = WaitingItem(waiting, "Mode", "MODE: FREE FOR ALL", ref rowY, row);
-            MenuOption split = WaitingItem(waiting, "Split", "SPLIT: 4 VS 4", ref rowY, row);
-            MenuOption shuffle = WaitingItem(waiting, "Shuffle", "RANDOM SPLIT", ref rowY, row);
+            // 名前の前の「›››」（W17）と、札の右にすべり出る小さな説明（W16。日本語の設定では日本語。2026-11-09 のユーザーの要望）。
+            // 名前は ››› と説明の分も収まるように短くした（MODE: SOLO、ITEM: NONE ／ DROP ／ PRESET、DROP: FEW ／ MID ／ MANY、QTY、CUSTOM）。
+            MenuOption ready = WaitingItem(waiting, "Ready", "READY", ref rowY, row, OnlineMenu.ReadySubEnglish, OnlineMenu.ReadySubJapanese);
+            MenuOption team = WaitingItem(waiting, "Team", "MY TEAM: RED", ref rowY, row, "SWITCH", "チーム");
+            MenuOption mode = WaitingItem(waiting, "Mode", "MODE: SOLO", ref rowY, row, "MATCH TYPE", "対戦の形式");
+            MenuOption split = WaitingItem(waiting, "Split", "SPLIT: 4 VS 4", ref rowY, row, "TEAM SIZES", "人数の配分");
+            MenuOption shuffle = WaitingItem(waiting, "Shuffle", "RANDOM SPLIT", ref rowY, row, "SHUFFLE", "振り分け");
             // アイテムのルール（docs/20_item_plan.md。並べ方は OnlineMenu が出す項目に合わせて詰める）。
-            MenuOption itemMode = WaitingItem(waiting, "ItemMode", "ITEMS: DEFAULT", ref rowY, row);
-            MenuOption itemCount = WaitingItem(waiting, "ItemCount", "START ITEM COUNT: 3", ref rowY, row);
-            MenuOption itemPick = WaitingItem(waiting, "ItemPick", "SELECT START ITEMS", ref rowY, row);
-            MenuOption dropRate = WaitingItem(waiting, "DropRate", "DROP RATE: MID", ref rowY, row);
-            MenuOption dropPool = WaitingItem(waiting, "DropPool", "SELECT DROP ITEMS", ref rowY, row);
-            MenuOption timeLimit = WaitingItem(waiting, "TimeLimit", "TIME LIMIT: ON", ref rowY, row);
-            MenuOption copyCode = WaitingItem(waiting, "CopyCode", "COPY JOIN CODE", ref rowY, row);
-            MenuOption leave = WaitingItem(waiting, "Leave", "LEAVE", ref rowY, row);
+            MenuOption itemMode = WaitingItem(waiting, "ItemMode", "ITEM: NONE", ref rowY, row, "ITEM MODE", "アイテム");
+            MenuOption itemCount = WaitingItem(waiting, "ItemCount", "QTY: 3", ref rowY, row, "START COUNT", "初期アイテム数");
+            MenuOption itemPick = WaitingItem(waiting, "ItemPick", "CUSTOM (0/3)", ref rowY, row, "PICK ITEMS", "初期アイテム選択");
+            MenuOption dropRate = WaitingItem(waiting, "DropRate", "DROP: MID", ref rowY, row, "DROP RATE", "ドロップ頻度");
+            MenuOption dropPool = WaitingItem(waiting, "DropPool", "CUSTOM (40/40)", ref rowY, row, "DROP POOL", "ドロップ選択");
+            MenuOption timeLimit = WaitingItem(waiting, "TimeLimit", "TIME LIMIT: ON", ref rowY, row, "TIMER", "制限時間");
+            MenuOption copyCode = WaitingItem(waiting, "CopyCode", "COPY JOIN CODE", ref rowY, row, "CLIPBOARD", "コピー");
+            MenuOption leave = WaitingItem(waiting, "Leave", "LEAVE", ref rowY, row, "EXIT ROOM", "退室");
             Text waitingMessage = MenuUiBuilder.CreateText(waiting, "Message", string.Empty, 26, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 top, new Vector2(110f, -800f), new Vector2(1500f, 44f), MenuUiBuilder.Ink, false);
             MenuUiBuilder.CreateHint(waiting, "↑↓←→: select     Enter / A: OK     Esc / B: cancel ready, leave", "↑↓←→:選択　　Enter ／ A: 決定　　Esc ／ B: 準備完了の取り消し・退室");
@@ -320,14 +322,18 @@ namespace Airerage.Editor
             return header;
         }
 
-        // 待機所の右の列の項目 1 つ（上から順に y を進める。上下左右で動く）。
-        private static MenuOption WaitingItem(Transform parent, string name, string label, ref float y, Vector2 size)
+        // 待機所の右の列の項目 1 つ（上から順に y を進める。上下左右で動く）。名前の前の「›››」（W17）と、札の右の小さな説明（W16。
+        // 英語 subEnglish、日本語 subJapanese）を付ける。
+        private static MenuOption WaitingItem(Transform parent, string name, string label, ref float y, Vector2 size,
+            string subEnglish, string subJapanese)
         {
             MenuOption item = MenuUiBuilder.CreateMenuItem(parent, name, label, new Vector2(0f, 1f), new Vector2(990f, y), size);
             item.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
             // 縁と裏の札は NETWORK の色（2026-11-08）。
             item.SetAccent(MenuAccents.Network, true);
-            // 長い項目（SPLIT: 2 VS 2 VS 2 VS 2 など）も 1 行のまま枠に収める（2026-11-03 の指摘）。
+            MenuUiBuilder.AddTextMotion(item, true, subEnglish, subJapanese);
+            // 長い項目（SPLIT: 2 VS 2 VS 2 VS 2 など）も 1 行のまま枠に収める（2026-11-03 の指摘）。「›››」で右へ寄り、右に説明が出ても
+            // 重ならない幅に収める（2026-11-09）。
             item.SetShrinkToFit(true);
             y -= size.y + 10f;
             return item;

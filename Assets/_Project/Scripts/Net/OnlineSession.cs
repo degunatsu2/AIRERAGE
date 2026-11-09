@@ -817,7 +817,8 @@ namespace Airerage.Net
             }
             if (!teamMode && players > MaxFreeForAllPlayers)
             {
-                return $"FREE FOR ALL IS UP TO {MaxFreeForAllPlayers} PLAYERS. SWITCH TO TEAM MODE";
+                // 待機所の MODE の札の名前（SOLO ／ TEAM）に合わせる（2026-11-09）。
+                return $"SOLO IS UP TO {MaxFreeForAllPlayers} PLAYERS. SWITCH MODE TO TEAM";
             }
             int teamCount = 0;
             for (uint bits = teams; bits != 0; bits &= bits - 1)

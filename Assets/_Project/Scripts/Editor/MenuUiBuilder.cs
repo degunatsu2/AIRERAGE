@@ -360,9 +360,11 @@ namespace Airerage.Editor
                 var go = new GameObject("Chevrons", typeof(RectTransform));
                 go.transform.SetParent(option.transform, false);
                 var marksRect = (RectTransform)go.transform;
-                marksRect.anchorMin = marksRect.anchorMax = new Vector2(0f, 0.5f);
+                // 高さは札に合わせる（待機所は項目が多いと札を低くする。2026-11-09）。
+                marksRect.anchorMin = new Vector2(0f, 0f);
+                marksRect.anchorMax = new Vector2(0f, 1f);
                 marksRect.pivot = new Vector2(0f, 0.5f);
-                marksRect.sizeDelta = new Vector2(ChevronMarks.WidthFor(height), height);
+                marksRect.sizeDelta = new Vector2(ChevronMarks.WidthFor(height), 0f);
                 // 名前の書き出しより少し左から（名前は ›› の分だけ右へ寄る）。
                 marksRect.anchoredPosition = new Vector2(option.LabelText.rectTransform.anchoredPosition.x - 12f * unit, 0f);
                 marks = go.AddComponent<ChevronMarks>();

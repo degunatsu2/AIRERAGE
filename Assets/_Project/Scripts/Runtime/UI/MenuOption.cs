@@ -47,6 +47,8 @@ namespace Airerage.Runtime.UI
         private const float SubTravel = 10f;
         private const float SubFadeSeconds = 0.16f;
         private const float SubMoveSeconds = 0.2f;
+        // 縮めて収めるとき、名前と W16 の説明の間に空ける幅（基準の札でのピクセル）。
+        private const float SubGap = 12f;
 
         [SerializeField] private SlantedPlate _plate;
         [SerializeField] private Text _label;
@@ -71,8 +73,10 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Text _sub;
         private Vector2[] _pinnedHomes;
 
-        // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。
+        // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。収めたときの W16 の説明の文（言語を変えて文が
+        // 変わったら収め直す）。
         private int _baseFontSize;
+        private string _fittedSub;
         private const int MinFitFontSize = 16;
 
         // 表の札の中は不透明（半透明だと、後ろに重なる裏の札が透けて見えた。ユーザーの指摘、2026-11-08）。
@@ -219,6 +223,25 @@ namespace Airerage.Runtime.UI
             _shrinkToFit = shrink;
         }
 
+        /// <summary>
+        /// W16 の小さな説明の文を変える（英語 en と日本語 ja。待機所の READY ／ CANCEL READY など、名前が変わる項目）。説明のない項目では
+        /// 何もしない。
+        /// </summary>
+        public void SetSub(string en, string ja)
+        {
+            if (_sub == null)
+            {
+                return;
+            }
+            LocalizedText localized = _sub.GetComponent<LocalizedText>();
+            if (localized != null && localized.English == en && localized.Japanese == ja)
+            {
+                return;
+            }
+            LocalizedText.Attach(_sub, en, ja);
+            FitLabel();
+        }
+
         // 字の大きさを、元の大きさから、文字の幅が枠に収まるまで小さくする（MinFitFontSize まで）。
         private void FitLabel()
         {
@@ -230,7 +253,8 @@ namespace Airerage.Runtime.UI
             {
                 _baseFontSize = _label.fontSize;
             }
-            float width = _label.rectTransform.rect.width;
+            _fittedSub = _sub != null ? _sub.text : null;
+            float width = FitWidth();
             int size = _baseFontSize;
             _label.fontSize = size;
             while (size > MinFitFontSize && _label.preferredWidth > width)
@@ -239,6 +263,31 @@ namespace Airerage.Runtime.UI
                 _label.fontSize = size;
             }
         }
+
+        // 名前を収める幅: 選んで W17 の「›››」の分だけ右へ寄り、札の右に W16 の説明が出ても重ならない幅（待機所。2026-11-09）。
+        // 名前と説明は札の子なので、札の中の位置で比べる（動いている途中でも、置き場所の位置で）。
+        private float FitWidth()
+        {
+            RectTransform label = _label.rectTransform;
+            bool awake = _rect != null;
+            float unit = awake ? _unit : Mathf.Max(0.5f, ((RectTransform)transform).rect.height / MotionUnitHeight);
+            float shift = _chevrons != null ? ChevronShift * unit : 0f;
+            float width = label.rect.width - shift;
+            if (_sub == null || string.IsNullOrEmpty(_sub.text))
+            {
+                return width;
+            }
+            RectTransform sub = _sub.rectTransform;
+            Vector2 labelHome = awake ? _labelHome : label.anchoredPosition;
+            Vector2 subHome = awake ? _subHome : sub.anchoredPosition;
+            float labelLeft = label.localPosition.x - (label.anchoredPosition.x - labelHome.x) + label.rect.xMin + shift;
+            float subRight = sub.localPosition.x - (sub.anchoredPosition.x - subHome.x) + sub.rect.xMax;
+            float subLeft = subRight - Mathf.Min(sub.rect.width, _sub.preferredWidth);
+            return Mathf.Min(width, subLeft - SubGap * unit - labelLeft);
+        }
+
+        /// <summary>名前が、選んで右へ寄り W16 の説明が出ても、説明に重ならずに収まっているか（テスト用）。</summary>
+        public bool LabelFitsBesideSub => _label == null || _label.preferredWidth <= FitWidth() + 0.5f;
 
         /// <summary>
         /// 項目の置き場所（選んでいないときの anchoredPosition）を変える（出す項目が変わる画面で並べ直す。待機所。docs/19 T9-5）。
@@ -479,6 +528,12 @@ namespace Airerage.Runtime.UI
         {
             float now = Time.unscaledTime;
             float dt = Time.unscaledDeltaTime;
+
+            // 言語を変えて W16 の説明の文が変わったら、名前を収め直す。
+            if (_shrinkToFit && _sub != null && _sub.text != _fittedSub)
+            {
+                FitLabel();
+            }
 
             // B13: 同じ親のほかの項目を選んでいる間は、暗く下げる。
             if (_recede)

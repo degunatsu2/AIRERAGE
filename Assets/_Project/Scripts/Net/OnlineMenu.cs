@@ -194,6 +194,9 @@ namespace Airerage.Net
         public MenuOption DropRateButton => _dropRate;
         public MenuOption DropPoolButton => _dropPool;
 
+        /// <summary>待機所の右の列の項目（上から順。出していない項目も含む。テスト用）。</summary>
+        public IEnumerable<MenuOption> WaitingButtons => WaitingOptions();
+
         /// <summary>列の見出し（t 番目。決定でそのチームに入る。個人戦は 0 番が PLAYERS。テスト用）と、観戦の待機所の見出し。</summary>
         public PlateButton TeamHeader(int t) => _teamHeaderButtons[t];
         public PlateButton SpectatorHeader => _spectatorHeader;
@@ -1131,8 +1134,16 @@ namespace Airerage.Net
             }
             RefreshHeaderButtons(session, teamMode, waiting, spectators);
             _ready.SetLabel(session.LocalReady ? "CANCEL READY" : "READY");
+            if (session.LocalReady)
+            {
+                _ready.SetSub(CancelReadySubEnglish, CancelReadySubJapanese);
+            }
+            else
+            {
+                _ready.SetSub(ReadySubEnglish, ReadySubJapanese);
+            }
             _team.SetLabel(session.LocalSpectator ? "MY TEAM: -" : $"MY TEAM: {Airerage.Runtime.Presentation.TeamColors.NameOf(session.LocalTeam)}");
-            _mode.SetLabel(teamMode ? "MODE: TEAM" : "MODE: FREE FOR ALL");
+            _mode.SetLabel(teamMode ? "MODE: TEAM" : "MODE: SOLO");
             List<int[]> patterns = Airerage.Core.Match.TeamRules.SizePatterns(players);
             if (patterns.Count == 0)
             {
@@ -1177,20 +1188,54 @@ namespace Airerage.Net
         private void RefreshItemOptions(OnlineSession session)
         {
             LobbyItems items = session.Items;
-            _itemMode.SetLabel(Loc.T($"ITEMS: {ItemSettings.ModeLabel(items.Mode)}", $"アイテム: {ItemSettings.ModeLabel(items.Mode)}"));
-            _itemCount.SetLabel(Loc.T($"START ITEM COUNT: {items.StartCount}", $"初期アイテム数: {items.StartCount}"));
+            // 名前は「›››」と札の右の説明の分も収まるように短い英語（日本語の設定でも。説明は日本語。2026-11-09 のユーザーの要望）。
+            _itemMode.SetLabel($"ITEM: {ItemModeLabel(items.Mode)}");
+            _itemCount.SetLabel($"QTY: {items.StartCount}");
             int picked = Mathf.Min(session.LocalStartItems.Count, items.StartCount);
-            _itemPick.SetLabel(Loc.T($"SELECT START ITEMS ({picked}/{items.StartCount})", $"初期アイテム選択（{picked}/{items.StartCount}）"));
-            _dropRate.SetLabel(Loc.T($"DROP RATE: {ItemSettings.RateLabel(items.DropRate)}", $"ドロップ頻度: {ItemSettings.RateLabel(items.DropRate)}"));
+            _itemPick.SetLabel($"CUSTOM ({picked}/{items.StartCount})");
+            _dropRate.SetLabel($"DROP: {DropRateLabel(items.DropRate)}");
             int pool = Airerage.Core.Items.ItemCatalog.CountIn(items.Pool);
-            _dropPool.SetLabel(Loc.T($"SELECT DROP ITEMS ({pool}/{Airerage.Core.Items.ItemCatalog.Count})",
-                $"ドロップアイテム選択（{pool}/{Airerage.Core.Items.ItemCatalog.Count}）"));
+            _dropPool.SetLabel($"CUSTOM ({pool}/{Airerage.Core.Items.ItemCatalog.Count})");
             foreach (MenuOption hostOnly in new[] { _itemMode, _itemCount, _dropRate, _dropPool })
             {
                 if (hostOnly.Button.interactable != session.IsHost)
                 {
                     hostOnly.SetAvailable(session.IsHost, "HOST");
                 }
+            }
+        }
+
+        /// <summary>待機所の READY の札の右の小さな説明（W16。英語と日本語）。準備完了の後は CANCEL READY の説明に変える。</summary>
+        public const string ReadySubEnglish = "I'M SET";
+        public const string ReadySubJapanese = "準備完了";
+        public const string CancelReadySubEnglish = "UNDO";
+        public const string CancelReadySubJapanese = "取り消し";
+
+        /// <summary>待機所のアイテムのモードの短い名前（NONE ／ DROP ／ PRESET。2026-11-09）。</summary>
+        public static string ItemModeLabel(Airerage.Core.Items.ItemMode mode)
+        {
+            switch (mode)
+            {
+                case Airerage.Core.Items.ItemMode.ItemDrop:
+                    return "DROP";
+                case Airerage.Core.Items.ItemMode.PreItem:
+                    return "PRESET";
+                default:
+                    return "NONE";
+            }
+        }
+
+        /// <summary>待機所のドロップ頻度の短い名前（FEW ／ MID ／ MANY。2026-11-09）。</summary>
+        public static string DropRateLabel(int rate)
+        {
+            switch (Mathf.Clamp(rate, 0, 2))
+            {
+                case 0:
+                    return "FEW";
+                case 2:
+                    return "MANY";
+                default:
+                    return "MID";
             }
         }
 
@@ -1217,7 +1262,7 @@ namespace Airerage.Net
             if (reason != null)
             {
                 problem = true;
-                return reason.StartsWith("FREE FOR ALL")
+                return reason.StartsWith("SOLO")
                     ? Loc.T(reason, $"個人戦は {OnlineSession.MaxFreeForAllPlayers} 人までです。MODE でチーム対戦にしてください")
                     : Loc.T(reason, "2 つ以上のチームに分かれてください");
             }
