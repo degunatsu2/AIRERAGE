@@ -83,6 +83,19 @@ namespace Airerage.PlayMode.Tests
             }
             float longer = runner.PlayerConfig.Wire.MaxLength * (1f + new Airerage.Core.Items.ItemTuning().LongHookPercent / 100f);
             Assert.That(aim.RangeRadius, Is.EqualTo(longer).Within(0.001f), "ロングフックの射程が照準の弧に出ない");
+
+            // カーソルの印（2026-11-12）: 照準器（途中の物に当たった点）とマウスカーソルが離れていれば出し、同じ所なら出さない。
+            Vector3 origin = view.transform.position;
+            Vector3 hit = origin + new Vector3(0f, 4f, 0f);
+            var ready = new Airerage.Core.Wire.WireState { Phase = Airerage.Core.Wire.WirePhase.Ready };
+            var blocked = new Airerage.Core.Wire.WireShotPreview(new Airerage.Core.Wire.WireAim(new System.Numerics.Vector3(0f, 1f, 0f), false, default),
+                Airerage.Core.Wire.WireShotResult.Attach, new System.Numerics.Vector3(hit.x, hit.y, 0f));
+            aim.Render(origin, ready, blocked, 12f, false, true, origin + new Vector3(0f, 9f, 0f));
+            Assert.That(aim.CursorShown, Is.True, "照準器がカーソルと離れているのに、カーソルの印が出ない");
+            aim.Render(origin, ready, blocked, 12f, false, true, hit);
+            Assert.That(aim.CursorShown, Is.False, "照準器とカーソルが同じ所なのに、カーソルの印が出る");
+            aim.Render(origin, ready, blocked, 12f, false, false, default);
+            Assert.That(aim.CursorShown, Is.False, "照準の指定がないのに、カーソルの印が出る");
         }
     }
 }

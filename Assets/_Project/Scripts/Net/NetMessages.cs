@@ -503,6 +503,9 @@ namespace Airerage.Net
         /// <summary>1 つの観戦の入力のメッセージに入れるティックの最大の数（8 人で約 6 KB。確実に届ける経路の大きさ 16 KB に収める）。</summary>
         public const int MaxSpectateTicks = 120;
 
+        // 1つの入力のバイト数（移動 X / Y、照準 X / Y、ボタン、照準の届く先。InputMessage と同じ並び。2026-11-12）。
+        private const int InputBytes = 7;
+
         /// <summary>
         /// 確定したティックの全員の入力（ホスト → 観戦の人）。ticks[i] はティック startTick + i の、プレイヤーの番号の順の入力（人数 players）。
         /// </summary>
@@ -533,6 +536,7 @@ namespace Airerage.Net
                         writer.Write(input.AimX);
                         writer.Write(input.AimY);
                         writer.Write((ushort)input.Buttons);
+                        writer.Write(input.AimReach);
                     }
                 }
                 writer.Flush();
@@ -551,7 +555,7 @@ namespace Airerage.Net
                 startTick = reader.ReadInt32();
                 int players = reader.ReadByte();
                 int count = reader.ReadUInt16();
-                if (players < 1 || data.Length != header + count * players * 6)
+                if (players < 1 || data.Length != header + count * players * InputBytes)
                 {
                     throw new FormatException($"観戦の入力のメッセージの長さが合いません（{count} ティック、{players} 人、{data.Length} バイト）");
                 }
@@ -566,7 +570,8 @@ namespace Airerage.Net
                         sbyte aimX = reader.ReadSByte();
                         sbyte aimY = reader.ReadSByte();
                         var buttons = (InputButtons)reader.ReadUInt16();
-                        ticks[i][p] = new PlayerInput(moveX, moveY, buttons, aimX, aimY);
+                        byte reach = reader.ReadByte();
+                        ticks[i][p] = new PlayerInput(moveX, moveY, buttons, aimX, aimY, reach);
                     }
                 }
             }
@@ -718,6 +723,7 @@ namespace Airerage.Net
                     writer.Write(input.AimX);
                     writer.Write(input.AimY);
                     writer.Write((ushort)input.Buttons);
+                    writer.Write(input.AimReach);
                 }
                 writer.Flush();
                 return stream.ToArray();
@@ -737,7 +743,7 @@ namespace Airerage.Net
                 fromTick = reader.ReadInt32();
                 startTick = reader.ReadInt32();
                 int count = reader.ReadUInt16();
-                if (data.Length != header + count * 6)
+                if (data.Length != header + count * InputBytes)
                 {
                     throw new FormatException($"抜けた知らせの長さが合いません（入力 {count} 個、{data.Length} バイト）");
                 }
@@ -749,7 +755,8 @@ namespace Airerage.Net
                     sbyte aimX = reader.ReadSByte();
                     sbyte aimY = reader.ReadSByte();
                     var buttons = (InputButtons)reader.ReadUInt16();
-                    inputs[i] = new PlayerInput(moveX, moveY, buttons, aimX, aimY);
+                    byte reach = reader.ReadByte();
+                    inputs[i] = new PlayerInput(moveX, moveY, buttons, aimX, aimY, reach);
                 }
             }
         }

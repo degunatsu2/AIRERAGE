@@ -113,17 +113,20 @@ namespace Airerage.PlayMode.Tests
                     Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "左の背景の帯が項目の色でない");
                 // 白い背景と試合の画面の境目は傾けて、段々の帯と菱形のドットでほどけさせる（D-92 の E2 + E3。2026-11-09）。
                 Assert.That(panel.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Right), "メインメニューの白い背景の右の端が境目になっていない");
-                float rhythmMin = 1f;
-                float rhythmMax = 0f;
-                for (float depth = 0f; depth < 1080f; depth += 5f)
+                // 段々の帯は 3 段の菱形のドットで、1 段目ほど間隔が狭く大きい（2026-11-12）。その外にドットはない。
+                Assert.That(MainMenuPanel.EdgeBandCount, Is.EqualTo(3), "段々の帯が 3 段でない");
+                for (int step = 1; step < MainMenuPanel.EdgeBandCount; step++)
                 {
-                    rhythmMin = Mathf.Min(rhythmMin, MainMenuPanel.DotRhythm(depth));
-                    rhythmMax = Mathf.Max(rhythmMax, MainMenuPanel.DotRhythm(depth));
+                    MainMenuPanel.EdgeBandDots(step - 1, out float innerStep, out float innerSize);
+                    MainMenuPanel.EdgeBandDots(step, out float outerStep, out float outerSize);
+                    Assert.That(outerStep, Is.GreaterThan(innerStep), $"{step + 1} 段目のドットの間隔が広くない");
+                    Assert.That(outerSize, Is.LessThan(innerSize), $"{step + 1} 段目のドットが小さくない");
                 }
-                Assert.That(rhythmMax - rhythmMin, Is.GreaterThan(0.5f), "ドットの大きさが高さで変わらない（縦の緩急がない）");
+                Assert.That(MainMenuPanel.EdgeReach, Is.LessThan(140f), "3 段目の外にもドットがある");
                 // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7）。縁の色は選んだ項目の色へ移る。
                 UnityEngine.UI.Text logo = backdrop.transform.Find("Logo").GetComponent<UnityEngine.UI.Text>();
                 Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.GreaterThan(2.9f), "左のロゴが白でない");
+                Assert.That(logo.text, Is.EqualTo("MAIN MENU"), "メインメニューの見出しが MAIN MENU でない（2026-11-12）");
                 Assert.That(backdrop.Logo, Is.Not.Null, "左のロゴに縁取りがない");
                 yield return new WaitForSecondsRealtime(TitleStroke.AccentSeconds + 0.05f);
                 Color logoAccent = backdrop.Logo.Accent;
@@ -343,6 +346,14 @@ namespace Airerage.PlayMode.Tests
                 count++;
             }
             Assert.That(count, Is.GreaterThan(3), "オプションの札がない");
+            // メインメニューのボタンの演出（小さな説明を除く）は、どの画面のボタンにも 1 つずつ付いている（2026-11-12）。
+            foreach (MenuOption option in menu.GetComponentsInChildren<MenuOption>(true))
+            {
+                Assert.That(option.Chevrons, Is.Not.Null, $"{option.name} に「›››」がない");
+                Assert.That(option.GetComponentsInChildren<ChevronMarks>(true).Length, Is.EqualTo(1), $"{option.name} の「›››」が重なっている");
+                Assert.That(option.Recedes, Is.True, $"{option.name} が、ほかの札を選んでいる間に下がらない");
+                Assert.That(option.AccentFuse, Is.True, $"{option.name} の導火線が札の色でない");
+            }
             // 以前は水色だった文字も OPTIONS の色（2026-11-08）。
             foreach (UnityEngine.UI.Text text in Object.FindFirstObjectByType<OptionsScreen>().GetComponentsInChildren<UnityEngine.UI.Text>(true))
             {
@@ -397,6 +408,9 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(characters.GetComponentInChildren<TitleStroke>(true), Is.Not.Null, "キャラクター選択の見出しに縁取りがない");
                 MainMenuPanel backdrop = characters.GetComponentInChildren<MainMenuPanel>(true);
                 Assert.That(backdrop.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Both), "キャラクター選択の白い背景の左右の端が境目になっていない");
+                // 白い背景は見出しがぎりぎり収まる幅で、アイコンの行は白い背景と同じ向きに傾けて並べる（上の行ほど右。2026-11-12）。
+                Assert.That(backdrop.rectTransform.anchorMax.x - backdrop.rectTransform.anchorMin.x, Is.LessThan(0.4f), "キャラクター選択の白い背景が広い");
+                Assert.That(characters.IconHome(0).x, Is.GreaterThan(characters.IconHome(4).x + 30f), "アイコンの行が斜めに並んでいない");
 
                 yield return Tap(keyboard, Key.Enter);
                 yield return WaitFor(() => menu.ShowingStageSelect, CharacterSelectScreen.SingleHoldSeconds + 3f, "ステージ選択へ進まない");

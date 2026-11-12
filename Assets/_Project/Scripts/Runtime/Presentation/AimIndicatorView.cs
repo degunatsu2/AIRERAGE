@@ -17,6 +17,8 @@ namespace Airerage.Runtime.Presentation
     /// 結果の色は 接続できる: 緑 / 接続できない物に当たる: 赤 / 届く接続先がない: 灰色。すぐに射出できない間（回収中・クールダウン中）は薄くする。
     /// 線と印の太さ・文字の大きさは画面の大きさ（ピクセル）で決める（カメラが引いた全画面でも細くならない）。
     /// 予測は WireTargeting.PredictShot（射出と同じ計算）。形は毎フレーム、頂点の色つきのメッシュに作り直す。状態を読むだけで、書き換えない。
+    /// 照準器はマウスカーソル（ゲームパッドは右スティックの倒し具合）の所に出し、途中で物に当たるならその点に出す。そのときと、カーソルが
+    /// 射程の外のときは、カーソルの所に小さく薄い照準器（カーソルの印【仮】）と、照準器からそこまでの薄い四角い点線を出す（2026-11-12）。
     /// </summary>
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public sealed class AimIndicatorView : MonoBehaviour
@@ -34,6 +36,14 @@ namespace Airerage.Runtime.Presentation
         private const float TickOuterPx = 9f;
         private const float RippleStartPx = 8f;
         private const float RippleEndPx = 38f;
+        // カーソルの印【仮】（小さく薄い照準器と、照準器からの薄い点線）。照準器からこれより離れたら出す。
+        private const float CursorRadiusPx = 12f;
+        private const float CursorWidthPx = 2f;
+        private const float CursorTickPx = 5f;
+        private const float CursorDashPx = 4f;
+        private const float CursorDashPeriodPx = 14f;
+        private const float CursorAlpha = 0.6f;
+        private const float CursorApartPx = 24f;
         private const float RangeArcWidthPx = 5f;
         private const float RangeRingWidthPx = 2f;
         private const float RangeArcDegrees = 25f;
@@ -91,6 +101,10 @@ namespace Airerage.Runtime.Presentation
         public int DashCount { get; private set; }
         public bool RippleShown { get; private set; }
 
+        /// <summary>カーソルの印を出しているか（照準器がカーソルと離れているとき）と、その位置（テスト用）。</summary>
+        public bool CursorShown { get; private set; }
+        public Vector3 CursorPoint { get; private set; }
+
         /// <summary>1 ピクセルが世界の何 m か（キャラクターの深さで。テスト用）。</summary>
         public float MetersPerPixel { get; private set; }
 
@@ -102,6 +116,29 @@ namespace Airerage.Runtime.Presentation
         {
             get => _baseColor;
             set => _baseColor = value;
+        }
+
+        /// <summary>
+        /// カーソルの印を出す位置を決める（照準の指定があるときだけ）。マウスで照準していればマウスカーソルの所（射程の外でもそのまま）、
+        /// ゲームパッドの右スティックなら、倒し具合で決めた届く先（origin から照準の方向へ）。
+        /// </summary>
+        public static bool TryGetCursor(Airerage.Runtime.Input.InputSystemAdapter input, in Airerage.Core.Input.PlayerInput shown,
+            in Airerage.Core.Input.InputFrame frame, Vector3 origin, WireTuning wire, out Vector3 cursor)
+        {
+            if (input != null && input.TryGetPointer(out System.Numerics.Vector3 pointer))
+            {
+                cursor = pointer.ToUnity();
+                return true;
+            }
+            if (shown.HasAim && shown.AimReach != 0 && frame.Aim.LengthSquared() > 1e-6f)
+            {
+                System.Numerics.Vector2 unit = System.Numerics.Vector2.Normalize(frame.Aim);
+                float distance = WireTargeting.AimDistance(wire, frame.Reach);
+                cursor = origin + new Vector3(unit.X, unit.Y, 0f) * distance;
+                return true;
+            }
+            cursor = default;
+            return false;
         }
 
         private void Awake()
@@ -125,9 +162,14 @@ namespace Airerage.Runtime.Presentation
             _labelText = null;
         }
 
-        /// <summary>照準を描く。hidden なら（透明の間。THIEF の E）すべて隠す。</summary>
-        public void Render(Vector3 origin, in WireState wire, in WireShotPreview preview, float maxLength, bool hidden = false)
+        /// <summary>
+        /// 照準を描く。hidden なら（透明の間。THIEF の E）すべて隠す。hasCursor なら cursor はマウスカーソル（ゲームパッドは右スティックで
+        /// 決めた届く先）の位置で、照準器と離れていればカーソルの印を出す。
+        /// </summary>
+        public void Render(Vector3 origin, in WireState wire, in WireShotPreview preview, float maxLength, bool hidden = false,
+            bool hasCursor = false, Vector3 cursor = default)
         {
+            CursorShown = false;
             _vertices.Clear();
             _colors.Clear();
             _triangles.Clear();
@@ -160,15 +202,30 @@ namespace Airerage.Runtime.Presentation
                 : _outOfRangeColor;
             ResultColor = Scaled(result);
 
+            // カーソルの印: 照準器（途中の物・射程の端）とカーソルが離れているときだけ。
+            Vector3 end0 = preview.EndPoint.ToUnity();
+            end0.z = Z;
+            cursor.z = Z;
+            bool showCursor = Aiming && hasCursor && Vector3.Distance(end0, cursor) > CursorApartPx * px;
+
             // 1 回目は暗い縁、2 回目は色（後から描いたものが上に重なる）。
             for (int pass = 0; pass < 2; pass++)
             {
                 bool outline = pass == 0;
                 DrawRange(flat, maxLength, direction, px, outline);
+                if (showCursor)
+                {
+                    DrawCursor(end0, cursor, px, outline);
+                }
                 if (Aiming)
                 {
                     DrawAim(flat, direction, preview, result, px, time, outline);
                 }
+            }
+            if (showCursor)
+            {
+                CursorShown = true;
+                CursorPoint = cursor;
             }
             if (Aiming)
             {
@@ -209,6 +266,39 @@ namespace Airerage.Runtime.Presentation
             else
             {
                 AddArc(center, radius, width, aim - span, aim + span, ArcSegments, baseColor);
+            }
+        }
+
+        // カーソルの印【仮】: 照準器から薄い四角い点線を伸ばし、カーソルの所に小さく薄い照準器（輪と 4 本の目盛り。回らない）。
+        private void DrawCursor(Vector3 end, Vector3 cursor, float px, bool outline)
+        {
+            Vector3 along = cursor - end;
+            float span = along.magnitude;
+            Vector3 unit = span > 1e-4f ? along / span : Vector3.right;
+            Color color = _baseColor;
+            color.a *= CursorAlpha;
+            color = Scaled(color);
+            Color outlineColor = Outline * new Color(1f, 1f, 1f, _alphaScale * CursorAlpha);
+            float period = CursorDashPeriodPx * px;
+            float from = (ReticleRadiusPx + 6f) * px;
+            float to = span - (CursorRadiusPx + 4f) * px;
+            for (float d = from; d < to; d += period)
+            {
+                float size = CursorDashPx * px;
+                Color dash = color;
+                dash.a *= 0.6f;
+                AddSquare(end + unit * d, unit, outline ? size + OutlinePx * 2f * px : size, outline ? outlineColor : dash);
+            }
+            float radius = CursorRadiusPx * px;
+            float width = (outline ? CursorWidthPx + OutlinePx * 2f : CursorWidthPx) * px;
+            AddArc(cursor, radius, width, 0f, Mathf.PI * 2f, ReticleSegments, outline ? outlineColor : color);
+            for (int k = 0; k < 4; k++)
+            {
+                float angle = k * Mathf.PI * 0.5f + Mathf.PI * 0.25f;
+                var dir = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+                Vector3 a = cursor + dir * (radius - CursorTickPx * 0.5f * px);
+                Vector3 b = cursor + dir * (radius + CursorTickPx * px);
+                AddSegment(outline ? a - dir * OutlinePx * px : a, outline ? b + dir * OutlinePx * px : b, width, outline ? outlineColor : color);
             }
         }
 

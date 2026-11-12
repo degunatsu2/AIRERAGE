@@ -62,6 +62,13 @@ namespace Airerage.Runtime.Input
         private Vector2 _pointerWorld;
         private float _aimStickDeadzone;
 
+        // 今のワイヤーの射程（m。アイテム・強化を含む。UpdateTargeting で覚える）。照準の届く先の割合を出すのに使う（2026-11-12）。
+        private float _wireRange;
+
+        // 右スティックをいちばん浅く倒したときの照準の届く先（射程に対する割合）と、いっぱいに倒したとみなす倒し具合。
+        private const float MinStickReach = 0.1f;
+        private const float FullStickTilt = 0.95f;
+
         // メーデーで場所を選んでいる間のカーソルと、選べる範囲。
         private System.Numerics.Vector2 _cursor;
         private System.Numerics.Vector2 _targetCenter;
@@ -144,6 +151,8 @@ namespace Airerage.Runtime.Input
         /// </summary>
         public void UpdateTargeting(in CharacterState state, CharacterConfig config, StageBounds? bounds)
         {
+            // 照準の届く先（マウスカーソルまでの距離・右スティックの倒し具合）を射程に対する割合にするため、今の射程を覚える。
+            _wireRange = config != null ? SpeedBoosts.EffectiveConfig(state, config).Wire.MaxLength : 0f;
             bool targeting = config != null && state.Combat.MaydayPhase == JuggernautRules.MaydaySelect;
             if (targeting && !Targeting)
             {
@@ -361,6 +370,15 @@ namespace Airerage.Runtime.Input
             return buttons;
         }
 
+        /// <summary>
+        /// マウスで照準しているとき、マウスカーソルのゲームの面の上の位置（射程の外でもそのまま。照準器と離れたときに印を出す。2026-11-12）。
+        /// </summary>
+        public bool TryGetPointer(out System.Numerics.Vector3 world)
+        {
+            world = new System.Numerics.Vector3(_pointerWorld.x, _pointerWorld.y, 0f);
+            return _hasPointer;
+        }
+
         private SimInput Build(System.Numerics.Vector3 position, InputButtons latched)
         {
             InputButtons buttons = (latched | Held()) & ~_suppressed;
@@ -374,14 +392,19 @@ namespace Airerage.Runtime.Input
             }
             if (_hasPointer)
             {
-                return input.WithAim(new System.Numerics.Vector2(_pointerWorld.x - position.X, _pointerWorld.y - position.Y));
+                // 照準はマウスカーソルの所（射程まで）。フックはそこまで飛ぶ（2026-11-12 のユーザーの要望）。
+                var toPointer = new System.Numerics.Vector2(_pointerWorld.x - position.X, _pointerWorld.y - position.Y);
+                return _wireRange > 0f ? input.WithAim(toPointer, toPointer.Length() / _wireRange) : input.WithAim(toPointer);
             }
             if (!UsingPointer)
             {
                 Vector2 aimStick = _aim.ReadValue<Vector2>();
-                if (aimStick.magnitude >= _aimStickDeadzone && aimStick.sqrMagnitude > 0f)
+                float tilt = aimStick.magnitude;
+                if (tilt >= _aimStickDeadzone && aimStick.sqrMagnitude > 0f)
                 {
-                    return input.WithAim(new System.Numerics.Vector2(aimStick.x, aimStick.y));
+                    // 右スティックの倒し具合で、照準の届く先を射程いっぱいまで動かす（2026-11-12 のユーザーの要望）。
+                    float reach = Mathf.Lerp(MinStickReach, 1f, Mathf.InverseLerp(_aimStickDeadzone, FullStickTilt, tilt));
+                    return input.WithAim(new System.Numerics.Vector2(aimStick.x, aimStick.y), reach);
                 }
             }
             return input;

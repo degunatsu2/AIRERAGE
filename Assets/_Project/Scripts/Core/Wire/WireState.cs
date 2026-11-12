@@ -88,6 +88,12 @@ namespace Airerage.Core.Wire
         /// <summary>フックが進んだ距離（Firing 中）。</summary>
         public float HookTraveled;
 
+        /// <summary>
+        /// このフックが飛べる距離（Firing 中。射出のときの照準の届く先。PC はマウスカーソル、ゲームパッドは右スティックの倒し具合で決まり、
+        /// 射程を超えない。途中で何にも当たらなければここで外れる。2026-11-12）。
+        /// </summary>
+        public float HookReach;
+
         /// <summary>エイムアシストで狙っているアンカーポイントがあるか。</summary>
         public bool HasTargetPoint;
 
@@ -143,6 +149,7 @@ namespace Airerage.Core.Wire
                 && HookPosition.Equals(other.HookPosition)
                 && HookDirection.Equals(other.HookDirection)
                 && HookTraveled.Equals(other.HookTraveled)
+                && HookReach.Equals(other.HookReach)
                 && HasTargetPoint == other.HasTargetPoint
                 && TargetPoint.Equals(other.TargetPoint)
                 && Anchor.Equals(other.Anchor)
@@ -168,6 +175,7 @@ namespace Airerage.Core.Wire
             hash.Add(HookPosition);
             hash.Add(HookDirection);
             hash.Add(HookTraveled);
+            hash.Add(HookReach);
             hash.Add(HasTargetPoint);
             hash.Add(TargetPoint);
             hash.Add(Anchor);

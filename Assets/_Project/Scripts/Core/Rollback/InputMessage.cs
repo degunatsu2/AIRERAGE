@@ -15,13 +15,13 @@ namespace Airerage.Core.Rollback
     public sealed class InputMessage
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const byte FormatVersion = 2;
+        public const byte FormatVersion = 3;
 
         /// <summary>1つのメッセージに入れる入力の最大の数。</summary>
         public const int MaxInputs = 255;
 
-        // 1つの入力のバイト数（移動 X / Y、照準 X / Y、ボタン）。
-        private const int InputBytes = 6;
+        // 1つの入力のバイト数（移動 X / Y、照準 X / Y、ボタン、照準の届く先。届く先は版 3 から。2026-11-12）。
+        private const int InputBytes = 7;
 
         private readonly List<PlayerInput> _inputs;
 
@@ -83,6 +83,7 @@ namespace Airerage.Core.Rollback
                     writer.Write(input.AimX);
                     writer.Write(input.AimY);
                     writer.Write((ushort)input.Buttons);
+                    writer.Write(input.AimReach);
                 }
                 writer.Flush();
                 return stream.ToArray();
@@ -126,7 +127,8 @@ namespace Airerage.Core.Rollback
                     sbyte aimX = reader.ReadSByte();
                     sbyte aimY = reader.ReadSByte();
                     var buttons = (InputButtons)reader.ReadUInt16();
-                    inputs[i] = new PlayerInput(moveX, moveY, buttons, aimX, aimY);
+                    byte reach = reader.ReadByte();
+                    inputs[i] = new PlayerInput(moveX, moveY, buttons, aimX, aimY, reach);
                 }
                 return new InputMessage(sender, senderTick, advantage, ack, startTick, inputs);
             }

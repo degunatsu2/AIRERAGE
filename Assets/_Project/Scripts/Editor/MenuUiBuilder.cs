@@ -404,8 +404,9 @@ namespace Airerage.Editor
             var rect = (RectTransform)option.transform;
             float height = rect.sizeDelta.y;
             float unit = height / 58f;
-            ChevronMarks marks = null;
-            if (chevrons)
+            // すでに付いているものは付け直さない（ほかの画面の札にまとめて付けるとき。2026-11-12）。
+            ChevronMarks marks = option.Chevrons;
+            if (chevrons && marks == null)
             {
                 var go = new GameObject("Chevrons", typeof(RectTransform));
                 go.transform.SetParent(option.transform, false);
@@ -421,8 +422,8 @@ namespace Airerage.Editor
                 marks.raycastTarget = false;
                 marks.color = option.Accent;
             }
-            Text sub = null;
-            if (!string.IsNullOrEmpty(subJapanese))
+            Text sub = option.Sub;
+            if (sub == null && !string.IsNullOrEmpty(subJapanese))
             {
                 // 初めは見えない（濃さは文字の色に持つ。選んだときに MenuOption が濃くする）。
                 Color hidden = option.Accent;
@@ -431,6 +432,40 @@ namespace Airerage.Editor
                     new Vector2(-30f * unit, 0f), new Vector2(300f, height), hidden, false), subJapanese);
             }
             option.ConfigureTextMotion(marks, sub);
+        }
+
+        /// <summary>
+        /// メインメニューのボタンの演出のうち、札の右の小さな説明（W16）と項目ごとの絵（B12）を除いたものを付ける（2026-11-12 のユーザーの
+        /// 要望: ほかの画面のボタンにも）。名前の前の「›››」（W17）、同じ並びのほかの札を選んでいる間は暗く下げる（B13。recedeAlpha は下げた
+        /// 濃さ）、導火線の光を札の色に（B1）。どれもすでに付いていれば付け直さない。B2・B3・B5・B9・B10・W1・W2 は MenuOption がどの札にも付ける。
+        /// 「›››」で名前が右へ寄っても札からはみ出さないように、名前を縮めて収める（大きさを合わせる名前は、寄る分だけ枠を狭める）。
+        /// </summary>
+        public static void ApplyMainMenuEffects(MenuOption option, float recedeAlpha)
+        {
+            bool hadChevrons = option.Chevrons != null;
+            AddTextMotion(option, true);
+            if (!option.Recedes)
+            {
+                option.SetRecede(true, recedeAlpha);
+            }
+            if (!option.AccentFuse)
+            {
+                option.SetAccent(option.Accent, true);
+            }
+            if (hadChevrons)
+            {
+                return;
+            }
+            Text label = option.LabelText;
+            if (label.resizeTextForBestFit)
+            {
+                float shift = MenuOption.ChevronShiftFor(((RectTransform)option.transform).sizeDelta.y);
+                label.rectTransform.sizeDelta -= new Vector2(shift, 0f);
+            }
+            else
+            {
+                option.SetShrinkToFit(true);
+            }
         }
 
         /// <summary>
@@ -539,8 +574,9 @@ namespace Airerage.Editor
                 // 上で右上の EXIT へ移れるように、向きは自動（押せない札は飛ばす）。
                 option.Button.navigation = new Navigation { mode = Navigation.Mode.Automatic };
                 option.SetSelectedShift(new Vector2(0f, 12f));
-                // 選んでいない項目は暗く下げる（D-88 の B13）。
+                // 選んでいない項目は暗く下げる（D-88 の B13）。メインメニューと同じ「›››」と導火線の色も（2026-11-12）。
                 option.SetRecede(true);
+                ApplyMainMenuEffects(option, MenuOption.RecedeAlpha);
             }
             // 右上の EXIT（ネットワーク対戦だけ。自分だけ部屋を出る。2026-11-03 のユーザーの要望）: 左に印（ドアと矢印）、右に EXIT。
             var exitSize = new Vector2(250f, 64f);
@@ -558,6 +594,8 @@ namespace Airerage.Editor
             iconRect.sizeDelta = new Vector2(46f, 46f);
             var exitIcon = iconObject.AddComponent<RawImage>();
             exitIcon.raycastTarget = false;
+            // メインメニューと同じ「›››」・下げ・導火線の色（2026-11-12）。
+            ApplyMainMenuEffects(exit, MenuOption.RecedeAlpha);
             // 案内の文字は、遊んでいるモードのイメージカラー（ResultsMenu が開くときに塗る。2026-11-08）。
             Text note = AccentTint.Mark(CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
                 bottom, new Vector2(0f, 46f), new Vector2(1400f, 40f), Accent));
@@ -597,9 +635,9 @@ namespace Airerage.Editor
             MenuOption menu = CreateMenuItem(panel, "BackToMenu", "BACK TO MENU", center, new Vector2(-260f, -70f), size);
             foreach (MenuOption option in new[] { resume, reset, menu })
             {
-                // 選んでいない項目は暗く下げる（D-88 の B13）。名前の前の「›››」（W17）。
+                // 選んでいない項目は暗く下げる（D-88 の B13）。名前の前の「›››」（W17）と導火線の色（メインメニューと同じ。2026-11-12）。
                 option.SetRecede(true);
-                AddTextMotion(option, true);
+                ApplyMainMenuEffects(option, MenuOption.RecedeAlpha);
             }
             Localize(CreateText(panel, "Hint", "Esc / Start: close    Enter / A: OK", 20, FontStyle.Bold, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -190f), new Vector2(800f, 40f), new Color(1f, 1f, 1f, 0.7f)),

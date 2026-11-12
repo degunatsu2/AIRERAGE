@@ -746,7 +746,7 @@ namespace Airerage.Core.Items
         {
             ItemBag bag = state.Items;
             int t = bag.ActTicks;
-            var still = new PlayerInput(0, 0, InputButtons.None, input.AimX, input.AimY);
+            var still = new PlayerInput(0, 0, InputButtons.None, input.AimX, input.AimY, input.AimReach);
             switch ((ItemId)bag.Act)
             {
                 case ItemId.Yaguraotoshi:
@@ -781,7 +781,7 @@ namespace Airerage.Core.Items
                     // 照準の方向へ急加速する（重力を受けない。地形に当たったら止まる。ジャンプとワイヤーは使わない）。
                     Vector2 velocity = bag.ActAim * tuning.RocketSpeed;
                     state.Velocity = new Vector3(velocity.X, velocity.Y, 0f);
-                    return new PlayerInput(0, 0, input.Buttons & ~(InputButtons.Jump | InputButtons.Wire), input.AimX, input.AimY);
+                    return new PlayerInput(0, 0, input.Buttons & ~(InputButtons.Jump | InputButtons.Wire), input.AimX, input.AimY, input.AimReach);
                 }
                 case ItemId.IcarusWing:
                     if (t < tuning.WingCastTicks)
@@ -792,7 +792,7 @@ namespace Airerage.Core.Items
                     // 飛んでいる: 上下左右の入力で、地上の速さで自由に動く（重力を受けない）。ジャンプとワイヤーは使わない。
                     Vector2 move = input.Move;
                     state.Velocity = new Vector3(move.X, move.Y, 0f) * config.Movement.RunSpeed;
-                    return new PlayerInput(0, 0, input.Buttons & ~(InputButtons.Jump | InputButtons.Wire), input.AimX, input.AimY);
+                    return new PlayerInput(0, 0, input.Buttons & ~(InputButtons.Jump | InputButtons.Wire), input.AimX, input.AimY, input.AimReach);
                 default:
                     state.Velocity = Vector3.Zero;
                     return still;

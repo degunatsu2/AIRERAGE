@@ -14,7 +14,7 @@ namespace Airerage.Core.Tests.Rollback
         {
             var inputs = new[]
             {
-                new PlayerInput(-127, 127, InputButtons.Jump | InputButtons.Wire, -90, 90),
+                new PlayerInput(-127, 127, InputButtons.Jump | InputButtons.Wire, -90, 90, 200),
                 PlayerInput.FromAxes(0.25f, -1f, InputButtons.None),
                 default(PlayerInput),
             };
@@ -28,7 +28,7 @@ namespace Airerage.Core.Tests.Rollback
             Assert.That(read.Ack, Is.EqualTo(1234567));
             Assert.That(read.StartTick, Is.EqualTo(1234500));
             Assert.That(read.Inputs, Is.EqualTo(inputs));
-            Assert.That(message.ToBytes().Length, Is.EqualTo(16 + 6 * inputs.Length), "16バイト＋1つの入力につき6バイト");
+            Assert.That(message.ToBytes().Length, Is.EqualTo(16 + 7 * inputs.Length), "16バイト＋1つの入力につき7バイト");
         }
 
         [Test]

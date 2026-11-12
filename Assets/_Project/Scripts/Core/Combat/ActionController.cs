@@ -212,7 +212,7 @@ namespace Airerage.Core.Combat
                 state.Combat.HoldVariant = (byte)CreamFlavor.Matcha;
             }
             const InputButtons taken = InputButtons.Wire | InputButtons.Attack;
-            input = new PlayerInput(input.MoveX, input.MoveY, input.Buttons & ~taken, input.AimX, input.AimY);
+            input = new PlayerInput(input.MoveX, input.MoveY, input.Buttons & ~taken, input.AimX, input.AimY, input.AimReach);
             frame = new InputFrame(input, state.PreviousButtons & ~taken);
         }
 
@@ -422,13 +422,13 @@ namespace Airerage.Core.Combat
             if (state.Action.IsFree && !IsRootedHold(state, combat))
             {
                 // フラックの構え（JUGGERNAUT の Q）の間は、その場から動かない（上下は弾道の段階を選ぶのに使う。JuggernautRules）。
-                return state.Combat.FlakStance ? new PlayerInput(0, 0, input.Buttons, input.AimX, input.AimY) : input;
+                return state.Combat.FlakStance ? new PlayerInput(0, 0, input.Buttons, input.AimX, input.AimY, input.AimReach) : input;
             }
             if (state.Wire.Whip && state.Action.Kind != ActionKind.Hitstun)
             {
                 // インバータの鞭（つながっていない電気のワイヤー）は、押している間は攻撃・技・ガードをしても続く（ワイヤーのボタンと照準を
                 // 残す。ユーザーの要望、2026-10-22）。のけぞったら回収する。
-                return new PlayerInput(0, 0, input.Buttons & ~InputButtons.Jump, input.AimX, input.AimY);
+                return new PlayerInput(0, 0, input.Buttons & ~InputButtons.Jump, input.AimX, input.AimY, input.AimReach);
             }
             bool walk = (state.Action.Kind == ActionKind.Attack && combat.Get(state.Action.Attack).Mobile)
                 || (state.Action.Kind == ActionKind.Guard && combat.GuardWalk && grounded);
@@ -455,7 +455,7 @@ namespace Airerage.Core.Combat
         {
             InputButtons buffered = state.Combat.HitstopPresses;
             state.Combat.HitstopPresses = InputButtons.None;
-            effectiveInput = new PlayerInput(input.MoveX, input.MoveY, input.Buttons | buffered, input.AimX, input.AimY);
+            effectiveInput = new PlayerInput(input.MoveX, input.MoveY, input.Buttons | buffered, input.AimX, input.AimY, input.AimReach);
             return new InputFrame(effectiveInput, state.PreviousButtons & ~buffered);
         }
 

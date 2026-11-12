@@ -59,18 +59,33 @@ namespace Airerage.Core.Input
         public readonly sbyte AimX;
         public readonly sbyte AimY;
 
+        /// <summary>
+        /// 照準の届く先（ワイヤーの射程に対する割合を 255 段階に。0 は指定なしで射程いっぱい）。PC はマウスカーソルまでの距離、
+        /// ゲームパッドは右スティックの倒し具合（2026-11-12 のユーザーの要望。フックはそこまで飛び、途中で何にも当たらなければ外れる）。
+        /// </summary>
+        public readonly byte AimReach;
+
+        /// <summary>届く先の段階の数（AimReach の最大）。</summary>
+        public const int ReachMax = 255;
+
         public PlayerInput(sbyte moveX, sbyte moveY, InputButtons buttons)
-            : this(moveX, moveY, buttons, 0, 0)
+            : this(moveX, moveY, buttons, 0, 0, 0)
         {
         }
 
         public PlayerInput(sbyte moveX, sbyte moveY, InputButtons buttons, sbyte aimX, sbyte aimY)
+            : this(moveX, moveY, buttons, aimX, aimY, 0)
+        {
+        }
+
+        public PlayerInput(sbyte moveX, sbyte moveY, InputButtons buttons, sbyte aimX, sbyte aimY, byte aimReach)
         {
             MoveX = moveX;
             MoveY = moveY;
             Buttons = buttons;
             AimX = aimX;
             AimY = aimY;
+            AimReach = aimReach;
         }
 
         /// <summary>-1〜1 のスティック値を量子化して作る（照準の指定なし）。</summary>
@@ -90,6 +105,24 @@ namespace Airerage.Core.Input
             Vector2 unit = direction / length;
             return new PlayerInput(MoveX, MoveY, Buttons, Quantize(unit.X), Quantize(unit.Y));
         }
+
+        /// <summary>
+        /// 照準の方向と届く先（射程に対する割合 0〜1。PC はマウスカーソルまでの距離、ゲームパッドは右スティックの倒し具合）を指定した
+        /// 入力を作る。割合はいちばん小さくても 1 段階（0 は「指定なし」なので使わない）。
+        /// </summary>
+        public PlayerInput WithAim(Vector2 direction, float reach)
+        {
+            PlayerInput aimed = WithAim(direction);
+            if (!aimed.HasAim)
+            {
+                return aimed;
+            }
+            int steps = (int)MathF.Round(Math.Clamp(reach, 0f, 1f) * ReachMax);
+            return new PlayerInput(MoveX, MoveY, Buttons, aimed.AimX, aimed.AimY, (byte)Math.Clamp(steps, 1, ReachMax));
+        }
+
+        /// <summary>照準の届く先（ワイヤーの射程に対する割合。指定がなければ 1）。</summary>
+        public float Reach => AimReach == 0 ? 1f : AimReach / (float)ReachMax;
 
         /// <summary>照準の方向が指定されているか。</summary>
         public bool HasAim => AimX != 0 || AimY != 0;
@@ -116,7 +149,7 @@ namespace Airerage.Core.Input
         public bool Equals(PlayerInput other)
         {
             return MoveX == other.MoveX && MoveY == other.MoveY && Buttons == other.Buttons
-                && AimX == other.AimX && AimY == other.AimY;
+                && AimX == other.AimX && AimY == other.AimY && AimReach == other.AimReach;
         }
 
         public override bool Equals(object obj)
@@ -126,12 +159,16 @@ namespace Airerage.Core.Input
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(MoveX, MoveY, Buttons, AimX, AimY);
+            return HashCode.Combine(MoveX, MoveY, Buttons, AimX, AimY, AimReach);
         }
 
         public override string ToString()
         {
-            return HasAim ? $"({MoveX}, {MoveY}) {Buttons} aim=({AimX}, {AimY})" : $"({MoveX}, {MoveY}) {Buttons}";
+            if (!HasAim)
+            {
+                return $"({MoveX}, {MoveY}) {Buttons}";
+            }
+            return AimReach == 0 ? $"({MoveX}, {MoveY}) {Buttons} aim=({AimX}, {AimY})" : $"({MoveX}, {MoveY}) {Buttons} aim=({AimX}, {AimY}) reach={AimReach}";
         }
 
         private static sbyte Quantize(float value)
@@ -151,6 +188,9 @@ namespace Airerage.Core.Input
         /// <summary>ワイヤーの照準に使う方向。照準の指定があればそれ、なければ移動のスティック。</summary>
         public readonly Vector2 Aim;
 
+        /// <summary>照準の届く先（ワイヤーの射程に対する割合。照準の指定がないか、届く先の指定がなければ 1）。</summary>
+        public readonly float Reach;
+
         public readonly InputButtons Held;
         public readonly InputButtons Pressed;
         public readonly InputButtons Released;
@@ -159,6 +199,7 @@ namespace Airerage.Core.Input
         {
             Move = current.Move;
             Aim = current.HasAim ? current.Aim : Move;
+            Reach = current.HasAim ? current.Reach : 1f;
             Held = current.Buttons;
             Pressed = current.Buttons & ~previous;
             Released = previous & ~current.Buttons;

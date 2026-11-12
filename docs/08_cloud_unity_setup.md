@@ -162,6 +162,7 @@ exit 0
 | テンプレート | `com.unity.template.urp-blank` 17.1.0 をレジストリから取得し、SHA1 一致（約30MB。ダウンロード URL は別のホストへのリダイレクトなので `curl -L` が必要） |
 | プロジェクトの作成（`-createProject -cloneFromTemplate`） | 成功（約310秒）。コンパイルエラー 0。音声デバイスがないため ALSA / FMOD のエラーが出るが、動作には影響しない |
 | Git LFS へのアップロード（`git lfs push`） | 初めは `lfs.github.com` が環境のネットワークポリシーで遮断された（403）。ユーザーが Allowed domains に `lfs.github.com` を追加した後は、アップロードできた（24KB の画像で確認）。リポジトリには `git lfs install --local --skip-smudge` で pre-push フックを入れてある（クラウドのセッションごとに必要） |
+| Git LFS のダウンロード（`git lfs pull`。2026-11-12） | リポジトリの名前が `degunatsu2/AIRERAGE` に変わり、古い名前の URL の LFS の問い合わせが転送（307）になって、`git lfs pull` が止まったままになった。クラウドのセッションでは、クローンした後に `git config lfs.url https://github.com/degunatsu2/AIRERAGE.git/info/lfs` を入れると取り込める（アップロードも同じ）。アップロードには `git lfs install --local --skip-smudge` も要る |
 | リポジトリのプロジェクトを開いて EditMode テスト（`-runTests -testPlatform EditMode`） | **49件すべて成功**（`Airerage.Core.Tests`、8つのテストクラス）。コンパイルエラー 0、警告 0。初回は約125秒（インポートを含む）、2回目は約26秒。既存の `.meta` は書き換えられなかった |
 
 ## 7. エディタの更新（2026-10-31、セキュリティ情報への対応）

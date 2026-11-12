@@ -16,9 +16,9 @@ namespace Airerage.Core.Rollback
     {
         /// <summary>
         /// 1つのメッセージに入れる入力の最大の数。通信路が一度に送れる大きさ（約1400バイト）に収まるようにする
-        /// （16 バイト＋180 × 6 バイト = 1096 バイト）。
+        /// （16 バイト＋160 × 7 バイト = 1136 バイト。入力に照準の届く先の 1 バイトを足したので 180 から減らした。2026-11-12）。
         /// </summary>
-        public const int MaxInputsPerMessage = 180;
+        public const int MaxInputsPerMessage = 160;
 
         private readonly RollbackSession _session;
         private readonly RollbackSettings _settings;

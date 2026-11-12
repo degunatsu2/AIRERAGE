@@ -115,5 +115,93 @@ namespace Airerage.Core.Tests.Wire
             Assert.That(target.Y, Is.EqualTo(StandingY + 10f).Within(1e-4f));
             Assert.That(big.AnchorRadii[0], Is.EqualTo(2f));
         }
-    }
+    
+        // ---- 照準の届く先（マウスカーソル・右スティックの倒し具合。2026-11-12 のユーザーの要望） ----
+
+        [Test]
+        public void PredictShot_WithReach_EndsAtTheCursor_WhenNothingIsInTheWay()
+        {
+            // 天井（8m）より手前の 4m を狙う: 照準器はカーソルの所（外れる）。
+            var tuning = new WireTuning();
+            float reach = 4f / tuning.MaxLength;
+
+            WireShotPreview preview = WireTargeting.PredictShot(Origin, Up, 1, tuning, GroundWithCeiling(attachable: true), reach);
+
+            Assert.That(preview.Result, Is.EqualTo(WireShotResult.OutOfRange), "カーソルの先の天井へ届いてしまう");
+            Assert.That(preview.EndPoint.Y, Is.EqualTo(StandingY + 4f).Within(1e-3f), "照準器がカーソルの所にない");
+        }
+
+        [Test]
+        public void PredictShot_WithReach_AttachesToWhatIsInTheWay()
+        {
+            // 天井（8m）の先の 10m を狙う: 途中の天井につながる（照準器は天井。カーソルの所には別の印を出す）。
+            var tuning = new WireTuning();
+            float reach = 10f / tuning.MaxLength;
+
+            WireShotPreview preview = WireTargeting.PredictShot(Origin, Up, 1, tuning, GroundWithCeiling(attachable: true), reach);
+
+            Assert.That(preview.Result, Is.EqualTo(WireShotResult.Attach));
+            Assert.That(preview.EndPoint.Y, Is.EqualTo(8f).Within(1e-3f));
+        }
+
+        [Test]
+        public void PredictShot_WithReach_StillAttaches_WhenTheCursorIsJustShortOfASurface()
+        {
+            // 天井の 0.6m 手前を狙っても、余裕（ReachMargin 1m）の中なので天井につながる。余裕の外なら外れる。
+            var tuning = new WireTuning();
+            BoxTerrain terrain = GroundWithCeiling(attachable: true);
+            float near = (8f - StandingY - 0.6f) / tuning.MaxLength;
+            float far = (8f - StandingY - 1.6f) / tuning.MaxLength;
+
+            Assert.That(WireTargeting.PredictShot(Origin, Up, 1, tuning, terrain, near).Result, Is.EqualTo(WireShotResult.Attach), "面の少し手前でつながらない");
+            Assert.That(WireTargeting.PredictShot(Origin, Up, 1, tuning, terrain, far).Result, Is.EqualTo(WireShotResult.OutOfRange), "余裕より手前でもつながる");
+        }
+
+        [Test]
+        public void AimAssist_WithReach_SkipsAnchorsFarBeyondTheCursor()
+        {
+            // 真上 10m のアンカー: カーソルが 4m なら選ばない。9.5m（判定の半径の中）なら選ぶ。
+            var tuning = new WireTuning();
+            BoxTerrain terrain = TestArenas.Ground().AddAnchor(0f, StandingY + 10f);
+            var up = new Vector3(0f, 1f, 0f);
+
+            Assert.That(WireTargeting.TryFindAssistTarget(Origin, up, tuning, terrain, out _, 4f / tuning.MaxLength), Is.False, "カーソルの先の遠いアンカーを選んだ");
+            Assert.That(WireTargeting.TryFindAssistTarget(Origin, up, tuning, terrain, out _, 9.5f / tuning.MaxLength), Is.True, "カーソルの近くのアンカーを選ばない");
+            Assert.That(WireTargeting.TryFindAssistTarget(Origin, up, tuning, terrain, out _), Is.True, "届く先の指定がなければ今までどおり");
+        }
+
+        [Test]
+        public void Fire_WithReach_MissesAtTheCursor_AndAttachesWhenTheCursorIsOnTheCeiling()
+        {
+            var harness = new SimHarness(GroundWithCeiling(attachable: true));
+            float maxLength = harness.Config.Wire.MaxLength;
+            PlayerInput shortShot = PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(Up, 4f / maxLength);
+
+            harness.Step(shortShot);
+            Assert.That(harness.State.Wire.HookReach, Is.EqualTo(4f + harness.Config.Wire.ReachMargin).Within(0.1f), "フックが飛べる距離がカーソルまでになっていない");
+            harness.StepUntil(s => s.Wire.Phase != WirePhase.Firing, shortShot, 60);
+            Assert.That(harness.State.Wire.Phase, Is.Not.EqualTo(WirePhase.Attached), "カーソルの先の天井につながった");
+            Assert.That(harness.State.Wire.LastMissReason, Is.EqualTo(WireMissReason.OutOfRange));
+
+            var second = new SimHarness(GroundWithCeiling(attachable: true));
+            PlayerInput onCeiling = PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(Up, 8f / maxLength);
+            second.StepUntil(s => s.Wire.Phase == WirePhase.Attached, onCeiling, 60);
+            Assert.That(second.State.Wire.Phase, Is.EqualTo(WirePhase.Attached), "カーソルを天井に置いてもつながらない");
+            Assert.That(second.State.Wire.Anchor.Y, Is.EqualTo(8f).Within(1e-3f));
+        }
+
+        [Test]
+        public void Reach_IsQuantized_AndKeptOnlyOnTheWirePressTick()
+        {
+            PlayerInput aimed = PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(Up, 0.5f);
+            Assert.That(aimed.Reach, Is.EqualTo(0.5f).Within(1f / PlayerInput.ReachMax), "届く先が量子化されない");
+            Assert.That(PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(Up, 0f).AimReach, Is.EqualTo(1), "0 は指定なしと区別できない");
+            Assert.That(PlayerInput.FromAxes(0f, 0f, InputButtons.None).WithAim(Up).Reach, Is.EqualTo(1f), "届く先の指定がなければ射程いっぱい");
+
+            PlayerInput pressed = Airerage.Core.Rollback.InputNormalizer.Normalize(aimed, default, 0);
+            PlayerInput held = Airerage.Core.Rollback.InputNormalizer.Normalize(aimed, pressed, 0);
+            Assert.That(pressed.AimReach, Is.EqualTo(aimed.AimReach), "撃つティックの届く先が消えた");
+            Assert.That(held.AimReach, Is.EqualTo(0), "押し続けている間も届く先が残っている（予測が外れやすくなる）");
+        }
+}
 }

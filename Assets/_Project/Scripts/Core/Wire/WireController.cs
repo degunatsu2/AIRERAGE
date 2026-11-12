@@ -207,7 +207,7 @@ namespace Airerage.Core.Wire
         private void Fire(ref CharacterState state, in InputFrame input, WireTuning tuning)
         {
             Vector3 origin = state.Position;
-            WireAim aim = WireTargeting.ResolveAim(origin, input.Aim, state.Facing, tuning, _collision);
+            WireAim aim = WireTargeting.ResolveAim(origin, input.Aim, state.Facing, tuning, _collision, input.Reach);
 
             SetPhase(ref state.Wire, WirePhase.Firing);
             state.Wire.HasTargetPoint = aim.HasTargetPoint;
@@ -215,6 +215,8 @@ namespace Airerage.Core.Wire
             state.Wire.HookPosition = origin;
             state.Wire.HookDirection = aim.Direction;
             state.Wire.HookTraveled = 0f;
+            // フックは照準の届く先（マウスカーソル・右スティックの倒し具合）まで飛ぶ（2026-11-12）。
+            state.Wire.HookReach = WireTargeting.ShotReach(tuning, input.Reach);
             state.Wire.LastReleaseReason = WireReleaseReason.None;
             state.Wire.LastMissReason = WireMissReason.None;
         }
@@ -222,7 +224,8 @@ namespace Airerage.Core.Wire
         private void AdvanceHook(ref CharacterState state, WireTuning tuning)
         {
             ref WireState wire = ref state.Wire;
-            float remaining = tuning.MaxLength - wire.HookTraveled;
+            float limit = wire.HookReach > 0f ? MathF.Min(wire.HookReach, tuning.MaxLength) : tuning.MaxLength;
+            float remaining = limit - wire.HookTraveled;
             float step = tuning.FireSpeed * SimTime.DeltaTime;
             if (step > remaining)
             {
@@ -268,11 +271,11 @@ namespace Airerage.Core.Wire
 
             wire.HookPosition += wire.HookDirection * step;
             wire.HookTraveled += step;
-            if (wire.HookTraveled >= tuning.MaxLength - SimMath.Epsilon)
+            if (wire.HookTraveled >= limit - SimMath.Epsilon)
             {
                 if (tuning.AttachInAir)
                 {
-                    // 何もなくても、最大射程の点（空中）につながる（キャッスルインジエアー）。
+                    // 何もなくても、届く先の点（空中）につながる（キャッスルインジエアー）。
                     Attach(ref state, wire.HookPosition, tuning);
                     return;
                 }

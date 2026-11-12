@@ -19,7 +19,7 @@ namespace Airerage.Core.Simulation
     public static class StateCodec
     {
         /// <summary>バイト列の形式の版。</summary>
-        public const int FormatVersion = 35;
+        public const int FormatVersion = 36;
 
         /// <summary>FNV-1a 64bit の初期値。</summary>
         public const ulong FnvOffsetBasis = 14695981039346656037UL;
@@ -279,6 +279,7 @@ namespace Airerage.Core.Simulation
             Write(writer, wire.HookPosition);
             Write(writer, wire.HookDirection);
             writer.Write(wire.HookTraveled);
+            writer.Write(wire.HookReach);
             writer.Write(wire.HasTargetPoint);
             Write(writer, wire.TargetPoint);
             Write(writer, wire.Anchor);
@@ -547,6 +548,7 @@ namespace Airerage.Core.Simulation
                 HookPosition = ReadVector3(reader),
                 HookDirection = ReadVector3(reader),
                 HookTraveled = reader.ReadSingle(),
+                HookReach = reader.ReadSingle(),
                 HasTargetPoint = reader.ReadBoolean(),
                 TargetPoint = ReadVector3(reader),
                 Anchor = ReadVector3(reader),

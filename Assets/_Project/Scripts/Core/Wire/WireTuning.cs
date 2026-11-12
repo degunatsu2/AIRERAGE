@@ -92,6 +92,12 @@ namespace Airerage.Core.Wire
         /// <summary>照準でスティックの入力を無視する範囲（0〜1）。</summary>
         public float AimDeadzone = 0.3f;
 
+        /// <summary>
+        /// 照準の届く先（マウスカーソル・右スティックの倒し具合。PlayerInput.AimReach）より先まで、フックが当たりを調べる余裕（m）【仮】。
+        /// カーソルが壁や足場の少し手前にあっても、その面につながる（2026-11-12）。
+        /// </summary>
+        public float ReachMargin = 1f;
+
         /// <summary>ロープの最小の長さ（m）。</summary>
         public float MinRopeLength = 1f;
 
@@ -171,6 +177,7 @@ namespace Airerage.Core.Wire
             v.NonNegative(nameof(AimAssistRadius), AimAssistRadius);
             v.InRange(nameof(NeutralAimAngleDeg), NeutralAimAngleDeg, -90f, 90f);
             v.InRange(nameof(AimDeadzone), AimDeadzone, 0f, 0.95f);
+            v.NonNegative(nameof(ReachMargin), ReachMargin);
             v.Positive(nameof(MinRopeLength), MinRopeLength);
             v.AtMost(nameof(MinRopeLength), MinRopeLength, nameof(MaxLength), MaxLength);
             v.Positive(nameof(MaxAttachTicks), MaxAttachTicks);

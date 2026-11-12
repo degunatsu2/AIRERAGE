@@ -53,6 +53,7 @@ MonoBehaviour:
       AimAssistRadius: 0.8
       NeutralAimAngleDeg: 45
       AimDeadzone: 0.3
+      ReachMargin: 1
       MinRopeLength: 1
       ReleaseWhenLineBlocked: 0
       RopeWrapping: 1

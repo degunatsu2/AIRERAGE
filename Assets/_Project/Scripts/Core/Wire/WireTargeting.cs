@@ -73,14 +73,38 @@ namespace Airerage.Core.Wire
         }
 
         /// <summary>
+        /// 照準の届く先（reach。射程に対する割合）までの距離（m）。照準器はここに出す（2026-11-12）。
+        /// </summary>
+        public static float AimDistance(WireTuning tuning, float reach)
+        {
+            return reach >= 1f ? tuning.MaxLength : MathF.Min(tuning.MaxLength, MathF.Max(0f, reach) * tuning.MaxLength);
+        }
+
+        /// <summary>
+        /// フックが飛べる距離（m）。照準の届く先に、少し先まで当たりを調べる余裕 ReachMargin を足す（射程を超えない）。空中につながる
+        /// 強化の間は余裕を足さない（照準の届く先そのものにつながる）。届く先の指定がなければ射程いっぱい。
+        /// </summary>
+        public static float ShotReach(WireTuning tuning, float reach)
+        {
+            if (reach >= 1f)
+            {
+                return tuning.MaxLength;
+            }
+            float distance = AimDistance(tuning, reach) + (tuning.AttachInAir ? 0f : tuning.ReachMargin);
+            return MathF.Min(tuning.MaxLength, distance);
+        }
+
+        /// <summary>
         /// エイムアシストの対象を探す。照準方向から AimAssistAngleDeg 以内か、照準の線がアンカーから AimAssistRadius（大きいアンカーは
         /// その半径 ICollisionQuery.AnchorRadii）以内を通る、
         /// 射程内・遮るものがないアンカーポイントのうち、
-        /// 照準方向との角度が最も小さいもの（同じなら近いもの）を選ぶ。
+        /// 照準方向との角度が最も小さいもの（同じなら近いもの）を選ぶ。照準の届く先（reach）が射程より手前なら、届く先からアンカーの
+        /// 判定の半径までのアンカーだけ（カーソルの先の遠いアンカーへは飛ばない。2026-11-12）。
         /// </summary>
         public static bool TryFindAssistTarget(
-            Vector3 origin, Vector3 aimDirection, WireTuning tuning, ICollisionQuery collision, out Vector3 target)
+            Vector3 origin, Vector3 aimDirection, WireTuning tuning, ICollisionQuery collision, out Vector3 target, float reach = 1f)
         {
+            float aimDistance = AimDistance(tuning, reach);
             target = default;
             bool found = false;
             float bestAngle = float.MaxValue;
@@ -93,14 +117,14 @@ namespace Airerage.Core.Wire
                 Vector3 toAnchor = anchors[i] - origin;
                 toAnchor.Z = 0f;
                 float distance = toAnchor.Length();
-                if (distance < SimMath.Epsilon || distance > tuning.MaxLength)
+                float radius = i < radii.Count ? MathF.Max(tuning.AimAssistRadius, radii[i]) : tuning.AimAssistRadius;
+                if (distance < SimMath.Epsilon || distance > tuning.MaxLength || (reach < 1f && distance > aimDistance + radius))
                 {
                     continue;
                 }
 
                 float angle = SimMath.AngleBetweenDeg(aimDirection, toAnchor / distance);
                 float along = Vector3.Dot(toAnchor, aimDirection);
-                float radius = i < radii.Count ? MathF.Max(tuning.AimAssistRadius, radii[i]) : tuning.AimAssistRadius;
                 bool nearTheLine = along > 0f && (toAnchor - aimDirection * along).Length() <= radius;
                 if (angle > tuning.AimAssistAngleDeg && !nearTheLine)
                 {
@@ -124,11 +148,13 @@ namespace Airerage.Core.Wire
 
         /// <summary>
         /// 射出の方向を決める（射出のときと同じ計算）。照準の入力から方向を求め、エイムアシストの対象があればそこへ向ける。
+        /// reach は照準の届く先（射程に対する割合。InputFrame.Reach）。
         /// </summary>
-        public static WireAim ResolveAim(Vector3 origin, Vector2 aimInput, int facing, WireTuning tuning, ICollisionQuery collision)
+        public static WireAim ResolveAim(Vector3 origin, Vector2 aimInput, int facing, WireTuning tuning, ICollisionQuery collision,
+            float reach = 1f)
         {
             Vector3 direction = AimDirection(aimInput, facing, tuning);
-            if (!TryFindAssistTarget(origin, direction, tuning, collision, out Vector3 target))
+            if (!TryFindAssistTarget(origin, direction, tuning, collision, out Vector3 target, reach))
             {
                 return new WireAim(direction, false, default);
             }
@@ -139,20 +165,22 @@ namespace Airerage.Core.Wire
 
         /// <summary>
         /// 今の位置から射出したときの結果を予測する（表示用）。フックが飛ぶ間のキャラクターの移動は考えない。
-        /// フックの判定（WireController）と同じく、照準方向へ射程まで（対象があれば対象まで）地形を調べる。
+        /// フックの判定（WireController）と同じく、照準方向へフックが飛べる距離（ShotReach）まで（対象があれば対象まで）地形を調べる。
+        /// 何にも当たらなければ、照準の届く先（reach。マウスカーソル）が終点（2026-11-12）。
         /// </summary>
-        public static WireShotPreview PredictShot(Vector3 origin, Vector2 aimInput, int facing, WireTuning tuning, ICollisionQuery collision)
+        public static WireShotPreview PredictShot(Vector3 origin, Vector2 aimInput, int facing, WireTuning tuning, ICollisionQuery collision,
+            float reach = 1f)
         {
-            WireAim aim = ResolveAim(origin, aimInput, facing, tuning, collision);
-            float reach = tuning.MaxLength;
+            WireAim aim = ResolveAim(origin, aimInput, facing, tuning, collision, reach);
+            float shot = ShotReach(tuning, reach);
             if (aim.HasTargetPoint)
             {
                 Vector3 toTarget = aim.TargetPoint - origin;
                 toTarget.Z = 0f;
-                reach = toTarget.Length();
+                shot = toTarget.Length();
             }
 
-            if (reach > 0f && CastHook(collision, origin, aim.Direction, reach, out CastHit hit))
+            if (shot > 0f && CastHook(collision, origin, aim.Direction, shot, out CastHit hit))
             {
                 return new WireShotPreview(aim, hit.Attachable || tuning.AttachAnySurface ? WireShotResult.Attach : WireShotResult.HitNonAttachable,
                     hit.Point);
@@ -161,9 +189,9 @@ namespace Airerage.Core.Wire
             {
                 return new WireShotPreview(aim, WireShotResult.Attach, aim.TargetPoint);
             }
-            // 空中につながる強化の間は、最大射程の点につながる（キャッスルインジエアー）。
+            // 空中につながる強化の間は、照準の届く先（指定がなければ最大射程）の点につながる（キャッスルインジエアー）。
             return new WireShotPreview(aim, tuning.AttachInAir ? WireShotResult.Attach : WireShotResult.OutOfRange,
-                origin + aim.Direction * tuning.MaxLength);
+                origin + aim.Direction * AimDistance(tuning, reach));
         }
 
         /// <summary>

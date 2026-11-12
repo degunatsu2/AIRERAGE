@@ -335,12 +335,12 @@ namespace Airerage.Editor
 
             // メインメニュー: 左に縦に並んだ斜めの札。
             RectTransform main = MenuUiBuilder.CreateFull(canvas.transform, "Main");
-            // 左の背景は、白地に選んでいる項目の色の斜めの帯（D-91 の M2 を白地に。2026-11-08）。ロゴは黒。
+            // 左の背景は、白地に選んでいる項目の色の斜めの帯（D-91 の M2 を白地に。2026-11-08）。
             MainMenuPanel panel = MenuUiBuilder.CreateWhitePanel(main, "Side", Vector2.zero, new Vector2(0.42f, 1f), 0.5f, 0.43f, MenuAccents.Single);
-            UnityEngine.UI.Text logo = MenuUiBuilder.CreateText(main, "Logo", "AIRERAGE", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
+            // 見出しは「MAIN MENU」（ゲームの名前から変えた。ほかの画面の見出しと同じ字。2026-11-12 のユーザーの要望）。白に項目の色の縁取りと
+            // 前の菱形（D-92 の T2・T7。縁の色は選んだ項目の色に移る）。
+            UnityEngine.UI.Text logo = MenuUiBuilder.CreateText(main, "Logo", "MAIN MENU", 64, FontStyle.BoldAndItalic, TextAnchor.UpperLeft,
                 new Vector2(0f, 1f), new Vector2(90f, -60f), new Vector2(700f, 90f), MenuUiBuilder.Ink, false);
-            logo.font = GameFonts.LatinBlack;
-            // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7。縁の色は選んだ項目の色に移る。2026-11-09）。
             MenuUiBuilder.StyleTitle(logo, MenuAccents.Single);
             var anchor = new Vector2(0f, 1f);
             var size = new Vector2(560f, 72f);
@@ -390,6 +390,12 @@ namespace Airerage.Editor
             // 終了の確認（いちばん手前に出すため、ほかの画面の後に作る）。
             QuitConfirmDialog quitDialog = MenuUiBuilder.CreateQuitDialog(canvas.transform);
             SandboxWireSceneBuilder.SetReference(screens, "_quitDialog", quitDialog);
+            // メインメニューのボタンの演出（W16 の小さな説明と B12 の項目ごとの絵を除く）を、ほかの画面のボタンにも付ける（2026-11-12 の
+            // ユーザーの要望）。すでに付いているものは付け直さない。白い背景の上なので、下げても濃いめ。
+            foreach (MenuOption option in canvas.GetComponentsInChildren<MenuOption>(true))
+            {
+                MenuUiBuilder.ApplyMainMenuEffects(option, 0.82f);
+            }
             // 画面の切り替えの演出（D-87。いちばん最後の子。画面の写しはこの直前に置く）。
             RectTransform transitionLayer = MenuUiBuilder.CreateFull(canvas.transform, "Transition");
             var transition = transitionLayer.gameObject.AddComponent<ScreenTransition>();

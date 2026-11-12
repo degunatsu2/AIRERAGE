@@ -159,7 +159,7 @@ namespace Airerage.Core.Tests.Replay
         [TestCase("ticks 2", "ticks 3", "一致しません")]
         [TestCase("final-checksum 000000000000002a", "final-checksum xyz", "16進数")]
         [TestCase("wire-model Inertial", "wire-model Orbit", "不明なワイヤーのタイプ")]
-        [TestCase("airerage-input-recording 1", "airerage-input-recording 99", "版")]
+        [TestCase("airerage-input-recording 2", "airerage-input-recording 99", "版")]
         public void Parse_Malformed_ThrowsWithLineNumber(string original, string broken, string expectedMessage)
         {
             var recording = new InputRecording(default(CharacterState), WireModelType.Inertial, new[] { Inputs.Jump, Inputs.Jump }, 42UL, string.Empty);

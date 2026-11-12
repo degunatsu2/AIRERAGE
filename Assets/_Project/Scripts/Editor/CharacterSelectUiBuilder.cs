@@ -18,12 +18,29 @@ namespace Airerage.Editor
     internal static class CharacterSelectUiBuilder
     {
         private const int Columns = 4;
-        private const float IconSize = 150f;
-        private const float IconGap = 18f;
+        // アイコンの大きさと間（白い背景を狭めて斜めに並べるので、少し小さくした。2026-11-12）。
+        private const float IconSize = 140f;
+        private const float IconGap = 16f;
+        // 白い背景の幅（「◇CHARACTER SELECT」がぎりぎり収まる幅。2026-11-12 のユーザーの要望）。見出し・アイコンの並び・知らせは、白い背景と
+        // 同じ向き（18°）に傾けて、高さに応じて横へずらして置く（画面の高さの真ん中が元の位置）。
+        private const float PanelWidth = 700f;
         private static readonly Vector2 CornerSize = new Vector2(430f, 290f);
         private const float CornerMargin = 24f;
         // 操作の説明（2 行まで）の後ろの黒い帯の高さ。
         private const float HintStripHeight = 72f;
+
+        // 画面の高さの真ん中から above ピクセル上の所で、白い背景（帯と同じ 18° の傾き）が横へずれる量。
+        private static float SlantShift(float above) => MainMenuPanel.EdgeLean * above;
+
+        // 枠の幅に収まらない文は、1 行（または改行どおり）のまま字を小さくして収める。
+        private static void FitInWidth(Text text, int maxSize)
+        {
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 14;
+            text.resizeTextMaxSize = maxSize;
+        }
 
         public static CharacterSelectScreen Create(Transform canvas)
         {
@@ -32,13 +49,16 @@ namespace Airerage.Editor
             MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, Vector2.one);
             // 見出しとアイコンの並びが収まる、メインメニューと同じ白い背景（四隅の枠の間で、画面の上から下まで。左右の端は帯と同じ向きに
             // 傾け、段々の帯と菱形のドットでほどけさせる。D-92。帯は入ってきたモードの色。2026-11-08）。下の辺だけ黒い帯にして操作の説明を見やすく（白い背景より手前、四隅の枠より奥）。
-            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Backdrop", new Vector2(470f / 1920f, 0f), new Vector2(1450f / 1920f, 1f),
-                0.74f, 0.68f, MenuUiBuilder.Accent));
+            AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Backdrop", new Vector2((960f - PanelWidth * 0.5f) / 1920f, 0f),
+                new Vector2((960f + PanelWidth * 0.5f) / 1920f, 1f), 0.74f, 0.68f, MenuUiBuilder.Accent));
             MenuUiBuilder.CreateHintStrip(panel, HintStripHeight);
+            // 見出しは前の菱形の分だけ右へ寄せて、菱形と文字のまとまりを白い背景の真ん中に置く。
             MenuUiBuilder.StyleTitle(MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 50, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(900f, 70f), MenuUiBuilder.Ink, false), MenuUiBuilder.Accent);
+                new Vector2(0.5f, 1f), new Vector2(SlantShift(540f - 61f) + 17f, -26f), new Vector2(900f, 70f), MenuUiBuilder.Ink, false), MenuUiBuilder.Accent);
+            // 設定の行（時間の制限・モード・CPU の数）は、白い背景の幅に収まるように、長いときは縮める。
             Text timeLimit = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(1500f, 40f), MenuUiBuilder.Accent));
+                new Vector2(0.5f, 1f), new Vector2(SlantShift(540f - 112f), -92f), new Vector2(PanelWidth - 30f, 40f), MenuUiBuilder.Accent));
+            FitInWidth(timeLimit, 24);
 
             var colors = new Color[CharacterSelectScreen.MaxPlayers];
             for (int i = 0; i < colors.Length; i++)
@@ -59,15 +79,16 @@ namespace Airerage.Editor
             // 画面の切り替えで、アイコンを 1 つずつめくって並べる（D-87 の T9）。
             grid.AddComponent<TransitionGroup>();
             var icons = new Object[count];
+            float gridTop = gridRect.anchoredPosition.y + gridRect.sizeDelta.y * 0.5f;
             for (int i = 0; i < count; i++)
             {
                 CharacterConfigAsset character = i < roster.Count ? roster.Get(i) : null;
                 int row = i / columns;
                 int rowLength = Mathf.Min(columns, count - row * columns);
-                // 最後の行が短いときは真ん中に寄せる。
+                // 最後の行が短いときは真ん中に寄せる。行は白い背景と同じ向きに傾けて、高さに応じて横へずらす。
                 float rowOffset = (columns - rowLength) * (IconSize + IconGap) * 0.5f;
-                float x = rowOffset + (i % columns) * (IconSize + IconGap) + IconSize * 0.5f;
                 float y = row * (IconSize + IconGap) + IconSize * 0.5f;
+                float x = rowOffset + (i % columns) * (IconSize + IconGap) + IconSize * 0.5f + SlantShift(gridTop - y);
                 icons[i] = CreateIcon(gridRect, i, character, new Vector2(x, -y));
             }
             var cursors = new Object[CharacterSelectScreen.MaxPlayers];
@@ -79,8 +100,10 @@ namespace Airerage.Editor
                 cursorTags[p] = tag;
             }
             // 知らせは 2 行まで（ローカル対戦の参加の案内。2026-11-08）。
+            float messageY = -gridRect.sizeDelta.y * 0.5f - 52f;
             Text message = MenuUiBuilder.CreateText(panel, "Message", string.Empty, 24, FontStyle.Bold, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -gridRect.sizeDelta.y * 0.5f - 52f), new Vector2(900f, 72f), MenuUiBuilder.InkSoft, false);
+                new Vector2(0.5f, 0.5f), new Vector2(SlantShift(messageY), messageY), new Vector2(PanelWidth - 30f, 72f), MenuUiBuilder.InkSoft, false);
+            FitInWidth(message, 24);
 
             // 四隅の枠。
             var corners = new Object[CharacterSelectScreen.MaxPlayers];

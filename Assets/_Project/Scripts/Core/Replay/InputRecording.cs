@@ -18,8 +18,8 @@ namespace Airerage.Core.Replay
     /// </summary>
     public sealed class InputRecording
     {
-        /// <summary>テキストの形式の版。</summary>
-        public const int FormatVersion = 1;
+        /// <summary>テキストの形式の版（版 2 で入力の行に照準の届く先を足した。版 1 も読める。2026-11-12）。</summary>
+        public const int FormatVersion = 2;
 
         private const string Magic = "airerage-input-recording";
 
@@ -101,7 +101,7 @@ namespace Airerage.Core.Replay
             AppendLine(text, "start", Convert.ToBase64String(StateCodec.ToBytes(StartState)));
             AppendLine(text, "config", ConfigText);
             text.Append("inputs\n");
-            // 1行に「移動 X、移動 Y、照準 X、照準 Y、ボタン、続くティック数」。
+            // 1行に「移動 X、移動 Y、照準 X、照準 Y、ボタン、続くティック数、照準の届く先」。
             int i = 0;
             while (i < _inputs.Count)
             {
@@ -116,7 +116,8 @@ namespace Airerage.Core.Replay
                     .Append(input.AimX.ToString(CultureInfo.InvariantCulture)).Append(' ')
                     .Append(input.AimY.ToString(CultureInfo.InvariantCulture)).Append(' ')
                     .Append(((ushort)input.Buttons).ToString(CultureInfo.InvariantCulture)).Append(' ')
-                    .Append(run.ToString(CultureInfo.InvariantCulture)).Append('\n');
+                    .Append(run.ToString(CultureInfo.InvariantCulture)).Append(' ')
+                    .Append(input.AimReach.ToString(CultureInfo.InvariantCulture)).Append('\n');
                 i += run;
             }
             text.Append("end\n");
@@ -137,7 +138,8 @@ namespace Airerage.Core.Replay
             {
                 throw reader.Error($"入力の記録ではありません（1行目は「{Magic} 版」）");
             }
-            if (ParseInt(reader, header[1]) != FormatVersion)
+            int version = ParseInt(reader, header[1]);
+            if (version != FormatVersion && version != 1)
             {
                 throw reader.Error($"対応していない形式の版です: {header[1]}（対応している版: {FormatVersion}）");
             }
@@ -184,13 +186,17 @@ namespace Airerage.Core.Replay
                     break;
                 }
                 string[] parts = line.Split(' ');
-                if (parts.Length != 6)
+                int columns = version == 1 ? 6 : 7;
+                if (parts.Length != columns)
                 {
-                    throw reader.Error("入力の行は「移動X 移動Y 照準X 照準Y ボタン ティック数」の6つの数です");
+                    throw reader.Error(version == 1
+                        ? "入力の行は「移動X 移動Y 照準X 照準Y ボタン ティック数」の6つの数です"
+                        : "入力の行は「移動X 移動Y 照準X 照準Y ボタン ティック数 届く先」の7つの数です");
                 }
+                byte reach = version == 1 ? (byte)0 : (byte)Math.Min(PlayerInput.ReachMax, (int)ParseUShort(reader, parts[6]));
                 var input = new PlayerInput(
                     ParseSByte(reader, parts[0]), ParseSByte(reader, parts[1]), (InputButtons)ParseUShort(reader, parts[4]),
-                    ParseSByte(reader, parts[2]), ParseSByte(reader, parts[3]));
+                    ParseSByte(reader, parts[2]), ParseSByte(reader, parts[3]), reach);
                 int run = ParseInt(reader, parts[5]);
                 if (run < 1)
                 {

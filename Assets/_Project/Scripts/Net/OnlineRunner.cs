@@ -698,15 +698,18 @@ namespace Airerage.Net
             DisplayedStates(_session.LocalPlayer, out CharacterState previous, out CharacterState current);
             Vector3 origin = Vector3.Lerp(previous.Position.ToUnity(), current.Position.ToUnity(), alpha);
             System.Numerics.Vector3 simOrigin = origin.ToNumerics();
-            var frame = new InputFrame(_input.Peek(simOrigin), current.PreviousButtons);
-            // 強化（キャッスルインジエアーの空中への接続など）も含めた調整値で予測する。
+            Airerage.Core.Input.PlayerInput shownInput = _input.Peek(simOrigin);
+            var frame = new InputFrame(shownInput, current.PreviousButtons);
+            // 強化（キャッスルインジエアーの空中への接続など）も含めた調整値で予測する。照準の届く先（マウスカーソル・右スティックの
+            // 倒し具合）まで（2026-11-12）。
             wire = Airerage.Core.Skills.SpeedBoosts.EffectiveConfig(current, _session.World.GetConfig(_session.LocalPlayer)).Wire;
-            WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _session.World.Collision);
+            WireShotPreview preview = WireTargeting.PredictShot(simOrigin, frame.Aim, current.Facing, wire, _session.World.Collision, frame.Reach);
             // 結果の画面（試合が終わった後）では出さない。始まる前のカウントダウンでは出す。
             // 照準を技に使っている間（Q の構え・R の場所選び・長押しの矢印）も出さない。
             bool hidden = current.Combat.InvisibleTicksLeft > 0 || _session.World.Phase == Airerage.Core.Match.MatchPhase.Finished
                 || Airerage.Core.Skills.SkillRules.AimsWithCursor(current, _session.World.GetConfig(_session.LocalPlayer));
-            _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, hidden);
+            bool hasCursor = Airerage.Runtime.Presentation.AimIndicatorView.TryGetCursor(_input, shownInput, frame, origin, wire, out Vector3 cursor);
+            _aimIndicator.Render(origin, current.Wire, preview, wire.MaxLength, hidden, hasCursor, cursor);
         }
 
         private void OnGUI()

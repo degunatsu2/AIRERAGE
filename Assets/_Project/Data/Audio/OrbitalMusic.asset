@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: OrbitalMusic
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Audio.MusicCue
   _clip: {fileID: 8300000, guid: 239abb0acac64f408dd447a23257ea64, type: 3}
-  _loopStart: 789390
-  _loopEnd: 7002161
+  _loopStart: 809676
+  _loopEnd: 7022447
   _volume: 1

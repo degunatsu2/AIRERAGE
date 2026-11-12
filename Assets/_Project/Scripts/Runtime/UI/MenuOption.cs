@@ -159,6 +159,18 @@ namespace Airerage.Runtime.UI
         /// <summary>札の右の小さな説明（W16。なければ null。テスト用）。</summary>
         public Text Sub => _sub;
 
+        /// <summary>同じ親のほかの項目を選んでいる間、暗く下げるか（B13）。</summary>
+        public bool Recedes => _recede;
+
+        /// <summary>導火線の光が札の色か（メインメニューと同じ。B1）。</summary>
+        public bool AccentFuse => _accentFuse;
+
+        /// <summary>文字が長ければ 1 行のまま縮めて収めるか。</summary>
+        public bool ShrinksToFit => _shrinkToFit;
+
+        /// <summary>高さ height の札で、選んで「›››」（W17）の分だけ名前が右へ寄る量（ピクセル）。</summary>
+        public static float ChevronShiftFor(float height) => ChevronShift * Mathf.Max(0.5f, height / MotionUnitHeight);
+
         /// <summary>名前が置き場所からずれている量（W1・W17。テスト用）。</summary>
         public Vector2 LabelOffset => _label != null ? _label.rectTransform.anchoredPosition - _labelHome : Vector2.zero;
 
@@ -376,6 +388,12 @@ namespace Airerage.Runtime.UI
         {
             Mouse mouse = Mouse.current;
             return mouse != null && mouse.leftButton.wasReleasedThisFrame;
+        }
+
+        private void Start()
+        {
+            // 名前を縮めて収める札は、出したときにも合わせる（実行中に名前を変えない札。2026-11-12）。
+            FitLabel();
         }
 
         private void Awake()

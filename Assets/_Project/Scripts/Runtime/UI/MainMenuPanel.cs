@@ -10,9 +10,9 @@ namespace Airerage.Runtime.UI
     /// 項目ごとに少し右へずれる（0.35 秒）。見本のページ（メインメニューの背景の案）と同じ割合で描く。
     /// 帯は項目の色を白に寄せた淡い色にし、左の端だけ項目の色そのものの線を引く（項目の色の裏の札が帯に溶けて一部しか見えなかったので、
     /// 帯を淡くして裏の札を浮かせた。ユーザーの指摘、2026-11-08）。
-    /// 試合の画面との境目（D-92。ユーザーが選んだ E2 + E3。2026-11-09）: 境目の端を帯と同じ向きに傾け（高さの真ん中が元の位置）、その外に
-    /// 細くなっていく帯を 3 本、さらにその外に菱形のドットを斜めの格子に並べ、外へ行くほど小さくして試合の画面へほどけさせる。ドットの
-    /// 大きさは高さでもゆるやかに変わり、間隔に緩急が付く。帯とドットの色は、その端の地の色（右の端は帯の淡い色、左の端は白）。
+    /// 試合の画面との境目（D-92。ユーザーが選んだ E2 + E3。2026-11-09、2026-11-12 に手直し）: 境目の端を帯と同じ向きに傾け（高さの真ん中が
+    /// 元の位置）、その外に段々の帯を 3 本。帯は菱形のドットを斜めの格子に等間隔に並べたもので、1 段目は間隔が狭く大きなドット、2 段目・
+    /// 3 段目になるほど間隔が広く小さなドットになり、試合の画面へほどけていく。色はその端の地の色（右の端は帯の淡い色、左の端は白）。
     /// メインメニューのほか、オプション・ステージ選択・アイテムを選ぶ画面・CPU LEVEL の左（右の端だけ）、キャラクター選択の真ん中（左右の
     /// 端）、ネットワークの画面と待機所の全面（端なし）に置く。
     /// </summary>
@@ -38,16 +38,45 @@ namespace Airerage.Runtime.UI
 
         /// <summary>試合の画面との境目の傾き（帯と同じ。高さ 1 に対する横のずれ）。</summary>
         public const float EdgeLean = Skew;
-        // 境目の外の段々の帯（端からの距離・幅・濃さ。ピクセル）。
-        private static readonly Vector3[] EdgeStrips = { new Vector3(14f, 30f, 0.85f), new Vector3(56f, 18f, 0.62f), new Vector3(88f, 9f, 0.42f) };
-        // 菱形のドット: 端からの始まり、横の間隔（縦は半分ずつずらした斜めの格子）、列の数、濃さ。
-        private const float DotStart = 114f;
-        private const float DotStep = 20f;
-        private const int DotColumns = 13;
-        private const float DotAlpha = 0.8f;
-        // 高さでの大きさの緩急（2 つの波を重ねて、規則正しすぎない変化にする。周期はピクセル）。
-        private const float RhythmLong = 470f;
-        private const float RhythmShort = 190f;
+        // 境目の外の段々の帯（ピクセル）: 端からの始まり・幅・ドットの横の間隔（縦は半分ずつずらした斜めの格子）・ドットの大きさ（中心から
+        // 角まで）・濃さ。1 段目ほど間隔が狭く大きい。
+        private static readonly EdgeBand[] EdgeBands =
+        {
+            new EdgeBand(12f, 36f, 12f, 5f, 0.9f),
+            new EdgeBand(58f, 30f, 15f, 3.8f, 0.8f),
+            new EdgeBand(98f, 27f, 18f, 2.7f, 0.7f),
+        };
+
+        private readonly struct EdgeBand
+        {
+            public readonly float Start;
+            public readonly float Width;
+            public readonly float Step;
+            public readonly float Size;
+            public readonly float Alpha;
+
+            public EdgeBand(float start, float width, float step, float size, float alpha)
+            {
+                Start = start;
+                Width = width;
+                Step = step;
+                Size = size;
+                Alpha = alpha;
+            }
+        }
+
+        /// <summary>段々の帯の数（テスト用）。</summary>
+        public static int EdgeBandCount => EdgeBands.Length;
+
+        /// <summary>index 段目の帯のドットの横の間隔と大きさ（ピクセル。テスト用）。</summary>
+        public static void EdgeBandDots(int index, out float step, out float size)
+        {
+            step = EdgeBands[index].Step;
+            size = EdgeBands[index].Size;
+        }
+
+        /// <summary>境目から、いちばん外の帯の外側までの距離（ピクセル。テスト用）。</summary>
+        public static float EdgeReach => EdgeBands[EdgeBands.Length - 1].Start + EdgeBands[EdgeBands.Length - 1].Width;
 
         /// <summary>試合の画面との境目がどこにあるか。</summary>
         public enum EdgeSides
@@ -233,51 +262,29 @@ namespace Airerage.Runtime.UI
             }
         }
 
-        // 高さの真ん中で x = edge を通る傾いた端の外（side が 1 なら右、-1 なら左）に、段々の帯と菱形のドットを描く。
+        // 高さの真ん中で x = edge を通る傾いた端の外（side が 1 なら右、-1 なら左）に、菱形のドットの段々の帯を描く。ドットは帯の中に
+        // 収まるものだけ（帯からはみ出す半端なドットは描かない）。
         private static void AddEdge(VertexHelper vh, Rect r, float edge, float side, Color c)
         {
             float mid = r.center.y;
-            float half = r.height * 0.5f * EdgeLean;
-            foreach (Vector3 s in EdgeStrips)
+            foreach (EdgeBand band in EdgeBands)
             {
-                float a = edge + side * s.x;
-                float b = edge + side * (s.x + s.y);
-                float lo = Mathf.Min(a, b);
-                float hi = Mathf.Max(a, b);
-                Color strip = c;
-                strip.a *= s.z;
-                AddRaw(vh, new[] { new Vector2(lo - half, r.yMin), new Vector2(lo + half, r.yMax), new Vector2(hi + half, r.yMax), new Vector2(hi - half, r.yMin) }, strip);
-            }
-            float rowStep = DotStep * 0.5f;
-            int row = 0;
-            for (float y = r.yMin + rowStep * 0.5f; y < r.yMax; y += rowStep, row++)
-            {
-                float edgeX = edge + EdgeLean * (y - mid);
-                float rhythm = DotRhythm(r.yMax - y);
-                for (int col = 0; col < DotColumns; col++)
+                Color dot = c;
+                dot.a *= band.Alpha;
+                float rowStep = band.Step * 0.5f;
+                int row = 0;
+                for (float y = r.yMin + rowStep * 0.5f; y < r.yMax; y += rowStep, row++)
                 {
-                    float fade = Mathf.Pow(1f - (float)col / DotColumns, 1.15f);
-                    float size = DotStep * 0.5f * fade * (0.35f + 0.65f * rhythm);
-                    if (size < 0.7f)
+                    float edgeX = edge + EdgeLean * (y - mid);
+                    float first = row % 2 == 1 ? band.Step * 0.5f : 0f;
+                    for (float d = band.Start + band.Size + first; d <= band.Start + band.Width - band.Size + 0.01f; d += band.Step)
                     {
-                        continue;
+                        float x = edgeX + side * d;
+                        float h = band.Size;
+                        AddRaw(vh, new[] { new Vector2(x, y + h), new Vector2(x + h, y), new Vector2(x, y - h), new Vector2(x - h, y) }, dot);
                     }
-                    float x = edgeX + side * (DotStart + col * DotStep + (row % 2 == 1 ? DotStep * 0.5f : 0f));
-                    Color dot = c;
-                    dot.a *= DotAlpha * (0.6f + 0.4f * fade);
-                    AddRaw(vh, new[] { new Vector2(x, y + size), new Vector2(x + size, y), new Vector2(x, y - size), new Vector2(x - size, y) }, dot);
                 }
             }
-        }
-
-        /// <summary>
-        /// 菱形のドットの、高さでの大きさの緩急（0〜1。depth は上の端からのピクセル）。長い波と短い波を重ねて、ところどころ大きく
-        /// （詰まって）、ところどころ小さく（まばらに）なる。
-        /// </summary>
-        public static float DotRhythm(float depth)
-        {
-            float wave = 0.55f + 0.3f * Mathf.Cos(2f * Mathf.PI * depth / RhythmLong + 0.6f) + 0.2f * Mathf.Cos(2f * Mathf.PI * depth / RhythmShort + 2.1f);
-            return Mathf.Clamp01(wave);
         }
 
         // 真ん中の高さで left〜right の、上が右へ half だけずれた平行四辺形。
