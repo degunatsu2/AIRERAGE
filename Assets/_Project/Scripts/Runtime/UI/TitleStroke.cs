@@ -15,9 +15,10 @@ namespace Airerage.Runtime.UI
         /// <summary>画面の色が移る秒数。</summary>
         public const float AccentSeconds = 0.25f;
 
-        // 縁の方向の数（多いほど丸い縁）と、影に使う方向の数。
-        private const int StrokeDirections = 16;
-        private const int ShadowDirections = 8;
+        // 縁と影は文字の写しを周りにずらして重ねて作る。写しの輪（太さに対する半径の割合と方向の数）。外の輪の方向が少ないと、斜めの
+        // 辺で写しの角が段になって見える（2026-11-12 のユーザーの指摘: 影がギザギザ）。外の輪は 1 ピクセルほどの間隔になる 32 方向、
+        // 内側の輪は細い所（点や細い線）で縁の内側に穴が空かないように埋める。影は縁と同じ形を下へずらす。
+        private static readonly (float Radius, int Directions)[] Rings = { (1f, 32), (0.5f, 16) };
         // 縁の暗い色を作る夜の色と混ぜる割合、影の淡い色を作る白と混ぜる割合（見本のページと同じ）。
         private static readonly Color Night = new Color(12f / 255f, 20f / 255f, 46f / 255f, 1f);
         private const float DeepMix = 0.45f;
@@ -133,19 +134,40 @@ namespace Airerage.Runtime.UI
             Color pastel = Pastel(accent);
             Output.Clear();
             // 影（縁の形を下へずらした淡い色）→ 縁（暗い色）→ 文字（白）の順に重ねる。
-            for (int d = 0; d < ShadowDirections; d++)
-            {
-                float a = 2f * Mathf.PI * d / ShadowDirections;
-                Copy(new Vector2(Mathf.Cos(a) * _width, Mathf.Sin(a) * _width - _drop), pastel);
-            }
-            for (int d = 0; d < StrokeDirections; d++)
-            {
-                float a = 2f * Mathf.PI * d / StrokeDirections;
-                Copy(new Vector2(Mathf.Cos(a) * _width, Mathf.Sin(a) * _width), deep);
-            }
+            CopyRings(new Vector2(0f, -_drop), pastel);
+            CopyRings(Vector2.zero, deep);
             Output.AddRange(Source);
             vh.Clear();
             vh.AddUIVertexTriangleStream(Output);
+        }
+
+        /// <summary>縁（または影）を作る写しの数（テスト用）。</summary>
+        public static int CopiesPerLayer
+        {
+            get
+            {
+                int n = 0;
+                foreach (var ring in Rings)
+                {
+                    n += ring.Directions;
+                }
+                return n;
+            }
+        }
+
+        // 縁の形（文字を輪の上の方向へずらした写しの重なり）を center だけずらして色 c で写す。
+        private void CopyRings(Vector2 center, Color c)
+        {
+            foreach (var ring in Rings)
+            {
+                float r = _width * ring.Radius;
+                for (int d = 0; d < ring.Directions; d++)
+                {
+                    // 内側の輪は外の輪と方向を半分ずらす（隙間を交互に埋める）。
+                    float a = 2f * Mathf.PI * (d + (ring.Radius < 1f ? 0.5f : 0f)) / ring.Directions;
+                    Copy(center + new Vector2(Mathf.Cos(a) * r, Mathf.Sin(a) * r), c);
+                }
+            }
         }
 
         // 文字の網を offset だけずらし、色 c（濃さは元の文字の濃さ）で写す。

@@ -40,6 +40,8 @@ namespace Airerage.Editor
         public const string JuggernautPath = "Assets/_Project/Data/Characters/Juggernaut.asset";
         public const string InputActionsPath = "Assets/_Project/Input/AirerageControls.inputactions";
         private const string MaterialFolder = "Assets/_Project/Materials";
+        internal const string AimShaderName = "Airerage/AimIndicatorOverlay";
+        private const string AimMaterialName = "AimIndicatorOverlay";
 
         // 地形の奥行き（見た目のため）。キャラクターの奥行きより大きければよい。
         private const float TerrainDepth = 4f;
@@ -1299,16 +1301,13 @@ namespace Airerage.Editor
 
         /// <summary>
         /// 照準のインジケーター（四角い点線の導線、照準器と結果の文字、波紋、射程の弧。ユーザーの選択、2026-11-02）。毎フレーム作り直す
-        /// 頂点の色つきのメッシュで描く。半透明にするため Sprites-Default を使う。baseColor は射程の弧と導線の根元の色（ローカル対戦は
-        /// プレイヤーの色。なければワイヤーの紫）。
+        /// 頂点の色つきのメッシュで描く。材質は AimIndicatorOverlay（Sprites-Default と同じ色の半透明で、奥行きはキャラクターと同じまま、
+        /// 手前の物に隠れる所も薄く重ねて見せる。2026-11-12）。baseColor は射程の弧と導線の根元の色（ローカル対戦はプレイヤーの色。
+        /// なければワイヤーの紫）。
         /// </summary>
         internal static AimIndicatorView CreateAimIndicator(Color? baseColor = null)
         {
-            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
-            if (material == null)
-            {
-                throw new InvalidOperationException("組み込みのマテリアル Sprites-Default が見つからない");
-            }
+            Material material = LoadOrCreateAimMaterial();
 
             var root = new GameObject("AimIndicator");
             root.AddComponent<MeshFilter>();
@@ -1327,6 +1326,26 @@ namespace Airerage.Editor
                 serialized.ApplyModifiedPropertiesWithoutUndo();
             }
             return view;
+        }
+
+        /// <summary>照準のインジケーターの材質（Assets/_Project/Materials/AimIndicatorOverlay.mat。なければシェーダーから作る）。</summary>
+        internal static Material LoadOrCreateAimMaterial()
+        {
+            string path = $"{MaterialFolder}/{AimMaterialName}.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material != null)
+            {
+                return material;
+            }
+            Shader shader = Shader.Find(AimShaderName);
+            if (shader == null)
+            {
+                throw new InvalidOperationException($"シェーダーが見つからない: {AimShaderName}（Assets/_Project/Shaders/AimIndicatorOverlay.shader）");
+            }
+            EnsureFolder(MaterialFolder);
+            material = new Material(shader) { name = AimMaterialName };
+            AssetDatabase.CreateAsset(material, path);
+            return material;
         }
 
         /// <summary>

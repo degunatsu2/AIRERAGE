@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using Airerage.Runtime.Data;
 using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Simulation;
 using Airerage.Runtime.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -142,6 +143,59 @@ namespace Airerage.Editor
             CaptureQuitDialog();
             CaptureWarnings();
             CaptureCoins();
+        }
+
+        /// <summary>
+        /// ワイヤーの照準が手前の物に隠れるときの見え方（2026-11-12）: 上は今の材質（AimIndicatorOverlay。隠れた所も薄く重ねる）、下は
+        /// 前の材質（Sprites-Default。物に埋まる）。どちらも射程の外（OUT）の照準器を、手前へ張り出した箱の中に置き、カーソルの印も出す。
+        /// Logs/Snapshots/AimOcclusion.png。
+        /// </summary>
+        public static void CaptureAimOcclusion()
+        {
+            Directory.CreateDirectory(OutputFolder);
+            OpenStage("Stage_Athletic");
+            var boxMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            boxMaterial.SetColor("_BaseColor", new Color(0.55f, 0.58f, 0.62f));
+            Material[] materials =
+            {
+                SandboxWireSceneBuilder.LoadOrCreateAimMaterial(),
+                AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"),
+            };
+            var views = new List<AimIndicatorView>();
+            WithCamera(camera =>
+            {
+                camera.fieldOfView = 40f;
+                camera.transform.position = new Vector3(3f, 30f, -18f);
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    float y = 33f - i * 6f;
+                    // 手前（z = -3）まで張り出した箱。照準は z = -0.8 なので、箱の前の面に隠れる。
+                    GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    box.transform.position = new Vector3(6f, y, 0f);
+                    box.transform.localScale = new Vector3(4f, 3f, 6f);
+                    box.GetComponent<MeshRenderer>().sharedMaterial = boxMaterial;
+
+                    var go = new GameObject($"Aim{i}");
+                    go.AddComponent<MeshFilter>();
+                    go.AddComponent<MeshRenderer>().sharedMaterial = materials[i];
+                    var view = go.AddComponent<AimIndicatorView>();
+                    typeof(AimIndicatorView).GetField("_camera", Private).SetValue(view, camera);
+                    CallAwake(view);
+                    views.Add(view);
+                    var origin = new Vector3(-1f, y, 0f);
+                    var end = new Vector3(6.5f, y, 0f);
+                    var aim = new Airerage.Core.Wire.WireAim(System.Numerics.Vector3.UnitX, false, default);
+                    var preview = new Airerage.Core.Wire.WireShotPreview(aim, Airerage.Core.Wire.WireShotResult.OutOfRange, end.ToNumerics());
+                    var wire = new Airerage.Core.Wire.WireState();
+                    view.Render(origin, wire, preview, 7.5f, false, true, new Vector3(9.5f, y, 0f));
+                }
+                RenderCamera(camera, new Vector2Int(1200, 700), $"{OutputFolder}/AimOcclusion.png");
+            });
+            foreach (AimIndicatorView view in views)
+            {
+                Object.DestroyImmediate(view.gameObject);
+            }
+            Object.DestroyImmediate(boxMaterial);
         }
 
         // コインの見本（1 枚・3 枚・赤・虹色）を、火口（赤い光）と雪原（明るい光）に並べて撮る（光で色が変わらないか。2026-10-21）。

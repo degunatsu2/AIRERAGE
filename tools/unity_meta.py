@@ -70,8 +70,21 @@ TextScriptImporter:
   assetBundleVariant:
 """
 
+SHADER_TEMPLATE = """fileFormatVersion: 2
+guid: {guid}
+ShaderImporter:
+  externalObjects: {{}}
+  defaultTextures: []
+  nonModifiableTextures: []
+  preprocessorOverride: 0
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+"""
+
 TEMPLATES_BY_SUFFIX = {
     ".cs": MONO_TEMPLATE,
+    ".shader": SHADER_TEMPLATE,
     ".asmdef": ASMDEF_TEMPLATE,
     ".asmref": ASMREF_TEMPLATE,
     ".md": TEXT_TEMPLATE,

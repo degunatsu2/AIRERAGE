@@ -72,6 +72,12 @@ namespace Airerage.PlayMode.Tests
             float expected = 2f * composer.CameraDistance * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad) / 1080f;
             Assert.That(aim.MetersPerPixel, Is.EqualTo(expected).Within(expected * 0.1f), "太さが画面の大きさに合っていない");
             Assert.That(aim.GetComponent<MeshFilter>().sharedMesh.vertexCount, Is.GreaterThan(0), "照準の形がない");
+            // 材質は手前の物に隠れる所も薄く重ねて見せるシェーダー（2 回描く。物に隠れない所と、隠れた所。2026-11-12）。
+            Material aimMaterial = aim.GetComponent<MeshRenderer>().sharedMaterial;
+            Assert.That(aimMaterial, Is.Not.Null, "照準の材質がない");
+            Assert.That(aimMaterial.shader.name, Is.EqualTo("Airerage/AimIndicatorOverlay"), "照準の材質が物に埋まらないシェーダーでない");
+            Assert.That(aimMaterial.passCount, Is.EqualTo(2), "照準のシェーダーが 2 回描かない");
+            Assert.That(aimMaterial.GetFloat("_OccludedAlpha"), Is.GreaterThan(0.3f).And.LessThan(1f), "隠れた所の濃さ");
 
             // パッシブアイテムのロングフックで射程が伸びたら、射程の弧も同じだけ伸びる（2026-11-06 の指摘。もとの調整値で描いていた）。
             Airerage.Core.Simulation.CharacterState hooked = runner.PlayerState;

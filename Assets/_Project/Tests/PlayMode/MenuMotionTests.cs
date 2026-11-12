@@ -406,6 +406,8 @@ namespace Airerage.PlayMode.Tests
                 }
                 Assert.That(tinted, Is.GreaterThan(3), "キャラクター選択に色を変える文字がない");
                 Assert.That(characters.GetComponentInChildren<TitleStroke>(true), Is.Not.Null, "キャラクター選択の見出しに縁取りがない");
+                // 縁と影は文字の写しを周りにずらして重ねて作る。写しが少ないと斜めの辺で段（ギザギザ）になる（2026-11-12 の指摘）。
+                Assert.That(TitleStroke.CopiesPerLayer, Is.GreaterThanOrEqualTo(40), "縁と影の写しが少ない（斜めの辺がギザギザになる）");
                 MainMenuPanel backdrop = characters.GetComponentInChildren<MainMenuPanel>(true);
                 Assert.That(backdrop.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Both), "キャラクター選択の白い背景の左右の端が境目になっていない");
                 // 白い背景は見出しがぎりぎり収まる幅で、アイコンの行は白い背景と同じ向きに傾けて並べる（上の行ほど右。2026-11-12）。
