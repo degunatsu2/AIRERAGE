@@ -11,9 +11,9 @@ namespace Airerage.Runtime.UI
     /// 帯は項目の色を白に寄せた淡い色にし、左の端だけ項目の色そのものの線を引く（項目の色の裏の札が帯に溶けて一部しか見えなかったので、
     /// 帯を淡くして裏の札を浮かせた。ユーザーの指摘、2026-11-08）。
     /// 試合の画面との境目（D-92 で端を帯と同じ向きに傾けた。高さの真ん中が元の位置）の模様は D-94 の H19「ぬいめ」の手直し（2026-11-14 の
-    /// ユーザーの決定。2026-11-14 に光る粒をなくした）: 境目の外に、境目と同じ向きの角の丸い短い線の縫い目を 2 列（1 列目はその端の地の
-    /// 色＝右の端は帯の淡い色・左の端は白、2 列目は画面の色を白に寄せた色）、白い背景の内側の縁の近くに画面の色の縫い目を 1 列。境目と
-    /// 縫い目の縁はぼかす（くっきりしすぎて浮いて見えないように。境目は内と外へ EdgeFeather の幅で地の色から透明へ移る）。
+    /// ユーザーの決定。同じ日に、光る粒と境目の外の 2 列の縫い目をなくした）: 白い背景の内側の縁の近くに、境目と同じ向きの角の丸い短い線の
+    /// 縫い目（画面の色）を 1 列。境目はぼかす（くっきりしすぎて浮いて見えないように。内と外へ EdgeFeather の幅で地の色から透明へ移る）。
+    /// 縫い目はぼかさない。
     /// メインメニューのほか、オプション・ステージ選択・アイテムを選ぶ画面・CPU LEVEL の左（右の端だけ）、キャラクター選択の真ん中（左右の
     /// 端）、ネットワークの画面と待機所の全面（端なし）に置く。
     /// </summary>
@@ -39,18 +39,14 @@ namespace Airerage.Runtime.UI
 
         /// <summary>試合の画面との境目の傾き（帯と同じ。高さ 1 に対する横のずれ）。</summary>
         public const float EdgeLean = Skew;
-        // 境目の縫い目（ピクセル）: 境目からの距離（外が正。負は白い背景の内側）・太さ・1 本の長さ・間。外の 2 列と内側の 1 列（見本のページの
-        // H19 の 1・2 列目と、内側に足した列）。
+        // 境目の縫い目（ピクセル）: 境目からの距離（外が正。負は白い背景の内側）・太さ・1 本の長さ・間。白い背景の内側の 1 列だけ（境目の外の
+        // 2 列はなくした。内側の列は 16 から少し内へ。2026-11-14 のユーザーの要望）。
         private static readonly Stitch[] Stitches =
         {
-            new Stitch(16f, 5f, 16f, 10f),
-            new Stitch(40f, 4f, 12f, 10f),
-            new Stitch(-16f, 3.5f, 14f, 9f),
+            new Stitch(-22f, 3.5f, 14f, 9f),
         };
         // 縫い目の角を丸くする半円の分割の数。
         private const int CapSegments = 5;
-        // 縫い目の縁のぼかしの幅（ピクセル。線の太さの縁から内と外へ半分ずつ、色から透明へ移る）。
-        private const float StitchSoftness = 2.5f;
         // 境目のぼかしの幅（ピクセル。境目を真ん中に、内側の半分は地の色のまま外側へ透明になる）。
         private const float EdgeFeatherWidth = 16f;
         // 2 列目の縫い目の色を作るとき、画面の色を白に寄せる割合。
@@ -91,9 +87,6 @@ namespace Airerage.Runtime.UI
 
         /// <summary>境目のぼかしの幅（ピクセル。テスト用）。</summary>
         public static float EdgeFeather => EdgeFeatherWidth;
-
-        /// <summary>縫い目の縁のぼかしの幅（ピクセル。テスト用）。</summary>
-        public static float StitchFeather => StitchSoftness;
 
         /// <summary>
         /// 高さの真ん中で x = edge を通る傾いた境目から、外へ offset（side が 1 なら右、-1 なら左）の所に、高さ y0〜y1 の縫い目の線を
@@ -317,6 +310,7 @@ namespace Airerage.Runtime.UI
             Color inner = hasAccent ? accent : new Color(_stripe.r, _stripe.g, _stripe.b, Mathf.Min(1f, _stripe.a * 8f) * accent.a);
             for (int i = 0; i < Stitches.Length; i++)
             {
+                // 内側の列は画面の色。外の列（今は使っていない）は、1 列目がその端の地の色、2 列目からは画面の色を白に寄せた色。
                 Stitch stitch = Stitches[i];
                 Color color = stitch.Offset < 0f ? inner : i == 0 ? c : hasAccent ? pastel : c;
                 AddStitches(vh, r, edge, side, mid, stitch, color);
@@ -335,19 +329,14 @@ namespace Airerage.Runtime.UI
             vh.AddTriangle(start, start + 2, start + 3);
         }
 
-        private static readonly List<Vector2> Outline = new List<Vector2>();
-
-        // 境目から stitch.Offset の所に、境目と同じ向きの角の丸い短い線を並べる（地の上下の端で切る）。線の縁は StitchSoftness の幅でぼかす。
+        // 境目から stitch.Offset の所に、境目と同じ向きの角の丸い短い線を並べる（地の上下の端で切る）。
         private static void AddStitches(VertexHelper vh, Rect r, float edge, float side, float mid, Stitch stitch, Color c)
         {
             float period = stitch.Length + stitch.Gap;
             // 境目に沿った向き（上が右へ傾く）。線の長さは高さで測る。
             Vector2 along = new Vector2(EdgeLean, 1f).normalized;
             Vector2 across = new Vector2(along.y, -along.x);
-            float inner = Mathf.Max(0.5f, (stitch.Width - StitchSoftness) * 0.5f);
-            float outer = (stitch.Width + StitchSoftness) * 0.5f;
-            Color clear = c;
-            clear.a = 0f;
+            float half = stitch.Width * 0.5f;
             for (float y0 = r.yMin + stitch.Gap * 0.5f; y0 < r.yMax; y0 += period)
             {
                 float y1 = Mathf.Min(y0 + stitch.Length, r.yMax);
@@ -356,10 +345,8 @@ namespace Airerage.Runtime.UI
                     continue;
                 }
                 StitchEnds(edge, side, mid, stitch.Offset, y0, y1, stitch.Width, out Vector2 a, out Vector2 b);
-                // 芯（色 c）と、その周りのぼかしの輪（芯の縁の c から外の透明へ）。輪郭は b の側の半円（across → along → -across）と a の側の
-                // 半円（-across → -along → across）。芯と輪は同じ並びの点で作る。
+                // 輪郭は b の側の半円（across → along → -across）と a の側の半円（-across → -along → across）。
                 Polygon.Clear();
-                Outline.Clear();
                 for (int end = 0; end < 2; end++)
                 {
                     Vector2 center = end == 0 ? b : a;
@@ -367,24 +354,10 @@ namespace Airerage.Runtime.UI
                     for (int k = 0; k <= CapSegments; k++)
                     {
                         float t = Mathf.PI * k / CapSegments;
-                        Vector2 dir = (across * Mathf.Cos(t) + along * Mathf.Sin(t)) * sign;
-                        Polygon.Add(center + dir * inner);
-                        Outline.Add(center + dir * outer);
+                        Polygon.Add(center + (across * Mathf.Cos(t) + along * Mathf.Sin(t)) * (half * sign));
                     }
                 }
-                int core = vh.currentVertCount;
                 AddConvex(vh, Polygon, c);
-                int rim = vh.currentVertCount;
-                for (int k = 0; k < Outline.Count; k++)
-                {
-                    vh.AddVert(Outline[k], clear, Vector2.zero);
-                }
-                for (int k = 0; k < Polygon.Count; k++)
-                {
-                    int next = (k + 1) % Polygon.Count;
-                    vh.AddTriangle(core + k, rim + k, rim + next);
-                    vh.AddTriangle(core + k, rim + next, core + next);
-                }
             }
         }
 

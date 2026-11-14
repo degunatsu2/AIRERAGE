@@ -7,8 +7,10 @@ using UnityEngine;
 namespace Airerage.Editor
 {
     /// <summary>
-    /// キャラクターのロゴ（仮の絵。docs/13 T5-8。ユーザーの案、2026-10-16）を描いて、テクスチャのアセット（.asset。テキスト形式なので
-    /// Git LFS を使わない）に保存する。本番の絵ができたら、キャラクターのアセットの Logo を差し替える（差し替えた絵は上書きしない）。
+    /// キャラクターのロゴ（仮の絵。docs/13 T5-8。ユーザーの案、2026-10-16）を描いて、PNG の画像（Git LFS）に保存する。形は数式（距離の関数）
+    /// で書いてあるので、どの大きさでもくっきり描ける。キャラクター選択の大きなロゴでもぼやけないように 1024 ピクセルで描き、小さく出す所は
+    /// ミップマップで縮める（2026-11-14 のユーザーの指摘: 96 ピクセルの絵を引き伸ばしていて画質が低い）。本番の絵ができたら、キャラクターの
+    /// アセットの Logo を差し替える（差し替えた絵は上書きしない）。
     /// - STANDARD: 白い、ふつうの人型。
     /// - SPACE TRAVELER: 紫の、土星のような惑星。真ん中に斜めの切れ込み。
     /// - STORM RUNNER: 黄緑の、風。
@@ -23,7 +25,7 @@ namespace Airerage.Editor
     internal static class CharacterLogoPainter
     {
         /// <summary>ロゴの大きさ（ピクセル）。</summary>
-        public const int Size = 96;
+        public const int Size = 1024;
 
         public const string Folder = "Assets/_Project/Data/Characters/Logos";
 
@@ -220,35 +222,86 @@ namespace Airerage.Editor
         }
 
         /// <summary>
-        /// ロゴを path のテクスチャのアセットに保存する（あれば同じアセットに描き直す。GUID は変えない）。pixels は Rasterize の結果。
+        /// ロゴを path の PNG の画像に保存し、取り込みの設定（透明・ミップマップ・なめらかな縮小）をして返す。中身が同じなら書き直さない
+        /// （GUID も変えない）。pixels は Rasterize の結果。
         /// </summary>
         public static Texture2D Write(string path, Color[] pixels)
         {
-            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            if (texture == null)
+            string folder = Path.GetDirectoryName(path)?.Replace('\\', '/');
+            if (!string.IsNullOrEmpty(folder) && !AssetDatabase.IsValidFolder(folder))
             {
-                string folder = Path.GetDirectoryName(path)?.Replace('\\', '/');
-                if (!string.IsNullOrEmpty(folder) && !AssetDatabase.IsValidFolder(folder))
-                {
-                    string parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
-                    AssetDatabase.CreateFolder(parent, Path.GetFileName(folder));
-                }
-                texture = new Texture2D(Size, Size, TextureFormat.RGBA32, true) { name = Path.GetFileNameWithoutExtension(path) };
-                Fill(texture, pixels);
-                AssetDatabase.CreateAsset(texture, path);
-                return texture;
+                string parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
+                AssetDatabase.CreateFolder(parent, Path.GetFileName(folder));
             }
-            Fill(texture, pixels);
-            EditorUtility.SetDirty(texture);
-            return texture;
+            var image = new Texture2D(Size, Size, TextureFormat.RGBA32, false);
+            byte[] png;
+            try
+            {
+                image.SetPixels(pixels);
+                image.Apply(false);
+                png = image.EncodeToPNG();
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(image);
+            }
+            bool changed = !File.Exists(path) || !SameBytes(File.ReadAllBytes(path), png);
+            if (changed)
+            {
+                File.WriteAllBytes(path, png);
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            }
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            if (importer == null)
+            {
+                throw new InvalidOperationException($"ロゴの画像を取り込めない: {path}");
+            }
+            if (Configure(importer))
+            {
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
-        private static void Fill(Texture2D texture, Color[] pixels)
+        // ロゴの取り込みの設定（UI の絵: 透明あり・ミップマップ・3 段のなめらかな縮小・端は伸ばす・高画質の圧縮）。変えたら true。
+        private static bool Configure(TextureImporter importer)
         {
-            texture.filterMode = FilterMode.Trilinear;
-            texture.wrapMode = TextureWrapMode.Clamp;
-            texture.SetPixels(pixels);
-            texture.Apply(true);
+            bool changed = false;
+            void Set<T>(T current, T wanted, Action<T> apply)
+            {
+                if (!EqualityComparer<T>.Default.Equals(current, wanted))
+                {
+                    apply(wanted);
+                    changed = true;
+                }
+            }
+            Set(importer.textureType, TextureImporterType.Default, v => importer.textureType = v);
+            Set(importer.sRGBTexture, true, v => importer.sRGBTexture = v);
+            Set(importer.alphaSource, TextureImporterAlphaSource.FromInput, v => importer.alphaSource = v);
+            Set(importer.alphaIsTransparency, true, v => importer.alphaIsTransparency = v);
+            Set(importer.mipmapEnabled, true, v => importer.mipmapEnabled = v);
+            Set(importer.wrapMode, TextureWrapMode.Clamp, v => importer.wrapMode = v);
+            Set(importer.filterMode, FilterMode.Trilinear, v => importer.filterMode = v);
+            Set(importer.maxTextureSize, Size, v => importer.maxTextureSize = v);
+            Set(importer.textureCompression, TextureImporterCompression.CompressedHQ, v => importer.textureCompression = v);
+            Set(importer.npotScale, TextureImporterNPOTScale.None, v => importer.npotScale = v);
+            return changed;
+        }
+
+        private static bool SameBytes(byte[] a, byte[] b)
+        {
+            if (a.Length != b.Length)
+            {
+                return false;
+            }
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i] != b[i])
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static void Fill(List<Layer> layers, Shape shape, Color color)

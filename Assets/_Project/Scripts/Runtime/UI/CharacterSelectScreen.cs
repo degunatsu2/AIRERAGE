@@ -59,8 +59,9 @@ namespace Airerage.Runtime.UI
         private const float PlateRightMargin = 40f;
         private const float PlateBottom = 92f;
 
-        // 右の大きな表示が変わったときの演出の秒数（ロゴが少し小さい所から伸び、名前が右から寄る）。
+        // 右の大きな表示が変わったときの演出の秒数（ロゴが少し小さい所から伸び、名前が右から寄る）と、技の札の演出をずらす秒数。
         private const float ShowcaseSeconds = 0.24f;
+        private const float SkillReplayStagger = 0.05f;
 
         /// <summary>技の説明に出す技の枠（左から Q、E、R）。</summary>
         public static readonly AttackSlot[] SkillSlots = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
@@ -107,6 +108,8 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Text _hint;
         [SerializeField] private Text _timeLimit;
         [SerializeField] private Text _message;
+        [Tooltip("左の一覧の後ろの白い背景（メインメニューと同じ。帯はカーソルのキャラクターの位置で左右へ動く。2026-11-14）")]
+        [SerializeField] private MainMenuPanel _backdrop;
         [Header("右の大きな表示（D-95 の L3。2026-11-14）")]
         [SerializeField] private RectTransform _showcase;
         [SerializeField] private Graphic _showDiamond;
@@ -118,6 +121,8 @@ namespace Airerage.Runtime.UI
         [Tooltip("Q・E・R のキーの四角（キャラクターの色）と技の名前（SkillSlots と同じ順）")]
         [SerializeField] private Graphic[] _showSkillKeys = new Graphic[0];
         [SerializeField] private Text[] _showSkillNames = new Text[0];
+        [Tooltip("Q・E・R の技の札（メインメニューの札と同じ演出。いつも選んだ見た目で、キャラクターが変わると演出をやり直す）")]
+        [SerializeField] private MenuOption[] _showSkillRows = new MenuOption[0];
 
         /// <summary>アイコンの並びの下の知らせ（テスト用）。</summary>
         public string ShownMessage => _message != null ? _message.text : string.Empty;
@@ -150,6 +155,11 @@ namespace Airerage.Runtime.UI
         private int _showIndex = -1;
         private float _showChangedAt = -10f;
         private Vector2 _showNameHome;
+        private int _skillReplayed = int.MaxValue;
+        // 名前の札のメインメニューと同じ演出（画面が選ぶ MenuOption。なければ null）と、白い背景の帯の今の位置と色。
+        private MenuOption[] _iconOptions = new MenuOption[0];
+        private int _backdropIndex = -1;
+        private Color _backdropAccent = Color.clear;
 
         /// <summary>トレーニング: 決定した（キャラクターの番号）。</summary>
         public event Action<int> Confirmed;
@@ -420,19 +430,21 @@ namespace Airerage.Runtime.UI
         /// プレイヤーの札 slot の置き場所（画面の右下を基準にした、札の左下の位置。size は札を作った大きさ）。4 人までは横に 1 列、compact
         /// （5 人以上）なら小さくして 4 枚ずつ 2 段（1P〜4P が上の段）。
         /// </summary>
-        public static Vector2 PlateHome(int slot, bool compact, Vector2 size)
+        public static Vector2 PlateHome(int slot, bool compact, Vector2 size, int columns = MaxLocalPlayers)
         {
             float scale = compact ? CompactCornerScale : PlateScale;
             float width = size.x * scale;
             float height = size.y * scale;
-            int column = slot % MaxLocalPlayers;
-            int row = compact && slot < MaxLocalPlayers ? 1 : 0;
-            float left = -PlateRightMargin - MaxLocalPlayers * width - (MaxLocalPlayers - 1) * PlateGap;
+            columns = Mathf.Max(1, columns);
+            int column = slot % columns;
+            int row = compact && slot < columns ? 1 : 0;
+            // 右寄せ（右の端は右の大きな表示と同じ縦の線。2026-11-14）。
+            float left = -PlateRightMargin - columns * width - (columns - 1) * PlateGap;
             return new Vector2(left + column * (width + PlateGap), PlateBottom + row * (height + PlateGap));
         }
 
-        /// <summary>slot の人のプレイヤーの札の今の置き場所（演出で揺らしても、ここへ戻す）。</summary>
-        public Vector2 CornerHome(int slot) => PlateHome(slot, Compact, CornerRect(slot).sizeDelta);
+        /// <summary>slot の人のプレイヤーの札の今の置き場所（演出で揺らしても、ここへ戻す。トレーニング・シングルは 1P だけを右寄せ）。</summary>
+        public Vector2 CornerHome(int slot) => PlateHome(slot, Compact, CornerRect(slot).sizeDelta, Mode == SelectMode.Single ? 1 : MaxLocalPlayers);
 
         /// <summary>番号 slot（1P が 0）の人のカーソルのキャラクター・READY か・参加しているか。</summary>
         public int CharacterOf(int slot) => _slots[slot].Character;
@@ -485,6 +497,36 @@ namespace Airerage.Runtime.UI
         {
             Accent = accent;
             AccentTint.Apply(this, accent);
+            RefreshBackdrop();
+        }
+
+        /// <summary>左の白い背景の帯が今いる項目（カーソルのキャラクターの番号。テスト用）。</summary>
+        public int BackdropIndex => _backdrop != null ? _backdrop.Index : -1;
+
+        // 白い背景の帯: メインメニューと同じように、カーソルのキャラクターの位置で左右へ動く（色は画面のイメージカラーのまま）。
+        private void RefreshBackdrop()
+        {
+            if (_backdrop == null)
+            {
+                return;
+            }
+            int index = Mathf.Max(0, HighlightedIcon());
+            Color accent = Accent;
+            accent.a = 1f;
+            if (index == _backdropIndex && accent == _backdropAccent)
+            {
+                return;
+            }
+            _backdropIndex = index;
+            _backdropAccent = accent;
+            _backdrop.Select(index, accent);
+        }
+
+        // 右の大きな表示に出している人のカーソルのアイコン（なければ -1）。
+        private int HighlightedIcon()
+        {
+            int focus = FocusSlot;
+            return focus >= 0 && _slots[focus].Joined && !IsWaiting(focus) ? CursorIndex(focus) : -1;
         }
 
         /// <summary>slot の人の色（ローカル対戦のチーム対戦ならチームの色）。</summary>
@@ -591,6 +633,11 @@ namespace Airerage.Runtime.UI
                 _iconHomes[i] = _icons[i].Rect.anchoredPosition;
             }
             _showNameHome = _showName.rectTransform.anchoredPosition;
+            _iconOptions = new MenuOption[_icons.Length];
+            for (int i = 0; i < _icons.Length; i++)
+            {
+                _iconOptions[i] = _icons[i].GetComponent<MenuOption>();
+            }
             UseJapaneseFont();
         }
 
@@ -836,6 +883,18 @@ namespace Airerage.Runtime.UI
             else
             {
                 _allReadySince = -1f;
+            }
+        }
+
+        // カーソルの枠は、選んで右へ動いた札についていく（メインメニューと同じ札の動き）。
+        private void LateUpdate()
+        {
+            for (int i = 0; i < MaxPlayers; i++)
+            {
+                if (_cursors.Length > i && _cursors[i].gameObject.activeSelf)
+                {
+                    _cursors[i].anchoredPosition = _icons[CursorIndex(i)].Rect.anchoredPosition;
+                }
             }
         }
 
@@ -1085,6 +1144,11 @@ namespace Airerage.Runtime.UI
             Slot slot = _slots[slotIndex];
             UiSounds.Find().Play(SoundId.UiCharacterDecide);
             slot.Ready = true;
+            // 決めた札がつぶれて戻り、光って火花が散る（メインメニューの札と同じ決定の演出 B10）。
+            if (slot.Character < _iconOptions.Length && _iconOptions[slot.Character] != null)
+            {
+                _iconOptions[slot.Character].Punch();
+            }
             switch (Mode)
             {
                 case SelectMode.Single:
@@ -1267,6 +1331,16 @@ namespace Airerage.Runtime.UI
                 RefreshCorner(i);
                 RefreshCursor(i);
             }
+            // 名前の札: 右の大きな表示の人のカーソルの札を、メインメニューの札と同じように選んだ見た目にする。
+            int highlighted = HighlightedIcon();
+            for (int i = 0; i < _iconOptions.Length; i++)
+            {
+                if (_iconOptions[i] != null)
+                {
+                    _iconOptions[i].SetHighlighted(i == highlighted);
+                }
+            }
+            RefreshBackdrop();
             RefreshShowcase();
             if (_hint != null)
             {
@@ -1510,6 +1584,13 @@ namespace Airerage.Runtime.UI
             {
                 key.color = theme;
             }
+            foreach (MenuOption row in _showSkillRows)
+            {
+                if (row != null && row.Accent != theme)
+                {
+                    row.SetAccent(theme, true);
+                }
+            }
             TitleStroke stroke = _showName.GetComponent<TitleStroke>();
             if (stroke != null)
             {
@@ -1520,6 +1601,8 @@ namespace Airerage.Runtime.UI
                 // キャラクターが変わった: ロゴが伸び、名前が右から寄って 1 文字ずつはねる。
                 _showIndex = index;
                 _showChangedAt = Time.unscaledTime;
+                // 技の札は上から順に、選んだ瞬間の演出をやり直す。
+                _skillReplayed = 0;
                 LetterRise rise = _showName.GetComponent<LetterRise>();
                 if (rise != null && isActiveAndEnabled)
                 {
@@ -1530,6 +1613,16 @@ namespace Airerage.Runtime.UI
 
         private void AnimateShowcase()
         {
+            // 技の札の演出のやり直し（Q・E・R を少しずつずらす）。
+            while (_skillReplayed < _showSkillRows.Length
+                && Time.unscaledTime >= _showChangedAt + _skillReplayed * SkillReplayStagger)
+            {
+                if (_showSkillRows[_skillReplayed] != null && _showcase.gameObject.activeInHierarchy)
+                {
+                    _showSkillRows[_skillReplayed].Replay();
+                }
+                _skillReplayed++;
+            }
             float t = Mathf.Clamp01((Time.unscaledTime - _showChangedAt) / ShowcaseSeconds);
             float eased = UiEase.SnapOut(t);
             float scale = Mathf.LerpUnclamped(0.86f, 1f, eased);

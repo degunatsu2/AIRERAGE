@@ -1171,7 +1171,7 @@ MonoBehaviour:
         MaydayDefaultHalfWidth: 64
         MaydayDefaultHalfHeight: 40
   _displayName: PASTRY CHEF
-  _logo: {fileID: 2800000, guid: 523089f68ab3afce4b4cb6a7d027b383, type: 2}
+  _logo: {fileID: 2800000, guid: c8258dcc4758bbe1f988034ebb774850, type: 3}
   _special1Icon: {fileID: 0}
   _special2Icon: {fileID: 0}
   _superIcon: {fileID: 0}

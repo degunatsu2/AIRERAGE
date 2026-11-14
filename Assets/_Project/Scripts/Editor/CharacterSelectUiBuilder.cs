@@ -9,35 +9,45 @@ namespace Airerage.Editor
     /// <summary>
     /// キャラクター選択の画面を作る（D-95 の L3 × G1。2026-11-14 のユーザーの決定）。基準の画面の大きさは 1920×1080（横に長い画面・
     /// 16:10 でも重ならないように、左の一覧は画面の左の真ん中、右の大きな表示は右の真ん中、プレイヤーの札は右下を基準に置く）:
-    /// - 左: メインメニューと同じ白い背景（右の端が境目。縫い目とぼかし）に、見出し・ローカル対戦の設定の行・キャラクターの名前の札の
-    ///   縦の一覧（最後は RANDOM。札は白い背景の境目と同じ 18° に傾け、高さに応じて横へずらす）と人ごとのカーソル。
-    /// - 右（後ろは試合の画面のまま）: 選んでいる人の番号と状態、キャラクターの大きなロゴ（キャラクターの色の菱形の上）、名前（白に
-    ///   キャラクターの色の縁取り）、ハッシュタグ、Q・E・R の技の名前。その下に知らせ。
-    /// - 右下: プレイヤーの札（番号、機器か名前、ロゴ、名前、ハッシュタグ、状態）を横に並べる（5 人以上は小さくして 2 段）。
+    /// - 左: メインメニューと同じ白い背景（右の端が境目。縫い目とぼかし。帯はカーソルのキャラクターの位置で左右へ動き、色は画面の
+    ///   イメージカラー）に、見出し・ローカル対戦の設定の行・キャラクターの名前の札のまっすぐな縦の一覧（札の左の縁は見出しの 1 文字目の線。
+    ///   最後は RANDOM）と人ごとのカーソル。札はメインメニューの札と同じ演出（W16 の説明を除く。画面が選ぶ MenuOption）。
+    /// - 右（後ろは試合の画面のまま）: 右の同じ縦の線に右寄せで、上から名前（白にキャラクターの色の縁取り）とハッシュタグ、キャラクターの色の
+    ///   菱形の上のロゴ、Q・E・R の技の名前の札（メインメニューの札と同じ演出）。ロゴの左に選んでいる人の番号と状態と知らせ。
+    /// - 右下: プレイヤーの札（番号、機器か名前、ロゴ、名前、ハッシュタグ、状態）を同じ縦の線に右寄せで横に並べる（5 人以上は小さくして 2 段）。
     /// - 下からせり出す技の説明（F1 ／ Select。ふだんは隠す）。
     /// </summary>
     internal static class CharacterSelectUiBuilder
     {
-        // 名前の札の大きさと間（縦に並べる）。
-        private const float PlateWidth = 470f;
+        // 名前の札の大きさと間（まっすぐ縦に並べる）。
+        private const float PlateWidth = 430f;
         private const float PlateHeight = 74f;
         private const float PlateStep = 86f;
         // 1 枚目の札の真ん中の高さ（画面の下から。基準の画面で）。
         private const float FirstPlateY = 863f;
-        // 白い背景の幅（高さの真ん中で）。札の右の端は、その高さの境目からこれだけ内側（縫い目とカーソルの枠の分）。
+        // 白い背景の幅（高さの真ん中で）。
         private const float PanelWidth = 700f;
-        private const float PlateInset = 36f;
+        // 見出しの左（画面の左から）。札の左の縁は見出しの 1 文字目の線（見出しの左＋1。ステージ選択と同じ）。
+        private const float TitleLeft = 92f;
+        private const float PlateLeft = TitleLeft + 1f;
+        // メインメニューの札と同じ、選んでいない札を下げた濃さ（白い背景の上）。
+        private const float RecedeOnWhite = 0.82f;
         private static readonly Vector2 CornerSize = new Vector2(430f, 290f);
         // 操作の説明（2 行まで）の後ろの黒い帯の高さ。
         private const float HintStripHeight = 72f;
-        // 右の大きな表示の大きさ（右の真ん中を基準に置く）と、ロゴの菱形の真ん中と大きさ。
+        // 右の大きな表示の大きさ（右の真ん中を基準に置く）と、右寄せの縦の線（表示の左下からの x。画面の右から 40。プレイヤーの札と同じ）。
         private static readonly Vector2 ShowcaseSize = new Vector2(1140f, 1080f);
-        private static readonly Vector2 ArtCenter = new Vector2(340f, 560f);
-        private const float DiamondSize = 380f;
-        private const float LogoSize = 400f;
-
-        // 画面の高さの真ん中から above ピクセル上の所で、白い背景（帯と同じ 18° の傾き）が横へずれる量。
-        private static float SlantShift(float above) => MainMenuPanel.EdgeLean * above;
+        private const float RightAxis = 1100f;
+        // ロゴの菱形（対角線の半分）。菱形の右の角を縦の線に置く。ロゴは菱形の真ん中。
+        private const float DiamondHalf = 160f;
+        private static readonly Vector2 ArtCenter = new Vector2(RightAxis - DiamondHalf, 715f);
+        private const float LogoSize = 240f;
+        // 技の札（縦の線に右寄せ。上から Q・E・R）。
+        private const float SkillWidth = 520f;
+        private const float SkillHeight = 58f;
+        private const float SkillTopY = 520f;
+        private const float SkillStep = 68f;
+        private const float SkillShift = 14f;
 
         // 枠の幅に収まらない文は、1 行（または改行どおり）のまま字を小さくして収める。
         private static void FitInWidth(Text text, int maxSize)
@@ -55,19 +65,18 @@ namespace Airerage.Editor
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CharacterSelect");
             // 後ろは試合の画面（G1）。文字が読みやすいように少しだけ暗くする。
             MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.3f), Vector2.zero, Vector2.one);
-            // 左の一覧の後ろの白い背景（画面の左から幅 PanelWidth。右の端が境目。帯は入ってきたモードの色）。
-            // 帯は境目の近くだけにして、一覧の後ろは白にする（2026-11-14 のユーザーの要望: 左の一覧の後ろに白い背景）。
-            MainMenuPanel backdrop = MenuUiBuilder.CreateWhitePanel(panel, "Backdrop", new Vector2(0f, 0f), new Vector2(0f, 1f), 0.9f, 0.84f,
+            // 左の一覧の後ろの白い背景（画面の左から幅 PanelWidth。右の端が境目）。メインメニューと同じ見た目で、帯はカーソルのキャラクターの
+            // 位置で左右へ動く（色は入ってきたモードの色。画面が決める。2026-11-14 のユーザーの要望）。
+            MainMenuPanel backdrop = MenuUiBuilder.CreateWhitePanel(panel, "Backdrop", new Vector2(0f, 0f), new Vector2(0f, 1f), 0.5f, 0.43f,
                 MenuUiBuilder.Accent);
             backdrop.rectTransform.offsetMin = Vector2.zero;
             backdrop.rectTransform.offsetMax = new Vector2(PanelWidth, 0f);
-            AccentTint.Mark(backdrop);
             MenuUiBuilder.CreateHintStrip(panel, HintStripHeight);
             MenuUiBuilder.StyleTitle(MenuUiBuilder.CreateText(panel, "Title", "CHARACTER SELECT", 50, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0f, 1f), new Vector2(92f, -30f), new Vector2(720f, 70f), MenuUiBuilder.Ink, false), MenuUiBuilder.Accent);
+                new Vector2(0f, 1f), new Vector2(TitleLeft, -30f), new Vector2(720f, 70f), MenuUiBuilder.Ink, false), MenuUiBuilder.Accent);
             // 設定の行（ローカル対戦の時間の制限・モード・CPU の数）は、白い背景の幅に収まるように、長いときは縮める。
             Text timeLimit = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                new Vector2(0f, 1f), new Vector2(64f, -104f), new Vector2(PanelWidth - 40f, 40f), MenuUiBuilder.Accent));
+                new Vector2(0f, 1f), new Vector2(PlateLeft, -104f), new Vector2(PanelWidth - PlateLeft - 40f, 40f), MenuUiBuilder.Accent));
             FitInWidth(timeLimit, 24);
 
             var colors = new Color[CharacterSelectScreen.MaxPlayers];
@@ -76,7 +85,7 @@ namespace Airerage.Editor
                 colors[i] = SandboxOnlineSceneBuilder.PlayerColors[i].Color;
             }
 
-            // 名前の札の縦の一覧（左の真ん中を基準に。最後は RANDOM。札は境目と同じ向きに傾け、高さに応じて横へずらす）。
+            // 名前の札のまっすぐな縦の一覧（左の真ん中を基準に。最後は RANDOM。札の左の縁は見出しの 1 文字目の線）。
             int count = roster.Count + 1;
             var grid = new GameObject("Grid", typeof(RectTransform));
             grid.transform.SetParent(panel, false);
@@ -91,8 +100,7 @@ namespace Airerage.Editor
             {
                 CharacterConfigAsset character = i < roster.Count ? roster.Get(i) : null;
                 float y = FirstPlateY - i * PlateStep;
-                float right = PanelWidth + SlantShift(y - 540f) - PlateInset;
-                icons[i] = CreateIcon(gridRect, i, character, new Vector2(right - PlateWidth * 0.5f, y));
+                icons[i] = CreateIcon(gridRect, i, character, new Vector2(PlateLeft + PlateWidth * 0.5f, y));
             }
             var cursors = new Object[CharacterSelectScreen.MaxPlayers];
             var cursorTags = new Object[CharacterSelectScreen.MaxPlayers];
@@ -158,6 +166,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_hint", hint);
             SandboxWireSceneBuilder.SetReference(screen, "_timeLimit", timeLimit);
             SandboxWireSceneBuilder.SetReference(screen, "_message", showcase.Message);
+            SandboxWireSceneBuilder.SetReference(screen, "_backdrop", backdrop);
             SandboxWireSceneBuilder.SetReference(screen, "_showcase", showcase.Root);
             SandboxWireSceneBuilder.SetReference(screen, "_showDiamond", showcase.Diamond);
             SandboxWireSceneBuilder.SetReference(screen, "_showLogo", showcase.Logo);
@@ -167,6 +176,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReference(screen, "_showTags", showcase.Tags);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_showSkillKeys", showcase.SkillKeys);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_showSkillNames", showcase.SkillNames);
+            SandboxWireSceneBuilder.SetReferenceArray(screen, "_showSkillRows", showcase.SkillRows);
             SandboxOnlineSceneBuilder.SetColors(screen, "_colors", colors);
             // 選んだとき・決めたときの演出（D-89。ユーザーの決定、2026-11-07）。
             panel.gameObject.AddComponent<CharacterSelectMotion>();
@@ -174,8 +184,8 @@ namespace Airerage.Editor
             return screen;
         }
 
-        // 名前の札 1 つ（境目と同じ向きの斜めの札に、左にロゴ、右に名前）。中心を center に置く（一覧の左下が原点）。character が null なら
-        // RANDOM（ロゴの所に「?」）。
+        // 名前の札 1 つ（メインメニューと同じ斜めの札に、左にロゴ、右に名前）。中心を center に置く（一覧の左下が原点）。character が null なら
+        // RANDOM（ロゴの所に「?」）。札はメインメニューの札と同じ演出（画面が選ぶ MenuOption。縁・裏の札・「›››」はキャラクターの色）。
         private static CharacterIcon CreateIcon(RectTransform grid, int index, CharacterConfigAsset character, Vector2 center)
         {
             var go = new GameObject($"Icon{index + 1}", typeof(RectTransform));
@@ -186,13 +196,14 @@ namespace Airerage.Editor
             rect.anchoredPosition = center;
             rect.sizeDelta = new Vector2(PlateWidth, PlateHeight);
             var plate = go.AddComponent<SlantedPlate>();
-            plate.Configure(MainMenuPanel.EdgeLean, 2f, new Color(0.05f, 0.08f, 0.13f, 0.92f), new Color(1f, 1f, 1f, 0.3f));
+            plate.Configure(0.35f, 3f, new Color(0.03f, 0.05f, 0.09f, 1f), new Color(1f, 1f, 1f, 0.35f));
+            plate.ConfigureBack(1f, new Vector2(-12f, -10f) * (PlateHeight / 96f));
             var logoGo = new GameObject("Logo", typeof(RectTransform));
             logoGo.transform.SetParent(go.transform, false);
             var logoRect = (RectTransform)logoGo.transform;
             logoRect.anchorMin = logoRect.anchorMax = logoRect.pivot = new Vector2(0f, 0.5f);
             float logoSize = PlateHeight - 12f;
-            logoRect.anchoredPosition = new Vector2(PlateHeight * MainMenuPanel.EdgeLean * 0.5f + 22f, 0f);
+            logoRect.anchoredPosition = new Vector2(PlateHeight * 0.35f * 0.5f + 20f, 0f);
             logoRect.sizeDelta = new Vector2(logoSize, logoSize);
             if (character != null)
             {
@@ -205,9 +216,21 @@ namespace Airerage.Editor
                 AccentTint.Mark(MenuUiBuilder.CreateText(logoGo.transform, "Question", "?", 52, FontStyle.Bold, TextAnchor.MiddleCenter,
                     new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(logoSize, logoSize), MenuUiBuilder.Accent));
             }
-            BestFit(MenuUiBuilder.CreateText(go.transform, "Name", character != null ? character.DisplayName : "RANDOM", 30, FontStyle.BoldAndItalic,
+            Text label = BestFit(MenuUiBuilder.CreateText(go.transform, "Name", character != null ? character.DisplayName : "RANDOM", 30, FontStyle.BoldAndItalic,
                 TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(logoRect.anchoredPosition.x + logoSize + 18f, 0f),
                 new Vector2(PlateWidth - logoRect.anchoredPosition.x - logoSize - 46f, 44f), Color.white), 16);
+            var button = go.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = plate;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            var option = go.AddComponent<MenuOption>();
+            Color theme = character != null ? character.ThemeColor : MenuUiBuilder.Accent;
+            option.Configure(plate, label, null, theme);
+            option.SetExternal(true);
+            option.SetAccent(theme, true);
+            MenuUiBuilder.ApplyMainMenuEffects(option, RecedeOnWhite);
+            // 選んだ札にはキャラクターの色が流れ込む（D-89 の C2）ので、「›››」は白にする。
+            option.SetWhiteChevrons(true);
             var icon = go.AddComponent<CharacterIcon>();
             icon.Configure(index);
             return icon;
@@ -221,7 +244,7 @@ namespace Airerage.Editor
             cursor = (RectTransform)go.transform;
             cursor.sizeDelta = new Vector2(PlateWidth, PlateHeight);
             var frame = go.AddComponent<SlantedPlate>();
-            frame.Configure(MainMenuPanel.EdgeLean, 4f, new Color(0f, 0f, 0f, 0f), color);
+            frame.Configure(0.35f, 4f, new Color(0f, 0f, 0f, 0f), color);
             frame.raycastTarget = false;
             // 1P〜4P は札の四隅、5P〜8P は上下の辺の 1/4・3/4 の所。
             Vector2[] corners =
@@ -249,10 +272,12 @@ namespace Airerage.Editor
             public Text Message;
             public Object[] SkillKeys;
             public Object[] SkillNames;
+            public Object[] SkillRows;
         }
 
-        // 右の大きな表示（右の真ん中を基準に。原点はその左下）: 番号と状態、キャラクターの色の菱形の上の大きなロゴ（RANDOM は「?」）、
-        // 名前（白にキャラクターの色の縁取り。右寄せ）、ハッシュタグ、Q・E・R の技の名前の札。知らせはその下（表示を隠しても出す）。
+        // 右の大きな表示（右の真ん中を基準に。原点はその左下）: 右の縦の線（RightAxis）に右寄せで、上から名前（白にキャラクターの色の縁取り）と
+        // ハッシュタグ、キャラクターの色の菱形の上のロゴ（RANDOM は「?」。菱形の右の角が縦の線）、Q・E・R の技の名前の札。ロゴの左に番号と
+        // 状態、その下に知らせ（知らせは表示を隠しても出す）。
         private static ShowcaseParts CreateShowcase(RectTransform panel)
         {
             var holder = new GameObject("ShowcaseArea", typeof(RectTransform));
@@ -269,9 +294,23 @@ namespace Airerage.Editor
             root.offsetMin = root.offsetMax = Vector2.zero;
             var parts = new ShowcaseParts { Root = root };
 
+            // 名前（右寄せ。白にキャラクターの色の縁取り。名前が変わると 1 文字ずつはねる）とハッシュタグ。
+            Text name = MenuUiBuilder.CreateText(root, "Name", string.Empty, 80, FontStyle.BoldAndItalic, TextAnchor.MiddleRight,
+                Vector2.zero, new Vector2(RightAxis, 975f), new Vector2(900f, 104f), Color.white, false);
+            name.rectTransform.pivot = new Vector2(1f, 0.5f);
+            BestFit(name, 40);
+            var stroke = name.gameObject.AddComponent<TitleStroke>();
+            stroke.Configure(8f, 10f, MenuUiBuilder.Accent);
+            name.gameObject.AddComponent<LetterRise>();
+            parts.Name = name;
+            parts.Tags = MenuUiBuilder.CreateText(root, "Tags", string.Empty, 30, FontStyle.Bold, TextAnchor.MiddleRight,
+                Vector2.zero, new Vector2(RightAxis, 900f), new Vector2(900f, 46f), Color.white);
+            parts.Tags.rectTransform.pivot = new Vector2(1f, 0.5f);
+
             // ロゴの菱形（キャラクターの色）と、その内側の淡い菱形。
-            parts.Diamond = Diamond(root, "Diamond", DiamondSize, new Color(1f, 1f, 1f, 0.92f));
-            Diamond(root, "DiamondInner", DiamondSize * 0.9f, new Color(1f, 1f, 1f, 0.32f));
+            float side = DiamondHalf * Mathf.Sqrt(2f);
+            parts.Diamond = Diamond(root, "Diamond", side, new Color(1f, 1f, 1f, 0.92f));
+            Diamond(root, "DiamondInner", side * 0.9f, new Color(1f, 1f, 1f, 0.32f));
             var logoGo = new GameObject("Logo", typeof(RectTransform));
             logoGo.transform.SetParent(root, false);
             var logoRect = (RectTransform)logoGo.transform;
@@ -281,65 +320,77 @@ namespace Airerage.Editor
             logoRect.sizeDelta = new Vector2(LogoSize, LogoSize);
             parts.Logo = logoGo.AddComponent<RawImage>();
             parts.Logo.raycastTarget = false;
-            parts.Question = MenuUiBuilder.CreateText(root, "Question", "?", 260, FontStyle.Bold, TextAnchor.MiddleCenter,
+            parts.Question = MenuUiBuilder.CreateText(root, "Question", "?", 170, FontStyle.Bold, TextAnchor.MiddleCenter,
                 Vector2.zero, ArtCenter, new Vector2(LogoSize, LogoSize), Color.white);
             parts.Question.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
-            parts.Player = MenuUiBuilder.CreateText(root, "Player", string.Empty, 44, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
-                Vector2.zero, new Vector2(120f, 845f), new Vector2(560f, 60f), Color.white);
-            // 名前（右寄せ。白にキャラクターの色の縁取り。名前が変わると 1 文字ずつはねる）。
-            Text name = MenuUiBuilder.CreateText(root, "Name", string.Empty, 80, FontStyle.BoldAndItalic, TextAnchor.MiddleRight,
-                Vector2.zero, new Vector2(1100f, 975f), new Vector2(1000f, 104f), Color.white, false);
-            name.rectTransform.pivot = new Vector2(1f, 0.5f);
-            BestFit(name, 40);
-            var stroke = name.gameObject.AddComponent<TitleStroke>();
-            stroke.Configure(8f, 10f, MenuUiBuilder.Accent);
-            name.gameObject.AddComponent<LetterRise>();
-            parts.Name = name;
-            parts.Tags = MenuUiBuilder.CreateText(root, "Tags", string.Empty, 30, FontStyle.Bold, TextAnchor.MiddleRight,
-                Vector2.zero, new Vector2(1100f, 895f), new Vector2(1000f, 46f), Color.white);
-            parts.Tags.rectTransform.pivot = new Vector2(1f, 0.5f);
+            // ロゴの左に、選んでいる人の番号と状態（右寄せ）。
+            float besideLogo = ArtCenter.x - DiamondHalf - 30f;
+            parts.Player = MenuUiBuilder.CreateText(root, "Player", string.Empty, 40, FontStyle.BoldAndItalic, TextAnchor.MiddleRight,
+                Vector2.zero, new Vector2(besideLogo, ArtCenter.y + 70f), new Vector2(560f, 56f), Color.white);
+            parts.Player.rectTransform.pivot = new Vector2(1f, 0.5f);
 
-            // Q・E・R の技の名前（境目と同じ向きの斜めの札を、下の段ほど少し左へ）。
+            // Q・E・R の技の名前の札（縦の線に右寄せ。メインメニューの札と同じ演出。画面が選ぶ MenuOption で、いつも選んだ見た目にし、
+            // キャラクターが変わると選んだ瞬間の演出をやり直す）。
             string[] keys = { "Q", "E", "R" };
             int count = CharacterSelectScreen.SkillSlots.Length;
             parts.SkillKeys = new Object[count];
             parts.SkillNames = new Object[count];
+            parts.SkillRows = new Object[count];
+            var skills = new GameObject("Skills", typeof(RectTransform));
+            skills.transform.SetParent(root, false);
+            var skillsRect = (RectTransform)skills.transform;
+            skillsRect.anchorMin = Vector2.zero;
+            skillsRect.anchorMax = Vector2.one;
+            skillsRect.offsetMin = skillsRect.offsetMax = Vector2.zero;
             for (int k = 0; k < count; k++)
             {
-                const float width = 560f;
-                const float height = 64f;
                 var row = new GameObject($"Skill{keys[k]}", typeof(RectTransform));
-                row.transform.SetParent(root, false);
+                row.transform.SetParent(skills.transform, false);
                 var rowRect = (RectTransform)row.transform;
                 rowRect.anchorMin = rowRect.anchorMax = Vector2.zero;
                 rowRect.pivot = new Vector2(1f, 0.5f);
-                rowRect.anchoredPosition = new Vector2(1120f - k * height * MainMenuPanel.EdgeLean * 1.3f, 700f - k * 80f);
-                rowRect.sizeDelta = new Vector2(width, height);
+                // 選んだ見た目のときに縦の線にそろうように、置き場所は選んだときに左へ動く分だけ右（選んだ瞬間の演出で左へ動いて止まる）。
+                rowRect.anchoredPosition = new Vector2(RightAxis + SkillShift, SkillTopY - k * SkillStep);
+                rowRect.sizeDelta = new Vector2(SkillWidth, SkillHeight);
                 var plate = row.AddComponent<SlantedPlate>();
-                plate.Configure(MainMenuPanel.EdgeLean, 2f, new Color(0.03f, 0.05f, 0.09f, 0.88f), new Color(1f, 1f, 1f, 0.25f));
+                plate.Configure(0.35f, 3f, new Color(0.03f, 0.05f, 0.09f, 1f), new Color(1f, 1f, 1f, 0.35f));
+                plate.ConfigureBack(1f, new Vector2(-12f, -10f) * (SkillHeight / 96f));
                 plate.raycastTarget = false;
                 // キーの四角（キャラクターの色）と文字。
                 var keyGo = new GameObject("Key", typeof(RectTransform));
                 keyGo.transform.SetParent(row.transform, false);
                 var keyRect = (RectTransform)keyGo.transform;
                 keyRect.anchorMin = keyRect.anchorMax = keyRect.pivot = new Vector2(0f, 0.5f);
-                keyRect.anchoredPosition = new Vector2(30f, 0f);
-                keyRect.sizeDelta = new Vector2(44f, 44f);
+                keyRect.anchoredPosition = new Vector2(SkillHeight * 0.35f * 0.5f + 12f, 0f);
+                keyRect.sizeDelta = new Vector2(40f, 40f);
                 var keyBox = keyGo.AddComponent<SlantedPlate>();
-                keyBox.Configure(MainMenuPanel.EdgeLean, 0f, Color.white, Color.clear);
+                keyBox.Configure(0.35f, 0f, Color.white, Color.clear);
                 keyBox.raycastTarget = false;
-                MenuUiBuilder.CreateText(keyGo.transform, "Letter", keys[k], 28, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                    new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(44f, 44f), MenuUiBuilder.Ink, false);
-                Text skill = BestFit(MenuUiBuilder.CreateText(row.transform, "Name", string.Empty, 28, FontStyle.Bold, TextAnchor.MiddleLeft,
-                    new Vector2(0f, 0.5f), new Vector2(92f, 0f), new Vector2(width - 120f, 44f), Color.white), 16);
+                MenuUiBuilder.CreateText(keyGo.transform, "Letter", keys[k], 26, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                    new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(40f, 40f), MenuUiBuilder.Ink, false);
+                float labelLeft = keyRect.anchoredPosition.x + 40f + 22f;
+                Text skill = BestFit(MenuUiBuilder.CreateText(row.transform, "Name", string.Empty, 26, FontStyle.Bold, TextAnchor.MiddleLeft,
+                    new Vector2(0f, 0.5f), new Vector2(labelLeft, 0f), new Vector2(SkillWidth - labelLeft - 30f, 44f), Color.white), 16);
+                var button = row.AddComponent<Button>();
+                button.transition = Selectable.Transition.None;
+                button.targetGraphic = plate;
+                button.navigation = new Navigation { mode = Navigation.Mode.None };
+                button.interactable = true;
+                var option = row.AddComponent<MenuOption>();
+                option.Configure(plate, skill, null, MenuUiBuilder.Accent);
+                option.SetExternal(true);
+                option.SetAccent(MenuUiBuilder.Accent, true);
+                option.SetSelectedShift(new Vector2(-SkillShift, 0f));
+                MenuUiBuilder.ApplyMainMenuEffects(option, 1f);
                 parts.SkillKeys[k] = keyBox;
                 parts.SkillNames[k] = skill;
+                parts.SkillRows[k] = option;
             }
 
-            // 知らせ（ローカル対戦の参加の案内・ネットワーク対戦のだれを待っているか。2 行まで）。ロゴの菱形に重ならないように右寄せ。
+            // 知らせ（ローカル対戦の参加の案内・番の人・ネットワーク対戦のだれを待っているか。2 行まで）。ロゴの左、番号と状態の下に右寄せ。
             parts.Message = MenuUiBuilder.CreateText(area, "Message", string.Empty, 26, FontStyle.Bold, TextAnchor.MiddleRight,
-                Vector2.zero, new Vector2(1100f, 420f), new Vector2(560f, 84f), Color.white);
+                Vector2.zero, new Vector2(besideLogo, ArtCenter.y - 20f), new Vector2(600f, 84f), Color.white);
             parts.Message.rectTransform.pivot = new Vector2(1f, 0.5f);
             FitInWidth(parts.Message, 26);
             return parts;

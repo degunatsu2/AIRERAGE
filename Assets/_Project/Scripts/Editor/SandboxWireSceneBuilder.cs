@@ -1463,9 +1463,12 @@ namespace Airerage.Editor
         // 仮のロゴ（CharacterLogoPainter）を描き直して、キャラクターに設定する。ほかの絵（本番の絵）が設定されていれば、そのままにする。
         private static void AssignLogo(CharacterConfigAsset character, string fileName, Color[] pixels)
         {
-            string path = $"{CharacterLogoPainter.Folder}/{fileName}Logo.asset";
+            // ロゴは 1024 ピクセルの PNG（2026-11-14。前は 96 ピクセルのテクスチャのアセット .asset。仮の絵のときは新しい PNG に差し替える）。
+            string path = $"{CharacterLogoPainter.Folder}/{fileName}Logo.png";
+            string legacy = $"{CharacterLogoPainter.Folder}/{fileName}Logo.asset";
             Texture2D logo = CharacterLogoPainter.Write(path, pixels);
-            if (character.Logo == null || AssetDatabase.GetAssetPath(character.Logo) == path)
+            string current = character.Logo != null ? AssetDatabase.GetAssetPath(character.Logo) : null;
+            if (current == null || current == path || current == legacy)
             {
                 character.SetLogo(logo);
                 EditorUtility.SetDirty(character);

@@ -1216,7 +1216,7 @@ MonoBehaviour:
         MaydayDefaultHalfWidth: 64
         MaydayDefaultHalfHeight: 40
   _displayName: SOLDERER
-  _logo: {fileID: 2800000, guid: 4f7d62fe05f522009a613ea4947a7a38, type: 2}
+  _logo: {fileID: 2800000, guid: 48898c66511cd0f7a84e58ee709f1d31, type: 3}
   _special1Icon: {fileID: 0}
   _special2Icon: {fileID: 0}
   _superIcon: {fileID: 0}

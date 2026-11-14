@@ -26,10 +26,11 @@ namespace Airerage.Runtime.Tests
                 Texture2D logo = character.Logo;
                 Assert.That(logo, Is.Not.Null, $"{character.DisplayName} にロゴがない");
                 Assert.That(logo.width, Is.EqualTo(logo.height), $"{character.DisplayName} のロゴが正方形でない");
-                Assert.That(logo.isReadable, Is.True);
+                // 大きく出してもぼやけない大きさ（数式の形から 1024 ピクセルで描いた PNG。2026-11-14）。
+                Assert.That(logo.width, Is.GreaterThanOrEqualTo(1024), $"{character.DisplayName} のロゴが小さい");
 
-                // 不透明な部分の、明るい色の平均（縁取りの暗い色は除く）。
-                Color[] pixels = logo.GetPixels();
+                // 不透明な部分の、明るい色の平均（縁取りの暗い色は除く）。ゲームでは画素を読まないので、元の PNG から読む。
+                Color[] pixels = ReadSource(logo);
                 Color sum = Color.clear;
                 int opaque = 0;
                 foreach (Color pixel in pixels)
@@ -88,6 +89,23 @@ namespace Airerage.Runtime.Tests
                     Assert.That(saturation, Is.LessThan(0.1f), $"{name} のロゴが白でない（{mean}）");
                 }
                 Assert.That(value, Is.GreaterThan(0.9f), $"{name} のロゴが暗い（{mean}）");
+            }
+        }
+
+        // ロゴの元の画像（PNG）の画素。
+        private static Color[] ReadSource(Texture2D logo)
+        {
+            string path = AssetDatabase.GetAssetPath(logo);
+            Assert.That(path, Does.EndWith(".png"), "ロゴが PNG でない");
+            var source = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            try
+            {
+                Assert.That(source.LoadImage(System.IO.File.ReadAllBytes(path)), Is.True, $"ロゴの画像を読めない: {path}");
+                return source.GetPixels();
+            }
+            finally
+            {
+                Object.DestroyImmediate(source);
             }
         }
     }

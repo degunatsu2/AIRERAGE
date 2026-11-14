@@ -580,10 +580,7 @@ namespace Airerage.Runtime.UI
                     icon.Tint.Set(0f, 0f, Color.clear, Color.clear);
                 }
 
-                if (icon.Root.anchoredPosition != icon.Home)
-                {
-                    icon.Root.anchoredPosition = icon.Home;
-                }
+                // 札の位置は MenuOption が動かす（選んだ札が右へ出る。メインメニューと同じ。2026-11-14）。
                 AnimateLogo(icon, hovered, now);
             }
         }
@@ -1027,10 +1024,6 @@ namespace Airerage.Runtime.UI
         {
             foreach (IconFx icon in _icons)
             {
-                if (icon.Root != null)
-                {
-                    icon.Root.anchoredPosition = icon.Home;
-                }
                 if (icon.Logo != null)
                 {
                     icon.Logo.anchoredPosition = icon.LogoHome;

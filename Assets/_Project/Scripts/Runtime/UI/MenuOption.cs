@@ -28,6 +28,8 @@ namespace Airerage.Runtime.UI
     /// - W2 レターライズ: 選んだ瞬間、名前の文字が 1 文字ずつ順にはね上がって戻る（LetterRise。文字の網だけを動かす）。
     /// - W16 サブラベル（_sub がある項目。メインメニュー）: 札の右に、日本語の小さな説明が左からすべり出る。
     /// - W17 シェブロン（_chevrons がある項目。メインメニューなどの一覧）: 名前が右へ寄り、前に項目の色の「›››」が順に光る（ChevronMarks）。
+    /// 選んでいる札を画面が決める札（External。キャラクター選択の名前の札と技の札。2026-11-14）は、EventSystem の選択・マウス・クリックでは
+    /// 動かず、画面が SetHighlighted で選び、Replay で選んだ瞬間の演出をやり直す（音と決定の演出は画面が出す）。
     /// </summary>
     [RequireComponent(typeof(Button))]
     public sealed class MenuOption : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, ICancelHandler
@@ -71,6 +73,10 @@ namespace Airerage.Runtime.UI
         [SerializeField] private ChevronMarks _chevrons;
         [Tooltip("選んでいる間、札の右にすべり出る小さな説明（W16。なければ出さない）")]
         [SerializeField] private Text _sub;
+        [Tooltip("選んでいる札を画面が決める（キャラクター選択の名前の札と技の札。EventSystem の選択・マウス・クリックでは動かない）")]
+        [SerializeField] private bool _external;
+        [Tooltip("「›››」を白にする（選んだ札に項目の色が流れ込む札。キャラクター選択の名前の札。2026-11-14）")]
+        [SerializeField] private bool _whiteChevrons;
         private Vector2[] _pinnedHomes;
 
         // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。収めたときの W16 の説明の文（言語を変えて文が
@@ -152,6 +158,65 @@ namespace Airerage.Runtime.UI
 
         /// <summary>名前の文字のはね（W2。テスト用）。</summary>
         public LetterRise Rise => _rise;
+
+        /// <summary>選んでいる札を画面が決めるか（External）。</summary>
+        public bool External => _external;
+
+        /// <summary>選んでいる札を画面が決める札にする（シーンのビルダー用）。</summary>
+        public void SetExternal(bool external)
+        {
+            _external = external;
+        }
+
+        /// <summary>「›››」を白にする（シーンのビルダー用。選んだ札に項目の色が流れ込む札で、印が色に埋もれないように）。</summary>
+        public void SetWhiteChevrons(bool white)
+        {
+            _whiteChevrons = white;
+            Refresh();
+        }
+
+        /// <summary>
+        /// 選んでいるかを画面が決める（External の札）。選んだ瞬間の演出は EventSystem で選んだときと同じ（音は画面が鳴らす）。
+        /// </summary>
+        public void SetHighlighted(bool selected)
+        {
+            if (selected == _selected)
+            {
+                return;
+            }
+            if (selected)
+            {
+                PlaySelect();
+            }
+            else
+            {
+                _selected = false;
+                Refresh();
+            }
+        }
+
+        /// <summary>
+        /// 選んだ瞬間の演出をやり直す（選んでいなければ選ぶ）。札は置き場所から行きすぎて戻り、名前は左下からすべり込んで 1 文字ずつはね、
+        /// 「›››」が光り直す（技の札: キャラクターが変わったとき）。
+        /// </summary>
+        public void Replay()
+        {
+            if (!_selected)
+            {
+                PlaySelect();
+                return;
+            }
+            _selected = false;
+            _shiftNow = Vector2.zero;
+            _shiftTo = Vector2.zero;
+            _labelShiftNow = 0f;
+            _labelShiftTo = 0f;
+            if (_chevrons != null)
+            {
+                _chevrons.Show(false);
+            }
+            PlaySelect();
+        }
 
         /// <summary>名前の前の「›››」（W17。なければ null。テスト用）。</summary>
         public ChevronMarks Chevrons => _chevrons;
@@ -431,6 +496,11 @@ namespace Airerage.Runtime.UI
             FitLabel();
             Button.onClick.AddListener(() =>
             {
+                // 画面が決める札は、決定の音と演出も画面が出す。
+                if (_external)
+                {
+                    return;
+                }
                 Sounds.Play(SoundId.UiConfirm);
                 Punch();
             });
@@ -502,11 +572,21 @@ namespace Airerage.Runtime.UI
 
         public void OnSelect(BaseEventData eventData)
         {
-            _selected = true;
+            if (_external)
+            {
+                return;
+            }
             if (!_quiet)
             {
                 Sounds.Play(SoundId.UiMove);
             }
+            PlaySelect();
+        }
+
+        // 選んだ瞬間の演出（導火線・裏の札・W1・W2）を出して、選んでいる見た目にする。
+        private void PlaySelect()
+        {
+            _selected = true;
             if (_plate != null)
             {
                 _plate.RunFuse();
@@ -525,13 +605,17 @@ namespace Airerage.Runtime.UI
 
         public void OnDeselect(BaseEventData eventData)
         {
+            if (_external)
+            {
+                return;
+            }
             _selected = false;
             Refresh();
         }
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (Button.IsInteractable() && EventSystem.current != null)
+            if (!_external && Button.IsInteractable() && EventSystem.current != null)
             {
                 EventSystem.current.SetSelectedGameObject(gameObject);
             }
@@ -693,7 +777,7 @@ namespace Airerage.Runtime.UI
             }
             if (_chevrons != null)
             {
-                Color mark = _accent;
+                Color mark = _whiteChevrons ? Color.white : _accent;
                 mark.a = 1f;
                 _chevrons.color = mark;
                 _chevrons.Show(_selected && live);
@@ -724,6 +808,22 @@ namespace Airerage.Runtime.UI
         // 同じ親のほかの項目を選んでいるか。
         private bool SiblingSelected()
         {
+            if (_external)
+            {
+                // 画面が決める札: 同じ親のほかの札が選ばれているか。
+                foreach (Transform sibling in transform.parent)
+                {
+                    if (sibling != transform && sibling.gameObject.activeInHierarchy)
+                    {
+                        MenuOption other = sibling.GetComponent<MenuOption>();
+                        if (other != null && other.IsSelected)
+                        {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
             GameObject current = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             return current != null && current != gameObject && current.transform.parent == transform.parent && current.activeInHierarchy
                 && current.GetComponent<MenuOption>() != null;

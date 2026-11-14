@@ -114,15 +114,14 @@ namespace Airerage.PlayMode.Tests
                     Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "左の背景の帯が項目の色でない");
                 // 白い背景と試合の画面の境目は傾ける（D-92。2026-11-09）。
                 Assert.That(panel.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Right), "メインメニューの白い背景の右の端が境目になっていない");
-                // 境目の模様は D-94 の H19「ぬいめ」の手直し（2026-11-14）: 外に縫い目 2 列、白い背景の内側に 1 列。光る粒はなくした。
-                Assert.That(MainMenuPanel.OuterStitchCount, Is.EqualTo(2), "境目の外の縫い目が 2 列でない");
+                // 境目の模様は D-94 の H19「ぬいめ」の手直し（2026-11-14）: 白い背景の内側に縫い目を 1 列だけ。光る粒と外の 2 列はなくした。
+                Assert.That(MainMenuPanel.OuterStitchCount, Is.EqualTo(0), "境目の外に縫い目がある");
                 Assert.That(MainMenuPanel.InnerStitchCount, Is.EqualTo(1), "白い背景の内側の縫い目が 1 列でない");
                 // 縫い目の線は境目と同じ向き（線の両端の丸みの分で傾きがずれていた。2026-11-14 の指摘）。
                 MainMenuPanel.StitchEnds(0f, 1f, 0f, 16f, 10f, 26f, 5f, out Vector2 dashA, out Vector2 dashB);
                 Assert.That((dashB.x - dashA.x) / (dashB.y - dashA.y), Is.EqualTo(MainMenuPanel.EdgeLean).Within(0.0001f), "縫い目の傾きが境目と違う");
-                // 境目と縫い目の縁はぼかす（くっきりしすぎて浮いて見えないように。2026-11-14）。
+                // 境目はぼかす（くっきりしすぎて浮いて見えないように。縫い目はぼかさない。2026-11-14）。
                 Assert.That(MainMenuPanel.EdgeFeather, Is.GreaterThan(8f), "境目がぼけていない");
-                Assert.That(MainMenuPanel.StitchFeather, Is.GreaterThan(1f), "縫い目の縁がぼけていない");
                 // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7）。縁の色は選んだ項目の色へ移る。
                 UnityEngine.UI.Text logo = backdrop.transform.Find("Logo").GetComponent<UnityEngine.UI.Text>();
                 Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.GreaterThan(2.9f), "左のロゴが白でない");
@@ -414,15 +413,63 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(backdrop.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Right), "キャラクター選択の白い背景の右の端が境目になっていない");
                 Assert.That(backdrop.rectTransform.anchorMax.x, Is.EqualTo(0f), "キャラクター選択の白い背景が画面の左にない");
                 Assert.That(backdrop.rectTransform.rect.width, Is.InRange(500f, 800f), "キャラクター選択の白い背景の幅");
+                // 名前の札はまっすぐ縦に並べ（境目の向きに合わせない）、札の左の縁を見出しの 1 文字目の線にそろえる（2026-11-14）。
                 for (int i = 1; i < characters.IconCount; i++)
                 {
                     Assert.That(characters.IconHome(i).y, Is.LessThan(characters.IconHome(i - 1).y - 40f), "名前の札が縦に並んでいない");
-                    Assert.That(characters.IconHome(i).x, Is.LessThan(characters.IconHome(i - 1).x), "名前の札が境目と同じ向きに傾いていない");
+                    Assert.That(characters.IconHome(i).x, Is.EqualTo(characters.IconHome(0).x).Within(0.01f), "名前の札がまっすぐ並んでいない");
                 }
+                var corners = new Vector3[4];
+                ((RectTransform)characters.transform.Find("Title")).GetWorldCorners(corners);
+                float titleLeft = corners[0].x;
+                float pixel = characters.GetComponentInParent<Canvas>().transform.lossyScale.x;
+                characters.Icon(characters.IconCount - 1).Rect.GetWorldCorners(corners);
+                Assert.That(corners[0].x - titleLeft, Is.EqualTo(pixel).Within(2f * pixel), "名前の札の左の縁が見出しの 1 文字目の線にない");
+                // 名前の札はメインメニューの札と同じ演出（画面が選ぶ MenuOption）。カーソルの札だけを選んだ見た目にする。
+                int cursorIcon = characters.CursorIndex(0);
+                MenuOption iconOption = characters.Icon(cursorIcon).GetComponent<MenuOption>();
+                Assert.That(iconOption, Is.Not.Null, "名前の札にメインメニューの札の演出がない");
+                Assert.That(iconOption.External && iconOption.IsSelected, Is.True, "カーソルの名前の札が選んだ見た目でない");
+                Assert.That(iconOption.Chevrons, Is.Not.Null, "名前の札に「›››」がない");
+                Assert.That(iconOption.Sub, Is.Null, "名前の札に説明（W16）がある");
+                Assert.That(characters.Icon((cursorIcon + 1) % characters.IconCount).GetComponent<MenuOption>().IsSelected, Is.False, "カーソルでない札も選んだ見た目");
+                // 白い背景はメインメニューと同じで、帯はカーソルのキャラクターの位置にある（色は画面のイメージカラー）。
+                Assert.That(characters.BackdropIndex, Is.EqualTo(cursorIcon), "白い背景の帯がカーソルのキャラクターの位置にない");
+                Assert.That(SameHue(backdrop.BandColor, training), Is.True, "白い背景の帯が画面のイメージカラーでない");
+
                 Assert.That(characters.ShowcaseShown, Is.True, "右の大きな表示がない");
                 CharacterConfigAsset focused = characters.CharacterAt(characters.CursorIndex(0));
                 Assert.That(characters.ShowcaseName, Is.EqualTo(focused != null ? focused.DisplayName : "RANDOM"), "右の大きな表示がカーソルのキャラクターでない");
                 Assert.That(characters.ShowcaseSkill(0), Is.Not.Empty, "右の大きな表示に技の名前がない");
+                // ロゴは大きく出してもぼやけない大きさ（数式の形から 1024 ピクセルで描く。2026-11-14）。
+                if (focused != null)
+                {
+                    Assert.That(focused.Logo.width, Is.GreaterThanOrEqualTo(1024), "ロゴの絵が小さい（大きく出すとぼやける）");
+                }
+                // 右は名前 → ロゴ → 技の札の順に、同じ縦の線に右寄せ（2026-11-14）。技の札もメインメニューの札と同じ演出。
+                yield return new WaitForSecondsRealtime(0.6f);
+                Transform showcase = characters.transform.Find("ShowcaseArea/Showcase");
+                ((RectTransform)showcase.Find("Name")).GetWorldCorners(corners);
+                float nameRight = corners[2].x;
+                float nameBottom = corners[0].y;
+                ((RectTransform)showcase.Find("Diamond")).GetWorldCorners(corners);
+                float diamondTop = Mathf.Max(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
+                float diamondRight = Mathf.Max(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+                float diamondBottom = Mathf.Min(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
+                Assert.That(diamondRight, Is.EqualTo(nameRight).Within(4f * pixel), "ロゴが名前と同じ縦の線に右寄せでない");
+                Assert.That(diamondTop, Is.LessThan(nameBottom), "ロゴが名前の下にない");
+                foreach (string key in new[] { "Q", "E", "R" })
+                {
+                    var row = (RectTransform)showcase.Find($"Skills/Skill{key}");
+                    MenuOption rowOption = row.GetComponent<MenuOption>();
+                    Assert.That(rowOption != null && rowOption.IsSelected, Is.True, $"技の札 {key} にメインメニューの札の演出がない");
+                    row.GetWorldCorners(corners);
+                    Assert.That(corners[2].x, Is.EqualTo(nameRight).Within(4f * pixel), $"技の札 {key} が名前と同じ縦の線に右寄せでない");
+                    Assert.That(corners[1].y, Is.LessThan(diamondBottom + 4f * pixel), $"技の札 {key} がロゴの下にない");
+                }
+                // 下のプレイヤーの札（トレーニングは 1P だけ）も同じ縦の線に右寄せ。
+                characters.CornerRect(0).GetWorldCorners(corners);
+                Assert.That(corners[2].x, Is.EqualTo(nameRight).Within(6f * pixel), "プレイヤーの札が同じ縦の線に右寄せでない");
 
                 yield return Tap(keyboard, Key.Enter);
                 yield return WaitFor(() => menu.ShowingStageSelect, CharacterSelectScreen.SingleHoldSeconds + 3f, "ステージ選択へ進まない");
