@@ -42,14 +42,14 @@ namespace Airerage.PlayMode.Tests
                 menu.Local.Button.onClick.Invoke();
                 yield return null;
 
-                // キーボードが P1、ゲームパッドが P2（キャラクターを 1 つずらす）。全員 READY で、最初のステージ。
+                // キーボードが P1、ゲームパッドが P2。1P から順に決める（2P は自分の番にキャラクターを 1 つずらす）。全員 READY で、最初のステージ。
                 CharacterSelectScreen join = menu.CharacterSelect;
                 yield return Tap(keyboard, Key.Enter);
                 yield return Press(gamepad, GamepadButton.South);
-                yield return Press(gamepad, GamepadButton.DpadRight);
+                yield return Tap(keyboard, Key.Enter);
+                yield return Press(gamepad, GamepadButton.DpadDown);
                 int p1 = join.CharacterOf(0);
                 int p2 = join.CharacterOf(1);
-                yield return Tap(keyboard, Key.Enter);
                 yield return Press(gamepad, GamepadButton.South);
                 yield return WaitFor(() => menu.ShowingStageSelect, 3f, "全員が READY でステージ選択に進まない");
                 menu.StageSelect.Option(0).Button.onClick.Invoke();

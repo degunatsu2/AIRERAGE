@@ -57,25 +57,42 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(join.JoinedCount, Is.EqualTo(1), "Enter で参加しない");
                 yield return Press(gamepad, GamepadButton.South);
                 Assert.That(join.JoinedCount, Is.EqualTo(2), "ゲームパッドの A で参加しない");
+                // キャラクターは 1P から順に 1 人ずつ決める（2026-11-14）。1P の番の間は、2P はカーソルを動かせず順番待ち。
+                Assert.That(join.ActiveSlot, Is.EqualTo(0), "1P の番から始まらない");
+                Assert.That(join.FocusSlot, Is.EqualTo(0), "右の大きな表示が 1P でない");
+                Assert.That(join.ShownState(1), Is.EqualTo("WAITING"), "2P の枠が順番待ちにならない");
                 int before = join.CharacterOf(1);
                 yield return Press(gamepad, GamepadButton.DpadRight);
+                Assert.That(join.CharacterOf(1), Is.EqualTo(before), "1P の番なのに 2P のカーソルが動いた");
+                yield return Press(gamepad, GamepadButton.North);
+                Assert.That(join.Timed, Is.False, "Y で時間の制限が変わらない（設定はだれでも変えられる）");
+                yield return Press(gamepad, GamepadButton.North);
+                Assert.That(join.Timed, Is.True);
+
+                // 1P が決めると 2P の番。1 人だけ READY ではまだ進まない。
+                yield return Tap(keyboard, Key.Enter);
+                Assert.That(join.IsReady(0), Is.True, "Enter で READY にならない");
+                Assert.That(join.ActiveSlot, Is.EqualTo(1), "1P が決めても 2P の番にならない");
+                Assert.That(menu.ShowingCharacterSelect, Is.True, "全員が READY になる前に進んだ");
+                yield return Press(gamepad, GamepadButton.DpadDown);
                 int character = join.CharacterOf(1);
-                Assert.That(character, Is.Not.EqualTo(before), "十字キーでキャラクターが変わらない");
+                Assert.That(character, Is.Not.EqualTo(before), "2P の番に十字キーでキャラクターが変わらない");
                 Assert.That(join.ShownState(1), Is.EqualTo("SELECTING"), "2P の枠に状態を出さない");
+                Assert.That(join.ShowcasePlayer, Does.StartWith("2P"), "右の大きな表示が 2P にならない");
                 yield return Press(gamepad, GamepadButton.Select);
                 Assert.That(join.DetailsOpen, Is.True, "ゲームパッドの Select で技の説明を出さない");
                 yield return Press(gamepad, GamepadButton.Select);
                 Assert.That(join.DetailsOpen, Is.False);
-                Assert.That(join.CharacterOf(0), Is.Not.EqualTo(-1));
-                yield return Press(gamepad, GamepadButton.North);
-                Assert.That(join.Timed, Is.False, "Y で時間の制限が変わらない");
-                yield return Press(gamepad, GamepadButton.North);
-                Assert.That(join.Timed, Is.True);
-
-                // 1 人だけ READY ではまだ進まない。全員 READY でステージ選択へ。
+                // 2P の番に戻るを押すと、1P の決定を取り消して 1P の番に戻る。1P がもう一度決めると、また 2P の番。
+                yield return Press(gamepad, GamepadButton.East);
+                Assert.That(join.IsReady(0), Is.False, "2P の番の戻るで 1P の決定が取り消されない");
+                Assert.That(join.ActiveSlot, Is.EqualTo(0), "1P の番に戻らない");
+                Assert.That(join.JoinedCount, Is.EqualTo(2), "2P が抜けた");
                 yield return Tap(keyboard, Key.Enter);
-                Assert.That(join.IsReady(0), Is.True, "Enter で READY にならない");
-                Assert.That(menu.ShowingCharacterSelect, Is.True, "全員が READY になる前に進んだ");
+                Assert.That(join.ActiveSlot, Is.EqualTo(1));
+                Assert.That(join.CharacterOf(1), Is.EqualTo(character), "2P のカーソルが変わった");
+
+                // 全員 READY でステージ選択へ。
                 yield return Press(gamepad, GamepadButton.South);
                 // 全員そろった帯（D-89 の C17）を見せてから進む。
                 Assert.That(menu.CharacterSelect.AllReady, Is.True, "全員が READY なのに、全員そろったことにならない");

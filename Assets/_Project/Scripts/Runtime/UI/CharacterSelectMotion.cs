@@ -97,7 +97,6 @@ namespace Airerage.Runtime.UI
             public bool StampHit;
             public float PeelAt = -10f;
             public Vector2 StampHome;
-            public Vector2 CornerHome;
             public float ShakeAt = -10f;
             public float LandAt = -10f;
             public bool Landed;
@@ -227,7 +226,7 @@ namespace Airerage.Runtime.UI
 
         private SlotFx BuildSlot(int slot)
         {
-            var fx = new SlotFx { CornerHome = _screen.CornerRect(slot).anchoredPosition, FuseAt = slot * 0.2f };
+            var fx = new SlotFx { FuseAt = slot * 0.2f };
             RawImage logo = _screen.CornerLogo(slot);
             Text name = _screen.CornerName(slot);
             Text tags = _screen.CornerTags(slot);
@@ -775,14 +774,16 @@ namespace Airerage.Runtime.UI
                 // 判が叩きつけられた瞬間に、枠が揺れる。
                 float shake = (now - fx.ShakeAt) / ShakeSeconds;
                 RectTransform corner = _screen.CornerRect(p);
+                // 札の置き場所は人数で変わる（5 人以上は小さくして 2 段）ので、毎回画面に聞く。
+                Vector2 home = _screen.CornerHome(p);
                 if (shake >= 0f && shake < 1f)
                 {
                     float amp = 5f * (1f - shake);
-                    corner.anchoredPosition = fx.CornerHome + new Vector2(Mathf.Sin(shake * 40f) * amp, Mathf.Cos(shake * 33f) * amp * 0.5f);
+                    corner.anchoredPosition = home + new Vector2(Mathf.Sin(shake * 40f) * amp, Mathf.Cos(shake * 33f) * amp * 0.5f);
                 }
-                else if (corner.anchoredPosition != fx.CornerHome)
+                else if (corner.anchoredPosition != home)
                 {
-                    corner.anchoredPosition = fx.CornerHome;
+                    corner.anchoredPosition = home;
                 }
             }
         }
@@ -1074,7 +1075,7 @@ namespace Airerage.Runtime.UI
                 _screen.CornerLogo(p).rectTransform.localScale = Vector3.one;
                 _screen.CornerName(p).rectTransform.anchoredPosition = fx.NameHome;
                 _screen.CornerTags(p).rectTransform.anchoredPosition = fx.TagsHome;
-                _screen.CornerRect(p).anchoredPosition = fx.CornerHome;
+                _screen.CornerRect(p).anchoredPosition = _screen.CornerHome(p);
                 fx.ReelAt = -10f;
                 fx.PeelAt = -10f;
                 fx.LandAt = -10f;

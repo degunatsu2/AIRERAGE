@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Airerage.Runtime.Audio;
 using Airerage.Runtime.Flow;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.UI;
 using NUnit.Framework;
 using UnityEngine;
@@ -113,11 +114,15 @@ namespace Airerage.PlayMode.Tests
                     Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "左の背景の帯が項目の色でない");
                 // 白い背景と試合の画面の境目は傾ける（D-92。2026-11-09）。
                 Assert.That(panel.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Right), "メインメニューの白い背景の右の端が境目になっていない");
-                // 境目の模様は D-94 の H19「ぬいめ」の手直し（2026-11-14）: 外に縫い目 2 列、白い背景の内側に 1 列、その外に光る粒。
+                // 境目の模様は D-94 の H19「ぬいめ」の手直し（2026-11-14）: 外に縫い目 2 列、白い背景の内側に 1 列。光る粒はなくした。
                 Assert.That(MainMenuPanel.OuterStitchCount, Is.EqualTo(2), "境目の外の縫い目が 2 列でない");
                 Assert.That(MainMenuPanel.InnerStitchCount, Is.EqualTo(1), "白い背景の内側の縫い目が 1 列でない");
-                Assert.That(MainMenuPanel.SparkleCount(1080f), Is.GreaterThan(30), "境目の外に光る粒がない");
-                Assert.That(MainMenuPanel.EdgeReach, Is.LessThan(320f), "光る粒が試合の画面の奥まで広がりすぎている");
+                // 縫い目の線は境目と同じ向き（線の両端の丸みの分で傾きがずれていた。2026-11-14 の指摘）。
+                MainMenuPanel.StitchEnds(0f, 1f, 0f, 16f, 10f, 26f, 5f, out Vector2 dashA, out Vector2 dashB);
+                Assert.That((dashB.x - dashA.x) / (dashB.y - dashA.y), Is.EqualTo(MainMenuPanel.EdgeLean).Within(0.0001f), "縫い目の傾きが境目と違う");
+                // 境目と縫い目の縁はぼかす（くっきりしすぎて浮いて見えないように。2026-11-14）。
+                Assert.That(MainMenuPanel.EdgeFeather, Is.GreaterThan(8f), "境目がぼけていない");
+                Assert.That(MainMenuPanel.StitchFeather, Is.GreaterThan(1f), "縫い目の縁がぼけていない");
                 // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7）。縁の色は選んだ項目の色へ移る。
                 UnityEngine.UI.Text logo = backdrop.transform.Find("Logo").GetComponent<UnityEngine.UI.Text>();
                 Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.GreaterThan(2.9f), "左のロゴが白でない");
@@ -296,7 +301,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(motion.StampShown(0), Is.False, "取り消しても判が残っている");
 
                 // RANDOM: カーソルがアイコンの上を回ってから止まり、そのキャラクターで決まる（C18）。
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < characters.IconCount; i++)
                 {
                     yield return Tap(keyboard, Key.DownArrow);
                     if (characters.CharacterOf(0) == characters.RandomIndex)
@@ -403,11 +408,21 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(characters.GetComponentInChildren<TitleStroke>(true), Is.Not.Null, "キャラクター選択の見出しに縁取りがない");
                 // 縁と影は文字の写しを周りにずらして重ねて作る。写しが少ないと斜めの辺で段（ギザギザ）になる（2026-11-12 の指摘）。
                 Assert.That(TitleStroke.CopiesPerLayer, Is.GreaterThanOrEqualTo(40), "縁と影の写しが少ない（斜めの辺がギザギザになる）");
+                // 配置は D-95 の L3 × G1（2026-11-14）: 左の白い背景（右の端だけが境目）にキャラクターの名前の札を縦に並べ、白い背景の境目と
+                // 同じ向きに傾けて上の札ほど右へずらす。右にカーソルのキャラクターを大きく出す。
                 MainMenuPanel backdrop = characters.GetComponentInChildren<MainMenuPanel>(true);
-                Assert.That(backdrop.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Both), "キャラクター選択の白い背景の左右の端が境目になっていない");
-                // 白い背景は見出しがぎりぎり収まる幅で、アイコンの行は白い背景と同じ向きに傾けて並べる（上の行ほど右。2026-11-12）。
-                Assert.That(backdrop.rectTransform.anchorMax.x - backdrop.rectTransform.anchorMin.x, Is.LessThan(0.4f), "キャラクター選択の白い背景が広い");
-                Assert.That(characters.IconHome(0).x, Is.GreaterThan(characters.IconHome(4).x + 30f), "アイコンの行が斜めに並んでいない");
+                Assert.That(backdrop.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Right), "キャラクター選択の白い背景の右の端が境目になっていない");
+                Assert.That(backdrop.rectTransform.anchorMax.x, Is.EqualTo(0f), "キャラクター選択の白い背景が画面の左にない");
+                Assert.That(backdrop.rectTransform.rect.width, Is.InRange(500f, 800f), "キャラクター選択の白い背景の幅");
+                for (int i = 1; i < characters.IconCount; i++)
+                {
+                    Assert.That(characters.IconHome(i).y, Is.LessThan(characters.IconHome(i - 1).y - 40f), "名前の札が縦に並んでいない");
+                    Assert.That(characters.IconHome(i).x, Is.LessThan(characters.IconHome(i - 1).x), "名前の札が境目と同じ向きに傾いていない");
+                }
+                Assert.That(characters.ShowcaseShown, Is.True, "右の大きな表示がない");
+                CharacterConfigAsset focused = characters.CharacterAt(characters.CursorIndex(0));
+                Assert.That(characters.ShowcaseName, Is.EqualTo(focused != null ? focused.DisplayName : "RANDOM"), "右の大きな表示がカーソルのキャラクターでない");
+                Assert.That(characters.ShowcaseSkill(0), Is.Not.Empty, "右の大きな表示に技の名前がない");
 
                 yield return Tap(keyboard, Key.Enter);
                 yield return WaitFor(() => menu.ShowingStageSelect, CharacterSelectScreen.SingleHoldSeconds + 3f, "ステージ選択へ進まない");

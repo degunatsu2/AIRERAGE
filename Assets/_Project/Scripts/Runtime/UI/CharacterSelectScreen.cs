@@ -15,17 +15,21 @@ using UnityEngine.UI;
 namespace Airerage.Runtime.UI
 {
     /// <summary>
-    /// キャラクター選択（docs/15 T6-3、6.9。格闘ゲームによくあるアイコンを選ぶ形。ユーザーの要望、2026-10-19）。
-    /// - 真ん中にキャラクターのアイコン（ロゴ）を並べ（四隅は空ける）、四隅に 1P〜4P の選んでいるキャラクター（ロゴ、名前、ハッシュタグ、
-    ///   状態）を出す。アイコンの上には人ごとの色の枠と「1P」などの札（カーソル）。
+    /// キャラクター選択（docs/15 T6-3、6.9。配置は D-95 の L3 × G1。2026-11-14 のユーザーの決定）。
+    /// - 左の白い背景にキャラクターの名前の札の縦の一覧（最後は RANDOM）。札の上には人ごとの色の枠と「1P」などの札（カーソル）。
+    /// - 右に、選んでいる人（FocusSlot）のカーソルのキャラクターを大きく（番号と状態、ロゴ、名前、ハッシュタグ、Q・E・R の技の名前）。
+    /// - 右下にプレイヤーの札（ロゴ、名前、ハッシュタグ、状態）を横に並べる。
     /// - 技の説明はふだんは出さず、F1（ゲームパッドは Select）を押すと下からせり出す（もう一度で引っ込む。押した人のカーソルの
     ///   キャラクター）。
     /// - 操作は機器を直接読む（同時に何人もが別のカーソルを動かすため）: 移動は 矢印・WASD ／ 十字キー・左スティック、決定は
     ///   Enter・Space ／ A・Start、戻るは Esc・Backspace ／ B。マウスはアイコンに乗せて選び、クリックで決定（キーボードの人）。
     /// 3 つの使い方:
     /// - Single（トレーニング）: 1P だけ。どの機器でも操作できる。決定で Confirmed、戻るで Cancelled。
-    /// - Local（ローカル対戦。T6-5）: 機器ごとに参加（決定）して 1P〜4P。決定で READY、戻るで取り消し、もう一度で抜ける。だれも参加して
-    ///   いなければ戻るで Cancelled。時間の制限は T ／ Y。2 人以上で全員 READY なら LocalConfirmed。
+    /// - Local（ローカル対戦。T6-5）: 機器ごとに参加（決定）して 1P〜4P。キャラクターは 1P から順に 1 人ずつ決める（右の大きな表示が
+    ///   1 人分のため。2026-11-14 のユーザーの要望）: 番の人（ActiveSlot。READY でないいちばん若い番号の人）だけがカーソルを動かして
+    ///   決め、ほかの人は順番待ち。決定で READY（次の人の番）。番の人の戻るは、前の人の決定を取り消す（前の人がいなければ抜ける）。
+    ///   READY の人の戻るは自分の決定の取り消し、順番待ちの人の戻るは抜ける。だれも参加していなければ戻るで Cancelled。時間の制限は
+    ///   T ／ Y。2 人以上で全員 READY なら LocalConfirmed。
     /// - Network（ネットワーク対戦。T6-7）: 自分の番号の枠をこの PC のどの機器でも操作する。ほかの人の枠は SetRemote で出す。カーソルを
     ///   動かすと NetworkHovered、決定・取り消しで NetworkReadyChanged、READY でないときの戻るで Cancelled（抜ける）。
     /// </summary>
@@ -44,8 +48,19 @@ namespace Airerage.Runtime.UI
         /// <summary>ローカル対戦で機器ごとに参加できる人数（D-85。CPU は別）。</summary>
         public const int MaxLocalPlayers = 4;
 
-        /// <summary>5 人以上のときの枠の縮め方（四隅に 2 枚ずつ重ねて並べる。5P〜8P の枠は、この大きさで 1P〜4P の内側に置く）。</summary>
-        public const float CompactCornerScale = 0.6f;
+        /// <summary>プレイヤーの札の大きさ（作った大きさに対する割合。4 人までは右下に横に 1 列）。</summary>
+        public const float PlateScale = 0.6f;
+
+        /// <summary>5 人以上のときのプレイヤーの札の大きさ（右下に 4 枚ずつ 2 段。1P〜4P が上の段、5P〜8P が下の段）。</summary>
+        public const float CompactCornerScale = 0.42f;
+
+        // プレイヤーの札の間、画面の右の端と下の端からの余白（基準の画面のピクセル）。
+        private const float PlateGap = 16f;
+        private const float PlateRightMargin = 40f;
+        private const float PlateBottom = 92f;
+
+        // 右の大きな表示が変わったときの演出の秒数（ロゴが少し小さい所から伸び、名前が右から寄る）。
+        private const float ShowcaseSeconds = 0.24f;
 
         /// <summary>技の説明に出す技の枠（左から Q、E、R）。</summary>
         public static readonly AttackSlot[] SkillSlots = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
@@ -92,6 +107,17 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Text _hint;
         [SerializeField] private Text _timeLimit;
         [SerializeField] private Text _message;
+        [Header("右の大きな表示（D-95 の L3。2026-11-14）")]
+        [SerializeField] private RectTransform _showcase;
+        [SerializeField] private Graphic _showDiamond;
+        [SerializeField] private RawImage _showLogo;
+        [SerializeField] private Text _showQuestion;
+        [SerializeField] private Text _showPlayer;
+        [SerializeField] private Text _showName;
+        [SerializeField] private Text _showTags;
+        [Tooltip("Q・E・R のキーの四角（キャラクターの色）と技の名前（SkillSlots と同じ順）")]
+        [SerializeField] private Graphic[] _showSkillKeys = new Graphic[0];
+        [SerializeField] private Text[] _showSkillNames = new Text[0];
 
         /// <summary>アイコンの並びの下の知らせ（テスト用）。</summary>
         public string ShownMessage => _message != null ? _message.text : string.Empty;
@@ -120,6 +146,10 @@ namespace Airerage.Runtime.UI
         // アイコンの置き場所（演出で動かしても、カーソルはここに置く）と、四隅の枠に出している名前（文字の演出の途中でも本来の名前）。
         private Vector2[] _iconHomes = new Vector2[0];
         private readonly string[] _shownNames = new string[MaxPlayers];
+        // 右の大きな表示に出しているアイコンと、変わった時刻（演出）。
+        private int _showIndex = -1;
+        private float _showChangedAt = -10f;
+        private Vector2 _showNameHome;
 
         /// <summary>トレーニング: 決定した（キャラクターの番号）。</summary>
         public event Action<int> Confirmed;
@@ -324,6 +354,86 @@ namespace Airerage.Runtime.UI
             _cpuCount = Mathf.Clamp(_cpuCount, 0, Mathf.Max(0, LocalCapacity - JoinedCount));
         }
 
+        /// <summary>
+        /// ローカル対戦で、今キャラクターを選ぶ番の人（READY でないいちばん若い番号の参加した人。いなければ -1。ほかのモードは -1）。
+        /// </summary>
+        public int ActiveSlot
+        {
+            get
+            {
+                if (Mode != SelectMode.Local)
+                {
+                    return -1;
+                }
+                for (int i = 0; i < _slots.Length; i++)
+                {
+                    if (_slots[i].Joined && !_slots[i].Ready)
+                    {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+        }
+
+        /// <summary>
+        /// 右の大きな表示に出す人（トレーニング・シングルは 1P、ネットワーク対戦は自分、ローカル対戦は番の人。全員決めたら最後に決めた人。
+        /// だれも参加していなければ -1）。
+        /// </summary>
+        public int FocusSlot
+        {
+            get
+            {
+                switch (Mode)
+                {
+                    case SelectMode.Single:
+                        return 0;
+                    case SelectMode.Network:
+                        return _localSlot;
+                    default:
+                        int active = ActiveSlot;
+                        if (active >= 0)
+                        {
+                            return active;
+                        }
+                        int last = -1;
+                        for (int i = 0; i < _slots.Length; i++)
+                        {
+                            last = _slots[i].Joined ? i : last;
+                        }
+                        return last;
+                }
+            }
+        }
+
+        /// <summary>ローカル対戦で、参加しているが順番を待っている人か。</summary>
+        public bool IsWaiting(int slot) => Mode == SelectMode.Local && _slots[slot].Joined && !_slots[slot].Ready && slot != ActiveSlot;
+
+        /// <summary>右の大きな表示を出しているか・出している名前・ハッシュタグ・技の名前・番号と状態（テスト用）。</summary>
+        public bool ShowcaseShown => _showcase.gameObject.activeSelf;
+        public string ShowcaseName => _showName.text;
+        public string ShowcaseTags => _showTags.text;
+        public string ShowcaseSkill(int index) => _showSkillNames[index].text;
+        public string ShowcasePlayer => _showPlayer.text;
+
+        /// <summary>
+        /// プレイヤーの札 slot の置き場所（画面の右下を基準にした、札の左下の位置。size は札を作った大きさ）。4 人までは横に 1 列、compact
+        /// （5 人以上）なら小さくして 4 枚ずつ 2 段（1P〜4P が上の段）。
+        /// </summary>
+        public static Vector2 PlateHome(int slot, bool compact, Vector2 size)
+        {
+            float scale = compact ? CompactCornerScale : PlateScale;
+            float width = size.x * scale;
+            float height = size.y * scale;
+            int column = slot % MaxLocalPlayers;
+            int row = compact && slot < MaxLocalPlayers ? 1 : 0;
+            float left = -PlateRightMargin - MaxLocalPlayers * width - (MaxLocalPlayers - 1) * PlateGap;
+            return new Vector2(left + column * (width + PlateGap), PlateBottom + row * (height + PlateGap));
+        }
+
+        /// <summary>slot の人のプレイヤーの札の今の置き場所（演出で揺らしても、ここへ戻す）。</summary>
+        public Vector2 CornerHome(int slot) => PlateHome(slot, Compact, CornerRect(slot).sizeDelta);
+
         /// <summary>番号 slot（1P が 0）の人のカーソルのキャラクター・READY か・参加しているか。</summary>
         public int CharacterOf(int slot) => _slots[slot].Character;
         public bool IsReady(int slot) => _slots[slot].Ready;
@@ -462,9 +572,11 @@ namespace Airerage.Runtime.UI
                 || _cornerPlates.Length != MaxPlayers || _cornerDevices.Length != MaxPlayers || _cornerLogos.Length != MaxPlayers
                 || _cornerNames.Length != MaxPlayers || _cornerTags.Length != MaxPlayers || _cornerStates.Length != MaxPlayers
                 || _details == null || _detailName == null || _detailTags == null
-                || _skillNames.Length != skills || _skillDescriptions.Length != skills || _skillCooldowns.Length != skills)
+                || _skillNames.Length != skills || _skillDescriptions.Length != skills || _skillCooldowns.Length != skills
+                || _showcase == null || _showDiamond == null || _showLogo == null || _showQuestion == null || _showPlayer == null
+                || _showName == null || _showTags == null || _showSkillKeys.Length != skills || _showSkillNames.Length != skills)
             {
-                Debug.LogError($"{name}: キャラクターの一覧・アイコン（{_icons.Length}）・カーソル・四隅の枠・技の説明の表示がそろっていません", this);
+                Debug.LogError($"{name}: キャラクターの一覧・アイコン（{_icons.Length}）・カーソル・プレイヤーの札・技の説明・右の大きな表示がそろっていません", this);
                 enabled = false;
                 return;
             }
@@ -478,6 +590,7 @@ namespace Airerage.Runtime.UI
             {
                 _iconHomes[i] = _icons[i].Rect.anchoredPosition;
             }
+            _showNameHome = _showName.rectTransform.anchoredPosition;
             UseJapaneseFont();
         }
 
@@ -488,6 +601,11 @@ namespace Airerage.Runtime.UI
             _language = GameSettings.LoadLanguage();
             bool ja = _language == GameLanguage.Japanese;
             _detailTags.font = GameFonts.Switch(_detailTags.font, ja);
+            _showTags.font = GameFonts.Switch(_showTags.font, ja);
+            foreach (Text skill in _showSkillNames)
+            {
+                skill.font = GameFonts.Switch(skill.font, ja);
+            }
             foreach (Text tags in _cornerTags)
             {
                 tags.font = GameFonts.Switch(tags.font, ja);
@@ -683,6 +801,7 @@ namespace Airerage.Runtime.UI
         private void Update()
         {
             UpdateDetailsSlide();
+            AnimateShowcase();
             if (Time.frameCount < _activeFromFrame)
             {
                 return;
@@ -840,9 +959,11 @@ namespace Airerage.Runtime.UI
                     break;
             }
             Slot slot = _slots[slotIndex];
+            // ローカル対戦は 1P から順に 1 人ずつ決める（番でない人はカーソルを動かせない。2026-11-14）。
+            bool myTurn = Mode != SelectMode.Local || slotIndex == ActiveSlot;
             if (intent.Details)
             {
-                ToggleDetails(slotIndex);
+                ToggleDetails(Mode == SelectMode.Local && FocusSlot >= 0 ? FocusSlot : slotIndex);
             }
             if (intent.ToggleTime && Mode == SelectMode.Local)
             {
@@ -860,6 +981,10 @@ namespace Airerage.Runtime.UI
             else if (slot.Rolling)
             {
                 // ルーレットの途中は、戻る（取り消し）だけ。
+            }
+            else if (!myTurn)
+            {
+                // 順番待ち（READY の人も、取り消すまでは動かせない）。
             }
             else if (intent.Confirm && !slot.Ready)
             {
@@ -995,6 +1120,18 @@ namespace Airerage.Runtime.UI
                 }
                 return;
             }
+            if (Mode == SelectMode.Local && slotIndex == ActiveSlot)
+            {
+                // 番の人の戻る: 前の人の決定を取り消して、前の人の番に戻す（前の人がいなければ抜ける）。
+                for (int j = slotIndex - 1; j >= 0; j--)
+                {
+                    if (_slots[j].Joined && _slots[j].Ready)
+                    {
+                        _slots[j].Ready = false;
+                        return;
+                    }
+                }
+            }
             if (Mode == SelectMode.Local)
             {
                 // 抜ける（後ろの人の番号を詰める。試合の番号と同じになるように）。
@@ -1062,14 +1199,19 @@ namespace Airerage.Runtime.UI
 
         private int Move(int index, int dx, int dy)
         {
-            return MoveInGrid(index, dx, dy, _icons.Length, _columns);
+            // 縦 1 列の一覧（D-95 の L3）では、左右も前後へ動かす（右・下で次、左・上で前）。
+            if (_columns == 1 && dy == 0)
+            {
+                dy = dx;
+            }
+            return MoveInGrid(index, 0, dy, _icons.Length, _columns);
         }
 
         // マウス: 乗せたアイコンへ、マウスを持つ人のカーソルを動かす。
         private void OnIconHovered(int character)
         {
             int slotIndex = MouseSlot();
-            if (slotIndex < 0 || _slots[slotIndex].Ready || _slots[slotIndex].Rolling || Time.frameCount < _activeFromFrame)
+            if (slotIndex < 0 || _slots[slotIndex].Ready || _slots[slotIndex].Rolling || Time.frameCount < _activeFromFrame || IsWaiting(slotIndex))
             {
                 return;
             }
@@ -1080,7 +1222,7 @@ namespace Airerage.Runtime.UI
         private void OnIconClicked(int character)
         {
             int slotIndex = MouseSlot();
-            if (slotIndex < 0 || _slots[slotIndex].Ready || _slots[slotIndex].Rolling || Time.frameCount < _activeFromFrame)
+            if (slotIndex < 0 || _slots[slotIndex].Ready || _slots[slotIndex].Rolling || Time.frameCount < _activeFromFrame || IsWaiting(slotIndex))
             {
                 return;
             }
@@ -1120,10 +1262,12 @@ namespace Airerage.Runtime.UI
             bool compact = Compact;
             for (int i = 0; i < MaxPlayers; i++)
             {
-                _corners[i].transform.localScale = Vector3.one * (compact ? CompactCornerScale : 1f);
+                _corners[i].transform.localScale = Vector3.one * (compact ? CompactCornerScale : PlateScale);
+                CornerRect(i).anchoredPosition = CornerHome(i);
                 RefreshCorner(i);
                 RefreshCursor(i);
             }
+            RefreshShowcase();
             if (_hint != null)
             {
                 if (Mode == SelectMode.Local)
@@ -1182,7 +1326,15 @@ namespace Airerage.Runtime.UI
                         return Loc.T("JOIN WITH ENTER (KEYBOARD) OR A (GAMEPAD)\nOR ADD CPUs WITH C / LB",
                             "Enter（キーボード）か A（ゲームパッド）で参加\nC ／ LB で CPU も入れられます");
                     }
-                    return LocalProblem() ?? string.Empty;
+                    string problem = LocalProblem();
+                    if (problem != null)
+                    {
+                        return problem;
+                    }
+                    int active = ActiveSlot;
+                    return active >= 0 && JoinedCount >= 2
+                        ? Loc.T($"{active + 1}P: CHOOSE YOUR CHARACTER", $"{active + 1}P がキャラクターを選んでください")
+                        : string.Empty;
                 case SelectMode.Network:
                     return _networkMessage;
                 default:
@@ -1272,15 +1424,16 @@ namespace Airerage.Runtime.UI
                 _shownNames[i] = character.DisplayName;
                 _cornerTags[i].text = TagsText(character.TagsIn(_language));
             }
-            _cornerStates[i].text = slot.Ready ? "READY!" : "SELECTING";
-            _cornerStates[i].color = slot.Ready ? color : new Color(1f, 1f, 1f, 0.7f);
+            _cornerStates[i].text = slot.Ready ? "READY!" : IsWaiting(i) ? "WAITING" : "SELECTING";
+            _cornerStates[i].color = slot.Ready ? color : new Color(1f, 1f, 1f, IsWaiting(i) ? 0.45f : 0.7f);
         }
 
         // カーソル: 参加している人のアイコンに、人ごとの色の枠（重なっても見えるよう、番号ごとに少し大きく）と札（アイコンの四隅）。
         private void RefreshCursor(int i)
         {
             Slot slot = _slots[i];
-            bool shown = slot.Joined && (Mode != SelectMode.Single || i == 0);
+            // ローカル対戦の順番待ちの人のカーソルは出さない（番の人と、決めた人だけ）。
+            bool shown = slot.Joined && (Mode != SelectMode.Single || i == 0) && !IsWaiting(i);
             _cursors[i].gameObject.SetActive(shown);
             if (!shown)
             {
@@ -1295,7 +1448,7 @@ namespace Airerage.Runtime.UI
             cursor.anchorMax = icon.anchorMax;
             cursor.pivot = icon.pivot;
             cursor.anchoredPosition = IconHome(index);
-            float grow = 8f + i * 7f;
+            float grow = 6f + i * 5f;
             cursor.sizeDelta = icon.sizeDelta + new Vector2(grow, grow) * 2f;
             Color color = i < _colors.Length ? _colors[i] : Color.white;
             _cursorTags[i].text = $"{i + 1}P";
@@ -1305,6 +1458,85 @@ namespace Airerage.Runtime.UI
             {
                 frame.BorderColor = slot.Ready ? Color.white : color;
             }
+        }
+
+        // 右の大きな表示（FocusSlot の人のカーソルのキャラクター。RANDOM のルーレットの途中は回っている顔）。
+        private void RefreshShowcase()
+        {
+            int focus = FocusSlot;
+            bool shown = focus >= 0 && _slots[focus].Joined;
+            _showcase.gameObject.SetActive(shown);
+            if (!shown)
+            {
+                _showIndex = -1;
+                return;
+            }
+            Slot slot = _slots[focus];
+            int index = CursorIndex(focus);
+            Color player = PlayerColor(focus);
+            string state = slot.Ready ? "READY!" : "SELECTING";
+            _showPlayer.text = $"{focus + 1}P   {state}";
+            _showPlayer.color = player;
+            CharacterConfigAsset character = index < Count ? _roster.Get(index) : null;
+            Color theme = character != null ? character.ThemeColor : Accent;
+            _showDiamond.color = new Color(theme.r, theme.g, theme.b, 0.92f);
+            if (character != null)
+            {
+                _showLogo.texture = character.Logo;
+                _showLogo.enabled = character.Logo != null;
+                _showQuestion.enabled = false;
+                _showName.text = character.DisplayName;
+                _showTags.text = TagsText(character.TagsIn(_language));
+                CombatTuning combat = character.Config.Combat;
+                for (int k = 0; k < SkillSlots.Length; k++)
+                {
+                    SkillText text = character.TextOf(SkillSlots[k]);
+                    string skillName = text != null ? text.NameIn(_language) : string.Empty;
+                    _showSkillNames[k].text = !string.IsNullOrEmpty(skillName) ? skillName : combat.Get(SkillSlots[k]).Name;
+                }
+            }
+            else
+            {
+                _showLogo.enabled = false;
+                _showQuestion.enabled = true;
+                _showName.text = "RANDOM";
+                _showTags.text = _language == GameLanguage.Japanese ? "#？？？" : "#???";
+                foreach (Text skill in _showSkillNames)
+                {
+                    skill.text = "???";
+                }
+            }
+            foreach (Graphic key in _showSkillKeys)
+            {
+                key.color = theme;
+            }
+            TitleStroke stroke = _showName.GetComponent<TitleStroke>();
+            if (stroke != null)
+            {
+                stroke.SetAccent(theme);
+            }
+            if (index != _showIndex)
+            {
+                // キャラクターが変わった: ロゴが伸び、名前が右から寄って 1 文字ずつはねる。
+                _showIndex = index;
+                _showChangedAt = Time.unscaledTime;
+                LetterRise rise = _showName.GetComponent<LetterRise>();
+                if (rise != null && isActiveAndEnabled)
+                {
+                    rise.Play();
+                }
+            }
+        }
+
+        private void AnimateShowcase()
+        {
+            float t = Mathf.Clamp01((Time.unscaledTime - _showChangedAt) / ShowcaseSeconds);
+            float eased = UiEase.SnapOut(t);
+            float scale = Mathf.LerpUnclamped(0.86f, 1f, eased);
+            _showLogo.rectTransform.localScale = Vector3.one * scale;
+            _showQuestion.rectTransform.localScale = Vector3.one * scale;
+            _showDiamond.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f + (1f - eased) * 18f);
+            _showName.rectTransform.anchoredPosition = _showNameHome + new Vector2((1f - eased) * 60f, 0f);
         }
 
         private void UpdateDetailsSlide()
@@ -1318,7 +1550,9 @@ namespace Airerage.Runtime.UI
             _detailsOpen = Mathf.MoveTowards(_detailsOpen, target, step);
             if (_detailsSlot >= 0)
             {
-                ShowDetails(_slots[_detailsSlot].Character);
+                // ローカル対戦は、番が移ったら番の人のキャラクターの説明に変える。
+                int shown = Mode == SelectMode.Local && FocusSlot >= 0 ? FocusSlot : _detailsSlot;
+                ShowDetails(_slots[shown].Character);
             }
             float eased = 1f - (1f - _detailsOpen) * (1f - _detailsOpen);
             float height = _details.rect.height;

@@ -655,6 +655,9 @@ namespace Airerage.Editor
                     LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)group.transform);
                 }
                 Canvas.ForceUpdateCanvases();
+                // 大きな字（キャラクター選択の右の名前など）が字体の絵（文字の表）を広げると、その前に作った文字の網が古い位置を指したまま
+                // になる（白い四角に写る）。もう一度作り直してから撮る（実行中は次のフレームで作り直される）。
+                Canvas.ForceUpdateCanvases();
                 camera.Render();
                 RenderTexture.active = texture;
                 var image = new Texture2D(size.x, size.y, TextureFormat.RGB24, false);
