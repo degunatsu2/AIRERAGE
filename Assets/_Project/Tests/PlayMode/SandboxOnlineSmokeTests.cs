@@ -42,6 +42,10 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(view.gameObject.activeSelf, Is.False, "試合の前にキャラクターが表示されている");
             }
 
+            // 立つ高さは STANDARD の体の大きさで決めている。前に選んだキャラクター（ほかのテストのランダムな選択などで保存された値）に
+            // 左右されないように STANDARD で始め、最後に保存の値だけを元に戻す（2026-11-14。JUGGERNAUT が残っていて高く立っていた）。
+            int chosen = runner.LocalCharacter;
+            runner.LocalCharacter = 0;
             Assert.That(runner.StartHost(0), Is.True, "待ち受けを始められない");
             Assert.That(runner.Session.State, Is.EqualTo(OnlineSession.SessionState.Lobby));
             runner.StartMatch();
@@ -73,6 +77,7 @@ namespace Airerage.PlayMode.Tests
             runner.Leave();
             Assert.That(runner.Session, Is.Null);
             Assert.That(shown.gameObject.activeSelf, Is.False, "抜けた後もキャラクターが表示されている");
+            runner.LocalCharacter = chosen;
         }
 
         [UnityTest]
