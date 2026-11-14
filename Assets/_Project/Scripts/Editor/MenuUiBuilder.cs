@@ -248,7 +248,7 @@ namespace Airerage.Editor
         /// <summary>
         /// 白い背景（MainMenuPanel。D-91 の M2 を白地に。2026-11-08）を anchorMin〜anchorMax に広げて置く。bandLeft・stripLeft は帯と細い帯の
         /// 左端（地の幅に対する割合）。帯の色は accent（実行中に AccentTint や項目の選択で変わる）。画面の端に付いていない側が試合の画面との
-        /// 境目になり、傾けて段々の帯と菱形のドットでほどけさせる（D-92。2026-11-09）。
+        /// 境目になり、傾けて縫い目と光る粒で飾る（D-92・D-94。2026-11-14）。
         /// </summary>
         public static MainMenuPanel CreateWhitePanel(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, float bandLeft, float stripLeft,
             Color accent)

@@ -10,9 +10,10 @@ namespace Airerage.Runtime.UI
     /// 項目ごとに少し右へずれる（0.35 秒）。見本のページ（メインメニューの背景の案）と同じ割合で描く。
     /// 帯は項目の色を白に寄せた淡い色にし、左の端だけ項目の色そのものの線を引く（項目の色の裏の札が帯に溶けて一部しか見えなかったので、
     /// 帯を淡くして裏の札を浮かせた。ユーザーの指摘、2026-11-08）。
-    /// 試合の画面との境目（D-92。ユーザーが選んだ E2 + E3。2026-11-09、2026-11-12 に手直し）: 境目の端を帯と同じ向きに傾け（高さの真ん中が
-    /// 元の位置）、その外に段々の帯を 3 本。帯は菱形のドットを斜めの格子に等間隔に並べたもので、1 段目は間隔が狭く大きなドット、2 段目・
-    /// 3 段目になるほど間隔が広く小さなドットになり、試合の画面へほどけていく。色はその端の地の色（右の端は帯の淡い色、左の端は白）。
+    /// 試合の画面との境目（D-92 で端を帯と同じ向きに傾けた。高さの真ん中が元の位置）の模様は D-94 の H19「ぬいめ」の手直し（2026-11-14 の
+    /// ユーザーの決定）: 境目の外に、境目に沿った角の丸い短い線の縫い目を 2 列（1 列目はその端の地の色＝右の端は帯の淡い色・左の端は白、
+    /// 2 列目は画面の色を白に寄せた色）、白い背景の内側の縁の近くに画面の色の縫い目を 1 列。その外に、やわらかく光る粒（H17 の光の粒を
+    /// 上らせず、H7 の星屑のように散らして置き、ゆっくりまたたく）。粒は境目の近くほど多く大きい。
     /// メインメニューのほか、オプション・ステージ選択・アイテムを選ぶ画面・CPU LEVEL の左（右の端だけ）、キャラクター選択の真ん中（左右の
     /// 端）、ネットワークの画面と待機所の全面（端なし）に置く。
     /// </summary>
@@ -38,45 +39,72 @@ namespace Airerage.Runtime.UI
 
         /// <summary>試合の画面との境目の傾き（帯と同じ。高さ 1 に対する横のずれ）。</summary>
         public const float EdgeLean = Skew;
-        // 境目の外の段々の帯（ピクセル）: 端からの始まり・幅・ドットの横の間隔（縦は半分ずつずらした斜めの格子）・ドットの大きさ（中心から
-        // 角まで）・濃さ。1 段目ほど間隔が狭く大きい。
-        private static readonly EdgeBand[] EdgeBands =
+        // 境目の縫い目（ピクセル）: 境目からの距離（外が正。負は白い背景の内側）・太さ・1 本の長さ・間。外の 2 列と内側の 1 列（見本のページの
+        // H19 の 1・2 列目と、内側に足した列）。
+        private static readonly Stitch[] Stitches =
         {
-            new EdgeBand(12f, 36f, 12f, 5f, 0.9f),
-            new EdgeBand(58f, 30f, 15f, 3.8f, 0.8f),
-            new EdgeBand(98f, 27f, 18f, 2.7f, 0.7f),
+            new Stitch(16f, 5f, 16f, 10f),
+            new Stitch(40f, 4f, 12f, 10f),
+            new Stitch(-16f, 3.5f, 14f, 9f),
         };
+        // 縫い目の角を丸くする半円の分割の数。
+        private const int CapSegments = 5;
+        // 光る粒（見本のページの H17 の光の粒を H7 の星屑のように置く）: 高さ 1080 あたりの数、境目からの始まりと広がり（外ほどまばら）、
+        // 粒の半径（光のにじみの半径はその 2.2 倍）、またたきの速さ（ラジアン/秒）。
+        private const int SparklesPer1080 = 70;
+        private const float SparkleStart = 58f;
+        private const float SparkleSpan = 200f;
+        private const float SparkleSpread = 1.5f;
+        private const float SparkleMinRadius = 4f;
+        private const float SparkleMaxRadius = 11f;
+        private const float GlowScale = 2.2f;
+        private const float TwinkleSpeed = 1.6f;
+        // 粒の光のにじみの輪（半径の割合）と、輪の分割の数。
+        private const float GlowCore = 0.15f;
+        private const float GlowHalo = 0.4f;
+        private const int GlowSegments = 14;
+        // 2 列目の縫い目の色・粒のにじみの色を作るとき、画面の色を白に寄せる割合。
+        private const float StitchTint = 0.3f;
+        private const float HaloTint = 0.6f;
 
-        private readonly struct EdgeBand
+        private readonly struct Stitch
         {
-            public readonly float Start;
+            public readonly float Offset;
             public readonly float Width;
-            public readonly float Step;
-            public readonly float Size;
-            public readonly float Alpha;
+            public readonly float Length;
+            public readonly float Gap;
 
-            public EdgeBand(float start, float width, float step, float size, float alpha)
+            public Stitch(float offset, float width, float length, float gap)
             {
-                Start = start;
+                Offset = offset;
                 Width = width;
-                Step = step;
-                Size = size;
-                Alpha = alpha;
+                Length = length;
+                Gap = gap;
             }
         }
 
-        /// <summary>段々の帯の数（テスト用）。</summary>
-        public static int EdgeBandCount => EdgeBands.Length;
-
-        /// <summary>index 段目の帯のドットの横の間隔と大きさ（ピクセル。テスト用）。</summary>
-        public static void EdgeBandDots(int index, out float step, out float size)
+        /// <summary>境目の外の縫い目の列の数（テスト用）。</summary>
+        public static int OuterStitchCount
         {
-            step = EdgeBands[index].Step;
-            size = EdgeBands[index].Size;
+            get
+            {
+                int n = 0;
+                foreach (Stitch stitch in Stitches)
+                {
+                    n += stitch.Offset > 0f ? 1 : 0;
+                }
+                return n;
+            }
         }
 
-        /// <summary>境目から、いちばん外の帯の外側までの距離（ピクセル。テスト用）。</summary>
-        public static float EdgeReach => EdgeBands[EdgeBands.Length - 1].Start + EdgeBands[EdgeBands.Length - 1].Width;
+        /// <summary>白い背景の内側の縫い目の列の数（テスト用）。</summary>
+        public static int InnerStitchCount => Stitches.Length - OuterStitchCount;
+
+        /// <summary>高さ height の端に置く光る粒の数（テスト用）。</summary>
+        public static int SparkleCount(float height) => Mathf.Max(1, Mathf.RoundToInt(SparklesPer1080 * height / 1080f));
+
+        /// <summary>境目から、いちばん外の粒の光のにじみの外側までの距離（ピクセル。テスト用）。</summary>
+        public static float EdgeReach => SparkleStart + SparkleSpan + SparkleMaxRadius * GlowScale;
 
         /// <summary>試合の画面との境目がどこにあるか。</summary>
         public enum EdgeSides
@@ -95,7 +123,7 @@ namespace Airerage.Runtime.UI
         [SerializeField] private float _bandLeft = 0.5f;
         [Tooltip("細い帯の左端（地の幅に対する割合）")]
         [SerializeField] private float _stripLeft = 0.43f;
-        [Tooltip("試合の画面との境目（傾けて、段々の帯と菱形のドットでほどけさせる端）")]
+        [Tooltip("試合の画面との境目（傾けて、縫い目と光る粒で飾る端）")]
         [SerializeField] private EdgeSides _edges;
 
         // 帯の今の状態（画面の切り替えの写しにも引き継ぐため、保存する値にする）。
@@ -197,7 +225,8 @@ namespace Airerage.Runtime.UI
         private void Update()
         {
             float now = Time.unscaledTime;
-            if (now - _colorAt < ColorSeconds + 0.05f || now - _moveAt < MoveSeconds + 0.05f)
+            // 境目の光る粒はまたたくので、境目があるときは毎フレーム描き直す。
+            if (_edges != EdgeSides.None || now - _colorAt < ColorSeconds + 0.05f || now - _moveAt < MoveSeconds + 0.05f)
             {
                 SetVerticesDirty();
             }
@@ -251,39 +280,136 @@ namespace Airerage.Runtime.UI
                 AddPolygon(vh, r, Slanted(r, bandLeft, bandLeft + EdgeWidth, half), accent);
             }
 
-            // 試合の画面との境目: 段々の帯と、ほどけていく菱形のドット（右の端は帯の色、左の端は地の色）。
-            if (right)
+            // 試合の画面との境目: 縫い目と光る粒（右の端の 1 列目は帯の色、左の端は地の色）。
+            if (right || left)
             {
-                AddEdge(vh, r, r.xMax, 1f, _index >= 0 ? band : paper);
-            }
-            if (left)
-            {
-                AddEdge(vh, r, r.xMin, -1f, paper);
+                Color accent = _index >= 0 ? CurrentColor(now) : _paper;
+                accent.a = tint;
+                if (right)
+                {
+                    AddEdge(vh, r, r.xMax, 1f, _index >= 0 ? band : paper, accent, _index >= 0, now);
+                }
+                if (left)
+                {
+                    AddEdge(vh, r, r.xMin, -1f, paper, accent, _index >= 0, now);
+                }
             }
         }
 
-        // 高さの真ん中で x = edge を通る傾いた端の外（side が 1 なら右、-1 なら左）に、菱形のドットの段々の帯を描く。ドットは帯の中に
-        // 収まるものだけ（帯からはみ出す半端なドットは描かない）。
-        private static void AddEdge(VertexHelper vh, Rect r, float edge, float side, Color c)
+        // 高さの真ん中で x = edge を通る傾いた端（side が 1 なら外は右、-1 なら左）に、縫い目と光る粒を描く。c はその端の地の色、accent は
+        // 画面の色（hasAccent でなければ地の色。内側の縫い目は斜線の地模様の色を濃くした色にする）。
+        private void AddEdge(VertexHelper vh, Rect r, float edge, float side, Color c, Color accent, bool hasAccent, float now)
         {
             float mid = r.center.y;
-            foreach (EdgeBand band in EdgeBands)
+            Color white = new Color(1f, 1f, 1f, accent.a);
+            Color pastel = Color.Lerp(accent, white, StitchTint);
+            Color inner = hasAccent ? accent : new Color(_stripe.r, _stripe.g, _stripe.b, Mathf.Min(1f, _stripe.a * 8f) * accent.a);
+            for (int i = 0; i < Stitches.Length; i++)
             {
-                Color dot = c;
-                dot.a *= band.Alpha;
-                float rowStep = band.Step * 0.5f;
-                int row = 0;
-                for (float y = r.yMin + rowStep * 0.5f; y < r.yMax; y += rowStep, row++)
+                Stitch stitch = Stitches[i];
+                Color color = stitch.Offset < 0f ? inner : i == 0 ? c : hasAccent ? pastel : c;
+                AddStitches(vh, r, edge, side, mid, stitch, color);
+            }
+
+            // 光る粒: 境目の近くほど多く大きい（距離は乱数の SparkleSpread 乗で、外ほどまばら）。またたきは粒ごとにずらす。
+            Color halo = hasAccent ? Color.Lerp(accent, white, HaloTint) : white;
+            int count = SparkleCount(r.height);
+            int seed = side > 0f ? 1 : 2;
+            for (int n = 0; n < count; n++)
+            {
+                float d = SparkleSpan * Mathf.Pow(Hash(n, seed * 7), SparkleSpread);
+                float near = 1f - d / SparkleSpan;
+                float y = r.yMin + Hash(n, seed * 7 + 1) * r.height;
+                float x = edge + EdgeLean * (y - mid) + side * (SparkleStart + d);
+                float radius = Mathf.Lerp(SparkleMinRadius, SparkleMaxRadius, Hash(n, seed * 7 + 2)) * (0.5f + 0.5f * near);
+                float twinkle = 0.35f + 0.65f * Mathf.Max(0f, Mathf.Sin(now * TwinkleSpeed + Hash(n, seed * 7 + 3) * 2f * Mathf.PI));
+                Color core = white;
+                core.a *= (0.95f * near + 0.05f) * twinkle;
+                Color mid2 = halo;
+                mid2.a *= 0.45f * near * twinkle;
+                AddGlow(vh, new Vector2(x, y), radius * GlowScale, core, mid2);
+            }
+        }
+
+        // 境目から stitch.Offset の所に、境目に沿った角の丸い短い線を並べる（地の上下の端で切る）。
+        private static void AddStitches(VertexHelper vh, Rect r, float edge, float side, float mid, Stitch stitch, Color c)
+        {
+            float period = stitch.Length + stitch.Gap;
+            // 境目に沿った向き（上が右へ傾く）。線の長さは高さで測る。
+            Vector2 along = new Vector2(EdgeLean, 1f).normalized;
+            Vector2 across = new Vector2(along.y, -along.x);
+            float half = stitch.Width * 0.5f;
+            for (float y0 = r.yMin + stitch.Gap * 0.5f; y0 < r.yMax; y0 += period)
+            {
+                float y1 = Mathf.Min(y0 + stitch.Length, r.yMax);
+                if (y1 - y0 < stitch.Width)
                 {
-                    float edgeX = edge + EdgeLean * (y - mid);
-                    float first = row % 2 == 1 ? band.Step * 0.5f : 0f;
-                    for (float d = band.Start + band.Size + first; d <= band.Start + band.Width - band.Size + 0.01f; d += band.Step)
-                    {
-                        float x = edgeX + side * d;
-                        float h = band.Size;
-                        AddRaw(vh, new[] { new Vector2(x, y + h), new Vector2(x + h, y), new Vector2(x, y - h), new Vector2(x - h, y) }, dot);
-                    }
+                    continue;
                 }
+                var a = new Vector2(edge + EdgeLean * (y0 - mid) + side * stitch.Offset, y0 + half);
+                var b = new Vector2(edge + EdgeLean * (y1 - mid) + side * stitch.Offset, y1 - half);
+                Polygon.Clear();
+                // b の側の半円（across → along → -across）と、a の側の半円（-across → -along → across）。
+                for (int k = 0; k <= CapSegments; k++)
+                {
+                    float t = Mathf.PI * k / CapSegments;
+                    Polygon.Add(b + (across * Mathf.Cos(t) + along * Mathf.Sin(t)) * half);
+                }
+                for (int k = 0; k <= CapSegments; k++)
+                {
+                    float t = Mathf.PI * k / CapSegments;
+                    Polygon.Add(a + (-across * Mathf.Cos(t) - along * Mathf.Sin(t)) * half);
+                }
+                AddConvex(vh, Polygon, c);
+            }
+        }
+
+        // 中心が明るく外へ消える光の粒（中心 → 小さな芯の輪は core、にじみの輪は halo、外の輪は透明）。
+        private static void AddGlow(VertexHelper vh, Vector2 center, float radius, Color core, Color halo)
+        {
+            if (core.a <= 0.003f && halo.a <= 0.003f)
+            {
+                return;
+            }
+            Color clear = halo;
+            clear.a = 0f;
+            int start = vh.currentVertCount;
+            vh.AddVert(center, core, Vector2.zero);
+            float[] rings = { GlowCore, GlowHalo, 1f };
+            Color[] colors = { core, halo, clear };
+            for (int ring = 0; ring < rings.Length; ring++)
+            {
+                for (int k = 0; k < GlowSegments; k++)
+                {
+                    float t = 2f * Mathf.PI * k / GlowSegments;
+                    vh.AddVert(center + new Vector2(Mathf.Cos(t), Mathf.Sin(t)) * (radius * rings[ring]), colors[ring], Vector2.zero);
+                }
+            }
+            for (int k = 0; k < GlowSegments; k++)
+            {
+                int next = (k + 1) % GlowSegments;
+                vh.AddTriangle(start, start + 1 + k, start + 1 + next);
+                for (int ring = 0; ring + 1 < rings.Length; ring++)
+                {
+                    int inA = start + 1 + ring * GlowSegments + k;
+                    int inB = start + 1 + ring * GlowSegments + next;
+                    int outA = inA + GlowSegments;
+                    int outB = inB + GlowSegments;
+                    vh.AddTriangle(inA, outA, outB);
+                    vh.AddTriangle(inA, outB, inB);
+                }
+            }
+        }
+
+        // 番号 (a, b) から決まる 0〜1 の値（粒の置き場所と大きさ。毎回同じ）。
+        private static float Hash(int a, int b)
+        {
+            unchecked
+            {
+                uint h = (uint)(a * 374761393 + b * 668265263);
+                h = (h ^ (h >> 13)) * 1274126177u;
+                h ^= h >> 16;
+                return h / 4294967296f;
             }
         }
 
@@ -308,14 +434,6 @@ namespace Airerage.Runtime.UI
             {
                 return;
             }
-            AddConvex(vh, Polygon, c);
-        }
-
-        // 切らずに、凸の多角形として足す（境目の外の飾り）。
-        private static void AddRaw(VertexHelper vh, Vector2[] points, Color c)
-        {
-            Polygon.Clear();
-            Polygon.AddRange(points);
             AddConvex(vh, Polygon, c);
         }
 

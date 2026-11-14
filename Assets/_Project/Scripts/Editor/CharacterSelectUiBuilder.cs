@@ -48,7 +48,7 @@ namespace Airerage.Editor
             RectTransform panel = MenuUiBuilder.CreateFull(canvas, "CharacterSelect");
             MenuUiBuilder.CreateFill(panel, "Dim", new Color(0f, 0f, 0f, 0.5f), Vector2.zero, Vector2.one);
             // 見出しとアイコンの並びが収まる、メインメニューと同じ白い背景（四隅の枠の間で、画面の上から下まで。左右の端は帯と同じ向きに
-            // 傾け、段々の帯と菱形のドットでほどけさせる。D-92。帯は入ってきたモードの色。2026-11-08）。下の辺だけ黒い帯にして操作の説明を見やすく（白い背景より手前、四隅の枠より奥）。
+            // 傾け、縫い目と光る粒で飾る。D-92・D-94。帯は入ってきたモードの色。2026-11-08）。下の辺だけ黒い帯にして操作の説明を見やすく（白い背景より手前、四隅の枠より奥）。
             AccentTint.Mark(MenuUiBuilder.CreateWhitePanel(panel, "Backdrop", new Vector2((960f - PanelWidth * 0.5f) / 1920f, 0f),
                 new Vector2((960f + PanelWidth * 0.5f) / 1920f, 1f), 0.74f, 0.68f, MenuUiBuilder.Accent));
             MenuUiBuilder.CreateHintStrip(panel, HintStripHeight);

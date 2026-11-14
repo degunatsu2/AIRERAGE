@@ -111,18 +111,13 @@ namespace Airerage.PlayMode.Tests
                 Color bandColor = panel.BandColor;
                 Assert.That(new Vector3(bandColor.r, bandColor.g, bandColor.b),
                     Is.EqualTo(new Vector3(menu.Training.Accent.r, menu.Training.Accent.g, menu.Training.Accent.b)), "左の背景の帯が項目の色でない");
-                // 白い背景と試合の画面の境目は傾けて、段々の帯と菱形のドットでほどけさせる（D-92 の E2 + E3。2026-11-09）。
+                // 白い背景と試合の画面の境目は傾ける（D-92。2026-11-09）。
                 Assert.That(panel.Edges, Is.EqualTo(MainMenuPanel.EdgeSides.Right), "メインメニューの白い背景の右の端が境目になっていない");
-                // 段々の帯は 3 段の菱形のドットで、1 段目ほど間隔が狭く大きい（2026-11-12）。その外にドットはない。
-                Assert.That(MainMenuPanel.EdgeBandCount, Is.EqualTo(3), "段々の帯が 3 段でない");
-                for (int step = 1; step < MainMenuPanel.EdgeBandCount; step++)
-                {
-                    MainMenuPanel.EdgeBandDots(step - 1, out float innerStep, out float innerSize);
-                    MainMenuPanel.EdgeBandDots(step, out float outerStep, out float outerSize);
-                    Assert.That(outerStep, Is.GreaterThan(innerStep), $"{step + 1} 段目のドットの間隔が広くない");
-                    Assert.That(outerSize, Is.LessThan(innerSize), $"{step + 1} 段目のドットが小さくない");
-                }
-                Assert.That(MainMenuPanel.EdgeReach, Is.LessThan(140f), "3 段目の外にもドットがある");
+                // 境目の模様は D-94 の H19「ぬいめ」の手直し（2026-11-14）: 外に縫い目 2 列、白い背景の内側に 1 列、その外に光る粒。
+                Assert.That(MainMenuPanel.OuterStitchCount, Is.EqualTo(2), "境目の外の縫い目が 2 列でない");
+                Assert.That(MainMenuPanel.InnerStitchCount, Is.EqualTo(1), "白い背景の内側の縫い目が 1 列でない");
+                Assert.That(MainMenuPanel.SparkleCount(1080f), Is.GreaterThan(30), "境目の外に光る粒がない");
+                Assert.That(MainMenuPanel.EdgeReach, Is.LessThan(320f), "光る粒が試合の画面の奥まで広がりすぎている");
                 // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7）。縁の色は選んだ項目の色へ移る。
                 UnityEngine.UI.Text logo = backdrop.transform.Find("Logo").GetComponent<UnityEngine.UI.Text>();
                 Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.GreaterThan(2.9f), "左のロゴが白でない");
