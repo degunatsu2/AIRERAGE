@@ -76,6 +76,12 @@ namespace Airerage.Runtime.UI
         /// <summary>傾き（高さに対する、上の辺の右へのずれの割合）。</summary>
         public float Slant => _slant;
 
+        /// <summary>縁の太さ（縁は札の内側に描く）。</summary>
+        public float BorderWidth => _borderWidth;
+
+        /// <summary>縁の内側の形の、左右の辺の横のずれ（縁の太さが d の斜めの辺の内側。中に重ねる塗りを縁の内側に収める）。</summary>
+        public static float InsetSide(float slant, float d) => d * (slant + Mathf.Sqrt(1f + slant * slant));
+
         public Color BorderColor
         {
             get => _borderColor;

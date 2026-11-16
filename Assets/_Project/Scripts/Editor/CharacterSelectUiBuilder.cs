@@ -48,6 +48,8 @@ namespace Airerage.Editor
         private const float SkillTopY = 520f;
         private const float SkillStep = 68f;
         private const float SkillShift = 14f;
+        // 白い背景の上の注意の文の色（濃い赤）。
+        private static readonly Color WarningOnWhite = new Color(0.78f, 0.1f, 0.16f, 1f);
 
         // 枠の幅に収まらない文は、1 行（または改行どおり）のまま字を小さくして収める。
         private static void FitInWidth(Text text, int maxSize)
@@ -78,6 +80,11 @@ namespace Airerage.Editor
             Text timeLimit = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(panel, "TimeLimit", string.Empty, 24, FontStyle.BoldAndItalic, TextAnchor.MiddleLeft,
                 new Vector2(0f, 1f), new Vector2(PlateLeft, -104f), new Vector2(PanelWidth - PlateLeft - 40f, 40f), MenuUiBuilder.Accent));
             FitInWidth(timeLimit, 24);
+            // 知らせ（ローカル対戦のチーム対戦で、チームが 1 つしかないときの注意だけ。設定の行の下。だれが選んでいるかと操作の説明は
+            // 下の札と下の帯にあるので、右には出さない。2026-11-16 のユーザーの要望）。
+            Text message = MenuUiBuilder.CreateText(panel, "Message", string.Empty, 22, FontStyle.Bold, TextAnchor.MiddleLeft,
+                new Vector2(0f, 1f), new Vector2(PlateLeft, -140f), new Vector2(PanelWidth - PlateLeft - 40f, 32f), WarningOnWhite, false);
+            FitInWidth(message, 22);
 
             var colors = new Color[CharacterSelectScreen.MaxPlayers];
             for (int i = 0; i < colors.Length; i++)
@@ -165,13 +172,12 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_skillCooldowns", details.Cooldowns);
             SandboxWireSceneBuilder.SetReference(screen, "_hint", hint);
             SandboxWireSceneBuilder.SetReference(screen, "_timeLimit", timeLimit);
-            SandboxWireSceneBuilder.SetReference(screen, "_message", showcase.Message);
+            SandboxWireSceneBuilder.SetReference(screen, "_message", message);
             SandboxWireSceneBuilder.SetReference(screen, "_backdrop", backdrop);
             SandboxWireSceneBuilder.SetReference(screen, "_showcase", showcase.Root);
             SandboxWireSceneBuilder.SetReference(screen, "_showDiamond", showcase.Diamond);
             SandboxWireSceneBuilder.SetReference(screen, "_showLogo", showcase.Logo);
             SandboxWireSceneBuilder.SetReference(screen, "_showQuestion", showcase.Question);
-            SandboxWireSceneBuilder.SetReference(screen, "_showPlayer", showcase.Player);
             SandboxWireSceneBuilder.SetReference(screen, "_showName", showcase.Name);
             SandboxWireSceneBuilder.SetReference(screen, "_showTags", showcase.Tags);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_showSkillKeys", showcase.SkillKeys);
@@ -228,6 +234,11 @@ namespace Airerage.Editor
             option.Configure(plate, label, null, theme);
             option.SetExternal(true);
             option.SetAccent(theme, true);
+            if (character != null)
+            {
+                // 選んだ札にはキャラクターの色が流れ込む（C2）。縁は中より濃い色にして、境目を見せる（2026-11-16 のユーザーの要望）。
+                option.SetSelectedBorder(TitleStroke.Deep(theme));
+            }
             MenuUiBuilder.ApplyMainMenuEffects(option, RecedeOnWhite);
             // 選んだ札にはキャラクターの色が流れ込む（D-89 の C2）ので、「›››」は白にする。
             option.SetWhiteChevrons(true);
@@ -266,18 +277,16 @@ namespace Airerage.Editor
             public Graphic Diamond;
             public RawImage Logo;
             public Text Question;
-            public Text Player;
             public Text Name;
             public Text Tags;
-            public Text Message;
             public Object[] SkillKeys;
             public Object[] SkillNames;
             public Object[] SkillRows;
         }
 
         // 右の大きな表示（右の真ん中を基準に。原点はその左下）: 右の縦の線（RightAxis）に右寄せで、上から名前（白にキャラクターの色の縁取り）と
-        // ハッシュタグ、キャラクターの色の菱形の上のロゴ（RANDOM は「?」。菱形の右の角が縦の線）、Q・E・R の技の名前の札。ロゴの左に番号と
-        // 状態、その下に知らせ（知らせは表示を隠しても出す）。
+        // ハッシュタグ、キャラクターの色の菱形の上のロゴ（RANDOM は「?」。菱形の右の角が縦の線）、Q・E・R の技の名前の札（だれが選んでいるかと
+        // 操作の説明は下の札と下の帯にあるので出さない。2026-11-16）。
         private static ShowcaseParts CreateShowcase(RectTransform panel)
         {
             var holder = new GameObject("ShowcaseArea", typeof(RectTransform));
@@ -303,8 +312,9 @@ namespace Airerage.Editor
             stroke.Configure(8f, 10f, MenuUiBuilder.Accent);
             name.gameObject.AddComponent<LetterRise>();
             parts.Name = name;
-            parts.Tags = MenuUiBuilder.CreateText(root, "Tags", string.Empty, 30, FontStyle.Bold, TextAnchor.MiddleRight,
-                Vector2.zero, new Vector2(RightAxis, 900f), new Vector2(900f, 46f), Color.white);
+            // ハッシュタグは入ってきたモードのイメージカラー（下の札のハッシュタグと同じ。2026-11-16 のユーザーの要望）。
+            parts.Tags = AccentTint.Mark(MenuUiBuilder.CreateText(root, "Tags", string.Empty, 30, FontStyle.Bold, TextAnchor.MiddleRight,
+                Vector2.zero, new Vector2(RightAxis, 900f), new Vector2(900f, 46f), MenuUiBuilder.Accent));
             parts.Tags.rectTransform.pivot = new Vector2(1f, 0.5f);
 
             // ロゴの菱形（キャラクターの色）と、その内側の淡い菱形。
@@ -323,12 +333,6 @@ namespace Airerage.Editor
             parts.Question = MenuUiBuilder.CreateText(root, "Question", "?", 170, FontStyle.Bold, TextAnchor.MiddleCenter,
                 Vector2.zero, ArtCenter, new Vector2(LogoSize, LogoSize), Color.white);
             parts.Question.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-
-            // ロゴの左に、選んでいる人の番号と状態（右寄せ）。
-            float besideLogo = ArtCenter.x - DiamondHalf - 30f;
-            parts.Player = MenuUiBuilder.CreateText(root, "Player", string.Empty, 40, FontStyle.BoldAndItalic, TextAnchor.MiddleRight,
-                Vector2.zero, new Vector2(besideLogo, ArtCenter.y + 70f), new Vector2(560f, 56f), Color.white);
-            parts.Player.rectTransform.pivot = new Vector2(1f, 0.5f);
 
             // Q・E・R の技の名前の札（縦の線に右寄せ。メインメニューの札と同じ演出。画面が選ぶ MenuOption で、いつも選んだ見た目にし、
             // キャラクターが変わると選んだ瞬間の演出をやり直す）。
@@ -383,16 +387,12 @@ namespace Airerage.Editor
                 option.SetAccent(MenuUiBuilder.Accent, true);
                 option.SetSelectedShift(new Vector2(-SkillShift, 0f));
                 MenuUiBuilder.ApplyMainMenuEffects(option, 1f);
+                // 技の札だけ、縁が光る演出（導火線・明滅）を出さない（2026-11-16 のユーザーの要望）。
+                option.SetEdgeLight(false);
                 parts.SkillKeys[k] = keyBox;
                 parts.SkillNames[k] = skill;
                 parts.SkillRows[k] = option;
             }
-
-            // 知らせ（ローカル対戦の参加の案内・番の人・ネットワーク対戦のだれを待っているか。2 行まで）。ロゴの左、番号と状態の下に右寄せ。
-            parts.Message = MenuUiBuilder.CreateText(area, "Message", string.Empty, 26, FontStyle.Bold, TextAnchor.MiddleRight,
-                Vector2.zero, new Vector2(besideLogo, ArtCenter.y - 20f), new Vector2(600f, 84f), Color.white);
-            parts.Message.rectTransform.pivot = new Vector2(1f, 0.5f);
-            FitInWidth(parts.Message, 26);
             return parts;
         }
 

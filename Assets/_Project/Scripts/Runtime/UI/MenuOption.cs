@@ -77,6 +77,10 @@ namespace Airerage.Runtime.UI
         [SerializeField] private bool _external;
         [Tooltip("「›››」を白にする（選んだ札に項目の色が流れ込む札。キャラクター選択の名前の札。2026-11-14）")]
         [SerializeField] private bool _whiteChevrons;
+        [Tooltip("選んでいる間の縁の色（濃さ 0 なら項目の色 _accent。選んだ札に項目の色が流れ込む札で、縁を中より濃くする。2026-11-16）")]
+        [SerializeField] private Color _selectedBorder = Color.clear;
+        [Tooltip("縁が光る演出（B1 の導火線と、選んでいる間の明滅）を出さない（キャラクター選択の技の札。2026-11-16 のユーザーの要望）")]
+        [SerializeField] private bool _noEdgeLight;
         private Vector2[] _pinnedHomes;
 
         // 縮める前の字の大きさ（Awake で覚える）と、縮めるときのいちばん小さい大きさ。収めたときの W16 の説明の文（言語を変えて文が
@@ -167,6 +171,23 @@ namespace Airerage.Runtime.UI
         {
             _external = external;
         }
+
+        /// <summary>選んでいる間の縁の色（シーンのビルダー用。濃さ 0 なら項目の色）。</summary>
+        public void SetSelectedBorder(Color border)
+        {
+            _selectedBorder = border;
+            Refresh();
+        }
+
+        /// <summary>縁が光る演出（導火線・明滅）を出すか（シーンのビルダー用）。</summary>
+        public void SetEdgeLight(bool on)
+        {
+            _noEdgeLight = !on;
+            Refresh();
+        }
+
+        /// <summary>縁が光る演出を出すか（テスト用）。</summary>
+        public bool EdgeLight => !_noEdgeLight;
 
         /// <summary>「›››」を白にする（シーンのビルダー用。選んだ札に項目の色が流れ込む札で、印が色に埋もれないように）。</summary>
         public void SetWhiteChevrons(bool white)
@@ -589,7 +610,10 @@ namespace Airerage.Runtime.UI
             _selected = true;
             if (_plate != null)
             {
-                _plate.RunFuse();
+                if (!_noEdgeLight)
+                {
+                    _plate.RunFuse();
+                }
                 // 裏の札が伸びて出てから、ゆっくり揺れる（文字の演出の見本のページと同じ動き。2026-11-08）。
                 _plate.SwingBack();
             }
@@ -835,10 +859,10 @@ namespace Airerage.Runtime.UI
             if (_plate != null)
             {
                 _plate.color = _selected ? SelectedFill : IdleFill;
-                _plate.BorderColor = _selected ? _accent : IdleBorder;
+                _plate.BorderColor = !_selected ? IdleBorder : _selectedBorder.a > 0f ? _selectedBorder : _accent;
                 _plate.AccentColor = _accent;
                 _plate.FuseColor = _accentFuse ? Color.Lerp(_accent, Color.white, 0.35f) : Color.white;
-                _plate.Glow = _selected;
+                _plate.Glow = _selected && !_noEdgeLight;
                 _plate.BackTarget = _selected ? 1f : 0f;
             }
             if (_label != null)

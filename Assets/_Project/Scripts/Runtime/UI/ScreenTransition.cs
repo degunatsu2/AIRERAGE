@@ -753,6 +753,8 @@ namespace Airerage.Runtime.UI
             {
                 group = copy.AddComponent<CanvasGroup>();
             }
+            // 無効のまま写った部品では濃さが効かない（白い背景が不透明のまま残る。2026-11-16 の指摘）。
+            group.enabled = true;
             group.alpha = 1f;
             group.interactable = false;
             group.blocksRaycasts = false;
@@ -974,7 +976,10 @@ namespace Airerage.Runtime.UI
             hidden.Group.alpha = 1f;
             if (hidden.Added)
             {
-                Destroy(hidden.Group);
+                // すぐに消す。Destroy（フレームの終わりに消す）だと、消すまでの間その部品は無効になり、同じフレームに次の切り替えが始まると
+                // （前の切り替えの途中で戻った）、写しにも無効のまま写って濃さが効かなかった（ネットワーク対戦の画面を開いてすぐ戻ると、
+                // 白い背景がフェードアウトせずに残る。2026-11-16 の指摘）。隠し直すときも、無効の部品の濃さを 0 にしてしまっていた。
+                DestroyImmediate(hidden.Group);
             }
         }
 

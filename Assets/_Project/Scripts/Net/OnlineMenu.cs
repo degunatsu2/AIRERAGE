@@ -1479,21 +1479,14 @@ namespace Airerage.Net
         private void RefreshCharacterSelect(OnlineSession session)
         {
             IReadOnlyList<LobbySlot> roster = session.Roster;
-            var waiting = new List<string>();
+            // だれを待っているかは下の札の状態（SELECTING ／ READY!）で分かるので、文では出さない（2026-11-16）。
             for (int p = 0; p < OnlineSession.MaxPlayers && p < roster.Count; p++)
             {
                 LobbySlot slot = roster[p];
                 // 観戦の人は、キャラクター選択の枠に出さない。
                 _characterSelect.SetRemote(p, slot.Plays, slot.Name, slot.Character, slot.Ready);
-                if (slot.Plays && !slot.Ready)
-                {
-                    waiting.Add(string.IsNullOrEmpty(slot.Name) ? $"{p + 1}P" : slot.Name);
-                }
             }
             _characterSelect.SetLocalReady(session.LocalReady);
-            _characterSelect.SetNetworkMessage(waiting.Count > 0
-                ? Loc.T($"WAITING FOR: {string.Join(", ", waiting)}", $"決定を待っています: {string.Join("、", waiting)}")
-                : Loc.T("EVERYONE IS READY", "全員が決定しました"));
         }
     }
 }

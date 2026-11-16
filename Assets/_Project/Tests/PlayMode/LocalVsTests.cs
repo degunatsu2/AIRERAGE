@@ -3,6 +3,7 @@ using System.Collections;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Flow;
 using Airerage.Runtime.Presentation;
+using Airerage.Runtime.Settings;
 using Airerage.Runtime.Simulation;
 using Airerage.Runtime.UI;
 using NUnit.Framework;
@@ -46,11 +47,8 @@ namespace Airerage.PlayMode.Tests
                 CharacterSelectScreen join = menu.CharacterSelect;
                 Assert.That(join.Mode, Is.EqualTo(CharacterSelectScreen.SelectMode.Local));
                 yield return null;
-                // 参加の案内は「C ／ LB」の前で 2 行に分け、句点は使わない（白い背景に収まるように。2026-11-08）。
-                string[] lines = join.ShownMessage.Split('\n');
-                Assert.That(lines.Length, Is.EqualTo(2), "参加の案内が 2 行でない");
-                Assert.That(lines[1].StartsWith("C ／ LB") || lines[1].StartsWith("OR ADD CPUs WITH C / LB"), Is.True, "2 行目が C ／ LB から始まらない");
-                Assert.That(join.ShownMessage, Does.Not.Contain("。"), "参加の案内に句点がある");
+                // 参加の案内は下の札（Enter ／ A で参加）と下の帯の操作の説明にあるので、知らせには出さない（2026-11-16）。
+                Assert.That(join.ShownMessage, Is.Empty, "参加の案内を知らせにも出している");
 
                 // 機器ごとに参加する（キーボードが P1、ゲームパッドが P2）。
                 yield return Tap(keyboard, Key.Enter);
@@ -78,7 +76,8 @@ namespace Airerage.PlayMode.Tests
                 int character = join.CharacterOf(1);
                 Assert.That(character, Is.Not.EqualTo(before), "2P の番に十字キーでキャラクターが変わらない");
                 Assert.That(join.ShownState(1), Is.EqualTo("SELECTING"), "2P の枠に状態を出さない");
-                Assert.That(join.ShowcasePlayer, Does.StartWith("2P"), "右の大きな表示が 2P にならない");
+                Assert.That(join.FocusSlot, Is.EqualTo(1), "右の大きな表示が 2P のカーソルにならない");
+                Assert.That(join.ShownMessage, Is.Empty, "番の人を知らせにも出している（下の札で分かる）");
                 yield return Press(gamepad, GamepadButton.Select);
                 Assert.That(join.DetailsOpen, Is.True, "ゲームパッドの Select で技の説明を出さない");
                 yield return Press(gamepad, GamepadButton.Select);
@@ -227,6 +226,14 @@ namespace Airerage.PlayMode.Tests
                 // 1 人だけでも、CPU を入れれば始められる。個人戦は人と CPU で 4 人まで。
                 yield return Tap(keyboard, Key.Enter);
                 Assert.That(join.JoinedCount, Is.EqualTo(1));
+                // チーム対戦でチームが 1 つしかないときだけ、左の白い背景に注意を出す（ほかの知らせは出さない。2026-11-16）。
+                Assert.That(join.ShownMessage, Is.Empty);
+                yield return Tap(keyboard, Key.M);
+                Assert.That(join.ShownMessage, Is.EqualTo(Loc.T("MAKE AT LEAST 2 TEAMS", "2 つ以上のチームに分かれてください")),
+                    "チームが 1 つしかないのに注意を出さない");
+                yield return Tap(keyboard, Key.M);
+                Assert.That(join.TeamMode, Is.False, "M で個人戦に戻らない");
+                Assert.That(join.ShownMessage, Is.Empty);
                 for (int i = 0; i < 5; i++)
                 {
                     yield return Tap(keyboard, Key.C);

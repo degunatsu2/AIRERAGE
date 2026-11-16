@@ -196,6 +196,14 @@ namespace Airerage.Runtime.UI
             // 札の中（札の色の上、ロゴと名前の下）に、色の流れ込みと衝撃波の光を重ねる。
             fx.Tint = AddFill(icon.Rect, "Tint", slant, false);
             fx.Flood = AddFill(icon.Rect, "Flood", slant, false);
+            if (plate != null)
+            {
+                // 流れ込む色は縁の内側だけ（縁は中より濃い色で残し、境目を見せる。2026-11-16 のユーザーの要望）。斜めの辺も縁と平行。
+                float d = plate.BorderWidth;
+                float side = SlantedPlate.InsetSide(slant, d);
+                fx.Flood.rectTransform.offsetMin = new Vector2(side, d);
+                fx.Flood.rectTransform.offsetMax = new Vector2(-side, -d);
+            }
             if (character == null && fx.Logo != null)
             {
                 // RANDOM: 乗せている間、全員の顔を回す（C18）。

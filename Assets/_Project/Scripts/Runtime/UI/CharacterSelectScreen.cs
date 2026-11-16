@@ -115,7 +115,6 @@ namespace Airerage.Runtime.UI
         [SerializeField] private Graphic _showDiamond;
         [SerializeField] private RawImage _showLogo;
         [SerializeField] private Text _showQuestion;
-        [SerializeField] private Text _showPlayer;
         [SerializeField] private Text _showName;
         [SerializeField] private Text _showTags;
         [Tooltip("Q・E・R のキーの四角（キャラクターの色）と技の名前（SkillSlots と同じ順）")]
@@ -124,7 +123,7 @@ namespace Airerage.Runtime.UI
         [Tooltip("Q・E・R の技の札（メインメニューの札と同じ演出。いつも選んだ見た目で、キャラクターが変わると演出をやり直す）")]
         [SerializeField] private MenuOption[] _showSkillRows = new MenuOption[0];
 
-        /// <summary>アイコンの並びの下の知らせ（テスト用）。</summary>
+        /// <summary>左の設定の行の下の知らせ（チーム対戦でチームが 1 つしかないときの注意だけ。テスト用）。</summary>
         public string ShownMessage => _message != null ? _message.text : string.Empty;
         [Tooltip("プレイヤーごとの色（1P〜4P）")]
         [SerializeField] private Color[] _colors = new Color[0];
@@ -141,7 +140,6 @@ namespace Airerage.Runtime.UI
         private bool _teamMode;
         private int _cpuCount;
         private int _localSlot;
-        private string _networkMessage = string.Empty;
         private GameLanguage _language = GameLanguage.Japanese;
         private int _detailsSlot = -1;
         private float _detailsOpen;
@@ -419,12 +417,12 @@ namespace Airerage.Runtime.UI
         /// <summary>ローカル対戦で、参加しているが順番を待っている人か。</summary>
         public bool IsWaiting(int slot) => Mode == SelectMode.Local && _slots[slot].Joined && !_slots[slot].Ready && slot != ActiveSlot;
 
-        /// <summary>右の大きな表示を出しているか・出している名前・ハッシュタグ・技の名前・番号と状態（テスト用）。</summary>
+        /// <summary>右の大きな表示を出しているか・出している名前・ハッシュタグ・技の名前（テスト用）。</summary>
         public bool ShowcaseShown => _showcase.gameObject.activeSelf;
         public string ShowcaseName => _showName.text;
         public string ShowcaseTags => _showTags.text;
         public string ShowcaseSkill(int index) => _showSkillNames[index].text;
-        public string ShowcasePlayer => _showPlayer.text;
+        public Color ShowcaseTagsColor => _showTags.color;
 
         /// <summary>
         /// プレイヤーの札 slot の置き場所（画面の右下を基準にした、札の左下の位置。size は札を作った大きさ）。4 人までは横に 1 列、compact
@@ -615,7 +613,7 @@ namespace Airerage.Runtime.UI
                 || _cornerNames.Length != MaxPlayers || _cornerTags.Length != MaxPlayers || _cornerStates.Length != MaxPlayers
                 || _details == null || _detailName == null || _detailTags == null
                 || _skillNames.Length != skills || _skillDescriptions.Length != skills || _skillCooldowns.Length != skills
-                || _showcase == null || _showDiamond == null || _showLogo == null || _showQuestion == null || _showPlayer == null
+                || _showcase == null || _showDiamond == null || _showLogo == null || _showQuestion == null
                 || _showName == null || _showTags == null || _showSkillKeys.Length != skills || _showSkillNames.Length != skills)
             {
                 Debug.LogError($"{name}: キャラクターの一覧・アイコン（{_icons.Length}）・カーソル・プレイヤーの札・技の説明・右の大きな表示がそろっていません", this);
@@ -781,18 +779,6 @@ namespace Airerage.Runtime.UI
             Refresh();
         }
 
-        /// <summary>ネットワーク対戦: 下に出す案内（だれを待っているか、など）。</summary>
-        public void SetNetworkMessage(string message)
-        {
-            message = message ?? string.Empty;
-            if (_networkMessage == message)
-            {
-                return;
-            }
-            _networkMessage = message;
-            Refresh();
-        }
-
         public void Hide()
         {
             _activeFromFrame = int.MaxValue;
@@ -820,7 +806,6 @@ namespace Airerage.Runtime.UI
             UseJapaneseFont();
             _detailsSlot = -1;
             _detailsOpen = 0f;
-            _networkMessage = string.Empty;
             _confirmAt = -1f;
             _allReadySince = -1f;
             _activeFromFrame = Time.frameCount + 1;
@@ -1389,31 +1374,11 @@ namespace Airerage.Runtime.UI
             return text;
         }
 
+        // 知らせはチーム対戦の注意だけ。参加の案内・番の人・ネットワーク対戦のだれを待っているかは、下の札（Enter ／ A で参加・WAITING・
+        // SELECTING・READY!）と下の帯の操作の説明にあるので出さない（右に浮いて見えた。2026-11-16 のユーザーの要望）。
         private string MessageText()
         {
-            switch (Mode)
-            {
-                case SelectMode.Local:
-                    if (JoinedCount + _cpuCount < 2)
-                    {
-                        // 白い背景に収まるように、「C ／ LB」の前で 2 行に分ける（句点は使わない。2026-11-08 の指摘）。
-                        return Loc.T("JOIN WITH ENTER (KEYBOARD) OR A (GAMEPAD)\nOR ADD CPUs WITH C / LB",
-                            "Enter（キーボード）か A（ゲームパッド）で参加\nC ／ LB で CPU も入れられます");
-                    }
-                    string problem = LocalProblem();
-                    if (problem != null)
-                    {
-                        return problem;
-                    }
-                    int active = ActiveSlot;
-                    return active >= 0 && JoinedCount >= 2
-                        ? Loc.T($"{active + 1}P: CHOOSE YOUR CHARACTER", $"{active + 1}P がキャラクターを選んでください")
-                        : string.Empty;
-                case SelectMode.Network:
-                    return _networkMessage;
-                default:
-                    return string.Empty;
-            }
+            return Mode == SelectMode.Local ? LocalProblem() ?? string.Empty : string.Empty;
         }
 
         /// <summary>
@@ -1545,12 +1510,7 @@ namespace Airerage.Runtime.UI
                 _showIndex = -1;
                 return;
             }
-            Slot slot = _slots[focus];
             int index = CursorIndex(focus);
-            Color player = PlayerColor(focus);
-            string state = slot.Ready ? "READY!" : "SELECTING";
-            _showPlayer.text = $"{focus + 1}P   {state}";
-            _showPlayer.color = player;
             CharacterConfigAsset character = index < Count ? _roster.Get(index) : null;
             Color theme = character != null ? character.ThemeColor : Accent;
             _showDiamond.color = new Color(theme.r, theme.g, theme.b, 0.92f);

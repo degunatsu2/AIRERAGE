@@ -121,7 +121,7 @@ namespace Airerage.PlayMode.Tests
                 MainMenuPanel.StitchEnds(0f, 1f, 0f, 16f, 10f, 26f, 5f, out Vector2 dashA, out Vector2 dashB);
                 Assert.That((dashB.x - dashA.x) / (dashB.y - dashA.y), Is.EqualTo(MainMenuPanel.EdgeLean).Within(0.0001f), "縫い目の傾きが境目と違う");
                 // 境目はぼかす（くっきりしすぎて浮いて見えないように。縫い目はぼかさない。2026-11-14）。
-                Assert.That(MainMenuPanel.EdgeFeather, Is.GreaterThan(8f), "境目がぼけていない");
+                Assert.That(MainMenuPanel.EdgeFeather, Is.InRange(6f, 12f), "境目のぼかしがないか、強すぎる（16 では強すぎた。2026-11-16）");
                 // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7）。縁の色は選んだ項目の色へ移る。
                 UnityEngine.UI.Text logo = backdrop.transform.Find("Logo").GetComponent<UnityEngine.UI.Text>();
                 Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.GreaterThan(2.9f), "左のロゴが白でない");
@@ -433,6 +433,26 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(iconOption.Chevrons, Is.Not.Null, "名前の札に「›››」がない");
                 Assert.That(iconOption.Sub, Is.Null, "名前の札に説明（W16）がある");
                 Assert.That(characters.Icon((cursorIcon + 1) % characters.IconCount).GetComponent<MenuOption>().IsSelected, Is.False, "カーソルでない札も選んだ見た目");
+                // 選んだ札に流れ込む色（C2）は縁の内側だけで、縁は中より濃い色（境目が見える。2026-11-16）。
+                for (int i = 0; i < characters.IconCount; i++)
+                {
+                    CharacterConfigAsset each = characters.CharacterAt(i);
+                    if (each == null)
+                    {
+                        continue;
+                    }
+                    MenuOption eachOption = characters.Icon(i).GetComponent<MenuOption>();
+                    var flood = (RectTransform)characters.Icon(i).Rect.Find("Flood");
+                    Assert.That(flood, Is.Not.Null, $"{each.DisplayName} の札に色の流れ込みがない");
+                    Assert.That(flood.offsetMin.y, Is.EqualTo(eachOption.Plate.BorderWidth).Within(0.01f), $"{each.DisplayName} の流れ込む色が縁まで覆う");
+                    Assert.That(flood.offsetMin.x, Is.GreaterThan(eachOption.Plate.BorderWidth), $"{each.DisplayName} の流れ込む色が斜めの縁まで覆う");
+                    if (i == cursorIcon)
+                    {
+                        Color.RGBToHSV(eachOption.Plate.BorderColor, out _, out _, out float borderValue);
+                        Color.RGBToHSV(each.ThemeColor, out _, out _, out float themeValue);
+                        Assert.That(borderValue, Is.LessThan(themeValue - 0.1f), $"{each.DisplayName} の選んだ札の縁が中の色より濃くない");
+                    }
+                }
                 // 白い背景はメインメニューと同じで、帯はカーソルのキャラクターの位置にある（色は画面のイメージカラー）。
                 Assert.That(characters.BackdropIndex, Is.EqualTo(cursorIcon), "白い背景の帯がカーソルのキャラクターの位置にない");
                 Assert.That(SameHue(backdrop.BandColor, training), Is.True, "白い背景の帯が画面のイメージカラーでない");
@@ -441,6 +461,10 @@ namespace Airerage.PlayMode.Tests
                 CharacterConfigAsset focused = characters.CharacterAt(characters.CursorIndex(0));
                 Assert.That(characters.ShowcaseName, Is.EqualTo(focused != null ? focused.DisplayName : "RANDOM"), "右の大きな表示がカーソルのキャラクターでない");
                 Assert.That(characters.ShowcaseSkill(0), Is.Not.Empty, "右の大きな表示に技の名前がない");
+                // ハッシュタグはモードのイメージカラー。だれが選んでいるかと操作の案内は右に出さない（下の札と下の帯にある。2026-11-16）。
+                Assert.That(SameHue(characters.ShowcaseTagsColor, training), Is.True, "右のハッシュタグがモードの色でない");
+                Assert.That(characters.transform.Find("ShowcaseArea/Showcase/Player"), Is.Null, "右に「1P SELECTING」が残っている");
+                Assert.That(characters.transform.Find("ShowcaseArea/Message"), Is.Null, "右に操作の案内が残っている");
                 // ロゴは大きく出してもぼやけない大きさ（数式の形から 1024 ピクセルで描く。2026-11-14）。
                 if (focused != null)
                 {
@@ -463,6 +487,9 @@ namespace Airerage.PlayMode.Tests
                     var row = (RectTransform)showcase.Find($"Skills/Skill{key}");
                     MenuOption rowOption = row.GetComponent<MenuOption>();
                     Assert.That(rowOption != null && rowOption.IsSelected, Is.True, $"技の札 {key} にメインメニューの札の演出がない");
+                    // 技の札だけ、縁が光る演出（導火線・明滅）を出さない（2026-11-16）。
+                    Assert.That(rowOption.EdgeLight, Is.False, $"技の札 {key} の縁が光る");
+                    Assert.That(rowOption.Plate.FuseRunning || rowOption.Plate.Glow, Is.False, $"技の札 {key} の縁が光っている");
                     row.GetWorldCorners(corners);
                     Assert.That(corners[2].x, Is.EqualTo(nameRight).Within(4f * pixel), $"技の札 {key} が名前と同じ縦の線に右寄せでない");
                     Assert.That(corners[1].y, Is.LessThan(diamondBottom + 4f * pixel), $"技の札 {key} がロゴの下にない");
@@ -531,6 +558,54 @@ namespace Airerage.PlayMode.Tests
             yield return WaitFor(() => !transition.Running, 3f, "切り替えが終わらない");
             yield return null;
             Assert.That(CopiesLeft(), Is.Zero, "演出が終わっても写しが残っている");
+        }
+
+        /// <summary>
+        /// NETWORK を開いてすぐ（切り替えの途中）に戻っても、出ていく接続の画面の白い背景がフェードアウトする（2026-11-16 の指摘: 前の
+        /// 切り替えを早送りした同じフレームに写すと、消す予約の入った無効の CanvasGroup まで写り、濃さが効かずに白い背景が残った）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Network_BackRightAfterOpening_FadesTheWhitePanel()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            var menu = Object.FindFirstObjectByType<MenuScreens>();
+            ScreenTransition transition = menu.Transition;
+            menu.ContinueFromTitle();
+            transition.Complete();
+            yield return null;
+            var online = Object.FindFirstObjectByType<Airerage.Net.OnlineMenu>();
+            foreach (int frames in new[] { 1, 3 })
+            {
+                menu.Network.Button.onClick.Invoke();
+                for (int f = 0; f < frames; f++)
+                {
+                    yield return null;
+                }
+                Assert.That(transition.Running, Is.True, "前提: メイン → ネットワークの切り替えの途中");
+                online.BackButton.Button.onClick.Invoke();
+                GameObject ghost = GameObject.Find("OnlineConnect (Transition)");
+                Assert.That(ghost, Is.Not.Null, "出ていく接続の画面の写しがない");
+                var group = ghost.GetComponent<CanvasGroup>();
+                Assert.That(group.enabled, Is.True, "写しの CanvasGroup が無効（濃さが効かない）");
+                var side = ghost.transform.Find("Side").GetComponent<MainMenuPanel>();
+                float start = Time.realtimeSinceStartup;
+                yield return WaitFor(() => Time.realtimeSinceStartup - start > 0.26f || !transition.Running, 3f, "時間が進まない");
+                if (ghost != null && ghost.activeInHierarchy)
+                {
+                    Assert.That(side.canvasRenderer.GetInheritedAlpha(), Is.LessThan(0.5f),
+                        $"戻る切り替えの途中で白い背景が薄くならない（{frames} フレームで戻った）");
+                }
+                yield return WaitFor(() => !transition.Running, 3f, "切り替えが終わらない");
+                yield return null;
+                Assert.That(CopiesLeft(), Is.Zero, "演出が終わっても写しが残っている");
+                foreach (CanvasGroup each in menu.GetComponentsInChildren<CanvasGroup>(true))
+                {
+                    Assert.That(each.enabled, Is.True, $"{each.name} の CanvasGroup が無効のまま残っている");
+                }
+            }
         }
 
         // 色の RGB が同じか（濃さは問わない）。
