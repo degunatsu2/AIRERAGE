@@ -121,7 +121,7 @@ namespace Airerage.PlayMode.Tests
                 MainMenuPanel.StitchEnds(0f, 1f, 0f, 16f, 10f, 26f, 5f, out Vector2 dashA, out Vector2 dashB);
                 Assert.That((dashB.x - dashA.x) / (dashB.y - dashA.y), Is.EqualTo(MainMenuPanel.EdgeLean).Within(0.0001f), "縫い目の傾きが境目と違う");
                 // 境目はぼかす（くっきりしすぎて浮いて見えないように。縫い目はぼかさない。2026-11-14）。
-                Assert.That(MainMenuPanel.EdgeFeather, Is.InRange(6f, 12f), "境目のぼかしがないか、強すぎる（16 では強すぎた。2026-11-16）");
+                Assert.That(MainMenuPanel.EdgeFeather, Is.InRange(2f, 6f), "境目のぼかしがないか、強すぎる（16・10 では強すぎた。2026-11-16）");
                 // ロゴは白に項目の色の縁取りと前の菱形（D-92 の T2・T7）。縁の色は選んだ項目の色へ移る。
                 UnityEngine.UI.Text logo = backdrop.transform.Find("Logo").GetComponent<UnityEngine.UI.Text>();
                 Assert.That(logo.color.r + logo.color.g + logo.color.b, Is.GreaterThan(2.9f), "左のロゴが白でない");
@@ -221,7 +221,19 @@ namespace Airerage.PlayMode.Tests
                 yield return WaitSeconds(0.35f);
                 Assert.That(motion.PopOf(hovered), Is.GreaterThan(0.8f), "乗せたアイコンのロゴが持ち上がらない（C1）");
                 Assert.That(motion.FloodOf(hovered), Is.GreaterThan(0.8f), "乗せたアイコンに色が流れ込まない（C2）");
-                Assert.That(menu.CharacterSelect.CursorRect(0).GetComponent<SlantedPlate>().Glow, Is.True, "カーソルの枠が光らない（C4 の代わり）");
+                Assert.That(menu.CharacterSelect.CursorRect(0).GetComponent<SlantedPlate>().Glow, Is.True, "カーソルの印が光らない（C4 の代わり）");
+                // カーソルは札を囲む枠ではなく、選んでいる名前の札の左に置くプレイヤーの色の印（2026-11-16）。
+                var cursorCorners = new Vector3[4];
+                var plateCorners = new Vector3[4];
+                menu.CharacterSelect.CursorRect(0).GetWorldCorners(cursorCorners);
+                menu.CharacterSelect.Icon(hovered).Rect.GetWorldCorners(plateCorners);
+                // 印も札も斜めなので、高さの真ん中の斜めの縁どうしで比べる。
+                float plateLeftMid = plateCorners[0].x + 0.35f * (plateCorners[1].y - plateCorners[0].y) * 0.5f;
+                float cursorRightMid = cursorCorners[2].x - 0.35f * (cursorCorners[1].y - cursorCorners[0].y) * 0.5f;
+                Assert.That(cursorRightMid, Is.LessThan(plateLeftMid), "カーソルの印が名前の札の左にない（札に重なる）");
+                Assert.That(cursorCorners[0].y, Is.GreaterThanOrEqualTo(plateCorners[0].y - 1f), "カーソルの印が札の高さからはみ出す");
+                Assert.That(cursorCorners[1].y, Is.LessThanOrEqualTo(plateCorners[1].y + 1f), "カーソルの印が札の高さからはみ出す");
+                Assert.That(menu.CharacterSelect.CursorRect(0).GetComponent<SlantedPlate>().color.a, Is.GreaterThan(0.9f), "カーソルの印がプレイヤーの色で塗られていない");
 
                 // 戻る: メインメニューへも斜めの札（「MAIN MENU」、水色、逆向き。2026-11-07）。
                 yield return Tap(keyboard, Key.Escape);
@@ -606,6 +618,30 @@ namespace Airerage.PlayMode.Tests
                     Assert.That(each.enabled, Is.True, $"{each.name} の CanvasGroup が無効のまま残っている");
                 }
             }
+        }
+
+        /// <summary>
+        /// タイトルロゴ（D-96。2026-11-16）: タイトルを出すたびに演出を始め（メインメニューから戻ったときも）、終わると止まる。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Title_PlaysTheLogo_EachTimeItIsShown()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            var menu = Object.FindFirstObjectByType<MenuScreens>();
+            TitleLogo logo = menu.TitleLogo;
+            Assert.That(logo, Is.Not.Null, "タイトルロゴがない");
+            Assert.That(logo.isActiveAndEnabled, Is.True, "タイトルにロゴが出ていない");
+            Assert.That(logo.Elapsed, Is.LessThan(TitleLogoTimeline.Duration + 3f), "タイトルを出したのにロゴの演出を始めていない");
+            yield return WaitFor(() => !logo.Playing, TitleLogoTimeline.Duration + 3f, "ロゴの演出が終わらない");
+            menu.ContinueFromTitle();
+            menu.Transition.Complete();
+            yield return null;
+            menu.ShowTitle();
+            Assert.That(logo.Playing, Is.True, "メインメニューから戻ったときにロゴの演出をやり直さない");
+            Assert.That(logo.Elapsed, Is.LessThan(0.2f));
         }
 
         // 色の RGB が同じか（濃さは問わない）。

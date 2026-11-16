@@ -557,6 +557,23 @@ namespace Airerage.Editor
             CaptureAll(screens, "LocalSelect");
         }
 
+        /// <summary>
+        /// カーソル（プレイヤーの印）の並び（2026-11-16）: ネットワーク対戦の 8 人で、1P〜6P が同じキャラクター（2 列）、7P・8P が別の
+        /// キャラクター（縦に 2 つ）。決めた人の印は白い縁。
+        /// </summary>
+        public static void CaptureCursorBadges()
+        {
+            MenuScreens screens = OpenMenu();
+            CharacterSelectScreen screen = PrepareSelect(screens);
+            screen.ShowNetwork(0, 0);
+            for (int p = 1; p < CharacterSelectScreen.MaxPlayers; p++)
+            {
+                screen.SetRemote(p, true, $"PLAYER {p + 1}", p < 6 ? 0 : 2, p % 3 == 0);
+            }
+            typeof(CharacterSelectScreen).GetMethod("Refresh", Private).Invoke(screen, null);
+            CaptureAll(screens, "CursorBadges");
+        }
+
         // メニューを開いてキャラクター選択だけを出す（再生していないので Awake は呼ばれない。日本語の字体を直接用意する）。
         private static CharacterSelectScreen PrepareSelect(MenuScreens screens)
         {

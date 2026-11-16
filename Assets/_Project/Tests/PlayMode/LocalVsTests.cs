@@ -71,6 +71,18 @@ namespace Airerage.PlayMode.Tests
                 yield return Tap(keyboard, Key.Enter);
                 Assert.That(join.IsReady(0), Is.True, "Enter で READY にならない");
                 Assert.That(join.ActiveSlot, Is.EqualTo(1), "1P が決めても 2P の番にならない");
+                // 同じキャラクターを 2 人が選んでいるときは、名前の札の左に印を縦に並べ、札の高さに収める（2026-11-16）。
+                if (join.CursorIndex(0) == join.CursorIndex(1))
+                {
+                    join.BadgeLayout(0, out Vector2 first, out Vector2 firstSize);
+                    join.BadgeLayout(1, out Vector2 second, out Vector2 secondSize);
+                    Assert.That(first.y, Is.GreaterThan(second.y), "1P の印が上に並ばない");
+                    Assert.That(first.y - firstSize.y * 0.5f, Is.GreaterThanOrEqualTo(second.y + secondSize.y * 0.5f), "印が重なっている");
+                    Assert.That(first.x, Is.EqualTo(second.x).Within(0.01f), "印が縦に並ばない");
+                    float plateHalf = join.Icon(join.CursorIndex(0)).Rect.sizeDelta.y * 0.5f;
+                    Assert.That(first.y + firstSize.y * 0.5f, Is.LessThanOrEqualTo(plateHalf + 0.01f), "印が札の高さからはみ出す");
+                    Assert.That(second.y - secondSize.y * 0.5f, Is.GreaterThanOrEqualTo(-plateHalf - 0.01f), "印が札の高さからはみ出す");
+                }
                 Assert.That(menu.ShowingCharacterSelect, Is.True, "全員が READY になる前に進んだ");
                 yield return Press(gamepad, GamepadButton.DpadDown);
                 int character = join.CharacterOf(1);

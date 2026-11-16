@@ -37,6 +37,8 @@ namespace Airerage.Runtime.UI
     public sealed class MenuScreens : MonoBehaviour
     {
         [SerializeField] private GameObject _title;
+        [Tooltip("タイトルロゴ（D-96。タイトルを出すたびに演出を始める）")]
+        [SerializeField] private TitleLogo _titleLogo;
         [SerializeField] private Text _pressAnyButton;
         [SerializeField] private GameObject _main;
         [SerializeField] private MenuOption _single;
@@ -406,11 +408,24 @@ namespace Airerage.Runtime.UI
             }
         }
 
-        /// <summary>タイトルを出す（どれかのキー・ボタンでメインメニューへ）。</summary>
+        /// <summary>タイトルを出す（どれかのキー・ボタンでメインメニューへ）。ロゴの演出を始めからする。</summary>
         public void ShowTitle()
+        {
+            ShowTitle(true);
+        }
+
+        /// <summary>タイトルロゴ（テスト用）。</summary>
+        public TitleLogo TitleLogo => _titleLogo;
+
+        // replayLogo: ロゴの演出を始めからするか（終了の確認を閉じて戻ったときは、タイトルが出たままなのでしない）。
+        private void ShowTitle(bool replayLogo)
         {
             HideAll();
             _title.SetActive(true);
+            if (replayLogo && _titleLogo != null)
+            {
+                _titleLogo.Play();
+            }
             _shownAt = Time.unscaledTime;
             if (EventSystem.current != null)
             {
@@ -427,7 +442,7 @@ namespace Airerage.Runtime.UI
             {
                 _anyButton?.Dispose();
                 _anyButton = null;
-                _quitDialog.Show(ShowTitle);
+                _quitDialog.Show(() => ShowTitle(false));
                 return;
             }
             ContinueFromTitle();

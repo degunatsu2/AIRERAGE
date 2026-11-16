@@ -247,27 +247,19 @@ namespace Airerage.Editor
             return icon;
         }
 
-        // カーソル（枠だけの斜めの札と、番号ごとに札の四隅の 1 つに置く「1P」などの札）。
+        // カーソル（プレイヤーの印）: 選んでいる名前の札の左に置く、プレイヤーの色の小さな斜めの札と「1P」などの番号。位置と大きさは画面が
+        // 決める（同じ札を選んでいる人の数で縮めて並べる。2026-11-16 のユーザーの要望。それまでは札を囲む枠）。
         private static void CreateCursor(RectTransform grid, int player, Color color, out RectTransform cursor, out Text tag)
         {
             var go = new GameObject($"Cursor{player + 1}P", typeof(RectTransform));
             go.transform.SetParent(grid, false);
             cursor = (RectTransform)go.transform;
-            cursor.sizeDelta = new Vector2(PlateWidth, PlateHeight);
-            var frame = go.AddComponent<SlantedPlate>();
-            frame.Configure(0.35f, 4f, new Color(0f, 0f, 0f, 0f), color);
-            frame.raycastTarget = false;
-            // 1P〜4P は札の四隅、5P〜8P は上下の辺の 1/4・3/4 の所。
-            Vector2[] corners =
-            {
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(1f, 0f),
-                new Vector2(0.3f, 1f), new Vector2(0.7f, 1f), new Vector2(0.3f, 0f), new Vector2(0.7f, 0f),
-            };
-            Vector2 corner = corners[player];
-            var offset = new Vector2(corner.x == 0f ? -4f : corner.x == 1f ? 4f : 0f, corner.y == 0f ? -14f : 14f);
-            TextAnchor alignment = corner.x == 0f ? TextAnchor.MiddleLeft : corner.x == 1f ? TextAnchor.MiddleRight : TextAnchor.MiddleCenter;
-            tag = MenuUiBuilder.CreateText(go.transform, "Tag", $"{player + 1}P", 24, FontStyle.BoldAndItalic,
-                alignment, corner, offset, new Vector2(60f, 30f), color);
+            cursor.sizeDelta = new Vector2(CharacterSelectScreen.BadgeWidth, CharacterSelectScreen.BadgeHeight);
+            var badge = go.AddComponent<SlantedPlate>();
+            badge.Configure(0.35f, 2f, color, new Color(0f, 0f, 0f, 0.35f));
+            badge.raycastTarget = false;
+            tag = MenuUiBuilder.CreateText(go.transform, "Tag", $"{player + 1}P", 21, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), Vector2.zero, cursor.sizeDelta, Color.white);
             go.SetActive(false);
         }
 

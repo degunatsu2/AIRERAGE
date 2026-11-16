@@ -62,6 +62,14 @@ namespace Airerage.Runtime.UI
         // 右の大きな表示が変わったときの演出の秒数（ロゴが少し小さい所から伸び、名前が右から寄る）と、技の札の演出をずらす秒数。
         private const float ShowcaseSeconds = 0.24f;
         private const float SkillReplayStagger = 0.05f;
+        // カーソル（プレイヤーの印）: 選んでいる名前の札の左に置く、プレイヤーの色の小さな札（いちばん大きいとき）。札の左の縁からの間と、
+        // 印どうしの間（2026-11-16 のユーザーの要望。それまでは札を囲む枠で、札の縁と重なって見えた）。
+        public const float BadgeWidth = 58f;
+        public const float BadgeHeight = 34f;
+        private const float BadgeGap = 4f;
+        private const float BadgeMargin = 10f;
+        // 同じ札の印が 4 つを超えたら 2 列にする（縦 1 列だと小さすぎて番号が読めない）。
+        private const int BadgeRowsMax = 4;
 
         /// <summary>技の説明に出す技の枠（左から Q、E、R）。</summary>
         public static readonly AttackSlot[] SkillSlots = { AttackSlot.Special1, AttackSlot.Special2, AttackSlot.Super };
@@ -871,14 +879,15 @@ namespace Airerage.Runtime.UI
             }
         }
 
-        // カーソルの枠は、選んで右へ動いた札についていく（メインメニューと同じ札の動き）。
+        // カーソル（プレイヤーの印）は、選んで右へ動いた札についていく（メインメニューと同じ札の動き）。
         private void LateUpdate()
         {
             for (int i = 0; i < MaxPlayers; i++)
             {
                 if (_cursors.Length > i && _cursors[i].gameObject.activeSelf)
                 {
-                    _cursors[i].anchoredPosition = _icons[CursorIndex(i)].Rect.anchoredPosition;
+                    BadgeLayout(i, out Vector2 offset, out _);
+                    _cursors[i].anchoredPosition = _icons[CursorIndex(i)].Rect.anchoredPosition + offset;
                 }
             }
         }
@@ -1467,12 +1476,15 @@ namespace Airerage.Runtime.UI
             _cornerStates[i].color = slot.Ready ? color : new Color(1f, 1f, 1f, IsWaiting(i) ? 0.45f : 0.7f);
         }
 
-        // カーソル: 参加している人のアイコンに、人ごとの色の枠（重なっても見えるよう、番号ごとに少し大きく）と札（アイコンの四隅）。
+        // カーソルを出すか（ローカル対戦の順番待ちの人は出さない。番の人と、決めた人だけ）。
+        private bool CursorVisible(int i) => _slots[i].Joined && (Mode != SelectMode.Single || i == 0) && !IsWaiting(i);
+
+        // カーソル: 参加している人の、選んでいる名前の札の左に、人ごとの色の小さな札（中に「1P」など）。同じ札を選んでいる人が何人もいれば、
+        // 札の高さに収まるように縮めて番号の順に縦に並べる（BadgeLayout）。決めた人の札は白い縁。
         private void RefreshCursor(int i)
         {
             Slot slot = _slots[i];
-            // ローカル対戦の順番待ちの人のカーソルは出さない（番の人と、決めた人だけ）。
-            bool shown = slot.Joined && (Mode != SelectMode.Single || i == 0) && !IsWaiting(i);
+            bool shown = CursorVisible(i);
             _cursors[i].gameObject.SetActive(shown);
             if (!shown)
             {
@@ -1485,18 +1497,62 @@ namespace Airerage.Runtime.UI
             cursor.SetAsLastSibling();
             cursor.anchorMin = icon.anchorMin;
             cursor.anchorMax = icon.anchorMax;
-            cursor.pivot = icon.pivot;
-            cursor.anchoredPosition = IconHome(index);
-            float grow = 6f + i * 5f;
-            cursor.sizeDelta = icon.sizeDelta + new Vector2(grow, grow) * 2f;
+            cursor.pivot = new Vector2(0.5f, 0.5f);
+            BadgeLayout(i, out Vector2 offset, out Vector2 size);
+            cursor.anchoredPosition = icon.anchoredPosition + offset;
+            cursor.sizeDelta = size;
             Color color = i < _colors.Length ? _colors[i] : Color.white;
-            _cursorTags[i].text = $"{i + 1}P";
-            _cursorTags[i].color = color;
-            var frame = cursor.GetComponent<SlantedPlate>();
-            if (frame != null)
+            Text tag = _cursorTags[i];
+            tag.text = $"{i + 1}P";
+            tag.color = Color.white;
+            tag.fontSize = Mathf.Max(9, Mathf.RoundToInt(size.y * 0.62f));
+            tag.rectTransform.sizeDelta = size;
+            var badge = cursor.GetComponent<SlantedPlate>();
+            if (badge != null)
             {
-                frame.BorderColor = slot.Ready ? Color.white : color;
+                badge.color = color;
+                badge.BorderColor = slot.Ready ? Color.white : new Color(0f, 0f, 0f, 0.35f);
             }
+        }
+
+        /// <summary>
+        /// カーソル slot の印の、名前の札の中心からのずれと大きさ。札の左の縁（高さの真ん中）から BadgeMargin だけ左に、同じ札を選んでいる
+        /// 人の印を番号の順に上から並べる（札の高さに収まるように縮める。4 つを超えたら 2 列）。
+        /// </summary>
+        public void BadgeLayout(int slot, out Vector2 offset, out Vector2 size)
+        {
+            int index = CursorIndex(slot);
+            int count = 0;
+            int order = 0;
+            for (int p = 0; p < MaxPlayers; p++)
+            {
+                if (!CursorVisible(p) || CursorIndex(p) != index)
+                {
+                    continue;
+                }
+                if (p == slot)
+                {
+                    order = count;
+                }
+                count++;
+            }
+            count = Mathf.Max(1, count);
+            RectTransform icon = _icons[index].Rect;
+            Vector2 plate = icon.sizeDelta;
+            SlantedPlate iconPlate = icon.GetComponent<SlantedPlate>();
+            float slant = iconPlate != null ? iconPlate.Slant : 0f;
+            int columns = count > BadgeRowsMax ? 2 : 1;
+            int rows = (count + columns - 1) / columns;
+            float h = Mathf.Min(BadgeHeight, (plate.y - (rows - 1) * BadgeGap) / rows);
+            float w = h * BadgeWidth / BadgeHeight;
+            int column = order / rows;
+            int row = order % rows;
+            float plateLeft = -plate.x * 0.5f + slant * plate.y * 0.5f;
+            float x = plateLeft - BadgeMargin - w * 0.5f - (columns - 1 - column) * (w + BadgeGap);
+            float total = rows * h + (rows - 1) * BadgeGap;
+            float y = total * 0.5f - h * 0.5f - row * (h + BadgeGap);
+            offset = new Vector2(x, y);
+            size = new Vector2(w, h);
         }
 
         // 右の大きな表示（FocusSlot の人のカーソルのキャラクター。RANDOM のルーレットの途中は回っている顔）。

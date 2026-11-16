@@ -44,6 +44,8 @@ namespace Airerage.Editor
         public const string StageFolder = "Assets/_Project/Data/Stages";
         public const string AthleticStageAssetPath = StageFolder + "/Athletic.asset";
         public const string StageCatalogPath = StageFolder + "/StageCatalog.asset";
+        // タイトルロゴのワイヤーとアンカーの中の菱形の色（案のページのシアン。D-96）。
+        private static readonly Color TitleLogoCyan = new Color(0.22f, 0.784f, 1f, 1f);
 
         // トレーニングのダミーの数（ステージの 2〜4 番目の出現位置に出す）。
         private const int TrainingDummies = 3;
@@ -324,12 +326,19 @@ namespace Airerage.Editor
             Canvas canvas = MenuUiBuilder.CreateCanvas("Menu", 0);
             var white = Color.white;
 
-            // タイトル: 大きな「AIRERAGE」と、点滅する「PRESS ANY BUTTON」。
+            // タイトル: タイトルロゴ（D-96）と、点滅する「PRESS ANY BUTTON」。
             RectTransform title = MenuUiBuilder.CreateFull(canvas.transform, "Title");
             MenuUiBuilder.CreateFill(title, "Band", new Color(0f, 0f, 0f, 0.45f), new Vector2(0f, 0.46f), new Vector2(1f, 0.74f));
-            // ロゴはいちばん太い字（Orbitron Black）。
-            MenuUiBuilder.CreateText(title, "Logo", "AIRERAGE", 150, FontStyle.BoldAndItalic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.6f), Vector2.zero, new Vector2(1600f, 200f), white).font = GameFonts.LatinBlack;
+            // ロゴは図形のメッシュで描く（文字とアンカーの枠は白、ワイヤーと中の菱形はシアン。2026-11-16 のユーザーの決定）。
+            var logoGo = new GameObject("Logo", typeof(RectTransform));
+            logoGo.transform.SetParent(title, false);
+            var logoRect = (RectTransform)logoGo.transform;
+            logoRect.anchorMin = logoRect.anchorMax = new Vector2(0.5f, 0.6f);
+            logoRect.pivot = new Vector2(0.5f, 0.5f);
+            logoRect.anchoredPosition = Vector2.zero;
+            logoRect.sizeDelta = new Vector2(1180f, 200f);
+            TitleLogo titleLogo = logoGo.AddComponent<TitleLogo>();
+            titleLogo.Configure(white, TitleLogoCyan);
             UnityEngine.UI.Text press = MenuUiBuilder.CreateText(title, "PressAnyButton", "PRESS ANY BUTTON", 34, FontStyle.Bold,
                 TextAnchor.MiddleCenter, new Vector2(0.5f, 0.28f), Vector2.zero, new Vector2(800f, 60f), white);
 
@@ -405,6 +414,7 @@ namespace Airerage.Editor
             // クリックした所の火花（2026-11-07）: 画面の切り替えの写しより手前。
             MenuUiBuilder.CreateClickSparks(canvas.transform);
             SandboxWireSceneBuilder.SetReference(screens, "_title", title.gameObject);
+            SandboxWireSceneBuilder.SetReference(screens, "_titleLogo", titleLogo);
             SandboxWireSceneBuilder.SetReference(screens, "_pressAnyButton", press);
             SandboxWireSceneBuilder.SetReference(screens, "_main", main.gameObject);
             string[] fields = { "_single", "_local", "_network", "_training", "_options", "_quit" };

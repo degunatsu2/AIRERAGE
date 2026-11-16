@@ -21,6 +21,29 @@ namespace Airerage.PlayMode.Tests
     {
         private const string Folder = "Logs/Snapshots";
 
+        /// <summary>タイトルロゴ（D-96）の出す演出を 1/30 秒ごとに撮る（Logs/Snapshots/TitleLogo_*.png）。</summary>
+        [UnityTest]
+        public IEnumerator CaptureTitleLogo()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            var menu = Object.FindFirstObjectByType<MenuScreens>();
+            yield return Wait(0.3f);
+            TitleLogo logo = menu.TitleLogo;
+            Assert.That(logo, Is.Not.Null);
+            int frames = Mathf.CeilToInt(TitleLogoTimeline.Duration * 30f) + 6;
+            for (int i = 0; i <= frames; i++)
+            {
+                logo.Seek(i / 30f);
+                Capture(menu, $"TitleLogo_{i:000}");
+            }
+        }
+
         [UnityTest]
         public IEnumerator CaptureTransitionsAndButtons()
         {

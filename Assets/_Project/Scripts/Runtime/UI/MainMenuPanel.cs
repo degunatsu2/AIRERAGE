@@ -47,9 +47,9 @@ namespace Airerage.Runtime.UI
         };
         // 縫い目の角を丸くする半円の分割の数。
         private const int CapSegments = 5;
-        // 境目のぼかしの幅（ピクセル。境目を真ん中に、内側の半分は地の色のまま外側へ透明になる）。16 では少し強すぎた（2026-11-16 の
-        // ユーザーの指摘）。
-        private const float EdgeFeatherWidth = 10f;
+        // 境目のぼかしの幅（ピクセル。境目を真ん中に、内側の半分は地の色のまま外側へ透明になる）。16・10 では強すぎた（2026-11-16 の
+        // ユーザーの指摘。4 に）。
+        private const float EdgeFeatherWidth = 4f;
         // 2 列目の縫い目の色を作るとき、画面の色を白に寄せる割合。
         private const float StitchTint = 0.3f;
 
