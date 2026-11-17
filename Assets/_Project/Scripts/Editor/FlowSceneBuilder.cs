@@ -663,6 +663,8 @@ namespace Airerage.Editor
             events.AddComponent<ImeGuard>();
             // 字体の絵が作り直されたら、出ているすべての文字を描き直させる（文字が白い四角になる不具合の守り。2026-11-17）。
             events.AddComponent<FontRebuildGuard>();
+            // 止まったときの見張り（どの段階で止まったかをログに書く。2026-11-17 の指摘: ウインドウを戻すと同時に Esc を押すと止まる）。
+            events.AddComponent<Airerage.Runtime.DebugTools.HangWatchdog>();
             // メニューの効果音（決定した直後に画面のシーンを外しても途切れないよう、いつも読み込むシーンに置く）。
             // タイトルとキャラクターの決定は音声ファイル（docs/18 4.3）。
             var sounds = new GameObject("UiSounds").AddComponent<UiSounds>();

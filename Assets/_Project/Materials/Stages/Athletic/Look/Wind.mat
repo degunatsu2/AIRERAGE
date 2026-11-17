@@ -28,16 +28,17 @@ Material:
     - _Base: 0.12
     - _Columns: 1.1
     - _Dust: 0.6
+    - _Glow: 2.4
     - _LaneSpacing: 0.75
     - _Length: 2.6
     - _Period: 7
-    - _Shade: 0.22
+    - _Shade: 0.1
     - _Spacing: 2.4
     - _Speed: 9
     - _Streak: 0.55
-    - _Strength: 0.75
-    - _Sway: 0.35
-    - _Width: 0.045
+    - _Strength: 0.6
+    - _Sway: 0
+    - _Width: 0.03
     m_Colors:
     - _Color: {r: 0.62, g: 0.9, b: 1.3, a: 1}
   m_BuildTextureStacks: []

@@ -26,14 +26,15 @@ Material:
     m_Ints: []
     m_Floats:
     - _Dust: 0.6
+    - _Glow: 2.4
     - _LaneSpacing: 0.75
     - _Length: 2.6
     - _Period: 7
-    - _Shade: 0.22
+    - _Shade: 0.1
     - _Speed: 9
-    - _Strength: 0.75
-    - _Sway: 0.35
-    - _Width: 0.045
+    - _Strength: 0.6
+    - _Sway: 0
+    - _Width: 0.03
     m_Colors:
     - _Color: {r: 0.5, g: 0.75, b: 1.4, a: 1}
   m_BuildTextureStacks: []

@@ -604,7 +604,8 @@ namespace Airerage.PlayMode.Tests
                 }
                 int allowed = 1 + Mathf.FloorToInt((Time.unscaledTime - started) / ImeGuard.RetrySeconds);
                 Assert.That(guard.LegacyWrites - writes, Is.LessThanOrEqualTo(allowed), "書き戻されるたびに IME の設定を書き合っている");
-                // ほかのアプリから戻った直後は IME に触らず、落ち着いてから当て直す。
+                // ほかのアプリから戻っても IME に触らない（2026-11-17 の 2 回目の指摘: 戻すと同時に Esc を押すと止まる）。入力欄のない
+                // 画面（メインメニュー・試合）では、ほかが書き換えても合わせ直さない。
                 guard.OnApplicationFocus(false);
                 guard.OnApplicationFocus(true);
                 Input.imeCompositionMode = IMECompositionMode.Auto;
@@ -612,11 +613,14 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 Assert.That(guard.Settling, Is.True, "戻った直後に待たない");
-                Assert.That(guard.LegacyWrites, Is.EqualTo(writes), "戻った直後に IME を切り替えている");
                 yield return WaitFor(() => !guard.Settling, 3f, "落ち着かない");
-                yield return null;
-                yield return null;
-                Assert.That(Input.imeCompositionMode, Is.EqualTo(IMECompositionMode.Off), "戻ってから IME を当て直さない");
+                float waited = Time.unscaledTime;
+                while (Time.unscaledTime - waited < ImeGuard.RetrySeconds * 1.5f)
+                {
+                    yield return null;
+                }
+                Assert.That(guard.LegacyWrites, Is.EqualTo(writes), "入力欄のない画面で、戻ってから IME を切り替えている");
+                Assert.That(guard.Busy, Is.Null, "IME の操作の途中のまま");
                 menu.Network.Button.onClick.Invoke();
                 menu.Transition.Complete();
                 yield return null;

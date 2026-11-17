@@ -1,6 +1,8 @@
 // 風（D-97。2026-11-17 のユーザーの要望: 風が塊として見えないように、もう少しリアルな風に）: 範囲を塗らず、空気の流れだけを描く。
-//   - 気流の筋: 流れに沿ってゆらゆらと曲がる細い線が、ところどころに現れて流れの向きへ進み、尾は薄く頭ははっきり、すぐに消える。
-//   - 運ばれる粒: 小さな光の粒（ちり）が、筋より少し遅く、揺れながら流れる。
+//   - 気流の筋: 流れに沿った細い線が、ところどころに現れて流れの向きへ進み、尾は薄く頭ははっきり、すぐに消える。
+//   - 運ばれる粒: 小さな光の粒（ちり）が、筋より少し遅く流れる。
+//   - 筋と粒は少し光る（_Glow で明るさを上げ、画面のにじみ〈ブルーム〉に拾わせる）。_Sway が 0 ならまっすぐ流れる（2 回目の要望:
+//     まっすぐ・線を少し薄く・少し発光）。
 // 筋と粒の周りはごく薄く暗くする（明るい空の上でも白い筋が見える。暗い背景ではほとんど変わらない）。
 // 範囲の両脇と両端では薄くなる（風の範囲の境を四角く見せない）。板の uv.y が流れの向き（StageDressing が板を風の向きに回す）。
 // 長さと間隔は m で決める（板の幅と長さは物体の大きさから読む）。乗算済みの半透明で重ねる。
@@ -9,15 +11,16 @@ Shader "Airerage/WindColumn"
     Properties
     {
         [HDR] _Color ("Color", Color) = (0.85, 0.95, 1.1, 1)
-        _Strength ("Strength", Range(0, 2)) = 0.75
+        _Strength ("Strength", Range(0, 2)) = 0.6
         _LaneSpacing ("Wisp lane spacing (m)", Float) = 0.75
-        _Width ("Wisp width (m)", Float) = 0.045
+        _Width ("Wisp width (m)", Float) = 0.03
         _Period ("Wisp period (m)", Float) = 7
         _Length ("Wisp length (m)", Float) = 2.6
         _Speed ("Flow speed (m/s)", Float) = 9
-        _Sway ("Sway (m)", Float) = 0.35
+        _Sway ("Sway (m)", Float) = 0
         _Dust ("Dust strength", Range(0, 2)) = 0.6
-        _Shade ("Shade around the wisps", Range(0, 1)) = 0.22
+        _Shade ("Shade around the wisps", Range(0, 1)) = 0.1
+        _Glow ("Glow (HDR multiplier)", Range(1, 6)) = 2.4
     }
 
     SubShader
@@ -48,6 +51,7 @@ Shader "Airerage/WindColumn"
                 float _Sway;
                 half _Dust;
                 half _Shade;
+                half _Glow;
             CBUFFER_END
 
             struct Attributes
@@ -138,7 +142,7 @@ Shader "Airerage/WindColumn"
                 half glow = saturate((wisps.x + mote) * _Strength) * fade;
                 half shade = saturate(max(wisps.y, moteShade) * _Strength) * fade * _Shade;
                 // 乗算済み: 芯は色を足し、陰は後ろを少し暗くする（色を足さずに不透明度だけ）。
-                return half4(_Color.rgb * glow, max(glow * 0.85, shade));
+                return half4(_Color.rgb * (glow * _Glow), max(glow * 0.85, shade));
             }
             ENDHLSL
         }

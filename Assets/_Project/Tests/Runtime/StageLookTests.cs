@@ -322,7 +322,23 @@ namespace Airerage.Runtime.Tests
                 Assert.That(collider.transform.parent != null && collider.transform.parent.name == "Terrain", Is.True,
                     $"地形の外に当たりがある: {collider.name}");
             }
+            // 奥の背景の飾りは影を受けず落とさない（影はカメラからの距離の球の中だけに出るので、奥の壁ではプレイヤーの周りの円の
+            // 中だけ影が出ていた。2026-11-17 の指摘: キッチンの奥の壁のタイルの線が、プレイヤーの周りだけ太い）。
+            // ATHLETIC は配置のデータ（StageLayout）から作らないので、飾り（Decor）がない。
+            GameObject decor = scene.GetRootGameObjects().FirstOrDefault(g => g.name == "Decor");
+            Assert.That(decor != null || stage == "Stage_Athletic", Is.True, "飾りがない");
+            foreach (Renderer renderer in decor != null ? decor.GetComponentsInChildren<Renderer>(true) : new Renderer[0])
+            {
+                if (renderer.bounds.min.z >= BackgroundShadowDepth)
+                {
+                    Assert.That(renderer.receiveShadows, Is.False, $"{renderer.name}: 奥の飾りが影を受ける（円の中だけ影が出る）");
+                    Assert.That(renderer.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.Off), $"{renderer.name}: 奥の飾りが影を落とす");
+                }
+            }
         }
+
+        // StageDressing.BackgroundShadowDepth と同じ（m）。
+        private const float BackgroundShadowDepth = 1f;
 
         [Test]
         public void CityNight_IsDressedForTheNight()

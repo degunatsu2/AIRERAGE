@@ -44,6 +44,13 @@ namespace Airerage.Editor.Stages
         // ワイヤーが刺さる足場の上の面の、正面の縁の光る帯の奥行き（m）。
         private const float TopRimDepth = 0.14f;
 
+        /// <summary>
+        /// これより奥（遊ぶ面 z = 0 から、手前の面までの距離。m）にある背景の飾りは、影を受けず落とさない。影はカメラから決まった距離
+        /// （PC_RPAsset の 50m）の球の中だけに描かれるので、奥の壁ではキャラクターの周りの円の中だけ影が出ていた（2026-11-17 の指摘:
+        /// キッチンの奥の壁のタイルの線が、プレイヤーの周りの円の中だけ太い。線の影が円の中だけ出ていた）。
+        /// </summary>
+        public const float BackgroundShadowDepth = 1f;
+
         /// <summary>ステージのシーン（開いている）を look で飾る。地形・ギミック・撃破の範囲・飾りを作った後に呼ぶ。</summary>
         public static void Apply(StageLook look, Vector2 boundsMin, Vector2 boundsMax)
         {
@@ -55,6 +62,7 @@ namespace Airerage.Editor.Stages
             DressGimmicks(look, folder);
             DressPlatforms(look, folder);
             CreateMembranes(look, folder, boundsMin, boundsMax);
+            QuietBackgroundShadows();
             if (look.Grid)
             {
                 CreateGrid(look, folder, boundsMin);
@@ -64,6 +72,24 @@ namespace Airerage.Editor.Stages
                 CreateBackdrop(look, folder, boundsMin);
             }
             CreateVolume(look, folder);
+        }
+
+        // 奥の背景の飾りは影を受けず落とさない（BackgroundShadowDepth）。遊ぶ面にかかる飾り（調理台・床など）はそのまま。
+        private static void QuietBackgroundShadows()
+        {
+            GameObject decor = GameObject.Find("Decor");
+            if (decor == null)
+            {
+                return;
+            }
+            foreach (Renderer renderer in decor.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer.bounds.min.z >= BackgroundShadowDepth)
+                {
+                    renderer.receiveShadows = false;
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+            }
         }
 
         /// <summary>材質を置くフォルダ。</summary>
@@ -282,15 +308,17 @@ namespace Airerage.Editor.Stages
             Material wind = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("Wind", "Airerage/WindColumn", m =>
             {
                 m.SetColor("_Color", look.WindColor);
-                m.SetFloat("_Strength", 0.75f);
+                m.SetFloat("_Strength", 0.6f);
                 m.SetFloat("_LaneSpacing", 0.75f);
-                m.SetFloat("_Width", 0.045f);
+                m.SetFloat("_Width", 0.03f);
                 m.SetFloat("_Period", 7f);
                 m.SetFloat("_Length", 2.6f);
                 m.SetFloat("_Speed", 9f);
-                m.SetFloat("_Sway", 0.35f);
+                // まっすぐ流れ、少し光る（2026-11-17 の 2 回目の要望）。
+                m.SetFloat("_Sway", 0f);
                 m.SetFloat("_Dust", 0.6f);
-                m.SetFloat("_Shade", 0.22f);
+                m.SetFloat("_Shade", 0.1f);
+                m.SetFloat("_Glow", 2.4f);
             }, folder);
             foreach (StageZoneView view in Object.FindObjectsByType<StageZoneView>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {

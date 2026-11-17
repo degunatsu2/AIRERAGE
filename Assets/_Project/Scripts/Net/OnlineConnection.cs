@@ -70,6 +70,9 @@ namespace Airerage.Net
         /// <summary>次の試合のルール（値はシーンの設定。テストで短くするのに使う）。</summary>
         public MatchRules MatchRules => _match;
 
+        // プロジェクトの設定の「裏でも動かす」（つないでいないときはこれに戻す）。
+        private bool _backgroundDefault;
+
         private void Awake()
         {
             if (_roster == null || _roster.Count == 0)
@@ -80,8 +83,7 @@ namespace Airerage.Net
             }
             _rollback.Validate();
             _match.Validate().ThrowIfInvalid();
-            // 同じ PC で複数のプレイヤーを動かすとき（Multiplayer Play Mode）、操作していないウィンドウも止めない。
-            Application.runInBackground = true;
+            _backgroundDefault = Application.runInBackground;
         }
 
         private void Start()
@@ -93,6 +95,16 @@ namespace Airerage.Net
         {
             _session?.Dispose();
             _session = null;
+            Application.runInBackground = _backgroundDefault;
+        }
+
+        // ウインドウが裏にあっても動かし続けるのは、つないでいる間だけ（通信を止めないため。同じ PC で複数のプレイヤーを動かす
+        // Multiplayer Play Mode でも、操作していないウインドウを止めない）。前は App のシーンを開いたときからいつも動かしていたが、
+        // 裏で動かしたままウインドウを切り替えて戻り、入力すると止まる Unity の不具合（UUM-130495）があるので、オフラインの試合と
+        // メニューでは止める（2026-11-17 の指摘: ウインドウを戻すと同時に Esc を押すと止まる）。
+        private void KeepRunningInBackground(bool connected)
+        {
+            Application.runInBackground = connected || _backgroundDefault;
         }
 
         /// <summary>ホストとして port で待ち受ける。失敗したら false（理由は Message）。</summary>
@@ -213,6 +225,7 @@ namespace Airerage.Net
             Busy = false;
             _session?.Dispose();
             _session = null;
+            KeepRunningInBackground(false);
         }
 
         /// <summary>ホスト: 選んだステージで試合を始める（全員がそのステージを読み込んでから始まる）。</summary>
@@ -298,6 +311,7 @@ namespace Airerage.Net
                     _session.Items = new LobbyItems(Airerage.Core.Items.ItemMode.Default, items.StartCount, items.DropRate, items.DropPool);
                 }
                 Message = string.Empty;
+                KeepRunningInBackground(true);
                 return true;
             }
             catch (InvalidOperationException e)

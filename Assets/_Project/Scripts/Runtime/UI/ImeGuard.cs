@@ -16,6 +16,9 @@ namespace Airerage.Runtime.UI
     /// （2026-11-17 の指摘。見出しの上の四角は、画面にいる間は消えず、別の画面へ移ると消える）。
     /// 切り替えるのは状態が変わったときだけ（毎フレーム書かない）。ほかから書き換えられたら 1 秒以上空けて合わせ直す。ほかのアプリから
     /// 戻った直後の 0.6 秒は触らない（OnApplicationFocus）。
+    /// 2 回目の指摘（2026-11-17: ウインドウを戻すと同時に Esc を押すと止まる。エディタでもビルドでも）: ほかのアプリから戻っても当て直さない。
+    /// 合わせ直しも入力欄がある画面だけ（試合中は IME に一度も触らない）。IME の切り替えの途中かどうかは Busy（止まったときの見張り
+    /// HangWatchdog が読む）。
     /// </summary>
     public sealed class ImeGuard : MonoBehaviour
     {
@@ -32,12 +35,16 @@ namespace Airerage.Runtime.UI
         private float _quietUntil = float.NegativeInfinity;
         private float _legacySetAt = float.NegativeInfinity;
         private Vector2 _cursor = new Vector2(float.NaN, float.NaN);
+        private volatile string _busy;
 
         /// <summary>今 IME を有効にしているか（テスト用）。</summary>
         public bool ImeEnabled => _enabled;
 
         /// <summary>古い入力の IME の設定を書いた回数（テスト用。毎フレーム書き続けていないかを確かめる）。</summary>
         public int LegacyWrites { get; private set; }
+
+        /// <summary>今している IME の操作（していなければ null。止まったときの見張りがほかのスレッドから読む）。</summary>
+        public string Busy => _busy;
 
         /// <summary>ほかのアプリから戻った直後で、IME に触らずに待っているか（テスト用）。</summary>
         public bool Settling => _unfocused || Time.unscaledTime < _quietUntil;
@@ -74,8 +81,8 @@ namespace Airerage.Runtime.UI
             _unfocused = !focused;
             if (focused)
             {
+                // 当て直さない（戻ったときに IME に触ると止まることがある。入力欄の出入りのときだけ切り替える）。
                 _quietUntil = Time.unscaledTime + SettleSeconds;
-                _applied = false;
             }
         }
 
@@ -91,8 +98,10 @@ namespace Airerage.Runtime.UI
             IMECompositionMode legacy = LegacyModeFor(want);
             if (!_applied || keyboard != _keyboard || want != _enabled)
             {
-                // 入力を始めた・終えた・戻ってきた: 両方の入口を 1 回ずつ切り替える。
+                // 入力を始めた・終えた（と最初の 1 回）: 両方の入口を 1 回ずつ切り替える。
+                _busy = want ? "Keyboard.SetIMEEnabled(true)" : "Keyboard.SetIMEEnabled(false)";
                 keyboard.SetIMEEnabled(want);
+                _busy = null;
                 SetLegacy(legacy);
                 _keyboard = keyboard;
                 _enabled = want;
@@ -102,14 +111,21 @@ namespace Airerage.Runtime.UI
             else if (UnityEngine.Input.imeCompositionMode != legacy && Time.unscaledTime - _legacySetAt >= RetrySeconds)
             {
                 // ほか（uGUI の入力欄・エディタ）が古い入力の設定を書き換えた。毎フレーム書き合わないよう、間を空けて合わせ直す。
-                SetLegacy(legacy);
+                // 入力欄がある画面（ネットワークの画面など）だけ。試合中は触らない。
+                _legacySetAt = Time.unscaledTime;
+                if (FindAnyObjectByType<InputField>() != null)
+                {
+                    SetLegacy(legacy);
+                }
             }
             if (want)
             {
                 Vector2 cursor = CursorFor(field);
                 if (cursor != _cursor)
                 {
+                    _busy = "Keyboard.SetIMECursorPosition";
                     keyboard.SetIMECursorPosition(cursor);
+                    _busy = null;
                     _cursor = cursor;
                 }
             }
@@ -119,7 +135,9 @@ namespace Airerage.Runtime.UI
         {
             if (UnityEngine.Input.imeCompositionMode != mode)
             {
+                _busy = $"Input.imeCompositionMode = {mode}";
                 UnityEngine.Input.imeCompositionMode = mode;
+                _busy = null;
                 LegacyWrites++;
             }
             _legacySetAt = Time.unscaledTime;
