@@ -16,7 +16,7 @@ namespace Airerage.PlayMode.Tests
     /// <summary>
     /// 試合へのゲート（D-99 の T12）と開始前の空撮（D-98 の I2）のコマを Logs/Snapshots/Intro_*.png に保存する（名前で選んだときだけ動く。
     /// 見た目の確認用）。シングルモードの試合を始め、ゲートの閉じる途中・閉じきった札・開く途中と、カウントダウンの間のカメラを撮る
-    /// （上下の帯と名前の札は OnGUI で描くので、ここでは写らない）。
+    /// （上下の帯と名前の札・READY ／ GO! は OnGUI で描くので、ここでは写らない）。
     /// </summary>
     [Explicit("画像を撮るときだけ")]
     public sealed class MatchIntroSnapshotTests
@@ -42,32 +42,18 @@ namespace Airerage.PlayMode.Tests
                 LocalPlayerSetup.Cpu(0, CpuLevel.Easy), LocalPlayerSetup.Cpu(1, CpuLevel.Easy), LocalPlayerSetup.Cpu(2, CpuLevel.Easy),
                 LocalPlayerSetup.Cpu(3, CpuLevel.Easy),
             };
-            float start = Time.realtimeSinceStartup;
             flow.StartLocal(stage, players, timed: true, single: true);
             Camera menuCamera = Object.FindFirstObjectByType<MenuCameraDrift>().GetComponent<Camera>();
-            foreach (float at in new[] { 0.12f, 0.24f, 0.42f })
-            {
-                while (Time.realtimeSinceStartup - start < at)
-                {
-                    yield return null;
-                }
-                CaptureCanvas(curtain, menuCamera, $"Intro_Gate_{at:0.00}");
-            }
+            CurtainGraphic bars = curtain.GetComponentInChildren<CurtainGraphic>(true);
+            // 1 枚撮るのに 1 秒ほどかかる（ソフトウェアの描画）ので、時刻ではなく扉の状態を待って撮る（撮った後は次のフレームへ進める）。
+            yield return Shoot(() => bars.Close >= 0.4f, () => CaptureCanvas(curtain, menuCamera, "Intro_Gate_1_Closing"));
+            yield return Shoot(() => bars.Plate >= 0.5f, () => CaptureCanvas(curtain, menuCamera, "Intro_Gate_2_Plate"));
             while (flow.Current != GameFlow.FlowScreen.Local || flow.IsLoading || SceneManager.GetActiveScene().name != sceneName)
             {
                 yield return null;
             }
-            yield return null;
             Camera camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
-            float opened = Time.realtimeSinceStartup;
-            foreach (float at in new[] { 0.1f, 0.25f })
-            {
-                while (Time.realtimeSinceStartup - opened < at)
-                {
-                    yield return null;
-                }
-                CaptureCanvas(curtain, camera, $"Intro_Open_{at:0.00}");
-            }
+            yield return Shoot(() => bars.Open >= 0.2f || !curtain.Showing, () => CaptureCanvas(curtain, camera, "Intro_Gate_3_Opening"));
             var intro = Object.FindFirstObjectByType<MatchIntroCamera>();
             Assert.That(intro, Is.Not.Null, "空撮のカメラがない");
             var hud = Object.FindFirstObjectByType<MatchHud>();
@@ -80,6 +66,19 @@ namespace Airerage.PlayMode.Tests
                 }
                 Capture(camera, $"Intro_Camera_{at:0.0}_{intro.Stage}");
             }
+        }
+
+        // cond が満たされたフレームで shoot を 1 回だけ呼び、次のフレームへ進める（30 秒待っても満たされなければ失敗）。
+        private static IEnumerator Shoot(System.Func<bool> cond, System.Action shoot)
+        {
+            float start = Time.realtimeSinceStartup;
+            while (!cond())
+            {
+                Assert.That(Time.realtimeSinceStartup - start, Is.LessThan(30f), "撮る状態にならない");
+                yield return null;
+            }
+            shoot();
+            yield return null;
         }
 
         private static void Capture(Camera camera, string name)
