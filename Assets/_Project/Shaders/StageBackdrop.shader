@@ -13,7 +13,9 @@ Shader "Airerage/StageBackdrop"
         _HazeBottom ("Haze bottom (world y)", Float) = -120
         _Blink ("Blink rate", Float) = 0
         _BandSpacing ("Band spacing (m)", Float) = 9
-        _BandStrength ("Band strength", Range(0, 0.5)) = 0.07
+        _BandStrength ("Band strength", Range(0, 2)) = 0.07
+        [HDR] _BandColor ("Band color", Color) = (1, 1, 1, 1)
+        _BandFill ("Band fill (lit windows)", Range(0, 1)) = 0
     }
 
     SubShader
@@ -43,7 +45,14 @@ Shader "Airerage/StageBackdrop"
                 float _Blink;
                 float _BandSpacing;
                 half _BandStrength;
+                half4 _BandColor;
+                half _BandFill;
             CBUFFER_END
+
+            float BandHash(float2 p)
+            {
+                return frac(sin(dot(p, float2(41.3, 289.1))) * 43758.5453);
+            }
 
             struct Attributes
             {
@@ -91,8 +100,14 @@ Shader "Airerage/StageBackdrop"
                 // 横の面の細い明るい帯（階の区切り。大きさの手がかり）。
                 float floorY = input.positionWS.y / max(_BandSpacing, 0.1);
                 float aa = max(fwidth(floorY), 1e-4);
-                half band = (1.0 - smoothstep(0.04, 0.04 + aa * 1.5, abs(frac(floorY) - 0.5))) * (1.0 - saturate(abs(n.y) * 2.0));
-                color += _BandStrength * band;
+                half side = 1.0 - saturate(abs(n.y) * 2.0);
+                half band = (1.0 - smoothstep(0.04, 0.04 + aa * 1.5, abs(frac(floorY) - 0.5))) * side;
+                // 夜は、階ごとに窓の明かりの点いた区画をまだらに光らせる（_BandFill）。
+                float floorIndex = floor(floorY);
+                float bay = floor((input.positionWS.x + input.positionWS.z) / 4.0);
+                half lit = step(1.0 - _BandFill, BandHash(float2(floorIndex, bay))) * side
+                    * (1.0 - smoothstep(0.32, 0.36, abs(frac(floorY) - 0.5)));
+                color += _BandColor.rgb * _BandStrength * max(band, lit);
                 half haze = saturate((_HazeTop - input.positionWS.y) / max(_HazeTop - _HazeBottom, 1e-3));
                 color = lerp(color, _HazeColor.rgb, haze);
                 color = MixFog(color, input.fogFactor);

@@ -25,24 +25,28 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _Ambient: 0.68
+    - _EdgeGlint: 0.6
     - _HeightGradient: 0.35
     - _HeightHigh: 22
     - _HeightLow: -2
-    - _ImpactSeconds: 0.8
-    - _ImpactSpeed: 9
-    - _ImpactWidth: 0.35
-    - _LocalGradient: 0.45
-    - _Occlusion: 0.45
-    - _RimStrength: 0.55
+    - _ImpactSeconds: 0.45
+    - _ImpactSpeed: 6
+    - _ImpactWidth: 0.16
+    - _LocalGradient: 0.65
+    - _Occlusion: 0.5
+    - _RimStrength: 0.3
+    - _Shininess: 48
+    - _Specular: 0.35
     - _TrimInset: 0.28
     - _TrimPulse: 0.3
     - _TrimWidth: 0.07
     m_Colors:
-    - _BaseColor: {r: 0.2, g: 0.42, b: 0.58, a: 1}
-    - _ImpactColor: {r: 1.1, g: 2.2, b: 2.7, a: 1}
+    - _BaseColor: {r: 0.22, g: 0.34, b: 0.5, a: 1}
+    - _ImpactColor: {r: 0.22, g: 0.42, b: 0.52, a: 1}
     - _RimColor: {r: 0.78, g: 0.9, b: 1, a: 1}
-    - _ShadeColor: {r: 0.86, g: 0.93, b: 1.15, a: 1}
-    - _TopColor: {r: 0.55, g: 0.78, b: 0.9, a: 1}
+    - _ShadeColor: {r: 0.84, g: 0.92, b: 1.2, a: 1}
+    - _TopColor: {r: 0.6, g: 0.65, b: 0.73, a: 1}
     - _TrimColor: {r: 0.55, g: 2.1, b: 2.6, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

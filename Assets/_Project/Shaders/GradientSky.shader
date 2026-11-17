@@ -15,6 +15,7 @@ Shader "Airerage/GradientSky"
         _SunDirection ("Sun direction", Vector) = (-0.45, 0.35, 1, 0)
         _SunSize ("Sun size", Range(16, 4096)) = 2600
         _SunGlow ("Sun glow", Range(0, 1)) = 0.25
+        _Stars ("Stars", Range(0, 1)) = 0
         _TenseColor ("Tense color", Color) = (1, 0.42, 0.34, 1)
         _Tense ("Tense", Range(0, 1)) = 0
     }
@@ -43,9 +44,26 @@ Shader "Airerage/GradientSky"
                 float4 _SunDirection;
                 float _SunSize;
                 half _SunGlow;
+                half _Stars;
                 half4 _TenseColor;
                 half _Tense;
             CBUFFER_END
+
+            // 夜空の星（向きを細かい升目に分け、升目ごとに乱数で星を置いて、ゆっくりまたたかせる）。
+            float StarHash(float3 p)
+            {
+                return frac(sin(dot(p, float3(127.1, 311.7, 74.7))) * 43758.5453);
+            }
+
+            half Stars(float3 d)
+            {
+                float3 cell = floor(d * 220.0);
+                float3 local = frac(d * 220.0) - 0.5;
+                float h = StarHash(cell);
+                half star = step(0.985, h) * (1.0 - smoothstep(0.05, 0.22, length(local)));
+                half twinkle = 0.6 + 0.4 * sin(_Time.y * (1.5 + h * 3.0) + h * 40.0);
+                return star * twinkle * saturate(d.y * 4.0);
+            }
 
             struct Attributes
             {
@@ -86,6 +104,7 @@ Shader "Airerage/GradientSky"
                 float3 sun = normalize(_SunDirection.xyz);
                 half facing = saturate(dot(d, sun));
                 color += _SunColor.rgb * (pow(facing, _SunSize) + _SunGlow * pow(facing, 12.0) * 0.35 + _SunGlow * pow(facing, 3.0) * 0.08);
+                color += _Stars * Stars(d);
                 half3 tense = dot(color, half3(0.2126, 0.7152, 0.0722)) * _TenseColor.rgb * 1.45 + color * 0.12;
                 color = lerp(color, tense, _Tense);
                 return half4(color, 1.0);

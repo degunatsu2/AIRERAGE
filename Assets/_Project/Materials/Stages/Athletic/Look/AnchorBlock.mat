@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: AnchorBlock
+  m_Shader: {fileID: 4800000, guid: 0bcd4162a7ff4de7801057fda7724e1c, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Ambient: 0.68
+    - _EdgeGlint: 0.6
+    - _HeightGradient: 0.35
+    - _HeightHigh: 22
+    - _HeightLow: -2
+    - _ImpactSeconds: 0.45
+    - _ImpactSpeed: 6
+    - _ImpactWidth: 0.16
+    - _LocalGradient: 0.65
+    - _Occlusion: 0.5
+    - _RimStrength: 0.3
+    - _Shininess: 48
+    - _Specular: 0.35
+    - _TrimInset: 0.28
+    - _TrimPulse: 0.3
+    - _TrimWidth: 0.07
+    m_Colors:
+    - _BaseColor: {r: 0.72, g: 0.56, b: 0.12, a: 1}
+    - _ImpactColor: {r: 0.22, g: 0.42, b: 0.52, a: 1}
+    - _RimColor: {r: 0.78, g: 0.9, b: 1, a: 1}
+    - _ShadeColor: {r: 0.84, g: 0.92, b: 1.2, a: 1}
+    - _TopColor: {r: 0.86, g: 0.74, b: 0.34, a: 1}
+    - _TrimColor: {r: 0.55, g: 2.1, b: 2.6, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

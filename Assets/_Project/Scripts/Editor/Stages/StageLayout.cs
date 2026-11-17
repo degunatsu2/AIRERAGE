@@ -53,6 +53,9 @@ namespace Airerage.Editor.Stages
         /// <summary>背景の飾り（見た目だけ。当たりはない）を作る。</summary>
         public Action<StageDecor> Decorate;
 
+        /// <summary>見た目の台本（D-97。あれば StageDressing が足場・ギミック・空・遠景・後処理を飾る。なければ今までの見た目）。</summary>
+        public StageLook Look;
+
         /// <summary>
         /// ステージの曲のファイルの名前（`Assets/_Project/Audio/Music/` の OGG。拡張子なし。ループのタグ付き。docs/18 6 章）。
         /// なければ、試合では仮の BGM（合成）を鳴らす。

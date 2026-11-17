@@ -299,6 +299,8 @@ namespace Airerage.Editor.Stages
                     // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
                     new Vector3(-17.5f, 13.5f, 0f), new Vector3(17.5f, 13.5f, 0f), new Vector3(-38.75f, 16f, 0f), new Vector3(38.75f, 16f, 0f) },
                 Decorate = decor => DecorateCity(decor, night: true),
+                // 夜の雰囲気の確認（D-97。2026-11-17 のユーザーの要望）。
+                Look = StageLook.CityNight(),
             };
         }
 

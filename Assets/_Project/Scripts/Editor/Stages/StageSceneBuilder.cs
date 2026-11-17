@@ -79,6 +79,11 @@ namespace Airerage.Editor.Stages
                 point.AddComponent<SpawnPointAuthoring>().Configure(p);
             }
             layout.Decorate?.Invoke(decor);
+            if (layout.Look != null)
+            {
+                // 背景とオブジェクトのクオリティアップ（D-97）。
+                StageDressing.Apply(layout.Look, layout.BoundsMin, layout.BoundsMax);
+            }
 
             string path = ScenePathOf(layout);
             SandboxWireSceneBuilder.EnsureFolder(SceneFolder);

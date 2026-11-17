@@ -137,7 +137,7 @@ namespace Airerage.Runtime.Tests
             Scene scene = Open(AthleticPath);
             BoxCollider[] terrain = InScene<BoxCollider>(scene);
             Assert.That(terrain.Length, Is.EqualTo(15), "地形の箱の数が変わった（遊びが変わる）");
-            StageBlock[] blocks = InScene<StageBlock>(scene);
+            StageBlock[] blocks = scene.GetRootGameObjects().Single(g => g.name == "TerrainVisuals").GetComponentsInChildren<StageBlock>();
             Assert.That(blocks.Length, Is.EqualTo(terrain.Length), "地形の箱ごとに面取りした見た目がない");
             foreach (BoxCollider box in terrain)
             {
@@ -193,8 +193,10 @@ namespace Airerage.Runtime.Tests
                 Assert.That(renderer.bounds.min.z, Is.GreaterThan(60f), $"遠景が遊ぶ所の近くにある: {renderer.name}");
                 Assert.That(renderer.shadowCastingMode, Is.EqualTo(ShadowCastingMode.Off), $"遠景が影を落とす: {renderer.name}");
             }
-            Assert.That(backdrop.GetComponentsInChildren<BackdropMotion>().Any(m => m.Kind == BackdropMotion.Mode.Drift), Is.True, "横切る飛行船がない（V17）");
-            Assert.That(backdrop.GetComponentsInChildren<BackdropMotion>().Any(m => m.Kind == BackdropMotion.Mode.Spin), Is.True, "回る輪がない（V17）");
+            // 世界観は現代日本: 浮かぶ島は置かず、運営の撮影の飛行船は 1 隻だけ（2026-11-17 の要望）。
+            Assert.That(backdrop.GetComponentsInChildren<Transform>().Any(t => t.name == "Island" || t.name == "Ring"), Is.False, "浮かぶ島が残っている");
+            Assert.That(backdrop.GetComponentsInChildren<BackdropMotion>().Length, Is.EqualTo(1), "横切る飛行船が 1 隻でない（V17）");
+            Assert.That(backdrop.Find("Airships").childCount, Is.EqualTo(1));
 
             GameObject grid = scene.GetRootGameObjects().Single(g => g.name == "LightGrid");
             Assert.That(grid.transform.position.y, Is.LessThan(-22f - 20f), "光の格子が撃破の線の近くにある（V18）");
@@ -207,6 +209,88 @@ namespace Airerage.Runtime.Tests
             {
                 Assert.That(renderer.sharedMaterial.shader.name, Is.EqualTo("Airerage/KillMembrane"));
             }
+        }
+
+        [Test]
+        public void Athletic_ImpactRings_AreSubtle()
+        {
+            // 着地とワイヤーの光の輪はかなり控えめに（2026-11-17 の要望）: にじまない明るさ・短い時間・細い輪。
+            Scene scene = Open(AthleticPath);
+            foreach (StageBlock block in InScene<StageBlock>(scene))
+            {
+                Material material = block.GetComponent<MeshRenderer>().sharedMaterial;
+                Color impact = material.GetColor("_ImpactColor");
+                Assert.That(Mathf.Max(impact.r, Mathf.Max(impact.g, impact.b)), Is.LessThan(1f), $"{block.name}: 光の輪がにじむほど明るい");
+                Assert.That(material.GetFloat("_ImpactSeconds"), Is.LessThanOrEqualTo(0.5f));
+                Assert.That(material.GetFloat("_ImpactSpeed") * material.GetFloat("_ImpactSeconds"), Is.LessThan(3.5f), "光の輪が広がりすぎる");
+            }
+        }
+
+        [Test]
+        public void Athletic_GimmicksAnchorsAndRims_MatchThePlatforms()
+        {
+            // ギミックも足場と同じ質感に（2026-11-17 の要望）。
+            Scene scene = Open(AthleticPath);
+            foreach (StageZoneView view in InScene<StageZoneView>(scene))
+            {
+                var line = (Material)new SerializedObject(view).FindProperty("_lineMaterial").objectReferenceValue;
+                Assert.That(line.shader.name, Is.EqualTo("Airerage/GlowLine"), $"{view.name}: 線が光る線でない");
+                var zone = view.GetComponent<StageZoneAuthoring>();
+                Transform[] parts = view.GetComponentsInChildren<Transform>(true);
+                switch (zone.Kind)
+                {
+                    case StageZoneKind.JumpPad:
+                        Assert.That(parts.Any(t => t.name == "PadBase" && t.GetComponent<StageBlock>() != null), Is.True, $"{view.name}: 面取りした台がない");
+                        Assert.That(parts.Single(t => t.name == "PadGlow").GetComponent<Renderer>().sharedMaterial.shader.name, Is.EqualTo("Airerage/Emissive"));
+                        Assert.That(parts.Any(t => t.name == "Pad"), Is.False, "前の平らな台が残っている");
+                        break;
+                    case StageZoneKind.Updraft:
+                        Assert.That(parts.Single(t => t.name == "Column").GetComponent<Renderer>().sharedMaterial.shader.name, Is.EqualTo("Airerage/WindColumn"),
+                            $"{view.name}: 風が光の柱でない");
+                        break;
+                    case StageZoneKind.BoostRing:
+                        Assert.That(parts.Count(t => t.name == "Piece" && t.GetComponent<StageBlock>() != null), Is.GreaterThanOrEqualTo(12), $"{view.name}: 枠がない");
+                        break;
+                }
+                foreach (Collider collider in view.GetComponentsInChildren<Collider>(true))
+                {
+                    Assert.Fail($"{view.name}: ギミックの見た目に当たりがある: {collider.name}");
+                }
+            }
+            foreach (WireAnchorPoint anchor in InScene<WireAnchorPoint>(scene))
+            {
+                Assert.That(anchor.GetComponent<StageBlock>(), Is.Not.Null, $"{anchor.name}: アンカーが面取りした菱形でない");
+                Assert.That(anchor.transform.Find("Core"), Is.Not.Null, $"{anchor.name}: 光る芯がない");
+            }
+            AttachableGlow glow = InScene<AttachableGlow>(scene).Single();
+            Assert.That(glow.GetComponentsInChildren<Renderer>(true).Any(r => r.name == "Surface"), Is.False,
+                "刺さる足場の正面に薄いオレンジの板が残っている（暗い面が赤茶色に濁る）");
+            var rims = new SerializedObject(glow).FindProperty("_rims");
+            for (int i = 0; i < rims.arraySize; i++)
+            {
+                var rim = (Renderer)rims.GetArrayElementAtIndex(i).objectReferenceValue;
+                Assert.That(rim.sharedMaterial.shader.name, Is.EqualTo("Airerage/Emissive"), "オレンジの縁がにじまない");
+                if (rim.name == "TopRim")
+                {
+                    Assert.That(rim.transform.localScale.z, Is.LessThan(0.2f), "上の面をオレンジの板が覆っている（陰影が見えない）");
+                }
+            }
+        }
+
+        [Test]
+        public void CityNight_IsDressedForTheNight()
+        {
+            Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_CityNight.unity");
+            SceneManager.SetActiveScene(scene);
+            Assert.That(RenderSettings.skybox.shader.name, Is.EqualTo("Airerage/GradientSky"));
+            Assert.That(RenderSettings.skybox.GetFloat("_Stars"), Is.GreaterThan(0f), "夜空に星がない");
+            BoxCollider[] terrain = InScene<BoxCollider>(scene);
+            StageBlock[] blocks = scene.GetRootGameObjects().Single(g => g.name == "TerrainVisuals").GetComponentsInChildren<StageBlock>();
+            Assert.That(blocks.Length, Is.EqualTo(terrain.Length), "ビルの箱ごとに面取りした見た目がない");
+            Assert.That(scene.GetRootGameObjects().Any(g => g.name == "LightGrid"), Is.False, "下に道路のある街に光の格子がある");
+            Assert.That(InScene<Volume>(scene).Single().sharedProfile.TryGet(out Bloom _), Is.True);
+            Transform bounds = scene.GetRootGameObjects().Single(g => g.name == "KnockoutBounds").transform;
+            Assert.That(bounds.Find("Membranes").childCount, Is.EqualTo(4));
         }
 
         [Test]

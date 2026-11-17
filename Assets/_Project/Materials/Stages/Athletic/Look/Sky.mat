@@ -27,6 +27,7 @@ Material:
     m_Floats:
     - _HorizonHeight: -0.1
     - _HorizonSharpness: 9
+    - _Stars: 0
     - _SunGlow: 0.25
     - _SunSize: 2600
     - _Tense: 0

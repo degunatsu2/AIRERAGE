@@ -83,13 +83,13 @@ namespace Airerage.Editor
 
         /// <summary>
         /// ステージの見た目（D-97。背景とオブジェクトのクオリティアップ）を、試合のカメラ（距離 30m・画角 40°・後処理あり）でいくつかの所から撮る
-        /// （Logs/Snapshots/Look_シーン名_*.png）。撮るステージは環境変数 AIRERAGE_LOOK_STAGES（, 区切り。なければ Stage_Athletic）。
+        /// （Logs/Snapshots/Look_シーン名_*.png）。撮るステージは環境変数 AIRERAGE_LOOK_STAGES（, 区切り。なければ Stage_Athletic と Stage_CityNight）。
         /// </summary>
         public static void CaptureStageLooks()
         {
             Directory.CreateDirectory(OutputFolder);
             string names = Environment.GetEnvironmentVariable("AIRERAGE_LOOK_STAGES");
-            foreach (string name in string.IsNullOrEmpty(names) ? new[] { "Stage_Athletic" } : names.Split(','))
+            foreach (string name in string.IsNullOrEmpty(names) ? new[] { "Stage_Athletic", "Stage_CityNight" } : names.Split(','))
             {
                 string[] found = AssetDatabase.FindAssets($"{name} t:Scene");
                 if (found.Length == 0)
@@ -115,6 +115,10 @@ namespace Airerage.Editor
                         ("Top", new Vector3(6f, 22f, -30f), 40f),
                         ("Low", new Vector3(-6f, -14f, -30f), 40f),
                         ("Edge", new Vector3(48f, 4f, -30f), 40f),
+                        // 近くから（足場とギミックの質感）。
+                        ("DetailLeft", new Vector3(-21f, 9f, -14f), 40f),
+                        ("DetailCenter", new Vector3(-2f, 3f, -12f), 40f),
+                        ("DetailRing", new Vector3(-12f, 12f, -15f), 40f),
                     };
                     foreach (var shot in shots)
                     {

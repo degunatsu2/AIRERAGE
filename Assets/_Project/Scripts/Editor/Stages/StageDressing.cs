@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Airerage.Core.Simulation;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
 using UnityEditor;
@@ -15,14 +16,19 @@ namespace Airerage.Editor.Stages
     /// ステージの飾りつけを自動で行う（D-97 の V27。2026-11-17 のユーザーの決定: V1・V3・V7・V8・V10〜V15・V17〜V19・V21・V22。進め方は
     /// この自動化 → ATHLETIC で試作 → 全ステージ）。地形の当たりの箱（BoxCollider）はそのままにして見た目だけを差し替え、ほかの飾りには
     /// 当たりを付けない（地形として読み込まれるのは今までの箱だけ。遊びは変わらない）。色と強さはステージの台本（StageLook）から。
-    /// - 足場: 地形の箱の見た目を外し、同じ大きさの面取りした箱（StageBlock。V1）に。材質 Airerage/StageSurface（V3・V7・V8・V10・V22）。
-    ///   小さな浮いたワイヤーの刺さらない足場は、見た目だけゆっくり上下する（V21）。
-    /// - 光・空・霧（V11・V15）: グラデーションの空（Airerage/GradientSky）、環境光、遠くを空の色に溶かす霧。
-    /// - 遠景（V14・V17）: 近・中・遠の 3 層の影の形（塔・浮かぶ島）、塔の先の点滅する灯り、ゆっくり回る輪、横切る飛行船。
-    /// - 光の格子（V18）: 撃破の線のさらに下に広がる格子の板。
+    /// - 足場: 地形の箱の見た目を外し、同じ大きさの面取りした箱（StageBlock。V1）に。材質 Airerage/StageSurface（V3・V7・V8・V10・V22。
+    ///   つやと面取りの光で立体感を出す）。小さな浮いたワイヤーの刺さらない足場は、見た目だけゆっくり上下する（V21）。ワイヤーが刺さる
+    ///   足場のオレンジの縁は光る面にし、上の面を覆っていた板は正面の縁の細い帯にする（上の面の陰影を見せる）。
+    /// - ギミック（2026-11-17 の要望: 足場と同じ質感に）: ジャンプ台は面取りした台と光る板、加速リングは面取りした枠、看板は枠と光る面、
+    ///   通風口・加速の床は面取りした台、風は光の柱（Airerage/WindColumn）、線（矢印・筋・輪）は光る線（Airerage/GlowLine）。
+    ///   アンカーは面取りした菱形と光る芯。
+    /// - 光・空・霧（V11・V15）: グラデーションの空（Airerage/GradientSky。夜は星）、環境光、遠くを空の色に溶かす霧。
+    /// - 遠景（V14・V17）: 今の街（世界観は現代日本）。遠い列と中くらいの列のビルのかたまり、左右の近いビル、屋上の航空障害灯、
+    ///   運営の撮影の飛行船 1 隻（浮かぶ島などは置かない。2026-11-17 の要望）。
+    /// - 光の格子（V18）: 撃破の線のさらに下に広がる格子の板（下に道路のある街のステージには置かない）。
     /// - 撃破の線の膜（V19）: 撃破の範囲の 4 辺の外に光の膜（キャラクターが近いほど濃い）。今までの赤い枠の線は外す。
     /// - 仕上げの画面処理（V13）: 光る物だけのにじみ（ブルーム）、色の調整、画面の端を少し暗く（ステージの Volume）。
-    /// 光の柱（V12）は拠点の表示（BankView）、触れたときの輪（V22）とキャラクターの位置は SurfaceImpactFeed（試合のシーン）。
+    /// 光の柱（V12）と拠点の光る線は拠点の表示（BankView）、触れたときの輪（V22）とキャラクターの位置は SurfaceImpactFeed（試合のシーン）。
     /// </summary>
     internal static class StageDressing
     {
@@ -35,32 +41,74 @@ namespace Airerage.Editor.Stages
         // 撃破の線の膜の幅（m。線から外へ）。
         private const float MembraneWidth = 6f;
 
-        /// <summary>ステージのシーン（開いている）を look で飾る。地形・撃破の範囲を作った後に呼ぶ。</summary>
+        // ワイヤーが刺さる足場の上の面の、正面の縁の光る帯の奥行き（m）。
+        private const float TopRimDepth = 0.14f;
+
+        /// <summary>ステージのシーン（開いている）を look で飾る。地形・ギミック・撃破の範囲・飾りを作った後に呼ぶ。</summary>
         public static void Apply(StageLook look, Vector2 boundsMin, Vector2 boundsMax)
         {
-            string folder = $"{MaterialRoot}/{look.Id}/Look";
+            string folder = FolderOf(look);
             ApplyLighting(look, folder);
             DressTerrain(look, folder);
+            DressAttachableGlow(look, folder);
+            DressAnchors(look, folder);
+            DressGimmicks(look, folder);
             CreateMembranes(look, folder, boundsMin, boundsMax);
-            CreateGrid(look, folder, boundsMin);
+            if (look.Grid)
+            {
+                CreateGrid(look, folder, boundsMin);
+            }
             CreateBackdrop(look, folder, boundsMin);
             CreateVolume(look, folder);
+        }
+
+        /// <summary>材質を置くフォルダ。</summary>
+        public static string FolderOf(StageLook look)
+        {
+            return $"{MaterialRoot}/{look.Id}/Look";
         }
 
         /// <summary>足場の材質（ワイヤーが刺さるか）。</summary>
         public static Material BlockMaterial(StageLook look, string folder, bool attachable)
         {
-            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(attachable ? "BlockAttachable" : "Block", "Airerage/StageSurface", m =>
+            return SurfaceMaterial(attachable ? "BlockAttachable" : "Block", look, folder, attachable ? look.AttachableSide : look.BlockSide,
+                attachable ? look.AttachableTop : look.BlockTop);
+        }
+
+        // 足場と同じ材質（面取りした箱に使う）。色だけを変える。
+        private static Material SurfaceMaterial(string name, StageLook look, string folder, Color side, Color top)
+        {
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/StageSurface", m =>
             {
-                m.SetColor("_BaseColor", attachable ? look.AttachableSide : look.BlockSide);
-                m.SetColor("_TopColor", attachable ? look.AttachableTop : look.BlockTop);
+                m.SetColor("_BaseColor", side);
+                m.SetColor("_TopColor", top);
                 m.SetColor("_ShadeColor", look.ShadeTint);
                 m.SetColor("_RimColor", look.RimColor);
                 m.SetFloat("_RimStrength", look.RimStrength);
                 m.SetFloat("_HeightLow", look.HeightLow);
                 m.SetFloat("_HeightHigh", look.HeightHigh);
+                m.SetFloat("_LocalGradient", look.LocalGradient);
+                m.SetFloat("_Occlusion", look.Occlusion);
+                m.SetFloat("_Ambient", look.Ambient);
+                m.SetFloat("_Specular", look.Specular);
+                m.SetFloat("_Shininess", 48f);
+                m.SetFloat("_EdgeGlint", look.EdgeGlint);
                 m.SetColor("_TrimColor", look.TrimColor);
+                // 触れたときの光の輪はかなり控えめに（2026-11-17 のユーザーの要望）: 暗い色・細い輪・短い時間・小さな広がり（約 2.7m）。
                 m.SetColor("_ImpactColor", look.ImpactColor);
+                m.SetFloat("_ImpactSpeed", 6f);
+                m.SetFloat("_ImpactSeconds", 0.45f);
+                m.SetFloat("_ImpactWidth", 0.16f);
+            }, folder);
+        }
+
+        private static Material EmissiveMaterial(string name, Color color, float intensity, string folder)
+        {
+            color.a = 1f;
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", color);
+                m.SetFloat("_Intensity", intensity);
             }, folder);
         }
 
@@ -86,7 +134,8 @@ namespace Airerage.Editor.Stages
                 m.SetVector("_SunDirection", look.SunDirection);
                 m.SetFloat("_SunSize", 2600f);
                 m.SetFloat("_SunGlow", 0.25f);
-                // 地平線のもやは目の高さより下へ（足場の後ろは青い空にして、白い上の面が溶けないように）。
+                m.SetFloat("_Stars", look.Stars);
+                // 地平線のもやは目の高さより下へ（足場の後ろは空の色にして、上の面が溶けないように）。
                 m.SetFloat("_HorizonHeight", look.HorizonHeight);
             }, folder);
             RenderSettings.skybox = sky;
@@ -141,6 +190,248 @@ namespace Airerage.Editor.Stages
             }
         }
 
+        // ワイヤーが刺さる足場のオレンジの縁（AttachableGlow）: 縁を光る面に（にじむ）、上の面を覆っていた板は正面の縁の細い帯に、
+        // 正面に重ねた薄いオレンジの板は外す、縁を回る光の粒は光る線に。
+        private static void DressAttachableGlow(StageLook look, string folder)
+        {
+            AttachableGlow glow = Object.FindFirstObjectByType<AttachableGlow>();
+            if (glow == null)
+            {
+                return;
+            }
+            Material rim = EmissiveMaterial("AttachableRim", SandboxWireSceneBuilder.AttachableGlowColor, look.AttachableRimIntensity, folder);
+            Material line = GlowLineMaterial(look, folder);
+            var serialized = new SerializedObject(glow);
+            SerializedProperty rims = serialized.FindProperty("_rims");
+            for (int i = 0; i < rims.arraySize; i++)
+            {
+                var renderer = (Renderer)rims.GetArrayElementAtIndex(i).objectReferenceValue;
+                if (renderer == null)
+                {
+                    continue;
+                }
+                renderer.sharedMaterial = rim;
+                if (renderer.name == "TopRim")
+                {
+                    Transform t = renderer.transform;
+                    Vector3 scale = t.localScale;
+                    float depth = scale.z / 0.98f;
+                    t.localScale = new Vector3(scale.x, scale.y, TopRimDepth);
+                    t.localPosition = new Vector3(t.localPosition.x, t.localPosition.y, -depth * 0.5f + TopRimDepth * 0.5f);
+                }
+            }
+            // 正面に重ねた薄いオレンジの板は外す（描画は光の量に比例する空間で重ねるので、暗い面ではごく薄くしても赤茶色に濁り、正面の
+            // 陰影が見えなくなった。刺さる足場は、にじむオレンジの縁と上の縁の帯、縁を回る光の粒で見分けられる）。
+            var surfaces = new List<GameObject>();
+            foreach (Renderer renderer in glow.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer.name == "Surface")
+                {
+                    surfaces.Add(renderer.gameObject);
+                }
+            }
+            foreach (GameObject surface in surfaces)
+            {
+                Object.DestroyImmediate(surface);
+            }
+            SerializedProperty sparks = serialized.FindProperty("_sparks");
+            for (int i = 0; i < sparks.arraySize; i++)
+            {
+                var spark = (LineRenderer)sparks.GetArrayElementAtIndex(i).objectReferenceValue;
+                if (spark != null)
+                {
+                    spark.sharedMaterial = line;
+                }
+            }
+        }
+
+        // アンカー: 面取りした菱形（金色）と、正面の光る芯。大きいアンカーの菱形も同じ材質に。
+        private static void DressAnchors(StageLook look, string folder)
+        {
+            Material body = SurfaceMaterial("AnchorBlock", look, folder, look.AnchorSide, look.AnchorTop);
+            Material core = EmissiveMaterial("AnchorCore", look.AnchorCore, look.GlowIntensity * 0.8f, folder);
+            foreach (WireAnchorPoint anchor in Object.FindObjectsByType<WireAnchorPoint>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                Transform target = anchor.GetComponent<MeshRenderer>() != null ? anchor.transform : anchor.transform.Find("Diamond");
+                if (target == null || target.GetComponent<MeshRenderer>() == null)
+                {
+                    continue;
+                }
+                Vector3 size = target.localScale;
+                target.localScale = Vector3.one;
+                target.GetComponent<MeshRenderer>().sharedMaterial = body;
+                target.gameObject.AddComponent<StageBlock>().Configure(size, Mathf.Min(size.x, size.y) * 0.18f, 0f, true, 0f, 4f);
+                GameObject glow = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Cube, "Core", core,
+                    new Vector3(size.x * 0.42f, size.y * 0.42f, 0.04f));
+                glow.transform.SetParent(target, false);
+                glow.transform.localPosition = new Vector3(0f, 0f, -size.z * 0.5f - 0.03f);
+                NoShadows(glow);
+            }
+        }
+
+        // ギミックの見た目を足場と同じ質感に（2026-11-17 の要望）。ギミックの範囲と効き方（StageZoneAuthoring）は変えない。
+        private static void DressGimmicks(StageLook look, string folder)
+        {
+            Material line = GlowLineMaterial(look, folder);
+            Material frame = SurfaceMaterial("GimmickFrame", look, folder, look.GimmickSide, look.GimmickTop);
+            Material wind = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("Wind", "Airerage/WindColumn", m =>
+            {
+                m.SetColor("_Color", look.WindColor);
+            }, folder);
+            foreach (StageZoneView view in Object.FindObjectsByType<StageZoneView>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var serialized = new SerializedObject(view);
+                serialized.FindProperty("_lineMaterial").objectReferenceValue = line;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                var zone = view.GetComponent<StageZoneAuthoring>();
+                var lookProperty = serialized.FindProperty("_look");
+                if (zone == null || (lookProperty != null && lookProperty.enumValueIndex != (int)StageZoneView.ZoneLook.Default))
+                {
+                    continue;
+                }
+                Color color = serialized.FindProperty("_color").colorValue;
+                switch (zone.Kind)
+                {
+                    case StageZoneKind.JumpPad:
+                        DressPad(view.transform, zone, frame, EmissiveMaterial("Glow" + Hex(color), color, look.GlowIntensity, folder));
+                        break;
+                    case StageZoneKind.Updraft:
+                    case StageZoneKind.Gust:
+                        DressWind(view.transform, zone, wind);
+                        break;
+                    case StageZoneKind.BoostRing:
+                        DressRing(view.transform, zone, frame, EmissiveMaterial("Glow" + Hex(color), color, look.GlowIntensity, folder));
+                        break;
+                    case StageZoneKind.Bumper:
+                        DressSign(view.transform, zone, frame, EmissiveMaterial("Glow" + Hex(color), color, look.GlowIntensity * 0.75f, folder));
+                        break;
+                    case StageZoneKind.SpeedLane:
+                        ToBlock(Find(view.transform, "Lane"), frame, 0.04f);
+                        break;
+                    case StageZoneKind.Launcher:
+                        ToBlock(Find(view.transform, "Vent"), frame, 0.08f);
+                        break;
+                }
+            }
+        }
+
+        // ジャンプ台: 床に置いた面取りした台と、その上の光る板（色はギミックの色）。
+        private static void DressPad(Transform root, StageZoneAuthoring zone, Material frame, Material glow)
+        {
+            Transform pad = Find(root, "Pad");
+            if (pad == null)
+            {
+                return;
+            }
+            Transform parent = pad.parent;
+            Object.DestroyImmediate(pad.gameObject);
+            float floor = -zone.Size.y * 0.5f;
+            var baseBlock = new GameObject("PadBase", typeof(MeshFilter), typeof(MeshRenderer));
+            baseBlock.transform.SetParent(parent, false);
+            baseBlock.transform.localPosition = new Vector3(0f, floor + 0.13f, 0f);
+            baseBlock.GetComponent<MeshRenderer>().sharedMaterial = frame;
+            baseBlock.AddComponent<StageBlock>().Configure(new Vector3(zone.Size.x + 0.5f, 0.26f, 2f), 0.08f, 0f, true, 0f, 4f);
+            GameObject plate = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Cube, "PadGlow", glow, new Vector3(zone.Size.x, 0.05f, 1.5f));
+            plate.transform.SetParent(parent, false);
+            plate.transform.localPosition = new Vector3(0f, floor + 0.285f, 0f);
+            NoShadows(plate);
+        }
+
+        // 風: 平らな薄い色の板を、両脇と両端がやわらかく消える光の柱に。板の上の向き（uv.y）を風の向きに回す。
+        private static void DressWind(Transform root, StageZoneAuthoring zone, Material wind)
+        {
+            Transform column = Find(root, "Column");
+            if (column == null)
+            {
+                return;
+            }
+            Vector2 direction = zone.Kind == StageZoneKind.Updraft || zone.Direction == Vector2.zero ? Vector2.up : zone.Direction.normalized;
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+            bool sideways = Mathf.Abs(direction.x) > Mathf.Abs(direction.y);
+            column.localScale = sideways ? new Vector3(zone.Size.y, zone.Size.x, 1f) : new Vector3(zone.Size.x, zone.Size.y, 1f);
+            column.localRotation = Quaternion.Euler(0f, 0f, angle);
+            column.GetComponent<Renderer>().sharedMaterial = wind;
+        }
+
+        // 加速リング: 輪の外に面取りした短い箱を並べた枠と、上下左右の光る節（輪の線は StageZoneView が光る線で描く）。
+        private static void DressRing(Transform root, StageZoneAuthoring zone, Material frame, Material glow)
+        {
+            var ring = new GameObject("RingFrame").transform;
+            ring.SetParent(root, false);
+            const int Pieces = 18;
+            float rx = zone.Size.x * 0.5f + 0.18f;
+            float ry = zone.Size.y * 0.5f + 0.18f;
+            for (int i = 0; i < Pieces; i++)
+            {
+                float a0 = i * Mathf.PI * 2f / Pieces;
+                float a1 = (i + 1) * Mathf.PI * 2f / Pieces;
+                var p0 = new Vector2(Mathf.Cos(a0) * rx, Mathf.Sin(a0) * ry);
+                var p1 = new Vector2(Mathf.Cos(a1) * rx, Mathf.Sin(a1) * ry);
+                Vector2 mid = (p0 + p1) * 0.5f;
+                Vector2 along = p1 - p0;
+                var piece = new GameObject("Piece", typeof(MeshFilter), typeof(MeshRenderer));
+                piece.transform.SetParent(ring, false);
+                piece.transform.localPosition = new Vector3(mid.x, mid.y, 0f);
+                piece.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg);
+                piece.GetComponent<MeshRenderer>().sharedMaterial = frame;
+                piece.AddComponent<StageBlock>().Configure(new Vector3(along.magnitude * 1.14f, 0.22f, 0.5f), 0.06f, 0f, true, 0f, 4f);
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                float a = i * Mathf.PI * 0.5f;
+                GameObject node = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Cube, "Node", glow, new Vector3(0.26f, 0.26f, 0.56f));
+                node.transform.SetParent(ring, false);
+                node.transform.localPosition = new Vector3(Mathf.Cos(a) * rx, Mathf.Sin(a) * ry, 0f);
+                node.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+                NoShadows(node);
+            }
+        }
+
+        // 看板（バンパー）: 面取りした枠と、正面の光る面（ネオン）。丸い物（噴石など）は光る面だけ。
+        private static void DressSign(Transform root, StageZoneAuthoring zone, Material frame, Material glow)
+        {
+            Transform body = Find(root, "Body");
+            if (body == null)
+            {
+                return;
+            }
+            body.GetComponent<Renderer>().sharedMaterial = glow;
+            if (Mathf.Approximately(zone.Size.x, zone.Size.y))
+            {
+                return;
+            }
+            Vector3 size = body.localScale;
+            body.localScale = new Vector3(size.x, size.y, 0.25f);
+            body.localPosition = new Vector3(body.localPosition.x, body.localPosition.y, -0.42f);
+            var back = new GameObject("SignFrame", typeof(MeshFilter), typeof(MeshRenderer));
+            back.transform.SetParent(body.parent, false);
+            back.transform.localPosition = new Vector3(body.localPosition.x, body.localPosition.y, 0.1f);
+            back.GetComponent<MeshRenderer>().sharedMaterial = frame;
+            back.AddComponent<StageBlock>().Configure(new Vector3(size.x + 0.3f, size.y + 0.3f, 0.8f), 0.1f, 0f, true, 0f, 4f);
+        }
+
+        // 箱の見た目を、同じ大きさの面取りした箱に（大きさは変形の大きさから。変形は 1 倍に戻す）。
+        private static void ToBlock(Transform box, Material material, float bevel)
+        {
+            if (box == null || box.GetComponent<MeshFilter>() == null)
+            {
+                return;
+            }
+            Vector3 size = box.localScale;
+            box.localScale = Vector3.one;
+            box.GetComponent<MeshRenderer>().sharedMaterial = material;
+            box.gameObject.AddComponent<StageBlock>().Configure(size, bevel, 0f, true, 0f, 4f);
+        }
+
+        private static Material GlowLineMaterial(StageLook look, string folder)
+        {
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("GlowLine", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", look.GlowIntensity);
+                m.SetFloat("_Core", 0.6f);
+            }, folder);
+        }
+
         // 撃破の範囲の 4 辺の外の光の膜（V19）。今までの赤い枠の線（KnockoutBounds の Frame）は外す。
         private static void CreateMembranes(StageLook look, string folder, Vector2 min, Vector2 max)
         {
@@ -192,20 +483,42 @@ namespace Airerage.Editor.Stages
             NoShadows(grid);
         }
 
-        // 遠景（V14・V17）: 遠い塔の並び、中くらいの距離の浮かぶ島（塔・灯り・回る輪）、近くの柱（遊ぶ所の真後ろは空ける）、横切る飛行船。
+        // 遠景（V14・V17）: 今の街（世界観は現代日本）。遠い列・中くらいの列のビルのかたまり（真ん中ほど低く、外ほど高い）、左右の近いビル、
+        // 屋上の航空障害灯（赤く点滅）、運営の撮影の飛行船 1 隻。遊ぶ所の真後ろと下は空ける。
         private static void CreateBackdrop(StageLook look, string folder, Vector2 boundsMin)
         {
             float hazeTop = boundsMin.y - 8f;
-            Material far = BackdropMaterial("BackdropFar", look.FarColor, look, folder, hazeTop, 0f);
-            Material mid = BackdropMaterial("BackdropMid", look.MidColor, look, folder, hazeTop, 0f);
-            Material near = BackdropMaterial("BackdropNear", look.NearColor, look, folder, hazeTop, 0f);
-            Material beacon = BackdropMaterial("BackdropBeacon", look.BeaconColor, look, folder, hazeTop, 1.1f);
+            Material far = BackdropMaterial("BackdropFar", look.FarColor, look, folder, hazeTop, 0f, true);
+            Material mid = BackdropMaterial("BackdropMid", look.MidColor, look, folder, hazeTop, 0f, true);
+            Material near = BackdropMaterial("BackdropNear", look.NearColor, look, folder, hazeTop, 0f, true);
+            Material beacon = BackdropMaterial("BackdropBeacon", look.BeaconColor, look, folder, hazeTop, 0.5f, false);
+            Material ship = BackdropMaterial("BackdropAirship", look.AirshipColor, look, folder, hazeTop, 0f, false);
             var random = new Random(look.Seed + 1);
             var root = new GameObject("Backdrop").transform;
 
-            // 遠い層: 下のもやから立つ塔の並び（段のある頭）。
-            Transform farRoot = Child(root, "Far");
-            // 塔はかたまりで置き、かたまりの間をあける（等間隔に並べると単調になる）。
+            Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f);
+            Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f);
+
+            // 近い列: 左右の外側だけに大きなビル（遊ぶ所の真後ろを空けて、足場と見分けやすく）。
+            Transform nearRoot = Child(root, "Near");
+            float[] nearX = { -230f, -165f, -110f, 110f, 165f, 230f };
+            for (int i = 0; i < nearX.Length; i++)
+            {
+                float z = Range(random, 90f, 125f);
+                float top = Range(random, -40f, 15f);
+                Building(nearRoot, near, beacon, new Vector3(nearX[i] + Range(random, -8f, 8f), top, z), Range(random, 12f, 20f), top + 220f, random, 0.7f);
+            }
+            // 遊ぶ所の下には何も置かない（下に床があるように見えないように。落ちたら撃破）。
+
+            // 運営の撮影の飛行船（1 隻。V17。2026-11-17 の要望）。
+            GameObject airship = Airship(Child(root, "Airships"), ship, beacon, new Vector3(-420f, 62f, 270f), 46f);
+            airship.AddComponent<BackdropMotion>().ConfigureDrift(new Vector3(4.5f, 0f, 0f), -720f, 720f);
+        }
+
+        // ビルの列: かたまりで置き、かたまりの間をあける（等間隔に並べると単調になる）。真ん中ほど低く、外ほど高く、ときどき高いビル。
+        private static void Skyline(Transform parent, Material body, Material beacon, Random random, float zMin, float zMax, float lowTop, float highTop,
+            float sideRise, float beaconChance)
+        {
             float cursor = -800f;
             while (cursor < 800f)
             {
@@ -214,60 +527,74 @@ namespace Airerage.Editor.Stages
                 {
                     float width = Range(random, 10f, 34f);
                     float x = cursor + width * 0.5f;
-                    float z = Range(random, 440f, 580f);
-                    // 真ん中（遊ぶ所の後ろ）ほど低く、外ほど高い（地平線の近くに沈めて、足場の後ろをすっきりさせる）。ときどき高い塔。
                     float side = Mathf.Clamp01(Mathf.Abs(x) / 600f);
-                    float top = Range(random, -25f, 15f) + side * Range(random, 10f, 60f);
-                    if (random.NextDouble() < 0.12 + side * 0.2)
+                    float top = Range(random, lowTop, highTop) + side * Range(random, 10f, sideRise);
+                    if (random.NextDouble() < 0.1 + side * 0.2)
                     {
                         top += Range(random, 40f, 90f);
                     }
-                    Tower(farRoot, far, beacon, new Vector3(x, top, z), width, top + 260f, random, beaconChance: 0.35f);
+                    Building(parent, body, beacon, new Vector3(x, top, Range(random, zMin, zMax)), width, top + 260f, random, beaconChance);
                     cursor += width + Range(random, 2f, 8f);
                 }
                 cursor += Range(random, 30f, 90f);
             }
+        }
 
-            // 中くらいの層: 浮かぶ島（板と、上の塔、下の段々の底）。いくつかの塔の先に回る輪。
-            Transform midRoot = Child(root, "Mid");
-            for (int i = 0; i < 8; i++)
+        // ビル: 下から top まで伸びる箱に、屋上の形を 1 つ（段の付いた頭・ヘリポートの平たい台・アンテナ・何もなし）。
+        // 高いビルの屋上には赤い航空障害灯。
+        private static void Building(Transform parent, Material body, Material beacon, Vector3 topCenter, float width, float height, Random random,
+            float beaconChance)
+        {
+            var building = new GameObject("Building").transform;
+            building.SetParent(parent, false);
+            building.position = topCenter;
+            float depth = width * Range(random, 0.6f, 1.1f);
+            Box(building, "Body", body, new Vector3(0f, -height * 0.5f, 0f), new Vector3(width, height, depth));
+            float roof = 0f;
+            int kind = random.Next(0, 4);
+            if (kind == 0)
             {
-                // 左右の外側か高い所だけに置く（遊ぶ所の後ろに平たい板が重なると、足場と見分けにくい）。
-                bool high = i == 3 || i == 4;
-                float x = high ? (i == 3 ? -1f : 1f) * Range(random, 60f, 110f) : (i < 4 ? -1f : 1f) * Range(random, 170f, 480f);
-                float y = high ? Range(random, 70f, 95f) : Range(random, 5f, 55f);
-                float z = Range(random, 280f, 360f);
-                FloatingIsland(midRoot, mid, beacon, new Vector3(x, y, z), random, ring: i == 1 || i == 6);
+                float capHeight = Range(random, 4f, 14f);
+                Box(building, "Setback", body, new Vector3(0f, capHeight * 0.5f, 0f), new Vector3(width * Range(random, 0.5f, 0.75f), capHeight, depth * 0.7f));
+                roof = capHeight;
             }
-
-            // 近い層: 左右の外側と下だけに、大きな柱と浮かぶ板（遊ぶ所の真後ろを空けて、足場と見分けやすく）。
-            Transform nearRoot = Child(root, "Near");
-            float[] nearX = { -230f, -165f, -110f, 110f, 165f, 230f };
-            for (int i = 0; i < nearX.Length; i++)
+            else if (kind == 1)
             {
-                float z = Range(random, 90f, 125f);
-                float top = Range(random, -40f, 15f);
-                Tower(nearRoot, near, beacon, new Vector3(nearX[i] + Range(random, -8f, 8f), top, z), Range(random, 10f, 18f), top + 220f, random,
-                    beaconChance: 0.6f);
+                Box(building, "Helipad", body, new Vector3(0f, 0.8f, 0f), new Vector3(width * 0.8f, 1.6f, depth * 0.8f));
+                roof = 1.6f;
             }
-            // 遊ぶ所の下には何も置かない（下に床があるように見えないように。落ちたら撃破）。
-
-            // 横切る飛行船（V17）。
-            Transform ships = Child(root, "Airships");
-            for (int i = 0; i < 3; i++)
+            else if (kind == 2)
             {
-                var ship = Airship(ships, far, beacon, new Vector3(-600f + i * 420f, Range(random, 50f, 95f), Range(random, 300f, 380f)),
-                    Range(random, 34f, 52f));
-                float speed = Range(random, 4f, 8f) * (i % 2 == 0 ? 1f : -1f);
-                ship.AddComponent<BackdropMotion>().ConfigureDrift(new Vector3(speed, 0f, 0f), -760f, 760f);
-                if (speed < 0f)
-                {
-                    ship.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
-                }
+                float mast = Range(random, 8f, 20f);
+                Box(building, "Antenna", body, new Vector3(width * 0.2f, mast * 0.5f, 0f), new Vector3(0.8f, mast, 0.8f));
+                roof = mast;
+            }
+            if (random.NextDouble() < beaconChance)
+            {
+                Box(building, "Beacon", beacon, new Vector3(kind == 2 ? width * 0.2f : 0f, roof + 0.9f, 0f), new Vector3(1.6f, 1.6f, 1.6f));
             }
         }
 
-        private static Material BackdropMaterial(string name, Color color, StageLook look, string folder, float hazeTop, float blink)
+        // 飛行船（運営の撮影）: 細長い胴、先の丸み、尾のひれ、撮影のゴンドラとカメラ、腹の赤い灯り（右向き）。
+        private static GameObject Airship(Transform parent, Material body, Material beacon, Vector3 position, float length)
+        {
+            var ship = new GameObject("Airship");
+            ship.transform.SetParent(parent, false);
+            ship.transform.position = position;
+            float girth = length * 0.2f;
+            GameObject hull = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Capsule, "Hull", body, new Vector3(girth, length * 0.5f, girth));
+            hull.transform.SetParent(ship.transform, false);
+            hull.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            NoShadows(hull);
+            Box(ship.transform, "FinTop", body, new Vector3(-length * 0.42f, girth * 0.55f, 0f), new Vector3(length * 0.12f, girth * 0.7f, 0.5f));
+            Box(ship.transform, "FinSide", body, new Vector3(-length * 0.42f, 0f, 0f), new Vector3(length * 0.12f, 0.5f, girth * 1.4f));
+            Box(ship.transform, "Gondola", body, new Vector3(length * 0.06f, -girth * 0.62f, 0f), new Vector3(length * 0.22f, girth * 0.28f, girth * 0.36f));
+            Box(ship.transform, "Camera", body, new Vector3(length * 0.16f, -girth * 0.86f, 0f), new Vector3(girth * 0.2f, girth * 0.2f, girth * 0.2f));
+            Box(ship.transform, "Light", beacon, new Vector3(-length * 0.04f, -girth * 0.78f, 0f), new Vector3(0.9f, 0.9f, 0.9f));
+            return ship;
+        }
+
+        private static Material BackdropMaterial(string name, Color color, StageLook look, string folder, float hazeTop, float blink, bool bands)
         {
             return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/StageBackdrop", m =>
             {
@@ -276,91 +603,11 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_HazeTop", hazeTop);
                 m.SetFloat("_HazeBottom", hazeTop - 150f);
                 m.SetFloat("_Blink", blink);
-                m.SetFloat("_BandSpacing", 9f);
-                m.SetFloat("_BandStrength", blink > 0f ? 0f : 0.07f);
+                m.SetFloat("_BandSpacing", 4.5f);
+                m.SetFloat("_BandStrength", bands ? look.BandStrength : 0f);
+                m.SetColor("_BandColor", look.BandColor);
+                m.SetFloat("_BandFill", bands ? look.BandFill : 0f);
             }, folder);
-        }
-
-        // 塔: 下から top まで伸びる箱と、少し細い頭の段。先に灯りを付けることがある。
-        private static void Tower(Transform parent, Material body, Material beacon, Vector3 topCenter, float width, float height, Random random,
-            float beaconChance)
-        {
-            var tower = new GameObject("Tower").transform;
-            tower.SetParent(parent, false);
-            tower.position = topCenter;
-            float depth = width * Range(random, 0.6f, 1.1f);
-            Box(tower, "Body", body, new Vector3(0f, -height * 0.5f, 0f), new Vector3(width, height, depth));
-            float capHeight = Range(random, 4f, 14f);
-            float capWidth = width * Range(random, 0.45f, 0.75f);
-            Box(tower, "Cap", body, new Vector3(0f, capHeight * 0.5f, 0f), new Vector3(capWidth, capHeight, depth * 0.7f));
-            if (random.NextDouble() < beaconChance)
-            {
-                Box(tower, "Beacon", beacon, new Vector3(0f, capHeight + 1.2f, 0f), new Vector3(1.8f, 1.8f, 1.8f));
-            }
-        }
-
-        // 浮かぶ島: 板の上に塔、下に段々の底。ring なら一番高い塔の先に、ゆっくり回る輪。
-        private static void FloatingIsland(Transform parent, Material body, Material beacon, Vector3 center, Random random, bool ring)
-        {
-            var island = new GameObject("Island").transform;
-            island.SetParent(parent, false);
-            island.position = center;
-            float width = Range(random, 34f, 70f);
-            float depth = Range(random, 16f, 26f);
-            Box(island, "Slab", body, Vector3.zero, new Vector3(width, 6f, depth));
-            Box(island, "Keel", body, new Vector3(0f, -6f, 0f), new Vector3(width * 0.62f, 6f, depth * 0.7f));
-            Box(island, "KeelTip", body, new Vector3(0f, -11f, 0f), new Vector3(width * 0.28f, 4f, depth * 0.4f));
-            int towers = random.Next(1, 4);
-            float tallest = 0f;
-            float tallestX = 0f;
-            for (int t = 0; t < towers; t++)
-            {
-                float x = Range(random, -width * 0.35f, width * 0.35f);
-                float h = Range(random, 10f, 38f);
-                float w = Range(random, 4f, 10f);
-                Box(island, "Tower", body, new Vector3(x, 3f + h * 0.5f, Range(random, -3f, 3f)), new Vector3(w, h, w));
-                if (h > tallest)
-                {
-                    tallest = h;
-                    tallestX = x;
-                }
-            }
-            Box(island, "Beacon", beacon, new Vector3(tallestX, 3f + tallest + 1f, 0f), new Vector3(1.4f, 1.4f, 1.4f));
-            if (ring)
-            {
-                var spinner = new GameObject("Ring").transform;
-                spinner.SetParent(island, false);
-                spinner.localPosition = new Vector3(tallestX, 3f + tallest * 0.75f, 0f);
-                const int Pieces = 14;
-                float radius = Range(random, 7f, 11f);
-                for (int p = 0; p < Pieces; p++)
-                {
-                    float angle = p * 360f / Pieces;
-                    GameObject piece = Box(spinner, "Piece", body, Quaternion.Euler(0f, angle, 0f) * new Vector3(radius, 0f, 0f),
-                        new Vector3(0.9f, 0.9f, radius * 2f * Mathf.PI / Pieces * 1.05f));
-                    piece.transform.localRotation = Quaternion.Euler(0f, angle, 0f);
-                }
-                spinner.localRotation = Quaternion.Euler(Range(random, -20f, 20f), 0f, Range(random, -12f, 12f));
-                spinner.gameObject.AddComponent<BackdropMotion>().ConfigureSpin(Vector3.up, Range(random, 8f, 16f));
-            }
-        }
-
-        // 飛行船: 細長い胴、先の丸み、尾のひれ、腹の灯り（右向き）。
-        private static GameObject Airship(Transform parent, Material body, Material beacon, Vector3 position, float length)
-        {
-            var ship = new GameObject("Airship");
-            ship.transform.SetParent(parent, false);
-            ship.transform.position = position;
-            float girth = length * 0.16f;
-            Box(ship.transform, "Hull", body, Vector3.zero, new Vector3(length, girth, girth * 1.1f));
-            GameObject nose = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Sphere, "Nose", body, new Vector3(girth * 1.4f, girth, girth * 1.1f));
-            nose.transform.SetParent(ship.transform, false);
-            nose.transform.localPosition = new Vector3(length * 0.5f, 0f, 0f);
-            NoShadows(nose);
-            Box(ship.transform, "Fin", body, new Vector3(-length * 0.46f, girth * 0.7f, 0f), new Vector3(length * 0.12f, girth * 0.9f, 0.6f));
-            Box(ship.transform, "Gondola", body, new Vector3(length * 0.08f, -girth * 0.65f, 0f), new Vector3(length * 0.3f, girth * 0.35f, girth * 0.5f));
-            Box(ship.transform, "Light", beacon, new Vector3(length * 0.08f, -girth * 0.9f, 0f), new Vector3(length * 0.26f, 0.5f, 0.6f));
-            return ship;
         }
 
         // 仕上げの画面処理（V13）: ステージの Volume（どこでも効く）。設定はステージのフォルダのアセット（作り直しても GUID を保つ）。
@@ -405,6 +652,24 @@ namespace Airerage.Editor.Stages
             component.name = typeof(T).Name;
             AssetDatabase.AddObjectToAsset(component, profile);
             return component;
+        }
+
+        // root の子孫から名前で探す（なければ null）。
+        private static Transform Find(Transform root, string name)
+        {
+            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name == name)
+                {
+                    return t;
+                }
+            }
+            return null;
+        }
+
+        private static string Hex(Color color)
+        {
+            return ColorUtility.ToHtmlStringRGB(color);
         }
 
         private static Transform Child(Transform parent, string name)

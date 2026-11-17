@@ -1050,7 +1050,12 @@ namespace Airerage.Editor
         /// <summary>拠点の表示（BankView。試合の仕組みのシーンに置く）。</summary>
         internal static void CreateBankView(MonoBehaviour source, GameAudio audio, EdgeGuideLayer guides)
         {
-            var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            // 輪・弧・柱の線は光る線（幅の真ん中ほど明るく、にじむ。D-97。2026-11-17 の要望: BANK も足場と同じ質感に）。
+            Material material = LoadOrCreateShaderMaterial("GlowLine", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", 2f);
+                m.SetFloat("_Core", 0.6f);
+            });
             var view = new GameObject("Bank").AddComponent<BankView>();
             SetReference(view, "_source", source);
             SetReference(view, "_camera", Object.FindFirstObjectByType<Camera>());

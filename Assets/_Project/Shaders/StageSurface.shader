@@ -6,7 +6,9 @@
 //   V11 色の台本: 色はステージごとの材質の値（StageLook）。影は灰色ではなく色をつける（_ShadeColor）。
 //   V3  光る線: ワイヤーが刺さらない足場の正面に、縁から少し内側の光る線（刺さる足場はオレンジの縁があるので付けない）。
 //   V21 足場の呼吸: 光る線をゆっくり明滅させる（箱ごとに位相をずらす）。
-//   V22 触れたときの反応: 着地・ワイヤーの接続の所から、光の輪が広がる（SurfaceImpactFeed が場所と時刻を渡す）。
+//   V22 触れたときの反応: 着地・ワイヤーの接続の所から、控えめな光の輪が広がる（SurfaceImpactFeed が場所と時刻を渡す）。
+// 立体感（2026-11-17 のユーザーの要望: 見本のページの光と影の質感に近づける）: 主の光と環境光の差を大きく（_Ambient）、上を向いた面と
+// 面取りの面につや（_Specular）、面取りの面が光を受けて縁が明るく光る（_EdgeGlint）、横の面の上下の明暗を強く。
 // 網の値: uv0 = 箱の中心からの位置（m。x, y）、uv1 = (横の半分の長さ, 縦の半分の長さ, 明滅の位相, 刺さる足場なら 1)。
 // 光は主の光と環境光だけ（追加の光は使わない）。影を受け、影を落とす。霧に溶ける。画面の陰（SSAO）のための DepthNormals も描く。
 Shader "Airerage/StageSurface"
@@ -23,14 +25,18 @@ Shader "Airerage/StageSurface"
         _HeightGradient ("World height gradient", Range(0, 1)) = 0.35
         _LocalGradient ("Per-block gradient", Range(0, 1)) = 0.45
         _Occlusion ("Bottom occlusion", Range(0, 1)) = 0.45
+        _Ambient ("Ambient strength", Range(0, 2)) = 0.75
+        _Specular ("Specular", Range(0, 2)) = 0.35
+        _Shininess ("Shininess", Range(2, 256)) = 48
+        _EdgeGlint ("Bevel edge glint", Range(0, 2)) = 0.55
         [HDR] _TrimColor ("Trim color", Color) = (0.9, 2.3, 2.6, 1)
         _TrimInset ("Trim inset (m)", Float) = 0.28
         _TrimWidth ("Trim width (m)", Float) = 0.07
         _TrimPulse ("Trim pulse", Range(0, 1)) = 0.3
-        [HDR] _ImpactColor ("Impact color", Color) = (1.2, 2.4, 2.8, 1)
-        _ImpactSpeed ("Impact ring speed (m/s)", Float) = 9
-        _ImpactSeconds ("Impact seconds", Float) = 0.8
-        _ImpactWidth ("Impact ring width (m)", Float) = 0.35
+        [HDR] _ImpactColor ("Impact color", Color) = (0.2, 0.4, 0.5, 1)
+        _ImpactSpeed ("Impact ring speed (m/s)", Float) = 6
+        _ImpactSeconds ("Impact seconds", Float) = 0.45
+        _ImpactWidth ("Impact ring width (m)", Float) = 0.16
     }
 
     SubShader
@@ -51,6 +57,10 @@ Shader "Airerage/StageSurface"
             half _HeightGradient;
             half _LocalGradient;
             half _Occlusion;
+            half _Ambient;
+            half _Specular;
+            half _Shininess;
+            half _EdgeGlint;
             half4 _TrimColor;
             float _TrimInset;
             float _TrimWidth;
@@ -167,7 +177,7 @@ Shader "Airerage/StageSurface"
                 // V7: 上を向いた面は明るい色。横の面は箱の下ほど暗く、ステージの高い所ほど明るい。
                 half up = saturate(n.y);
                 half3 albedo = lerp(_BaseColor.rgb, _TopColor.rgb, up * up);
-                albedo *= lerp(1.0 - _LocalGradient * 0.45, 1.0, localY);
+                albedo *= lerp(1.0 - _LocalGradient * 0.7, 1.0, localY * localY * (3.0 - 2.0 * localY));
                 albedo *= lerp(1.0 - _HeightGradient * 0.3, 1.0 + _HeightGradient * 0.12, worldY);
 
                 // V10: 箱の下の側と下を向いた面を暗くする。
@@ -177,15 +187,24 @@ Shader "Airerage/StageSurface"
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
                 half lambert = saturate(dot(n, mainLight.direction));
-                half3 direct = mainLight.color * (lambert * mainLight.shadowAttenuation);
-                // V11: 光の当たらない所は灰色ではなく、ステージの影の色に寄せる。
-                half3 ambient = SampleSH(n) * _ShadeColor.rgb;
+                half shadow = mainLight.shadowAttenuation;
+                half3 direct = mainLight.color * (lambert * shadow);
+                // V11: 光の当たらない所は灰色ではなく、ステージの影の色に寄せる。環境光は控えめにして、面ごとの明暗の差を出す。
+                half3 ambient = SampleSH(n) * _ShadeColor.rgb * _Ambient;
                 #if defined(_SCREEN_SPACE_OCCLUSION)
                     AmbientOcclusionFactor ao = GetScreenSpaceAmbientOcclusion(GetNormalizedScreenSpaceUV(input.positionCS));
                     ambient *= ao.indirectAmbientOcclusion;
                     direct *= ao.directAmbientOcclusion;
                 #endif
                 half3 color = albedo * (ambient + direct) * occlusion;
+
+                // つや: 光の反射の向きに近い面ほど明るい（上の面と面取りの面に光の筋が走る）。
+                half3 halfway = normalize(mainLight.direction + viewDir);
+                half gloss = pow(saturate(dot(n, halfway)), _Shininess) * _Specular * shadow;
+                // 面取りの面（軸の向きでない面）は、光を受けて縁が明るく光る。
+                half bevel = saturate((1.0 - max(abs(n.x), max(abs(n.y), abs(n.z)))) * 3.5);
+                half glint = bevel * _EdgeGlint * (0.35 + 0.65 * lambert * shadow);
+                color += mainLight.color * (gloss + glint) * occlusion;
 
                 // V8: 縁の光（視線とすれ違う面ほど強い）。
                 half fresnel = pow(1.0 - saturate(dot(n, viewDir)), 3.0);

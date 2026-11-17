@@ -25,13 +25,15 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _BandSpacing: 9
+    - _BandFill: 0
+    - _BandSpacing: 4.5
     - _BandStrength: 0.07
     - _Blink: 0
     - _HazeBottom: -180
     - _HazeTop: -30
     - _TopTint: 1.12
     m_Colors:
+    - _BandColor: {r: 1, g: 1, b: 1, a: 1}
     - _BaseColor: {r: 0.46, g: 0.58, b: 0.8, a: 1}
     - _HazeColor: {r: 0.7, g: 0.81, b: 0.94, a: 1}
   m_BuildTextureStacks: []
