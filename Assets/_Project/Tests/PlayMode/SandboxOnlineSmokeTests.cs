@@ -243,24 +243,28 @@ namespace Airerage.PlayMode.Tests
             runner.StartMatch();
 
             bool sawIntro = false;
-            bool sawOpening = false;
+            bool sawReady = false;
+            bool sawGo = false;
             bool sawTimer = false;
             bool sawFinish = false;
             float start = Time.time;
             while (!hud.ShowingResults && Time.time - start < 8f)
             {
                 sawIntro |= hud.ShowingIntro;
-                sawOpening |= hud.OpeningIntro;
+                sawReady |= hud.RoundCall == "READY";
+                sawGo |= hud.RoundCall == "GO!";
                 sawTimer |= hud.TimerText == "0:02" || hud.TimerText == "0:01";
                 sawFinish |= hud.CenterText == "FINISH!";
-                Assert.That(hud.CenterText, Is.Not.EqualTo("GO!").And.Not.EqualTo("1"), "カウントダウンの数字を出している（演出を変えた）");
+                Assert.That(hud.CenterText, Is.Not.EqualTo("1"), "カウントダウンの数字を出している（演出を変えた）");
                 yield return null;
             }
 
             Assert.That(runner.Session.World.Phase, Is.EqualTo(MatchPhase.Finished), "試合が終わらない");
             Assert.That(sawIntro, Is.True, "始まる前の演出（黒い帯と名前）が出ない");
             Assert.That(hud.PlatesShown, Is.EqualTo(1), "名前が滑り込まない");
-            Assert.That(sawOpening, Is.True, "始まったときに帯が開かない");
+            // 始まりの演出の最後のラウンドコール（D-98。2026-11-17）。
+            Assert.That(sawReady, Is.True, "READY を出さない");
+            Assert.That(sawGo, Is.True, "始まった瞬間に GO! を出さない");
             Assert.That(sawTimer, Is.True, "残り時間が出ない");
             Assert.That(sawFinish, Is.True, "FINISH! が出ない");
             Assert.That(hud.ShowingResults, Is.True, "結果が出ない");

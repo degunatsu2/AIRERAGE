@@ -13,4 +13,4 @@
 | Kenney City Kit (Commercial)（ビル街の近くの建物） | https://kenney.nl/assets/city-kit-commercial | Download（寄付の画面は Continue without donating） |
 | Kenney Modular Buildings（同上） | https://kenney.nl/assets/modular-buildings | 同じ |
 
-ファイルの名前は変えなくてよい。
+ファイルの名前は変えなくてよい。push のやり方（git が初めてでも分かる手順）は `docs/15_flow_plan.md` の 48 章の 3。

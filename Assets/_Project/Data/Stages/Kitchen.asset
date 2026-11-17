@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Kitchen
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: SWEET KITCHEN
+  _nameJa: "\u304A\u83D3\u5B50\u306E\u30AD\u30C3\u30C1\u30F3"
   _sceneName: Stage_Kitchen
   _description: The oven blasts fire every 40 seconds. Ride the roll cakes across
     the sky, and dive into the sink drain to be flushed up to the shelf.

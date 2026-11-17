@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Wharf
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: FROZEN WHARF
+  _nameJa: "\u51CD\u3066\u3064\u304F\u57E0\u982D"
   _sceneName: Stage_Wharf
   _description: Bollards to hook onto, a hollow red container carried every 20 seconds,
     a cold sea under the piers you can only float in for a while.

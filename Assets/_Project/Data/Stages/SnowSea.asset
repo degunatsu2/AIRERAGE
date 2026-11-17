@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: SnowSea
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: FROST COAST
+  _nameJa: "\u96EA\u539F\u3068\u6D77"
   _sceneName: Stage_SnowSea
   _description: Slippery ice floes on a freezing sea. Ski-jump off the ridge, ride
     the waves, hide from the blizzard.

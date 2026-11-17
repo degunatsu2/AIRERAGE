@@ -27,8 +27,11 @@ namespace Airerage.Core.Match
     [Serializable]
     public sealed class MatchRules
     {
-        /// <summary>始まる前のカウントダウン（ティック）。この間は入力を無視する。</summary>
-        public int CountdownTicks = 180;
+        /// <summary>
+        /// 始まる前のカウントダウン（ティック）。この間は入力を無視する。始まりの演出（空撮・ステージの名前と札・集中線とズーム・READY）の
+        /// 長さに合わせて 5 秒（3 秒から延ばした。2026-11-17 のユーザーの決定 D-98）。
+        /// </summary>
+        public int CountdownTicks = 300;
 
         /// <summary>試合の長さ（ティック。カウントダウンの後から数える）。0 なら時間の制限はない。</summary>
         public int DurationTicks = 10800;

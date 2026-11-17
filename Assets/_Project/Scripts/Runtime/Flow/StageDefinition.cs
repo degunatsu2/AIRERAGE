@@ -14,6 +14,8 @@ namespace Airerage.Runtime.Flow
     {
         [Tooltip("選択の画面に出す名前")]
         [SerializeField] private string _displayName = "STAGE";
+        [Tooltip("日本語の短い名前（試合の始まりの演出で、名前の下に小さく出す）")]
+        [SerializeField] private string _nameJa = string.Empty;
         [Tooltip("ステージのシーンの名前（ビルドの設定のシーンの一覧に入れる）")]
         [SerializeField] private string _sceneName = string.Empty;
         [Tooltip("選択の画面に出す説明（英語）")]
@@ -26,6 +28,7 @@ namespace Airerage.Runtime.Flow
         [SerializeField] private MusicCue _music;
 
         public string DisplayName => string.IsNullOrEmpty(_displayName) ? name : _displayName;
+        public string NameJa => _nameJa;
         public string SceneName => _sceneName;
         public string Description => _description;
         public string DescriptionJa => _descriptionJa;
@@ -46,6 +49,12 @@ namespace Airerage.Runtime.Flow
             _description = description;
             _descriptionJa = descriptionJa;
             _color = color;
+        }
+
+        /// <summary>日本語の短い名前を設定する（シーンのビルダー用）。</summary>
+        public void SetNameJa(string nameJa)
+        {
+            _nameJa = nameJa ?? string.Empty;
         }
 
         /// <summary>試合で鳴らす曲を設定する（シーンのビルダー用。null なら仮の BGM）。</summary>

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Manor
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: VAMPIRE MANOR
+  _nameJa: "\u5438\u8840\u9B3C\u306E\u9928"
   _sceneName: Stage_Manor
   _description: 'Outside a vampire''s manor. Demon hands crawl the graveyard and
     the farm: get caught and you are dragged into the prison in the sky.'

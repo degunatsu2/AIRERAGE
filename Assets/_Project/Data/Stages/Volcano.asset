@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Volcano
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: CRATER
+  _nameJa: "\u706B\u53E3"
   _sceneName: Stage_Volcano
   _description: Inside an active crater. Lava bursts from random spots, steam geysers
     blast from the walls, molten rocks bounce you away.

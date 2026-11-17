@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: SpaceStation
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: ORBITAL STATION
+  _nameJa: "\u5B87\u5B99\u30B9\u30C6\u30FC\u30B7\u30E7\u30F3"
   _sceneName: Stage_SpaceStation
   _description: Zero-g inside the hollow starships, warp gates that wrap around the
     edges, a roaming rescue gate below.

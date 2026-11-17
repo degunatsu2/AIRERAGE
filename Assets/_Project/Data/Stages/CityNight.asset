@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: CityNight
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: SKYLINE NIGHT
+  _nameJa: "\u591C\u306E\u30D3\u30EB\u8857"
   _sceneName: Stage_CityNight
   _description: The same rooftops after dark. Neon signs bounce you, subway vents
     blast up from the canyons.

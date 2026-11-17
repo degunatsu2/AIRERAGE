@@ -634,11 +634,19 @@ namespace Airerage.Editor
             Object.DestroyImmediate(canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>());
             RectTransform root = MenuUiBuilder.CreateFull(canvas.transform, "Bars");
             var bars = root.gameObject.AddComponent<CurtainGraphic>();
-            UnityEngine.UI.Text label = MenuUiBuilder.CreateText(root, "Label", string.Empty, 48, FontStyle.Italic, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 150f), new Vector2(1600f, 90f), Color.white, false);
+            // ゲートの合わせ目の札の文字（ステージの名前と日本語の名前。D-99 の T12）。
+            UnityEngine.UI.Text label = MenuUiBuilder.CreateText(root, "Label", string.Empty, 66, FontStyle.Normal, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 18f), new Vector2(720f, 90f), MenuUiBuilder.Ink, false);
             label.font = GameFonts.LatinBlack;
+            // 長い名前（ORBITAL STATION など）も札に収める。
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 30;
+            label.resizeTextMaxSize = 66;
+            UnityEngine.UI.Text sub = MenuUiBuilder.CreateText(root, "Sub", string.Empty, 28, FontStyle.Bold, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -40f), new Vector2(720f, 44f), MenuUiBuilder.InkSoft, false);
+            sub.font = GameFonts.JapaneseBold;
             var curtain = canvas.gameObject.AddComponent<ScreenCurtain>();
-            curtain.Configure(root.gameObject, bars, label);
+            curtain.Configure(root.gameObject, bars, label, sub);
             root.gameObject.SetActive(false);
             return curtain;
         }
@@ -699,10 +707,12 @@ namespace Airerage.Editor
                 LoadOrCreateStage(AthleticStageAssetPath, "ATHLETIC", Path.GetFileNameWithoutExtension(AthleticStagePath),
                     "Jump pads, updrafts and boost rings.", "ジャンプ台、上昇気流、加速リングで空を飛び回るアスレチック。", new Color(0.35f, 0.85f, 1f)),
             };
+            stages[0].SetNameJa(StageNameJa("Athletic"));
             foreach (StageLayout layout in StageSceneBuilder.Layouts)
             {
                 StageDefinition stage = LoadOrCreateStage($"{StageFolder}/{layout.Id}.asset", layout.DisplayName, layout.SceneName,
                     layout.Description, layout.DescriptionJa, layout.Color);
+                stage.SetNameJa(StageNameJa(layout.Id));
                 // ステージの曲（ループの位置は曲のファイルのタグから。docs/18 6 章）。曲ごとの音量は 1（ファイルの大きさのまま）。
                 stage.SetMusic(string.IsNullOrEmpty(layout.Music)
                     ? null
@@ -720,6 +730,26 @@ namespace Airerage.Editor
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
             return catalog;
+        }
+
+        // 試合の始まりの演出で、ステージの名前の下に小さく出す日本語の名前（D-98。2026-11-17）。
+        private static string StageNameJa(string id)
+        {
+            switch (id)
+            {
+                case "Athletic": return "空のアスレチック";
+                case "CityDay": return "昼のビル街";
+                case "CityNight": return "夜のビル街";
+                case "Volcano": return "火口";
+                case "SnowSea": return "雪原と海";
+                case "SpaceStation": return "宇宙ステーション";
+                case "Lab": return "ひみつの研究所";
+                case "Kitchen": return "お菓子のキッチン";
+                case "Manor": return "吸血鬼の館";
+                case "Stadium": return "嵐の陸上競技場";
+                case "Wharf": return "凍てつく埠頭";
+                default: return string.Empty;
+            }
         }
 
         private static StageDefinition LoadOrCreateStage(string path, string displayName, string sceneName, string description, string descriptionJa,

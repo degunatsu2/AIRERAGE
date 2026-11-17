@@ -286,7 +286,8 @@ namespace Airerage.Runtime.Flow
                 && (screen == FlowScreen.Training || screen == FlowScreen.Local || screen == FlowScreen.OnlineMatch);
             if (curtain)
             {
-                yield return _curtain.Close(stage != null ? stage.DisplayName : string.Empty);
+                // 行き先のステージの色の扉と、名前の札（D-99 の T12）。
+                yield return stage != null ? _curtain.Close(stage.DisplayName, stage.NameJa, stage.Color) : _curtain.Close(string.Empty);
             }
             while (_previewLoading)
             {

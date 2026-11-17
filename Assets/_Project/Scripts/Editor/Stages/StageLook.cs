@@ -109,6 +109,11 @@ namespace Airerage.Editor.Stages
         public float BandFill;
         /// <summary>飛行船の色（運営の撮影の飛行船。1 隻）。</summary>
         public Color AirshipColor;
+        /// <summary>
+        /// 実在の街（PLATEAU の西新宿）の地面の高さ（m）。空のステージ（ATHLETIC）は遊ぶ所のずっと下のもやの中、ビル街は谷の底の
+        /// 道路より下（遠くの大通りの先に高層ビルの上の方が見える）。
+        /// </summary>
+        public float PlateauGround = -175f;
 
         // 光の格子（V18）と撃破の線の膜（V19）。
         /// <summary>光の格子を置くか（街のステージは下に道路があるので置かない）。</summary>

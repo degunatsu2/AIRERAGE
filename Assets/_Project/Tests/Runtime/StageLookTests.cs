@@ -360,6 +360,39 @@ namespace Airerage.Runtime.Tests
             Assert.That(tokyo.Find("Beacons").childCount, Is.GreaterThan(5), "高いビルに航空障害灯がない");
         }
 
+        [TestCase("Stage_CityDay")]
+        [TestCase("Stage_CityNight")]
+        public void CityBackdrops_KeepTheVistaToTokyoOpen(string stage)
+        {
+            // 2026-11-17 の回答（ビル街の昼夜は背景が前と変わって見えない）: 谷の奥のビル群が西新宿を隠していた。真ん中の奥のビル群を
+            // 置かず・低くして、大通りの先の高層ビル群の上半分は見えるようにする（いつもの目の高さから見て）。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            Renderer shinjuku = scene.GetRootGameObjects().Single(g => g.name == "Backdrop").transform.Find("Tokyo/Shinjuku").GetComponent<Renderer>();
+            var eye = new Vector3(0f, 6f, -30f);
+            float towerTop = Elevation(eye, shinjuku.bounds.max.y, shinjuku.bounds.center.z);
+            float towerHalf = Elevation(eye, (shinjuku.bounds.min.y + shinjuku.bounds.max.y) * 0.5f, shinjuku.bounds.center.z);
+            Assert.That(towerTop, Is.GreaterThan(5f).And.LessThan(20f), "高層ビルが低すぎる・画面の上からはみ出す");
+            Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+            int checkedCount = 0;
+            foreach (Renderer renderer in decor.GetComponentsInChildren<Renderer>(true))
+            {
+                if ((renderer.name != "Skyline" && renderer.name != "Block") || Mathf.Abs(renderer.bounds.center.x) > 40f)
+                {
+                    continue;
+                }
+                checkedCount++;
+                Assert.That(Elevation(eye, renderer.bounds.max.y, renderer.bounds.min.z), Is.LessThan(Mathf.Max(towerHalf, 0f)),
+                    $"{renderer.name} ({renderer.bounds.center}): 真ん中の奥のビルが西新宿を隠す");
+            }
+            Assert.That(checkedCount, Is.GreaterThan(3), "大通りの見通しの手前の低い街並みがない");
+        }
+
+        // 目から見上げる角度（度）。
+        private static float Elevation(Vector3 eye, float y, float z)
+        {
+            return Mathf.Atan2(y - eye.y, z - eye.z) * Mathf.Rad2Deg;
+        }
+
         [Test]
         public void CityNight_IsDressedForTheNight()
         {

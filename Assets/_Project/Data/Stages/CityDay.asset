@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: CityDay
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: SKYLINE DAY
+  _nameJa: "\u663C\u306E\u30D3\u30EB\u8857"
   _sceneName: Stage_CityDay
   _description: Rooftop parkour. Moving walkways, rooftop ducts and gusts between
     the towers.

@@ -927,6 +927,15 @@ namespace Airerage.Editor
             {
                 SetReference(hud, "_controls", controls);
             }
+            // 試合の始まりの空撮のカメラ（D-98 の I2。カウントダウンの間だけ Cinemachine を止めてカメラを動かす）。
+            Camera mainCamera = Object.FindFirstObjectByType<Camera>();
+            var intro = new GameObject("MatchIntroCamera").AddComponent<MatchIntroCamera>();
+            SetReference(intro, "_source", source);
+            SetReference(intro, "_camera", mainCamera);
+            if (mainCamera != null && mainCamera.TryGetComponent(out CinemachineBrain brain))
+            {
+                SetReference(intro, "_brain", brain);
+            }
             // キャラクターと重なった HUD を透かす仕組み（試合の HUD のあるシーンに 1 つ。ユーザーの要望、2026-10-30）。
             var occlusion = new GameObject("HudOcclusion").AddComponent<HudOcclusion>();
             SetReference(occlusion, "_source", source);

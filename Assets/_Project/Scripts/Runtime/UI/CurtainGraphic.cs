@@ -4,26 +4,40 @@ using UnityEngine.UI;
 namespace Airerage.Runtime.UI
 {
     /// <summary>
-    /// 試合へ入るときの黒い帯（D-87 の T10 シネマスコープ。試合の始まりの演出 D-46 と同じ形）: 上と下の黒い帯が、右上がりの斜めの
-    /// 線で合わさって画面を閉じ、白い線が斜めに走って、帯が上下へ少し傾きながら開く。Close・Slash・Open（0〜1）で描く。
+    /// 試合へ入るときのゲート（D-99 の T12。2026-11-17 のユーザーの決定）: 行き先のステージの色の扉が左右から閉じて真ん中で合わさり、
+    /// 合わせ目に名前の札（白い面にステージの色の縁と裏の札）。扉が開くと試合の始まりの演出（シネマスコープの帯つき）が見える。
+    /// Close（0〜1。扉が閉じる）・Plate（0〜1。札の出方）・Open（0〜1。扉が開く）で描く。札の文字は ScreenCurtain の Text。
     /// </summary>
     [RequireComponent(typeof(CanvasRenderer))]
     public sealed class CurtainGraphic : MaskableGraphic
     {
-        private static readonly Color GlowColor = new Color(0.35f, 0.85f, 1f);
+        /// <summary>札の大きさ（キャンバスの単位）。</summary>
+        public static readonly Vector2 PlateSize = new Vector2(760f, 150f);
 
         [SerializeField, HideInInspector] private float _close;
-        [SerializeField, HideInInspector] private float _slash;
+        [SerializeField, HideInInspector] private float _plate;
         [SerializeField, HideInInspector] private float _open;
+        [SerializeField, HideInInspector] private Color _door = new Color(0.07f, 0.09f, 0.13f);
+        [SerializeField, HideInInspector] private Color _accent = new Color(0.35f, 0.85f, 1f);
 
         public float Close => _close;
         public float Open => _open;
+        public float Plate => _plate;
+        public Color Accent => _accent;
 
-        public void Set(float close, float slash, float open)
+        public void Set(float close, float plate, float open)
         {
             _close = Mathf.Clamp01(close);
-            _slash = Mathf.Clamp01(slash);
+            _plate = Mathf.Clamp01(plate);
             _open = Mathf.Clamp01(open);
+            SetVerticesDirty();
+        }
+
+        /// <summary>扉の色（行き先のステージの色）。扉は暗く沈めた色、縁はステージの色。</summary>
+        public void SetStageColor(Color accent)
+        {
+            _accent = new Color(accent.r, accent.g, accent.b, 1f);
+            _door = Color.Lerp(new Color(0.05f, 0.06f, 0.09f), _accent, 0.22f);
             SetVerticesDirty();
         }
 
@@ -43,65 +57,80 @@ namespace Airerage.Runtime.UI
         private void Populate(VertexHelper vh)
         {
             vh.Clear();
-            if (_close <= 0f && _slash <= 0f)
+            if (_close <= 0f)
             {
                 return;
             }
             Rect r = GetPixelAdjustedRect();
-            float h = r.height;
-            float tilt = h * 0.093f;
-            float k = 2f * tilt / Mathf.Max(1f, r.width);
-            float cy = r.center.y;
-            float left = r.xMin - 120f;
-            float right = r.xMax + 120f;
-            float LineY(float x) => cy + (x - r.center.x) * k;
-
-            float travel = h * 0.62f;
-            float closed = (1f - UiEase.InCubic(_close)) * travel;
-            float open = UiEase.OutCubic(_open);
-            var topOffset = new Vector2(-70f * open, closed + open * h * 0.7f);
-            var bottomOffset = new Vector2(70f * open, -closed - open * h * 0.7f);
-            Color black = new Color(0f, 0f, 0f, color.a);
-
-            // 上の帯（下の辺が斜めの線。1 ピクセル重ねて隙間をなくす）と、下の帯。
-            Quad(vh, new Vector2(left, r.yMax + 20f) + topOffset, new Vector2(right, r.yMax + 20f) + topOffset,
-                new Vector2(right, LineY(right) - 1f) + topOffset, new Vector2(left, LineY(left) - 1f) + topOffset, black, black);
-            Quad(vh, new Vector2(left, LineY(left) + 1f) + bottomOffset, new Vector2(right, LineY(right) + 1f) + bottomOffset,
-                new Vector2(right, r.yMin - 20f) + bottomOffset, new Vector2(left, r.yMin - 20f) + bottomOffset, black, black);
-
-            // 斜めの白い線（真ん中から両側へ伸び、開くと薄れる）と、その周りの水色の光。
-            if (_slash > 0f && _open < 1f)
+            float half = r.width * 0.5f + 40f;
+            // 扉の合わせ目の位置（閉じる: 外から真ん中へ減速して。開く: 真ん中から外へ加速して）。
+            float shut = UiEase.OutCubic(_close) * (1f - UiEase.InOutCubic(_open));
+            float leftEdge = r.xMin - 40f + half * shut;
+            float rightEdge = r.xMax + 40f - half * shut;
+            float top = r.yMax + 20f;
+            float bottom = r.yMin - 20f;
+            Door(vh, r.xMin - 40f, leftEdge, top, bottom, 1f);
+            Door(vh, rightEdge, r.xMax + 40f, top, bottom, -1f);
+            if (_plate > 0f)
             {
-                float half = (r.width * 0.6f + 120f) * UiEase.OutCubic(_slash);
-                var dir = new Vector2(1f, k).normalized;
-                Vector2 n = new Vector2(-dir.y, dir.x);
-                Vector2 c = r.center;
-                float fade = 1f - open;
-                Color glow = GlowColor;
-                glow.a = 0.35f * fade;
-                Color clear = glow;
-                clear.a = 0f;
-                Line(vh, c - dir * half, c + dir * half, n, 18f, glow, clear);
-                Color core = new Color(1f, 1f, 1f, fade);
-                Line(vh, c - dir * half, c + dir * half, n, 4f, core, core);
+                DrawPlate(vh, r.center);
             }
         }
 
-        // 太さ width の線（真ん中が center の色、外の縁が edge の色）。
-        private static void Line(VertexHelper vh, Vector2 a, Vector2 b, Vector2 n, float width, Color center, Color edge)
+        // 扉 1 枚（x0〜x1）。face は合わせ目の向き（左の扉は +1、右の扉は -1）。合わせ目にステージの色の帯と白い細い線、少し内側に
+        // もう 1 本のステージの色の線、横に 2 本の薄いレール。
+        private void Door(VertexHelper vh, float x0, float x1, float top, float bottom, float face)
         {
-            Vector2 o = n * width * 0.5f;
-            Quad(vh, a + o, b + o, b, a, edge, center);
-            Quad(vh, a, b, b - o, a - o, center, edge);
+            if (x1 <= x0)
+            {
+                return;
+            }
+            Rect(vh, x0, x1, top, bottom, _door);
+            float seam = face > 0f ? x1 : x0;
+            Color accent = _accent;
+            Color rail = _accent;
+            rail.a = 0.35f;
+            float height = top - bottom;
+            Rect(vh, Mathf.Min(seam, seam - face * 16f), Mathf.Max(seam, seam - face * 16f), top, bottom, accent);
+            Rect(vh, Mathf.Min(seam - face * 16f, seam - face * 19f), Mathf.Max(seam - face * 16f, seam - face * 19f), top, bottom, Color.white);
+            Rect(vh, Mathf.Min(seam - face * 42f, seam - face * 48f), Mathf.Max(seam - face * 42f, seam - face * 48f), top, bottom, accent);
+            float inner = face > 0f ? Mathf.Max(x0, seam - 420f) : seam;
+            float outer = face > 0f ? seam : Mathf.Min(x1, seam + 420f);
+            Rect(vh, inner, outer, bottom + height * 0.3f + 3f, bottom + height * 0.3f, rail);
+            Rect(vh, inner, outer, bottom + height * 0.7f + 3f, bottom + height * 0.7f, rail);
         }
 
-        private static void Quad(VertexHelper vh, Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color top, Color bottom)
+        // 合わせ目の名前の札: ステージの色の裏の札、白い面、ステージの色の縁。弾んで大きくなり、開くときに縮んで消える。
+        private void DrawPlate(VertexHelper vh, Vector2 center)
+        {
+            float pop = UiEase.OutBack(_plate);
+            Vector2 size = PlateSize * pop;
+            float lean = size.y * 0.3f;
+            Slanted(vh, center + new Vector2(10f, -8f), size, lean, _accent);
+            Slanted(vh, center, size + new Vector2(8f, 8f), lean, _accent);
+            Slanted(vh, center, size, lean, Color.white);
+        }
+
+        private static void Slanted(VertexHelper vh, Vector2 center, Vector2 size, float lean, Color color)
+        {
+            float hw = size.x * 0.5f;
+            float hh = size.y * 0.5f;
+            Quad(vh, center + new Vector2(-hw + lean, hh), center + new Vector2(hw + lean, hh), center + new Vector2(hw - lean, -hh),
+                center + new Vector2(-hw - lean, -hh), color);
+        }
+
+        private static void Rect(VertexHelper vh, float x0, float x1, float top, float bottom, Color color)
+        {
+            Quad(vh, new Vector2(x0, top), new Vector2(x1, top), new Vector2(x1, bottom), new Vector2(x0, bottom), color);
+        }
+
+        private static void Quad(VertexHelper vh, Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color color)
         {
             int start = vh.currentVertCount;
-            vh.AddVert(a, top, Vector2.zero);
-            vh.AddVert(b, top, Vector2.zero);
-            vh.AddVert(c, bottom, Vector2.zero);
-            vh.AddVert(d, bottom, Vector2.zero);
+            vh.AddVert(a, color, Vector2.zero);
+            vh.AddVert(b, color, Vector2.zero);
+            vh.AddVert(c, color, Vector2.zero);
+            vh.AddVert(d, color, Vector2.zero);
             vh.AddTriangle(start, start + 1, start + 2);
             vh.AddTriangle(start, start + 2, start + 3);
         }

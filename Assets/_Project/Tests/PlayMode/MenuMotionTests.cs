@@ -736,7 +736,9 @@ namespace Airerage.PlayMode.Tests
             Assert.That(curtain, Is.Not.Null, "試合へ入るときの黒い帯がない");
             flow.StartTraining(flow.Stages.Get(0));
             yield return null;
-            Assert.That(curtain.Showing, Is.True, "試合へ入るときに黒い帯を出さない");
+            Assert.That(curtain.Showing, Is.True, "試合へ入るときにゲートを出さない");
+            // ゲート（D-99 の T12）: 行き先のステージの色の扉と、合わせ目の札にステージの名前。
+            Assert.That(curtain.Label, Is.EqualTo(flow.Stages.Get(0).DisplayName), "札にステージの名前がない");
             Assert.That(NavigationGate.Current.Held, Is.True, "帯を閉じている間にメニューの決定を止めない");
             yield return WaitSeconds(0.3f);
             Assert.That(flow.LoadedScenes, Does.Contain("Menu"), "帯が閉じる前にメニューを外した");

@@ -588,7 +588,7 @@ namespace Airerage.Editor.Stages
 
             // 真ん中の奥は実在の東京（PLATEAU の西新宿の高層ビル群と周りの街。2026-11-17 のユーザーの決定。docs/15 6.51）。作った箱の
             // ビルは、その外側（遠い列）と手前の低い列だけ。
-            bool city = CreatePlateauCity(Child(root, "Tokyo"), far, mid, beacon);
+            bool city = CreatePlateauCity(Child(root, "Tokyo"), far, mid, beacon, look.PlateauGround);
             Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f, city ? PlateauHalfWidth : 0f);
             Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f, city ? PlateauMidKeepOut : 0f);
 
@@ -612,10 +612,9 @@ namespace Airerage.Editor.Stages
         // tools/assets/plateau_skyline.py が、西新宿の高層ビル（LOD2。地面から 60m 以上）と周りの街（LOD1。25m 以上）を背景用に軽くした形。
         private const string PlateauFolder = "Assets/_Project/ThirdParty/PLATEAU";
 
-        // 実在の街の大きさ（横と高さ）と奥行き（奥行きは縮めて遠景の帯に収める）、地面の高さ、置く奥行き。
+        // 実在の街の大きさ（横と高さ）と奥行き（奥行きは縮めて遠景の帯に収める）、置く奥行き。地面の高さは台本（StageLook.PlateauGround）。
         private const float PlateauScale = 0.8f;
         private const float PlateauDepthScale = 0.1f;
-        private const float PlateauGround = -175f;
         private const float ShinjukuZ = 400f;
         private const float TokyoZ = 640f;
 
@@ -626,7 +625,7 @@ namespace Airerage.Editor.Stages
         private const float PlateauMidKeepOut = 300f;
 
         // 西新宿（手前・濃い色）と周りの街（奥・遠い色）を置き、高いビルの屋上に航空障害灯を付ける。モデルがなければ false。
-        private static bool CreatePlateauCity(Transform root, Material far, Material mid, Material beacon)
+        private static bool CreatePlateauCity(Transform root, Material far, Material mid, Material beacon, float ground)
         {
             Mesh shinjuku = LoadObjMesh($"{PlateauFolder}/Shinjuku_LOD2.obj");
             Mesh tokyo = LoadObjMesh($"{PlateauFolder}/Tokyo_LOD1.obj");
@@ -636,8 +635,8 @@ namespace Airerage.Editor.Stages
                 return false;
             }
             var scale = new Vector3(PlateauScale, PlateauScale, PlateauDepthScale);
-            Transform hero = PlaceMesh(root, "Shinjuku", shinjuku, mid, new Vector3(0f, PlateauGround, ShinjukuZ), scale);
-            PlaceMesh(root, "Surroundings", tokyo, far, new Vector3(0f, PlateauGround, TokyoZ), scale);
+            Transform hero = PlaceMesh(root, "Shinjuku", shinjuku, mid, new Vector3(0f, ground, ShinjukuZ), scale);
+            PlaceMesh(root, "Surroundings", tokyo, far, new Vector3(0f, ground, TokyoZ), scale);
             // 航空障害灯: 25m の升目ごとのいちばん高い所のうち、上から 14 か所（150m より高く、互いに 60m 以上離す）。
             var tops = new Dictionary<Vector2Int, Vector3>();
             foreach (Vector3 v in shinjuku.vertices)

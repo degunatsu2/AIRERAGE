@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Stadium
   m_EditorClassIdentifier: Airerage.Runtime::Airerage.Runtime.Flow.StageDefinition
   _displayName: STORM STADIUM
+  _nameJa: "\u5D50\u306E\u9678\u4E0A\u7AF6\u6280\u5834"
   _sceneName: Stage_Stadium
   _description: 'No bottom to fall from: knock rivals off the sides or over the scoreboard.
     Swing between the anchors and dodge the pitched baseballs.'

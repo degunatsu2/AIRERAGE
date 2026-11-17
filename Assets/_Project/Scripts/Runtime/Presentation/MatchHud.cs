@@ -3,6 +3,7 @@ using Airerage.Core.Common;
 using Airerage.Core.Match;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Audio;
+using Airerage.Runtime.Data;
 using Airerage.Runtime.Simulation;
 using Airerage.Runtime.UI;
 using UnityEngine;
@@ -13,8 +14,10 @@ namespace Airerage.Runtime.Presentation
     /// <summary>
     /// 試合の表示（docs/12_match_plan.md T4-1）: 始まる前の演出、上の中央の残り時間、終わったときの「FINISH!」と結果（順位）。
     /// 結果には「Restart」と「Quit」（IMatchControls があれば）。復帰までの残りは、出現位置の周りのゲージで示す（CharacterView）。
-    /// 始まる前の演出は「シネマスコープ」（D-46 の C 案。ユーザーの選択、2026-10-13）: 画面の上下に黒い帯が入り、全員の名前が色つきで
-    /// 左右から滑り込む。始まると、帯が斜めに切り裂かれるように開く。
+    /// 始まる前の演出（D-98。2026-11-17 のユーザーの決定: I1 + I2、最後に集中線とズームからラウンドコール）: ゲート（ScreenCurtain）が開いた
+    /// ときには、もう上下に黒い帯（シネマスコープ）が付いている。カメラが空撮でステージを回る間（MatchIntroCamera）に、上の帯へステージの
+    /// 名前、下の帯へプレイヤーの札（斜めの札。プレイヤーの色）が滑り込む。名前と札が去ると、集中線とともにカメラが突進し、白い光で帯が
+    /// 外れて、「READY」→ 試合が始まった瞬間に「GO!」。時間割は MatchIntroTimeline（カウントダウンの長さに合わせて縮む）。
     /// 残り時間は、上の辺に付いた台形の札と、その下の試合の流れのバー（TimerPlate。ユーザーの選択、2026-10-14）。残り 10 秒は
     /// 赤く脈打ち、1 秒ごとに短い音。アディショナルタイムは橙色。お知らせ（拠点の移動、100 枚のコイン、ホットエリア）は NoticeHud。
     /// アディショナルタイムの始まり（OVERTIME）と試合の終わり（FINISH! / 名前 WINS!）は、お知らせと同じ画面を横切る帯（BannerStrip。
@@ -23,12 +26,10 @@ namespace Airerage.Runtime.Presentation
     /// </summary>
     public sealed class MatchHud : MonoBehaviour
     {
-        // カウントダウンの中の、演出の区切り（カウントダウン全体に対する割合）。
-        private const float BarsInEnd = 0.15f;
-        private const float PlatesStart = 0.15f;
-        private const float PlateInterval = 0.13f;
-        private const float PlateDuration = 0.14f;
-        private const float SlashStart = 0.82f;
+        // 演出の音を鳴らしたか（1 試合に 1 回ずつ）。
+        private const int SoundDive = 1;
+        private const int SoundFlash = 2;
+        private const int SoundReady = 4;
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
@@ -36,8 +37,6 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private MonoBehaviour _controls;
         [Tooltip("演出と FINISH! の音（なくてもよい）")]
         [SerializeField] private GameAudio _audio;
-        [Tooltip("始まったときに、帯が開く時間（秒）")]
-        [SerializeField] private float _openSeconds = 0.5f;
         [Tooltip("「FINISH!」を出してから結果を出すまで（秒）")]
         [SerializeField] private float _finishSeconds = 2f;
         [Tooltip("残り時間を目立たせる秒数")]
@@ -50,9 +49,19 @@ namespace Airerage.Runtime.Presentation
         private MatchRules _rules;
         private MatchPhase? _lastPhase;
         private int _platesStarted;
-        private float _openAt = -1f;
+        private float _goAt = -1f;
         private float _finishAt = -1f;
-        private float _introProgress = -1f;
+        private float _introTime = -1f;
+        private int _introSounds;
+        private readonly MatchIntroTimeline.TickClock _clock = new MatchIntroTimeline.TickClock();
+        private string _stageName = string.Empty;
+        private string _stageNameJa = string.Empty;
+        private Color _stageColor = new Color(0.35f, 0.85f, 1f);
+        private GUIStyle _call;
+        private GUIStyle _stageTitle;
+        private GUIStyle _stageSub;
+        private GUIStyle _plateName;
+        private GUIStyle _plateSub;
         private float _overtimeAt = -1f;
         private int _lastWarningSecond = -1;
         private readonly List<float> _bankMoves = new List<float>();
@@ -83,10 +92,19 @@ namespace Airerage.Runtime.Presentation
         public int CountdownTicksPlayed { get; private set; }
 
         /// <summary>始まる前の演出（黒い帯と名前）を出しているか。</summary>
-        public bool ShowingIntro => _introProgress >= 0f;
+        public bool ShowingIntro => _introTime >= 0f;
 
-        /// <summary>始まった直後に、帯が開いているところか。</summary>
-        public bool OpeningIntro => _openAt >= 0f && Time.time - _openAt < _openSeconds;
+        /// <summary>突進の白い光で、帯が外れているところか。</summary>
+        public bool OpeningIntro => _introTime >= MatchIntroTimeline.Flash && _introTime < MatchIntroTimeline.Flash + 0.3f;
+
+        /// <summary>演出の基準の秒（MatchIntroTimeline。カウントダウンでなければ -1。テスト用）。</summary>
+        public float IntroTime => _introTime;
+
+        /// <summary>今のラウンドコール（「READY」「GO!」。出していなければ空。テスト用）。</summary>
+        public string RoundCall { get; private set; } = string.Empty;
+
+        /// <summary>上の帯に出すステージの名前（テスト用）。</summary>
+        public string StageName => _stageName;
 
         /// <summary>滑り込み始めた名前の数（テスト用）。</summary>
         public int PlatesShown => _platesStarted;
@@ -130,7 +148,9 @@ namespace Airerage.Runtime.Presentation
                 _rules = rules;
                 _lastPhase = null;
                 _platesStarted = 0;
-                _openAt = -1f;
+                _goAt = -1f;
+                _introSounds = 0;
+                FindStage();
                 _finishAt = -1f;
                 _overtimeAt = -1f;
                 _lastWarningSecond = -1;
@@ -143,7 +163,8 @@ namespace Airerage.Runtime.Presentation
             ShowingResults = false;
             Ranking = new int[0];
             ChallengersText = string.Empty;
-            _introProgress = -1f;
+            RoundCall = string.Empty;
+            _introTime = -1f;
             if (rules == null)
             {
                 return;
@@ -156,19 +177,36 @@ namespace Airerage.Runtime.Presentation
             switch (phase)
             {
                 case MatchPhase.Countdown:
-                    _introProgress = rules.CountdownTicks > 0 ? 1f - (float)left / rules.CountdownTicks : 1f;
-                    // 名前が滑り込み始めるたびに音を鳴らす。
-                    int plates = Mathf.Min(_feed.CharacterCount, PlatesStartedAt(_introProgress));
+                    _introTime = MatchIntroTimeline.DesignTime(rules, tick, _clock.Between(tick));
+                    // 札が滑り込み始めるたびに音。集中線の突進・白い光・READY にも音。
+                    int plates = Mathf.Min(_feed.CharacterCount, PlatesStartedAt(_introTime));
                     for (; _platesStarted < plates; _platesStarted++)
                     {
                         Play(SoundId.IntroWhoosh);
+                    }
+                    PlayOnce(SoundDive, MatchIntroTimeline.AerialEnd, SoundId.UiWhoosh);
+                    PlayOnce(SoundFlash, MatchIntroTimeline.Flash, SoundId.IntroSlash);
+                    PlayOnce(SoundReady, MatchIntroTimeline.ReadyStart, SoundId.CountdownTick);
+                    if (_introTime >= MatchIntroTimeline.ReadyStart)
+                    {
+                        RoundCall = "READY";
                     }
                     break;
                 case MatchPhase.Playing:
                     if (_lastPhase == MatchPhase.Countdown)
                     {
-                        _openAt = Time.time;
-                        Play(SoundId.IntroSlash);
+                        _goAt = Time.time;
+                        // カウントダウンが短く白い光の前に始まったとき（テストなど）も、帯が外れる音は鳴らす。
+                        if ((_introSounds & SoundFlash) == 0)
+                        {
+                            _introSounds |= SoundFlash;
+                            Play(SoundId.IntroSlash);
+                        }
+                        Play(SoundId.SuperStart);
+                    }
+                    if (_goAt >= 0f && Time.time - _goAt < MatchIntroTimeline.GoSeconds)
+                    {
+                        RoundCall = "GO!";
                     }
                     if (rules.HasTimeLimit)
                     {
@@ -247,14 +285,41 @@ namespace Airerage.Runtime.Presentation
             return string.Join("  ", names);
         }
 
-        // 演出の進み progress までに、滑り込み始めた名前の数。
-        private static int PlatesStartedAt(float progress)
+        // 基準の秒 t までに、滑り込み始めた札の数。
+        private static int PlatesStartedAt(float t)
         {
-            if (progress < PlatesStart)
+            if (t < MatchIntroTimeline.PlatesStart)
             {
                 return 0;
             }
-            return 1 + Mathf.FloorToInt((progress - PlatesStart) / PlateInterval);
+            return 1 + Mathf.FloorToInt((t - MatchIntroTimeline.PlatesStart) / MatchIntroTimeline.PlateInterval);
+        }
+
+        // 演出の区切り at を過ぎたら、1 試合に 1 回だけ音を鳴らす。
+        private void PlayOnce(int flag, float at, SoundId id)
+        {
+            if (_introTime >= at && (_introSounds & flag) == 0)
+            {
+                _introSounds |= flag;
+                Play(id);
+            }
+        }
+
+        // 上の帯に出すステージの名前と色（ゲームの流れの行き先。検証用のシーンはシーンの名前）。
+        private void FindStage()
+        {
+            var flow = FindFirstObjectByType<Airerage.Runtime.Flow.GameFlow>();
+            // CurrentStage は読み込みが済んでから入るので、試合のシーンが動き出したときには行き先（TargetStage）を見る（GameAudio と同じ）。
+            Airerage.Runtime.Flow.StageDefinition stage = flow != null ? (flow.TargetStage != null ? flow.TargetStage : flow.CurrentStage) : null;
+            if (stage != null)
+            {
+                _stageName = stage.DisplayName;
+                _stageNameJa = stage.NameJa;
+                _stageColor = stage.Color;
+                return;
+            }
+            _stageName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Replace("Stage_", string.Empty).ToUpperInvariant();
+            _stageNameJa = string.Empty;
         }
 
         private CharacterState[] States()
@@ -299,11 +364,11 @@ namespace Airerage.Runtime.Presentation
             Matrix4x4 matrix = GUI.matrix;
             if (ShowingIntro)
             {
-                DrawIntro(_introProgress, 0f);
+                DrawIntro(_introTime);
             }
-            else if (OpeningIntro)
+            if (RoundCall.Length > 0)
             {
-                DrawIntro(1f, Ease((Time.time - _openAt) / _openSeconds));
+                DrawRoundCall();
             }
             GUI.matrix = matrix;
             if (TimerText.Length > 0 && !ShowingResults)
@@ -349,76 +414,180 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        // シネマスコープの演出。progress はカウントダウンの進み（0〜1）、open は始まった後に帯が開く進み（0〜1）。
-        private void DrawIntro(float progress, float open)
+        // 始まる前の演出（基準の秒 t。MatchIntroTimeline）: シネマスコープの帯、上の帯のステージの名前、下の帯のプレイヤーの札、集中線、
+        // 突進の終わりの白い光。帯はゲートが開いたときから付いていて、白い光で上下へ外れる。
+        private void DrawIntro(float t)
         {
+            EnsureIntroStyles();
             Matrix4x4 baseMatrix = GUI.matrix;
             float width = Screen.width;
             float height = Screen.height;
-            float bar = height * 0.17f;
-            float barsIn = Ease(progress / BarsInEnd);
+            float bar = height * 0.13f;
+            float off = Ease((t - MatchIntroTimeline.Flash) / 0.28f);
+            float labelsOut = Ease((t - MatchIntroTimeline.LabelsOut) / 0.3f);
 
-            // 名前（帯の間に、上から順に並べる。偶数番は左から、奇数番は右から滑り込む。開くときは左右へ去る）。
-            int count = _feed.CharacterCount;
-            const float plateWidth = 440f;
-            const float plateHeight = 58f;
-            for (int i = 0; i < count; i++)
+            // 集中線（突進の間。画面の外側から真ん中へ向かう光の線。だんだん濃く）。
+            float dive = Mathf.Clamp01((t - MatchIntroTimeline.AerialEnd) / (MatchIntroTimeline.Flash - MatchIntroTimeline.AerialEnd));
+            if (t >= MatchIntroTimeline.AerialEnd && t < MatchIntroTimeline.Flash + 0.15f)
             {
-                float t = Ease((progress - (PlatesStart + i * PlateInterval)) / PlateDuration);
-                if (t <= 0f)
-                {
-                    continue;
-                }
-                float side = i % 2 == 0 ? -1f : 1f;
-                float targetX = (width - plateWidth) * 0.5f;
-                float startX = side < 0f ? -plateWidth : width;
-                float x = Mathf.Lerp(startX, targetX, t) + side * open * width * 0.6f;
-                float y = height * 0.5f + (i - (count - 1) * 0.5f) * (plateHeight + 12f) - plateHeight * 0.5f;
-                float alpha = 1f - open;
-                Color color = _feed.ColorOf(i);
-                GUI.color = new Color(0f, 0f, 0f, 0.55f * alpha);
-                GUI.DrawTexture(new Rect(x, y, plateWidth, plateHeight), Texture2D.whiteTexture);
-                GUI.color = new Color(color.r, color.g, color.b, alpha);
-                GUI.DrawTexture(new Rect(x, y, 14f, plateHeight), Texture2D.whiteTexture);
-                GUI.DrawTexture(new Rect(x, y + plateHeight - 3f, plateWidth, 3f), Texture2D.whiteTexture);
-                Color text = Color.Lerp(color, Color.white, 0.4f);
-                text.a = alpha;
-                GUI.color = text;
-                GUI.Label(new Rect(x + 32f, y, plateWidth - 40f, plateHeight), _feed.LabelOf(i), _plate);
+                DrawSpeedLines(dive, t, baseMatrix);
             }
 
-            // 切り裂く光（カウントダウンの終わりに、画面を斜めに横切って伸びる）。
-            float slash = open > 0f ? 1f : Ease((progress - SlashStart) / (1f - SlashStart));
-            if (slash > 0f)
+            // 上下の黒い帯。
+            float barShift = off * bar * 1.4f;
+            GUI.color = Color.black;
+            GUI.DrawTexture(new Rect(0f, -barShift, width, bar), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0f, height - bar + barShift, width, bar), Texture2D.whiteTexture);
+            // 帯の内側の縁にステージの色の細い線。
+            Color edge = _stageColor;
+            edge.a = 1f - off;
+            GUI.color = edge;
+            GUI.DrawTexture(new Rect(0f, bar - 3f - barShift, width, 3f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0f, height - bar + barShift, width, 3f), Texture2D.whiteTexture);
+
+            // 上の帯: ステージの名前（左から滑り込み、去るときは上へ）。
+            float nameIn = Ease((t - MatchIntroTimeline.NameIn) / 0.45f);
+            if (nameIn > 0f && labelsOut < 1f)
             {
-                GUIUtility.RotateAroundPivot(-8f, new Vector2(width * 0.5f, height * 0.5f));
-                float length = width * 1.5f * slash;
-                GUI.color = new Color(1f, 1f, 1f, 0.9f * (1f - open));
-                GUI.DrawTexture(new Rect((width - length) * 0.5f, height * 0.5f - 2f, length, 4f), Texture2D.whiteTexture);
+                float x = Mathf.Lerp(-width * 0.5f, height * 0.06f, nameIn);
+                float y = bar * 0.12f - labelsOut * bar - barShift;
+                float alpha = 1f - labelsOut;
+                // ステージの色の菱形の印。
+                GUIUtility.RotateAroundPivot(45f, new Vector2(x + bar * 0.12f, y + bar * 0.34f));
+                GUI.color = new Color(_stageColor.r, _stageColor.g, _stageColor.b, alpha);
+                GUI.DrawTexture(new Rect(x + bar * 0.04f, y + bar * 0.26f, bar * 0.16f, bar * 0.16f), Texture2D.whiteTexture);
                 GUI.matrix = baseMatrix;
+                GUI.color = new Color(1f, 1f, 1f, alpha);
+                GUI.Label(new Rect(x + bar * 0.32f, y, width, bar * 0.6f), _stageName, _stageTitle);
+                if (_stageNameJa.Length > 0)
+                {
+                    GUI.color = new Color(1f, 1f, 1f, 0.8f * alpha);
+                    GUI.Label(new Rect(x + bar * 0.34f, y + bar * 0.56f, width, bar * 0.3f), _stageNameJa, _stageSub);
+                }
             }
 
-            // 上下の黒い帯（入ってくる。開くときは、少し傾きながら上下へ去る）。
-            DrawBar(new Rect(-width * 0.25f, -bar + bar * barsIn - open * bar * 1.6f, width * 1.5f, bar), -6f * open, baseMatrix);
-            DrawBar(new Rect(-width * 0.25f, height - bar * barsIn + open * bar * 1.6f, width * 1.5f, bar), -6f * open, baseMatrix);
-
-            // 開いた瞬間の白い光。
-            if (open > 0f)
+            // 下の帯: プレイヤーの札（右から順に滑り込み、去るときは下へ）。
+            int count = _feed.CharacterCount;
+            if (count > 0 && labelsOut < 1f)
             {
-                GUI.color = new Color(1f, 1f, 1f, 0.35f * (1f - open));
+                float gap = 14f;
+                float plateHeight = bar * 0.62f;
+                float plateWidth = Mathf.Min(340f, (width - 80f - gap * (count - 1)) / count);
+                float total = plateWidth * count + gap * (count - 1);
+                float left = (width - total) * 0.5f;
+                float y = height - bar + (bar - plateHeight) * 0.5f + labelsOut * bar + barShift;
+                for (int i = 0; i < count; i++)
+                {
+                    float k = Ease((t - (MatchIntroTimeline.PlatesStart + i * MatchIntroTimeline.PlateInterval)) / MatchIntroTimeline.PlateSlide);
+                    if (k <= 0f)
+                    {
+                        continue;
+                    }
+                    float target = left + i * (plateWidth + gap);
+                    float x = Mathf.Lerp(width + 40f + i * 60f, target, k);
+                    CharacterConfigAsset character = _feed.CharacterOf(i);
+                    DrawPlate(new Rect(x, y, plateWidth, plateHeight), _feed.ColorOf(i), _feed.LabelOf(i),
+                        character != null ? character.DisplayName : string.Empty, 1f - labelsOut, baseMatrix);
+                }
+            }
+
+            // 突進の終わりの白い光（帯が外れるのを隠す）。
+            if (t >= MatchIntroTimeline.Flash)
+            {
+                GUI.color = new Color(1f, 1f, 1f, 0.85f * (1f - Ease((t - MatchIntroTimeline.Flash) / 0.4f)));
                 GUI.DrawTexture(new Rect(0f, 0f, width, height), Texture2D.whiteTexture);
+            }
+            GUI.matrix = baseMatrix;
+        }
+
+        // 斜めの札（裏の札つき。メニューの札と同じ形）: プレイヤーの色の面に、名前とキャラクターの名前。
+        private void DrawPlate(Rect rect, Color color, string label, string sub, float alpha, Matrix4x4 baseMatrix)
+        {
+            // 横へずらす斜め（下ほど左へ）。札の真ん中を中心に。
+            Matrix4x4 shear = Matrix4x4.identity;
+            shear.m01 = -0.32f;
+            Vector3 center = rect.center;
+            GUI.matrix = baseMatrix * Matrix4x4.Translate(center) * shear * Matrix4x4.Translate(-center);
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.DrawTexture(new Rect(rect.x + 6f, rect.y + 5f, rect.width, rect.height), Texture2D.whiteTexture);
+            GUI.color = new Color(color.r, color.g, color.b, alpha);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = new Color(1f, 1f, 1f, 0.9f * alpha);
+            GUI.DrawTexture(new Rect(rect.x, rect.yMax - 3f, rect.width, 3f), Texture2D.whiteTexture);
+            GUI.matrix = baseMatrix;
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.Label(new Rect(rect.x, rect.y + rect.height * 0.04f, rect.width, rect.height * 0.62f), label, _plateName);
+            if (sub.Length > 0)
+            {
+                GUI.color = new Color(1f, 1f, 1f, 0.85f * alpha);
+                GUI.Label(new Rect(rect.x, rect.y + rect.height * 0.6f, rect.width, rect.height * 0.36f), sub, _plateSub);
             }
         }
 
-        private static void DrawBar(Rect rect, float angle, Matrix4x4 baseMatrix)
+        // 集中線: 画面の外側から真ん中へ向かう細い光の線（タイトル → メインメニューのスカイダイブの速さの線と同じ考え方）。
+        private void DrawSpeedLines(float strength, float t, Matrix4x4 baseMatrix)
         {
-            if (angle != 0f)
+            var center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            float reach = new Vector2(Screen.width, Screen.height).magnitude * 0.55f;
+            const int lines = 56;
+            for (int i = 0; i < lines; i++)
             {
-                GUIUtility.RotateAroundPivot(angle, rect.center);
+                // 線ごとの決まった乱れ（毎フレーム同じ並びで、外へ流れる）。
+                float seed = Mathf.Repeat(Mathf.Sin(i * 12.9898f) * 43758.5453f, 1f);
+                float angle = i * 360f / lines + seed * 5f;
+                float flow = Mathf.Repeat(t * 3.2f + seed, 1f);
+                float inner = reach * Mathf.Lerp(0.45f, 0.2f, strength) + flow * reach * 0.25f;
+                float length = reach * (0.35f + seed * 0.4f) * (0.5f + strength * 0.5f);
+                float thickness = 1.5f + seed * 3f * strength;
+                GUIUtility.RotateAroundPivot(angle, center);
+                GUI.color = new Color(1f, 1f, 1f, (0.25f + seed * 0.5f) * strength * (1f - flow * 0.5f));
+                GUI.DrawTexture(new Rect(center.x + inner, center.y - thickness * 0.5f, length, thickness), Texture2D.whiteTexture);
+                GUI.matrix = baseMatrix;
             }
-            GUI.color = Color.black;
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        }
+
+        // ラウンドコール（READY → GO!）。画面の真ん中に大きく、ステージの色の縁取り。READY は弾んで出て、GO! は大きく出て縮みながら消える。
+        private void DrawRoundCall()
+        {
+            EnsureIntroStyles();
+            Matrix4x4 baseMatrix = GUI.matrix;
+            bool go = RoundCall == "GO!";
+            float age = go ? Time.time - _goAt : (_introTime - MatchIntroTimeline.ReadyStart) * (_rules != null && _rules.CountdownTicks > 0
+                ? _rules.CountdownTicks / (MatchIntroTimeline.DesignSeconds * Airerage.Core.Common.SimTime.TicksPerSecond) : 1f);
+            float scale = go ? Mathf.Lerp(1.5f, 1f, Ease(age / 0.18f)) : UiEase.OutBack(Mathf.Clamp01(age / 0.25f));
+            float alpha = go ? 1f - Mathf.Clamp01((age - MatchIntroTimeline.GoSeconds * 0.6f) / (MatchIntroTimeline.GoSeconds * 0.4f)) : 1f;
+            if (scale <= 0.01f || alpha <= 0f)
+            {
+                return;
+            }
+            var center = new Vector2(Screen.width * 0.5f, Screen.height * 0.46f);
+            GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), center);
+            var rect = new Rect(center.x - Screen.width * 0.5f, center.y - Screen.height * 0.12f, Screen.width, Screen.height * 0.24f);
+            Color outline = go ? new Color(1f, 0.55f, 0.15f, alpha) : new Color(_stageColor.r, _stageColor.g, _stageColor.b, alpha);
+            float thick = Mathf.Max(3f, Screen.height * 0.006f);
+            GUI.color = outline;
+            for (int i = 0; i < 16; i++)
+            {
+                float a = i * Mathf.PI * 2f / 16f;
+                GUI.Label(new Rect(rect.x + Mathf.Cos(a) * thick, rect.y + Mathf.Sin(a) * thick, rect.width, rect.height), RoundCall, _call);
+            }
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.Label(rect, RoundCall, _call);
             GUI.matrix = baseMatrix;
+        }
+
+        private void EnsureIntroStyles()
+        {
+            int h = Screen.height;
+            if (_call != null && _call.fontSize == Mathf.RoundToInt(h * 0.16f))
+            {
+                return;
+            }
+            _call = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.16f), alignment = TextAnchor.MiddleCenter };
+            _stageTitle = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.058f), alignment = TextAnchor.MiddleLeft };
+            _stageSub = new GUIStyle(GUI.skin.label) { font = GameFonts.JapaneseBold, fontSize = Mathf.RoundToInt(h * 0.024f), alignment = TextAnchor.UpperLeft };
+            _plateName = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.03f), alignment = TextAnchor.MiddleCenter };
+            _plateSub = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBold, fontSize = Mathf.RoundToInt(h * 0.016f), alignment = TextAnchor.MiddleCenter };
         }
 
         // 結果: 右上の表と同じ札（PlayerStatusPlate）を、大きくして順位の順に並べる。順位は札の順位の四角（1 位 金・2 位 銀・3 位 銅）、

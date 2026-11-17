@@ -302,7 +302,7 @@ namespace Airerage.Editor.Stages
                     new Vector3(-17.5f, 13.5f, 0f), new Vector3(17.5f, 13.5f, 0f), new Vector3(-38.75f, 16f, 0f), new Vector3(38.75f, 16f, 0f) },
                 Decorate = decor => DecorateCity(decor, night: true),
                 // 夜の雰囲気の確認（D-97。2026-11-17 のユーザーの要望）。
-                Look = StageLook.CityNight(),
+                Look = NightLook(),
             };
         }
 
@@ -351,10 +351,35 @@ namespace Airerage.Editor.Stages
             {
                 decor.Box("HollowLight", new Vector3(x, -4.15f, 0f), new Vector3(2f, 0.15f, 1.2f), decor.Unlit("HollowLamp", new Color(1f, 0.92f, 0.7f)));
             }
-            // 谷の底の道路（撃破の範囲の下）。
+            // 谷の底の道路（撃破の範囲の下）と、その先へまっすぐ延びる大通り（霧で薄れて、遠くの西新宿の高層ビルの足もとへ続く）。
             decor.Box("Street", new Vector3(0f, -24f, 6f), new Vector3(110f, 0.5f, 30f), street);
+            decor.Box("Avenue", new Vector3(0f, -24.25f, 300f), new Vector3(1600f, 0.5f, 560f), street);
+            // 大通りの両側の低い街並み（見通しの奥を空っぽに見せない。高層ビルを隠さない低さ）。
+            for (float z = 110f; z < 300f; z += decor.Range(40f, 60f))
+            {
+                for (float x = -280f; x < 280f;)
+                {
+                    float width = decor.Range(8f, 20f);
+                    float middle = x + width * 0.5f;
+                    if (Mathf.Abs(middle) > 14f)
+                    {
+                        float height = decor.Range(4f, 14f) + Mathf.Abs(middle) / 280f * 12f;
+                        float depth = decor.Range(10f, 22f);
+                        decor.Box("Block", new Vector3(middle, -24f + height * 0.5f, z), new Vector3(width, height, depth),
+                            decor.Random.NextDouble() < 0.5 ? facade : glass);
+                        if (night && decor.Random.NextDouble() < 0.6)
+                        {
+                            // 夜は正面にまばらな窓の明かり（灰色の塊に見えないように）。
+                            decor.Quad("BlockLights", new Vector3(middle, -24f + height * decor.Range(0.35f, 0.8f), z - depth * 0.5f - 0.05f),
+                                new Vector2(width * decor.Range(0.3f, 0.75f), 0.8f), decor.Random.NextDouble() < 0.3 ? windowCool : window);
+                        }
+                    }
+                    x += width + decor.Range(3f, 9f);
+                }
+            }
 
-            // 背景のビル群（3 列。奥ほど高く、霧で薄くなる）。
+            // 背景のビル群（3 列。奥ほど高く、霧で薄くなる）。真ん中（CityVistaHalfWidth の内側）は奥の 2 列を置かず、手前の列も低くして、
+            // 大通りの先の西新宿の高層ビル群（PLATEAU）を見通せるようにする（2026-11-17 の回答: ビル街の背景が変わって見えない）。
             float[] rows = { 18f, 38f, 70f };
             for (int row = 0; row < rows.Length; row++)
             {
@@ -363,6 +388,15 @@ namespace Airerage.Editor.Stages
                 {
                     float width = decor.Range(5f, 12f);
                     float top = decor.Range(-2f, 22f) + row * 10f;
+                    if (Mathf.Abs(x + width * 0.5f) < CityVistaHalfWidth)
+                    {
+                        if (row > 0)
+                        {
+                            x += width + decor.Range(1f, 5f);
+                            continue;
+                        }
+                        top = decor.Range(-14f, -5f);
+                    }
                     var center = new Vector3(x + width * 0.5f, (top - 30f) * 0.5f, z);
                     decor.Box("Skyline", center, new Vector3(width, top + 30f, decor.Range(6f, 12f)), decor.Random.NextDouble() < 0.5 ? facade : glass);
                     if (night)
@@ -402,10 +436,24 @@ namespace Airerage.Editor.Stages
             }
         }
 
+        // 背景のビル群を置かない真ん中の幅（x の絶対値。両側のビルの列のあいだから大通りの先を見通す）。
+        private const float CityVistaHalfWidth = 50f;
+
+        // 西新宿（PLATEAU）の地面の高さ: 谷の底の道路（-24）より下に沈め、大通りの地平の上に高層ビルの上の方だけが並んで見える高さ。
+        private const float CityPlateauGround = -100f;
+
         private static StageLook DayLook(StageTheme theme)
         {
             StageLook look = StageLook.FromTheme("CityDay", theme, StageMood.Day);
             look.Skyline = true;
+            look.PlateauGround = CityPlateauGround;
+            return look;
+        }
+
+        private static StageLook NightLook()
+        {
+            StageLook look = StageLook.CityNight();
+            look.PlateauGround = CityPlateauGround;
             return look;
         }
     }
