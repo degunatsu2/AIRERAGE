@@ -85,7 +85,11 @@ namespace Airerage.Runtime.UI
             Edges.Clear();
         }
 
-        /// <summary>graphic のローカルの座標で、画面の 1 ピクセルの長さ。</summary>
+        /// <summary>
+        /// graphic のローカルの座標で、画面の 1 ピクセルの長さ（キャンバスの倍率だけから決める）。graphic 自身や親の拡大は見ない: 画面の
+        /// 切り替えで札が横にめくれる間（横の拡大がほぼ 0）に作り直すと、1 ピクセルが何百倍にもなり、帯が画面を横切る大きな形になった
+        /// （2026-11-17 の指摘）。拡大の演出の間は帯もいっしょに伸び縮みするが、拡大は 1 倍の近くなので見た目は変わらない。
+        /// </summary>
         public static float LocalPixel(Graphic graphic)
         {
             Canvas canvas = graphic.canvas;
@@ -93,15 +97,8 @@ namespace Airerage.Runtime.UI
             {
                 return 1f;
             }
-            Canvas root = canvas.rootCanvas;
-            float rootScale = Mathf.Abs(root.transform.lossyScale.x);
-            float scale = Mathf.Abs(graphic.transform.lossyScale.x);
-            if (rootScale <= 0f || scale <= 0f || root.scaleFactor <= 0f)
-            {
-                return 0f;
-            }
-            // ローカルの 1 単位 = (自分の拡大 ÷ キャンバスの拡大) × キャンバスの倍率 ピクセル。
-            return 1f / (scale / rootScale * root.scaleFactor);
+            float factor = canvas.rootCanvas.scaleFactor;
+            return factor > 0f ? 1f / factor : 1f;
         }
 
         // 辺 a-b の、三角形の残りの点 c と反対の側へ、幅 width の帯（内側は元の色、外側は透明）。

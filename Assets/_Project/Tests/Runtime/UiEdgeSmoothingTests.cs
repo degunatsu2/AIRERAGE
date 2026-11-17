@@ -94,8 +94,9 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
-        public void LocalPixel_FollowsTheCanvasAndTheGraphicScale()
+        public void LocalPixel_FollowsOnlyTheCanvas_NotTheAnimatedScaleOfTheGraphic()
         {
+            // 画面の切り替えで札が横にめくれる間（横の拡大がほぼ 0）でも、帯は 1 ピクセルのまま（何百倍にもならない。2026-11-17 の指摘）。
             var root = new GameObject("Canvas", typeof(RectTransform));
             try
             {
@@ -103,10 +104,11 @@ namespace Airerage.Runtime.Tests
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 var child = new GameObject("Plate", typeof(RectTransform));
                 child.transform.SetParent(root.transform, false);
-                child.transform.localScale = new Vector3(2f, 2f, 1f);
                 var plate = child.AddComponent<SlantedPlate>();
-                float expected = 1f / (2f * canvas.scaleFactor);
-                Assert.That(UiEdgeSmoothing.LocalPixel(plate), Is.EqualTo(expected).Within(0.0001f), "2 倍に拡大した札の 1 ピクセルが半分の長さでない");
+                float normal = UiEdgeSmoothing.LocalPixel(plate);
+                Assert.That(normal, Is.EqualTo(1f / canvas.scaleFactor).Within(0.0001f));
+                child.transform.localScale = new Vector3(0.001f, 1f, 1f);
+                Assert.That(UiEdgeSmoothing.LocalPixel(plate), Is.EqualTo(normal).Within(0.0001f), "横にめくれている間に帯が太くなる");
             }
             finally
             {
