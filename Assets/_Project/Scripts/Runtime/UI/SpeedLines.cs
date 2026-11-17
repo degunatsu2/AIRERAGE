@@ -40,6 +40,13 @@ namespace Airerage.Runtime.UI
 
         protected override void OnPopulateMesh(VertexHelper vh)
         {
+            Populate(vh);
+            // 斜めの辺のギザギザを消す（形の外周に画面の 1 ピクセルのぼかし。UiEdgeSmoothing。2026-11-16 のユーザーの要望）。
+            UiEdgeSmoothing.Apply(vh, this);
+        }
+
+        private void Populate(VertexHelper vh)
+        {
             vh.Clear();
             if (_progress < 0f || _progress > 1f)
             {

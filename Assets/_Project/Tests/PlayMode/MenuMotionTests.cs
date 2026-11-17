@@ -573,6 +573,50 @@ namespace Airerage.PlayMode.Tests
         }
 
         /// <summary>
+        /// 日本語入力（IME）は、文字の入力欄に入力している間だけ有効（2026-11-16 の指摘: 入力欄の外で IME の窓が左上に出ていた）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Ime_IsOnlyEnabledWhileTypingInAField()
+        {
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                SceneManager.LoadScene("App");
+                yield return null;
+                var flow = Object.FindFirstObjectByType<GameFlow>();
+                yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+                var guard = Object.FindFirstObjectByType<ImeGuard>();
+                Assert.That(guard, Is.Not.Null, "いつも読み込むシーンに IME の制御がない");
+                var menu = Object.FindFirstObjectByType<MenuScreens>();
+                menu.ContinueFromTitle();
+                menu.Transition.Complete();
+                yield return null;
+                yield return null;
+                Assert.That(guard.ImeEnabled, Is.False, "メニューで IME が有効のまま");
+                menu.Network.Button.onClick.Invoke();
+                menu.Transition.Complete();
+                yield return null;
+                var online = Object.FindFirstObjectByType<Airerage.Net.OnlineMenu>();
+                UnityEngine.UI.InputField field = online.NameField;
+                EventSystem.current.SetSelectedGameObject(field.gameObject);
+                field.ActivateInputField();
+                yield return null;
+                yield return null;
+                Assert.That(field.isFocused, Is.True, "前提: 名前の入力欄に入力している");
+                Assert.That(guard.ImeEnabled, Is.True, "入力欄に入力しているのに IME が無効");
+                field.DeactivateInputField();
+                EventSystem.current.SetSelectedGameObject(online.BackButton.gameObject);
+                yield return null;
+                yield return null;
+                Assert.That(guard.ImeEnabled, Is.False, "入力欄を離れても IME が有効のまま");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keyboard);
+            }
+        }
+
+        /// <summary>
         /// NETWORK を開いてすぐ（切り替えの途中）に戻っても、出ていく接続の画面の白い背景がフェードアウトする（2026-11-16 の指摘: 前の
         /// 切り替えを早送りした同じフレームに写すと、消す予約の入った無効の CanvasGroup まで写り、濃さが効かずに白い背景が残った）。
         /// </summary>

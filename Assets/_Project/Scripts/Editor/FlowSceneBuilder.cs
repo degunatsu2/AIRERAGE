@@ -634,6 +634,8 @@ namespace Airerage.Editor
             // 背景を押しても選んでいる項目を外さない（外れると Esc ／ B の「戻る」が効かない。2026-11-06）。外れたときは選び直す。
             module.deselectOnBackgroundClick = false;
             events.AddComponent<SelectionKeeper>();
+            // 日本語入力（IME）は文字の入力欄に入力している間だけ有効にする（左上に IME の窓が出ないように。2026-11-16）。
+            events.AddComponent<ImeGuard>();
             // メニューの効果音（決定した直後に画面のシーンを外しても途切れないよう、いつも読み込むシーンに置く）。
             // タイトルとキャラクターの決定は音声ファイル（docs/18 4.3）。
             var sounds = new GameObject("UiSounds").AddComponent<UiSounds>();
