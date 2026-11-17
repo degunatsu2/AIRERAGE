@@ -119,6 +119,8 @@ namespace Airerage.Editor
                 point.transform.position = SandboxOnlineSceneBuilder.SpawnPositions[p];
                 point.AddComponent<SpawnPointAuthoring>().Configure(p);
             }
+            // 背景とオブジェクトのクオリティアップ（D-97。ATHLETIC で試作）。
+            StageDressing.Apply(StageLook.Athletic(), SandboxOnlineSceneBuilder.BoundsMin, SandboxOnlineSceneBuilder.BoundsMax);
             Save(scene, AthleticStagePath);
         }
 
@@ -145,6 +147,7 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.CreateFollowCamera(characterView.transform, inputActions);
             AimIndicatorView aimIndicator = SandboxWireSceneBuilder.CreateAimIndicator();
             Camera camera = Object.FindFirstObjectByType<Camera>();
+            EnablePostProcessing(camera);
 
             var runner = new GameObject("Simulation").AddComponent<SimulationRunner>();
             SandboxWireSceneBuilder.SetReference(runner, "_character", character);
@@ -167,6 +170,7 @@ namespace Airerage.Editor
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
             SandboxWireSceneBuilder.CreateBankView(runner, audio, guides);
+            CreateSurfaceImpacts(runner);
             SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
             SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
@@ -191,6 +195,7 @@ namespace Airerage.Editor
             CinemachineCamera follow = SandboxWireSceneBuilder.CreateFollowCamera(cameraTarget, inputActions);
             Object.DestroyImmediate(follow.GetComponent<CameraZoom>());
             Camera camera = Object.FindFirstObjectByType<Camera>();
+            EnablePostProcessing(camera);
 
             var runner = new GameObject("LocalMatch").AddComponent<LocalMatchRunner>();
             SandboxWireSceneBuilder.SetReference(runner, "_roster", roster);
@@ -221,6 +226,7 @@ namespace Airerage.Editor
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
             SandboxWireSceneBuilder.CreateBankView(runner, audio, guides);
+            CreateSurfaceImpacts(runner);
             SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
             SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
@@ -279,6 +285,7 @@ namespace Airerage.Editor
             CinemachineCamera follow = SandboxWireSceneBuilder.CreateFollowCamera(null, inputActions);
             AimIndicatorView aimIndicator = SandboxWireSceneBuilder.CreateAimIndicator();
             Camera camera = Object.FindFirstObjectByType<Camera>();
+            EnablePostProcessing(camera);
 
             var runner = new GameObject("Online").AddComponent<Airerage.Net.OnlineRunner>();
             SandboxWireSceneBuilder.SetReference(runner, "_character", character);
@@ -308,11 +315,27 @@ namespace Airerage.Editor
             EdgeGuideLayer guides = SandboxWireSceneBuilder.CreateEdgeGuides();
             SandboxWireSceneBuilder.CreateCoinViews(runner, guides);
             SandboxWireSceneBuilder.CreateBankView(runner, audio, guides);
+            CreateSurfaceImpacts(runner);
             SandboxWireSceneBuilder.CreatePlayerGuides(runner, guides);
             SandboxWireSceneBuilder.CreateScoreboard(runner, audio);
             SandboxWireSceneBuilder.CreateAtmosphere(runner, audio);
             MenuUiBuilder.CreateResultsMenu(runner, matchHud, inputActions);
             Save(scene, OnlineMatchScenePath);
+        }
+
+        // ステージの仕上げの画面処理（D-97 の V13。ステージの Volume）をカメラに効かせる。後処理の既定の設定（URP の設定のアセット）は空にして
+        // あるので、Volume のないステージの見た目は変わらない。
+        private static void EnablePostProcessing(Camera camera)
+        {
+            camera.allowHDR = true;
+            UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(camera).renderPostProcessing = true;
+        }
+
+        // 足場の光の輪（着地・ワイヤーの接続）と撃破の線の膜に、キャラクターの動きを渡す（D-97 の V19・V22）。
+        private static void CreateSurfaceImpacts(MonoBehaviour runner)
+        {
+            var feed = new GameObject("SurfaceImpacts").AddComponent<SurfaceImpactFeed>();
+            SandboxWireSceneBuilder.SetReference(feed, "_source", runner);
         }
 
         private static void BuildMenu()
@@ -322,6 +345,8 @@ namespace Airerage.Editor
             Camera camera = Object.FindFirstObjectByType<Camera>();
             camera.fieldOfView = 40f;
             camera.gameObject.AddComponent<MenuCameraDrift>();
+            // メニューの背景のステージにも、ステージの仕上げの画面処理（D-97 の V13）を効かせる。
+            EnablePostProcessing(camera);
 
             Canvas canvas = MenuUiBuilder.CreateCanvas("Menu", 0);
             var white = Color.white;

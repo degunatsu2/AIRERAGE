@@ -49,6 +49,11 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private int _noticeSoundWindowTicks = 30;
         [Tooltip("光の柱の高さ（m）")]
         [SerializeField] private float _beamHeight = 9f;
+        [Tooltip("遠くからも見える高い光の柱（D-97 の V12。板。なくてもよい）と、予告中の次の地点の柱")]
+        [SerializeField] private Renderer _pillar;
+        [SerializeField] private Renderer _nextPillar;
+        [Tooltip("高い光の柱の高さと幅（m）")]
+        [SerializeField] private Vector2 _pillarSize = new Vector2(3.4f, 70f);
         [SerializeField] private float _popupSeconds = 1.3f;
         [SerializeField] private float _flashSeconds = 0.5f;
 
@@ -67,10 +72,16 @@ namespace Airerage.Runtime.Presentation
         private bool _nextOffscreen;
         private int _shownSpot = -1;
         private float _appearedAt = float.NegativeInfinity;
+        private MaterialPropertyBlock _pillarBlock;
+        private static readonly int PillarColorId = Shader.PropertyToID("_Color");
+        private static readonly int PillarStrengthId = Shader.PropertyToID("_Strength");
 
         /// <summary>今の拠点の地点の番号（なければ -1）と、予告している次の地点の番号（予告していなければ -1）。テスト用。</summary>
         public int CurrentSpot { get; private set; } = -1;
         public int NextSpot { get; private set; } = -1;
+
+        /// <summary>高い光の柱の濃さ（0 = 出していない）。テスト用。</summary>
+        public float PillarStrength { get; private set; }
 
         /// <summary>今の拠点が画面の外か（端に矢印を出しているか）。テスト用。</summary>
         public bool BankOffscreen { get; private set; }
@@ -189,12 +200,17 @@ namespace Airerage.Runtime.Presentation
             _beam.SetPosition(0, _bankCenter + new Vector3(0f, -_radius * 0.6f, 0f));
             _beam.SetPosition(1, _bankCenter + new Vector3(0f, _beamHeight * eased, 0f));
             SetGradient(_beam, ringColor, (0.35f + 0.25f * flash + 0.4f * (1f - appear)) * eased, 0f);
+            // 遠くからも見える高い光の柱（V12。行き先を光で示す）。出た・移ったときと確定したときは強く。
+            PillarStrength = (0.55f + 0.35f * flash + 0.6f * (1f - appear)) * eased;
+            PlacePillar(_pillar, _bankCenter, ringColor, PillarStrength);
 
             if (NextSpot >= 0)
             {
                 _nextCenter = ToWorld(spots[NextSpot].Position);
                 float blink = 0.35f + 0.45f * (0.5f + 0.5f * Mathf.Sin(time * 9f));
                 DrawRing(_next, _nextCenter, _radius, _color, blink);
+                // 次の地点の柱は、輪と同じ速さで点滅する（予告）。
+                PlacePillar(_nextPillar, _nextCenter, _color, 0.25f + 0.45f * (0.5f + 0.5f * Mathf.Sin(time * 4.5f)));
             }
 
             // 画面の外なら、誘導表示の札（左に拠点の絵、右に「BANK」。予告中は次の地点も「NEXT」で）。
@@ -300,6 +316,38 @@ namespace Airerage.Runtime.Presentation
             _sweep.enabled = bank;
             _beam.enabled = bank;
             _next.enabled = next;
+            if (_pillar != null)
+            {
+                _pillar.enabled = bank;
+            }
+            if (_nextPillar != null)
+            {
+                _nextPillar.enabled = next;
+            }
+            if (!bank)
+            {
+                PillarStrength = 0f;
+            }
+        }
+
+        // 高い光の柱の板を、地点の少し下から上へ立て、色と濃さを塗る（材質は分けずに、描くときの値で）。
+        private void PlacePillar(Renderer pillar, Vector3 center, Color color, float strength)
+        {
+            if (pillar == null)
+            {
+                return;
+            }
+            if (_pillarBlock == null)
+            {
+                _pillarBlock = new MaterialPropertyBlock();
+            }
+            Transform t = pillar.transform;
+            t.position = center + new Vector3(0f, _pillarSize.y * 0.5f - _radius * 0.6f, 0.4f);
+            t.localScale = new Vector3(_pillarSize.x, _pillarSize.y, 1f);
+            pillar.GetPropertyBlock(_pillarBlock);
+            _pillarBlock.SetColor(PillarColorId, color * 1.8f);
+            _pillarBlock.SetFloat(PillarStrengthId, strength);
+            pillar.SetPropertyBlock(_pillarBlock);
         }
 
         private static void DrawRing(LineRenderer line, Vector3 center, float radius, Color color, float alpha)

@@ -31,6 +31,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(feed.BankSpots.Count, Is.GreaterThanOrEqualTo(3), "拠点の候補がない");
             Assert.That(feed.BankSpots[0].IsFirst, Is.True, "最初の拠点が先頭にない");
             Assert.That(view.CurrentSpot, Is.EqualTo(0), "始まりの拠点が最初の地点ではない");
+            Assert.That(view.PillarStrength, Is.GreaterThan(0f), "拠点の高い光の柱を出していない（D-97 の V12）");
 
             // 所持コインを持たせて、拠点の中へ移す。
             BankSpot bank = feed.BankSpots[view.CurrentSpot];

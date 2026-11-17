@@ -11,6 +11,9 @@ namespace Airerage.Runtime.UI
     /// 新しい Input System だけを使う設定では、ゲームが IME を何もしないと、日本語入力が「あ」のままゲームの操作のキー（Q・E・M・C など）を
     /// 押したときに、IME の入力中の窓が画面の左上（位置を教えていないので）に出ていた。入力欄の外では IME を切り、入力欄に入力している間は
     /// IME を有効にして、窓を入力欄の左下に出す。いつも読み込むシーン（App）の EventSystem に置く。
+    /// IME の切り替えは 2 つの入口の両方で行う: Input System の Keyboard と、古い入力の UnityEngine.Input.imeCompositionMode（uGUI の入力欄が使い、
+    /// 入力を終えると「自動」に戻す）。片方だけだと、エディタのゲームビューで IME が切れず、見出しの上に入力中の窓が残った
+    /// （2026-11-17 の指摘。見出しの上の四角は、画面にいる間は消えず、別の画面へ移ると消える）。
     /// </summary>
     public sealed class ImeGuard : MonoBehaviour
     {
@@ -21,6 +24,12 @@ namespace Airerage.Runtime.UI
 
         /// <summary>今 IME を有効にしているか（テスト用）。</summary>
         public bool ImeEnabled => _enabled;
+
+        /// <summary>古い入力の IME の設定のうち、今の状態で求めるもの（入力中は有効、ほかは無効）。</summary>
+        public static IMECompositionMode LegacyModeFor(bool typing)
+        {
+            return typing ? IMECompositionMode.On : IMECompositionMode.Off;
+        }
 
         private void OnEnable()
         {
@@ -35,6 +44,7 @@ namespace Airerage.Runtime.UI
                 _keyboard.SetIMEEnabled(true);
             }
             _keyboard = null;
+            UnityEngine.Input.imeCompositionMode = IMECompositionMode.Auto;
         }
 
         private void OnApplicationFocus(bool focused)
@@ -55,6 +65,12 @@ namespace Airerage.Runtime.UI
             }
             InputField field = FocusedField(EventSystem.current);
             bool want = field != null;
+            // 古い入力の設定は uGUI の入力欄が入力の終わりに「自動」へ戻すので、毎フレーム合わせる。
+            IMECompositionMode legacy = LegacyModeFor(want);
+            if (UnityEngine.Input.imeCompositionMode != legacy)
+            {
+                UnityEngine.Input.imeCompositionMode = legacy;
+            }
             if (!_applied || keyboard != _keyboard || want != _enabled)
             {
                 keyboard.SetIMEEnabled(want);

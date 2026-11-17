@@ -11,11 +11,13 @@ namespace Airerage.Runtime.Presentation
     /// あるものに変え、背景の空を少し赤くする。予告の瞬間に警報を鳴らす。表示だけで、状態は書き換えない。
     /// 予告かどうかはティック数とルールだけから決まる（FieldCoinRules.JackpotAnnounceTick）ので、巻き戻しても変わらない。
     /// 再戦でティックが戻れば、ふつうに戻る。
-    /// 空は、シーンの空のマテリアル（手続き型の空の _SkyTint）を写したものを使う（元のアセットを書き換えない）。
+    /// 空は、シーンの空のマテリアル（手続き型の空の _SkyTint、またはグラデーションの空 Airerage/GradientSky の _Tense。D-97）を写したものを
+    /// 使う（元のアセットを書き換えない）。
     /// </summary>
     public sealed class MatchAtmosphere : MonoBehaviour
     {
         private static readonly int SkyTintId = Shader.PropertyToID("_SkyTint");
+        private static readonly int TenseId = Shader.PropertyToID("_Tense");
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
         [SerializeField] private MonoBehaviour _source;
@@ -51,10 +53,13 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             _originalSky = RenderSettings.skybox;
-            if (_originalSky != null && _originalSky.HasProperty(SkyTintId))
+            if (_originalSky != null && (_originalSky.HasProperty(SkyTintId) || _originalSky.HasProperty(TenseId)))
             {
                 _sky = new Material(_originalSky) { name = _originalSky.name + " (Atmosphere)" };
-                _normalTint = _sky.GetColor(SkyTintId);
+                if (_sky.HasProperty(SkyTintId))
+                {
+                    _normalTint = _sky.GetColor(SkyTintId);
+                }
                 RenderSettings.skybox = _sky;
             }
         }
@@ -94,7 +99,14 @@ namespace Airerage.Runtime.Presentation
             SkyBlend = Mathf.MoveTowards(SkyBlend, target, Time.deltaTime / Mathf.Max(0.05f, _transitionSeconds));
             if (_sky != null)
             {
-                _sky.SetColor(SkyTintId, Color.Lerp(_normalTint, _tenseSkyTint, SkyBlend * _tenseAmount));
+                if (_sky.HasProperty(TenseId))
+                {
+                    _sky.SetFloat(TenseId, SkyBlend * _tenseAmount);
+                }
+                else
+                {
+                    _sky.SetColor(SkyTintId, Color.Lerp(_normalTint, _tenseSkyTint, SkyBlend * _tenseAmount));
+                }
             }
         }
     }

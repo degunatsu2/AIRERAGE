@@ -82,6 +82,55 @@ namespace Airerage.Editor
         }
 
         /// <summary>
+        /// ステージの見た目（D-97。背景とオブジェクトのクオリティアップ）を、試合のカメラ（距離 30m・画角 40°・後処理あり）でいくつかの所から撮る
+        /// （Logs/Snapshots/Look_シーン名_*.png）。撮るステージは環境変数 AIRERAGE_LOOK_STAGES（, 区切り。なければ Stage_Athletic）。
+        /// </summary>
+        public static void CaptureStageLooks()
+        {
+            Directory.CreateDirectory(OutputFolder);
+            string names = Environment.GetEnvironmentVariable("AIRERAGE_LOOK_STAGES");
+            foreach (string name in string.IsNullOrEmpty(names) ? new[] { "Stage_Athletic" } : names.Split(','))
+            {
+                string[] found = AssetDatabase.FindAssets($"{name} t:Scene");
+                if (found.Length == 0)
+                {
+                    throw new InvalidOperationException($"ステージのシーンがない: {name}");
+                }
+                EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(found[0]), OpenSceneMode.Single);
+                var go = new GameObject("SnapshotCamera");
+                Camera camera = go.AddComponent<Camera>();
+                camera.clearFlags = CameraClearFlags.Skybox;
+                camera.farClipPlane = 1000f;
+                camera.allowHDR = true;
+                camera.allowMSAA = true;
+                var data = go.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+                data.renderPostProcessing = true;
+                try
+                {
+                    (string Tag, Vector3 Position, float Fov)[] shots =
+                    {
+                        ("Overview", new Vector3(0f, 12f, -78f), 55f),
+                        ("Center", new Vector3(0f, 6f, -30f), 40f),
+                        ("Left", new Vector3(-22f, 11f, -30f), 40f),
+                        ("Top", new Vector3(6f, 22f, -30f), 40f),
+                        ("Low", new Vector3(-6f, -14f, -30f), 40f),
+                        ("Edge", new Vector3(48f, 4f, -30f), 40f),
+                    };
+                    foreach (var shot in shots)
+                    {
+                        camera.fieldOfView = shot.Fov;
+                        go.transform.position = shot.Position;
+                        RenderCamera(camera, new Vector2Int(1920, 1080), $"{OutputFolder}/Look_{name}_{shot.Tag}.png");
+                    }
+                }
+                finally
+                {
+                    Object.DestroyImmediate(go);
+                }
+            }
+        }
+
+        /// <summary>
         /// ステージ選択だけ（ステージの絵は撮らない）: 試合の前の選択と、オプションの RANDOM STAGES（チェック・すべてチェック・DONE。
         /// docs/20 の 3 回目の要望）。
         /// </summary>

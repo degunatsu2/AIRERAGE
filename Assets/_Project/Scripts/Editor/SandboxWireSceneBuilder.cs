@@ -1060,6 +1060,10 @@ namespace Airerage.Editor
             SetReference(view, "_next", CreateIndicatorLine(view.transform, "Next", material, 0.14f));
             SetReference(view, "_audio", audio);
             SetReference(view, "_guides", guides);
+            // 遠くからも見える高い光の柱（D-97 の V12。今の拠点と、予告中の次の地点）。色と濃さは BankView が描くときに塗る。
+            Material pillar = LoadOrCreateShaderMaterial("BankPillar", "Airerage/LightPillar", m => m.SetFloat("_StreakSpeed", 0.6f));
+            SetReference(view, "_pillar", CreatePillar(view.transform, "Pillar", pillar));
+            SetReference(view, "_nextPillar", CreatePillar(view.transform, "NextPillar", pillar));
             // ホットエリア（30 秒ごとのフルーツとコイン。拠点と同じく試合の仕組みのシーンに置く。2026-11-02）。
             CreateHotAreaView(source, audio, guides);
         }
@@ -1507,6 +1511,47 @@ namespace Airerage.Editor
             material = new Material(shader);
             material.SetColor("_BaseColor", color);
             AssetDatabase.CreateAsset(material, path);
+            return material;
+        }
+
+        // 拠点の光の柱の板（影を落とさない・受けない）。
+        private static Renderer CreatePillar(Transform parent, string name, Material material)
+        {
+            GameObject go = CreateVisual(PrimitiveType.Quad, name, material, Vector3.one);
+            go.transform.SetParent(parent, false);
+            var renderer = go.GetComponent<MeshRenderer>();
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.enabled = false;
+            return renderer;
+        }
+
+        /// <summary>
+        /// 自前のシェーダーの材質を作る（なければ作り、あれば同じアセットのまま値だけ当て直す。GUID を変えないので、シーンの参照が変わらない）。
+        /// folder を省くと Assets/_Project/Materials。
+        /// </summary>
+        internal static Material LoadOrCreateShaderMaterial(string name, string shaderName, Action<Material> setup, string folder = null)
+        {
+            folder ??= MaterialFolder;
+            string path = $"{folder}/{name}.mat";
+            Shader shader = Shader.Find(shaderName);
+            if (shader == null)
+            {
+                throw new InvalidOperationException($"シェーダーが見つからない: {shaderName}");
+            }
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                EnsureFolder(folder);
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, path);
+            }
+            else if (material.shader != shader)
+            {
+                material.shader = shader;
+            }
+            setup?.Invoke(material);
+            EditorUtility.SetDirty(material);
             return material;
         }
 

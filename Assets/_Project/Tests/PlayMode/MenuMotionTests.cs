@@ -593,6 +593,7 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 yield return null;
                 Assert.That(guard.ImeEnabled, Is.False, "メニューで IME が有効のまま");
+                Assert.That(Input.imeCompositionMode, Is.EqualTo(IMECompositionMode.Off), "メニューで古い入力の IME が切れていない（エディタで窓が残る）");
                 menu.Network.Button.onClick.Invoke();
                 menu.Transition.Complete();
                 yield return null;
@@ -604,11 +605,14 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 Assert.That(field.isFocused, Is.True, "前提: 名前の入力欄に入力している");
                 Assert.That(guard.ImeEnabled, Is.True, "入力欄に入力しているのに IME が無効");
+                Assert.That(Input.imeCompositionMode, Is.EqualTo(IMECompositionMode.On), "入力欄に入力しているのに古い入力の IME が無効");
                 field.DeactivateInputField();
                 EventSystem.current.SetSelectedGameObject(online.BackButton.gameObject);
                 yield return null;
                 yield return null;
                 Assert.That(guard.ImeEnabled, Is.False, "入力欄を離れても IME が有効のまま");
+                // uGUI の入力欄は入力の終わりに「自動」へ戻すが、ImeGuard が切る。
+                Assert.That(Input.imeCompositionMode, Is.EqualTo(IMECompositionMode.Off), "入力欄を離れても古い入力の IME が切れない");
             }
             finally
             {
