@@ -594,6 +594,29 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
                 Assert.That(guard.ImeEnabled, Is.False, "メニューで IME が有効のまま");
                 Assert.That(Input.imeCompositionMode, Is.EqualTo(IMECompositionMode.Off), "メニューで古い入力の IME が切れていない（エディタで窓が残る）");
+                // ほか（エディタ）が毎フレーム書き戻しても、毎フレーム書き合わない（2026-11-17 の指摘: ウインドウを戻すとたまに止まる）。
+                int writes = guard.LegacyWrites;
+                float started = Time.unscaledTime;
+                for (int i = 0; i < 20; i++)
+                {
+                    Input.imeCompositionMode = IMECompositionMode.Auto;
+                    yield return null;
+                }
+                int allowed = 1 + Mathf.FloorToInt((Time.unscaledTime - started) / ImeGuard.RetrySeconds);
+                Assert.That(guard.LegacyWrites - writes, Is.LessThanOrEqualTo(allowed), "書き戻されるたびに IME の設定を書き合っている");
+                // ほかのアプリから戻った直後は IME に触らず、落ち着いてから当て直す。
+                guard.OnApplicationFocus(false);
+                guard.OnApplicationFocus(true);
+                Input.imeCompositionMode = IMECompositionMode.Auto;
+                writes = guard.LegacyWrites;
+                yield return null;
+                yield return null;
+                Assert.That(guard.Settling, Is.True, "戻った直後に待たない");
+                Assert.That(guard.LegacyWrites, Is.EqualTo(writes), "戻った直後に IME を切り替えている");
+                yield return WaitFor(() => !guard.Settling, 3f, "落ち着かない");
+                yield return null;
+                yield return null;
+                Assert.That(Input.imeCompositionMode, Is.EqualTo(IMECompositionMode.Off), "戻ってから IME を当て直さない");
                 menu.Network.Button.onClick.Invoke();
                 menu.Transition.Complete();
                 yield return null;

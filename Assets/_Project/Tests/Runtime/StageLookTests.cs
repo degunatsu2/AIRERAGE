@@ -233,8 +233,9 @@ namespace Airerage.Runtime.Tests
             Scene scene = Open(AthleticPath);
             foreach (StageZoneView view in InScene<StageZoneView>(scene))
             {
-                var line = (Material)new SerializedObject(view).FindProperty("_lineMaterial").objectReferenceValue;
-                Assert.That(line.shader.name, Is.EqualTo("Airerage/GlowLine"), $"{view.name}: 線が光る線でない");
+                Assert.That(view.LineMaterial.shader.name, Is.EqualTo("Airerage/GlowLine"), $"{view.name}: 線が光る線でない");
+                // 予告の斜線と記号は今までの材質（光る線の材質で描くと光の塊になった。2026-11-17 の指摘）。
+                Assert.That(view.OverlayMaterial.shader.name, Is.EqualTo("Sprites/Default"), $"{view.name}: 予告の板が光る線の材質");
                 var zone = view.GetComponent<StageZoneAuthoring>();
                 Transform[] parts = view.GetComponentsInChildren<Transform>(true);
                 switch (zone.Kind)
@@ -274,6 +275,52 @@ namespace Airerage.Runtime.Tests
                 {
                     Assert.That(rim.transform.localScale.z, Is.LessThan(0.2f), "上の面をオレンジの板が覆っている（陰影が見えない）");
                 }
+            }
+        }
+
+        private static IEnumerable<string> DressedStages()
+        {
+            return new[]
+            {
+                "Stage_Athletic", "Stage_CityDay", "Stage_CityNight", "Stage_Volcano", "Stage_SnowSea", "Stage_SpaceStation", "Stage_Lab",
+                "Stage_Kitchen", "Stage_Manor", "Stage_Stadium", "Stage_Wharf",
+            };
+        }
+
+        [TestCaseSource(nameof(DressedStages))]
+        public void EveryStage_IsDressed_WithoutChangingTheTerrain(string stage)
+        {
+            // ほかのステージにも当てる（2026-11-17 の要望）。地形の当たりはそのまま、見た目だけ。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            SceneManager.SetActiveScene(scene);
+            Assert.That(RenderSettings.skybox.shader.name, Is.EqualTo("Airerage/GradientSky"), "グラデーションの空でない");
+            BoxCollider[] terrain = scene.GetRootGameObjects().Single(g => g.name == "Terrain").GetComponentsInChildren<BoxCollider>();
+            StageBlock[] blocks = scene.GetRootGameObjects().Single(g => g.name == "TerrainVisuals").GetComponentsInChildren<StageBlock>();
+            Assert.That(blocks.Length, Is.EqualTo(terrain.Length), "地形の箱ごとに面取りした見た目がない");
+            foreach (BoxCollider box in terrain)
+            {
+                Assert.That(box.GetComponent<MeshRenderer>(), Is.Null, $"{box.name}: 元の箱の見た目が残っている");
+            }
+            Assert.That(InScene<Volume>(scene).Single().sharedProfile.TryGet(out Bloom _), Is.True, "仕上げの画面処理がない");
+            Transform bounds = scene.GetRootGameObjects().Single(g => g.name == "KnockoutBounds").transform;
+            Assert.That(bounds.Find("Membranes").childCount, Is.EqualTo(4), "撃破の線の膜がない");
+            Assert.That(bounds.Find("Frame"), Is.Null, "前の赤い枠の線が残っている");
+            foreach (StageZoneView view in InScene<StageZoneView>(scene))
+            {
+                Assert.That(view.LineMaterial.shader.name, Is.EqualTo("Airerage/GlowLine"), $"{view.name}: 線が光る線でない");
+                Assert.That(view.OverlayMaterial.shader.name, Is.EqualTo("Sprites/Default"), $"{view.name}: 予告の板が光る線の材質（光の塊になる）");
+                Transform column = view.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "Column");
+                Renderer columnRenderer = column != null ? column.GetComponent<Renderer>() : null;
+                if (columnRenderer != null && columnRenderer.sharedMaterial.shader.name == "Airerage/WindColumn")
+                {
+                    // 風は気流の筋と粒だけ（2026-11-17 の要望）。前の矢印の形の筋を重ねない。
+                    Assert.That(view.WindLines, Is.False, $"{view.name}: 風に前の筋が重なる");
+                }
+            }
+            foreach (Collider collider in InScene<Collider>(scene))
+            {
+                Assert.That(collider.transform.parent != null && collider.transform.parent.name == "Terrain", Is.True,
+                    $"地形の外に当たりがある: {collider.name}");
             }
         }
 

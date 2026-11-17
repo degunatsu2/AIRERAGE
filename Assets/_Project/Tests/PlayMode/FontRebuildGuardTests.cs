@@ -83,6 +83,31 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        /// <summary>
+        /// 字体の絵の作り直しが毎フレーム続いても、描き直しを続けない（30 フレームで休む。2026-11-17 の指摘: ウインドウを戻すとたまに止まる）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Guard_BacksOff_WhenRebuildsNeverStop()
+        {
+            var go = new GameObject("Guard");
+            try
+            {
+                var guard = go.AddComponent<FontRebuildGuard>();
+                int frames = FontRebuildGuard.MaxConsecutiveFrames + 10;
+                for (int i = 0; i < frames; i++)
+                {
+                    guard.NotifyRebuilt();
+                    yield return null;
+                }
+                Assert.That(guard.BackingOff, Is.True, "作り直しが続いても休まない");
+                Assert.That(guard.Refreshes, Is.LessThanOrEqualTo(FontRebuildGuard.MaxConsecutiveFrames), "休まずに描き直し続けた");
+            }
+            finally
+            {
+                Object.Destroy(go);
+            }
+        }
+
         // 文字の網が作り直された回数を数える。
         private sealed class MeshCounter : BaseMeshEffect
         {

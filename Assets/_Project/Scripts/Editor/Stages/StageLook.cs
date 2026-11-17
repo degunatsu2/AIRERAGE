@@ -2,6 +2,21 @@ using UnityEngine;
 
 namespace Airerage.Editor.Stages
 {
+    /// <summary>ステージの雰囲気（色の台本を、ステージの今の色 StageTheme から作るときの土台）。</summary>
+    internal enum StageMood
+    {
+        /// <summary>昼の屋外（太陽の光、明るい空）。</summary>
+        Day,
+        /// <summary>夜の屋外（星、月明かり、光るものがにじむ）。</summary>
+        Night,
+        /// <summary>屋内（空はほとんど見えない。太陽と星なし）。</summary>
+        Indoor,
+        /// <summary>宇宙（真っ黒な空と星、霧なし）。</summary>
+        Space,
+        /// <summary>溶岩（赤い空、熱でにじむ）。</summary>
+        Lava,
+    }
+
     /// <summary>
     /// ステージの見た目の台本（D-97 の V11 色の台本。2026-11-17 のユーザーの決定）: 空・霧・光・足場・ギミック・遠景・格子・撃破の線の膜・
     /// 仕上げの画面処理の色と強さを、ステージごとに 1 か所にまとめる。StageDressing がこの値でステージを飾る。今は ATHLETIC と
@@ -26,6 +41,8 @@ namespace Airerage.Editor.Stages
         public Vector3 SunDirection;
         /// <summary>夜空の星の明るさ（0 なら出さない）。</summary>
         public float Stars;
+        /// <summary>霧を使うか（宇宙は使わない）。</summary>
+        public bool Fog = true;
         public Color FogColor;
         public float FogStart;
         public float FogEnd;
@@ -78,6 +95,8 @@ namespace Airerage.Editor.Stages
         public Color WindColor;
 
         // 遠景（V14・V17）。
+        /// <summary>今の街の遠景（ビルの列と飛行船）を置くか（街のステージだけ。ほかはステージの側の背景を使う）。</summary>
+        public bool Skyline = true;
         public Color NearColor;
         public Color MidColor;
         public Color FarColor;
@@ -177,6 +196,118 @@ namespace Airerage.Editor.Stages
                 Saturation = 8f,
                 Vignette = 0.18f,
             };
+        }
+
+        /// <summary>
+        /// ステージの今の色（StageTheme）から台本を作る（2026-11-17 の要望: ほかのステージにも当てる）。ステージの側の背景（壁・山・海・
+        /// 惑星など）はそのままにして、空・霧・光をその色に合わせ、足場とギミックの質感だけを同じにする。土台は雰囲気（mood）ごとに
+        /// ATHLETIC（明るい）か SKYLINE NIGHT（暗い）の調整値。遠くの街は置かない（街のステージは呼んだ側で Skyline を入れる）。
+        /// </summary>
+        public static StageLook FromTheme(string id, StageTheme theme, StageMood mood)
+        {
+            bool dark = mood == StageMood.Night || mood == StageMood.Space;
+            StageLook look = dark ? CityNight() : Athletic();
+            look.Id = id;
+            look.Seed = Stable(id);
+            look.Skyline = false;
+            look.Grid = false;
+
+            // 空: 空の色合いから天頂と空、霧の色から地平線、地面の色から下。
+            Color tint = theme.SkyTint;
+            look.SkyZenith = Scale(tint, dark ? 0.22f : 0.5f);
+            look.SkySky = Scale(tint, dark ? 0.45f : 0.95f);
+            look.SkyHorizon = Color.Lerp(theme.FogColor, Color.white, dark ? 0f : 0.15f);
+            look.SkyBelow = Color.Lerp(theme.FogColor, theme.Ground, 0.5f);
+            look.SunColor = mood == StageMood.Day ? new Color(1.25f, 1.15f, 0.95f) : mood == StageMood.Lava ? new Color(1.3f, 0.6f, 0.3f) : Color.black;
+            look.Stars = dark ? 0.9f : 0f;
+            look.Fog = theme.Fog;
+            look.FogColor = theme.FogColor;
+            look.FogStart = Mathf.Max(theme.FogStart, 60f);
+            look.FogEnd = Mathf.Max(theme.FogEnd, look.FogStart + 80f);
+            look.HazeColor = theme.FogColor;
+
+            // 光: 色と強さはステージのまま（少し強く）。向きは左上の手前から（立体感）。
+            look.LightColor = theme.Light;
+            look.LightIntensity = theme.LightIntensity * (dark ? 1.3f : 1.08f);
+            look.AmbientSky = theme.AmbientSky;
+            look.AmbientEquator = theme.AmbientEquator;
+            look.AmbientGround = theme.AmbientGround;
+
+            // 足場: 横の面はステージの色（明るすぎる色は抑える）、上の面は少し明るく（白く飛ばない明るさまで）。
+            // 暗すぎる色は少し明るく（光が当たっても黒い塊に見えないように）。
+            look.BlockSide = Floor(Cap(theme.Terrain, 0.66f), 0.26f);
+            look.BlockTop = Floor(Cap(Color.Lerp(theme.Terrain, Color.white, 0.25f), dark ? 0.5f : 0.78f), 0.36f);
+            look.AttachableSide = Floor(Cap(Scale(theme.Attachable, 0.85f), 0.55f), 0.24f);
+            look.AttachableTop = Floor(Cap(Color.Lerp(theme.Attachable, Color.white, 0.3f), dark ? 0.5f : 0.75f), 0.34f);
+            look.HeightLow = -10f;
+            look.HeightHigh = 25f;
+
+            // 縁の光る線: 夜は空の色合い（恐怖の館は薄紫）、溶岩は橙。ほかは近未来の水色のまま。
+            if (mood == StageMood.Night)
+            {
+                look.TrimColor = Color.Lerp(Normalize(theme.SkyTint, 2.6f), new Color(2.6f, 2.6f, 2.6f), 0.2f);
+            }
+
+            if (mood == StageMood.Space)
+            {
+                look.SkyZenith = new Color(0.005f, 0.006f, 0.015f);
+                look.SkySky = new Color(0.01f, 0.012f, 0.03f);
+                look.SkyHorizon = new Color(0.03f, 0.035f, 0.07f);
+                look.SkyBelow = new Color(0.01f, 0.01f, 0.02f);
+                look.Stars = 1f;
+            }
+            else if (mood == StageMood.Indoor)
+            {
+                look.Stars = 0f;
+                look.BloomIntensity = 0.55f;
+                look.Vignette = 0.22f;
+            }
+            else if (mood == StageMood.Lava)
+            {
+                look.WindColor = new Color(1.1f, 0.85f, 0.65f);
+                look.TrimColor = new Color(2.6f, 1.1f, 0.45f);
+                look.BloomThreshold = 1f;
+                look.BloomIntensity = 0.85f;
+                look.Vignette = 0.24f;
+            }
+            return look;
+        }
+
+        // 文字列から決まる種（string.GetHashCode は実行ごとに変わることがあるので使わない）。
+        private static int Stable(string id)
+        {
+            int seed = 17;
+            foreach (char c in id)
+            {
+                seed = seed * 31 + c;
+            }
+            return seed;
+        }
+
+        private static Color Scale(Color c, float k)
+        {
+            return new Color(c.r * k, c.g * k, c.b * k, 1f);
+        }
+
+        // いちばん明るい成分を value にする（色合いを保つ。光る色に使う）。
+        private static Color Normalize(Color c, float value)
+        {
+            float m = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+            return m > 0f ? Scale(c, value / m) : new Color(value, value, value, 1f);
+        }
+
+        // いちばん明るい成分が min に届かなければ、色合いを保って明るくする。
+        private static Color Floor(Color c, float min)
+        {
+            float m = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+            return m < min && m > 0f ? Scale(c, min / m) : new Color(c.r, c.g, c.b, 1f);
+        }
+
+        // いちばん明るい成分が max を超えないように、色合いを保って暗くする。
+        private static Color Cap(Color c, float max)
+        {
+            float m = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+            return m > max ? Scale(c, max / m) : new Color(c.r, c.g, c.b, 1f);
         }
 
         /// <summary>

@@ -14,16 +14,33 @@ namespace Airerage.Runtime.UI
     /// IME の切り替えは 2 つの入口の両方で行う: Input System の Keyboard と、古い入力の UnityEngine.Input.imeCompositionMode（uGUI の入力欄が使い、
     /// 入力を終えると「自動」に戻す）。片方だけだと、エディタのゲームビューで IME が切れず、見出しの上に入力中の窓が残った
     /// （2026-11-17 の指摘。見出しの上の四角は、画面にいる間は消えず、別の画面へ移ると消える）。
+    /// 切り替えるのは状態が変わったときだけ（毎フレーム書かない）。ほかから書き換えられたら 1 秒以上空けて合わせ直す。ほかのアプリから
+    /// 戻った直後の 0.6 秒は触らない（OnApplicationFocus）。
     /// </summary>
     public sealed class ImeGuard : MonoBehaviour
     {
+        /// <summary>ほかのアプリから戻ってから、IME に触らずに待つ秒数。</summary>
+        public const float SettleSeconds = 0.6f;
+
+        /// <summary>古い入力の IME の設定がほかから書き換えられたとき、合わせ直す間隔の下限（秒）。</summary>
+        public const float RetrySeconds = 1f;
+
         private Keyboard _keyboard;
         private bool _applied;
         private bool _enabled;
+        private bool _unfocused;
+        private float _quietUntil = float.NegativeInfinity;
+        private float _legacySetAt = float.NegativeInfinity;
         private Vector2 _cursor = new Vector2(float.NaN, float.NaN);
 
         /// <summary>今 IME を有効にしているか（テスト用）。</summary>
         public bool ImeEnabled => _enabled;
+
+        /// <summary>古い入力の IME の設定を書いた回数（テスト用。毎フレーム書き続けていないかを確かめる）。</summary>
+        public int LegacyWrites { get; private set; }
+
+        /// <summary>ほかのアプリから戻った直後で、IME に触らずに待っているか（テスト用）。</summary>
+        public bool Settling => _unfocused || Time.unscaledTime < _quietUntil;
 
         /// <summary>古い入力の IME の設定のうち、今の状態で求めるもの（入力中は有効、ほかは無効）。</summary>
         public static IMECompositionMode LegacyModeFor(bool typing)
@@ -47,11 +64,17 @@ namespace Airerage.Runtime.UI
             UnityEngine.Input.imeCompositionMode = IMECompositionMode.Auto;
         }
 
-        private void OnApplicationFocus(bool focused)
+        /// <summary>
+        /// ほかのアプリへ移った・戻った（2026-11-17 の指摘: 試合中にウインドウを戻すと、たまにゲームが止まる）。ウインドウが切り替わる
+        /// 途中に IME を切り替えると、Windows の日本語入力とエディタ（ゲームビューを出したときに IME の設定を戻す）とで切り替え合い、
+        /// 止まることがある。離れている間と戻ってから少しの間は IME に触らず、落ち着いてから 1 回だけ当て直す。
+        /// </summary>
+        public void OnApplicationFocus(bool focused)
         {
-            // ほかのアプリから戻ったら、IME の状態を当て直す。
+            _unfocused = !focused;
             if (focused)
             {
+                _quietUntil = Time.unscaledTime + SettleSeconds;
                 _applied = false;
             }
         }
@@ -59,25 +82,27 @@ namespace Airerage.Runtime.UI
         private void Update()
         {
             Keyboard keyboard = Keyboard.current;
-            if (keyboard == null)
+            if (keyboard == null || Settling)
             {
                 return;
             }
             InputField field = FocusedField(EventSystem.current);
             bool want = field != null;
-            // 古い入力の設定は uGUI の入力欄が入力の終わりに「自動」へ戻すので、毎フレーム合わせる。
             IMECompositionMode legacy = LegacyModeFor(want);
-            if (UnityEngine.Input.imeCompositionMode != legacy)
-            {
-                UnityEngine.Input.imeCompositionMode = legacy;
-            }
             if (!_applied || keyboard != _keyboard || want != _enabled)
             {
+                // 入力を始めた・終えた・戻ってきた: 両方の入口を 1 回ずつ切り替える。
                 keyboard.SetIMEEnabled(want);
+                SetLegacy(legacy);
                 _keyboard = keyboard;
                 _enabled = want;
                 _applied = true;
                 _cursor = new Vector2(float.NaN, float.NaN);
+            }
+            else if (UnityEngine.Input.imeCompositionMode != legacy && Time.unscaledTime - _legacySetAt >= RetrySeconds)
+            {
+                // ほか（uGUI の入力欄・エディタ）が古い入力の設定を書き換えた。毎フレーム書き合わないよう、間を空けて合わせ直す。
+                SetLegacy(legacy);
             }
             if (want)
             {
@@ -88,6 +113,16 @@ namespace Airerage.Runtime.UI
                     _cursor = cursor;
                 }
             }
+        }
+
+        private void SetLegacy(IMECompositionMode mode)
+        {
+            if (UnityEngine.Input.imeCompositionMode != mode)
+            {
+                UnityEngine.Input.imeCompositionMode = mode;
+                LegacyWrites++;
+            }
+            _legacySetAt = Time.unscaledTime;
         }
 
         /// <summary>今入力している文字の入力欄（なければ null）。</summary>

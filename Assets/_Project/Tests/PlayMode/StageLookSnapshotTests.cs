@@ -32,7 +32,8 @@ namespace Airerage.PlayMode.Tests
                 yield return null;
             }
             Directory.CreateDirectory(Folder);
-            foreach (string scene in new[] { "Stage_Athletic", "Stage_CityNight" })
+            string[] scenes = (System.Environment.GetEnvironmentVariable("AIRERAGE_PLAY_STAGES") ?? "Stage_Athletic,Stage_CityNight").Split(',');
+            foreach (string scene in scenes)
             {
                 flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == scene));
                 while (flow.Current != GameFlow.FlowScreen.Training || flow.IsLoading || SceneManager.GetActiveScene().name != scene)
@@ -59,6 +60,13 @@ namespace Airerage.PlayMode.Tests
                 Capture(camera, $"Play_{scene}_Landing");
                 yield return Wait(1.5f);
                 Capture(camera, $"Play_{scene}_Later");
+
+                // 風（周期のある風の予告と吹いている間を含むように、0.5 秒ごとに 7 秒）。
+                for (int i = 0; i < 14; i++)
+                {
+                    yield return Wait(0.5f);
+                    Capture(camera, $"Play_{scene}_Wind{i:00}");
+                }
             }
         }
 

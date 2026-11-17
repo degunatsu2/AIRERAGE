@@ -52,7 +52,12 @@ namespace Airerage.Runtime.Presentation
         /// <summary>予告の点滅の速さ（1 秒あたり）。</summary>
         private const float WarningBlinkPerSecond = 4f;
 
+        [Tooltip("予告の斜線と記号の材質（Sprites/Default。線にも使う）")]
         [SerializeField] private Material _lineMaterial;
+        [Tooltip("線（印・輪・筋）だけに使う光る線の材質（D-97。なければ _lineMaterial）")]
+        [SerializeField] private Material _glowMaterial;
+        [Tooltip("風（上昇気流・風）の筋を線で描くか（D-97 の風の見た目では、筋は風の柱の材質が描くので描かない）")]
+        [SerializeField] private bool _windLines = true;
         [SerializeField] private Color _color = new Color(0.3f, 1f, 0.45f);
         [Tooltip("印が流れる周期（秒）")]
         [SerializeField] private float _period = 0.9f;
@@ -93,6 +98,25 @@ namespace Airerage.Runtime.Presentation
             _lineMaterial = lineMaterial;
             _color = color;
         }
+
+        /// <summary>
+        /// 線を光る線の材質で描き、風の筋を線で描かない（D-97。シーンのビルダー用）。予告の斜線と記号は _lineMaterial のまま（光る線の
+        /// 材質で描くと、斜線の絵の代わりに光の塊が出た。2026-11-17 の指摘）。
+        /// </summary>
+        public void ConfigureGlow(Material glowMaterial, bool windLines)
+        {
+            _glowMaterial = glowMaterial;
+            _windLines = windLines;
+        }
+
+        /// <summary>線を描く材質（テスト用）。</summary>
+        public Material LineMaterial => _glowMaterial != null ? _glowMaterial : _lineMaterial;
+
+        /// <summary>予告の斜線と記号の材質（テスト用）。</summary>
+        public Material OverlayMaterial => _lineMaterial;
+
+        /// <summary>風の筋の線を描くか（風のシェーダーで風を描くステージでは描かない。テスト用）。</summary>
+        public bool WindLines => _windLines;
 
         /// <summary>効いている間だけ出す見た目を決める（シーンのビルダー用）。</summary>
         public void ConfigureActiveVisual(GameObject visual)
@@ -167,6 +191,8 @@ namespace Airerage.Runtime.Presentation
                 case StageZoneKind.Gust when IsSteadyDraft:
                     // いつも吹いている縦の風は、上昇気流と同じ見た目（ユーザーの要望、2026-10-29）。
                     CreateDraftStreaks();
+                    break;
+                case StageZoneKind.Gust when !_windLines:
                     break;
                 case StageZoneKind.BoostRing:
                     _ring = CreateLine("Ring", RingSegments, 0.16f);
@@ -308,7 +334,7 @@ namespace Airerage.Runtime.Presentation
             var go = new GameObject(name);
             go.transform.SetParent(transform, false);
             var line = go.AddComponent<LineRenderer>();
-            line.sharedMaterial = _lineMaterial;
+            line.sharedMaterial = _glowMaterial != null ? _glowMaterial : _lineMaterial;
             line.useWorldSpace = true;
             line.positionCount = points;
             line.startWidth = line.endWidth = width;
@@ -949,6 +975,10 @@ namespace Airerage.Runtime.Presentation
         // 縦の風の筋（幅 0.8m ごとの列、2〜8 列。1 列に 2 本）。
         private void CreateDraftStreaks()
         {
+            if (!_windLines)
+            {
+                return;
+            }
             int streaks = Mathf.Clamp(Mathf.RoundToInt(_zone.Size.x / 0.8f), 2, 8);
             for (int i = 0; i < streaks * 2; i++)
             {

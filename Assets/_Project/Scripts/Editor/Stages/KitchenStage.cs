@@ -184,6 +184,8 @@ namespace Airerage.Editor.Stages
                     // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
                     new Vector3(-29.75f, 3f, 0f), new Vector3(-38.5f, 15.6f, 0f), new Vector3(38.5f, 15.6f, 0f), new Vector3(47.5f, 19.2f, 0f) },
                 Decorate = Decorate,
+                // 背景とオブジェクトのクオリティアップ（D-97）。
+                Look = StageLook.FromTheme("Kitchen", theme, StageMood.Indoor),
             };
         }
 

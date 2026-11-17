@@ -53,12 +53,16 @@ namespace Airerage.Editor.Stages
             DressAttachableGlow(look, folder);
             DressAnchors(look, folder);
             DressGimmicks(look, folder);
+            DressPlatforms(look, folder);
             CreateMembranes(look, folder, boundsMin, boundsMax);
             if (look.Grid)
             {
                 CreateGrid(look, folder, boundsMin);
             }
-            CreateBackdrop(look, folder, boundsMin);
+            if (look.Skyline)
+            {
+                CreateBackdrop(look, folder, boundsMin);
+            }
             CreateVolume(look, folder);
         }
 
@@ -144,7 +148,7 @@ namespace Airerage.Editor.Stages
             RenderSettings.ambientSkyColor = look.AmbientSky;
             RenderSettings.ambientEquatorColor = look.AmbientEquator;
             RenderSettings.ambientGroundColor = look.AmbientGround;
-            RenderSettings.fog = true;
+            RenderSettings.fog = look.Fog;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = look.FogColor;
             RenderSettings.fogStartDistance = look.FogStart;
@@ -274,18 +278,32 @@ namespace Airerage.Editor.Stages
         {
             Material line = GlowLineMaterial(look, folder);
             Material frame = SurfaceMaterial("GimmickFrame", look, folder, look.GimmickSide, look.GimmickTop);
+            // 風（2026-11-17 の要望: 塊に見えないリアルな風）: 範囲は塗らず、気流の筋と運ばれる粒だけ（Airerage/WindColumn）。
             Material wind = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("Wind", "Airerage/WindColumn", m =>
             {
                 m.SetColor("_Color", look.WindColor);
+                m.SetFloat("_Strength", 0.75f);
+                m.SetFloat("_LaneSpacing", 0.75f);
+                m.SetFloat("_Width", 0.045f);
+                m.SetFloat("_Period", 7f);
+                m.SetFloat("_Length", 2.6f);
+                m.SetFloat("_Speed", 9f);
+                m.SetFloat("_Sway", 0.35f);
+                m.SetFloat("_Dust", 0.6f);
+                m.SetFloat("_Shade", 0.22f);
             }, folder);
             foreach (StageZoneView view in Object.FindObjectsByType<StageZoneView>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 var serialized = new SerializedObject(view);
-                serialized.FindProperty("_lineMaterial").objectReferenceValue = line;
-                serialized.ApplyModifiedPropertiesWithoutUndo();
                 var zone = view.GetComponent<StageZoneAuthoring>();
                 var lookProperty = serialized.FindProperty("_look");
-                if (zone == null || (lookProperty != null && lookProperty.enumValueIndex != (int)StageZoneView.ZoneLook.Default))
+                bool plain = zone != null && (lookProperty == null || lookProperty.enumValueIndex == (int)StageZoneView.ZoneLook.Default);
+                bool windShader = plain && (zone.Kind == StageZoneKind.Updraft || zone.Kind == StageZoneKind.Gust) && Find(view.transform, "Column") != null;
+                // 線（印・輪・筋）は光る線に。予告の斜線と記号は今までの材質のまま（光る線の材質で描くと光の塊になった。2026-11-17 の指摘）。
+                // 風の範囲を光の柱で描くときは、線の筋は描かない。
+                view.ConfigureGlow(line, windLines: !windShader);
+                EditorUtility.SetDirty(view);
+                if (!plain)
                 {
                     continue;
                 }
@@ -313,6 +331,49 @@ namespace Airerage.Editor.Stages
                         break;
                 }
             }
+        }
+
+        // 動く足場と扉（StagePlatformAuthoring の見た目の Body）: 同じ大きさの面取りした箱に（色はステージで決めた色のまま）。
+        // ワイヤーが刺さる足場の正面の縁（RimTop など）は、にじむオレンジの光る面に。見た目を作り込んだ足場（Body のないもの）はそのまま。
+        private static void DressPlatforms(StageLook look, string folder)
+        {
+            Material rim = EmissiveMaterial("AttachableRim", SandboxWireSceneBuilder.AttachableGlowColor, look.AttachableRimIntensity, folder);
+            foreach (StagePlatformAuthoring platform in Object.FindObjectsByType<StagePlatformAuthoring>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                Transform visual = platform.transform.Find("Visual");
+                if (visual == null)
+                {
+                    continue;
+                }
+                bool rims = false;
+                foreach (Transform part in visual)
+                {
+                    if (part.name.StartsWith("Rim"))
+                    {
+                        part.GetComponent<Renderer>().sharedMaterial = rim;
+                        rims = true;
+                    }
+                }
+                Transform body = visual.Find("Body");
+                var renderer = body != null ? body.GetComponent<MeshRenderer>() : null;
+                if (renderer == null || body.GetComponent<MeshFilter>().sharedMesh == null || body.GetComponent<MeshFilter>().sharedMesh.name != "Cube")
+                {
+                    continue;
+                }
+                Color color = renderer.sharedMaterial.HasProperty("_BaseColor") ? renderer.sharedMaterial.GetColor("_BaseColor") : look.BlockSide;
+                Material material = SurfaceMaterial("Platform" + Hex(color), look, folder, CapColor(color, 0.66f),
+                    CapColor(Color.Lerp(color, Color.white, 0.25f), 0.78f));
+                ToBlock(body, material, look.Bevel);
+                body.GetComponent<StageBlock>().Configure(body.GetComponent<StageBlock>().Size, look.Bevel, 0f, rims, 0f, 4f);
+            }
+        }
+
+        // いちばん明るい成分が max を超えないように、色合いを保って暗くする。
+        private static Color CapColor(Color c, float max)
+        {
+            float m = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+            float k = m > max ? max / m : 1f;
+            return new Color(c.r * k, c.g * k, c.b * k, 1f);
         }
 
         // ジャンプ台: 床に置いた面取りした台と、その上の光る板（色はギミックの色）。

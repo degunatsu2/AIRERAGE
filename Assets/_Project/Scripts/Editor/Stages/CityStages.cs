@@ -177,6 +177,8 @@ namespace Airerage.Editor.Stages
                     // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
                     new Vector3(-17.5f, 13.5f, 0f), new Vector3(17.5f, 13.5f, 0f), new Vector3(-36.25f, 16f, 0f), new Vector3(36.25f, 16f, 0f) },
                 Decorate = decor => DecorateCity(decor, night: false),
+                // 背景とオブジェクトのクオリティアップ（D-97）。遠くに今の街。
+                Look = DayLook(theme),
             };
         }
 
@@ -398,6 +400,13 @@ namespace Airerage.Editor.Stages
                 }
                 decor.Sphere("Moon", new Vector3(-50f, 48f, 110f), new Vector3(9f, 9f, 9f), decor.Unlit("Moon", new Color(0.95f, 0.95f, 0.85f)));
             }
+        }
+
+        private static StageLook DayLook(StageTheme theme)
+        {
+            StageLook look = StageLook.FromTheme("CityDay", theme, StageMood.Day);
+            look.Skyline = true;
+            return look;
         }
     }
 }
