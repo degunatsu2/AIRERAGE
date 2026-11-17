@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Airerage.Core.Simulation;
 using Airerage.Runtime.Presentation;
 using Airerage.Runtime.Simulation;
@@ -585,12 +586,15 @@ namespace Airerage.Editor.Stages
             var random = new Random(look.Seed + 1);
             var root = new GameObject("Backdrop").transform;
 
-            Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f);
-            Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f);
+            // 真ん中の奥は実在の東京（PLATEAU の西新宿の高層ビル群と周りの街。2026-11-17 のユーザーの決定。docs/15 6.51）。作った箱の
+            // ビルは、その外側（遠い列）と手前の低い列だけ。
+            bool city = CreatePlateauCity(Child(root, "Tokyo"), far, mid, beacon);
+            Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f, city ? PlateauHalfWidth : 0f);
+            Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f, city ? PlateauMidKeepOut : 0f);
 
             // 近い列: 左右の外側だけに大きなビル（遊ぶ所の真後ろを空けて、足場と見分けやすく）。
             Transform nearRoot = Child(root, "Near");
-            float[] nearX = { -230f, -165f, -110f, 110f, 165f, 230f };
+            float[] nearX = city ? new[] { -230f, -165f, 165f, 230f } : new[] { -230f, -165f, -110f, 110f, 165f, 230f };
             for (int i = 0; i < nearX.Length; i++)
             {
                 float z = Range(random, 90f, 125f);
@@ -604,9 +608,104 @@ namespace Airerage.Editor.Stages
             airship.AddComponent<BackdropMotion>().ConfigureDrift(new Vector3(4.5f, 0f, 0f), -720f, 720f);
         }
 
+        // 実在の東京（国土交通省 Project PLATEAU の 3D 都市モデル。東京都 23 区 2020 年度。CC BY 4.0 互換・出典の表示が必要）。
+        // tools/assets/plateau_skyline.py が、西新宿の高層ビル（LOD2。地面から 60m 以上）と周りの街（LOD1。25m 以上）を背景用に軽くした形。
+        private const string PlateauFolder = "Assets/_Project/ThirdParty/PLATEAU";
+
+        // 実在の街の大きさ（横と高さ）と奥行き（奥行きは縮めて遠景の帯に収める）、地面の高さ、置く奥行き。
+        private const float PlateauScale = 0.8f;
+        private const float PlateauDepthScale = 0.1f;
+        private const float PlateauGround = -175f;
+        private const float ShinjukuZ = 400f;
+        private const float TokyoZ = 640f;
+
+        /// <summary>作った箱のビルを置かない真ん中の幅（x の絶対値。西新宿の高層ビル群の幅）。</summary>
+        public const float PlateauHalfWidth = 760f;
+
+        // 手前の低い列も、真ん中のこの幅には置かない（西新宿の高層ビル群を手前の箱で隠さない）。
+        private const float PlateauMidKeepOut = 300f;
+
+        // 西新宿（手前・濃い色）と周りの街（奥・遠い色）を置き、高いビルの屋上に航空障害灯を付ける。モデルがなければ false。
+        private static bool CreatePlateauCity(Transform root, Material far, Material mid, Material beacon)
+        {
+            Mesh shinjuku = LoadObjMesh($"{PlateauFolder}/Shinjuku_LOD2.obj");
+            Mesh tokyo = LoadObjMesh($"{PlateauFolder}/Tokyo_LOD1.obj");
+            if (shinjuku == null || tokyo == null)
+            {
+                Debug.LogWarning($"PLATEAU の街のモデルがない（{PlateauFolder}）。作った箱のビルだけで遠景を作る");
+                return false;
+            }
+            var scale = new Vector3(PlateauScale, PlateauScale, PlateauDepthScale);
+            Transform hero = PlaceMesh(root, "Shinjuku", shinjuku, mid, new Vector3(0f, PlateauGround, ShinjukuZ), scale);
+            PlaceMesh(root, "Surroundings", tokyo, far, new Vector3(0f, PlateauGround, TokyoZ), scale);
+            // 航空障害灯: 25m の升目ごとのいちばん高い所のうち、上から 14 か所（150m より高く、互いに 60m 以上離す）。
+            var tops = new Dictionary<Vector2Int, Vector3>();
+            foreach (Vector3 v in shinjuku.vertices)
+            {
+                var cell = new Vector2Int(Mathf.FloorToInt(v.x / 25f), Mathf.FloorToInt(v.z / 25f));
+                if (!tops.TryGetValue(cell, out Vector3 top) || v.y > top.y)
+                {
+                    tops[cell] = v;
+                }
+            }
+            var chosen = new List<Vector3>();
+            foreach (Vector3 top in tops.Values.Where(t => t.y > 150f).OrderByDescending(t => t.y))
+            {
+                if (chosen.Count >= 14)
+                {
+                    break;
+                }
+                if (chosen.All(c => Vector2.Distance(new Vector2(c.x, c.z), new Vector2(top.x, top.z)) > 60f))
+                {
+                    chosen.Add(top);
+                }
+            }
+            Transform lights = Child(root, "Beacons");
+            foreach (Vector3 top in chosen)
+            {
+                GameObject light = Box(lights, "Beacon", beacon, Vector3.zero, new Vector3(2.4f, 2.4f, 2.4f));
+                light.transform.position = hero.TransformPoint(top) + Vector3.up * 1.6f;
+            }
+            return true;
+        }
+
+        // OBJ のモデルからメッシュを読む（材質は作らず、法線は計算し、頂点を読めるように読み込みの設定を合わせる）。
+        private static Mesh LoadObjMesh(string path)
+        {
+            if (!(AssetImporter.GetAtPath(path) is ModelImporter importer))
+            {
+                return null;
+            }
+            if (importer.materialImportMode != ModelImporterMaterialImportMode.None || !importer.isReadable
+                || importer.importNormals != ModelImporterNormals.Calculate || importer.importCameras || importer.importLights)
+            {
+                importer.materialImportMode = ModelImporterMaterialImportMode.None;
+                importer.isReadable = true;
+                importer.importNormals = ModelImporterNormals.Calculate;
+                importer.normalSmoothingAngle = 20f;
+                importer.importCameras = false;
+                importer.importLights = false;
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAllAssetsAtPath(path).OfType<Mesh>().FirstOrDefault();
+        }
+
+        private static Transform PlaceMesh(Transform parent, string name, Mesh mesh, Material material, Vector3 position, Vector3 scale)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = position;
+            go.transform.localScale = scale;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = material;
+            NoShadows(go);
+            return go.transform;
+        }
+
         // ビルの列: かたまりで置き、かたまりの間をあける（等間隔に並べると単調になる）。真ん中ほど低く、外ほど高く、ときどき高いビル。
+        // keepOut: 真ん中のこの幅（x の絶対値）には置かない（実在の街を見せる所）。
         private static void Skyline(Transform parent, Material body, Material beacon, Random random, float zMin, float zMax, float lowTop, float highTop,
-            float sideRise, float beaconChance)
+            float sideRise, float beaconChance, float keepOut)
         {
             float cursor = -800f;
             while (cursor < 800f)
@@ -616,6 +715,11 @@ namespace Airerage.Editor.Stages
                 {
                     float width = Range(random, 10f, 34f);
                     float x = cursor + width * 0.5f;
+                    if (Mathf.Abs(x) < keepOut)
+                    {
+                        cursor += width + Range(random, 2f, 8f);
+                        continue;
+                    }
                     float side = Mathf.Clamp01(Mathf.Abs(x) / 600f);
                     float top = Range(random, lowTop, highTop) + side * Range(random, 10f, sideRise);
                     if (random.NextDouble() < 0.1 + side * 0.2)

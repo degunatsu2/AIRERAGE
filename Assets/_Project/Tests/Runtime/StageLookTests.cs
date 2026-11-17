@@ -340,6 +340,26 @@ namespace Airerage.Runtime.Tests
         // StageDressing.BackgroundShadowDepth と同じ（m）。
         private const float BackgroundShadowDepth = 1f;
 
+        [TestCase("Stage_Athletic")]
+        [TestCase("Stage_CityDay")]
+        [TestCase("Stage_CityNight")]
+        public void CityBackdrops_ShowTheRealTokyoSkyline(string stage)
+        {
+            // 無料の背景のアセット: PLATEAU の西新宿の高層ビル群と周りの街を遠景の真ん中の奥に（2026-11-17 のユーザーの決定）。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            Transform tokyo = scene.GetRootGameObjects().Single(g => g.name == "Backdrop").transform.Find("Tokyo");
+            Assert.That(tokyo, Is.Not.Null, "実在の街がない");
+            foreach (string name in new[] { "Shinjuku", "Surroundings" })
+            {
+                MeshFilter mesh = tokyo.Find(name).GetComponent<MeshFilter>();
+                Assert.That(mesh.sharedMesh, Is.Not.Null, $"{name}: 形がない");
+                Assert.That(mesh.sharedMesh.triangles.Length / 3, Is.GreaterThan(10000), $"{name}: 建物が少なすぎる");
+                Assert.That(mesh.GetComponent<Renderer>().sharedMaterial.shader.name, Is.EqualTo("Airerage/StageBackdrop"), $"{name}: 遠景の材質でない");
+                Assert.That(mesh.GetComponent<Collider>(), Is.Null, $"{name}: 当たりがある");
+            }
+            Assert.That(tokyo.Find("Beacons").childCount, Is.GreaterThan(5), "高いビルに航空障害灯がない");
+        }
+
         [Test]
         public void CityNight_IsDressedForTheNight()
         {

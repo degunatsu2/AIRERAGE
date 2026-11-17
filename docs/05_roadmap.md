@@ -176,3 +176,6 @@ Phase 5 以降は、ユーザーの方針（2026-10-15。D-52〜D-54: キャラ�
 - [ ] **リリース直前にユーザーにもう一度確認する**（ユーザーの指示、2026-10-29）: 同梱した字体（Orbitron・M PLUS 1。D-77）の
   ライセンスの文（`Assets/_Project/Resources/Fonts/` の `Orbitron-OFL.txt`・`MPLUS1-OFL.txt`）を、配布するフォルダにも入れること。
   今はゲームのデータの中にだけ入っている（SIL Open Font License 1.1 は、字体と一緒にライセンスの文を配ることを求める）
+- [ ] **背景の 3D アセットの出典とライセンス**（2026-11-17）: PLATEAU（実在の東京の街並み。`Assets/_Project/ThirdParty/PLATEAU/README.md`）は
+  出典の表示が必要（「国土交通省 Project PLATEAU の 3D 都市モデルを加工して作成」）。クレジットの画面か配布する文書に書く。CC0 のアセット
+  （Kenney・KayKit・Quaternius）は表示の義務はないが、同じ所にお礼として名前を書く（`Assets/_Project/ThirdParty/` の各 README）。
