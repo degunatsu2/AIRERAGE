@@ -316,12 +316,8 @@ namespace Airerage.Editor.Stages
                 view.ConfigureLook(zone.Look);
                 if (zone.Kind == StageZoneKind.Water)
                 {
-                    // 水面を出入りしたときのしぶき（青白い水滴。2026-11-18 の要望: 水の表現をリアルに）。
-                    view.ConfigureWater(SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WaterSplash", "Airerage/Wisp", m =>
-                    {
-                        m.SetColor("_Color", new Color(0.55f, 0.72f, 0.85f));
-                        m.SetFloat("_Core", 5f);
-                    }, decor.Folder));
+                    // 水はシェーダーで描く（水面の線は出さない）。
+                    view.ConfigureWater();
                 }
                 Transform propParent = go.transform;
                 if (zone.TravelSeconds > 0f)

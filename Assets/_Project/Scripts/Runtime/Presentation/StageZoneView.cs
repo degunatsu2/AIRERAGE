@@ -82,9 +82,6 @@ namespace Airerage.Runtime.Presentation
         private ISimulationFeed _feed;
 
         [SerializeField] private bool _shaderWater;
-        [SerializeField] private Material _splashMaterial;
-        private ParticleSystem _splash;
-        private Vector3[] _previousPositions = new Vector3[0];
         private GameAudio _audio;
         private float _nextFeedSearch;
         private int _lastTick = int.MinValue;
@@ -117,17 +114,13 @@ namespace Airerage.Runtime.Presentation
         }
 
         /// <summary>
-        /// 水をシェーダー（Airerage/Water）で描く（2026-11-18 の要望: 水の表現をリアルに）。水面の線はシェーダーが描くので線は出さず、
-        /// キャラクターが水面を出入りしたときのしぶきを splash の材質の粒で出す（シーンのビルダー用）。
+        /// 水をシェーダー（Airerage/Water）で描く（2026-11-18 の要望: 水の表現をリアルに）。水面の線はシェーダーが描くので線は出さない
+        /// （シーンのビルダー用）。出入りのしぶきは、水色のギザギザした星のように見えたので消した（2026-11-18 の要望）。
         /// </summary>
-        public void ConfigureWater(Material splash)
+        public void ConfigureWater()
         {
-            _splashMaterial = splash;
             _shaderWater = true;
         }
-
-        /// <summary>しぶきを出した回数（テスト用）。</summary>
-        public int Splashes { get; private set; }
 
         /// <summary>水をシェーダーで描くか（テスト用）。</summary>
         public bool ShaderWater => _shaderWater;
@@ -443,113 +436,6 @@ namespace Airerage.Runtime.Presentation
 
         private const int WaterPoints = 48;
 
-        // しぶきを出す、水面を通る速さの下限（m/s）と、大きなしぶきになる速さ。
-        private const float SplashMinSpeed = 2f;
-        private const float SplashBigSpeed = 14f;
-
-        // キャラクターが水面を上から下へ（入水）、下から上へ（出水）通ったら、しぶきを出す（見た目だけ。前のフレームの位置と比べる）。
-        private void DetectSplashes(Vector3 center, Vector2 half, float top)
-        {
-            if (_feed == null || _feed.CharacterCount == 0)
-            {
-                return;
-            }
-            int count = _feed.CharacterCount;
-            if (_previousPositions.Length != count)
-            {
-                _previousPositions = new Vector3[count];
-                for (int i = 0; i < count; i++)
-                {
-                    System.Numerics.Vector3 p = _feed.GetState(i).Position;
-                    _previousPositions[i] = new Vector3(p.X, p.Y, p.Z);
-                }
-                return;
-            }
-            for (int i = 0; i < count; i++)
-            {
-                CharacterState state = _feed.GetState(i);
-                var now = new Vector3(state.Position.X, state.Position.Y, state.Position.Z);
-                Vector3 before = _previousPositions[i];
-                _previousPositions[i] = now;
-                if (Mathf.Abs(now.x - center.x) > half.x || (now - before).sqrMagnitude > 100f)
-                {
-                    continue;
-                }
-                bool entered = before.y > top && now.y <= top;
-                bool left = before.y <= top && now.y > top;
-                float speed = Mathf.Abs(state.Velocity.Y);
-                if ((entered || left) && speed >= SplashMinSpeed)
-                {
-                    EmitSplash(new Vector3(now.x, top, -2.6f), speed, entered);
-                }
-            }
-        }
-
-        // しぶき: 水面から上へ飛び散る水滴と、水面に広がる白い泡。入水のほうが大きい。
-        private void EmitSplash(Vector3 at, float speed, bool entered)
-        {
-            if (_splash == null)
-            {
-                if (_splashMaterial == null)
-                {
-                    return;
-                }
-                _splash = CreateSplashSystem();
-            }
-            float power = Mathf.Clamp01((speed - SplashMinSpeed) / (SplashBigSpeed - SplashMinSpeed));
-            int drops = Mathf.RoundToInt(Mathf.Lerp(10f, 34f, power) * (entered ? 1f : 0.55f));
-            var emit = new ParticleSystem.EmitParams();
-            for (int i = 0; i < drops; i++)
-            {
-                float angle = UnityEngine.Random.Range(-1f, 1f) * 70f * Mathf.Deg2Rad;
-                float up = Mathf.Lerp(4f, 11f, power) * UnityEngine.Random.Range(0.55f, 1.15f);
-                emit.position = at + new Vector3(UnityEngine.Random.Range(-0.4f, 0.4f), 0.05f, UnityEngine.Random.Range(-0.2f, 0.2f));
-                emit.velocity = new Vector3(Mathf.Sin(angle) * up * 0.45f, Mathf.Cos(angle) * up, 0f);
-                emit.startSize = UnityEngine.Random.Range(0.12f, 0.3f);
-                emit.startLifetime = UnityEngine.Random.Range(0.5f, 0.95f);
-                emit.startColor = new Color(0.85f, 0.95f, 1f, 1f);
-                _splash.Emit(emit, 1);
-            }
-            // 水面に広がる泡（大きく柔らかい粒。重さなし）。
-            for (int i = 0; i < 6; i++)
-            {
-                emit.position = at + new Vector3(UnityEngine.Random.Range(-0.8f, 0.8f), 0.02f, 0f);
-                emit.velocity = new Vector3(UnityEngine.Random.Range(-2.2f, 2.2f), 0.15f, 0f);
-                emit.startSize = UnityEngine.Random.Range(0.6f, 1.2f) * Mathf.Lerp(0.8f, 1.5f, power);
-                emit.startLifetime = UnityEngine.Random.Range(0.6f, 1.1f);
-                emit.startColor = new Color(0.8f, 0.92f, 1f, 0.55f);
-                _splash.Emit(emit, 1);
-            }
-            Splashes++;
-        }
-
-        private ParticleSystem CreateSplashSystem()
-        {
-            var go = new GameObject("Splash");
-            go.transform.SetParent(transform, false);
-            var particles = go.AddComponent<ParticleSystem>();
-            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            ParticleSystem.MainModule main = particles.main;
-            main.loop = false;
-            main.playOnAwake = false;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.gravityModifier = 2.2f;
-            main.maxParticles = 400;
-            ParticleSystem.EmissionModule emission = particles.emission;
-            emission.enabled = false;
-            ParticleSystem.ColorOverLifetimeModule fade = particles.colorOverLifetime;
-            fade.enabled = true;
-            var gradient = new Gradient();
-            gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.5f), new GradientAlphaKey(0f, 1f) });
-            fade.color = gradient;
-            var renderer = go.GetComponent<ParticleSystemRenderer>();
-            renderer.sharedMaterial = _splashMaterial;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
-            return particles;
-        }
-
         // 水面の波（ゆっくり揺れる線）と、水の中を上がっていく泡（シミュレーションの水面は動かない。見た目だけ）。
         private void RenderWater(Vector3 center, Vector2 half)
         {
@@ -557,7 +443,6 @@ namespace Airerage.Runtime.Presentation
             if (_shaderWater)
             {
                 _ring.enabled = false;
-                DetectSplashes(center, half, top);
             }
             float t = Time.time;
             for (int i = 0; i < WaterPoints; i++)

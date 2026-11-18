@@ -36,7 +36,9 @@ from PIL import Image, ImageFilter
 
 URL = ('https://gsic-opendata.s3.ap-northeast-1.amazonaws.com/national-gov/mlit/city-bureau/3d-city-model/2020/'
        'plateau-tokyo23ku/13100_tokyo23-ku_2020_obj_3_op.zip')
-PADDING = 4
+# 区画のまわりの余白（画素）。縁の色を外へ伸ばして埋める。遠くでミップマップが隣の区画の色を混ぜる「色のにじみ」を防ぐ
+# （2026-11-18 の P1。前は 4 画素で、遠くの細かい建物の色が混ざっていた）。--padding で変える。
+PADDING = 16
 
 
 def load_remote_zip():
@@ -187,6 +189,7 @@ def night_lights(atlas, placed, cells):
 
 
 def main():
+    global PADDING
     ap = argparse.ArgumentParser()
     ap.add_argument('output')
     ap.add_argument('--cache', required=True)
@@ -198,7 +201,9 @@ def main():
     ap.add_argument('--atlas', type=int, default=4096)
     ap.add_argument('--night', action='store_true', help='夜の窓の明かりの絵も書く')
     ap.add_argument('--snap-ground', action='store_true', help='建物ごとに根元を地面にそろえる')
+    ap.add_argument('--padding', type=int, default=16, help='区画のまわりの余白（画素。縁の色を伸ばす）')
     args = ap.parse_args()
+    PADDING = args.padding
 
     rz = load_remote_zip()
     os.makedirs(args.cache, exist_ok=True)
@@ -287,9 +292,8 @@ def main():
         image, crop, _, _ = sources[key]
         cw, ch = cells[key]
         piece = image.crop(crop).resize((cw, ch), Image.LANCZOS)
-        # 縁を外へ伸ばす（縮めた絵の色が隣のセルににじまないように）。
-        padded = piece.resize((cw + PADDING * 2, ch + PADDING * 2), Image.NEAREST)
-        padded.paste(piece, (PADDING, PADDING))
+        # 縁の画素をそのまま外へ伸ばして余白を埋める（にじみ出し。縮めた絵の色が隣のセルににじまないように）。
+        padded = Image.fromarray(np.pad(np.asarray(piece), ((PADDING, PADDING), (PADDING, PADDING), (0, 0)), mode='edge'))
         atlas.paste(padded, (x - PADDING, y - PADDING))
     atlas.save(f'{args.output}_Atlas.jpg', quality=88)
     if args.night:

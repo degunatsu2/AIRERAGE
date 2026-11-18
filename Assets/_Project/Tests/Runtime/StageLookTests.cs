@@ -561,32 +561,30 @@ namespace Airerage.Runtime.Tests
             Assert.That(InScene<Renderer>(scene).Any(r => r.name == "Fog" || r.name == "ForestTree"), Is.False, "前の平たい霧の板か箱の森が残っている");
         }
 
-        [TestCase("Stage_Volcano")]
-        [TestCase("Stage_SnowSea")]
-        [TestCase("Stage_Wharf")]
-        [TestCase("Stage_Stadium")]
-        [TestCase("Stage_Manor")]
-        [TestCase("Stage_Athletic")]
-        public void FarGround_ReachesTheBackdrop_AndTheSkyRunsDownToItsEdge(string stage)
+        [TestCaseSource(nameof(DressedStages))]
+        public void OutdoorStages_AreSkyAllAround_AndTheFogMatchesTheHorizon(string stage)
         {
-            // 2026-11-18 の要望: いちばん奥の背景の小物までを地面として、空はその根元までしっかり描く（特にアスレチックと火山）。
+            // 2026-11-18 の要望: 屋内のステージ（キッチン・研究所）以外は最後面を全部空にし、空と地面の境目に地平線の処理（霧と遠景の
+            // もやの色を空の地平線の色にそろえ、遠くの地面・海・建物の根元を空に溶かす）。
             Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
             SceneManager.SetActiveScene(scene);
-            Renderer ground = InScene<Renderer>(scene).FirstOrDefault(r => r.name == "FarGround" || r.name == "Streets");
-            Assert.That(ground, Is.Not.Null, "奥の地面がない");
-            float groundY = ground.bounds.center.y;
-            float back = ground.bounds.max.z;
-            // 奥の地面は、いちばん奥の背景の物（山・森・街・スタンド）より奥まで続く。
-            float farthest = InScene<Renderer>(scene).Where(r => r != ground && r.name != "LightGrid" && !(r is ParticleSystemRenderer)
-                && !r.name.StartsWith("Fog") && r.name != "MoonRay" && r.name != "Streets" && r.bounds.size.x < 1000f).Max(r => r.bounds.center.z);
-            Assert.That(back, Is.GreaterThan(Mathf.Min(farthest, 900f)), $"奥の地面（奥の端 {back}）が奥の背景（{farthest}）まで届かない");
-            // 空の地平線は、いちばん高いカメラから見た奥の地面の端より下（その上はいつも空）。
-            Transform bounds = scene.GetRootGameObjects().Single(g => g.name == "KnockoutBounds").transform;
-            float top = bounds.GetComponentsInChildren<Renderer>().Max(r => r.bounds.max.y);
-            float horizon = RenderSettings.skybox.GetFloat("_HorizonHeight");
-            float eyeY = Mathf.Max(top, 0f) + 6f;
-            float edge = (groundY - eyeY) / (Mathf.Min(back, 970f) + 30f);
-            Assert.That(horizon, Is.LessThan(edge + 0.02f), $"空の地平線（{horizon}）が奥の地面の端（{edge}）より上");
+            Assert.That(InScene<Renderer>(scene).Any(r => r.name == "FarGround"), Is.False, "奥の地面の板が残っている");
+            bool indoor = stage == "Stage_Kitchen" || stage == "Stage_Lab";
+            if (indoor || !RenderSettings.fog)
+            {
+                return;
+            }
+            Material sky = RenderSettings.skybox;
+            Color horizon = sky.GetColor("_HorizonColor");
+            Color fog = RenderSettings.fogColor;
+            Assert.That(Mathf.Abs(fog.r - horizon.r) + Mathf.Abs(fog.g - horizon.g) + Mathf.Abs(fog.b - horizon.b), Is.LessThan(0.02f),
+                $"霧の色 {fog} が空の地平線の色 {horizon} と違う（遠くの地面と空の境目に線が出る）");
+            // 地平線より下も空（地面の色でなく、もやから空の色へ）。
+            Color below = sky.GetColor("_BelowColor");
+            Color skyColor = sky.GetColor("_SkyColor");
+            Color expected = Color.Lerp(horizon, skyColor, 0.3f);
+            Assert.That(Mathf.Abs(below.r - expected.r) + Mathf.Abs(below.g - expected.g) + Mathf.Abs(below.b - expected.b), Is.LessThan(0.02f),
+                "地平線より下が空の色でない");
         }
 
         [Test]
@@ -620,6 +618,7 @@ namespace Airerage.Runtime.Tests
         {
             // 2026-11-18 の要望: 水の表現をリアルに（揺れる水面と泡・深さの色・光の網と筋・空を映す水面・しぶき）。
             Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            SceneManager.SetActiveScene(scene);
             StageZoneView[] water = InScene<StageZoneView>(scene).Where(v => v.GetComponent<StageZoneAuthoring>().Kind == StageZoneKind.Water).ToArray();
             Assert.That(water.Length, Is.GreaterThan(0));
             foreach (StageZoneView view in water)
@@ -636,7 +635,8 @@ namespace Airerage.Runtime.Tests
                 Renderer sea = InScene<Renderer>(scene).Single(r => r.name == "Sea");
                 Assert.That(sea.sharedMaterial.shader.name, Is.EqualTo("Airerage/Water"), "海の箱が水のシェーダーでない");
                 Assert.That(sea.sharedMaterial.renderQueue, Is.EqualTo(2000), "海の箱は不透明で描く");
-                Assert.That(InScene<Renderer>(scene).Single(r => r.name == "FarGround").sharedMaterial.shader.name, Is.EqualTo("Airerage/Water"), "奥の海が水面でない");
+                // 海は霧が地平線の色になりきる所まで続く（水平線で空に溶ける）。
+                Assert.That(sea.bounds.max.z + 30f, Is.GreaterThan(RenderSettings.fogEndDistance), "海が霧に溶ける前に途切れる");
             }
         }
 

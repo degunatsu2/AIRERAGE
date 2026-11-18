@@ -178,8 +178,7 @@ namespace Airerage.Editor.Stages
                     new Vector3(-36.75f, 1f, 0f), new Vector3(36.75f, 1f, 0f), new Vector3(-45f, 17.6f, 0f), new Vector3(45f, 17.6f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。観客席の背景があるので、遠くの街は置かない。
-                // 奥のスタンドの外も地面（芝生と街の緑）にする（2026-11-18 の要望）。
-                Look = StageLook.FromTheme("Stadium", theme, StageMood.Day).WithFarGround(0f, new Color(0.3f, 0.4f, 0.3f), 46f),
+                Look = StageLook.FromTheme("Stadium", theme, StageMood.Day),
             };
         }
 

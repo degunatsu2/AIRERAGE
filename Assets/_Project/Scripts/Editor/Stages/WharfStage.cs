@@ -186,8 +186,7 @@ namespace Airerage.Editor.Stages
                     new Vector3(-34.25f, 2f, 0f), new Vector3(39.75f, 13.6f, 0f), new Vector3(-3.75f, -2f, 0f), new Vector3(4f, -2f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。
-                // 奥の山の根元まで海を続ける（2026-11-18 の要望）。
-                Look = StageLook.FromTheme("Wharf", theme, StageMood.Day).WithFarGround(-5f, new Color(0.03f, 0.13f, 0.25f), 136f, true),
+                Look = StageLook.FromTheme("Wharf", theme, StageMood.Day),
             };
         }
 
@@ -256,7 +255,8 @@ namespace Airerage.Editor.Stages
             Material stripe = decor.Unlit("LighthouseStripe", new Color(0.85f, 0.15f, 0.12f));
 
             // 奥の海（遊ぶ面より奥だけ）。
-            decor.Box("Sea", new Vector3(0f, -22f, 70f), new Vector3(220f, 34f, 136f), sea);
+            // 海は奥の山の向こうまで続け、霧で空の地平線の色に溶かす（水平線。2026-11-18 の要望: 最後面は空、地平線の処理）。
+            decor.Box("Sea", new Vector3(0f, -22f, 211f), new Vector3(1000f, 34f, 418f), sea);
             // 遠くの氷山のステージ（FROST COAST）: 浮かぶ氷、氷山、船。
             decor.Box("FarFloeA", new Vector3(-30f, -4.5f, 95f), new Vector3(10f, 3f, 8f), ice);
             decor.Box("FarFloeB", new Vector3(-10f, -4.2f, 100f), new Vector3(14f, 3.6f, 9f), ice);

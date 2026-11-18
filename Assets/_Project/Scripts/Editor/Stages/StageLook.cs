@@ -83,25 +83,8 @@ namespace Airerage.Editor.Stages
         public float SunSize = 2600f;
         public float SunGlow = 0.25f;
 
-        // 奥の地面（2026-11-18 の要望: いちばん奥の背景の小物までを地面として、空はその根元までしっかり描く。特にアスレチックと火山）。
-        /// <summary>奥の地面の板を置くか（高さ FarGroundY、奥行き FarGroundNear から StageDressing.FarGroundBack まで）。</summary>
-        public bool FarGround;
-        public float FarGroundY;
-        public float FarGroundNear = 20f;
-        public Color FarGroundColor;
-        /// <summary>奥の地面を海（水のシェーダーの水面）にするか。FarGroundColor は深い所の色。</summary>
-        public bool FarGroundWater;
-
-        /// <summary>奥の地面の板を置く（火山の溶岩の平原、海、森の地面など）。台本の書き方を短くするため自分を返す。</summary>
-        public StageLook WithFarGround(float y, Color color, float near, bool water = false)
-        {
-            FarGround = true;
-            FarGroundY = y;
-            FarGroundColor = color;
-            FarGroundNear = near;
-            FarGroundWater = water;
-            return this;
-        }
+        /// <summary>屋内のステージか（キッチン・研究所。空の最後面と地平線の処理をしない）。</summary>
+        public bool Indoor;
 
         /// <summary>霧を使うか（宇宙は使わない）。</summary>
         public bool Fog = true;
@@ -242,18 +225,6 @@ namespace Airerage.Editor.Stages
         public float Saturation;
         public float Vignette;
 
-        /// <summary>
-        /// ATHLETIC のステージの台本（Athletic() は昼のステージの台本の土台でもあるので、ATHLETIC だけの物はここに書く）。はるか下の
-        /// 西新宿の道路の地面を手前から敷く（2026-11-18 の要望: いちばん奥の背景の根元までを地面にして、空はその根元まで描く）。
-        /// </summary>
-        public static StageLook AthleticStage()
-        {
-            StageLook look = Athletic();
-            look.PlateauStreets = true;
-            look.PlateauStreetsFront = -60f;
-            return look;
-        }
-
         /// <summary>ATHLETIC（空のアスレチック）: 明るい昼の空、白い上の面と青みの影、水色の光る線、遠くに今の街の塔。</summary>
         public static StageLook Athletic()
         {
@@ -338,6 +309,7 @@ namespace Airerage.Editor.Stages
             look.Id = id;
             look.Seed = Stable(id);
             look.Skyline = false;
+            look.Indoor = mood == StageMood.Indoor;
             // 光の格子（認識阻害の結界。2026-11-18 の要望で全ステージに。「AIRERAGE の大会中はステージに認識阻害の結界が張られている」）。
             // ステージの下の床や海に隠れないよう、撃破の線のすぐ下に置く。
             look.Grid = true;
@@ -484,6 +456,8 @@ namespace Airerage.Editor.Stages
                     CloudLit = new Color(0.98f, 0.99f, 1f);
                     CloudSoftness = 0.12f;
                     CloudScale = 1.4f;
+                    // 奥の雪山が霧に溶けきらないように。
+                    FogEnd = 320f;
                     break;
                 case "SpaceStation":
                     Stars = 1f;
@@ -524,17 +498,39 @@ namespace Airerage.Editor.Stages
                     HorizonGlow = new Color(0.35f, 0.09f, 0.02f);
                     HorizonGlowHeight = 0.18f;
                     Embers = 1f;
+                    // 霧が地平線の色になるので、奥の火山が溶けきらないよう霧を遠くまで（もやの中のシルエットに）。
+                    FogEnd = 320f;
                     break;
                 case "Wharf":
                     SkyZenith = new Color(0.2f, 0.38f, 0.7f);
                     SkySky = new Color(0.48f, 0.64f, 0.88f);
                     DayClouds(0.56f, 0.36f, new Color(0.62f, 0.68f, 0.79f), 0.6f);
+                    // 奥の山が霧に溶けきらないように。
+                    FogEnd = 380f;
                     break;
             }
             if (SunColor.maxColorComponent <= 0f && MoonColor.maxColorComponent > 0f)
             {
                 // 夜の雲は月の側から照らす。
                 SunDirection = MoonDirection;
+            }
+            if (!Indoor && Fog)
+            {
+                MatchHorizon();
+            }
+
+            // 地平線の処理（2026-11-18 の要望: 屋内のステージ以外は最後面を全部空にし、空と地面の境目に地平線・水平線の処理を）。
+            // 3D の描き方の定石どおり、霧の色・遠景の足もとのもやの色・空の地平線の色を同じにする（大気遠近: 遠くの地面・海・建物の
+            // 根元は空の地平線の色に溶け、境目の線が出ない）。地平線より下も地面の色ではなく、もやから空の色へ続ける（最後面は空）。
+            // 夜は霧を地平線の色まで明るくすると景色が白っぽくなるので、霧と地平線の色の真ん中にそろえる。
+            void MatchHorizon()
+            {
+                bool night = Stars > 0.3f;
+                Color horizon = night ? Color.Lerp(FogColor, SkyHorizon, 0.5f) : SkyHorizon;
+                SkyHorizon = horizon;
+                FogColor = horizon;
+                HazeColor = horizon;
+                SkyBelow = Color.Lerp(horizon, SkySky, 0.3f);
             }
 
             void DayClouds(float cover, float top, Color shade, float cirrus)

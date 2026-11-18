@@ -78,10 +78,6 @@ namespace Airerage.Editor.Stages
             {
                 CreateWindowCity(look, folder);
             }
-            if (look.FarGround)
-            {
-                CreateFarGround(look, folder);
-            }
             CreateVolume(look, folder);
         }
 
@@ -781,38 +777,26 @@ namespace Airerage.Editor.Stages
             }, folder);
         }
 
-        /// <summary>奥の地面の板の奥の端（ワールドの z。カメラの描く奥行き 1000m より手前）と、左右の広さ。</summary>
-        public const float FarGroundBack = 880f;
-        private const float FarGroundHalfWidth = 1600f;
+        /// <summary>空の地平線を合わせる奥の端（ワールドの z。カメラの描く奥行き 1000m より手前）。</summary>
+        public const float HorizonBack = 880f;
 
         /// <summary>空の地平線を合わせる目の位置（いちばん高いカメラ。ステージの上の端より少し上、いつもの距離 30m）。</summary>
         public const float HorizonEyeAbove = 6f;
         public const float HorizonEyeZ = -30f;
 
         /// <summary>
-        /// 空の地平線を、奥の地面の奥の端より少し下にする（2026-11-18 の要望: いちばん奥の背景の小物までを地面として、空はその根元まで
-        /// しっかり描く）。前は地平線のもや（地面に見える色）が奥の山やビルの根元より上から始まっていた。カメラが高いほど奥の端は低く見える
-        /// ので、いちばん高いカメラから見た奥の端に合わせる（低いカメラでは、端の上はいつも空）。雲の帯の頂の高さは今の見た目のまま保つ。
-        /// 奥の地面がないステージ（宇宙・屋内）はそのまま。
+        /// 空の地平線を、ビル街の道路の地面の奥の端より少し下にする（空のもやが地面に見える色で建物の根元より上から始まらないように）。
+        /// カメラが高いほど奥の端は低く見えるので、いちばん高いカメラから見た奥の端に合わせる。雲の帯の頂の高さは今のまま保つ。ほかの
+        /// 外のステージは、最後面を全部空にして霧の色を空の地平線の色にそろえる（StageLook.ApplySky。2026-11-18 の要望）。
         /// </summary>
         public static void FitHorizon(StageLook look, Vector2 boundsMax)
         {
-            float groundY;
-            float back;
-            if (look.FarGround)
-            {
-                groundY = look.FarGroundY;
-                back = FarGroundBack;
-            }
-            else if (look.Skyline && look.PlateauStreets)
-            {
-                groundY = look.PlateauGround;
-                back = Mathf.Min(StreetsBack, FarGroundBack);
-            }
-            else
+            if (!look.Skyline || !look.PlateauStreets)
             {
                 return;
             }
+            float groundY = look.PlateauGround;
+            float back = Mathf.Min(StreetsBack, HorizonBack);
             float eyeY = boundsMax.y + HorizonEyeAbove;
             float edge = (groundY - eyeY) / (back - HorizonEyeZ);
             float horizon = edge - 0.012f;
@@ -821,22 +805,6 @@ namespace Airerage.Editor.Stages
                 look.CloudTop += look.HorizonHeight - horizon;
                 look.HorizonHeight = horizon;
             }
-        }
-
-        // 奥の地面の板（霧で遠くほど空の地平線の色に溶ける。光を受けない色）。当たりも影もない。
-        private static void CreateFarGround(StageLook look, string folder)
-        {
-            Material material = look.FarGroundWater
-                ? StageDecor.WaterMaterial("FarSea", Color.Lerp(look.FarGroundColor, new Color(0.25f, 0.55f, 0.65f), 0.6f), look.FarGroundColor, false,
-                    look.FarGroundY, true, look.SkySky, look.SkyHorizon, folder)
-                : SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("FarGround", "Universal Render Pipeline/Unlit", m =>
-                {
-                    m.SetColor("_BaseColor", look.FarGroundColor);
-                }, folder);
-            float depth = FarGroundBack - look.FarGroundNear;
-            GameObject ground = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, "FarGround", material, new Vector3(FarGroundHalfWidth * 2f, depth, 1f));
-            ground.transform.SetPositionAndRotation(new Vector3(0f, look.FarGroundY, look.FarGroundNear + depth * 0.5f), Quaternion.Euler(90f, 0f, 0f));
-            NoShadows(ground);
         }
 
         // 窓の外の街の広さ（m）: 道路の地面の左右と奥の端、周りの街（LOD1）のくり返しの列。
@@ -958,20 +926,26 @@ namespace Airerage.Editor.Stages
         }
 
         // 外壁の写真のアトラスなどを読む（縮めずに、ミップマップと異方性で遠くでもちらつかない読み込みの設定に合わせる）。
-        private static Texture2D LoadAtlas(string path, int size = 4096, TextureWrapMode wrap = TextureWrapMode.Clamp, int aniso = 4)
+        // 異方性フィルタは最大（斜めから見た壁のぼけと縞を減らす）、ミップマップは少しだけ細かい段を使う（遠くの細かい意匠がつぶれて
+        // 色が混ざるのを減らす）。2026-11-18 の P5。
+        private const int AtlasAniso = 16;
+        private const float AtlasMipBias = -0.25f;
+
+        private static Texture2D LoadAtlas(string path, int size = 4096, TextureWrapMode wrap = TextureWrapMode.Clamp, int aniso = AtlasAniso)
         {
             if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
             {
                 return null;
             }
             if (importer.maxTextureSize != size || !importer.mipmapEnabled || importer.anisoLevel != aniso || importer.wrapMode != wrap
-                || !importer.sRGBTexture)
+                || !importer.sRGBTexture || !Mathf.Approximately(importer.mipMapBias, AtlasMipBias))
             {
                 importer.maxTextureSize = size;
                 importer.mipmapEnabled = true;
                 importer.anisoLevel = aniso;
                 importer.wrapMode = wrap;
                 importer.sRGBTexture = true;
+                importer.mipMapBias = AtlasMipBias;
                 importer.SaveAndReimport();
             }
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
@@ -1040,13 +1014,14 @@ namespace Airerage.Editor.Stages
             {
                 return null;
             }
-            if (importer.materialImportMode != ModelImporterMaterialImportMode.None || !importer.isReadable
+            if (importer.materialImportMode != ModelImporterMaterialImportMode.None || !importer.isReadable || importer.normalSmoothingAngle > 0.01f
                 || importer.importNormals != ModelImporterNormals.Calculate || importer.importCameras || importer.importLights)
             {
                 importer.materialImportMode = ModelImporterMaterialImportMode.None;
                 importer.isReadable = true;
                 importer.importNormals = ModelImporterNormals.Calculate;
-                importer.normalSmoothingAngle = 20f;
+                // 面ごとの平らな陰影（なめらかにすると、細かい凹凸の多い建物で陰影がにじんで崩れて見えた。2026-11-18 の P2）。
+                importer.normalSmoothingAngle = 0f;
                 importer.importCameras = false;
                 importer.importLights = false;
                 importer.SaveAndReimport();

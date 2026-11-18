@@ -45,7 +45,7 @@ Material:
     - _SunSize: 2600
     - _Tense: 0
     m_Colors:
-    - _BelowColor: {r: 0.105, g: 0.085, b: 0.14, a: 1}
+    - _BelowColor: {r: 0.1282, g: 0.1088, b: 0.181, a: 1}
     - _CirrusColor: {r: 1, g: 1, b: 1, a: 1}
     - _CloudLit: {r: 0.4, g: 0.35, b: 0.5, a: 1}
     - _CloudShade: {r: 0.06, g: 0.045, b: 0.09, a: 1}

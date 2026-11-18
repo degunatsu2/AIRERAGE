@@ -185,8 +185,7 @@ namespace Airerage.Editor.Stages
                     new Vector3(-14.5f, 1.5f, 0f), new Vector3(44.5f, 4f, 0f), new Vector3(-13f, 15.6f, 0f), new Vector3(27f, 17.6f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。
-                // 奥の雪山の根元まで海を続ける（2026-11-18 の要望）。
-                Look = StageLook.FromTheme("SnowSea", theme, StageMood.Day).WithFarGround(-6f, new Color(0.04f, 0.14f, 0.26f), 58f, true),
+                Look = StageLook.FromTheme("SnowSea", theme, StageMood.Day),
             };
         }
 
@@ -211,7 +210,8 @@ namespace Airerage.Editor.Stages
             Material flake = decor.Unlit("Snowflake", Color.white);
 
             // 奥の海（遊ぶ面より奥だけ。手前は海の判定の半透明の水で、沈んでいく人と水の中のコインが見える。2026-10-26）。
-            decor.Box("Sea", new Vector3(0f, -23f, 31f), new Vector3(150f, 34f, 58f), sea);
+            // 海は奥の雪山の向こうまで続け、霧で空の地平線の色に溶かす（水平線。2026-11-18 の要望: 最後面は空、地平線の処理）。
+            decor.Box("Sea", new Vector3(0f, -23f, 176f), new Vector3(900f, 34f, 348f), sea);
             for (int i = 0; i < 18; i++)
             {
                 decor.Quad("Foam", new Vector3(decor.Range(-24f, 48f), -5.95f, decor.Range(-12f, 30f)), new Vector2(decor.Range(1f, 4f), 0.12f), foam);

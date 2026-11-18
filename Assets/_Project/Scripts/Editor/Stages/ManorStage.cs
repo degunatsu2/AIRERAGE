@@ -189,8 +189,7 @@ namespace Airerage.Editor.Stages
                     new Vector3(-12.75f, 3f, 0f), new Vector3(12.75f, 3f, 0f), new Vector3(-12f, 21.8f, 0f), new Vector3(12f, 21.8f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。
-                // 奥の森の向こうも暗い地面にする（2026-11-18 の要望）。
-                Look = StageLook.FromTheme("Manor", theme, StageMood.Night).WithFarGround(-0.02f, new Color(0.05f, 0.04f, 0.06f), ForestFar - 4f),
+                Look = StageLook.FromTheme("Manor", theme, StageMood.Night),
             };
         }
 
@@ -359,14 +358,18 @@ namespace Airerage.Editor.Stages
             {
                 Put(graves[i % graves.Length], decor.Range(-46.5f, -26f), 0f, decor.Range(3.2f, 9f), decor.Range(1.05f, 1.35f), decor.Range(-25f, 25f), PropTint);
             }
-            // 柵（4m ずつ。ところどころ壊れている）と柱、入口の門。
-            for (int i = 0; i < 5; i++)
+            // 柵（4m ずつ。ところどころ壊れている）と柱、入口の門。墓場の地面（x -48〜-24）の上に収める（門の右側が地面の外で宙に
+            // 浮いていた。2026-11-18 の指摘）。
+            for (int i = 0; i < 4; i++)
             {
                 float x = -45.5f + i * 4f;
                 Put(i == 2 ? "fence_broken" : "fence", x, 0f, 2.6f, 1f, 0f, PropTint);
                 Put("fence_pillar", x - 2f, 0f, 2.6f, 1f, 0f, PropTint);
             }
-            Put("arch_gate", -24.6f, 0f, 2.6f, 1.05f, 0f, PropTint);
+            Put("fence_pillar", -31.5f, 0f, 2.6f, 1f, 0f, PropTint);
+            Put("arch_gate", -29.4f, 0f, 2.6f, 1f, 0f, PropTint);
+            Put("fence_pillar", -27.2f, 0f, 2.6f, 1f, 0f, PropTint);
+            Put("fence_broken", -25.7f, 0f, 2.6f, 0.72f, 0f, PropTint);
             // 墓場の枯れ木（前は細い箱）と、ランタン、かぼちゃ。
             Put("tree_dead_large", -43f, 0f, 5f, 2.4f, 30f, PropTint);
             Put("tree_dead_medium", -29f, 0f, 7.5f, 2f, -40f, PropTint);

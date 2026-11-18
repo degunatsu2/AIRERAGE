@@ -105,8 +105,6 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private RingGaugeView _cloakGauge;
         [Tooltip("キャッスルインジエアー（STORM RUNNER の R）の残り（空色。あれば）")]
         [SerializeField] private RingGaugeView _skyGauge;
-        [Tooltip("水に飛び込んだ瞬間の水しぶき（あれば）")]
-        [SerializeField] private BurstEffectView _splashBurst;
         [Tooltip("悪魔の手に握られた見た目（恐怖の館。ユーザーの要望、2026-10-26）")]
         [SerializeField] private CaptureEffectView _captureEffect;
         [Tooltip("向きの印（目の帯と突き出た印をまとめた子。右向きで作り、左を向いたら左右を反転する。なければ出さない）")]
@@ -122,7 +120,6 @@ namespace Airerage.Runtime.Presentation
         private int _shownWireCancelCooldown;
         private int _shownBounces;
         private int _shownGimmicks;
-        private int _shownSplashes;
         private bool _shownCaptured;
 
         // 悪魔の手に握られてから、指が閉じきるまでと、渦に吸い込まれきるまで（ティック。見た目だけ）。
@@ -194,7 +191,6 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>体の周りのゲージの並べ方（重ならないように、古いゲージほど外側に）。</summary>
         public RingGaugeStack GaugeStack => _gaugeStack ??= new RingGaugeStack(AroundGauges());
-        public BurstEffectView SplashBurst => _splashBurst;
         public CaptureEffectView CaptureEffect => _captureEffect;
 
         /// <summary>悪魔の手の渦に吸い込まれきって、見えなくしているか。</summary>
@@ -583,11 +579,6 @@ namespace Airerage.Runtime.Presentation
             {
                 _bounceBurst.Play(center);
             }
-            if (c.SplashCount > _shownSplashes && shown && _splashBurst != null)
-            {
-                _splashBurst.Play(center);
-            }
-            _shownSplashes = c.SplashCount;
             // ジャンプ台・加速リング・壁ジャンプ。
             int gimmicks = state.JumpPadCount + state.BoostRingCount + state.WallJumpCount;
             if (gimmicks > _shownGimmicks && shown && _gimmickBurst != null)

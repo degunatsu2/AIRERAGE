@@ -120,7 +120,7 @@ namespace Airerage.Editor
                 point.AddComponent<SpawnPointAuthoring>().Configure(p);
             }
             // 背景とオブジェクトのクオリティアップ（D-97。ATHLETIC で試作）。
-            StageDressing.Apply(StageLook.AthleticStage(), SandboxOnlineSceneBuilder.BoundsMin, SandboxOnlineSceneBuilder.BoundsMax);
+            StageDressing.Apply(StageLook.Athletic(), SandboxOnlineSceneBuilder.BoundsMin, SandboxOnlineSceneBuilder.BoundsMax);
             Save(scene, AthleticStagePath);
         }
 
