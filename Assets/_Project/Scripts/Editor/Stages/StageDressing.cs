@@ -57,6 +57,7 @@ namespace Airerage.Editor.Stages
         {
             string folder = FolderOf(look);
             look.ApplySky();
+            FitHorizon(look, boundsMax);
             ApplyLighting(look, folder);
             DressTerrain(look, folder);
             DressAttachableGlow(look, folder);
@@ -76,6 +77,10 @@ namespace Airerage.Editor.Stages
             if (look.WindowCity)
             {
                 CreateWindowCity(look, folder);
+            }
+            if (look.FarGround)
+            {
+                CreateFarGround(look, folder);
             }
             CreateVolume(look, folder);
         }
@@ -656,7 +661,6 @@ namespace Airerage.Editor.Stages
         private const string PlateauAtlasPath = PlateauFolder + "/Shinjuku_LOD2_Atlas.jpg";
         private const string PlateauNightPath = PlateauFolder + "/Shinjuku_LOD2_AtlasNight.jpg";
         private const string PlateauGroundPath = PlateauFolder + "/Shinjuku_Ground.jpg";
-        private const string PlateauGroundNightPath = PlateauFolder + "/Shinjuku_GroundNight.jpg";
 
         // 道路の地図の範囲（中心からの m。tools/assets/plateau_roads.py の --half と同じ）と、地面の板の左右の広さと奥の端（ワールド）。
         private const float PlateauGroundHalf = 1200f;
@@ -732,6 +736,8 @@ namespace Airerage.Editor.Stages
                 m.SetTexture("_NightTex", null);
                 m.SetFloat("_NightStrength", 0f);
                 m.SetFloat("_NightSides", 0f);
+                // 夜は濡れた道路のネオンの照り返し（手前の大通りと同じ）。
+                m.SetFloat("_WetReflect", look.WetReflect);
             }, folder);
             GameObject streets = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, "Streets", material, new Vector3(width, depth, 1f));
             streets.transform.SetParent(root, false);
@@ -773,6 +779,64 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_NightStrength", nightLights != null ? look.CityNightGlow : 0f);
                 m.SetFloat("_NightSides", 1f);
             }, folder);
+        }
+
+        /// <summary>奥の地面の板の奥の端（ワールドの z。カメラの描く奥行き 1000m より手前）と、左右の広さ。</summary>
+        public const float FarGroundBack = 880f;
+        private const float FarGroundHalfWidth = 1600f;
+
+        /// <summary>空の地平線を合わせる目の位置（いちばん高いカメラ。ステージの上の端より少し上、いつもの距離 30m）。</summary>
+        public const float HorizonEyeAbove = 6f;
+        public const float HorizonEyeZ = -30f;
+
+        /// <summary>
+        /// 空の地平線を、奥の地面の奥の端より少し下にする（2026-11-18 の要望: いちばん奥の背景の小物までを地面として、空はその根元まで
+        /// しっかり描く）。前は地平線のもや（地面に見える色）が奥の山やビルの根元より上から始まっていた。カメラが高いほど奥の端は低く見える
+        /// ので、いちばん高いカメラから見た奥の端に合わせる（低いカメラでは、端の上はいつも空）。雲の帯の頂の高さは今の見た目のまま保つ。
+        /// 奥の地面がないステージ（宇宙・屋内）はそのまま。
+        /// </summary>
+        public static void FitHorizon(StageLook look, Vector2 boundsMax)
+        {
+            float groundY;
+            float back;
+            if (look.FarGround)
+            {
+                groundY = look.FarGroundY;
+                back = FarGroundBack;
+            }
+            else if (look.Skyline && look.PlateauStreets)
+            {
+                groundY = look.PlateauGround;
+                back = Mathf.Min(StreetsBack, FarGroundBack);
+            }
+            else
+            {
+                return;
+            }
+            float eyeY = boundsMax.y + HorizonEyeAbove;
+            float edge = (groundY - eyeY) / (back - HorizonEyeZ);
+            float horizon = edge - 0.012f;
+            if (horizon < look.HorizonHeight)
+            {
+                look.CloudTop += look.HorizonHeight - horizon;
+                look.HorizonHeight = horizon;
+            }
+        }
+
+        // 奥の地面の板（霧で遠くほど空の地平線の色に溶ける。光を受けない色）。当たりも影もない。
+        private static void CreateFarGround(StageLook look, string folder)
+        {
+            Material material = look.FarGroundWater
+                ? StageDecor.WaterMaterial("FarSea", Color.Lerp(look.FarGroundColor, new Color(0.25f, 0.55f, 0.65f), 0.6f), look.FarGroundColor, false,
+                    look.FarGroundY, true, look.SkySky, look.SkyHorizon, folder)
+                : SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("FarGround", "Universal Render Pipeline/Unlit", m =>
+                {
+                    m.SetColor("_BaseColor", look.FarGroundColor);
+                }, folder);
+            float depth = FarGroundBack - look.FarGroundNear;
+            GameObject ground = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, "FarGround", material, new Vector3(FarGroundHalfWidth * 2f, depth, 1f));
+            ground.transform.SetPositionAndRotation(new Vector3(0f, look.FarGroundY, look.FarGroundNear + depth * 0.5f), Quaternion.Euler(90f, 0f, 0f));
+            NoShadows(ground);
         }
 
         // 窓の外の街の広さ（m）: 道路の地面の左右と奥の端、周りの街（LOD1）のくり返しの列。

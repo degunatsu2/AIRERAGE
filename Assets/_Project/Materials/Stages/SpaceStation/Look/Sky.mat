@@ -37,7 +37,7 @@ Material:
     - _HorizonSharpness: 9
     - _MilkyWay: 0.8
     - _MoonSize: 3
-    - _Nebula: 0.55
+    - _Nebula: 0.6
     - _Planet: 1
     - _PlanetRadius: 50
     - _Stars: 1
@@ -55,8 +55,8 @@ Material:
     - _HorizonGlow: {r: 0, g: 0, b: 0, a: 1}
     - _MoonColor: {r: 0, g: 0, b: 0, a: 1}
     - _MoonDirection: {r: 0.45, g: 0.4, b: 1, a: 0}
-    - _NebulaA: {r: 0.35, g: 0.12, b: 0.6, a: 1}
-    - _NebulaB: {r: 0.08, g: 0.35, b: 0.7, a: 1}
+    - _NebulaA: {r: 0.6, g: 0.12, b: 0.78, a: 1}
+    - _NebulaB: {r: 0.05, g: 0.45, b: 0.85, a: 1}
     - _PlanetAtmosphere: {r: 0.35, g: 0.65, b: 1.6, a: 1}
     - _PlanetDirection: {r: 0, g: -0.899, b: 0.438, a: 0}
     - _PlanetLand: {r: 0.19999996, g: 0.29999998, b: 0.13999996, a: 1}

@@ -289,31 +289,36 @@ Shader "Airerage/GradientSky"
                 {
                     color = lerp(_HorizonColor.rgb, _BelowColor.rgb, saturate(-h * 3.0));
                 }
-                half haze = exp(-abs(h) * _HorizonSharpness);
+                // 地平線のもやは、上は薄く狭く（奥の山やビルの根元まで空に見えるように。2026-11-18 の要望）、下は今までどおり。
+                half haze = h >= 0.0 ? exp(-h * _HorizonSharpness * 2.2) * 0.85 : exp(h * _HorizonSharpness);
                 color = lerp(color, _HorizonColor.rgb, haze);
                 float2 c = Cylinder(d);
                 float3 sun = normalize(_SunDirection.xyz);
                 float2 sunC = Cylinder(sun);
                 half facing = saturate(dot(d, sun));
 
-                // 星・天の川・星雲（夜と宇宙）。
-                if (_Stars > 0.0)
-                {
-                    float3 band = normalize(float3(-0.75, 0.62, 0.12));
-                    half milky = exp(-pow(dot(d, band) / 0.16, 2.0)) * _MilkyWay;
-                    half3 stars = StarField(d, 1.0 + milky * 2.5) * _Stars;
-                    half mist = Fbm(c * float2(7.0, 7.0) + 11.0, 4);
-                    stars += half3(0.55, 0.6, 0.85) * milky * smoothstep(0.35, 0.8, mist) * 0.22;
-                    color += stars * saturate(h * 4.0 + 0.3);
-                }
+                // 星雲（宇宙）は星よりも奥: 淡く色の濃い光の雲と暗い塵の筋だけにして、星はその上にくっきり重ねる（2026-11-18 の要望:
+                // 銀河のようなもやが星より手前に見える。前は明るい灰色の煙のようで星を覆って見えた）。星雲の濃い所ほど星を多く。
+                half nebulaMask = 0.0;
                 if (_Nebula > 0.0)
                 {
                     float2 nq = c * 1.6 + 7.0;
                     float n1 = Fbm(nq + Fbm(nq * 0.7, 3) * 1.5, 5);
                     float n2 = Fbm(nq * 1.7 + 3.3, 4);
-                    half3 nebula = lerp(_NebulaA.rgb, _NebulaB.rgb, smoothstep(0.35, 0.7, n2)) * pow(saturate((n1 - 0.4) * 2.4), 2.0);
-                    half dust = smoothstep(0.55, 0.75, Fbm(nq * 2.3 - 4.1, 4));
-                    color += nebula * _Nebula * (1.0 - dust * 0.6);
+                    nebulaMask = pow(saturate((n1 - 0.42) * 2.6), 2.2);
+                    half3 tint = lerp(_NebulaA.rgb, _NebulaB.rgb, smoothstep(0.35, 0.7, n2));
+                    half dust = smoothstep(0.52, 0.72, Fbm(nq * 2.3 - 4.1, 4));
+                    color += tint * nebulaMask * _Nebula * 0.45 * (1.0 - dust * 0.85);
+                }
+                // 星・天の川（夜と宇宙）。
+                if (_Stars > 0.0)
+                {
+                    float3 band = normalize(float3(-0.75, 0.62, 0.12));
+                    half milky = exp(-pow(dot(d, band) / 0.16, 2.0)) * _MilkyWay;
+                    half3 stars = StarField(d, 1.0 + milky * 2.5 + nebulaMask * 2.0) * _Stars;
+                    half mist = Fbm(c * float2(7.0, 7.0) + 11.0, 4);
+                    stars += half3(0.45, 0.5, 0.8) * milky * smoothstep(0.4, 0.85, mist) * 0.1;
+                    color += stars * saturate(h * 4.0 + 0.3);
                 }
 
                 // 地平線の光（街明かり・溶岩の照り返し）。

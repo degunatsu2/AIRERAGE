@@ -31,6 +31,7 @@ Shader "Airerage/StageBackdrop"
         _NightTex ("Night window lights (atlas)", 2D) = "black" {}
         _NightStrength ("Night lights strength", Range(0, 8)) = 0
         _NightSides ("Night lights on sides only", Range(0, 1)) = 1
+        _WetReflect ("Wet road neon reflections", Range(0, 4)) = 0
         _FogFadeStart ("Fog fade start (world z)", Float) = -100000
         _FogFadeEnd ("Fog fade end (world z)", Float) = -99999
     }
@@ -82,6 +83,7 @@ Shader "Airerage/StageBackdrop"
                 half _NightSides;
                 float _FogFadeStart;
                 float _FogFadeEnd;
+                half _WetReflect;
             CBUFFER_END
 
             // 夜の窓のネオンの色（暖かい白・青白・マゼンタ・シアン・紫・橙）。
@@ -98,6 +100,15 @@ Shader "Airerage/StageBackdrop"
             float BandHash(float2 p)
             {
                 return frac(sin(dot(p, float2(41.3, 289.1))) * 43758.5453);
+            }
+
+            // 濡れた道路の照り返しに使う、なめらかなノイズ（0〜1）。
+            half WetNoise(float2 p)
+            {
+                float2 i = floor(p);
+                float2 f = frac(p);
+                float2 u = f * f * (3.0 - 2.0 * f);
+                return lerp(lerp(BandHash(i), BandHash(i + float2(1, 0)), u.x), lerp(BandHash(i + float2(0, 1)), BandHash(i + float2(1, 1)), u.x), u.y);
             }
 
             struct Attributes
@@ -174,6 +185,27 @@ Shader "Airerage/StageBackdrop"
                 if (_NightStrength > 0.0)
                 {
                     emission += SAMPLE_TEXTURE2D(_NightTex, sampler_NightTex, input.uv).rgb * _NightStrength * lerp(1.0, side, _NightSides);
+                }
+                // 夜の濡れた道路のネオンの照り返し（2026-11-18 の要望: 地面にもネオンの照り返しを描いて、奥の街の光と地続きに）。
+                // 上を向いた面だけ。世界の位置で決まるので、大通りと西新宿の道路の地面でつながる。照り返しは手前へ縦に伸びる光の筋
+                // （奥行きの向きに引き伸ばしたノイズ）で、色は横の位置でゆっくり変わるネオンの色。水たまりのまだらと、ゆっくりした揺らぎ。
+                // 道路の地図がある所は、暗い車道ほど強く（明るい歩道は弱く）。
+                if (_WetReflect > 0.0)
+                {
+                    half top = saturate(n.y * 2.0 - 1.0);
+                    float2 w = input.positionWS.xz;
+                    float2 q = float2(w.x * 0.22, w.y * 0.012);
+                    half streak = pow(WetNoise(q), 3.0) * 1.6 + pow(WetNoise(q * float2(3.1, 2.0) + 7.0), 4.0) * 0.9;
+                    half3 tint = NeonColor(WetNoise(float2(w.x * 0.045, 1.3)));
+                    half puddle = WetNoise(w * 0.35 + 3.0);
+                    half shimmer = 0.85 + 0.15 * sin(_Time.y * 1.7 + w.x * 0.3 + w.y * 0.05);
+                    half road = 1.0;
+                    if (_TexBlend > 0.0)
+                    {
+                        half3 map = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).rgb;
+                        road = lerp(0.35, 1.0, saturate((0.38 - dot(map, half3(0.299, 0.587, 0.114))) * 6.0));
+                    }
+                    emission += tint * streak * (0.35 + 0.65 * puddle) * shimmer * top * road * _WetReflect;
                 }
                 half haze = saturate((_HazeTop - input.positionWS.y) / max(_HazeTop - _HazeBottom, 1e-3));
                 color = lerp(color, _HazeColor.rgb, haze);

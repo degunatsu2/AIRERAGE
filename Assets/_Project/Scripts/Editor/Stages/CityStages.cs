@@ -327,7 +327,22 @@ namespace Airerage.Editor.Stages
                     decor.Unlit("SkyAmber", Glow(new Color(1f, 0.58f, 0.16f), 2.4f)),
                 }
                 : null;
-            Material street = decor.Lit("Street", night ? new Color(0.06f, 0.06f, 0.08f) : new Color(0.3f, 0.3f, 0.32f));
+            // 夜の道路は濡れたアスファルトのネオンの照り返し（2026-11-18 の要望: 奥の街の光と地続きに。西新宿の道路の地面と同じ照り返し）。
+            Material street = night
+                ? SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WetStreet", "Airerage/StageBackdrop", m =>
+                {
+                    m.SetColor("_BaseColor", new Color(0.05f, 0.05f, 0.07f));
+                    m.SetFloat("_HazeTop", -1000f);
+                    m.SetFloat("_HazeBottom", -1100f);
+                    m.SetFloat("_Blink", 0f);
+                    m.SetFloat("_BandStrength", 0f);
+                    m.SetFloat("_BandFill", 0f);
+                    m.SetFloat("_TexBlend", 0f);
+                    m.SetFloat("_LightShade", 0.3f);
+                    m.SetFloat("_FogAmount", 1f);
+                    m.SetFloat("_WetReflect", CityWetReflect);
+                }, "Assets/_Project/Materials/Stages/CityNight")
+                : decor.Lit("Street", new Color(0.3f, 0.3f, 0.32f));
 
             // 地形のビルの奥行き（見た目だけ）と正面の窓。
             (float MinX, float MaxX, float Top)[] buildings =
@@ -468,6 +483,9 @@ namespace Airerage.Editor.Stages
         // 2026-11-18 の要望（背景の下側で建物がぶつ切り）で、道路の地面（谷の底の大通りと同じ高さ）に立たせた。大きさは少し小さく、
         // 少し奥へ（道路に立つと高層ビルの頭が画面の上からはみ出さないように）。地面は大通りの奥の端 CityStreetsFront から。
         private const float CityPlateauGround = -24f;
+
+        // 夜の濡れた道路のネオンの照り返しの強さ（大通りと西新宿の道路の地面で同じ）。
+        private const float CityWetReflect = 1.1f;
         private const float CityPlateauScale = 0.62f;
         private const float CityPlateauPush = 80f;
         private const float CityStreetsFront = 380f;
@@ -495,6 +513,7 @@ namespace Airerage.Editor.Stages
             // 重ねる（恐怖の館・宇宙ステーションも夜の台本を土台にするので、ここでビル街の夜だけ変える）。
             look.CityNightGlow = 5.5f;
             look.WindowGlow = 4.5f;
+            look.WetReflect = CityWetReflect;
             look.BloomThreshold = 0.8f;
             look.BloomIntensity = 1.25f;
             look.BloomScatter = 0.86f;

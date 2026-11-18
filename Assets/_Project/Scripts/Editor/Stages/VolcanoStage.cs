@@ -166,7 +166,8 @@ namespace Airerage.Editor.Stages
                     new Vector3(-46.75f, 17f, 0f), new Vector3(46.75f, 17f, 0f), new Vector3(-7f, 23.6f, 0f), new Vector3(7f, 23.6f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。
-                Look = StageLook.FromTheme("Volcano", theme, StageMood.Lava),
+                // 奥の山の根元までを、溶岩の湖と同じ高さの黒い火山の平原にする（2026-11-18 の要望）。
+                Look = StageLook.FromTheme("Volcano", theme, StageMood.Lava).WithFarGround(-20f, new Color(0.11f, 0.06f, 0.05f), 24f),
             };
         }
 

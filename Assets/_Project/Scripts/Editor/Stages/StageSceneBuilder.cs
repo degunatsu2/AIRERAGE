@@ -314,6 +314,15 @@ namespace Airerage.Editor.Stages
                 view.Configure(lineMaterial, color);
                 view.ConfigureWarningSound(zone.WarningSound);
                 view.ConfigureLook(zone.Look);
+                if (zone.Kind == StageZoneKind.Water)
+                {
+                    // 水面を出入りしたときのしぶき（青白い水滴。2026-11-18 の要望: 水の表現をリアルに）。
+                    view.ConfigureWater(SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WaterSplash", "Airerage/Wisp", m =>
+                    {
+                        m.SetColor("_Color", new Color(0.55f, 0.72f, 0.85f));
+                        m.SetFloat("_Core", 5f);
+                    }, decor.Folder));
+                }
                 Transform propParent = go.transform;
                 if (zone.TravelSeconds > 0f)
                 {
@@ -387,11 +396,16 @@ namespace Airerage.Editor.Stages
                 case StageZoneKind.Water:
                 {
                     // 水の手前の面（キャラクターと地形の前。水の中のキャラクターとコインが透けて見える。撃破の線より下まで）と、手前の水面。
+                    // どちらも水のシェーダー（揺れる水面と泡・深さの色・光の網と筋・空を映す水面。2026-11-18 の要望）。
                     float depth = size.y + 30f;
-                    GameObject front = decor.Quad("Front", parent, new Vector3(0f, size.y * 0.5f - depth * 0.5f, -2.4f), new Vector2(size.x, depth),
-                        decor.Transparent(kind, WithAlpha(color, 0.5f)));
+                    float surfaceY = zone.Center.y + size.y * 0.5f;
+                    Color shallow = Color.Lerp(color, new Color(0.2f, 0.68f, 0.75f), 0.5f);
+                    Color deep = new Color(0.02f, 0.1f, 0.24f);
+                    // 水面の線の揺れの分だけ上まで（シェーダーが水面より上を描かない）。
+                    GameObject front = decor.Quad("Front", parent, new Vector3(0f, size.y * 0.5f - depth * 0.5f + 0.3f, -2.4f), new Vector2(size.x, depth + 0.6f),
+                        decor.Water($"Water{zone.Name}", shallow, deep, true, surfaceY, false));
                     GameObject surface = decor.Quad("Surface", parent, new Vector3(0f, size.y * 0.5f, -6f), new Vector2(size.x, 8f),
-                        decor.Transparent(kind + "Surface", WithAlpha(Color.Lerp(color, Color.white, 0.25f), 0.4f)));
+                        decor.Water($"Water{zone.Name}Surface", shallow, deep, false, surfaceY, false));
                     surface.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                     return front;
                 }
@@ -517,6 +531,40 @@ namespace Airerage.Editor.Stages
         public float Range(float min, float max)
         {
             return min + (float)Random.NextDouble() * (max - min);
+        }
+
+        /// <summary>材質を置くフォルダ。</summary>
+        public string Folder => _folder;
+
+        /// <summary>
+        /// 水の材質（Airerage/Water。2026-11-18 の要望: 水の表現をリアルに）。cross が真なら水の断面（半透明。surfaceY は水面のワールドの
+        /// 高さ）、偽なら水面（opaque なら不透明。海の箱や奥の海の板）。
+        /// </summary>
+        public Material Water(string name, Color shallow, Color deep, bool cross, float surfaceY, bool opaque)
+        {
+            return WaterMaterial(name, shallow, deep, cross, surfaceY, opaque, new Color(0.42f, 0.6f, 0.88f), new Color(0.85f, 0.9f, 0.96f), _folder);
+        }
+
+        /// <summary>水の材質を作る（StageDressing の奥の海の板からも使う）。</summary>
+        public static Material WaterMaterial(string name, Color shallow, Color deep, bool cross, float surfaceY, bool opaque, Color sky, Color horizon, string folder)
+        {
+            Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/Water", m =>
+            {
+                m.SetFloat("_Mode", cross ? 0f : 1f);
+                m.SetColor("_ShallowColor", shallow);
+                m.SetColor("_DeepColor", deep);
+                m.SetFloat("_SurfaceY", surfaceY);
+                m.SetFloat("_Opacity", opaque ? 1f : cross ? 0.42f : 0.45f);
+                m.SetFloat("_DeepOpacity", opaque ? 1f : 0.82f);
+                m.SetColor("_SkyColor", sky);
+                m.SetColor("_HorizonColor", horizon);
+                m.SetFloat("_SrcBlend", opaque ? (float)BlendMode.One : (float)BlendMode.SrcAlpha);
+                m.SetFloat("_DstBlend", opaque ? (float)BlendMode.Zero : (float)BlendMode.OneMinusSrcAlpha);
+                m.SetFloat("_ZWrite", opaque ? 1f : 0f);
+            }, folder);
+            material.renderQueue = opaque ? (int)RenderQueue.Geometry : (int)RenderQueue.Transparent;
+            EditorUtility.SetDirty(material);
+            return material;
         }
 
         public Material Lit(string name, Color color)

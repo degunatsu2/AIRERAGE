@@ -344,6 +344,35 @@ namespace Airerage.Editor.Stages
             decor.Box($"Window{side}Sill", new Vector3(center.x, center.y - h * 0.5f - 0.2f, 14.6f), new Vector3(w + 1.2f, 0.4f, 1.4f), sill);
         }
 
+        private const string PropFolder = "Assets/_Project/Materials/Stages/Kitchen";
+
+        // 調理台の奥の瓶・まな板と人参・皿立て・ケチャップとマスタード、オーブンの上の鍋、奥の壁の棚。
+        private static void Props(StageDecor decor)
+        {
+            ThirdPartyProps.Pack pack = ThirdPartyProps.Restaurant;
+            Color tint = Color.white;
+            void Put(string model, float x, float y, float z, float scale, float yaw = 0f)
+            {
+                ThirdPartyProps.Place(decor, pack, model, new Vector3(x, y, z), scale, yaw, tint, PropFolder);
+            }
+            // 左の調理台（上の面 y 2、奥行き z 2〜7）。
+            Put("jar_A_large", -46f, 2f, 5f, 7f);
+            Put("jar_B_large", -42.6f, 2f, 5f, 7f, 20f);
+            Put("jar_C_medium", -39.6f, 2f, 5.2f, 7f, -15f);
+            Put("cuttingboard", -30.5f, 2f, 4.9f, 4.6f, 4f);
+            Put("food_ingredient_carrot_chopped", -30.5f, 2.7f, 4.9f, 4.6f, 4f);
+            // 右の調理台。
+            Put("dishrack_plates", 29.2f, 2f, 5f, 4.4f, 10f);
+            Put("ketchup", 33.6f, 2f, 5.6f, 6f);
+            Put("mustard", 35.2f, 2f, 5.6f, 6f, 30f);
+            // オーブンの上（上の面 y 17、奥行き z 5〜13）の鍋。
+            Put("pot_A_stew", -6.5f, 17f, 9.2f, 6.5f, 8f);
+            Put("pot_B", 6.5f, 17f, 9.2f, 6.5f, -12f);
+            // 奥の壁（手前の面 z 15）の棚（窓より外側）。
+            Put("shelf_papertowel_decorated", -52f, 14f, 13f, 6.5f);
+            Put("shelf_papertowel_decorated", 52f, 14f, 13f, 6.5f);
+        }
+
         // 奥の壁とタイル、大きなオーブン（火柱の口）、コンロのつまみ、窓、調理台の奥行き、吊るしたおたま。
         private static void Decorate(StageDecor decor)
         {
@@ -392,6 +421,9 @@ namespace Airerage.Editor.Stages
                 Window(decor, center);
             }
             decor.Box("Floor", new Vector3(0f, -22f, 10f), new Vector3(150f, 2f, 40f), floor);
+            // 背景の小物（KayKit Restaurant Bits。CC0。2026-11-18 のユーザーの指示で受け取ったアセットを組み込む）。キッチンは人の約 8 倍の
+            // 大きさなので、小物も 5〜7 倍で置く。どれも遊ぶ面より奥（z 2.3 より奥）で、当たりはない。
+            Props(decor);
             // 吊るしたおたまの柄（アンカーの上）。
             foreach (Vector2 hook in new[] { new Vector2(-15f, 25f), new Vector2(15f, 25f), new Vector2(0f, 36f), new Vector2(-28f, 27f), new Vector2(28f, 27f) })
             {

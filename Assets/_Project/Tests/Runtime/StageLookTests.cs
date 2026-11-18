@@ -190,7 +190,15 @@ namespace Airerage.Runtime.Tests
             }
             foreach (Renderer renderer in backdrop.GetComponentsInChildren<Renderer>())
             {
-                Assert.That(renderer.bounds.min.z, Is.GreaterThan(60f), $"遠景が遊ぶ所の近くにある: {renderer.name}");
+                if (renderer.name == "Streets")
+                {
+                    // はるか下の西新宿の道路の地面は、ステージの真下から奥へ敷く（2026-11-18 の要望: 奥の背景の根元までを地面に）。
+                    Assert.That(renderer.bounds.max.y, Is.LessThan(-100f), "下の道路の地面が遊ぶ所の近くにある");
+                }
+                else
+                {
+                    Assert.That(renderer.bounds.min.z, Is.GreaterThan(60f), $"遠景が遊ぶ所の近くにある: {renderer.name}");
+                }
                 Assert.That(renderer.shadowCastingMode, Is.EqualTo(ShadowCastingMode.Off), $"遠景が影を落とす: {renderer.name}");
             }
             // 世界観は現代日本: 浮かぶ島は置かず、運営の撮影の飛行船は 1 隻だけ（2026-11-17 の要望）。
@@ -511,6 +519,125 @@ namespace Airerage.Runtime.Tests
             }
             Assert.That(parts.Where(r => r.name.StartsWith("BackWall")).Select(r => r.bounds.max.x).Max(), Is.GreaterThan(150f),
                 "奥の壁が狭い（全体を映すカメラで壁の外の街が見える）");
+        }
+
+        [Test]
+        public void Kitchen_AndManor_UseTheKayKitProps()
+        {
+            // 2026-11-18 のユーザーの指示: push したアセット（KayKit。CC0）を背景に組み込む。小物は色の絵の材質で、当たりはない。
+            foreach (string stage in new[] { "Stage_Kitchen", "Stage_Manor" })
+            {
+                Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+                Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+                Transform[] props = decor.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("Prop_")).ToArray();
+                Assert.That(props.Length, Is.GreaterThan(8), $"{stage} に背景の小物が少ない");
+                foreach (Transform prop in props)
+                {
+                    Renderer renderer = prop.GetComponentInChildren<Renderer>();
+                    Assert.That(renderer, Is.Not.Null, $"{stage} の {prop.name} に見た目がない");
+                    Assert.That(renderer.sharedMaterial.GetTexture("_BaseMap"), Is.Not.Null, $"{stage} の {prop.name} に色の絵がない");
+                    Assert.That(prop.GetComponentsInChildren<Collider>(true), Is.Empty, $"{stage} の {prop.name} に当たりがある");
+                    // 遊ぶ面（z 0 のまわり）に出ない。
+                    Assert.That(renderer.bounds.min.z, Is.GreaterThan(0f), $"{stage} の {prop.name} が遊ぶ面より手前に出ている");
+                }
+            }
+        }
+
+        [Test]
+        public void Manor_HasDriftingFogLayers_MoonRays_AndWisps()
+        {
+            // 2026-11-18 の要望: 恐怖の館の手前の霧をリアルにし、怪しい空気感と雰囲気を出す。
+            Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_Manor.unity");
+            Transform atmosphere = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform.Find("Atmosphere");
+            Assert.That(atmosphere, Is.Not.Null, "霧の層がない");
+            Renderer[] fog = atmosphere.GetComponentsInChildren<Renderer>().Where(r => r.sharedMaterial.shader.name == "Airerage/FogSheet").ToArray();
+            Assert.That(fog.Length, Is.GreaterThanOrEqualTo(6), "霧の板が少ない");
+            Assert.That(fog.Any(r => r.bounds.center.z < 0f), Is.True, "手前の地霧がない");
+            Assert.That(fog.Any(r => r.bounds.center.z > 40f), Is.True, "奥の森の霧がない");
+            Assert.That(fog.Where(r => r.bounds.center.z < 0f).All(r => r.sharedMaterial.GetFloat("_Density") < 0.5f), Is.True,
+                "手前の霧が濃すぎる（遊ぶ所を隠す）");
+            Assert.That(atmosphere.GetComponentsInChildren<ParticleSystem>().Length, Is.GreaterThanOrEqualTo(2), "鬼火がない");
+            Assert.That(atmosphere.GetComponentsInChildren<Renderer>().Count(r => r.name == "MoonRay"), Is.EqualTo(3), "月の光の筋がない");
+            Assert.That(InScene<Renderer>(scene).Any(r => r.name == "Fog" || r.name == "ForestTree"), Is.False, "前の平たい霧の板か箱の森が残っている");
+        }
+
+        [TestCase("Stage_Volcano")]
+        [TestCase("Stage_SnowSea")]
+        [TestCase("Stage_Wharf")]
+        [TestCase("Stage_Stadium")]
+        [TestCase("Stage_Manor")]
+        [TestCase("Stage_Athletic")]
+        public void FarGround_ReachesTheBackdrop_AndTheSkyRunsDownToItsEdge(string stage)
+        {
+            // 2026-11-18 の要望: いちばん奥の背景の小物までを地面として、空はその根元までしっかり描く（特にアスレチックと火山）。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            SceneManager.SetActiveScene(scene);
+            Renderer ground = InScene<Renderer>(scene).FirstOrDefault(r => r.name == "FarGround" || r.name == "Streets");
+            Assert.That(ground, Is.Not.Null, "奥の地面がない");
+            float groundY = ground.bounds.center.y;
+            float back = ground.bounds.max.z;
+            // 奥の地面は、いちばん奥の背景の物（山・森・街・スタンド）より奥まで続く。
+            float farthest = InScene<Renderer>(scene).Where(r => r != ground && r.name != "LightGrid" && !(r is ParticleSystemRenderer)
+                && !r.name.StartsWith("Fog") && r.name != "MoonRay" && r.name != "Streets" && r.bounds.size.x < 1000f).Max(r => r.bounds.center.z);
+            Assert.That(back, Is.GreaterThan(Mathf.Min(farthest, 900f)), $"奥の地面（奥の端 {back}）が奥の背景（{farthest}）まで届かない");
+            // 空の地平線は、いちばん高いカメラから見た奥の地面の端より下（その上はいつも空）。
+            Transform bounds = scene.GetRootGameObjects().Single(g => g.name == "KnockoutBounds").transform;
+            float top = bounds.GetComponentsInChildren<Renderer>().Max(r => r.bounds.max.y);
+            float horizon = RenderSettings.skybox.GetFloat("_HorizonHeight");
+            float eyeY = Mathf.Max(top, 0f) + 6f;
+            float edge = (groundY - eyeY) / (Mathf.Min(back, 970f) + 30f);
+            Assert.That(horizon, Is.LessThan(edge + 0.02f), $"空の地平線（{horizon}）が奥の地面の端（{edge}）より上");
+        }
+
+        [Test]
+        public void Stadium_HasNoSimpleClouds()
+        {
+            // 2026-11-18 の要望: 陸上競技場の簡易な雲を消す（雲は空に描く）。
+            Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_Stadium.unity");
+            Assert.That(InScene<Renderer>(scene).Any(r => r.name == "Cloud"), Is.False);
+        }
+
+        [Test]
+        public void CityNight_WetRoads_ReflectTheNeon()
+        {
+            // 2026-11-18 の要望: 夜のビル街の地面にもネオンの照り返しを描いて、奥の街の光と地続きに。
+            Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_CityNight.unity");
+            Renderer avenue = InScene<Renderer>(scene).Single(r => r.name == "Avenue");
+            Renderer streets = InScene<Renderer>(scene).Single(r => r.name == "Streets");
+            foreach (Renderer road in new[] { avenue, streets })
+            {
+                Assert.That(road.sharedMaterial.shader.name, Is.EqualTo("Airerage/StageBackdrop"), $"{road.name} が照り返しのシェーダーでない");
+                Assert.That(road.sharedMaterial.GetFloat("_WetReflect"), Is.GreaterThan(0.5f), $"{road.name} にネオンの照り返しがない");
+            }
+            Assert.That(avenue.sharedMaterial.GetFloat("_WetReflect"), Is.EqualTo(streets.sharedMaterial.GetFloat("_WetReflect")).Within(0.01f),
+                "大通りと西新宿の道路の照り返しの強さが違う（つなぎ目が出る）");
+        }
+
+        [TestCase("Stage_SnowSea")]
+        [TestCase("Stage_Wharf")]
+        [TestCase("Stage_Kitchen")]
+        public void Water_IsDrawnWithTheWaterShader(string stage)
+        {
+            // 2026-11-18 の要望: 水の表現をリアルに（揺れる水面と泡・深さの色・光の網と筋・空を映す水面・しぶき）。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            StageZoneView[] water = InScene<StageZoneView>(scene).Where(v => v.GetComponent<StageZoneAuthoring>().Kind == StageZoneKind.Water).ToArray();
+            Assert.That(water.Length, Is.GreaterThan(0));
+            foreach (StageZoneView view in water)
+            {
+                Assert.That(view.ShaderWater, Is.True, $"{view.name} がしぶきを出さない");
+                Renderer front = view.GetComponentsInChildren<Renderer>(true).Single(r => r.name == "Front");
+                Assert.That(front.sharedMaterial.shader.name, Is.EqualTo("Airerage/Water"));
+                Assert.That(front.sharedMaterial.GetFloat("_Mode"), Is.EqualTo(0f), "手前の面が水の断面でない");
+                float top = view.transform.position.y + view.GetComponent<StageZoneAuthoring>().Size.y * 0.5f;
+                Assert.That(front.sharedMaterial.GetFloat("_SurfaceY"), Is.EqualTo(top).Within(0.01f), "水の断面の水面の高さがずれている");
+            }
+            if (stage != "Stage_Kitchen")
+            {
+                Renderer sea = InScene<Renderer>(scene).Single(r => r.name == "Sea");
+                Assert.That(sea.sharedMaterial.shader.name, Is.EqualTo("Airerage/Water"), "海の箱が水のシェーダーでない");
+                Assert.That(sea.sharedMaterial.renderQueue, Is.EqualTo(2000), "海の箱は不透明で描く");
+                Assert.That(InScene<Renderer>(scene).Single(r => r.name == "FarGround").sharedMaterial.shader.name, Is.EqualTo("Airerage/Water"), "奥の海が水面でない");
+            }
         }
 
         [Test]

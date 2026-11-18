@@ -83,6 +83,26 @@ namespace Airerage.Editor.Stages
         public float SunSize = 2600f;
         public float SunGlow = 0.25f;
 
+        // 奥の地面（2026-11-18 の要望: いちばん奥の背景の小物までを地面として、空はその根元までしっかり描く。特にアスレチックと火山）。
+        /// <summary>奥の地面の板を置くか（高さ FarGroundY、奥行き FarGroundNear から StageDressing.FarGroundBack まで）。</summary>
+        public bool FarGround;
+        public float FarGroundY;
+        public float FarGroundNear = 20f;
+        public Color FarGroundColor;
+        /// <summary>奥の地面を海（水のシェーダーの水面）にするか。FarGroundColor は深い所の色。</summary>
+        public bool FarGroundWater;
+
+        /// <summary>奥の地面の板を置く（火山の溶岩の平原、海、森の地面など）。台本の書き方を短くするため自分を返す。</summary>
+        public StageLook WithFarGround(float y, Color color, float near, bool water = false)
+        {
+            FarGround = true;
+            FarGroundY = y;
+            FarGroundColor = color;
+            FarGroundNear = near;
+            FarGroundWater = water;
+            return this;
+        }
+
         /// <summary>霧を使うか（宇宙は使わない）。</summary>
         public bool Fog = true;
         public Color FogColor;
@@ -185,6 +205,9 @@ namespace Airerage.Editor.Stages
         /// </summary>
         public Color CityGlowColor = Color.black;
 
+        /// <summary>夜の濡れた道路のネオンの照り返しの強さ（西新宿の道路の地面。0 なら照り返さない。2026-11-18 の要望）。</summary>
+        public float WetReflect;
+
         // 窓の外の街（キッチン。2026-11-18 の要望: 窓に窓枠と鍵を付けて、外にビル街の街並み）。
         /// <summary>窓の外に実在の街（PLATEAU の西新宿の縮尺の模型）を置くか。</summary>
         public bool WindowCity;
@@ -218,6 +241,18 @@ namespace Airerage.Editor.Stages
         public float Contrast;
         public float Saturation;
         public float Vignette;
+
+        /// <summary>
+        /// ATHLETIC のステージの台本（Athletic() は昼のステージの台本の土台でもあるので、ATHLETIC だけの物はここに書く）。はるか下の
+        /// 西新宿の道路の地面を手前から敷く（2026-11-18 の要望: いちばん奥の背景の根元までを地面にして、空はその根元まで描く）。
+        /// </summary>
+        public static StageLook AthleticStage()
+        {
+            StageLook look = Athletic();
+            look.PlateauStreets = true;
+            look.PlateauStreetsFront = -60f;
+            return look;
+        }
 
         /// <summary>ATHLETIC（空のアスレチック）: 明るい昼の空、白い上の面と青みの影、水色の光る線、遠くに今の街の塔。</summary>
         public static StageLook Athletic()
@@ -453,9 +488,10 @@ namespace Airerage.Editor.Stages
                 case "SpaceStation":
                     Stars = 1f;
                     MilkyWay = 0.8f;
-                    Nebula = 0.55f;
-                    NebulaA = new Color(0.35f, 0.12f, 0.6f);
-                    NebulaB = new Color(0.08f, 0.35f, 0.7f);
+                    // 星雲は淡く色の濃い光（灰色の煙に見えないように）。星はその上にくっきり。
+                    Nebula = 0.6f;
+                    NebulaA = new Color(0.6f, 0.12f, 0.78f);
+                    NebulaB = new Color(0.05f, 0.45f, 0.85f);
                     // 足もとの地球（縁が見上げる角度 -14° ほどに来る）と、大気のない鋭い太陽。
                     Planet = true;
                     PlanetDirection = new Vector3(0f, -0.899f, 0.438f);

@@ -185,7 +185,8 @@ namespace Airerage.Editor.Stages
                     new Vector3(-14.5f, 1.5f, 0f), new Vector3(44.5f, 4f, 0f), new Vector3(-13f, 15.6f, 0f), new Vector3(27f, 17.6f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。
-                Look = StageLook.FromTheme("SnowSea", theme, StageMood.Day),
+                // 奥の雪山の根元まで海を続ける（2026-11-18 の要望）。
+                Look = StageLook.FromTheme("SnowSea", theme, StageMood.Day).WithFarGround(-6f, new Color(0.04f, 0.14f, 0.26f), 58f, true),
             };
         }
 
@@ -199,7 +200,8 @@ namespace Airerage.Editor.Stages
         // 海、雪の山、遠くの氷山、針葉樹、雪の粒。
         private static void Decorate(StageDecor decor)
         {
-            Material sea = decor.Lit("Sea", new Color(0.12f, 0.32f, 0.52f));
+            // 海は水のシェーダーの水面（空を映し、さざ波と太陽のきらめき。2026-11-18 の要望: 水の表現をリアルに）。
+            Material sea = decor.Water("SeaWater", new Color(0.2f, 0.5f, 0.62f), new Color(0.04f, 0.14f, 0.26f), false, -6f, true);
             Material foam = decor.Unlit("Foam", new Color(0.92f, 0.97f, 1f));
             Material snow = decor.Lit("Snow", new Color(0.93f, 0.95f, 0.98f));
             Material ice = decor.Lit("Ice", new Color(0.65f, 0.85f, 0.95f));

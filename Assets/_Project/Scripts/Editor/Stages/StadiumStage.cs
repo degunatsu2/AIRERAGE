@@ -178,7 +178,8 @@ namespace Airerage.Editor.Stages
                     new Vector3(-36.75f, 1f, 0f), new Vector3(36.75f, 1f, 0f), new Vector3(-45f, 17.6f, 0f), new Vector3(45f, 17.6f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。観客席の背景があるので、遠くの街は置かない。
-                Look = StageLook.FromTheme("Stadium", theme, StageMood.Day),
+                // 奥のスタンドの外も地面（芝生と街の緑）にする（2026-11-18 の要望）。
+                Look = StageLook.FromTheme("Stadium", theme, StageMood.Day).WithFarGround(0f, new Color(0.3f, 0.4f, 0.3f), 46f),
             };
         }
 
@@ -191,7 +192,6 @@ namespace Airerage.Editor.Stages
             Material crowd = decor.Lit("Crowd", new Color(0.7f, 0.5f, 0.4f));
             Material light = decor.Unlit("Floodlight", new Color(1f, 0.98f, 0.85f));
             Material screen = decor.Unlit("ScoreScreen", new Color(0.15f, 0.9f, 0.5f));
-            Material cloud = decor.Lit("Cloud", new Color(0.97f, 0.97f, 1f));
             Material bar = decor.Lit("HighJumpBar", new Color(1f, 0.85f, 0.2f));
             Material gold = decor.Lit("Gold", new Color(1f, 0.8f, 0.25f));
 
@@ -222,12 +222,7 @@ namespace Airerage.Editor.Stages
                 pole.transform.rotation = Quaternion.Euler(0f, 0f, x < 0f ? -12f : 12f);
             }
             decor.Box("PodiumGold", new Vector3(0f, 2.41f, 0f), new Vector3(3f, 0.04f, 4f), gold);
-            // 空の雲。
-            for (int i = 0; i < 10; i++)
-            {
-                decor.Sphere("Cloud", new Vector3(decor.Range(-90f, 90f), decor.Range(40f, 60f), decor.Range(60f, 110f)),
-                    new Vector3(decor.Range(12f, 24f), decor.Range(4f, 8f), 6f), cloud);
-            }
+            // 前の簡易な雲（白い球）は消した（2026-11-18 の要望。雲は空に描く）。
         }
     }
 }

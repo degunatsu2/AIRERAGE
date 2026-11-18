@@ -30,10 +30,10 @@ Material:
     - _CloudScale: 1
     - _CloudSoftness: 0.06
     - _CloudSpeed: 0.004
-    - _CloudTop: 0.45
+    - _CloudTop: 0.60925275
     - _Embers: 0
     - _HorizonGlowHeight: 0.18
-    - _HorizonHeight: -0.1
+    - _HorizonHeight: -0.25925276
     - _HorizonSharpness: 9
     - _MilkyWay: 0
     - _MoonSize: 3

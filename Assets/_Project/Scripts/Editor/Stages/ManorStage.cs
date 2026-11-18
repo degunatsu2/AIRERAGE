@@ -189,7 +189,8 @@ namespace Airerage.Editor.Stages
                     new Vector3(-12.75f, 3f, 0f), new Vector3(12.75f, 3f, 0f), new Vector3(-12f, 21.8f, 0f), new Vector3(12f, 21.8f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。
-                Look = StageLook.FromTheme("Manor", theme, StageMood.Night),
+                // 奥の森の向こうも暗い地面にする（2026-11-18 の要望）。
+                Look = StageLook.FromTheme("Manor", theme, StageMood.Night).WithFarGround(-0.02f, new Color(0.05f, 0.04f, 0.06f), ForestFar - 4f),
             };
         }
 
@@ -224,6 +225,172 @@ namespace Airerage.Editor.Stages
             decor.Box("BandMiddle", visual, new Vector3(0f, 0f, -1.9f), new Vector3(spec.Size.x * 0.9f, 0.15f, 0.1f), iron);
         }
 
+        private const string PropFolder = "Assets/_Project/Materials/Stages/Manor";
+
+        // 背景の小物の色合い（夜の月明かりの中で明るすぎないように少し暗く）と、奥の森の松（黒い針葉樹に見えるように暗く）。
+        private static readonly Color PropTint = new Color(0.62f, 0.58f, 0.68f);
+        private static readonly Color ForestTint = new Color(0.16f, 0.14f, 0.2f);
+
+        /// <summary>奥の森を置く奥行きの範囲（m）と、森の地面の高さ。</summary>
+        public const float ForestNear = 14f;
+        public const float ForestFar = 70f;
+        public const float ForestGround = 0f;
+
+        // 霧の板（下ほど濃く上へ薄れ、流れる）: (名前, 中心, 大きさ, 奥行き z, 濃さ, 流れ m/s)。手前の 2 枚は足もとだけの薄い地霧
+        // （遊ぶ所を隠さない）、遊ぶ面のすぐ奥は濃い霧、墓場と谷には溜まった霧、奥の森は奥ほど高く濃い霧の層で根元を沈める。
+        private static readonly (string Name, Vector2 Center, Vector2 Size, float Z, float Density, Vector2 Drift)[] FogLayers =
+        {
+            ("FogFront", new Vector2(0f, 1.2f), new Vector2(160f, 8f), -4.5f, 0.42f, new Vector2(0.5f, 0.03f)),
+            ("FogFrontLow", new Vector2(0f, 0.2f), new Vector2(160f, 5f), -3.2f, 0.34f, new Vector2(-0.35f, 0.02f)),
+            ("FogBehind", new Vector2(0f, 2f), new Vector2(170f, 12f), 4.6f, 0.72f, new Vector2(0.4f, 0.04f)),
+            ("FogGraveyard", new Vector2(-36f, 1.4f), new Vector2(34f, 6f), 3.1f, 0.85f, new Vector2(0.25f, 0.02f)),
+            ("FogAbyss", new Vector2(0f, -12f), new Vector2(64f, 16f), 6.5f, 0.95f, new Vector2(-0.3f, 0.06f)),
+            ("FogForestNear", new Vector2(0f, 4f), new Vector2(230f, 16f), 16f, 0.85f, new Vector2(0.35f, 0.03f)),
+            ("FogForestMid", new Vector2(0f, 6f), new Vector2(270f, 22f), 30f, 0.92f, new Vector2(-0.3f, 0.03f)),
+            ("FogForestFar", new Vector2(0f, 8f), new Vector2(330f, 30f), 50f, 1.0f, new Vector2(0.28f, 0.02f)),
+            ("FogForestBack", new Vector2(0f, 10f), new Vector2(400f, 40f), 72f, 1.1f, new Vector2(-0.22f, 0.02f)),
+        };
+
+        // 霧の色（月明かりの薄紫）と、地面の近くの色（青白い緑。怪しい空気）。
+        private static readonly Color FogColor = new Color(0.56f, 0.5f, 0.68f, 0.62f);
+        private static readonly Color FogLowColor = new Color(0.44f, 0.58f, 0.5f, 1f);
+
+        private static void Atmosphere(StageDecor decor)
+        {
+            Transform root = new GameObject("Atmosphere").transform;
+            root.SetParent(decor.Root, false);
+            for (int i = 0; i < FogLayers.Length; i++)
+            {
+                var layer = FogLayers[i];
+                int index = i;
+                Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(layer.Name, "Airerage/FogSheet", m =>
+                {
+                    m.SetColor("_Color", FogColor);
+                    m.SetColor("_LowColor", FogLowColor);
+                    m.SetFloat("_Density", layer.Density);
+                    m.SetFloat("_NoiseScale", layer.Z > 10f ? 0.045f : 0.09f);
+                    m.SetVector("_Drift", new Vector4(layer.Drift.x, layer.Drift.y, 0f, 0f));
+                    m.SetFloat("_TopFade", 0.75f);
+                    m.SetFloat("_BottomFade", layer.Z < 0f ? 0f : 0.04f);
+                    m.SetFloat("_EdgeFade", 0.1f);
+                    m.SetFloat("_Seed", index + 1);
+                }, PropFolder);
+                GameObject sheet = decor.Quad(layer.Name, new Vector3(layer.Center.x, layer.Center.y, layer.Z), layer.Size, material);
+                sheet.transform.SetParent(root, true);
+                sheet.GetComponent<Renderer>().receiveShadows = false;
+            }
+
+            // 赤い満月から差す、ごく薄い光の筋（右上から左下へ。足し合わせて描く）。
+            Material ray = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("MoonRay", "Airerage/CityGlow", m =>
+            {
+                m.SetColor("_Color", new Color(0.2f, 0.04f, 0.035f));
+                m.SetFloat("_Falloff", 1.6f);
+                m.SetFloat("_EdgeSoftness", 0.45f);
+                m.SetFloat("_Shimmer", 0.3f);
+            }, PropFolder);
+            (float X, float Width)[] rays = { (12f, 7f), (26f, 11f), (41f, 6f) };
+            foreach (var r in rays)
+            {
+                GameObject shaft = decor.Quad("MoonRay", new Vector3(r.X, 46f, 38f), new Vector2(r.Width, 120f), ray);
+                shaft.transform.rotation = Quaternion.Euler(0f, 0f, 160f);
+                shaft.transform.SetParent(root, true);
+            }
+
+            // 鬼火（墓場と谷にゆらゆら漂う青白い光の粒）。
+            Material wisp = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("Wisp", "Airerage/Wisp", m =>
+            {
+                m.SetColor("_Color", new Color(0.9f, 1.7f, 1.4f));
+                m.SetFloat("_Core", 10f);
+            }, PropFolder);
+            Wisps(root, wisp, "WispsGraveyard", new Vector3(-36f, 2.5f, 5.5f), new Vector3(24f, 4f, 5f), 1.1f);
+            Wisps(root, wisp, "WispsAbyss", new Vector3(0f, -9f, 5f), new Vector3(40f, 6f, 4f), 0.7f);
+        }
+
+        // ゆっくり漂って明滅する光の粒（見た目だけ。試合の結果には関わらない）。
+        private static void Wisps(Transform parent, Material material, string name, Vector3 center, Vector3 size, float rate)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = center;
+            var particles = go.AddComponent<ParticleSystem>();
+            ParticleSystem.MainModule main = particles.main;
+            main.loop = true;
+            main.prewarm = true;
+            main.duration = 10f;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(6f, 10f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f, 0.35f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.35f, 0.8f);
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 40;
+            ParticleSystem.EmissionModule emission = particles.emission;
+            emission.rateOverTime = rate;
+            ParticleSystem.ShapeModule shape = particles.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = size;
+            ParticleSystem.NoiseModule noise = particles.noise;
+            noise.enabled = true;
+            noise.strength = 0.45f;
+            noise.frequency = 0.35f;
+            noise.scrollSpeed = 0.2f;
+            ParticleSystem.ColorOverLifetimeModule fade = particles.colorOverLifetime;
+            fade.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.75f, 1f, 0.9f), 1f) },
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(0.6f, 0.6f), new GradientAlphaKey(0f, 1f) });
+            fade.color = gradient;
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+
+        private static void Props(StageDecor decor)
+        {
+            ThirdPartyProps.Pack pack = ThirdPartyProps.Halloween;
+            GameObject Put(string model, float x, float y, float z, float scale, float yaw, Color tint)
+            {
+                return ThirdPartyProps.Place(decor, pack, model, new Vector3(x, y, z), scale, yaw, tint, PropFolder);
+            }
+            // 墓場（地面 y 0、x -47〜-25、奥行き z 3〜9）の墓石。
+            string[] graves = { "gravestone", "grave_A", "grave_B", "gravemarker_A", "gravemarker_B" };
+            for (int i = 0; i < 11; i++)
+            {
+                Put(graves[i % graves.Length], decor.Range(-46.5f, -26f), 0f, decor.Range(3.2f, 9f), decor.Range(1.05f, 1.35f), decor.Range(-25f, 25f), PropTint);
+            }
+            // 柵（4m ずつ。ところどころ壊れている）と柱、入口の門。
+            for (int i = 0; i < 5; i++)
+            {
+                float x = -45.5f + i * 4f;
+                Put(i == 2 ? "fence_broken" : "fence", x, 0f, 2.6f, 1f, 0f, PropTint);
+                Put("fence_pillar", x - 2f, 0f, 2.6f, 1f, 0f, PropTint);
+            }
+            Put("arch_gate", -24.6f, 0f, 2.6f, 1.05f, 0f, PropTint);
+            // 墓場の枯れ木（前は細い箱）と、ランタン、かぼちゃ。
+            Put("tree_dead_large", -43f, 0f, 5f, 2.4f, 30f, PropTint);
+            Put("tree_dead_medium", -29f, 0f, 7.5f, 2f, -40f, PropTint);
+            Put("post_lantern", -48.4f, 0f, 3.2f, 1.4f, 0f, PropTint);
+            Put("lantern_standing", -26.5f, 0f, 3.6f, 1.6f, 0f, PropTint);
+            Put("pumpkin_orange_jackolantern", -31.5f, 0f, 3.4f, 1.2f, 15f, PropTint);
+            Put("skull", -37.5f, 0f, 3.1f, 1.2f, -20f, PropTint);
+            // 農園（x 25〜47）の端のかぼちゃ。
+            Put("pumpkin_orange_jackolantern", 24.4f, 0f, 4.2f, 1.3f, -10f, PropTint);
+            Put("pumpkin_yellow_jackolantern", 47.6f, 0f, 3.8f, 1.2f, 25f, PropTint);
+            Put("pumpkin_orange", 27.5f, 0f, 6.5f, 1.1f, 40f, PropTint);
+            Put("pumpkin_orange_small", 44f, 0f, 6.8f, 1.2f, -30f, PropTint);
+            // 奥の森（黒い松と枯れ木）。地面は暗い土の板。
+            string[] trees = { "tree_pine_orange_large", "tree_dead_large", "tree_pine_orange_medium", "tree_dead_medium", "tree_pine_yellow_large" };
+            for (int i = 0; i < 46; i++)
+            {
+                string model = trees[i % trees.Length];
+                bool pine = model.StartsWith("tree_pine");
+                Put(model, decor.Range(-88f, 88f), ForestGround, decor.Range(ForestNear, ForestFar), decor.Range(2.2f, 4f), decor.Range(0f, 360f), pine ? ForestTint : PropTint * 0.6f);
+            }
+            decor.Box("ForestFloor", new Vector3(0f, ForestGround - 0.5f, (ForestNear + ForestFar) * 0.5f + 2f), new Vector3(190f, 1f, ForestFar - ForestNear + 12f),
+                decor.Lit("ForestFloor", new Color(0.08f, 0.06f, 0.09f)));
+        }
+
         // 館の正面（窓の明かり、尖った屋根）、墓場の柵と墓石、農園のトマトの株、霧、遠くの森。赤い満月は空に描く（StageLook.ApplySky。
         // 2026-11-18 の要望で空をリアルにした。前の平たい赤い円の位置と大きさのまま）。
         private static void Decorate(StageDecor decor)
@@ -231,13 +398,10 @@ namespace Airerage.Editor.Stages
             Material stone = decor.Lit("ManorStone", new Color(0.26f, 0.24f, 0.3f));
             Material roof = decor.Lit("ManorRoof", new Color(0.18f, 0.12f, 0.2f));
             Material windowLight = decor.Unlit("ManorWindow", new Color(1f, 0.8f, 0.35f));
-            Material grave = decor.Lit("Grave", new Color(0.45f, 0.45f, 0.48f));
             Material dirt = decor.Lit("Dirt", new Color(0.18f, 0.13f, 0.1f));
             Material leaf = decor.Lit("TomatoLeaf", new Color(0.15f, 0.32f, 0.12f));
             Material tomato = decor.Unlit("Tomato", new Color(0.9f, 0.12f, 0.1f));
             Material straw = decor.Lit("Straw", new Color(0.75f, 0.62f, 0.3f));
-            Material fog = decor.Transparent("Fog", new Color(0.7f, 0.7f, 0.85f, 0.08f));
-            Material tree = decor.Lit("DeadTree", new Color(0.12f, 0.09f, 0.08f));
             Material abyss = decor.Lit("Abyss", new Color(0.03f, 0.02f, 0.05f));
             Material prisonStone = decor.Lit("PrisonStone", new Color(0.2f, 0.18f, 0.22f));
             Material chain = decor.Lit("Chain", new Color(0.3f, 0.3f, 0.32f));
@@ -256,24 +420,13 @@ namespace Airerage.Editor.Stages
             GameObject spire = decor.Box("TowerSpire", new Vector3(0f, 36f, 3f), new Vector3(4.5f, 4.5f, 4f), roof);
             spire.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
             decor.Box("RoofBack", new Vector3(0f, 22f, 6f), new Vector3(30f, 4f, 6f), roof);
-            // 霧。
-            for (int i = 0; i < 8; i++)
-            {
-                decor.Quad("Fog", new Vector3(decor.Range(-50f, 50f), decor.Range(-2f, 6f), decor.Range(-4f, 8f)), new Vector2(decor.Range(14f, 30f), 4f), fog);
-            }
+            // 霧・月の光の筋・鬼火（2026-11-18 の要望: 手前の霧をリアルにし、怪しい空気感と雰囲気を出す）。
+            Atmosphere(decor);
             // 墓場の丘の奥行き、墓石の並び、柵。
             decor.Box("GraveHillBack", new Vector3(-36f, -6f, 6f), new Vector3(24f, 12f, 8f), dirt);
-            for (int i = 0; i < 10; i++)
-            {
-                float x = decor.Range(-47f, -25f);
-                decor.Box("BackGrave", new Vector3(x, 0.8f, decor.Range(2.5f, 9f)), new Vector3(0.9f, decor.Range(1f, 2f), 0.3f), grave);
-            }
-            for (float x = -47.5f; x <= -24.5f; x += 1.2f)
-            {
-                decor.Box("Fence", new Vector3(x, 1f, 2.6f), new Vector3(0.1f, 2f, 0.1f), tree);
-            }
-            // 枯れ木。
-            decor.Box("TreeTrunk", new Vector3(-43f, 6f, 0.5f), new Vector3(1f, 12f, 1f), tree);
+            // 墓石・柵・枯れ木・門・ランタン・かぼちゃ・奥の森は KayKit Halloween Bits（CC0。2026-11-18 のユーザーの指示で受け取った
+            // アセットを組み込む）。
+            Props(decor);
             // 農園の奥行き、トマトの株、カカシの頭と服。
             decor.Box("FarmBack", new Vector3(36f, -6f, 6f), new Vector3(24f, 12f, 8f), dirt);
             for (float x = 25f; x <= 47f; x += 2.2f)
@@ -306,11 +459,6 @@ namespace Airerage.Editor.Stages
                 {
                     decor.Box("Chain", new Vector3(x - 2f + i * 4f, 31.5f, 1.8f), new Vector3(0.12f, 2f, 0.12f), chain);
                 }
-            }
-            for (int i = 0; i < 16; i++)
-            {
-                float h = decor.Range(14f, 30f);
-                decor.Box("ForestTree", new Vector3(-90f + i * 12f + decor.Range(-3f, 3f), h * 0.5f - 6f, decor.Range(40f, 70f)), new Vector3(3f, h, 3f), tree);
             }
         }
     }

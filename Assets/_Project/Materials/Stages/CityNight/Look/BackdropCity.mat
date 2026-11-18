@@ -48,6 +48,7 @@ Material:
     - _NightStrength: 5.5
     - _TexBlend: 1
     - _TopTint: 1.12
+    - _WetReflect: 0
     - _WindowGlow: 1
     m_Colors:
     - _BandColor: {r: 1, g: 0.78, b: 0.45, a: 1}

@@ -8,7 +8,7 @@
 - 道路の面（緯度・経度。EPSG:6697）を、平面直角座標 IX 系（EPSG:6677。PLATEAU の OBJ と同じ東・北の m）へ変換する
   （国土地理院の Gauss-Krüger 投影の式。河瀬 2011）。
 - 中心（--center E N）から ±--half m の四角を --size 画素四方の絵にし、地面（歩道・敷地）の色に道路を塗る（穴は地面の色に戻す）。
-- 昼の絵（_Ground.jpg）と、夜に光らせる絵（_GroundNight.jpg。道路を街灯の橙で、ところどころ明るい点）を書く。
+- 道路の地図の絵（_Ground.jpg）を書く（昼も夜も同じ絵。夜は暗い色合いで描く。夜の道路の明かりの絵は 2026-11-18 にやめた）。
 
 使い方: python3 -I tools/assets/plateau_roads.py 出力の名前 --cache フォルダ --mesh2 533945 --center -12196.9 -34315.7 [--half 1200] [--size 2048]
 出典: 国土交通省 Project PLATEAU（3D 都市モデル。東京都 23 区 2020 年度）。加工して作成。
@@ -18,7 +18,6 @@ import importlib.util
 import json
 import math
 import os
-import random
 import xml.etree.ElementTree as ET
 
 from PIL import Image, ImageDraw, ImageFilter
@@ -29,7 +28,6 @@ GML = '{http://www.opengis.net/gml}'
 
 GROUND = (118, 120, 124)      # 歩道・敷地（明るいコンクリート）
 ASPHALT = (52, 55, 60)        # 車道
-NIGHT_ROAD = (255, 150, 60)   # 夜の道路（街灯の橙）
 
 
 def load_remote_zip():
@@ -119,9 +117,7 @@ def main():
         return ((e - (cx - args.half)) * scale, ((cy + args.half) - n) * scale)
 
     day = Image.new('RGB', (args.size, args.size), GROUND)
-    mask = Image.new('L', (args.size, args.size), 0)
     draw_day = ImageDraw.Draw(day)
-    draw_mask = ImageDraw.Draw(mask)
     count = 0
     for mesh in args.mesh2:
         name = f'13100_tokyo23-ku_2020_citygml_3_2_op/udx/tran/{mesh}_tran_6697_op.gml'
@@ -135,31 +131,15 @@ def main():
             if max(xs) < 0 or min(xs) > args.size or max(ys) < 0 or min(ys) > args.size or len(points) < 3:
                 continue
             draw_day.polygon(points, fill=ASPHALT)
-            draw_mask.polygon(points, fill=255)
             for hole in holes:
                 hole_points = [to_pixel(lat, lon) for lat, lon in hole]
                 if len(hole_points) >= 3:
                     draw_day.polygon(hole_points, fill=GROUND)
-                    draw_mask.polygon(hole_points, fill=0)
             count += 1
     # 縁を少しなじませる（遠くで線がちらつかないように）。
     day = day.filter(ImageFilter.GaussianBlur(0.6))
     day.save(f'{args.output}_Ground.jpg', quality=88)
 
-    # 夜: 道路を街灯の橙に（真ん中ほど明るく）、ところどころ明るい点（交差点・車の明かり）。
-    rng = random.Random(20261118)
-    glow = mask.filter(ImageFilter.GaussianBlur(1.2))
-    night = Image.new('RGB', (args.size, args.size), (0, 0, 0))
-    night.paste(Image.new('RGB', (args.size, args.size), NIGHT_ROAD), (0, 0), glow.point(lambda v: int(v * 0.55)))
-    dots = ImageDraw.Draw(night)
-    pixels = mask.load()
-    for _ in range(args.size * 6):
-        x, y = rng.randrange(args.size), rng.randrange(args.size)
-        if pixels[x, y] > 128:
-            r = rng.choice((1, 1, 2))
-            color = rng.choice(((255, 235, 200), (255, 190, 110), (255, 90, 70), (200, 230, 255)))
-            dots.ellipse((x - r, y - r, x + r, y + r), fill=color)
-    night.save(f'{args.output}_GroundNight.jpg', quality=88)
     print(f'{args.output}: 道路の面 {count}、{args.size} 四方（1 画素 {1 / scale:.2f}m）、中心 {cx} {cy}、範囲 ±{args.half}m')
 
 
