@@ -224,13 +224,13 @@ namespace Airerage.Editor.Stages
             decor.Box("BandMiddle", visual, new Vector3(0f, 0f, -1.9f), new Vector3(spec.Size.x * 0.9f, 0.15f, 0.1f), iron);
         }
 
-        // 館の正面（窓の明かり、尖った屋根）、墓場の柵と墓石、農園のトマトの株、赤い満月、霧、遠くの森。
+        // 館の正面（窓の明かり、尖った屋根）、墓場の柵と墓石、農園のトマトの株、霧、遠くの森。赤い満月は空に描く（StageLook.ApplySky。
+        // 2026-11-18 の要望で空をリアルにした。前の平たい赤い円の位置と大きさのまま）。
         private static void Decorate(StageDecor decor)
         {
             Material stone = decor.Lit("ManorStone", new Color(0.26f, 0.24f, 0.3f));
             Material roof = decor.Lit("ManorRoof", new Color(0.18f, 0.12f, 0.2f));
             Material windowLight = decor.Unlit("ManorWindow", new Color(1f, 0.8f, 0.35f));
-            Material moon = decor.Unlit("BloodMoon", new Color(1f, 0.3f, 0.25f));
             Material grave = decor.Lit("Grave", new Color(0.45f, 0.45f, 0.48f));
             Material dirt = decor.Lit("Dirt", new Color(0.18f, 0.13f, 0.1f));
             Material leaf = decor.Lit("TomatoLeaf", new Color(0.15f, 0.32f, 0.12f));
@@ -256,8 +256,7 @@ namespace Airerage.Editor.Stages
             GameObject spire = decor.Box("TowerSpire", new Vector3(0f, 36f, 3f), new Vector3(4.5f, 4.5f, 4f), roof);
             spire.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
             decor.Box("RoofBack", new Vector3(0f, 22f, 6f), new Vector3(30f, 4f, 6f), roof);
-            // 赤い満月と霧。
-            decor.Sphere("Moon", new Vector3(18f, 48f, 90f), new Vector3(24f, 24f, 1f), moon);
+            // 霧。
             for (int i = 0; i < 8; i++)
             {
                 decor.Quad("Fog", new Vector3(decor.Range(-50f, 50f), decor.Range(-2f, 6f), decor.Range(-4f, 8f)), new Vector2(decor.Range(14f, 30f), 4f), fog);

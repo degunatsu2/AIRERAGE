@@ -156,12 +156,12 @@ namespace Airerage.Editor.Stages
             };
         }
 
-        // 星、惑星、モジュールの奥行きと窓、トラスの骨組み、太陽電池パネルの面、ドッキングの灯り。
+        // 星、モジュールの奥行きと窓、トラスの骨組み、太陽電池パネルの面、ドッキングの灯り。惑星（地球）は空に描く（StageLook.ApplySky。
+        // 2026-11-18 の要望で空をリアルにしたので、前の光を受ける青い球は置かない）。
         private static void Decorate(StageDecor decor)
         {
             Material star = decor.Unlit("Star", Color.white);
             Material starBlue = decor.Unlit("StarBlue", new Color(0.7f, 0.8f, 1f));
-            Material planet = decor.Lit("Planet", new Color(0.25f, 0.5f, 0.85f));
             Material hull = decor.Lit("Hull", new Color(0.62f, 0.65f, 0.7f));
             Material panel = decor.Lit("Panel", new Color(0.12f, 0.2f, 0.55f));
             Material window = decor.Unlit("Window", new Color(0.55f, 0.95f, 1f));
@@ -174,7 +174,6 @@ namespace Airerage.Editor.Stages
                 decor.Sphere("Star", new Vector3(decor.Range(-260f, 260f), decor.Range(-140f, 200f), decor.Range(180f, 260f)), new Vector3(s, s, s),
                     decor.Random.NextDouble() < 0.2 ? starBlue : star);
             }
-            decor.Sphere("Planet", new Vector3(90f, -150f, 320f), new Vector3(300f, 300f, 300f), planet);
 
             // モジュールの奥行き（見た目だけ）と窓。
             (float MinX, float MinY, float MaxX, float MaxY)[] modules =

@@ -144,6 +144,50 @@ namespace Airerage.PlayMode.Tests
             blizzardView.Warning.Hide();
         }
 
+        // ビル街の昼の上空の風は、同じ範囲に左向きと右向きが交互に吹く。予告の間は、吹く向きへ流れる黄色の「>」で向きを知らせる
+        // （2026-11-18 の要望）。風の筋を線で描かないステージでも出し、吹き始めたら消す。
+        [UnityTest]
+        public IEnumerator CityDay_GustWarning_ShowsWhichWayTheWindWillBlow()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            StageDefinition city = flow.Stages.Stages.First(s => s.SceneName == "Stage_CityDay");
+            flow.StartTraining(city);
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+
+            var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
+            StageZoneView[] winds = UnityEngine.Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.None)
+                .Where(v => v.name.StartsWith("BuildingWind")).ToArray();
+            Assert.That(winds.Length, Is.EqualTo(2), "上空の左向きと右向きの風がない");
+            Assert.That(winds.All(v => !v.WindLines), Is.True, "ビル街の昼は風のシェーダーで風を描く前提");
+            foreach (Vector2 expected in new[] { Vector2.left, Vector2.right })
+            {
+                StageZoneView view = winds.Single(v => Vector2.Dot(v.WarningArrowDirection, expected) > 0.99f);
+                // 試合の始まりの数ティックの短い予告は除く（すぐ吹き始めて、次のフレームには消えている）。同じフレームで確かめる。
+                yield return WaitFor(() => view.ShowsWarning && runner.CurrentTick > 60, 14f, $"{view.name} の予告が出ない");
+                Assert.That(view.WarningArrows, Is.GreaterThanOrEqualTo(4),
+                    $"{view.name} の予告に向きの矢印がない（矢印の線 {view.GetComponentsInChildren<LineRenderer>(true).Count(l => l.name.StartsWith("WarningArrow"))} 本、"
+                    + $"予告 {view.ShowsWarning}、ティック {runner.CurrentTick}）");
+                LineRenderer arrow = view.GetComponentsInChildren<LineRenderer>().First(l => l.name == "WarningArrow1" && l.enabled);
+                Vector3 back = arrow.GetPosition(0);
+                Vector3 tip = arrow.GetPosition(1);
+                Assert.That(Mathf.Sign(tip.x - back.x), Is.EqualTo(Mathf.Sign(expected.x)), $"{view.name} の矢印が吹く向きを指していない");
+                Assert.That(arrow.startColor.r > 0.9f && arrow.startColor.g > 0.7f && arrow.startColor.b < 0.3f, Is.True, $"{view.name} の矢印が黄色でない");
+                Vector2 before = view.FirstWarningArrowTip;
+                yield return WaitSeconds(0.2f);
+                if (view.ShowsWarning)
+                {
+                    float moved = Vector2.Dot(view.FirstWarningArrowTip - before, expected);
+                    // 端で折り返した直後でなければ、吹く向きへ進んでいる。
+                    Assert.That(moved > 0f || Mathf.Abs(moved) > 20f, Is.True, $"{view.name} の矢印が吹く向きへ流れない（{moved}）");
+                }
+                yield return WaitFor(() => !view.ShowsWarning, 6f, $"{view.name} の予告が終わらない");
+                Assert.That(view.WarningArrows, Is.EqualTo(0), $"{view.name} が吹き始めても矢印が残る");
+            }
+        }
+
         [UnityTest]
         public IEnumerator SpaceStation_EdgeGate_WrapsThePlayerToTheOtherSide()
         {

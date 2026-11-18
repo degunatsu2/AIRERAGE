@@ -45,7 +45,7 @@ Material:
     - _LightShade: 0.6
     - _NeonMix: 0
     - _NightSides: 1
-    - _NightStrength: 3
+    - _NightStrength: 5.5
     - _TexBlend: 1
     - _TopTint: 1.12
     - _WindowGlow: 1

@@ -151,6 +151,9 @@ namespace Airerage.Runtime.UI
         /// <summary>今動いている写しの数（テスト用）。</summary>
         public int GhostCount => _outgoing.Count + _incoming.Count;
 
+        /// <summary>背景のステージを映すカメラ（切り替えでも動かさない。テスト用）。</summary>
+        public MenuCameraDrift BackdropCamera => _camera;
+
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(RectTransform screens, GameObject[] ignore, MenuCameraDrift camera)
         {
@@ -322,10 +325,8 @@ namespace Airerage.Runtime.UI
             {
                 case TransitionKind.SkyDive:
                 {
-                    if (_camera != null)
-                    {
-                        _camera.Dive();
-                    }
+                    // 背景のステージはズームしない（突進した後にメインメニューで元の距離へ戻るのが不自然。2026-11-18 の要望）。
+                    // 速さの線と白い光だけで突き抜ける。
                     var lines = NewFull("SpeedLines").gameObject.AddComponent<SpeedLines>();
                     lines.Configure(Vector2.zero, UnityEngine.Random.Range(1, int.MaxValue));
                     AddTrack(0f, 0.64f, false, p => lines.Progress = p >= 1f ? -1f : p);

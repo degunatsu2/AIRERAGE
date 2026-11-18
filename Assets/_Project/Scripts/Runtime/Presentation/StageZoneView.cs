@@ -71,6 +71,8 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private ZoneLook _look;
 
         private readonly List<LineRenderer> _marks = new List<LineRenderer>();
+        // 周期のある風の予告で、吹く向きを知らせる「>」（風の筋を線で描かないステージでも出す）。
+        private readonly List<LineRenderer> _warningArrows = new List<LineRenderer>();
         private StageZoneAuthoring _zone;
         private LineRenderer _ring;
         private LineRenderer _inner;
@@ -225,7 +227,7 @@ namespace Airerage.Runtime.Presentation
                     int gustStreaks = Mathf.Clamp(Mathf.RoundToInt(Extent(new Vector2(_direction.y, -_direction.x)) / 0.9f), 2, 10);
                     for (int i = 0; i < gustStreaks * 2; i++)
                     {
-                        _marks.Add(CreateLine($"Streak{i + 1}", 2, 0.07f));
+                        _marks.Add(CreateLine($"Streak{i + 1}", 2, GustStreakWidth));
                     }
                     break;
                 case StageZoneKind.Ice:
@@ -279,6 +281,16 @@ namespace Airerage.Runtime.Presentation
                         _marks.Add(CreateLine($"Snow{i + 1}", 2, 0.1f));
                     }
                     break;
+            }
+            if (_zone.Kind == StageZoneKind.Gust && _core.Period > 0 && !IsSteadyDraft)
+            {
+                for (int i = 0; i < WarningArrowCount; i++)
+                {
+                    LineRenderer arrow = CreateLine($"WarningArrow{i + 1}", 3, 0.2f);
+                    arrow.numCornerVertices = 2;
+                    arrow.enabled = false;
+                    _warningArrows.Add(arrow);
+                }
             }
             if (_core.Period > 0 && _lineMaterial != null)
             {
@@ -487,7 +499,7 @@ namespace Airerage.Runtime.Presentation
             Box(_inner, center, half, 0.7f - 0.08f * pulse, 0.5f + 0.3f * pulse);
         }
 
-        // 向きへ流れる筋。周期のある風は、吹いている間だけ流れ、吹き始める前に点滅して知らせる。
+        // 向きへ流れる筋。周期のある風は、吹いている間だけ流れ、吹き始める前は吹く向きの黄色の矢印で知らせる。
         private void RenderGust(Vector3 center, Vector2 half, float time, int tick)
         {
             float strength = PeriodicStrength(tick, out bool warning, out _);
@@ -500,6 +512,16 @@ namespace Airerage.Runtime.Presentation
             if (IsSteadyDraft)
             {
                 RenderDraft(center, half, time);
+                return;
+            }
+            RenderGustWarningArrows(center, half, time, warning);
+            if (warning)
+            {
+                // 予告の間は筋を流さない（矢印だけ）。
+                foreach (LineRenderer line in _marks)
+                {
+                    SetColor(line, 0f);
+                }
                 return;
             }
             Vector2 side = new Vector2(_direction.y, -_direction.x);
@@ -518,17 +540,103 @@ namespace Airerage.Runtime.Presentation
                 float streak = Mathf.Min(flow ? 2.6f : 1.6f, length * (flow ? 0.35f : 0.25f));
                 Vector2 from = basePoint + _direction * ((phase - 0.5f) * length);
                 Vector2 to = from + _direction * streak;
-                if (warning)
-                {
-                    // 止まった短い筋を点滅させる。
-                    from = basePoint + _direction * (((i * 0.37f) % 1f - 0.5f) * length);
-                    to = from + _direction * 0.4f;
-                }
                 LineRenderer line = _marks[i];
                 line.SetPosition(0, ToWorld(Vector2.Max(min, Vector2.Min(max, from))));
                 line.SetPosition(1, ToWorld(Vector2.Max(min, Vector2.Min(max, to))));
-                SetColor(line, (warning ? 1f : Fade(phase)) * 0.65f * strength);
+                SetColor(line, Fade(phase) * 0.65f * strength);
             }
+        }
+
+        // 風の筋の太さ。
+        private const float GustStreakWidth = 0.07f;
+
+        // 予告の矢印の数（列は 1〜3。1 列に並ぶ数は WarningArrowCount / 列）。
+        private const int WarningArrowCount = 12;
+
+        private static readonly Color WarningArrowColor = new Color(1f, 0.84f, 0.05f, 1f);
+
+        // 予告の矢印が流れる速さ（m/s）。
+        private const float WarningArrowSpeed = 6f;
+
+        // 予告の矢印の奥行き（予告の斜線より手前）。
+        private const float WarningArrowDepth = -0.9f;
+
+        /// <summary>予告の間に出している、吹く向きの矢印の数（テスト用）。</summary>
+        public int WarningArrows { get; private set; }
+
+        /// <summary>予告の矢印のうち 1 つ目の先の位置（世界の xy。テスト用。向きへ流れているかを見る）。</summary>
+        public Vector2 FirstWarningArrowTip { get; private set; }
+
+        /// <summary>予告の矢印の向き（世界の xy の単位ベクトル。テスト用）。</summary>
+        public Vector2 WarningArrowDirection => _direction;
+
+        // 予告の間は、吹く向きへゆっくり流れる黄色の「>」を並べて、これから吹く向きを知らせる（2026-11-18 の要望: ビル街の昼の上空の風は、
+        // 同じ範囲に左向きと右向きが交互に吹くので、予告の斜線だけでは向きが分からない）。
+        private void RenderGustWarningArrows(Vector3 center, Vector2 half, float time, bool warning)
+        {
+            if (_warningArrows.Count == 0)
+            {
+                return;
+            }
+            if (!warning)
+            {
+                if (WarningArrows > 0)
+                {
+                    foreach (LineRenderer arrow in _warningArrows)
+                    {
+                        arrow.enabled = false;
+                    }
+                }
+                WarningArrows = 0;
+                return;
+            }
+            Vector2 side = new Vector2(_direction.y, -_direction.x);
+            float length = Extent(_direction);
+            float across = Extent(side);
+            int rows = Mathf.Clamp(Mathf.RoundToInt(across / 4f), 1, 3);
+            int perRow = Mathf.Max(1, _warningArrows.Count / rows);
+            float width = Mathf.Min(across / rows * 0.6f, 3f);
+            float depth = width * 0.45f;
+            float thickness = Mathf.Clamp(width * 0.09f, 0.12f, 0.3f);
+            float pulse = 0.7f + 0.3f * Mathf.Abs(Mathf.Sin(time * Mathf.PI * 1.6f));
+            // 吹く向きへ秒速 WarningArrowSpeed m で流す（広い範囲でも速くなりすぎない）。
+            float travel = Mathf.Max(1f, length - depth * 2f);
+            float rate = Mathf.Min(0.5f, WarningArrowSpeed / travel);
+            int shown = 0;
+            for (int i = 0; i < _warningArrows.Count; i++)
+            {
+                LineRenderer line = _warningArrows[i];
+                int row = i / perRow;
+                if (row >= rows)
+                {
+                    line.enabled = false;
+                    continue;
+                }
+                line.enabled = true;
+                line.startWidth = line.endWidth = thickness;
+                // 列ごとに半歩ずらし、吹く向きへゆっくり流す。
+                float phase = Mathf.Repeat(time * rate + (i % perRow + (row % 2) * 0.5f) / perRow, 1f);
+                float offset = ((row + 0.5f) / rows - 0.5f) * across;
+                Vector2 tip = new Vector2(center.x, center.y) + side * offset + _direction * ((phase - 0.5f) * travel + depth * 0.5f);
+                Vector2 back = tip - _direction * depth;
+                // 予告の斜線（-0.7）より手前に描く。
+                line.SetPosition(0, ToWorld(back + side * width * 0.5f, WarningArrowDepth));
+                line.SetPosition(1, ToWorld(tip, WarningArrowDepth));
+                line.SetPosition(2, ToWorld(back - side * width * 0.5f, WarningArrowDepth));
+                SetLineColor(line, WarningArrowColor, pulse * Fade(phase));
+                if (shown == 0)
+                {
+                    FirstWarningArrowTip = tip;
+                }
+                shown++;
+            }
+            WarningArrows = shown;
+        }
+
+        private static void SetLineColor(LineRenderer line, Color color, float alpha)
+        {
+            color.a *= Mathf.Clamp01(alpha);
+            line.startColor = line.endColor = color;
         }
 
         // 周期のあるギミックの見た目の強さ（0〜1）。効いている間は 1、止んでいる間は 0、効き始める前は点滅する（warning）。
@@ -1050,6 +1158,11 @@ namespace Airerage.Runtime.Presentation
         private static float Fade(float phase)
         {
             return Mathf.Clamp01(Mathf.Min(phase * 4f, (1f - phase) * 3f));
+        }
+
+        private static Vector3 ToWorld(Vector2 point, float z)
+        {
+            return new Vector3(point.x, point.y, z);
         }
 
         private static Vector3 ToWorld(Vector2 point)

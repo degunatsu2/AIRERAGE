@@ -46,7 +46,12 @@ namespace Airerage.PlayMode.Tests
                 var camera = Object.FindFirstObjectByType<MenuCameraDrift>();
                 var sounds = Object.FindFirstObjectByType<UiSounds>();
 
-                // タイトル → メイン: スカイダイブ。画面はすぐ入れ替わり、写しが動き、カメラが前へ突進する。
+                // タイトル → メイン: スカイダイブ。画面はすぐ入れ替わり、写しが動く。背景のステージはズームしない（2026-11-18 の要望:
+                // 突進した後にメインメニューで元の距離へ戻るのが不自然）。
+                Assert.That(transition.BackdropCamera, Is.SameAs(camera));
+                // 読み込んだ最初のフレームは、カメラがまだシーンの初めの位置（LateUpdate の前）。
+                yield return null;
+                float distance = camera.transform.position.z;
                 menu.ContinueFromTitle();
                 Assert.That(menu.ShowingMain, Is.True, "タイトルの決定ですぐにメインメニューへ入れ替わらない");
                 yield return null;
@@ -55,7 +60,7 @@ namespace Airerage.PlayMode.Tests
                 Assert.That(transition.Running, Is.True, "演出が動いていない");
                 Assert.That(transition.LastKind, Is.EqualTo(TransitionKind.SkyDive));
                 Assert.That(transition.GhostCount, Is.GreaterThan(0), "画面の写しを動かしていない");
-                Assert.That(camera.Diving, Is.True, "背景のカメラが前へ突進しない");
+                Assert.That(camera.transform.position.z, Is.EqualTo(distance).Within(0.01f), "背景のカメラが前へ突進している");
                 Assert.That(GameObject.Find("SpeedLines"), Is.Not.Null, "速さの線がない");
                 // 切り替えの途中でも、写しは本物の動きに合わせる（選んだ SINGLE は右へ出て、ほかの項目は下がる B13。2026-11-08）。
                 yield return WaitSeconds(0.45f);

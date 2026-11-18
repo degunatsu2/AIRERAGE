@@ -28,15 +28,5 @@ namespace Airerage.Runtime.Tests
             }
             Assert.That(peak, Is.GreaterThan(1.05f), "選んだ札が行きすぎてから戻らない（B2）");
         }
-
-        [Test]
-        public void CameraDive_PushesForward_ThenSettlesFromBehind()
-        {
-            Assert.That(MenuCameraDrift.DivePush(-0.1f), Is.EqualTo(0f));
-            Assert.That(MenuCameraDrift.DivePush(0.39f), Is.GreaterThan(20f), "前へ突進しない");
-            Assert.That(MenuCameraDrift.DivePush(0.45f), Is.LessThan(0f), "白い光の間に後ろへ移らない");
-            Assert.That(MenuCameraDrift.DivePush(MenuCameraDrift.DiveSeconds), Is.EqualTo(0f), "元の距離へ戻らない");
-            Assert.That(System.Math.Abs(MenuCameraDrift.DivePush(MenuCameraDrift.DiveSeconds - 0.01f)), Is.LessThan(0.5f), "戻るときに跳ぶ");
-        }
     }
 }

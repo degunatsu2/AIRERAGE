@@ -56,6 +56,7 @@ namespace Airerage.Editor.Stages
         public static void Apply(StageLook look, Vector2 boundsMin, Vector2 boundsMax)
         {
             string folder = FolderOf(look);
+            look.ApplySky();
             ApplyLighting(look, folder);
             DressTerrain(look, folder);
             DressAttachableGlow(look, folder);
@@ -71,6 +72,10 @@ namespace Airerage.Editor.Stages
             if (look.Skyline)
             {
                 CreateBackdrop(look, folder, boundsMin);
+            }
+            if (look.WindowCity)
+            {
+                CreateWindowCity(look, folder);
             }
             CreateVolume(look, folder);
         }
@@ -163,9 +168,33 @@ namespace Airerage.Editor.Stages
                 m.SetColor("_BelowColor", look.SkyBelow);
                 m.SetColor("_SunColor", look.SunColor);
                 m.SetVector("_SunDirection", look.SunDirection);
-                m.SetFloat("_SunSize", 2600f);
-                m.SetFloat("_SunGlow", 0.25f);
+                m.SetFloat("_SunSize", look.SunSize);
+                m.SetFloat("_SunGlow", look.SunGlow);
                 m.SetFloat("_Stars", look.Stars);
+                // 空模様（2026-11-18 の要望）。
+                m.SetFloat("_CloudCover", look.CloudCover);
+                m.SetColor("_CloudLit", look.CloudLit);
+                m.SetColor("_CloudShade", look.CloudShade);
+                m.SetColor("_CloudUnder", look.CloudUnder);
+                m.SetFloat("_CloudTop", look.CloudTop);
+                m.SetFloat("_CloudScale", look.CloudScale);
+                m.SetFloat("_CloudSpeed", look.CloudSpeed);
+                m.SetFloat("_CloudSoftness", look.CloudSoftness);
+                m.SetFloat("_Cirrus", look.Cirrus);
+                m.SetColor("_CirrusColor", look.CirrusColor);
+                m.SetColor("_MoonColor", look.MoonColor);
+                m.SetVector("_MoonDirection", look.MoonDirection);
+                m.SetFloat("_MoonSize", look.MoonSize);
+                m.SetFloat("_MilkyWay", look.MilkyWay);
+                m.SetColor("_HorizonGlow", look.HorizonGlow);
+                m.SetFloat("_HorizonGlowHeight", look.HorizonGlowHeight);
+                m.SetFloat("_Nebula", look.Nebula);
+                m.SetColor("_NebulaA", look.NebulaA);
+                m.SetColor("_NebulaB", look.NebulaB);
+                m.SetFloat("_Planet", look.Planet ? 1f : 0f);
+                m.SetVector("_PlanetDirection", look.PlanetDirection);
+                m.SetFloat("_PlanetRadius", look.PlanetRadius);
+                m.SetFloat("_Embers", look.Embers);
                 // 地平線のもやは目の高さより下へ（足場の後ろは空の色にして、上の面が溶けないように）。
                 m.SetFloat("_HorizonHeight", look.HorizonHeight);
             }, folder);
@@ -563,7 +592,8 @@ namespace Airerage.Editor.Stages
         {
             Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("Grid", "Airerage/StageGrid", m =>
             {
-                m.SetColor("_LineColor", look.GridColor);
+                m.SetColor("_LineColor", look.GridColor * look.GridStrength);
+                m.SetFloat("_LineWidth", 1.1f);
                 m.SetFloat("_Spacing", 10f);
                 m.SetFloat("_FadeStart", 60f);
                 m.SetFloat("_FadeEnd", 360f);
@@ -595,6 +625,10 @@ namespace Airerage.Editor.Stages
             {
                 // 建物を道路の地面の上に立たせる（根元を切らない。2026-11-18 の要望）。
                 CreatePlateauStreets(tokyo, look, folder, hazeTop);
+            }
+            if (look.CityGlowColor.maxColorComponent > 0f)
+            {
+                CreateCityGlow(Child(root, "CityGlow"), look, folder);
             }
             Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f, city ? PlateauHalfWidth : 0f);
             Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f, city ? PlateauMidKeepOut : 0f);
@@ -629,6 +663,33 @@ namespace Airerage.Editor.Stages
         private const float StreetsHalfWidth = 1500f;
         private const float StreetsBack = 1150f;
 
+        // 夜の街明かりのもや: 遠景のビルの足もとから上へ薄れる光の層を 2 枚（奥に高く濃い層、街の手前に低く薄い層）。足し合わせて描き、
+        // ブルームでにじむ（2026-11-18 の要望: 夜の都会の空気感）。
+        private static void CreateCityGlow(Transform root, StageLook look, string folder)
+        {
+            float ground = look.PlateauGround;
+            float back = ShinjukuZ + look.PlateauPush + 160f;
+            (string Name, float Z, float Width, float Height, float Strength, float Falloff)[] layers =
+            {
+                ("Back", back, 2800f, 320f, 1f, 2.2f),
+                ("Front", look.PlateauStreetsFront, 2200f, 120f, 0.45f, 1.6f),
+            };
+            foreach (var layer in layers)
+            {
+                Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial($"CityGlow{layer.Name}", "Airerage/CityGlow", m =>
+                {
+                    m.SetColor("_Color", look.CityGlowColor * layer.Strength);
+                    m.SetFloat("_Falloff", layer.Falloff);
+                    m.SetFloat("_EdgeSoftness", 0.22f);
+                    m.SetFloat("_Shimmer", 0.15f);
+                }, folder);
+                GameObject glow = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, layer.Name, material, new Vector3(layer.Width, layer.Height, 1f));
+                glow.transform.SetParent(root, false);
+                glow.transform.position = new Vector3(0f, ground + layer.Height * 0.5f, layer.Z);
+                NoShadows(glow);
+            }
+        }
+
         // 実在の街の地面（道路の地図を貼った板。昼は歩道の灰色に車道、夜は街灯の橙の道路）。地図は実際の位置に合わせ、外はくり返す。
         private static void CreatePlateauStreets(Transform root, StageLook look, string folder, float hazeTop)
         {
@@ -638,8 +699,6 @@ namespace Airerage.Editor.Stages
                 Debug.LogWarning($"PLATEAU の道路の地図がない（{PlateauGroundPath}）。地面を置かない");
                 return;
             }
-            bool night = look.CityNightGlow > 0f;
-            Texture2D lights = night ? LoadAtlas(PlateauGroundNightPath, 2048, TextureWrapMode.Repeat, 8) : null;
             float front = look.PlateauStreetsFront;
             float width = StreetsHalfWidth * 2f;
             float depth = StreetsBack - front;
@@ -669,9 +728,9 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_FogAmount", look.CityFogAmount);
                 m.SetFloat("_FogFadeStart", look.CityFogFadeStart);
                 m.SetFloat("_FogFadeEnd", look.CityFogFadeEnd);
-                m.SetTexture("_NightTex", lights);
-                // 地面は横の面なので、縦の面だけに限らない。
-                m.SetFloat("_NightStrength", night ? look.CityNightGlow * 0.6f : 0f);
+                // 夜の道路は光らせない（橙に光る道路が大通りとのつなぎ目を目立たせていた。2026-11-18 の指摘）。
+                m.SetTexture("_NightTex", null);
+                m.SetFloat("_NightStrength", 0f);
                 m.SetFloat("_NightSides", 0f);
             }, folder);
             GameObject streets = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, "Streets", material, new Vector3(width, depth, 1f));
@@ -714,6 +773,124 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_NightStrength", nightLights != null ? look.CityNightGlow : 0f);
                 m.SetFloat("_NightSides", 1f);
             }, folder);
+        }
+
+        // 窓の外の街の広さ（m）: 道路の地面の左右と奥の端、周りの街（LOD1）のくり返しの列。
+        private const float WindowStreetsHalfWidth = 900f;
+        private const float WindowStreetsBack = 900f;
+        // 周りの街（LOD1）を西新宿より後ろへずらす距離（m。手前の端が窓の壁より前に出ないように）。
+        private const float WindowAroundPush = 60f;
+
+        /// <summary>
+        /// 窓の外の街（キッチン。2026-11-18 の要望: 窓に窓枠と鍵、外にビル街の街並み）。実在の西新宿（PLATEAU。外壁の写真つき）を縮尺の
+        /// 模型にして壁のすぐ後ろに置き、周りの街（LOD1）を左右と奥へくり返して地平線まで埋め、道路の地面を敷く。遠くに置くと、窓が小さく
+        /// カメラから遠いので、カメラが少し動くだけで窓から見える所が大きく変わり、空か地面しか見えなくなる（近い模型なら、カメラの高さに
+        /// よって上の階から足もとまでが見える）。奥行きは少し縮める（窓から見える奥行きに収める）。足もとは空の色のもやに溶かす。影は落とさない。
+        /// </summary>
+        private static void CreateWindowCity(StageLook look, string folder)
+        {
+            Mesh shinjuku = LoadObjMesh($"{PlateauFolder}/Shinjuku_LOD2.obj");
+            Mesh tokyo = LoadObjMesh($"{PlateauFolder}/Tokyo_LOD1.obj");
+            Texture2D atlas = LoadAtlas(PlateauAtlasPath);
+            Texture2D ground = LoadAtlas(PlateauGroundPath, 2048, TextureWrapMode.Repeat, 8);
+            if (shinjuku == null || tokyo == null || atlas == null)
+            {
+                Debug.LogWarning($"PLATEAU の街のモデルか外壁の写真がない（{PlateauFolder}）。窓の外に街を置かない");
+                return;
+            }
+            Vector3 center = look.WindowCityCenter;
+            float scale = look.WindowCityScale;
+            float depthScale = scale * look.WindowCityDepth;
+            float hazeTop = center.y + 34f * scale / 0.15f;
+            float hazeBottom = center.y - 60f;
+            var root = new GameObject("WindowCity").transform;
+
+            void Haze(Material m, float fog)
+            {
+                m.SetColor("_HazeColor", look.WindowCityHaze);
+                m.SetFloat("_HazeTop", hazeTop);
+                m.SetFloat("_HazeBottom", hazeBottom);
+                m.SetFloat("_Blink", 0f);
+                m.SetFloat("_FogAmount", fog);
+                m.SetFloat("_FogFadeStart", 0f);
+                m.SetFloat("_FogFadeEnd", 0f);
+                m.SetTexture("_NightTex", null);
+                m.SetFloat("_NightStrength", 0f);
+                m.SetFloat("_NightSides", 0f);
+            }
+
+            Material hero = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WindowCity", "Airerage/StageBackdrop", m =>
+            {
+                m.SetColor("_BaseColor", new Color(0.62f, 0.66f, 0.72f));
+                m.SetFloat("_BandStrength", 0f);
+                m.SetFloat("_BandFill", 0f);
+                m.SetTexture("_MainTex", atlas);
+                m.SetTextureScale("_MainTex", Vector2.one);
+                m.SetTextureOffset("_MainTex", Vector2.zero);
+                m.SetFloat("_TexBlend", 1f);
+                m.SetColor("_TexTint", look.WindowCityTint);
+                m.SetFloat("_LightShade", 0.6f);
+                Haze(m, look.WindowCityFog);
+            }, folder);
+            Material around = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WindowCityAround", "Airerage/StageBackdrop", m =>
+            {
+                m.SetColor("_BaseColor", new Color(0.6f, 0.64f, 0.7f));
+                // 階の帯（窓の並び）。帯の間隔は縮尺に合わせる（実物の 1 階 3.5m）。
+                m.SetFloat("_BandSpacing", 3.5f * scale);
+                m.SetFloat("_BandStrength", 0.12f);
+                m.SetColor("_BandColor", new Color(0.35f, 0.42f, 0.52f));
+                m.SetFloat("_BandFill", 0f);
+                m.SetTexture("_MainTex", null);
+                m.SetFloat("_TexBlend", 0f);
+                m.SetFloat("_LightShade", 0.6f);
+                Haze(m, Mathf.Min(1f, look.WindowCityFog + 0.15f));
+            }, folder);
+
+            var heroScale = new Vector3(scale, scale, depthScale);
+            PlaceMesh(root, "Shinjuku", shinjuku, hero, center, heroScale);
+            // 周りの街: 本来の並びを西新宿の後ろへ少しずらして 1 つ、左右と奥へ向きを 180° ずつ変えてくり返す（同じ並びに見えないように）。
+            Vector3 tile = Vector3.Scale(tokyo.bounds.size, heroScale);
+            Transform aroundRoot = Child(root, "Around");
+            for (int row = 0; row < 2; row++)
+            {
+                for (int column = -1; column <= 1; column++)
+                {
+                    bool turned = ((row + column) & 1) != 0;
+                    var position = new Vector3(center.x + column * tile.x, center.y, center.z + WindowAroundPush + row * tile.z);
+                    Transform copy = PlaceMesh(aroundRoot, $"Around{row}{column + 1}", tokyo, around, position, heroScale);
+                    copy.rotation = Quaternion.Euler(0f, turned ? 180f : 0f, 0f);
+                }
+            }
+
+            if (ground != null)
+            {
+                // 道路の地面（西新宿の道路の地図。建物と同じ縮尺。外はくり返す）。奥は霧と空のもやに溶かす。
+                float front = center.z - (shinjuku.bounds.extents.z + 40f) * depthScale;
+                float width = WindowStreetsHalfWidth * 2f;
+                float depth = WindowStreetsBack - front;
+                var streetsCenter = new Vector3(center.x, center.y + 0.02f, (front + WindowStreetsBack) * 0.5f);
+                float span = PlateauGroundHalf * 2f;
+                var tiling = new Vector2(width / (span * scale), depth / (span * depthScale));
+                var offset = new Vector2(0.5f + (streetsCenter.x - center.x) / (span * scale) - tiling.x * 0.5f,
+                    0.5f + (streetsCenter.z - center.z) / (span * depthScale) - tiling.y * 0.5f);
+                Material streets = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WindowCityStreets", "Airerage/StageBackdrop", m =>
+                {
+                    m.SetColor("_BaseColor", new Color(0.5f, 0.52f, 0.55f));
+                    m.SetFloat("_BandStrength", 0f);
+                    m.SetFloat("_BandFill", 0f);
+                    m.SetTexture("_MainTex", ground);
+                    m.SetTextureScale("_MainTex", tiling);
+                    m.SetTextureOffset("_MainTex", offset);
+                    m.SetFloat("_TexBlend", 1f);
+                    m.SetColor("_TexTint", look.WindowCityTint);
+                    m.SetFloat("_LightShade", 0f);
+                    Haze(m, Mathf.Min(1f, look.WindowCityFog + 0.3f));
+                }, folder);
+                GameObject plane = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, "Streets", streets, new Vector3(width, depth, 1f));
+                plane.transform.SetParent(root, false);
+                plane.transform.SetPositionAndRotation(streetsCenter, Quaternion.Euler(90f, 0f, 0f));
+                NoShadows(plane);
+            }
         }
 
         // 外壁の写真のアトラスなどを読む（縮めずに、ミップマップと異方性で遠くでもちらつかない読み込みの設定に合わせる）。

@@ -27,10 +27,10 @@ Material:
     m_Floats:
     - _FadeEnd: 360
     - _FadeStart: 60
-    - _LineWidth: 1.4
+    - _LineWidth: 1.1
     - _Scroll: 1.5
     - _Spacing: 10
     m_Colors:
-    - _LineColor: {r: 0.14615385, g: 0.6942308, b: 0.95000005, a: 1}
+    - _LineColor: {r: 0.029230772, g: 0.13884616, b: 0.19000001, a: 0.2}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

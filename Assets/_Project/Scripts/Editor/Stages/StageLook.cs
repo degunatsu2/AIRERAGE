@@ -41,6 +41,48 @@ namespace Airerage.Editor.Stages
         public Vector3 SunDirection;
         /// <summary>夜空の星の明るさ（0 なら出さない）。</summary>
         public float Stars;
+        // 空模様（2026-11-18 の要望: 最奥の空をステージに合ったリアルな空模様に。Airerage/GradientSky）。強さ 0 なら描かない。
+        /// <summary>地平線から湧く積雲の量（0〜1）。</summary>
+        public float CloudCover;
+        /// <summary>雲の光の当たる側と陰の色。</summary>
+        public Color CloudLit = new Color(0.97f, 0.97f, 0.96f);
+        public Color CloudShade = new Color(0.62f, 0.68f, 0.78f);
+        /// <summary>雲を下から照らす光（HDR。夜の街明かり・溶岩）。</summary>
+        public Color CloudUnder = Color.black;
+        /// <summary>積雲の頂の高さ（見上げる角度の正接。カメラの上の端はおよそ 0.58）。</summary>
+        public float CloudTop = 0.4f;
+        /// <summary>雲の大きさ（大きいほど大きなかたまり）。</summary>
+        public float CloudScale = 1f;
+        /// <summary>雲が流れる速さ（方位のラジアン毎秒）。</summary>
+        public float CloudSpeed = 0.004f;
+        /// <summary>雲の縁の柔らかさ。</summary>
+        public float CloudSoftness = 0.06f;
+        /// <summary>高い所の筋雲（巻雲）の濃さと色。</summary>
+        public float Cirrus;
+        public Color CirrusColor = Color.white;
+        /// <summary>月の色（HDR。黒なら出さない）・向き・大きさ（度）。</summary>
+        public Color MoonColor = Color.black;
+        public Vector3 MoonDirection = new Vector3(0.45f, 0.4f, 1f);
+        public float MoonSize = 3f;
+        /// <summary>天の川の濃さ。</summary>
+        public float MilkyWay;
+        /// <summary>地平線の光（HDR。夜の街明かり・溶岩の照り返し）と、上へ薄れる高さ。</summary>
+        public Color HorizonGlow = Color.black;
+        public float HorizonGlowHeight = 0.18f;
+        /// <summary>星雲（宇宙）。</summary>
+        public float Nebula;
+        public Color NebulaA = new Color(0.35f, 0.12f, 0.6f);
+        public Color NebulaB = new Color(0.1f, 0.4f, 0.8f);
+        /// <summary>惑星（宇宙。地球）。</summary>
+        public bool Planet;
+        public Vector3 PlanetDirection = new Vector3(0f, -0.88f, 0.47f);
+        public float PlanetRadius = 50f;
+        /// <summary>舞い上がる火の粉（溶岩）。</summary>
+        public float Embers;
+        /// <summary>太陽の円盤の鋭さ（大きいほど小さい）と、まわりのかさ・広い光の強さ。</summary>
+        public float SunSize = 2600f;
+        public float SunGlow = 0.25f;
+
         /// <summary>霧を使うか（宇宙は使わない）。</summary>
         public bool Fog = true;
         public Color FogColor;
@@ -137,6 +179,27 @@ namespace Airerage.Editor.Stages
         /// <summary>作った箱のビルの夜の窓に混ぜるネオンの色の割合と、窓の明かりの強さの倍率（光らせる）。</summary>
         public float NeonMix;
         public float WindowGlow = 1f;
+        /// <summary>
+        /// 夜の街明かりのもやの色（HDR。黒なら置かない）。遠景のビルの足もとから上へ薄れる光の層を、奥と手前の 2 枚重ねて足す
+        /// （2026-11-18 の要望: ネオンの光をもっと発光させてぼかし、夜の都会の空気感を強調）。
+        /// </summary>
+        public Color CityGlowColor = Color.black;
+
+        // 窓の外の街（キッチン。2026-11-18 の要望: 窓に窓枠と鍵を付けて、外にビル街の街並み）。
+        /// <summary>窓の外に実在の街（PLATEAU の西新宿の縮尺の模型）を置くか。</summary>
+        public bool WindowCity;
+        /// <summary>窓の外の西新宿の中心（ワールド。y は地面の高さ）。</summary>
+        public Vector3 WindowCityCenter;
+        /// <summary>窓の外の街の縮尺（横と高さ）。</summary>
+        public float WindowCityScale = 0.15f;
+        /// <summary>窓の外の街の奥行きの縮め方（縮尺に掛ける。窓から見える奥行きを収める）。</summary>
+        public float WindowCityDepth = 0.35f;
+        /// <summary>窓の外の街の霧のかかり方（0〜1）。</summary>
+        public float WindowCityFog = 0.3f;
+        /// <summary>窓の外の街の外壁の写真の色合い。</summary>
+        public Color WindowCityTint = new Color(1f, 0.98f, 0.96f);
+        /// <summary>窓の外の街の足もとのもやの色（空の地平線の色に寄せる）。</summary>
+        public Color WindowCityHaze = new Color(0.84f, 0.88f, 0.93f);
 
         // 光の格子（V18）と撃破の線の膜（V19）。
         /// <summary>光の格子を置くか（街のステージは下に道路があるので置かない）。</summary>
@@ -144,6 +207,8 @@ namespace Airerage.Editor.Stages
         public Color GridColor;
         /// <summary>格子を置く深さ（撃破の線の下の端から、さらに下へ m）。</summary>
         public float GridDepth;
+        /// <summary>格子の線の明るさの割合（目を凝らすと見える程度に薄く。2026-11-18 の要望で全ステージ 0.2）。</summary>
+        public float GridStrength = 0.2f;
         public Color MembraneColor;
 
         // 仕上げの画面処理（V13）。
@@ -304,6 +369,157 @@ namespace Airerage.Editor.Stages
             // 格子の線は縁の光る線と同じ色合い（明るさは格子のシェーダーの範囲に収める）。
             look.GridColor = Normalize(look.TrimColor, 0.95f);
             return look;
+        }
+
+        /// <summary>
+        /// ステージごとの空模様（2026-11-18 の要望: 最奥の空をステージに合ったリアルな空模様に。商業ゲームの空を参考に）。Id で選ぶ。
+        /// 昼の屋外は地平線から湧く積雲（遠い列と手前の大きな雲）と高い所の筋雲、夜は月と星と雲（夜の街は街明かりが雲の底を照らし、
+        /// 星は少ない。恐怖の館は大きな満月と天の川）、宇宙は星雲と天の川と地球、溶岩は灰の雲を下から照らす赤い光と火の粉、
+        /// 屋内は窓や壁の外から見える空（キッチンは午後の空、研究所は曇りの夕方）。色は Material.SetColor に渡す値（ガンマ）。
+        /// </summary>
+        public void ApplySky()
+        {
+            CloudUnder = Color.black;
+            MoonColor = Color.black;
+            HorizonGlow = Color.black;
+            Cirrus = 0f;
+            MilkyWay = 0f;
+            Nebula = 0f;
+            Planet = false;
+            Embers = 0f;
+            CloudCover = 0f;
+            var daySun = new Color(1.25f, 1.15f, 0.95f);
+            switch (Id)
+            {
+                case "Athletic":
+                    DayClouds(0.62f, 0.45f, new Color(0.62f, 0.69f, 0.82f), 0.45f);
+                    break;
+                case "CityDay":
+                    SkyZenith = new Color(0.2f, 0.38f, 0.72f);
+                    SkySky = new Color(0.45f, 0.62f, 0.88f);
+                    SkyHorizon = new Color(0.8f, 0.86f, 0.93f);
+                    DayClouds(0.58f, 0.4f, new Color(0.62f, 0.67f, 0.77f), 0.35f);
+                    break;
+                case "CityNight":
+                    Stars = 0.5f;
+                    NightMoon(new Color(1.3f, 1.27f, 1.2f), new Vector3(0.55f, 0.45f, 1f), 2f);
+                    CloudCover = 0.5f;
+                    CloudLit = new Color(0.3f, 0.26f, 0.38f);
+                    CloudShade = new Color(0.07f, 0.06f, 0.1f);
+                    CloudUnder = new Color(0.32f, 0.13f, 0.24f);
+                    CloudTop = 0.32f;
+                    HorizonGlow = new Color(0.16f, 0.06f, 0.12f);
+                    HorizonGlowHeight = 0.12f;
+                    break;
+                case "Kitchen":
+                    SkyZenith = new Color(0.18f, 0.36f, 0.7f);
+                    SkySky = new Color(0.45f, 0.62f, 0.88f);
+                    SkyHorizon = new Color(0.95f, 0.88f, 0.8f);
+                    SkyBelow = new Color(0.8f, 0.78f, 0.78f);
+                    SunColor = new Color(1.2f, 1.05f, 0.85f);
+                    SunDirection = new Vector3(-0.5f, 0.3f, 1f);
+                    DayClouds(0.6f, 0.42f, new Color(0.68f, 0.64f, 0.7f), 0.4f);
+                    CloudLit = new Color(1f, 0.96f, 0.9f);
+                    CirrusColor = new Color(1f, 0.94f, 0.88f);
+                    WindowCityHaze = Color.Lerp(SkyHorizon, Color.white, 0.1f);
+                    break;
+                case "Lab":
+                    CloudCover = 0.8f;
+                    CloudLit = new Color(0.55f, 0.58f, 0.64f);
+                    CloudShade = new Color(0.3f, 0.33f, 0.4f);
+                    CloudTop = 0.6f;
+                    CloudSoftness = 0.18f;
+                    CloudScale = 1.6f;
+                    break;
+                case "Manor":
+                    Stars = 0.9f;
+                    MilkyWay = 0.5f;
+                    // 赤い満月（前の飾りの赤い円と同じ所・大きさ。いつものカメラから右上の 5.5° ほど）。
+                    NightMoon(new Color(1.9f, 0.55f, 0.42f), new Vector3(0.15f, 0.27f, 1f), 5.5f);
+                    HorizonGlow = new Color(0.06f, 0.03f, 0.08f);
+                    CloudCover = 0.55f;
+                    CloudLit = new Color(0.4f, 0.35f, 0.5f);
+                    CloudShade = new Color(0.06f, 0.045f, 0.09f);
+                    CloudTop = 0.5f;
+                    break;
+                case "SnowSea":
+                    SunColor = new Color(1.25f, 1.12f, 0.95f);
+                    SunDirection = new Vector3(-0.6f, 0.18f, 1f);
+                    DayClouds(0.68f, 0.32f, new Color(0.7f, 0.76f, 0.87f), 0.5f);
+                    CloudLit = new Color(0.98f, 0.99f, 1f);
+                    CloudSoftness = 0.12f;
+                    CloudScale = 1.4f;
+                    break;
+                case "SpaceStation":
+                    Stars = 1f;
+                    MilkyWay = 0.8f;
+                    Nebula = 0.55f;
+                    NebulaA = new Color(0.35f, 0.12f, 0.6f);
+                    NebulaB = new Color(0.08f, 0.35f, 0.7f);
+                    // 足もとの地球（縁が見上げる角度 -14° ほどに来る）と、大気のない鋭い太陽。
+                    Planet = true;
+                    PlanetDirection = new Vector3(0f, -0.899f, 0.438f);
+                    PlanetRadius = 50f;
+                    SunColor = new Color(2.5f, 2.4f, 2.2f);
+                    SunDirection = new Vector3(-0.65f, 0.5f, 1f);
+                    SunSize = 3000f;
+                    SunGlow = 0.04f;
+                    break;
+                case "Stadium":
+                    SkyZenith = new Color(0.16f, 0.36f, 0.75f);
+                    SkySky = new Color(0.4f, 0.6f, 0.9f);
+                    // 夏の高い積雲。
+                    DayClouds(0.66f, 0.6f, new Color(0.58f, 0.64f, 0.77f), 0.25f);
+                    CloudLit = new Color(0.99f, 0.99f, 0.98f);
+                    break;
+                case "Volcano":
+                    SkyZenith = new Color(0.08f, 0.04f, 0.04f);
+                    SkySky = new Color(0.22f, 0.09f, 0.07f);
+                    SkyHorizon = new Color(0.62f, 0.24f, 0.12f);
+                    SkyBelow = new Color(0.3f, 0.1f, 0.06f);
+                    SunColor = new Color(0.9f, 0.35f, 0.15f);
+                    CloudCover = 0.72f;
+                    CloudLit = new Color(0.3f, 0.22f, 0.2f);
+                    CloudShade = new Color(0.07f, 0.05f, 0.05f);
+                    CloudUnder = new Color(0.75f, 0.22f, 0.06f);
+                    CloudTop = 0.75f;
+                    CloudSoftness = 0.1f;
+                    CloudScale = 1.2f;
+                    HorizonGlow = new Color(0.35f, 0.09f, 0.02f);
+                    HorizonGlowHeight = 0.18f;
+                    Embers = 1f;
+                    break;
+                case "Wharf":
+                    SkyZenith = new Color(0.2f, 0.38f, 0.7f);
+                    SkySky = new Color(0.48f, 0.64f, 0.88f);
+                    DayClouds(0.56f, 0.36f, new Color(0.62f, 0.68f, 0.79f), 0.6f);
+                    break;
+            }
+            if (SunColor.maxColorComponent <= 0f && MoonColor.maxColorComponent > 0f)
+            {
+                // 夜の雲は月の側から照らす。
+                SunDirection = MoonDirection;
+            }
+
+            void DayClouds(float cover, float top, Color shade, float cirrus)
+            {
+                if (SunColor.maxColorComponent <= 0f)
+                {
+                    SunColor = daySun;
+                }
+                CloudCover = cover;
+                CloudTop = top;
+                CloudLit = new Color(0.98f, 0.98f, 0.97f);
+                CloudShade = shade;
+                Cirrus = cirrus;
+            }
+
+            void NightMoon(Color color, Vector3 direction, float size)
+            {
+                MoonColor = color;
+                MoonDirection = direction;
+                MoonSize = size;
+            }
         }
 
         // 文字列から決まる種（string.GetHashCode は実行ごとに変わることがあるので使わない）。

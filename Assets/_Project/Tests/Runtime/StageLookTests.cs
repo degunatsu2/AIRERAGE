@@ -288,6 +288,53 @@ namespace Airerage.Runtime.Tests
         }
 
         [TestCaseSource(nameof(DressedStages))]
+        public void EveryStage_HasASkyThatFitsTheStage(string stage)
+        {
+            // 2026-11-18 の要望: 最奥の空をステージに合ったリアルな空模様に。昼は雲、夜は月と星、宇宙は星雲と地球、溶岩は灰の雲と火の粉。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            SceneManager.SetActiveScene(scene);
+            Material sky = RenderSettings.skybox;
+            Assert.That(sky.shader.name, Is.EqualTo("Airerage/GradientSky"));
+            // 月と惑星は空に描く（飾りの平たい球を重ねると 2 つ見える）。
+            Assert.That(InScene<Renderer>(scene).Any(r => r.name == "Moon" || r.name == "Planet"), Is.False, "飾りの月か惑星が空の物と重なる");
+            bool night = stage == "Stage_CityNight" || stage == "Stage_Manor";
+            bool space = stage == "Stage_SpaceStation";
+            if (space)
+            {
+                Assert.That(sky.GetFloat("_Planet"), Is.EqualTo(1f), "宇宙に地球がない");
+                Assert.That(sky.GetFloat("_Nebula"), Is.GreaterThan(0f), "宇宙に星雲がない");
+                Assert.That(sky.GetFloat("_Stars"), Is.GreaterThan(0.5f), "宇宙に星が少ない");
+                Assert.That(sky.GetFloat("_CloudCover"), Is.EqualTo(0f), "宇宙に雲がある");
+                return;
+            }
+            Assert.That(sky.GetFloat("_CloudCover"), Is.GreaterThan(0.3f), "雲がない");
+            Assert.That(sky.GetFloat("_Planet"), Is.EqualTo(0f));
+            Assert.That(sky.GetFloat("_Nebula"), Is.EqualTo(0f));
+            if (night)
+            {
+                Assert.That(sky.GetColor("_MoonColor").maxColorComponent, Is.GreaterThan(0.5f), "夜に月がない");
+                Assert.That(sky.GetFloat("_Stars"), Is.GreaterThan(0f), "夜に星がない");
+                Vector4 sun = sky.GetVector("_SunDirection");
+                Vector4 moon = sky.GetVector("_MoonDirection");
+                Assert.That(Vector3.Dot(((Vector3)sun).normalized, ((Vector3)moon).normalized), Is.GreaterThan(0.99f), "夜の雲が月の側から照らされない");
+                if (stage == "Stage_Manor")
+                {
+                    Color red = sky.GetColor("_MoonColor");
+                    Assert.That(red.r, Is.GreaterThan(red.g * 2f), "恐怖の館の満月が赤くない");
+                }
+            }
+            else
+            {
+                Assert.That(sky.GetColor("_MoonColor").maxColorComponent, Is.EqualTo(0f), "昼に月がある");
+            }
+            Assert.That(sky.GetFloat("_Embers"), stage == "Stage_Volcano" ? Is.GreaterThan(0f) : Is.EqualTo(0f), "火の粉は溶岩のステージだけ");
+            if (stage == "Stage_Volcano" || stage == "Stage_CityNight")
+            {
+                Assert.That(sky.GetColor("_CloudUnder").maxColorComponent, Is.GreaterThan(0.2f), "雲の底を下から照らす光がない");
+            }
+        }
+
+        [TestCaseSource(nameof(DressedStages))]
         public void EveryStage_IsDressed_WithoutChangingTheTerrain(string stage)
         {
             // ほかのステージにも当てる（2026-11-17 の要望）。地形の当たりはそのまま、見た目だけ。
@@ -310,6 +357,9 @@ namespace Airerage.Runtime.Tests
             Assert.That(grid, Is.Not.Null, "光の格子がない");
             Assert.That(grid.GetComponent<Renderer>().sharedMaterial.shader.name, Is.EqualTo("Airerage/StageGrid"));
             Assert.That(grid.transform.position.y, Is.LessThan(bounds.GetComponent<KnockoutBounds>().Min.y), "光の格子が撃破の線より上にある");
+            // 目を凝らすと見える程度に薄く（2026-11-18 の要望）。
+            Color line = grid.GetComponent<Renderer>().sharedMaterial.GetColor("_LineColor");
+            Assert.That(Mathf.Max(line.r, Mathf.Max(line.g, line.b)), Is.LessThan(0.35f), "光の格子が明るすぎる");
             foreach (StageZoneView view in InScene<StageZoneView>(scene))
             {
                 Assert.That(view.LineMaterial.shader.name, Is.EqualTo("Airerage/GlowLine"), $"{view.name}: 線が光る線でない");
@@ -380,6 +430,11 @@ namespace Airerage.Runtime.Tests
                 Assert.That(shinjuku.GetTexture("_NightTex"), Is.Not.Null, "夜の窓の明かりの絵がない");
                 Assert.That(shinjuku.GetFloat("_NightStrength"), Is.GreaterThan(1f), "夜の明かりが光らない");
                 Assert.That(shinjuku.GetFloat("_BandFill"), Is.EqualTo(0f), "写真の窓と合わない窓の帯を重ねている");
+                // 夜の道路は光らせない（大通りとのつなぎ目が目立った。2026-11-18 の指摘）。街明かりのもやは奥と手前の 2 枚。
+                Assert.That(tokyo.Find("Streets").GetComponent<Renderer>().sharedMaterial.GetFloat("_NightStrength"), Is.EqualTo(0f), "夜の道路が光る");
+                Transform glow = scene.GetRootGameObjects().Single(g => g.name == "Backdrop").transform.Find("CityGlow");
+                Assert.That(glow, Is.Not.Null, "夜の街明かりのもやがない");
+                Assert.That(glow.childCount, Is.EqualTo(2));
             }
             Assert.That(shinjuku.GetTexture("_MainTex"), Is.Not.Null, "西新宿に外壁の写真がない");
             Assert.That(shinjuku.GetTexture("_MainTex").width, Is.EqualTo(4096), "外壁の写真が縮んで読み込まれている");
@@ -419,6 +474,43 @@ namespace Airerage.Runtime.Tests
         private static float Elevation(Vector3 eye, float y, float z)
         {
             return Mathf.Atan2(y - eye.y, z - eye.z) * Mathf.Rad2Deg;
+        }
+
+        [Test]
+        public void Kitchen_Windows_HaveFramesAndALock_AndLookOutOnTheCity()
+        {
+            // 2026-11-18 の要望: キッチンの奥の水色の所（窓）に窓枠と鍵を付けて、外にビル街の街並みが見えるように。
+            Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_Kitchen.unity");
+            Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+            Renderer[] parts = decor.GetComponentsInChildren<Renderer>(true);
+            Assert.That(parts.Any(r => r.name == "WindowWest" || r.name == "WindowEast"), Is.False, "前の水色の板が残っている");
+            Renderer city = scene.GetRootGameObjects().Single(g => g.name == "WindowCity").transform.Find("Shinjuku").GetComponent<Renderer>();
+            Assert.That(city.sharedMaterial.GetTexture("_MainTex"), Is.Not.Null, "窓の外の街に外壁の写真がない");
+            Bounds wholeCity = scene.GetRootGameObjects().Single(g => g.name == "WindowCity").GetComponentsInChildren<Renderer>()
+                .Select(r => r.bounds).Aggregate((a, b) => { a.Encapsulate(b); return a; });
+            Assert.That(wholeCity.min.z, Is.GreaterThan(17f), "窓の外の街が壁より手前に出ている");
+            foreach (string side in new[] { "West", "East" })
+            {
+                foreach (string part in new[] { "FrameTop", "FrameBottom", "FrameLeft", "FrameRight", "SashOuterGlass", "SashInnerGlass", "LockBase",
+                    "LockCrescent", "LockKnob", "LockKeeper", "Sill" })
+                {
+                    Assert.That(parts.Any(r => r.name == $"Window{side}{part}"), Is.True, $"窓（{side}）に {part} がない");
+                }
+                Renderer glass = parts.First(r => r.name == $"Window{side}SashInnerGlass");
+                Vector3 center = glass.bounds.center;
+                // 壁は窓の所でくりぬかれている（窓の真ん中を壁の箱が覆わない）。
+                Assert.That(parts.Where(r => r.name.StartsWith("BackWall")).Any(r => r.bounds.Contains(new Vector3(center.x, center.y, 16f))), Is.False,
+                    $"窓（{side}）の所が壁でふさがっている");
+                // いつもの高さのカメラから窓の真ん中を通る視線が、外の街（西新宿）に当たる。高いカメラからは足もとの道路が見える。
+                foreach (float eyeY in new[] { 12f, 20f, 26f })
+                {
+                    var eye = new Vector3(0f, eyeY, -30f);
+                    var ray = new Ray(eye, (center - eye).normalized);
+                    Assert.That(city.bounds.IntersectRay(ray), Is.True, $"高さ {eyeY} のカメラから窓（{side}）の外に街が見えない");
+                }
+            }
+            Assert.That(parts.Where(r => r.name.StartsWith("BackWall")).Select(r => r.bounds.max.x).Max(), Is.GreaterThan(150f),
+                "奥の壁が狭い（全体を映すカメラで壁の外の街が見える）");
         }
 
         [Test]

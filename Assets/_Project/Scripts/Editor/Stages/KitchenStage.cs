@@ -185,7 +185,7 @@ namespace Airerage.Editor.Stages
                     new Vector3(-29.75f, 3f, 0f), new Vector3(-38.5f, 15.6f, 0f), new Vector3(38.5f, 15.6f, 0f), new Vector3(47.5f, 19.2f, 0f) },
                 Decorate = Decorate,
                 // 背景とオブジェクトのクオリティアップ（D-97）。
-                Look = StageLook.FromTheme("Kitchen", theme, StageMood.Indoor),
+                Look = KitchenLook(theme),
             };
         }
 
@@ -206,6 +206,144 @@ namespace Airerage.Editor.Stages
                 decor.Lit("RollFrosting", new Color(1f, 0.85f, 0.9f)));
         }
 
+        // 見た目の台本: 室内。窓の外に実在の西新宿の街並み（2026-11-18 の要望: 窓に窓枠と鍵を付けて、外にビル街の街並みが見えるように）。
+        private static StageLook KitchenLook(StageTheme theme)
+        {
+            StageLook look = StageLook.FromTheme("Kitchen", theme, StageMood.Indoor);
+            look.WindowCity = true;
+            // 壁のすぐ後ろ（手前の端が壁の裏 z = 17 より奥）。地面は窓より下で、高いビルの上の階が窓の真ん中ほどに来る高さ。
+            look.WindowCityCenter = new Vector3(0f, 8f, 67f);
+            return look;
+        }
+
+        // 窓の中心と大きさ（奥の壁の手前の面 z = 15）。
+        private static readonly Vector2[] WindowCenters = { new Vector2(-30f, 26f), new Vector2(30f, 26f) };
+        private static readonly Vector2 WindowSize = new Vector2(12f, 9f);
+
+        // 奥の壁（z 15〜17）の広さ。
+        private const float WallHalfWidth = 200f;
+        private const float WallBottom = -60f;
+        private const float WallTop = 120f;
+
+        // 奥の壁を窓の所だけくりぬいた箱で作り、タイルの目地の線も窓をよける。
+        private static void BackWall(StageDecor decor, Material tile, Material tileLine)
+        {
+            float bottom = WindowCenters[0].y - WindowSize.y * 0.5f;
+            float top = WindowCenters[0].y + WindowSize.y * 0.5f;
+            void Wall(string name, float x0, float x1, float y0, float y1)
+            {
+                decor.Box(name, new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, 16f), new Vector3(x1 - x0, y1 - y0, 2f), tile);
+            }
+            Wall("BackWall", -WallHalfWidth, WallHalfWidth, WallBottom, bottom);
+            Wall("BackWallTop", -WallHalfWidth, WallHalfWidth, top, WallTop);
+            // 窓の高さの帯: 窓と窓の間と、両外。
+            var edges = new System.Collections.Generic.List<float> { -WallHalfWidth };
+            foreach (Vector2 center in WindowCenters)
+            {
+                edges.Add(center.x - WindowSize.x * 0.5f);
+                edges.Add(center.x + WindowSize.x * 0.5f);
+            }
+            edges.Add(WallHalfWidth);
+            for (int i = 0; i + 1 < edges.Count; i += 2)
+            {
+                Wall($"BackWallBand{i / 2 + 1}", edges[i], edges[i + 1], bottom, top);
+            }
+            for (float y = -56f; y <= WallTop - 4f; y += 4f)
+            {
+                if (y <= bottom || y >= top)
+                {
+                    decor.Box("TileLine", new Vector3(0f, y, 14.9f), new Vector3(WallHalfWidth * 2f, 0.08f, 0.1f), tileLine);
+                    continue;
+                }
+                for (int i = 0; i + 1 < edges.Count; i += 2)
+                {
+                    decor.Box("TileLine", new Vector3((edges[i] + edges[i + 1]) * 0.5f, y, 14.9f), new Vector3(edges[i + 1] - edges[i], 0.08f, 0.1f), tileLine);
+                }
+            }
+        }
+
+        // 引き違いの窓（日本の家の窓）: アルミの窓枠（壁の厚みを埋める）、左右 2 枚の障子（左は外のレール、右は内のレールで、真ん中で
+        // 重なる）、ガラス（ほとんど透明。斜めの映り込み）、重なりの所のクレセントの鍵（右の障子の框に座と弧の形のレバーとつまみ、左の
+        // 障子の框に受け）、窓台。外の街は StageDressing の窓の外の街（StageLook.WindowCity）。
+        private static void Window(StageDecor decor, Vector2 center)
+        {
+            Material frame = decor.Lit("WindowFrame", new Color(0.8f, 0.82f, 0.84f));
+            Material sash = decor.Lit("WindowSash", new Color(0.7f, 0.72f, 0.75f));
+            Material chrome = decor.Lit("WindowLock", new Color(0.93f, 0.93f, 0.95f));
+            Material glass = decor.Transparent("WindowGlass", new Color(0.82f, 0.92f, 1f, 0.08f));
+            Material glare = decor.Transparent("WindowGlare", new Color(1f, 1f, 1f, 0.13f));
+            Material sill = decor.Lit("WindowSill", new Color(0.95f, 0.93f, 0.9f));
+            const float frameWidth = 0.45f;
+            const float frameFront = 14.5f;
+            const float frameBack = 17f;
+            const float bar = 0.32f;
+            const float overlap = 0.12f;
+            float w = WindowSize.x;
+            float h = WindowSize.y;
+            float frameZ = (frameFront + frameBack) * 0.5f;
+            float frameDepth = frameBack - frameFront;
+            string side = center.x < 0f ? "West" : "East";
+
+            // 窓枠（上下左右。壁の厚みを埋める）。
+            decor.Box($"Window{side}FrameTop", new Vector3(center.x, center.y + h * 0.5f - frameWidth * 0.5f, frameZ), new Vector3(w, frameWidth, frameDepth), frame);
+            decor.Box($"Window{side}FrameBottom", new Vector3(center.x, center.y - h * 0.5f + frameWidth * 0.5f, frameZ), new Vector3(w, frameWidth, frameDepth), frame);
+            decor.Box($"Window{side}FrameLeft", new Vector3(center.x - w * 0.5f + frameWidth * 0.5f, center.y, frameZ), new Vector3(frameWidth, h, frameDepth), frame);
+            decor.Box($"Window{side}FrameRight", new Vector3(center.x + w * 0.5f - frameWidth * 0.5f, center.y, frameZ), new Vector3(frameWidth, h, frameDepth), frame);
+            // 下のレール（2 本）。
+            float innerLeft = center.x - w * 0.5f + frameWidth;
+            float innerRight = center.x + w * 0.5f - frameWidth;
+            float innerBottom = center.y - h * 0.5f + frameWidth;
+            float innerTop = center.y + h * 0.5f - frameWidth;
+            decor.Box($"Window{side}RailOuter", new Vector3(center.x, innerBottom + 0.05f, 15.9f), new Vector3(innerRight - innerLeft, 0.1f, 0.06f), sash);
+            decor.Box($"Window{side}RailInner", new Vector3(center.x, innerBottom + 0.05f, 15.45f), new Vector3(innerRight - innerLeft, 0.1f, 0.06f), sash);
+
+            // 障子 2 枚（左が外のレール、右が内のレール）。
+            float sashWidth = (innerRight - innerLeft + overlap) * 0.5f;
+            float sashHeight = innerTop - innerBottom;
+            (string Name, float Left, float Z)[] sashes =
+            {
+                ("Outer", innerLeft, 15.9f),
+                ("Inner", innerRight - sashWidth, 15.45f),
+            };
+            foreach (var s in sashes)
+            {
+                float cx = s.Left + sashWidth * 0.5f;
+                float cy = innerBottom + sashHeight * 0.5f;
+                string name = $"Window{side}Sash{s.Name}";
+                decor.Box($"{name}Top", new Vector3(cx, innerTop - bar * 0.5f, s.Z), new Vector3(sashWidth, bar, 0.28f), sash);
+                decor.Box($"{name}Bottom", new Vector3(cx, innerBottom + bar * 0.5f, s.Z), new Vector3(sashWidth, bar, 0.28f), sash);
+                decor.Box($"{name}Left", new Vector3(s.Left + bar * 0.5f, cy, s.Z), new Vector3(bar, sashHeight, 0.28f), sash);
+                decor.Box($"{name}Right", new Vector3(s.Left + sashWidth - bar * 0.5f, cy, s.Z), new Vector3(bar, sashHeight, 0.28f), sash);
+                var pane = new Vector2(sashWidth - bar * 2f, sashHeight - bar * 2f);
+                decor.Quad($"{name}Glass", new Vector3(cx, cy, s.Z), pane, glass);
+                // 斜めの映り込み（左上に太い筋と細い筋）。ガラスの中に収まる長さ。
+                GameObject wide = decor.Quad($"{name}Glare", new Vector3(cx - pane.x * 0.12f, cy + pane.y * 0.12f, s.Z - 0.02f), new Vector2(pane.x * 0.95f, 0.55f), glare);
+                wide.transform.rotation = Quaternion.Euler(0f, 0f, 35f);
+                GameObject thin = decor.Quad($"{name}GlareThin", new Vector3(cx + pane.x * 0.08f, cy + pane.y * 0.02f, s.Z - 0.02f), new Vector2(pane.x * 0.8f, 0.16f), glare);
+                thin.transform.rotation = Quaternion.Euler(0f, 0f, 35f);
+            }
+
+            // クレセントの鍵: 右の障子（内）の左の框に座と、左へふくらむ弧のレバーとつまみ。左の障子（外）の右の框に受け。
+            float meet = innerRight - sashWidth + bar * 0.5f;
+            decor.Box($"Window{side}LockBase", new Vector3(meet, center.y, 15.27f), new Vector3(0.26f, 0.8f, 0.1f), chrome);
+            const float radius = 0.3f;
+            for (int i = 0; i < 7; i++)
+            {
+                float angle = Mathf.Lerp(100f, 260f, i / 6f) * Mathf.Deg2Rad;
+                var position = new Vector3(meet + Mathf.Cos(angle) * radius, center.y + Mathf.Sin(angle) * radius, 15.2f);
+                GameObject piece = decor.Box($"Window{side}LockCrescent", position, new Vector3(0.12f, 0.14f, 0.08f), chrome);
+                piece.transform.rotation = Quaternion.Euler(0f, 0f, angle * Mathf.Rad2Deg);
+            }
+            GameObject lever = decor.Box($"Window{side}LockLever", new Vector3(meet + 0.17f, center.y - 0.2f, 15.2f), new Vector3(0.1f, 0.4f, 0.08f), chrome);
+            lever.transform.rotation = Quaternion.Euler(0f, 0f, 40f);
+            decor.Sphere($"Window{side}LockKnob", new Vector3(meet + 0.3f, center.y - 0.35f, 15.16f), new Vector3(0.2f, 0.2f, 0.16f), chrome);
+            // 受けは左の障子（外）の重なりの框の見えている所（右の障子の框の左）。
+            decor.Box($"Window{side}LockKeeper", new Vector3(meet - 0.26f, center.y, 15.72f), new Vector3(0.16f, 0.44f, 0.08f), chrome);
+
+            // 窓台（手前へ少し出る）。
+            decor.Box($"Window{side}Sill", new Vector3(center.x, center.y - h * 0.5f - 0.2f, 14.6f), new Vector3(w + 1.2f, 0.4f, 1.4f), sill);
+        }
+
         // 奥の壁とタイル、大きなオーブン（火柱の口）、コンロのつまみ、窓、調理台の奥行き、吊るしたおたま。
         private static void Decorate(StageDecor decor)
         {
@@ -217,15 +355,10 @@ namespace Airerage.Editor.Stages
             Material wood = decor.Lit("CabinetWood", new Color(0.62f, 0.42f, 0.3f));
             Material marble = decor.Lit("Marble", new Color(0.96f, 0.94f, 0.92f));
             Material floor = decor.Lit("KitchenFloor", new Color(0.55f, 0.35f, 0.28f));
-            Material window = decor.Unlit("Window", new Color(0.75f, 0.9f, 1f));
             Material sinkWater = decor.Lit("SinkBack", new Color(0.55f, 0.78f, 0.92f));
 
-            // 奥の壁のタイル。
-            decor.Box("BackWall", new Vector3(0f, 18f, 16f), new Vector3(150f, 70f, 2f), tile);
-            for (float y = -8f; y <= 50f; y += 4f)
-            {
-                decor.Box("TileLine", new Vector3(0f, y, 14.9f), new Vector3(150f, 0.08f, 0.1f), tileLine);
-            }
+            // 奥の壁のタイル（窓の所はくりぬく。窓の外に街が見える）。全体を映すカメラでも端と上が見えないように広く高く。
+            BackWall(decor, tile, tileLine);
             // 大きなオーブン（コンロの奥。口が光る）と、扉の窓。
             decor.Box("OvenBody", new Vector3(0f, 6f, 9f), new Vector3(26f, 22f, 8f), oven);
             decor.Box("OvenMouth", new Vector3(0f, 8f, 4.9f), new Vector3(20f, 12f, 0.2f), ovenGlow);
@@ -253,9 +386,11 @@ namespace Airerage.Editor.Stages
             {
                 decor.Box("DrainGrate", new Vector3(42.15f, -2f + i * 0.8f, -1.6f), new Vector3(0.12f, 0.12f, 0.6f), steel);
             }
-            // 窓と床（遠く下）。
-            decor.Quad("WindowWest", new Vector3(-30f, 26f, 14.8f), new Vector2(12f, 9f), window);
-            decor.Quad("WindowEast", new Vector3(30f, 26f, 14.8f), new Vector2(12f, 9f), window);
+            // 窓（引き違いの窓。窓枠・障子・ガラス・クレセントの鍵・窓台）と床（遠く下）。
+            foreach (Vector2 center in WindowCenters)
+            {
+                Window(decor, center);
+            }
             decor.Box("Floor", new Vector3(0f, -22f, 10f), new Vector3(150f, 2f, 40f), floor);
             // 吊るしたおたまの柄（アンカーの上）。
             foreach (Vector2 hook in new[] { new Vector2(-15f, 25f), new Vector2(15f, 25f), new Vector2(0f, 36f), new Vector2(-28f, 27f), new Vector2(28f, 27f) })

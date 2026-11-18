@@ -445,7 +445,6 @@ namespace Airerage.Editor.Stages
                     decor.Box("NeonEdge", new Vector3((building.MinX + building.MaxX) * 0.5f, building.Top + 0.04f, -2.05f),
                         new Vector3(building.MaxX - building.MinX, 0.08f, 0.08f), building.MinX < 0f ? neonPink : neonCyan);
                 }
-                decor.Sphere("Moon", new Vector3(-50f, 48f, 110f), new Vector3(9f, 9f, 9f), decor.Unlit("Moon", new Color(0.95f, 0.95f, 0.85f)));
             }
         }
 
@@ -492,6 +491,14 @@ namespace Airerage.Editor.Stages
         {
             StageLook look = StageLook.CityNight();
             PlaceTokyo(look);
+            // 夜の都会の空気感（2026-11-18 の要望: ネオンをもっと発光させてぼかす）。明かりを強く、ブルームを広くにじませ、街明かりのもやを
+            // 重ねる（恐怖の館・宇宙ステーションも夜の台本を土台にするので、ここでビル街の夜だけ変える）。
+            look.CityNightGlow = 5.5f;
+            look.WindowGlow = 4.5f;
+            look.BloomThreshold = 0.8f;
+            look.BloomIntensity = 1.25f;
+            look.BloomScatter = 0.86f;
+            look.CityGlowColor = new Color(0.55f, 0.16f, 0.42f);
             return look;
         }
 

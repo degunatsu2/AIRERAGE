@@ -25,18 +25,45 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _Cirrus: 0
+    - _CloudCover: 0
+    - _CloudScale: 1
+    - _CloudSoftness: 0.06
+    - _CloudSpeed: 0.004
+    - _CloudTop: 0.4
+    - _Embers: 0
+    - _HorizonGlowHeight: 0.18
     - _HorizonHeight: -0.08
     - _HorizonSharpness: 9
+    - _MilkyWay: 0.8
+    - _MoonSize: 3
+    - _Nebula: 0.55
+    - _Planet: 1
+    - _PlanetRadius: 50
     - _Stars: 1
-    - _SunGlow: 0.25
-    - _SunSize: 2600
+    - _SunGlow: 0.04
+    - _SunSize: 3000
     - _Tense: 0
     m_Colors:
     - _BelowColor: {r: 0.01, g: 0.01, b: 0.02, a: 1}
+    - _CirrusColor: {r: 1, g: 1, b: 1, a: 1}
+    - _CloudLit: {r: 0.97, g: 0.97, b: 0.96, a: 1}
+    - _CloudShade: {r: 0.62, g: 0.68, b: 0.78, a: 1}
+    - _CloudUnder: {r: 0, g: 0, b: 0, a: 1}
+    - _EmberColor: {r: 3, g: 1.2, b: 0.3, a: 1}
     - _HorizonColor: {r: 0.03, g: 0.035, b: 0.07, a: 1}
+    - _HorizonGlow: {r: 0, g: 0, b: 0, a: 1}
+    - _MoonColor: {r: 0, g: 0, b: 0, a: 1}
+    - _MoonDirection: {r: 0.45, g: 0.4, b: 1, a: 0}
+    - _NebulaA: {r: 0.35, g: 0.12, b: 0.6, a: 1}
+    - _NebulaB: {r: 0.08, g: 0.35, b: 0.7, a: 1}
+    - _PlanetAtmosphere: {r: 0.35, g: 0.65, b: 1.6, a: 1}
+    - _PlanetDirection: {r: 0, g: -0.899, b: 0.438, a: 0}
+    - _PlanetLand: {r: 0.19999996, g: 0.29999998, b: 0.13999996, a: 1}
+    - _PlanetOcean: {r: 0.03, g: 0.11999995, b: 0.34999996, a: 1}
     - _SkyColor: {r: 0.01, g: 0.012, b: 0.03, a: 1}
-    - _SunColor: {r: 0, g: 0, b: 0, a: 1}
-    - _SunDirection: {r: -0.5, g: 0.42, b: 1, a: 0}
+    - _SunColor: {r: 2.5, g: 2.4, b: 2.2, a: 1}
+    - _SunDirection: {r: -0.65, g: 0.5, b: 1, a: 0}
     - _TenseColor: {r: 1, g: 0.41999996, b: 0.33999997, a: 1}
     - _ZenithColor: {r: 0.005, g: 0.006, b: 0.015, a: 1}
   m_BuildTextureStacks: []
