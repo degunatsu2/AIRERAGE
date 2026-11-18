@@ -9,7 +9,8 @@
 - 面のつながりで建物に分け（同じ位置の頂点はつなぐ）、地面からの高さが --min-height 以上の建物だけを残す。
 - テクスチャは、使っている範囲だけを切り出し、外壁の 1 画素がおよそ --texel m になる大きさへ縮めて、1 枚のアトラス（--atlas 画素四方の
   JPG）にまとめ、UV を付け替える（入りきらなければ、入るまで 1 画素あたりの大きさを広げる）。
-- 平面直角座標（東・北・高さ。m）を、中心からの位置にし、地面を高さ 0 にする。Unity の OBJ の読み込みは X を反転するので、X を反転して書く
+- 平面直角座標（東・北・高さ。m）を、中心からの位置にし、地面を高さ 0 にする。建物ごとの根元の高さは土地の起伏で ±10m ほど違うので、
+  --snap-ground なら建物ごとに根元を地面（--ground）にそろえる（道路の地面に立たせたとき、浮いたり沈んだりしないように）。Unity の OBJ の読み込みは X を反転するので、X を反転して書く
   （読み込むと東が +X・上が +Y・北が +Z）。
 
 - 夜の明かり（--night）: 外壁の写真の窓（まわりより暗く青みのある所）を見つけ、窓ごとに点ける・点けないを決めて、建物（テクスチャ）
@@ -196,6 +197,7 @@ def main():
     ap.add_argument('--texel', type=float, default=0.6, help='外壁の 1 画素の大きさ（m）の目安')
     ap.add_argument('--atlas', type=int, default=4096)
     ap.add_argument('--night', action='store_true', help='夜の窓の明かりの絵も書く')
+    ap.add_argument('--snap-ground', action='store_true', help='建物ごとに根元を地面にそろえる')
     args = ap.parse_args()
 
     rz = load_remote_zip()
@@ -302,16 +304,17 @@ def main():
     out_v, out_t, out_f = [], [], []
     v_index, t_index = {}, {}
     plain = (0.5 / args.atlas, 0.5 / args.atlas)
-    for mesh, verts, uvs, group, textures, _ in kept:
+    for mesh, verts, uvs, group, textures, base in kept:
+        lift = ground - base if args.snap_ground else 0.0
         for a, b, c, material in group:
             key = (mesh, textures.get(material, '')) if material else None
             ids = []
             for vi, ti in (a, b, c):
                 e, n, hgt = verts[vi]
-                vk = (round(e * 100), round(n * 100), round(hgt * 100))
+                vk = (round(e * 100), round(n * 100), round((hgt + lift) * 100))
                 if vk not in v_index:
                     v_index[vk] = len(out_v)
-                    out_v.append((-(e - cx), hgt - ground, n - cy))
+                    out_v.append((-(e - cx), hgt + lift - ground, n - cy))
                 if key in placed and ti >= 0:
                     x, y = placed[key]
                     cw, ch = cells[key]
@@ -332,7 +335,7 @@ def main():
                 out_f.append(ids)
     with open(f'{args.output}.obj', 'w', encoding='utf-8') as f:
         f.write('# 出典: 国土交通省 Project PLATEAU（3D 都市モデル 東京都 23 区 2020 年度）。加工して作成（tools/assets/plateau_textured.py）\n')
-        f.write(f'# center E={cx:.3f} N={cy:.3f} ground={ground:.3f} min-height={args.min_height} texel={texel:.3f}m '
+        f.write(f'# center E={cx:.3f} N={cy:.3f} ground={ground:.3f} snap-ground={args.snap_ground} min-height={args.min_height} texel={texel:.3f}m '
                 f'atlas={os.path.basename(args.output)}_Atlas.jpg\n')
         for x, y, z in out_v:
             f.write(f'v {x:.2f} {y:.2f} {z:.2f}\n')

@@ -7,7 +7,8 @@
   1 枚にまとめた）。形は減らしていない（2026-11-18 のユーザーの要望: ほぼシルエットに見えない、ある程度リアルな背景）。
   作り方: `tools/assets/plateau_textured.py`（配布の zip から必要な区画とテクスチャだけを取り出す。`tools/assets/remote_zip.py`）。
   `python3 -I tools/assets/plateau_textured.py 出力の名前 --cache 作業のフォルダ --mesh 53394525 53394526 53394535 53394536 --min-height 50
-  --center -12196.9 -34315.7 --ground 34.9 --texel 0.6 --atlas 4096`
+  --center -12196.9 -34315.7 --ground 34.9 --texel 0.6 --atlas 4096 --night --snap-ground`（`--snap-ground` で建物ごとに根元を地面に
+  そろえる。土地の起伏で ±10m ほど違い、道路の地面に立たせると浮いたり沈んだりするため）
 - `Shinjuku_LOD2_AtlasNight.jpg`: 夜の窓の明かり（外壁の写真の窓〈まわりより暗く青みのある所〉を見つけ、窓ごとに点ける・点けないと、
   建物ごとのネオンの色を決めた絵。同じ並び）。`plateau_textured.py ... --night` で作る（2026-11-18 の要望: 夜の明かりを窓と同期させ、
   ネオン風に光らせる）。
