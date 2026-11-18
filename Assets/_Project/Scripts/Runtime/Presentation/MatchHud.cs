@@ -16,8 +16,10 @@ namespace Airerage.Runtime.Presentation
     /// 結果には「Restart」と「Quit」（IMatchControls があれば）。復帰までの残りは、出現位置の周りのゲージで示す（CharacterView）。
     /// 始まる前の演出（D-98。2026-11-17 のユーザーの決定: I1 + I2、最後に集中線とズームからラウンドコール）: ゲート（ScreenCurtain）が開いた
     /// ときには、もう上下に黒い帯（シネマスコープ）が付いている。カメラが空撮でステージを回る間（MatchIntroCamera）に、上の帯へステージの
-    /// 名前、下の帯へプレイヤーの札（斜めの札。プレイヤーの色）が滑り込む。名前と札が去ると、集中線とともにカメラが突進し、白い光で帯が
-    /// 外れて、「READY」→ 試合が始まった瞬間に「GO!」。時間割は MatchIntroTimeline（カウントダウンの長さに合わせて縮む）。
+    /// 名前、下の帯へプレイヤーの札（斜めの札。プレイヤーの色）が滑り込み、上の帯の右で Loading のゲージがグリッチとともに増える
+    /// （100% で Complete を 2 回点滅）。名前と札が去ると、集中線とともにカメラが突進し、白い光で帯が外れて、試合中の表示（タイマー・
+    /// 右上の札・技の札など）がフェードインし（HudFade.Reveal）、「ON YOUR MARKS」→「GET READY……」→ 試合が始まった瞬間に「ROLL!」。
+    /// 文字の下に、始まりまでのゲージ（緑 → 黄 → 赤）。2026-11-18 の要望。時間割は MatchIntroTimeline（カウントダウンの長さに合わせて縮む）。
     /// 残り時間は、上の辺に付いた台形の札と、その下の試合の流れのバー（TimerPlate。ユーザーの選択、2026-10-14）。残り 10 秒は
     /// 赤く脈打ち、1 秒ごとに短い音。アディショナルタイムは橙色。お知らせ（拠点の移動、100 枚のコイン、ホットエリア）は NoticeHud。
     /// アディショナルタイムの始まり（OVERTIME）と試合の終わり（FINISH! / 名前 WINS!）は、お知らせと同じ画面を横切る帯（BannerStrip。
@@ -28,7 +30,7 @@ namespace Airerage.Runtime.Presentation
     {
         // 演出の音を鳴らしたか（1 試合に 1 回ずつ）。
         private const int SoundDive = 1;
-        private const int SoundFlash = 2;
+        private const int SoundSet = 2;
         private const int SoundReady = 4;
 
         [Tooltip("状態を読む相手（SimulationRunner か OnlineRunner。ISimulationFeed）")]
@@ -62,6 +64,8 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _stageSub;
         private GUIStyle _plateName;
         private GUIStyle _plateSub;
+        private GUIStyle _loading;
+        private Texture2D _gaugeGradient;
         private float _overtimeAt = -1f;
         private int _lastWarningSecond = -1;
         private readonly List<float> _bankMoves = new List<float>();
@@ -100,8 +104,15 @@ namespace Airerage.Runtime.Presentation
         /// <summary>演出の基準の秒（MatchIntroTimeline。カウントダウンでなければ -1。テスト用）。</summary>
         public float IntroTime => _introTime;
 
-        /// <summary>今のラウンドコール（「READY」「GO!」。出していなければ空。テスト用）。</summary>
+        /// <summary>今のラウンドコール（「ON YOUR MARKS」「GET READY……」「ROLL!」。出していなければ空。テスト用）。</summary>
         public string RoundCall { get; private set; } = string.Empty;
+
+        /// <summary>ラウンドコールの下の、始まりまでのゲージ（0〜1。始まった後の ROLL! では 1。テスト用）。</summary>
+        public float StartGauge { get; private set; }
+
+        /// <summary>上の帯の右の Loading の数（0〜100。出していなければ -1）と、Complete を出しているか（テスト用）。</summary>
+        public int LoadingPercent => ShowingIntro && _introTime < MatchIntroTimeline.Flash ? MatchIntroTimeline.LoadingPercent(_introTime) : -1;
+        public bool LoadingComplete => ShowingIntro && _introTime < MatchIntroTimeline.Flash && MatchIntroTimeline.CompleteVisible(_introTime);
 
         /// <summary>上の帯に出すステージの名前（テスト用）。</summary>
         public string StageName => _stageName;
@@ -122,6 +133,16 @@ namespace Airerage.Runtime.Presentation
         {
             _resultPlate?.Dispose();
             _timerPlate?.Dispose();
+            if (_gaugeGradient != null)
+            {
+                Destroy(_gaugeGradient);
+            }
+        }
+
+        private void OnDisable()
+        {
+            // 試合中の表示を隠したまま外れない（メニューへ戻ったときなど）。
+            HudFade.SetReveal(1f);
         }
 
         private void Awake()
@@ -164,9 +185,13 @@ namespace Airerage.Runtime.Presentation
             Ranking = new int[0];
             ChallengersText = string.Empty;
             RoundCall = string.Empty;
+            StartGauge = 0f;
             _introTime = -1f;
+            // 試合中の表示の出し具合（始まりの演出の間だけ 0 から上げる。ほかは 1）。
+            float reveal = 1f;
             if (rules == null)
             {
+                HudFade.SetReveal(reveal);
                 return;
             }
 
@@ -178,35 +203,34 @@ namespace Airerage.Runtime.Presentation
             {
                 case MatchPhase.Countdown:
                     _introTime = MatchIntroTimeline.DesignTime(rules, tick, _clock.Between(tick));
-                    // 札が滑り込み始めるたびに音。集中線の突進・白い光・READY にも音。
-                    int plates = Mathf.Min(_feed.CharacterCount, PlatesStartedAt(_introTime));
-                    for (; _platesStarted < plates; _platesStarted++)
-                    {
-                        Play(SoundId.IntroWhoosh);
-                    }
+                    // 札が滑り込み始めた数（音は鳴らさない。札の音と、白い光の切り裂く高い音は消した。2026-11-18 の要望）。
+                    // 集中線の突進の風を切る音と、ON YOUR MARKS・GET READY の短い音は鳴らす。
+                    _platesStarted = Mathf.Min(_feed.CharacterCount, PlatesStartedAt(_introTime));
                     PlayOnce(SoundDive, MatchIntroTimeline.AerialEnd, SoundId.UiWhoosh);
-                    PlayOnce(SoundFlash, MatchIntroTimeline.Flash, SoundId.IntroSlash);
                     PlayOnce(SoundReady, MatchIntroTimeline.ReadyStart, SoundId.CountdownTick);
-                    if (_introTime >= MatchIntroTimeline.ReadyStart)
+                    PlayOnce(SoundSet, MatchIntroTimeline.SetStart, SoundId.CountdownTick);
+                    RoundCall = MatchIntroTimeline.CallAt(_introTime);
+                    StartGauge = MatchIntroTimeline.StartGauge(_introTime);
+                    reveal = MatchIntroTimeline.HudReveal(_introTime);
+                    if (rules.HasTimeLimit)
                     {
-                        RoundCall = "READY";
+                        // 試合中の表示と一緒にタイマーも出す（始まるまでは試合の長さのまま）。
+                        int full = Seconds(rules.DurationTicks);
+                        TimerText = $"{full / 60}:{full % 60:00}";
+                        TimerLabel = "TIME";
+                        TimerDigits = TimerText;
                     }
                     break;
                 case MatchPhase.Playing:
                     if (_lastPhase == MatchPhase.Countdown)
                     {
                         _goAt = Time.time;
-                        // カウントダウンが短く白い光の前に始まったとき（テストなど）も、帯が外れる音は鳴らす。
-                        if ((_introSounds & SoundFlash) == 0)
-                        {
-                            _introSounds |= SoundFlash;
-                            Play(SoundId.IntroSlash);
-                        }
                         Play(SoundId.SuperStart);
                     }
                     if (_goAt >= 0f && Time.time - _goAt < MatchIntroTimeline.GoSeconds)
                     {
-                        RoundCall = "GO!";
+                        RoundCall = MatchIntroTimeline.CallGo;
+                        StartGauge = 1f;
                     }
                     if (rules.HasTimeLimit)
                     {
@@ -268,6 +292,7 @@ namespace Airerage.Runtime.Presentation
                     break;
             }
             _lastPhase = phase;
+            HudFade.SetReveal(reveal);
         }
 
         // アディショナルタイムに、拠点に着けば勝てる人（確定＋所持が、ほかの人の確定の最大以上）の名前。
@@ -466,6 +491,9 @@ namespace Airerage.Runtime.Presentation
                 }
             }
 
+            // 上の帯の右: Loading のゲージ（グリッチ。100% で Complete を 2 回点滅。去るときは名前と一緒に上へ）。
+            DrawLoading(t, width - height * 0.06f, bar * 0.2f - labelsOut * bar - barShift, bar, 1f - labelsOut);
+
             // 下の帯: プレイヤーの札（右から順に滑り込み、去るときは下へ）。
             int count = _feed.CharacterCount;
             if (count > 0 && labelsOut < 1f)
@@ -546,48 +574,210 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        // ラウンドコール（READY → GO!）。画面の真ん中に大きく、ステージの色の縁取り。READY は弾んで出て、GO! は大きく出て縮みながら消える。
+        // ラウンドコール（ON YOUR MARKS → GET READY…… → ROLL!。2026-11-18 の要望）。画面の真ん中に大きく、ステージの色の縁取り（ROLL! は橙）。
+        // 呼び出しが替わるたびに弾んで出て、ROLL! は大きく出て縮みながら消える。長い文字は画面の幅に収める。文字の下に、始まりまでのゲージ。
         private void DrawRoundCall()
         {
             EnsureIntroStyles();
             Matrix4x4 baseMatrix = GUI.matrix;
-            bool go = RoundCall == "GO!";
-            float age = go ? Time.time - _goAt : (_introTime - MatchIntroTimeline.ReadyStart) * (_rules != null && _rules.CountdownTicks > 0
-                ? _rules.CountdownTicks / (MatchIntroTimeline.DesignSeconds * Airerage.Core.Common.SimTime.TicksPerSecond) : 1f);
-            float scale = go ? Mathf.Lerp(1.5f, 1f, Ease(age / 0.18f)) : UiEase.OutBack(Mathf.Clamp01(age / 0.25f));
-            float alpha = go ? 1f - Mathf.Clamp01((age - MatchIntroTimeline.GoSeconds * 0.6f) / (MatchIntroTimeline.GoSeconds * 0.4f)) : 1f;
-            if (scale <= 0.01f || alpha <= 0f)
+            bool go = RoundCall == MatchIntroTimeline.CallGo;
+            float realPerDesign = _rules != null && _rules.CountdownTicks > 0
+                ? _rules.CountdownTicks / (MatchIntroTimeline.DesignSeconds * Airerage.Core.Common.SimTime.TicksPerSecond) : 1f;
+            float callStart = RoundCall == MatchIntroTimeline.CallSet ? MatchIntroTimeline.SetStart : MatchIntroTimeline.ReadyStart;
+            float since = go ? Time.time - _goAt : (_introTime - callStart) * realPerDesign;
+            float pop = go ? Mathf.Lerp(1.5f, 1f, Ease(since / 0.18f)) : UiEase.OutBack(Mathf.Clamp01(since / 0.25f));
+            float alpha = go ? 1f - Mathf.Clamp01((since - MatchIntroTimeline.GoSeconds * 0.6f) / (MatchIntroTimeline.GoSeconds * 0.4f)) : 1f;
+            if (alpha <= 0f)
             {
                 return;
             }
-            var center = new Vector2(Screen.width * 0.5f, Screen.height * 0.46f);
-            GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), center);
-            var rect = new Rect(center.x - Screen.width * 0.5f, center.y - Screen.height * 0.12f, Screen.width, Screen.height * 0.24f);
-            Color outline = go ? new Color(1f, 0.55f, 0.15f, alpha) : new Color(_stageColor.r, _stageColor.g, _stageColor.b, alpha);
-            float thick = Mathf.Max(3f, Screen.height * 0.006f);
-            GUI.color = outline;
-            for (int i = 0; i < 16; i++)
+            float width = _call.CalcSize(new GUIContent(RoundCall)).x;
+            float fit = Mathf.Min(1f, Screen.width * 0.86f / Mathf.Max(1f, width));
+            var center = new Vector2(Screen.width * 0.5f, Screen.height * 0.44f);
+            float scale = pop * fit;
+            if (scale > 0.01f)
             {
-                float a = i * Mathf.PI * 2f / 16f;
-                GUI.Label(new Rect(rect.x + Mathf.Cos(a) * thick, rect.y + Mathf.Sin(a) * thick, rect.width, rect.height), RoundCall, _call);
+                GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), center);
+                var rect = new Rect(center.x - Screen.width, center.y - Screen.height * 0.1f, Screen.width * 2f, Screen.height * 0.2f);
+                Color outline = go ? new Color(1f, 0.55f, 0.15f, alpha) : new Color(_stageColor.r, _stageColor.g, _stageColor.b, alpha);
+                float thick = Mathf.Max(3f, Screen.height * 0.005f);
+                GUI.color = outline;
+                for (int i = 0; i < 16; i++)
+                {
+                    float a = i * Mathf.PI * 2f / 16f;
+                    GUI.Label(new Rect(rect.x + Mathf.Cos(a) * thick, rect.y + Mathf.Sin(a) * thick, rect.width, rect.height), RoundCall, _call);
+                }
+                GUI.color = new Color(1f, 1f, 1f, alpha);
+                GUI.Label(rect, RoundCall, _call);
+                GUI.matrix = baseMatrix;
             }
+            DrawStartGauge(center.y + _call.fontSize * 0.55f * fit + Screen.height * 0.025f, alpha, go);
+        }
+
+        // 始まりまでのゲージ（左が緑、真ん中が黄、右が赤のグラデーション。ON YOUR MARKS で空、試合の始まりで満ちる。2026-11-18 の要望）。
+        // 暗い溝に白い縁、満ちている所の先に白い光、GET READY に替わる所に小さな区切り。ROLL! で白く光る。
+        private void DrawStartGauge(float y, float alpha, bool go)
+        {
+            float width = Mathf.Min(Screen.width * 0.5f, Screen.height * 0.85f);
+            float height = Mathf.Max(10f, Screen.height * 0.014f);
+            var track = new Rect(Screen.width * 0.5f - width * 0.5f, y, width, height);
+            float border = Mathf.Max(2f, height * 0.18f);
+            GUI.color = new Color(0f, 0f, 0f, 0.6f * alpha);
+            GUI.DrawTexture(new Rect(track.x - border, track.y - border, track.width + border * 2f, track.height + border * 2f), Texture2D.whiteTexture);
+            float fill = Mathf.Clamp01(StartGauge);
             GUI.color = new Color(1f, 1f, 1f, alpha);
-            GUI.Label(rect, RoundCall, _call);
-            GUI.matrix = baseMatrix;
+            GUI.DrawTextureWithTexCoords(new Rect(track.x, track.y, track.width * fill, track.height), GaugeGradient(), new Rect(0f, 0f, fill, 1f));
+            float split = (MatchIntroTimeline.SetStart - MatchIntroTimeline.ReadyStart) / (MatchIntroTimeline.DesignSeconds - MatchIntroTimeline.ReadyStart);
+            GUI.color = new Color(1f, 1f, 1f, 0.55f * alpha);
+            GUI.DrawTexture(new Rect(track.x + track.width * split - 1f, track.y, 2f, track.height), Texture2D.whiteTexture);
+            if (fill > 0f && fill < 1f)
+            {
+                GUI.color = new Color(1f, 1f, 1f, 0.95f * alpha);
+                GUI.DrawTexture(new Rect(track.x + track.width * fill - 2f, track.y - border, 4f, track.height + border * 2f), Texture2D.whiteTexture);
+            }
+            // 白い縁（上下と左右）。
+            GUI.color = new Color(1f, 1f, 1f, 0.85f * alpha);
+            GUI.DrawTexture(new Rect(track.x - border, track.y - border, track.width + border * 2f, 1.5f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(track.x - border, track.yMax + border - 1.5f, track.width + border * 2f, 1.5f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(track.x - border, track.y - border, 1.5f, track.height + border * 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(track.xMax + border - 1.5f, track.y - border, 1.5f, track.height + border * 2f), Texture2D.whiteTexture);
+            if (go)
+            {
+                float flash = 1f - Mathf.Clamp01((Time.time - _goAt) / 0.35f);
+                GUI.color = new Color(1f, 1f, 1f, flash * alpha);
+                GUI.DrawTexture(new Rect(track.x - border, track.y - border, track.width + border * 2f, track.height + border * 2f), Texture2D.whiteTexture);
+            }
+        }
+
+        // 始まりまでのゲージの色（緑 → 黄 → 赤）。
+        private Texture2D GaugeGradient()
+        {
+            if (_gaugeGradient != null)
+            {
+                return _gaugeGradient;
+            }
+            _gaugeGradient = new Texture2D(256, 1, TextureFormat.RGBA32, false)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.DontSave,
+            };
+            var green = new Color(0.2f, 0.95f, 0.35f);
+            var yellow = new Color(1f, 0.88f, 0.15f);
+            var red = new Color(1f, 0.2f, 0.18f);
+            for (int x = 0; x < 256; x++)
+            {
+                float k = x / 255f;
+                _gaugeGradient.SetPixel(x, 0, k < 0.5f ? Color.Lerp(green, yellow, k * 2f) : Color.Lerp(yellow, red, (k - 0.5f) * 2f));
+            }
+            _gaugeGradient.Apply();
+            return _gaugeGradient;
+        }
+
+        // 上の帯の右の Loading（2026-11-18 の要望）: 「Loading……  37%」とゲージを右寄せで。数は少し止まっては跳び、跳んだ直後とときどき
+        // グリッチ（赤と水色のずれ・横にずれる切れ目・ノイズの小さな四角）。100% で「Complete」に替わり、2 回点滅する（ゲージは満ちたまま光る）。
+        private void DrawLoading(float t, float right, float top, float bar, float alpha)
+        {
+            float from = MatchIntroTimeline.LoadingStart - 0.15f;
+            if (t < from || alpha <= 0f)
+            {
+                return;
+            }
+            alpha *= Mathf.Clamp01((t - from) / 0.15f);
+            int percent = MatchIntroTimeline.LoadingPercent(t);
+            bool complete = t >= MatchIntroTimeline.LoadingEnd;
+            int bucket = Mathf.FloorToInt(t * 24f);
+            bool glitch = MatchIntroTimeline.LoadingJumped(t) || Noise(bucket, 7) < 0.1f;
+            float textHeight = bar * 0.36f;
+            var textRect = new Rect(right - Screen.width * 0.5f, top, Screen.width * 0.5f, textHeight);
+            string text = complete ? (MatchIntroTimeline.CompleteVisible(t) ? "Complete" : string.Empty) : $"Loading……  {percent}%";
+            Color main = complete ? Color.Lerp(_stageColor, Color.white, 0.45f) : Color.white;
+            if (text.Length > 0)
+            {
+                DrawGlitchText(textRect, text, main, alpha, glitch && !complete || (complete && t < MatchIntroTimeline.LoadingEnd + 0.08f), bucket);
+            }
+            float gaugeWidth = Mathf.Min(Screen.width * 0.24f, bar * 3.4f);
+            float gaugeHeight = Mathf.Max(5f, bar * 0.07f);
+            var track = new Rect(right - gaugeWidth, top + textHeight + bar * 0.05f, gaugeWidth, gaugeHeight);
+            GUI.color = new Color(1f, 1f, 1f, 0.18f * alpha);
+            GUI.DrawTexture(track, Texture2D.whiteTexture);
+            float fill = percent / 100f;
+            float jitter = glitch ? (Noise(bucket, 3) - 0.5f) * bar * 0.12f : 0f;
+            GUI.color = new Color(_stageColor.r, _stageColor.g, _stageColor.b, alpha);
+            GUI.DrawTexture(new Rect(track.x + jitter, track.y, track.width * fill, track.height), Texture2D.whiteTexture);
+            if (fill > 0f)
+            {
+                GUI.color = new Color(1f, 1f, 1f, alpha);
+                GUI.DrawTexture(new Rect(track.x + track.width * fill - 3f + jitter, track.y - 2f, 3f, track.height + 4f), Texture2D.whiteTexture);
+            }
+            if (complete)
+            {
+                // 満ちたゲージが Complete と一緒に光る。
+                GUI.color = new Color(1f, 1f, 1f, (MatchIntroTimeline.CompleteVisible(t) ? 0.55f : 0.1f) * alpha);
+                GUI.DrawTexture(track, Texture2D.whiteTexture);
+            }
+            if (glitch)
+            {
+                // ノイズの小さな四角（文字とゲージのまわり）。
+                for (int i = 0; i < 6; i++)
+                {
+                    float w = Mathf.Lerp(4f, bar * 0.6f, Noise(bucket, 20 + i));
+                    float h = Mathf.Lerp(2f, bar * 0.05f, Noise(bucket, 40 + i));
+                    float x = right - gaugeWidth * 1.15f + Noise(bucket, 60 + i) * gaugeWidth * 1.15f;
+                    float y = top + Noise(bucket, 80 + i) * (track.yMax - top);
+                    float pick = Noise(bucket, 100 + i);
+                    Color c = pick < 0.33f ? new Color(1f, 0.15f, 0.4f) : pick < 0.66f ? new Color(0.1f, 0.95f, 1f) : Color.white;
+                    GUI.color = new Color(c.r, c.g, c.b, 0.6f * alpha);
+                    GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
+                }
+            }
+        }
+
+        // グリッチの文字: 赤と水色を左右にずらして重ね、文字を横に 3 つに切ってそれぞれ横へずらす。glitch でなければふつうに描く。
+        private void DrawGlitchText(Rect rect, string text, Color color, float alpha, bool glitch, int bucket)
+        {
+            if (!glitch)
+            {
+                GUI.color = new Color(color.r, color.g, color.b, alpha);
+                GUI.Label(rect, text, _loading);
+                return;
+            }
+            float split = Mathf.Max(2f, rect.height * 0.07f);
+            GUI.color = new Color(1f, 0.15f, 0.4f, 0.75f * alpha);
+            GUI.Label(new Rect(rect.x + split, rect.y, rect.width, rect.height), text, _loading);
+            GUI.color = new Color(0.1f, 0.95f, 1f, 0.75f * alpha);
+            GUI.Label(new Rect(rect.x - split, rect.y, rect.width, rect.height), text, _loading);
+            GUI.color = new Color(color.r, color.g, color.b, alpha);
+            const int slices = 3;
+            for (int i = 0; i < slices; i++)
+            {
+                float y0 = rect.height * i / slices;
+                float dx = (Noise(bucket, 10 + i) - 0.5f) * rect.height * 0.7f;
+                GUI.BeginGroup(new Rect(rect.x, rect.y + y0, rect.width, rect.height / slices + 1f));
+                GUI.Label(new Rect(dx, -y0, rect.width, rect.height), text, _loading);
+                GUI.EndGroup();
+            }
+        }
+
+        // 0〜1 の決まった乱れ（表示だけ。グリッチの形）。
+        private static float Noise(int a, int b)
+        {
+            return Mathf.Repeat(Mathf.Sin(a * 12.9898f + b * 78.233f) * 43758.5453f, 1f);
         }
 
         private void EnsureIntroStyles()
         {
             int h = Screen.height;
-            if (_call != null && _call.fontSize == Mathf.RoundToInt(h * 0.16f))
+            if (_call != null && _call.fontSize == Mathf.RoundToInt(h * 0.12f))
             {
                 return;
             }
-            _call = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.16f), alignment = TextAnchor.MiddleCenter };
+            _call = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.12f), alignment = TextAnchor.MiddleCenter };
             _stageTitle = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.058f), alignment = TextAnchor.MiddleLeft };
             _stageSub = new GUIStyle(GUI.skin.label) { font = GameFonts.JapaneseBold, fontSize = Mathf.RoundToInt(h * 0.024f), alignment = TextAnchor.UpperLeft };
             _plateName = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.03f), alignment = TextAnchor.MiddleCenter };
             _plateSub = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBold, fontSize = Mathf.RoundToInt(h * 0.016f), alignment = TextAnchor.MiddleCenter };
+            _loading = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBold, fontSize = Mathf.RoundToInt(h * 0.026f), alignment = TextAnchor.MiddleRight, clipping = TextClipping.Overflow };
         }
 
         // 結果: 右上の表と同じ札（PlayerStatusPlate）を、大きくして順位の順に並べる。順位は札の順位の四角（1 位 金・2 位 銀・3 位 銅）、

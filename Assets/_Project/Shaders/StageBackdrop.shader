@@ -2,6 +2,8 @@
 // 明暗だけで描き、下ほど空のもやの色に溶かす。霧（RenderSettings）で遠いほど空の色に近づく。_Blink > 0 の材質は、物ごとに位相を
 // ずらして点滅する（塔の先の灯り）。横の面には階の区切りの細い明るい帯（大きさの手がかり）。当たりはない（地形として読み込まれないよう、
 // 飾りにはコライダーを付けない）。
+// 実在の街（PLATEAU の西新宿）は、外壁の写真のアトラス（_MainTex）を _TexBlend で使い、主の光の向きで面に陰影を付ける（_LightShade。
+// 2026-11-18 の要望: ほぼシルエットに見えない、ある程度リアルな背景）。夜は写真を _TexTint で暗くし、窓の明かり（_BandFill）を重ねる。
 Shader "Airerage/StageBackdrop"
 {
     Properties
@@ -16,6 +18,11 @@ Shader "Airerage/StageBackdrop"
         _BandStrength ("Band strength", Range(0, 2)) = 0.07
         [HDR] _BandColor ("Band color", Color) = (1, 1, 1, 1)
         _BandFill ("Band fill (lit windows)", Range(0, 1)) = 0
+        _MainTex ("Facade texture (atlas)", 2D) = "white" {}
+        _TexBlend ("Texture blend", Range(0, 1)) = 0
+        [HDR] _TexTint ("Texture tint", Color) = (1, 1, 1, 1)
+        _LightShade ("Main light shading", Range(0, 1)) = 0
+        _FogAmount ("Fog amount", Range(0, 1)) = 1
     }
 
     SubShader
@@ -35,6 +42,10 @@ Shader "Airerage/StageBackdrop"
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _BaseColor;
@@ -47,6 +58,11 @@ Shader "Airerage/StageBackdrop"
                 half _BandStrength;
                 half4 _BandColor;
                 half _BandFill;
+                float4 _MainTex_ST;
+                half _TexBlend;
+                half4 _TexTint;
+                half _LightShade;
+                half _FogAmount;
             CBUFFER_END
 
             float BandHash(float2 p)
@@ -58,6 +74,7 @@ Shader "Airerage/StageBackdrop"
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                float2 uv : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -67,6 +84,7 @@ Shader "Airerage/StageBackdrop"
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS : TEXCOORD1;
                 half fogFactor : TEXCOORD2;
+                float2 uv : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -80,6 +98,7 @@ Shader "Airerage/StageBackdrop"
                 output.positionWS = position.positionWS;
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.fogFactor = ComputeFogFactor(position.positionCS.z);
+                output.uv = TRANSFORM_TEX(input.uv, _MainTex);
                 return output;
             }
 
@@ -89,7 +108,17 @@ Shader "Airerage/StageBackdrop"
                 float3 n = normalize(input.normalWS);
                 // 上の面は少し明るく、横の面は光の来る側（左上）を少し明るく。
                 half shade = lerp(0.92, _TopTint, saturate(n.y)) + 0.05 * saturate(-n.x);
-                half3 color = _BaseColor.rgb * shade;
+                // 実在の街: 主の光の向きで陰影（光の当たらない面も暗くしすぎない）。
+                Light mainLight = GetMainLight();
+                half lambert = saturate(dot(n, mainLight.direction));
+                shade = lerp(shade, 0.58 + 0.62 * lambert, _LightShade);
+                half3 albedo = _BaseColor.rgb;
+                if (_TexBlend > 0.0)
+                {
+                    half3 facade = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).rgb * _TexTint.rgb;
+                    albedo = lerp(albedo, facade, _TexBlend);
+                }
+                half3 color = albedo * shade;
                 if (_Blink > 0.0)
                 {
                     float3 origin = float3(UNITY_MATRIX_M[0].w, UNITY_MATRIX_M[1].w, UNITY_MATRIX_M[2].w);
@@ -110,7 +139,8 @@ Shader "Airerage/StageBackdrop"
                 color += _BandColor.rgb * _BandStrength * max(band, lit);
                 half haze = saturate((_HazeTop - input.positionWS.y) / max(_HazeTop - _HazeBottom, 1e-3));
                 color = lerp(color, _HazeColor.rgb, haze);
-                color = MixFog(color, input.fogFactor);
+                // 霧の掛かり方（1 でふつう。谷のもやが濃いビル街の昼は、遠くの実在の街だけ弱める）。
+                color = lerp(color, MixFog(color, input.fogFactor), _FogAmount);
                 return half4(color, 1.0);
             }
             ENDHLSL

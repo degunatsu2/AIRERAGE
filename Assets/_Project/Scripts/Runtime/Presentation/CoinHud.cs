@@ -227,6 +227,11 @@ namespace Airerage.Runtime.Presentation
 
         private void OnGUI()
         {
+            // 試合の始まりの演出の間は出さない（演出の後に、ほかの試合中の表示と一緒にフェードインする。HudFade.Reveal。2026-11-18）。
+            if (!HudFade.Revealed)
+            {
+                return;
+            }
             if (_count == null)
             {
                 _count = GameFonts.Use(new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft });
@@ -246,7 +251,7 @@ namespace Airerage.Runtime.Presentation
                 {
                     continue;
                 }
-                GUI.color = _color;
+                GUI.color = HudFade.Apply(_color);
                 GUI.DrawTexture(new Rect(screen.x - 26f, screen.y - 8f, 16f, 16f), _dot);
                 Shadowed(new Rect(screen.x - 6f, screen.y - 14f, 80f, 28f), state.Coins.Held.ToString(), _count, Color.white);
             }
@@ -295,9 +300,9 @@ namespace Airerage.Runtime.Presentation
 
         private static void Shadowed(Rect rect, string text, GUIStyle style, Color color)
         {
-            GUI.color = new Color(0f, 0f, 0f, 0.75f * color.a);
+            GUI.color = HudFade.Apply(new Color(0f, 0f, 0f, 0.75f * color.a));
             GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width, rect.height), text, style);
-            GUI.color = color;
+            GUI.color = HudFade.Apply(color);
             GUI.Label(rect, text, style);
         }
 

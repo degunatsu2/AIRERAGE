@@ -588,7 +588,8 @@ namespace Airerage.Editor.Stages
 
             // 真ん中の奥は実在の東京（PLATEAU の西新宿の高層ビル群と周りの街。2026-11-17 のユーザーの決定。docs/15 6.51）。作った箱の
             // ビルは、その外側（遠い列）と手前の低い列だけ。
-            bool city = CreatePlateauCity(Child(root, "Tokyo"), far, mid, beacon, look.PlateauGround);
+            Material plateau = PlateauMaterial(look, folder, hazeTop);
+            bool city = CreatePlateauCity(Child(root, "Tokyo"), far, plateau != null ? plateau : mid, beacon, look.PlateauGround);
             Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f, city ? PlateauHalfWidth : 0f);
             Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f, city ? PlateauMidKeepOut : 0f);
 
@@ -609,8 +610,60 @@ namespace Airerage.Editor.Stages
         }
 
         // 実在の東京（国土交通省 Project PLATEAU の 3D 都市モデル。東京都 23 区 2020 年度。CC BY 4.0 互換・出典の表示が必要）。
-        // tools/assets/plateau_skyline.py が、西新宿の高層ビル（LOD2。地面から 60m 以上）と周りの街（LOD1。25m 以上）を背景用に軽くした形。
+        // 西新宿の高層ビル（LOD2。地面から 50m 以上の 151 棟）は、形を減らさず外壁の写真のアトラスつき（tools/assets/plateau_textured.py。
+        // 2026-11-18 の要望: ほぼシルエットに見えない、ある程度リアルな背景）。周りの街（LOD1。25m 以上）は高さの箱（plateau_skyline.py）。
         private const string PlateauFolder = "Assets/_Project/ThirdParty/PLATEAU";
+        private const string PlateauAtlasPath = PlateauFolder + "/Shinjuku_LOD2_Atlas.jpg";
+
+        // 西新宿の外壁の写真の材質（遠景の材質に、写真・主の光の向きの陰影・夜は暗くして窓の明かり）。写真がなければ null。
+        private static Material PlateauMaterial(StageLook look, string folder, float hazeTop)
+        {
+            Texture2D atlas = LoadAtlas(PlateauAtlasPath);
+            if (atlas == null)
+            {
+                Debug.LogWarning($"PLATEAU の外壁の写真がない（{PlateauAtlasPath}）。色だけで塗る");
+                return null;
+            }
+            bool night = look.BandFill > 0f;
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("BackdropCity", "Airerage/StageBackdrop", m =>
+            {
+                m.SetColor("_BaseColor", look.MidColor);
+                m.SetColor("_HazeColor", look.HazeColor);
+                m.SetFloat("_HazeTop", hazeTop);
+                m.SetFloat("_HazeBottom", hazeTop - 150f);
+                m.SetFloat("_Blink", 0f);
+                m.SetFloat("_BandSpacing", 4.5f);
+                // 昼は写真の窓のまま（階の帯は重ねない）。夜は暗くした写真に窓の明かり。
+                m.SetFloat("_BandStrength", night ? look.BandStrength : 0f);
+                m.SetColor("_BandColor", look.BandColor);
+                m.SetFloat("_BandFill", night ? look.BandFill : 0f);
+                m.SetTexture("_MainTex", atlas);
+                m.SetFloat("_TexBlend", 1f);
+                m.SetColor("_TexTint", look.CityTexTint);
+                m.SetFloat("_LightShade", 0.6f);
+                m.SetFloat("_FogAmount", look.CityFogAmount);
+            }, folder);
+        }
+
+        // 外壁の写真のアトラスを読む（4096 四方のまま、ミップマップと異方性で遠くでもちらつかない読み込みの設定に合わせる）。
+        private static Texture2D LoadAtlas(string path)
+        {
+            if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
+            {
+                return null;
+            }
+            if (importer.maxTextureSize != 4096 || !importer.mipmapEnabled || importer.anisoLevel != 4 || importer.wrapMode != TextureWrapMode.Clamp
+                || !importer.sRGBTexture)
+            {
+                importer.maxTextureSize = 4096;
+                importer.mipmapEnabled = true;
+                importer.anisoLevel = 4;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.sRGBTexture = true;
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
 
         // 実在の街の大きさ（横と高さ）と奥行き（奥行きは縮めて遠景の帯に収める）、置く奥行き。地面の高さは台本（StageLook.PlateauGround）。
         private const float PlateauScale = 0.8f;

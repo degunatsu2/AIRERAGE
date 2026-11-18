@@ -442,11 +442,16 @@ namespace Airerage.Editor.Stages
         // 西新宿（PLATEAU）の地面の高さ: 谷の底の道路（-24）より下に沈め、大通りの地平の上に高層ビルの上の方だけが並んで見える高さ。
         private const float CityPlateauGround = -100f;
 
+        // 昼のビル街で、西新宿に掛ける霧の割合（谷の近くのもやより薄く、遠くの霞として少し残す）。
+        private const float CityDayPlateauFog = 0.35f;
+
         private static StageLook DayLook(StageTheme theme)
         {
             StageLook look = StageLook.FromTheme("CityDay", theme, StageMood.Day);
             look.Skyline = true;
             look.PlateauGround = CityPlateauGround;
+            // 谷のもや（霧 60〜170m）のままだと、450m 先の西新宿は霧の色の影になる（2026-11-18 の指摘: ほぼシルエット）。
+            look.CityFogAmount = CityDayPlateauFog;
             return look;
         }
 

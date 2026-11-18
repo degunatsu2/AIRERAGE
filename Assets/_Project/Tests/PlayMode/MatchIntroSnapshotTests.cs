@@ -68,6 +68,49 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        /// <summary>
+        /// 開始前の演出の画面全体（OnGUI で描く帯・ステージ名・札・Loading・ラウンドコール・試合中の表示のフェードインを含む）を
+        /// Logs/Snapshots/IntroHud_*.png に撮る。バッチモードでない Unity（仮想の画面）で動かしたときだけ写る（バッチモードには画面がない）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureIntroHud()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            Directory.CreateDirectory(Folder);
+            string sceneName = System.Environment.GetEnvironmentVariable("AIRERAGE_INTRO_STAGE") ?? "Stage_CityNight";
+            StageDefinition stage = flow.Stages.Stages.First(s => s.SceneName == sceneName);
+            var players = new[]
+            {
+                LocalPlayerSetup.Cpu(0, CpuLevel.Easy), LocalPlayerSetup.Cpu(1, CpuLevel.Easy), LocalPlayerSetup.Cpu(2, CpuLevel.Easy),
+                LocalPlayerSetup.Cpu(3, CpuLevel.Easy),
+            };
+            flow.StartLocal(stage, players, timed: true, single: true);
+            while (flow.Current != GameFlow.FlowScreen.Local || flow.IsLoading || SceneManager.GetActiveScene().name != sceneName)
+            {
+                yield return null;
+            }
+            var hud = Object.FindFirstObjectByType<MatchHud>();
+            foreach (float at in new[] { 0.3f, 1.2f, 2.1f, 2.35f, 3.2f, 3.6f, 4.2f, 5.4f, 6.5f })
+            {
+                // 始まった後（ROLL!）は、演出が終わるのを待つだけ。
+                while (at <= MatchIntroTimeline.DesignSeconds ? hud.ShowingIntro && hud.IntroTime < at : hud.ShowingIntro)
+                {
+                    yield return null;
+                }
+                yield return new WaitForEndOfFrame();
+                Texture2D shot = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes($"{Folder}/IntroHud_{at:0.00}.png", shot.EncodeToPNG());
+                Object.Destroy(shot);
+                yield return null;
+            }
+        }
+
         // cond が満たされたフレームで shoot を 1 回だけ呼び、次のフレームへ進める（30 秒待っても満たされなければ失敗）。
         private static IEnumerator Shoot(System.Func<bool> cond, System.Action shoot)
         {

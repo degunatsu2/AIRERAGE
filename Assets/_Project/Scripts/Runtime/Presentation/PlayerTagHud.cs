@@ -92,6 +92,11 @@ namespace Airerage.Runtime.Presentation
 
         private void OnGUI()
         {
+            // 試合の始まりの演出の間は出さない（演出の後に、ほかの試合中の表示と一緒にフェードインする。HudFade.Reveal。2026-11-18）。
+            if (!HudFade.Revealed)
+            {
+                return;
+            }
             if (_feed == null || Event.current.type != EventType.Repaint)
             {
                 return;
@@ -104,11 +109,11 @@ namespace Airerage.Runtime.Presentation
                     continue;
                 }
                 // プレイヤーの色の枠、黒い四角、白い番号。
-                GUI.color = new Color(color.r, color.g, color.b, 1f);
+                GUI.color = HudFade.Apply(new Color(color.r, color.g, color.b, 1f));
                 GUI.DrawTexture(rect, Texture2D.whiteTexture);
-                GUI.color = Color.black;
+                GUI.color = HudFade.Apply(Color.black);
                 GUI.DrawTexture(new Rect(rect.x + _border, rect.y + _border, rect.width - _border * 2f, rect.height - _border * 2f), Texture2D.whiteTexture);
-                GUI.color = Color.white;
+                GUI.color = HudFade.Apply(Color.white);
                 GUI.Label(rect, label, Style());
             }
             GUI.color = previous;

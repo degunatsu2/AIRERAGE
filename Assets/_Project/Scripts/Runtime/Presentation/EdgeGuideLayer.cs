@@ -236,6 +236,11 @@ namespace Airerage.Runtime.Presentation
 
         private void OnGUI()
         {
+            // 試合の始まりの演出の間は出さない（演出の後に、ほかの試合中の表示と一緒にフェードインする。HudFade.Reveal。2026-11-18）。
+            if (!HudFade.Revealed)
+            {
+                return;
+            }
             if (_entries.Count == 0)
             {
                 return;
@@ -294,7 +299,7 @@ namespace Airerage.Runtime.Presentation
             float thickness = Mathf.Lerp(4f, 1f, progress);
             var outer = new Rect(rect.x - spread, rect.y - spread, rect.width + spread * 2f, rect.height + spread * 2f);
             Color previous = GUI.color;
-            GUI.color = new Color(color.r, color.g, color.b, (1f - progress) * 0.9f * alpha);
+            GUI.color = HudFade.Apply(new Color(color.r, color.g, color.b, (1f - progress) * 0.9f * alpha));
             GUI.DrawTexture(new Rect(outer.x, outer.y, outer.width, thickness), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(outer.x, outer.yMax - thickness, outer.width, thickness), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(outer.x, outer.y, thickness, outer.height), Texture2D.whiteTexture);

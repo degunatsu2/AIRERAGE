@@ -358,6 +358,13 @@ namespace Airerage.Runtime.Tests
                 Assert.That(mesh.GetComponent<Collider>(), Is.Null, $"{name}: 当たりがある");
             }
             Assert.That(tokyo.Find("Beacons").childCount, Is.GreaterThan(5), "高いビルに航空障害灯がない");
+            // 西新宿は外壁の写真つき（ほぼシルエットに見えないように。2026-11-18 の要望）。
+            Material shinjuku = tokyo.Find("Shinjuku").GetComponent<Renderer>().sharedMaterial;
+            Assert.That(shinjuku.GetTexture("_MainTex"), Is.Not.Null, "西新宿に外壁の写真がない");
+            Assert.That(shinjuku.GetTexture("_MainTex").width, Is.EqualTo(4096), "外壁の写真が縮んで読み込まれている");
+            Assert.That(shinjuku.GetFloat("_TexBlend"), Is.EqualTo(1f));
+            Assert.That(shinjuku.GetFloat("_LightShade"), Is.GreaterThan(0f), "面に光の陰影がない");
+            Assert.That(tokyo.Find("Shinjuku").GetComponent<MeshFilter>().sharedMesh.uv.Length, Is.GreaterThan(0), "形に UV がない");
         }
 
         [TestCase("Stage_CityDay")]

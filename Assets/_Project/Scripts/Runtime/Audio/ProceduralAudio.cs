@@ -52,10 +52,10 @@ namespace Airerage.Runtime.Audio
         /// <summary>加速リングで加速した（風を切って加速する音）。</summary>
         Boost,
 
-        /// <summary>始まる前の演出で、名前が滑り込む（風を切る柔らかい音）。</summary>
+        /// <summary>始まる前の演出で、名前が滑り込む（風を切る柔らかい音）。今は鳴らさない（2026-11-18 の要望で消した。番号は保つ）。</summary>
         IntroWhoosh,
 
-        /// <summary>試合の開始（黒い帯を切り裂く鋭い音）。</summary>
+        /// <summary>試合の開始（黒い帯を切り裂く鋭い音。高い音が下がる）。今は鳴らさない（2026-11-18 の要望で消した。番号は保つ）。</summary>
         IntroSlash,
 
         /// <summary>試合の終了（FINISH!。下がっていく和音）。</summary>

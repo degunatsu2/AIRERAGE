@@ -169,6 +169,8 @@ namespace Airerage.Runtime.Presentation
         public void Render(Vector3 origin, in WireState wire, in WireShotPreview preview, float maxLength, bool hidden = false,
             bool hasCursor = false, Vector3 cursor = default)
         {
+            // 試合の始まりの演出の間は出さない（ほかの試合中の表示と一緒に、出し具合が半分を超えたら出す。2026-11-18）。
+            hidden |= HudFade.Reveal < 0.5f;
             CursorShown = false;
             _vertices.Clear();
             _colors.Clear();
@@ -375,6 +377,11 @@ namespace Airerage.Runtime.Presentation
 
         private void OnGUI()
         {
+            // 試合の始まりの演出の間は出さない（演出の後に、ほかの試合中の表示と一緒にフェードインする。HudFade.Reveal。2026-11-18）。
+            if (!HudFade.Revealed)
+            {
+                return;
+            }
             if (_labelText == null || Event.current.type != EventType.Repaint)
             {
                 return;
@@ -405,11 +412,11 @@ namespace Airerage.Runtime.Presentation
             }
             var box = new Rect(x - 8f * scale, y - 15f * scale, size.x + 16f * scale, 30f * scale);
             Color previous = GUI.color;
-            GUI.color = new Color(0.03f, 0.05f, 0.08f, 0.78f * _labelColor.a);
+            GUI.color = HudFade.Apply(new Color(0.03f, 0.05f, 0.08f, 0.78f * _labelColor.a));
             GUI.DrawTexture(box, Texture2D.whiteTexture);
-            GUI.color = _labelColor;
+            GUI.color = HudFade.Apply(_labelColor);
             GUI.DrawTexture(new Rect(box.x, box.yMax - 2f * scale, box.width, 2f * scale), Texture2D.whiteTexture);
-            GUI.color = new Color(1f, 1f, 1f, _labelColor.a);
+            GUI.color = HudFade.Apply(new Color(1f, 1f, 1f, _labelColor.a));
             GUI.Label(new Rect(x, box.y, size.x + 2f, box.height), _labelText, _label);
             GUI.color = previous;
         }

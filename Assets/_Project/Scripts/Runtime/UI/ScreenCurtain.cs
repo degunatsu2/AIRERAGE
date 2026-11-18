@@ -16,14 +16,25 @@ namespace Airerage.Runtime.UI
         public const float CloseSeconds = 0.5f;
         public const float OpenSeconds = 0.56f;
 
+        // 1 フレームで進める時間の上限（秒）。読み込み直後の重いフレーム（1 秒以上かかることがある）で、開く演出を一度に使い切らない
+        // （2026-11-18 の指摘: 閉じた後、開く演出が省略されて始まる）。
+        private const float MaxStep = 0.05f;
+
+        // 開き始める前に待つ、落ち着いたフレーム（この秒数より短いフレーム）の数と、待つ長さの上限（秒。実時間）。
+        private const float SettledFrameSeconds = 0.1f;
+        private const int SettledFrames = 2;
+        private const float MaxSettleSeconds = 1.5f;
+
         [SerializeField] private GameObject _root;
         [SerializeField] private CurtainGraphic _bars;
         [SerializeField] private Text _label;
         [SerializeField] private Text _sub;
 
-        private float _closeAt = -10f;
-        private float _openAt = -10f;
+        private float _closeTime;
+        private float _openTime;
         private bool _opening;
+        private int _settledFrames;
+        private float _settleWaited;
         private bool _navHeld;
 
         /// <summary>帯が閉じきっているか。</summary>
@@ -82,12 +93,12 @@ namespace Airerage.Runtime.UI
             _root.SetActive(true);
             // 帯が閉じるのに合わせて、進む風の音（2026-11-07。docs/18 4.19）。
             UiSounds.Find().Play(SoundId.UiWhoosh);
-            _closeAt = Time.unscaledTime;
+            _closeTime = 0f;
             _opening = false;
             Closed = false;
             HoldNavigation();
             Animate();
-            while (Time.unscaledTime - _closeAt < CloseSeconds)
+            while (_closeTime < CloseSeconds)
             {
                 yield return null;
             }
@@ -102,25 +113,49 @@ namespace Airerage.Runtime.UI
             {
                 return;
             }
-            _openAt = Time.unscaledTime;
+            _openTime = 0f;
+            _settledFrames = 0;
+            _settleWaited = 0f;
             _opening = true;
         }
+
+        /// <summary>開く演出が進んだ時間（秒。テスト用）。</summary>
+        public float OpenProgressSeconds => _opening ? _openTime : 0f;
 
         private void Update()
         {
             if (_root != null && _root.activeSelf)
             {
+                Step(Time.unscaledDeltaTime);
                 Animate();
             }
         }
 
+        // 演出の時間を進める。重いフレームでも MaxStep までしか進めない。開くときは、読み込み直後の詰まったフレームが落ち着くまで
+        // 待ってから進める（試合のシーンの最初の数フレームは重い）。
+        private void Step(float delta)
+        {
+            float step = Mathf.Min(Mathf.Max(0f, delta), MaxStep);
+            if (!_opening)
+            {
+                _closeTime += step;
+                return;
+            }
+            if (_settledFrames < SettledFrames && _settleWaited < MaxSettleSeconds)
+            {
+                _settleWaited += delta;
+                _settledFrames = delta < SettledFrameSeconds ? _settledFrames + 1 : 0;
+                return;
+            }
+            _openTime += step;
+        }
+
         private void Animate()
         {
-            float now = Time.unscaledTime;
             if (_opening)
             {
                 // 札が縮んで消え（0.12 秒）、扉が左右へ開く（0.06〜0.56 秒）。
-                float t = now - _openAt;
+                float t = _openTime;
                 float plate = 1f - UiEase.Clamp01(t / 0.12f);
                 _bars.Set(1f, plate, (t - 0.06f) / 0.5f);
                 SetLabel(UiEase.OutBack(plate), plate);
@@ -135,7 +170,7 @@ namespace Airerage.Runtime.UI
                 return;
             }
             // 扉が閉じ（0.32 秒）、合わさった後に札が弾んで出る（0.26〜0.5 秒）。
-            float c = now - _closeAt;
+            float c = _closeTime;
             float pop = UiEase.Clamp01((c - 0.26f) / 0.24f);
             _bars.Set(c / 0.32f, pop, 0f);
             SetLabel(UiEase.OutBack(pop), pop);

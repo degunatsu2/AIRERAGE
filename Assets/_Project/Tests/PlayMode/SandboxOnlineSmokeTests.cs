@@ -244,6 +244,7 @@ namespace Airerage.PlayMode.Tests
 
             bool sawIntro = false;
             bool sawReady = false;
+            bool sawSet = false;
             bool sawGo = false;
             bool sawTimer = false;
             bool sawFinish = false;
@@ -251,8 +252,9 @@ namespace Airerage.PlayMode.Tests
             while (!hud.ShowingResults && Time.time - start < 8f)
             {
                 sawIntro |= hud.ShowingIntro;
-                sawReady |= hud.RoundCall == "READY";
-                sawGo |= hud.RoundCall == "GO!";
+                sawReady |= hud.RoundCall == MatchIntroTimeline.CallMarks;
+                sawSet |= hud.RoundCall == MatchIntroTimeline.CallSet;
+                sawGo |= hud.RoundCall == MatchIntroTimeline.CallGo;
                 sawTimer |= hud.TimerText == "0:02" || hud.TimerText == "0:01";
                 sawFinish |= hud.CenterText == "FINISH!";
                 Assert.That(hud.CenterText, Is.Not.EqualTo("1"), "カウントダウンの数字を出している（演出を変えた）");
@@ -262,15 +264,18 @@ namespace Airerage.PlayMode.Tests
             Assert.That(runner.Session.World.Phase, Is.EqualTo(MatchPhase.Finished), "試合が終わらない");
             Assert.That(sawIntro, Is.True, "始まる前の演出（黒い帯と名前）が出ない");
             Assert.That(hud.PlatesShown, Is.EqualTo(1), "名前が滑り込まない");
-            // 始まりの演出の最後のラウンドコール（D-98。2026-11-17）。
-            Assert.That(sawReady, Is.True, "READY を出さない");
-            Assert.That(sawGo, Is.True, "始まった瞬間に GO! を出さない");
+            // 始まりの演出の最後のラウンドコール（D-98。2026-11-18 に ON YOUR MARKS → GET READY…… → ROLL!）。
+            Assert.That(sawReady, Is.True, "ON YOUR MARKS を出さない");
+            Assert.That(sawSet, Is.True, "GET READY…… を出さない");
+            Assert.That(sawGo, Is.True, "始まった瞬間に ROLL! を出さない");
             Assert.That(sawTimer, Is.True, "残り時間が出ない");
             Assert.That(sawFinish, Is.True, "FINISH! が出ない");
             Assert.That(hud.ShowingResults, Is.True, "結果が出ない");
             Assert.That(hud.Ranking, Is.EqualTo(new[] { 0 }));
-            Assert.That(audio.History.Contains(SoundId.IntroWhoosh), Is.True);
-            Assert.That(audio.History.Contains(SoundId.IntroSlash), Is.True);
+            // ズームの風を切る音は鳴らし、札の音と白い光の高い音は鳴らさない（2026-11-18 の要望）。
+            Assert.That(audio.History.Contains(SoundId.UiWhoosh), Is.True, "ズームの風の音が鳴らない");
+            Assert.That(audio.History.Contains(SoundId.IntroWhoosh), Is.False, "札の音が鳴っている");
+            Assert.That(audio.History.Contains(SoundId.IntroSlash), Is.False, "白い光の高い音が鳴っている");
             Assert.That(audio.History.Contains(SoundId.Finish), Is.True);
             runner.Leave();
             yield return null;

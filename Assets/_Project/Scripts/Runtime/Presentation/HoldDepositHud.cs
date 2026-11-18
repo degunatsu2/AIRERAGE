@@ -54,6 +54,11 @@ namespace Airerage.Runtime.Presentation
 
         private void OnGUI()
         {
+            // 試合の始まりの演出の間は出さない（演出の後に、ほかの試合中の表示と一緒にフェードインする。HudFade.Reveal。2026-11-18）。
+            if (!HudFade.Revealed)
+            {
+                return;
+            }
             if (_camera == null)
             {
                 return;

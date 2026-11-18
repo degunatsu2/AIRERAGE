@@ -114,6 +114,12 @@ namespace Airerage.Editor.Stages
         /// 道路より下（遠くの大通りの先に高層ビルの上の方が見える）。
         /// </summary>
         public float PlateauGround = -175f;
+        /// <summary>
+        /// 実在の街の外壁の写真に掛ける色（昼はそのまま、夜は暗くして窓の明かりを重ねる。2026-11-18 の要望: シルエットに見えない背景）。
+        /// </summary>
+        public Color CityTexTint = Color.white;
+        /// <summary>実在の街に掛ける霧の割合（1 でふつう。霧の近いビル街の昼は、遠くの西新宿が霧の色の影にならないよう弱める）。</summary>
+        public float CityFogAmount = 1f;
 
         // 光の格子（V18）と撃破の線の膜（V19）。
         /// <summary>光の格子を置くか（街のステージは下に道路があるので置かない）。</summary>
@@ -377,6 +383,7 @@ namespace Airerage.Editor.Stages
                 BandStrength = 0.55f,
                 BandFill = 0.35f,
                 AirshipColor = new Color(0.16f, 0.17f, 0.24f),
+                CityTexTint = new Color(0.13f, 0.14f, 0.21f),
                 Grid = false,
                 GridColor = new Color(0.4f, 0.3f, 1.2f),
                 GridDepth = 46f,
