@@ -1366,7 +1366,14 @@ C スコープ・D フックの影）を出し、ユーザーが選んだ組み�
   必要（今までと同じ。`Assets/_Project/ThirdParty/PLATEAU/README.md`）。周りの街（LOD1）にはテクスチャがないので高さの箱のまま。
 - **zip の push**: こちらで見ると、ブランチ `claude/clever-heisenberg-lcs4hy` に新しい記録は届いていない（ほかのブランチもない）。49 章の 3 の
   確かめ方で、どこで止まったかを教えてほしい。
-- **確かめたこと**: 下の通り。
+- **確かめたこと**: ✅ 自動テスト済み（dotnet 720 件）。✅ Unity のバッチモードで確認済み（EditMode 1142 件・PlayMode 123 件がすべて通る。
+  新しいテスト: 重いフレームでも開く演出を 1 フレームで 0.05 秒より進めない、Loading が減らずに少しずつ跳んで 100% になり Complete を 2 回
+  点滅させてズームの前に終わる、演出の間は試合中の表示が 0 で ON YOUR MARKS からフェードインしタイマーも出る、ON YOUR MARKS → GET READY……
+  → ROLL! とゲージ、外れたら表示を戻す〈`MatchIntroTests`〉、Sandbox_Online の試合で 3 つの呼び出しが出て、風の音は鳴り札の音と高い音は
+  鳴らない〈`SandboxOnlineSmokeTests`〉、西新宿の材質に 4096 四方の写真と光の陰影、形に UV〈`StageLookTests`〉）。ATHLETIC・SKYLINE の昼夜の
+  遠景を撮り、西新宿が外壁の写真つきで見えることを確かめた（昼のビル街は霧を弱めた後）。帯・Loading・ラウンドコールの配置は、同じ式で
+  描いた下見の絵で確かめた（OnGUI はクラウドの撮影に写らず、バッチモードでない Unity はこの環境では起動しなかった。撮影用の
+  `MatchIntroSnapshotTests.CaptureIntroHud` は画面のある環境で使える）。⚠️ 実際の見え方・速さ・音は手もとで（49 章）。
 
 ## 7. 操作での確認（ユーザー。T6-1・T6-2・T6-6）— 確認済み（2026-10-16、問題なし）
 
