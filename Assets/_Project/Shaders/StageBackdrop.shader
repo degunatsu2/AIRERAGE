@@ -3,7 +3,10 @@
 // ずらして点滅する（塔の先の灯り）。横の面には階の区切りの細い明るい帯（大きさの手がかり）。当たりはない（地形として読み込まれないよう、
 // 飾りにはコライダーを付けない）。
 // 実在の街（PLATEAU の西新宿）は、外壁の写真のアトラス（_MainTex）を _TexBlend で使い、主の光の向きで面に陰影を付ける（_LightShade。
-// 2026-11-18 の要望: ほぼシルエットに見えない、ある程度リアルな背景）。夜は写真を _TexTint で暗くし、窓の明かり（_BandFill）を重ねる。
+// 2026-11-18 の要望: ほぼシルエットに見えない、ある程度リアルな背景）。夜は写真を _TexTint で暗くし、写真の窓に合わせて作った明かりの絵
+// （_NightTex。縦の面だけ）を光らせる（窓と同期・ネオン風。同じ日の 2 回目の要望）。作った箱のビルの夜の窓（_BandFill）は、ネオンの色を
+// 混ぜて（_NeonMix）光らせる。明かりは霧で消えきらないよう、霧の後に足す。_FogFadeStart〜_FogFadeEnd（ワールドの z）で霧の割合を
+// 1 から _FogAmount へなじませる（手前の霧の濃い大通りとのつなぎ目を出さない）。
 Shader "Airerage/StageBackdrop"
 {
     Properties
@@ -15,7 +18,7 @@ Shader "Airerage/StageBackdrop"
         _HazeBottom ("Haze bottom (world y)", Float) = -120
         _Blink ("Blink rate", Float) = 0
         _BandSpacing ("Band spacing (m)", Float) = 9
-        _BandStrength ("Band strength", Range(0, 2)) = 0.07
+        _BandStrength ("Band strength", Range(0, 6)) = 0.07
         [HDR] _BandColor ("Band color", Color) = (1, 1, 1, 1)
         _BandFill ("Band fill (lit windows)", Range(0, 1)) = 0
         _MainTex ("Facade texture (atlas)", 2D) = "white" {}
@@ -23,6 +26,13 @@ Shader "Airerage/StageBackdrop"
         [HDR] _TexTint ("Texture tint", Color) = (1, 1, 1, 1)
         _LightShade ("Main light shading", Range(0, 1)) = 0
         _FogAmount ("Fog amount", Range(0, 1)) = 1
+        _NeonMix ("Neon window colors", Range(0, 1)) = 0
+        _WindowGlow ("Window lights glow", Range(0, 8)) = 1
+        _NightTex ("Night window lights (atlas)", 2D) = "black" {}
+        _NightStrength ("Night lights strength", Range(0, 8)) = 0
+        _NightSides ("Night lights on sides only", Range(0, 1)) = 1
+        _FogFadeStart ("Fog fade start (world z)", Float) = -100000
+        _FogFadeEnd ("Fog fade end (world z)", Float) = -99999
     }
 
     SubShader
@@ -46,6 +56,8 @@ Shader "Airerage/StageBackdrop"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
+            TEXTURE2D(_NightTex);
+            SAMPLER(sampler_NightTex);
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _BaseColor;
@@ -63,7 +75,25 @@ Shader "Airerage/StageBackdrop"
                 half4 _TexTint;
                 half _LightShade;
                 half _FogAmount;
+                half _NeonMix;
+                half _WindowGlow;
+                float4 _NightTex_ST;
+                half _NightStrength;
+                half _NightSides;
+                float _FogFadeStart;
+                float _FogFadeEnd;
             CBUFFER_END
+
+            // 夜の窓のネオンの色（暖かい白・青白・マゼンタ・シアン・紫・橙）。
+            half3 NeonColor(float h)
+            {
+                if (h < 0.3) return half3(1.0, 0.8, 0.48);
+                if (h < 0.42) return half3(0.72, 0.88, 1.0);
+                if (h < 0.58) return half3(1.0, 0.28, 0.86);
+                if (h < 0.74) return half3(0.22, 0.95, 1.0);
+                if (h < 0.88) return half3(0.66, 0.36, 1.0);
+                return half3(1.0, 0.58, 0.16);
+            }
 
             float BandHash(float2 p)
             {
@@ -136,11 +166,26 @@ Shader "Airerage/StageBackdrop"
                 float bay = floor((input.positionWS.x + input.positionWS.z) / 4.0);
                 half lit = step(1.0 - _BandFill, BandHash(float2(floorIndex, bay))) * side
                     * (1.0 - smoothstep(0.32, 0.36, abs(frac(floorY) - 0.5)));
-                color += _BandColor.rgb * _BandStrength * max(band, lit);
+                color += _BandColor.rgb * _BandStrength * band * (1.0 - lit);
+                // 夜の窓の明かり（作った箱のビル）: ネオンの色を混ぜ、霧の後に足して光らせる。
+                half3 litColor = lerp(_BandColor.rgb, NeonColor(BandHash(float2(bay * 0.37 + 11.0, floorIndex * 0.11))), _NeonMix);
+                half3 emission = litColor * _BandStrength * _WindowGlow * lit;
+                // 実在の街の夜の明かり（写真の窓に合わせた絵。縦の面だけ）。
+                if (_NightStrength > 0.0)
+                {
+                    emission += SAMPLE_TEXTURE2D(_NightTex, sampler_NightTex, input.uv).rgb * _NightStrength * lerp(1.0, side, _NightSides);
+                }
                 half haze = saturate((_HazeTop - input.positionWS.y) / max(_HazeTop - _HazeBottom, 1e-3));
                 color = lerp(color, _HazeColor.rgb, haze);
-                // 霧の掛かり方（1 でふつう。谷のもやが濃いビル街の昼は、遠くの実在の街だけ弱める）。
-                color = lerp(color, MixFog(color, input.fogFactor), _FogAmount);
+                // 霧の掛かり方（1 でふつう。谷のもやが濃いビル街の昼は、遠くの実在の街だけ弱める）。手前（_FogFadeStart まで）は 1 のまま。
+                half fogAmount = lerp(1.0, _FogAmount, saturate((input.positionWS.z - _FogFadeStart) / max(_FogFadeEnd - _FogFadeStart, 1e-3)));
+                color = lerp(color, MixFog(color, input.fogFactor), fogAmount);
+                half keep = 1.0;
+                #if defined(FOG_LINEAR) || defined(FOG_EXP) || defined(FOG_EXP2)
+                    keep = ComputeFogIntensity(input.fogFactor);
+                #endif
+                // 明かりは霧で消えきらない（遠くでも 4 割は残す）。下のもやでは薄れる。
+                color += emission * lerp(1.0, lerp(0.4, 1.0, keep), fogAmount) * (1.0 - haze * 0.8);
                 return half4(color, 1.0);
             }
             ENDHLSL

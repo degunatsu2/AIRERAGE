@@ -12,9 +12,13 @@
 - 平面直角座標（東・北・高さ。m）を、中心からの位置にし、地面を高さ 0 にする。Unity の OBJ の読み込みは X を反転するので、X を反転して書く
   （読み込むと東が +X・上が +Y・北が +Z）。
 
+- 夜の明かり（--night）: 外壁の写真の窓（まわりより暗く青みのある所）を見つけ、窓ごとに点ける・点けないを決めて、建物（テクスチャ）
+  ごとの色（暖かい白・ネオンのマゼンタ・シアン・紫・橙）で光らせた絵を、同じ並びのアトラスに書く（2026-11-18 の要望: 夜の明かりを
+  窓と同期させ、ネオン風に光らせる）。シェーダーが縦の面にだけ足す（屋根は光らない）。
+
 使い方: python3 -I tools/assets/plateau_textured.py 出力の名前 --cache フォルダ --mesh 53394525 53394526 ... \
-            [--min-height 50] [--center E N] [--ground G] [--texel 0.6] [--atlas 4096]
-  出力: 出力の名前.obj と 出力の名前_Atlas.jpg
+            [--min-height 50] [--center E N] [--ground G] [--texel 0.6] [--atlas 4096] [--night]
+  出力: 出力の名前.obj と 出力の名前_Atlas.jpg（--night なら 出力の名前_AtlasNight.jpg も）
 出典: 国土交通省 Project PLATEAU（3D 都市モデル。東京都 23 区 2020 年度）。加工して作成。
 """
 import argparse
@@ -26,7 +30,8 @@ import os
 import re
 import sys
 
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageFilter
 
 URL = ('https://gsic-opendata.s3.ap-northeast-1.amazonaws.com/national-gov/mlit/city-bureau/3d-city-model/2020/'
        'plateau-tokyo23ku/13100_tokyo23-ku_2020_obj_3_op.zip')
@@ -139,6 +144,47 @@ def pack(cells, size):
     return placed
 
 
+# 夜の明かりの色（建物ごとに 1 つ選ぶ。暖かい白が多め、ネオンの色を混ぜる）と、窓ごとに混ぜる 2 つ目の色。
+NIGHT_PALETTE = [
+    ((1.0, 0.80, 0.48), 0.30),   # 暖かい白（事務所の明かり）
+    ((0.72, 0.88, 1.0), 0.12),   # 青白い明かり
+    ((1.0, 0.28, 0.86), 0.16),   # ネオンのマゼンタ
+    ((0.22, 0.95, 1.0), 0.16),   # ネオンのシアン
+    ((0.66, 0.36, 1.0), 0.14),   # ネオンの紫
+    ((1.0, 0.58, 0.16), 0.12),   # ネオンの橙
+]
+
+
+def night_lights(atlas, placed, cells):
+    """外壁の写真から窓を見つけ、窓ごとに点けた明かりの絵（同じ並び）を返す。"""
+    rgb = np.asarray(atlas, dtype=np.float32) / 255.0
+    lum = rgb[..., 0] * 0.299 + rgb[..., 1] * 0.587 + rgb[..., 2] * 0.114
+    local = np.asarray(Image.fromarray((lum * 255).astype(np.uint8)).filter(ImageFilter.BoxBlur(3)), dtype=np.float32) / 255.0
+    # 窓のガラス: まわりより暗い所と、青みのある所。
+    glass = np.clip((local - lum) * 7.0 + (rgb[..., 2] - rgb[..., 0]) * 2.5 - 0.05, 0.0, 1.0) ** 0.8
+    out = np.zeros_like(rgb)
+    weights = np.array([w for _, w in NIGHT_PALETTE])
+    weights /= weights.sum()
+    for index, (key, (x, y)) in enumerate(sorted(placed.items())):
+        cw, ch = cells[key]
+        # 決まった種（同じ入力なら毎回同じ絵）。
+        rng = np.random.default_rng(index * 7919 + 17)
+        main = np.array(NIGHT_PALETTE[rng.choice(len(NIGHT_PALETTE), p=weights)][0], dtype=np.float32)
+        accent = np.array(NIGHT_PALETTE[rng.choice(len(NIGHT_PALETTE), p=weights)][0], dtype=np.float32)
+        lit_ratio = rng.uniform(0.45, 0.75)
+        # 窓のかたまり（横 3 画素・縦 2 画素ほど。1 画素がおよそ 0.7m）ごとに点ける・点けないと色を決める。
+        by = np.arange(ch)[:, None] // 2
+        bx = np.arange(cw)[None, :] // 3
+        hashed = ((bx * 73856093) ^ (by * 19349663) ^ (index * 83492791)) & 0xFFFF
+        lit = (hashed / 65535.0) < lit_ratio
+        use_accent = (((by * 2654435761) ^ index) & 0xFF) < 40
+        color = np.where(use_accent[..., None], accent, main)
+        brightness = 0.65 + 0.35 * ((hashed * 31 & 0xFF) / 255.0)
+        region = glass[y:y + ch, x:x + cw]
+        out[y:y + ch, x:x + cw] = region[..., None] * lit[..., None] * color * brightness[..., None]
+    return Image.fromarray((np.clip(out, 0.0, 1.0) * 255).astype(np.uint8))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('output')
@@ -149,6 +195,7 @@ def main():
     ap.add_argument('--ground', type=float)
     ap.add_argument('--texel', type=float, default=0.6, help='外壁の 1 画素の大きさ（m）の目安')
     ap.add_argument('--atlas', type=int, default=4096)
+    ap.add_argument('--night', action='store_true', help='夜の窓の明かりの絵も書く')
     args = ap.parse_args()
 
     rz = load_remote_zip()
@@ -243,6 +290,8 @@ def main():
         padded.paste(piece, (PADDING, PADDING))
         atlas.paste(padded, (x - PADDING, y - PADDING))
     atlas.save(f'{args.output}_Atlas.jpg', quality=88)
+    if args.night:
+        night_lights(atlas, placed, cells).save(f'{args.output}_AtlasNight.jpg', quality=90)
 
     # 位置と UV を書く。
     es = [verts[c[0]][0] for _, verts, _, group, _, _ in kept for f in group for c in f[:3]]

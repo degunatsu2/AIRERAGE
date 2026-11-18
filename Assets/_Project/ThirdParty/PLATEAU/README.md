@@ -8,6 +8,14 @@
   作り方: `tools/assets/plateau_textured.py`（配布の zip から必要な区画とテクスチャだけを取り出す。`tools/assets/remote_zip.py`）。
   `python3 -I tools/assets/plateau_textured.py 出力の名前 --cache 作業のフォルダ --mesh 53394525 53394526 53394535 53394536 --min-height 50
   --center -12196.9 -34315.7 --ground 34.9 --texel 0.6 --atlas 4096`
+- `Shinjuku_LOD2_AtlasNight.jpg`: 夜の窓の明かり（外壁の写真の窓〈まわりより暗く青みのある所〉を見つけ、窓ごとに点ける・点けないと、
+  建物ごとのネオンの色を決めた絵。同じ並び）。`plateau_textured.py ... --night` で作る（2026-11-18 の要望: 夜の明かりを窓と同期させ、
+  ネオン風に光らせる）。
+- `Shinjuku_Ground.jpg` と `Shinjuku_GroundNight.jpg`: 西新宿の地面（道路の地図。CityGML の道路〈tran、2 次メッシュ 533945〉の面を、
+  緯度・経度から平面直角座標 IX 系へ変換して、真上から見た絵に塗った。中心から ±1200m・2048 四方・1 画素およそ 1.2m）と、夜の道路の
+  明かり（街灯の橙と、ところどころの明るい点）。ビル街の昼夜で、建物を道路の地面の上に立たせる（2026-11-18 の要望: 背景の下側で建物が
+  ぶつ切り）。作り方: `python3 -I tools/assets/plateau_roads.py 出力の名前 --cache 作業のフォルダ --mesh2 533945
+  --center -12196.9 -34315.7 --half 1200 --size 2048`。元のデータは同じデータセットの CityGML。
 - `Tokyo_LOD1.obj`: その周り（14 区画、LOD1〈高さの箱〉、25m 以上の約 1000 棟）。作り方: `tools/assets/plateau_skyline.py`（面のつながりで
   建物に分け、高い建物だけ残す。LOD1 にテクスチャはない）。
 - 元のデータは G空間情報センターの「3D都市モデル（Project PLATEAU）東京都23区（2020年度）」の OBJ。

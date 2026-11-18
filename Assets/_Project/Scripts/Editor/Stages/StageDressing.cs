@@ -589,7 +589,13 @@ namespace Airerage.Editor.Stages
             // 真ん中の奥は実在の東京（PLATEAU の西新宿の高層ビル群と周りの街。2026-11-17 のユーザーの決定。docs/15 6.51）。作った箱の
             // ビルは、その外側（遠い列）と手前の低い列だけ。
             Material plateau = PlateauMaterial(look, folder, hazeTop);
-            bool city = CreatePlateauCity(Child(root, "Tokyo"), far, plateau != null ? plateau : mid, beacon, look.PlateauGround);
+            Transform tokyo = Child(root, "Tokyo");
+            bool city = CreatePlateauCity(tokyo, far, plateau != null ? plateau : mid, beacon, look);
+            if (city && look.PlateauStreets)
+            {
+                // 建物を道路の地面の上に立たせる（根元を切らない。2026-11-18 の要望）。
+                CreatePlateauStreets(tokyo, look, folder, hazeTop);
+            }
             Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f, city ? PlateauHalfWidth : 0f);
             Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f, city ? PlateauMidKeepOut : 0f);
 
@@ -614,6 +620,65 @@ namespace Airerage.Editor.Stages
         // 2026-11-18 の要望: ほぼシルエットに見えない、ある程度リアルな背景）。周りの街（LOD1。25m 以上）は高さの箱（plateau_skyline.py）。
         private const string PlateauFolder = "Assets/_Project/ThirdParty/PLATEAU";
         private const string PlateauAtlasPath = PlateauFolder + "/Shinjuku_LOD2_Atlas.jpg";
+        private const string PlateauNightPath = PlateauFolder + "/Shinjuku_LOD2_AtlasNight.jpg";
+        private const string PlateauGroundPath = PlateauFolder + "/Shinjuku_Ground.jpg";
+        private const string PlateauGroundNightPath = PlateauFolder + "/Shinjuku_GroundNight.jpg";
+
+        // 道路の地図の範囲（中心からの m。tools/assets/plateau_roads.py の --half と同じ）と、地面の板の左右の広さと奥の端（ワールド）。
+        private const float PlateauGroundHalf = 1200f;
+        private const float StreetsHalfWidth = 1500f;
+        private const float StreetsBack = 1150f;
+
+        // 実在の街の地面（道路の地図を貼った板。昼は歩道の灰色に車道、夜は街灯の橙の道路）。地図は実際の位置に合わせ、外はくり返す。
+        private static void CreatePlateauStreets(Transform root, StageLook look, string folder, float hazeTop)
+        {
+            Texture2D day = LoadAtlas(PlateauGroundPath, 2048, TextureWrapMode.Repeat, 8);
+            if (day == null)
+            {
+                Debug.LogWarning($"PLATEAU の道路の地図がない（{PlateauGroundPath}）。地面を置かない");
+                return;
+            }
+            bool night = look.CityNightGlow > 0f;
+            Texture2D lights = night ? LoadAtlas(PlateauGroundNightPath, 2048, TextureWrapMode.Repeat, 8) : null;
+            float front = look.PlateauStreetsFront;
+            float width = StreetsHalfWidth * 2f;
+            float depth = StreetsBack - front;
+            var center = new Vector3(0f, look.PlateauGround + 0.02f, (front + StreetsBack) * 0.5f);
+            float heroZ = ShinjukuZ + look.PlateauPush;
+            // 板の UV（0〜1）から地図の UV へ: 東は +x、北は +z（建物の OBJ と同じ。奥行きは PlateauDepthScale に縮めてある）。地図の左が西、
+            // 上が北。
+            float span = PlateauGroundHalf * 2f;
+            var tiling = new Vector2(width / (span * look.PlateauScale), depth / (span * PlateauDepthScale));
+            var offset = new Vector2(0.5f + center.x / (span * look.PlateauScale) - tiling.x * 0.5f,
+                0.5f + (center.z - heroZ) / (span * PlateauDepthScale) - tiling.y * 0.5f);
+            Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("BackdropStreets", "Airerage/StageBackdrop", m =>
+            {
+                m.SetColor("_BaseColor", look.MidColor);
+                m.SetColor("_HazeColor", look.HazeColor);
+                m.SetFloat("_HazeTop", hazeTop);
+                m.SetFloat("_HazeBottom", hazeTop - 150f);
+                m.SetFloat("_Blink", 0f);
+                m.SetFloat("_BandStrength", 0f);
+                m.SetFloat("_BandFill", 0f);
+                m.SetTexture("_MainTex", day);
+                m.SetTextureScale("_MainTex", tiling);
+                m.SetTextureOffset("_MainTex", offset);
+                m.SetFloat("_TexBlend", 1f);
+                m.SetColor("_TexTint", look.CityTexTint);
+                m.SetFloat("_LightShade", 0f);
+                m.SetFloat("_FogAmount", look.CityFogAmount);
+                m.SetFloat("_FogFadeStart", look.CityFogFadeStart);
+                m.SetFloat("_FogFadeEnd", look.CityFogFadeEnd);
+                m.SetTexture("_NightTex", lights);
+                // 地面は横の面なので、縦の面だけに限らない。
+                m.SetFloat("_NightStrength", night ? look.CityNightGlow * 0.6f : 0f);
+                m.SetFloat("_NightSides", 0f);
+            }, folder);
+            GameObject streets = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, "Streets", material, new Vector3(width, depth, 1f));
+            streets.transform.SetParent(root, false);
+            streets.transform.SetPositionAndRotation(center, Quaternion.Euler(90f, 0f, 0f));
+            NoShadows(streets);
+        }
 
         // 西新宿の外壁の写真の材質（遠景の材質に、写真・主の光の向きの陰影・夜は暗くして窓の明かり）。写真がなければ null。
         private static Material PlateauMaterial(StageLook look, string folder, float hazeTop)
@@ -624,7 +689,7 @@ namespace Airerage.Editor.Stages
                 Debug.LogWarning($"PLATEAU の外壁の写真がない（{PlateauAtlasPath}）。色だけで塗る");
                 return null;
             }
-            bool night = look.BandFill > 0f;
+            Texture2D nightLights = look.CityNightGlow > 0f ? LoadAtlas(PlateauNightPath) : null;
             return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("BackdropCity", "Airerage/StageBackdrop", m =>
             {
                 m.SetColor("_BaseColor", look.MidColor);
@@ -633,40 +698,45 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_HazeBottom", hazeTop - 150f);
                 m.SetFloat("_Blink", 0f);
                 m.SetFloat("_BandSpacing", 4.5f);
-                // 昼は写真の窓のまま（階の帯は重ねない）。夜は暗くした写真に窓の明かり。
-                m.SetFloat("_BandStrength", night ? look.BandStrength : 0f);
+                // 写真の窓のまま（階の帯と作った窓の明かりは重ねない。夜の明かりは写真の窓に合わせた絵 _NightTex）。
+                m.SetFloat("_BandStrength", 0f);
                 m.SetColor("_BandColor", look.BandColor);
-                m.SetFloat("_BandFill", night ? look.BandFill : 0f);
+                m.SetFloat("_BandFill", 0f);
                 m.SetTexture("_MainTex", atlas);
                 m.SetFloat("_TexBlend", 1f);
                 m.SetColor("_TexTint", look.CityTexTint);
                 m.SetFloat("_LightShade", 0.6f);
                 m.SetFloat("_FogAmount", look.CityFogAmount);
+                m.SetFloat("_FogFadeStart", look.CityFogFadeStart);
+                m.SetFloat("_FogFadeEnd", look.CityFogFadeEnd);
+                // 夜は、写真の窓に合わせて作った明かりの絵を、縦の面だけ光らせる（窓と同期。ネオン風。2026-11-18 の要望）。
+                m.SetTexture("_NightTex", nightLights);
+                m.SetFloat("_NightStrength", nightLights != null ? look.CityNightGlow : 0f);
+                m.SetFloat("_NightSides", 1f);
             }, folder);
         }
 
-        // 外壁の写真のアトラスを読む（4096 四方のまま、ミップマップと異方性で遠くでもちらつかない読み込みの設定に合わせる）。
-        private static Texture2D LoadAtlas(string path)
+        // 外壁の写真のアトラスなどを読む（縮めずに、ミップマップと異方性で遠くでもちらつかない読み込みの設定に合わせる）。
+        private static Texture2D LoadAtlas(string path, int size = 4096, TextureWrapMode wrap = TextureWrapMode.Clamp, int aniso = 4)
         {
             if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
             {
                 return null;
             }
-            if (importer.maxTextureSize != 4096 || !importer.mipmapEnabled || importer.anisoLevel != 4 || importer.wrapMode != TextureWrapMode.Clamp
+            if (importer.maxTextureSize != size || !importer.mipmapEnabled || importer.anisoLevel != aniso || importer.wrapMode != wrap
                 || !importer.sRGBTexture)
             {
-                importer.maxTextureSize = 4096;
+                importer.maxTextureSize = size;
                 importer.mipmapEnabled = true;
-                importer.anisoLevel = 4;
-                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.anisoLevel = aniso;
+                importer.wrapMode = wrap;
                 importer.sRGBTexture = true;
                 importer.SaveAndReimport();
             }
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
-        // 実在の街の大きさ（横と高さ）と奥行き（奥行きは縮めて遠景の帯に収める）、置く奥行き。地面の高さは台本（StageLook.PlateauGround）。
-        private const float PlateauScale = 0.8f;
+        // 実在の街の奥行きの縮め方（遠景の帯に収める）と、置く奥行き。大きさ・地面の高さ・奥へずらす距離は台本（StageLook.PlateauScale ほか）。
         private const float PlateauDepthScale = 0.1f;
         private const float ShinjukuZ = 400f;
         private const float TokyoZ = 640f;
@@ -678,8 +748,9 @@ namespace Airerage.Editor.Stages
         private const float PlateauMidKeepOut = 300f;
 
         // 西新宿（手前・濃い色）と周りの街（奥・遠い色）を置き、高いビルの屋上に航空障害灯を付ける。モデルがなければ false。
-        private static bool CreatePlateauCity(Transform root, Material far, Material mid, Material beacon, float ground)
+        private static bool CreatePlateauCity(Transform root, Material far, Material mid, Material beacon, StageLook look)
         {
+            float ground = look.PlateauGround;
             Mesh shinjuku = LoadObjMesh($"{PlateauFolder}/Shinjuku_LOD2.obj");
             Mesh tokyo = LoadObjMesh($"{PlateauFolder}/Tokyo_LOD1.obj");
             if (shinjuku == null || tokyo == null)
@@ -687,9 +758,9 @@ namespace Airerage.Editor.Stages
                 Debug.LogWarning($"PLATEAU の街のモデルがない（{PlateauFolder}）。作った箱のビルだけで遠景を作る");
                 return false;
             }
-            var scale = new Vector3(PlateauScale, PlateauScale, PlateauDepthScale);
-            Transform hero = PlaceMesh(root, "Shinjuku", shinjuku, mid, new Vector3(0f, ground, ShinjukuZ), scale);
-            PlaceMesh(root, "Surroundings", tokyo, far, new Vector3(0f, ground, TokyoZ), scale);
+            var scale = new Vector3(look.PlateauScale, look.PlateauScale, PlateauDepthScale);
+            Transform hero = PlaceMesh(root, "Shinjuku", shinjuku, mid, new Vector3(0f, ground, ShinjukuZ + look.PlateauPush), scale);
+            PlaceMesh(root, "Surroundings", tokyo, far, new Vector3(0f, ground, TokyoZ + look.PlateauPush), scale);
             // 航空障害灯: 25m の升目ごとのいちばん高い所のうち、上から 14 か所（150m より高く、互いに 60m 以上離す）。
             var tops = new Dictionary<Vector2Int, Vector3>();
             foreach (Vector3 v in shinjuku.vertices)
@@ -852,6 +923,9 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_BandStrength", bands ? look.BandStrength : 0f);
                 m.SetColor("_BandColor", look.BandColor);
                 m.SetFloat("_BandFill", bands ? look.BandFill : 0f);
+                // 夜の窓の明かりはネオンの色を混ぜて光らせる（2026-11-18 の要望）。
+                m.SetFloat("_NeonMix", look.NeonMix);
+                m.SetFloat("_WindowGlow", look.WindowGlow);
             }, folder);
         }
 

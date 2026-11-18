@@ -120,6 +120,23 @@ namespace Airerage.Editor.Stages
         public Color CityTexTint = Color.white;
         /// <summary>実在の街に掛ける霧の割合（1 でふつう。霧の近いビル街の昼は、遠くの西新宿が霧の色の影にならないよう弱める）。</summary>
         public float CityFogAmount = 1f;
+        /// <summary>実在の街の大きさ（横と高さ）と、奥へずらす距離（m）。</summary>
+        public float PlateauScale = 0.8f;
+        public float PlateauPush;
+        /// <summary>
+        /// 実在の街を道路の地面の上に立たせるか（PLATEAU の道路の地図を貼った地面。ビル街の昼夜。2026-11-18 の要望: 背景の下側で建物が
+        /// ぶつ切りになっている）。地面は PlateauStreetsFront（ワールドの z）から奥。
+        /// </summary>
+        public bool PlateauStreets;
+        public float PlateauStreetsFront = 380f;
+        /// <summary>実在の街の霧の割合を、手前の霧の濃い所（1）から CityFogAmount へなじませる範囲（ワールドの z）。</summary>
+        public float CityFogFadeStart = -100000f;
+        public float CityFogFadeEnd = -99999f;
+        /// <summary>実在の街の夜の窓の明かり（外壁の写真の窓に合わせた絵）の強さ（0 なら点けない。光らせるので 1 より大きく）。</summary>
+        public float CityNightGlow;
+        /// <summary>作った箱のビルの夜の窓に混ぜるネオンの色の割合と、窓の明かりの強さの倍率（光らせる）。</summary>
+        public float NeonMix;
+        public float WindowGlow = 1f;
 
         // 光の格子（V18）と撃破の線の膜（V19）。
         /// <summary>光の格子を置くか（街のステージは下に道路があるので置かない）。</summary>
@@ -221,7 +238,10 @@ namespace Airerage.Editor.Stages
             look.Id = id;
             look.Seed = Stable(id);
             look.Skyline = false;
-            look.Grid = false;
+            // 光の格子（認識阻害の結界。2026-11-18 の要望で全ステージに。「AIRERAGE の大会中はステージに認識阻害の結界が張られている」）。
+            // ステージの下の床や海に隠れないよう、撃破の線のすぐ下に置く。
+            look.Grid = true;
+            look.GridDepth = 1.5f;
 
             // 空: 空の色合いから天頂と空、霧の色から地平線、地面の色から下。
             Color tint = theme.SkyTint;
@@ -281,6 +301,8 @@ namespace Airerage.Editor.Stages
                 look.BloomIntensity = 0.85f;
                 look.Vignette = 0.24f;
             }
+            // 格子の線は縁の光る線と同じ色合い（明るさは格子のシェーダーの範囲に収める）。
+            look.GridColor = Normalize(look.TrimColor, 0.95f);
             return look;
         }
 
@@ -384,9 +406,14 @@ namespace Airerage.Editor.Stages
                 BandFill = 0.35f,
                 AirshipColor = new Color(0.16f, 0.17f, 0.24f),
                 CityTexTint = new Color(0.13f, 0.14f, 0.21f),
-                Grid = false,
+                // 夜の背景の明かりはネオン風に光らせる（窓と同期した写真の窓の明かり・ネオンの色を混ぜた箱のビルの窓。2026-11-18 の要望）。
+                CityNightGlow = 3f,
+                NeonMix = 0.6f,
+                WindowGlow = 3f,
+                // 光の格子（認識阻害の結界。2026-11-18 の要望で全ステージに）。撃破の線のすぐ下（下の道路より上）。
+                Grid = true,
                 GridColor = new Color(0.4f, 0.3f, 1.2f),
-                GridDepth = 46f,
+                GridDepth = 1.5f,
                 MembraneColor = new Color(1.8f, 0.3f, 0.85f),
                 BloomThreshold = 0.9f,
                 BloomIntensity = 0.8f,

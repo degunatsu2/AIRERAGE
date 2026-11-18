@@ -305,6 +305,11 @@ namespace Airerage.Runtime.Tests
             Transform bounds = scene.GetRootGameObjects().Single(g => g.name == "KnockoutBounds").transform;
             Assert.That(bounds.Find("Membranes").childCount, Is.EqualTo(4), "撃破の線の膜がない");
             Assert.That(bounds.Find("Frame"), Is.Null, "前の赤い枠の線が残っている");
+            // 光の格子（認識阻害の結界。2026-11-18 の要望で全ステージに）。撃破の線の下にある。
+            GameObject grid = scene.GetRootGameObjects().SingleOrDefault(g => g.name == "LightGrid");
+            Assert.That(grid, Is.Not.Null, "光の格子がない");
+            Assert.That(grid.GetComponent<Renderer>().sharedMaterial.shader.name, Is.EqualTo("Airerage/StageGrid"));
+            Assert.That(grid.transform.position.y, Is.LessThan(bounds.GetComponent<KnockoutBounds>().Min.y), "光の格子が撃破の線より上にある");
             foreach (StageZoneView view in InScene<StageZoneView>(scene))
             {
                 Assert.That(view.LineMaterial.shader.name, Is.EqualTo("Airerage/GlowLine"), $"{view.name}: 線が光る線でない");
@@ -360,6 +365,22 @@ namespace Airerage.Runtime.Tests
             Assert.That(tokyo.Find("Beacons").childCount, Is.GreaterThan(5), "高いビルに航空障害灯がない");
             // 西新宿は外壁の写真つき（ほぼシルエットに見えないように。2026-11-18 の要望）。
             Material shinjuku = tokyo.Find("Shinjuku").GetComponent<Renderer>().sharedMaterial;
+            if (stage != "Stage_Athletic")
+            {
+                // ビル街は、道路の地図を貼った地面の上に建物が立つ（根元を切らない。2026-11-18 の要望）。
+                Transform streets = tokyo.Find("Streets");
+                Assert.That(streets, Is.Not.Null, "道路の地面がない");
+                Assert.That(streets.GetComponent<Renderer>().sharedMaterial.GetTexture("_MainTex"), Is.Not.Null, "道路の地図がない");
+                float bottom = tokyo.Find("Shinjuku").GetComponent<Renderer>().bounds.min.y;
+                Assert.That(bottom, Is.EqualTo(streets.position.y).Within(2f), "建物の根元が道路の地面にない");
+            }
+            if (stage == "Stage_CityNight")
+            {
+                // 夜の明かりは写真の窓に合わせた絵（窓と同期。ネオン風に光らせる）。作った窓の帯は重ねない。
+                Assert.That(shinjuku.GetTexture("_NightTex"), Is.Not.Null, "夜の窓の明かりの絵がない");
+                Assert.That(shinjuku.GetFloat("_NightStrength"), Is.GreaterThan(1f), "夜の明かりが光らない");
+                Assert.That(shinjuku.GetFloat("_BandFill"), Is.EqualTo(0f), "写真の窓と合わない窓の帯を重ねている");
+            }
             Assert.That(shinjuku.GetTexture("_MainTex"), Is.Not.Null, "西新宿に外壁の写真がない");
             Assert.That(shinjuku.GetTexture("_MainTex").width, Is.EqualTo(4096), "外壁の写真が縮んで読み込まれている");
             Assert.That(shinjuku.GetFloat("_TexBlend"), Is.EqualTo(1f));
@@ -410,7 +431,9 @@ namespace Airerage.Runtime.Tests
             BoxCollider[] terrain = InScene<BoxCollider>(scene);
             StageBlock[] blocks = scene.GetRootGameObjects().Single(g => g.name == "TerrainVisuals").GetComponentsInChildren<StageBlock>();
             Assert.That(blocks.Length, Is.EqualTo(terrain.Length), "ビルの箱ごとに面取りした見た目がない");
-            Assert.That(scene.GetRootGameObjects().Any(g => g.name == "LightGrid"), Is.False, "下に道路のある街に光の格子がある");
+            // 光の格子（認識阻害の結界）は全ステージに（2026-11-18 の要望）。下の道路より上、撃破の線より下。
+            GameObject grid = scene.GetRootGameObjects().Single(g => g.name == "LightGrid");
+            Assert.That(grid.transform.position.y, Is.GreaterThan(-24f).And.LessThan(-22f));
             Assert.That(InScene<Volume>(scene).Single().sharedProfile.TryGet(out Bloom _), Is.True);
             Transform bounds = scene.GetRootGameObjects().Single(g => g.name == "KnockoutBounds").transform;
             Assert.That(bounds.Find("Membranes").childCount, Is.EqualTo(4));
