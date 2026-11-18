@@ -345,6 +345,265 @@ namespace Airerage.Editor.Stages
             renderer.receiveShadows = false;
         }
 
+        // 館の色（こげ茶の壁・さらに暗い縁取り・屋根）、紫のアクセント、窓の紫の光（ブルームでにじむ明るさ）。
+        private static readonly Color ManorWall = new Color(0.25f, 0.15f, 0.1f);
+        private static readonly Color ManorTrim = new Color(0.15f, 0.09f, 0.06f);
+        private static readonly Color ManorRoofTile = new Color(0.12f, 0.07f, 0.08f);
+        private static readonly Color ManorAccent = new Color(0.45f, 0.17f, 0.56f);
+        private static readonly Color ManorGlow = new Color(1.5f, 0.5f, 2.2f);
+
+        /// <summary>
+        /// 館: 2 階建ての本館（こげ茶の石の壁・付け柱・階の帯と軒の紫の縁取り・切妻の屋根・煙突）、左右の小塔（細い窓と尖った屋根）、
+        /// 真ん中の高い塔（紫に光るばら窓と尖塔）、アーチの窓（紫の光・十字の桟・窓台）、真ん中の扉。見た目だけ（当たりはない）。
+        /// </summary>
+        private static void ManorHouse(StageDecor decor)
+        {
+            Material wall = decor.Lit("ManorWall", ManorWall);
+            Material trim = decor.Lit("ManorTrim", ManorTrim);
+            Material roof = decor.Lit("ManorRoofTile", ManorRoofTile);
+            Material accent = decor.Lit("ManorAccent", ManorAccent);
+            Material glow = decor.Unlit("ManorWindowPurple", ManorGlow);
+            Transform root = new GameObject("ManorHouse").transform;
+            root.SetParent(decor.Root, false);
+            GameObject Box(string name, Vector3 center, Vector3 size, Material material)
+            {
+                GameObject go = decor.Box(name, root, center, size, material);
+                return go;
+            }
+            // 縦に伸ばした菱形（尖った屋根・尖塔）。下の半分は塔の中に隠れる。
+            void Spire(string name, Vector3 center, float width, float depth, float stretch, Material material)
+            {
+                var pivot = new GameObject(name).transform;
+                pivot.SetParent(root, false);
+                pivot.localPosition = center;
+                pivot.localScale = new Vector3(1f, stretch, 1f);
+                float side = width / Mathf.Sqrt(2f);
+                decor.Box(name + "Shape", pivot, Vector3.zero, new Vector3(side, side, depth), material).transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            }
+            // 丸い板（アーチの上や、ばら窓）。
+            GameObject Disc(string name, Vector3 center, float diameter, Material material)
+            {
+                GameObject go = decor.Cylinder(name, root, center, new Vector3(diameter, 0.04f, diameter), material);
+                go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                return go;
+            }
+            // アーチの窓（縁取り・紫の光・十字の桟・窓台）。center は光る窓の中心、front は壁の手前の面の z。
+            void ArchWindow(string name, Vector2 center, float width, float height, float front)
+            {
+                float z = front - 0.06f;
+                Box(name + "Frame", new Vector3(center.x, center.y, z + 0.02f), new Vector3(width + 0.5f, height + 0.4f, 0.12f), trim);
+                Disc(name + "ArchFrame", new Vector3(center.x, center.y + height * 0.5f, z + 0.02f), width + 0.5f, trim);
+                Box(name + "Glass", new Vector3(center.x, center.y, z - 0.03f), new Vector3(width, height, 0.05f), glow);
+                Disc(name + "Arch", new Vector3(center.x, center.y + height * 0.5f, z - 0.03f), width, glow);
+                Box(name + "Mullion", new Vector3(center.x, center.y + width * 0.15f, z - 0.07f), new Vector3(0.12f, height + width * 0.5f, 0.06f), trim);
+                Box(name + "Transom", new Vector3(center.x, center.y + height * 0.12f, z - 0.07f), new Vector3(width, 0.12f, 0.06f), trim);
+                Box(name + "Sill", new Vector3(center.x, center.y - height * 0.5f - 0.2f, z - 0.2f), new Vector3(width + 0.8f, 0.22f, 0.5f), accent);
+            }
+
+            // 本館（x -11〜11、高さ 16、手前の面 z 4）と土台。
+            const float front = 4f;
+            Box("ManorHall", new Vector3(0f, 8f, 7.5f), new Vector3(22f, 16f, 7f), wall);
+            Box("ManorPlinth", new Vector3(0f, 0.6f, 7.5f), new Vector3(23f, 1.2f, 7.6f), trim);
+            // 付け柱と、階の帯・軒（紫の縁取り）。
+            foreach (float x in new[] { -11f, -6.6f, -2.2f, 2.2f, 6.6f, 11f })
+            {
+                Box("ManorPilaster", new Vector3(x, 8f, front - 0.15f), new Vector3(0.6f, 16f, 0.3f), trim);
+            }
+            Box("ManorBand", new Vector3(0f, 8f, front - 0.2f), new Vector3(22.4f, 0.45f, 0.4f), accent);
+            Box("ManorCornice", new Vector3(0f, 16.2f, front - 0.25f), new Vector3(23.2f, 0.7f, 0.6f), trim);
+            Box("ManorCorniceLine", new Vector3(0f, 15.65f, front - 0.3f), new Vector3(22.6f, 0.18f, 0.2f), accent);
+            // 窓（1 階は真ん中が扉）。
+            float[] bays = { -8.8f, -4.4f, 0f, 4.4f, 8.8f };
+            for (int floor = 0; floor < 2; floor++)
+            {
+                foreach (float x in bays)
+                {
+                    if (floor == 0 && Mathf.Approximately(x, 0f))
+                    {
+                        continue;
+                    }
+                    ArchWindow($"ManorWindow{floor}", new Vector2(x, floor == 0 ? 3.9f : 11.6f), 1.6f, 2.8f, front);
+                }
+            }
+            // 扉（両開きの暗い木と、上の紫の光の明かり取り）と石段。
+            Box("ManorDoor", new Vector3(0f, 2.6f, front - 0.05f), new Vector3(2.6f, 4f, 0.15f), trim);
+            Box("ManorDoorSplit", new Vector3(0f, 2.6f, front - 0.14f), new Vector3(0.1f, 4f, 0.05f), accent);
+            Disc("ManorDoorArchFrame", new Vector3(0f, 4.6f, front - 0.04f), 3.1f, trim);
+            Disc("ManorDoorFanlight", new Vector3(0f, 4.6f, front - 0.1f), 2.4f, glow);
+            for (int i = 0; i < 3; i++)
+            {
+                Box("ManorStep", new Vector3(0f, 0.2f + i * 0.3f, front - 0.9f + i * 0.3f), new Vector3(4.6f - i * 0.6f, 0.3f, 0.6f), trim);
+            }
+            // 切妻の屋根（2 枚の板）と、妻壁（下の半分は本館の中に隠れる菱形）と、その丸い紫の窓。
+            const float slope = 28f;
+            float halfSpan = 11.6f;
+            float rise = halfSpan * Mathf.Tan(slope * Mathf.Deg2Rad);
+            float plank = halfSpan / Mathf.Cos(slope * Mathf.Deg2Rad) + 0.8f;
+            foreach (int side in new[] { -1, 1 })
+            {
+                GameObject roofPlank = Box("ManorRoof", new Vector3(side * halfSpan * 0.5f, 16f + rise * 0.5f, 7.5f), new Vector3(plank, 0.7f, 7.8f), roof);
+                roofPlank.transform.localRotation = Quaternion.Euler(0f, 0f, -side * slope);
+                GameObject edge = Box("ManorRoofEdge", new Vector3(side * halfSpan * 0.5f, 16f + rise * 0.5f + 0.42f, front - 0.3f), new Vector3(plank, 0.16f, 0.2f), accent);
+                edge.transform.localRotation = Quaternion.Euler(0f, 0f, -side * slope);
+            }
+            var gable = new GameObject("ManorGable").transform;
+            gable.SetParent(root, false);
+            gable.localPosition = new Vector3(0f, 16f, front + 0.35f);
+            gable.localScale = new Vector3(1f, rise / halfSpan, 1f);
+            float gableSide = halfSpan * 2f / Mathf.Sqrt(2f);
+            decor.Box("ManorGableShape", gable, Vector3.zero, new Vector3(gableSide, gableSide, 0.4f), wall).transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            Disc("ManorGableWindowFrame", new Vector3(0f, 18.4f, front + 0.08f), 2.3f, trim);
+            Disc("ManorGableWindow", new Vector3(0f, 18.4f, front + 0.02f), 1.7f, glow);
+            // 煙突（紫の笠）。
+            foreach (float x in new[] { -8f, 8f })
+            {
+                Box("ManorChimney", new Vector3(x, 20.5f, 9.5f), new Vector3(1.4f, 5f, 1.4f), trim);
+                Box("ManorChimneyCap", new Vector3(x, 23.1f, 9.5f), new Vector3(1.8f, 0.3f, 1.8f), accent);
+            }
+            // 左右の小塔（細い光る窓・紫の帯・尖った屋根と頂の針）。
+            foreach (float x in new[] { -13.6f, 13.6f })
+            {
+                Box("ManorTurret", new Vector3(x, 11f, 7.5f), new Vector3(5f, 22f, 5.5f), wall);
+                Box("ManorTurretBand", new Vector3(x, 21.7f, 7.5f), new Vector3(5.5f, 0.5f, 6f), accent);
+                Box("ManorTurretBandLow", new Vector3(x, 8f, 7.5f), new Vector3(5.3f, 0.35f, 5.8f), trim);
+                foreach (float y in new[] { 4.5f, 12f, 18f })
+                {
+                    ArchWindow("ManorTurretWindow", new Vector2(x, y), 0.9f, 2.2f, 4.75f);
+                }
+                Spire("ManorTurretRoof", new Vector3(x, 22f, 7.5f), 6.4f, 6.4f, 1.9f, roof);
+                decor.Cylinder("ManorFinial", root, new Vector3(x, 29.4f, 7.5f), new Vector3(0.12f, 0.9f, 0.12f), trim);
+            }
+            // 真ん中の高い塔（本館より奥。紫に光るばら窓と尖塔）。
+            Box("ManorTower", new Vector3(0f, 23f, 8.2f), new Vector3(7f, 14f, 5f), wall);
+            Box("ManorTowerBand", new Vector3(0f, 29.8f, 8.2f), new Vector3(7.6f, 0.6f, 5.6f), accent);
+            Box("ManorTowerLedge", new Vector3(0f, 20.4f, 8.2f), new Vector3(7.4f, 0.35f, 5.4f), trim);
+            Disc("ManorRoseFrame", new Vector3(0f, 25f, 5.66f), 3.9f, trim);
+            Disc("ManorRose", new Vector3(0f, 25f, 5.6f), 3.1f, glow);
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject spoke = Box("ManorRoseSpoke", new Vector3(0f, 25f, 5.55f), new Vector3(3.1f, 0.12f, 0.05f), trim);
+                spoke.transform.localRotation = Quaternion.Euler(0f, 0f, i * 45f);
+            }
+            Spire("ManorSpire", new Vector3(0f, 30f, 8.2f), 7.6f, 5.4f, 2.6f, roof);
+            decor.Cylinder("ManorSpireFinial", root, new Vector3(0f, 41.2f, 8.2f), new Vector3(0.16f, 1.4f, 0.16f), trim);
+        }
+
+        /// <summary>トマト農園（x 25〜47、地面 y 0、奥行き z 2〜10）: 3 列の畝に、支柱と葉の茂みと赤い実のトマトの株。</summary>
+        private static void TomatoFarm(StageDecor decor)
+        {
+            Material soil = decor.Lit("FarmSoil", new Color(0.16f, 0.11f, 0.08f));
+            Material stake = decor.Lit("TomatoStake", new Color(0.42f, 0.32f, 0.22f));
+            var leafTint = new Color(0.45f, 0.62f, 0.42f);
+            var fruitTint = new Color(0.95f, 0.85f, 0.85f);
+            foreach (float z in new[] { 3.4f, 5.6f, 7.8f })
+            {
+                decor.Box("FarmRow", new Vector3(36f, 0.12f, z), new Vector3(22f, 0.3f, 1.1f), soil);
+                for (float x = 26f; x <= 46.1f; x += 2.5f)
+                {
+                    float jitter = decor.Range(-0.3f, 0.3f);
+                    float px = x + jitter;
+                    decor.Cylinder("TomatoStake", new Vector3(px, 1.15f, z + 0.05f), new Vector3(0.08f, 1.15f, 0.08f), stake);
+                    float[] heights = { 0.25f, 0.85f, 1.45f };
+                    for (int k = 0; k < heights.Length; k++)
+                    {
+                        ThirdPartyProps.Place(decor, ThirdPartyProps.Restaurant, "food_ingredient_lettuce", new Vector3(px + decor.Range(-0.2f, 0.2f), heights[k], z),
+                            0.85f - k * 0.12f, decor.Range(0f, 360f), leafTint, PropFolder);
+                    }
+                    int fruits = 3 + decor.Random.Next(3);
+                    for (int k = 0; k < fruits; k++)
+                    {
+                        ThirdPartyProps.Place(decor, ThirdPartyProps.Restaurant, "food_ingredient_tomato",
+                            new Vector3(px + decor.Range(-0.45f, 0.45f), decor.Range(0.45f, 1.6f), z - decor.Range(0.25f, 0.45f)), decor.Range(0.3f, 0.4f),
+                            decor.Range(0f, 360f), fruitTint, PropFolder);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// ボロボロのカカシ: 十字の柱、縫い目の目と口の麻袋の頭、くたびれたとんがり帽子、継ぎはぎのコートと袖、裾と袖口のぼろぼろの布の切れ端、
+        /// はみ出したわら。crow なら腕にカラスがとまる。
+        /// </summary>
+        private static void Scarecrow(StageDecor decor, float x, float z, float yaw, bool crow)
+        {
+            Material wood = decor.Lit("ScarecrowWood", new Color(0.3f, 0.22f, 0.15f));
+            Material sack = decor.Lit("ScarecrowSack", new Color(0.55f, 0.45f, 0.3f));
+            Material stitch = decor.Lit("ScarecrowStitch", new Color(0.08f, 0.06f, 0.05f));
+            Material coat = decor.Lit("ScarecrowCoat", new Color(0.27f, 0.16f, 0.2f));
+            Material patch = decor.Lit("ScarecrowPatch", new Color(0.42f, 0.32f, 0.22f));
+            Material hat = decor.Lit("ScarecrowHat", new Color(0.12f, 0.09f, 0.1f));
+            Material straw = decor.Lit("Straw", new Color(0.75f, 0.62f, 0.3f));
+            var root = new GameObject("Scarecrow").transform;
+            root.SetParent(decor.Root, false);
+            root.SetPositionAndRotation(new Vector3(x, 0f, z), Quaternion.Euler(0f, yaw, 0f));
+            decor.Cylinder("ScarecrowPost", root, new Vector3(0f, 2.6f, 0f), new Vector3(0.18f, 2.6f, 0.18f), wood);
+            decor.Box("ScarecrowBar", root, new Vector3(0f, 4f, 0f), new Vector3(4.4f, 0.2f, 0.2f), wood);
+            // 頭（麻袋）と、×の目と縫い目の口。
+            decor.Sphere("ScarecrowHead", root, new Vector3(0f, 5.25f, 0f), new Vector3(1.05f, 1.2f, 0.95f), sack);
+            foreach (float ex in new[] { -0.22f, 0.22f })
+            {
+                foreach (float angle in new[] { 45f, -45f })
+                {
+                    decor.Box("ScarecrowEye", root, new Vector3(ex, 5.4f, -0.46f), new Vector3(0.28f, 0.05f, 0.04f), stitch).transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+                }
+            }
+            decor.Box("ScarecrowMouth", root, new Vector3(0f, 5.0f, -0.45f), new Vector3(0.5f, 0.04f, 0.04f), stitch).transform.localRotation = Quaternion.Euler(0f, 0f, -6f);
+            for (int i = 0; i < 5; i++)
+            {
+                decor.Box("ScarecrowMouthStitch", root, new Vector3(-0.2f + i * 0.1f, 5.0f, -0.46f), new Vector3(0.03f, 0.14f, 0.04f), stitch);
+            }
+            // くたびれたとんがり帽子（つば・山・折れた先）。
+            GameObject brim = decor.Cylinder("ScarecrowHatBrim", root, new Vector3(0.05f, 5.78f, 0f), new Vector3(1.7f, 0.03f, 1.5f), hat);
+            brim.transform.localRotation = Quaternion.Euler(0f, 0f, -8f);
+            decor.Cylinder("ScarecrowHatCrown", root, new Vector3(0.08f, 6.15f, 0f), new Vector3(0.8f, 0.35f, 0.75f), hat).transform.localRotation = Quaternion.Euler(0f, 0f, -6f);
+            decor.Cylinder("ScarecrowHatTip", root, new Vector3(0.3f, 6.65f, 0f), new Vector3(0.45f, 0.25f, 0.42f), hat).transform.localRotation = Quaternion.Euler(0f, 0f, -35f);
+            // コート（胴と袖）と継ぎはぎ。
+            decor.Box("ScarecrowCoat", root, new Vector3(0f, 3.45f, 0f), new Vector3(1.5f, 2f, 0.7f), coat);
+            foreach (int s in new[] { -1, 1 })
+            {
+                decor.Box("ScarecrowSleeve", root, new Vector3(s * 1.25f, 4f, 0f), new Vector3(1.6f, 0.55f, 0.55f), coat);
+            }
+            decor.Box("ScarecrowPatch", root, new Vector3(-0.35f, 3.7f, -0.36f), new Vector3(0.45f, 0.4f, 0.03f), patch).transform.localRotation = Quaternion.Euler(0f, 0f, 8f);
+            decor.Box("ScarecrowPatch", root, new Vector3(0.9f, 4.05f, -0.29f), new Vector3(0.35f, 0.3f, 0.03f), patch).transform.localRotation = Quaternion.Euler(0f, 0f, -12f);
+            // 裾と袖口のぼろぼろの布の切れ端（長さと角度をばらばらに）。
+            for (int i = 0; i < 7; i++)
+            {
+                float hx = -0.65f + i * 0.22f;
+                float length = decor.Range(0.45f, 1f);
+                decor.Box("ScarecrowRag", root, new Vector3(hx, 2.45f - length * 0.5f, 0f), new Vector3(0.2f, length, 0.06f), coat).transform.localRotation =
+                    Quaternion.Euler(0f, 0f, decor.Range(-14f, 14f));
+            }
+            foreach (int s in new[] { -1, 1 })
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    float length = decor.Range(0.3f, 0.65f);
+                    decor.Box("ScarecrowRag", root, new Vector3(s * (1.75f + i * 0.13f), 3.72f - length * 0.5f, 0f), new Vector3(0.12f, length, 0.05f), coat).transform.localRotation =
+                        Quaternion.Euler(0f, 0f, decor.Range(-18f, 18f));
+                }
+                // 袖口と首のわら。
+                for (int i = 0; i < 4; i++)
+                {
+                    decor.Cylinder("ScarecrowStraw", root, new Vector3(s * (2.1f + decor.Range(0f, 0.15f)), 4f + decor.Range(-0.15f, 0.15f), 0f), new Vector3(0.05f, 0.22f, 0.05f), straw).transform.localRotation =
+                        Quaternion.Euler(0f, 0f, s * decor.Range(55f, 110f));
+                }
+            }
+            for (int i = 0; i < 5; i++)
+            {
+                decor.Cylinder("ScarecrowStraw", root, new Vector3(decor.Range(-0.3f, 0.3f), 4.62f, 0f), new Vector3(0.05f, 0.2f, 0.05f), straw).transform.localRotation =
+                    Quaternion.Euler(0f, 0f, decor.Range(-50f, 50f));
+            }
+            if (crow)
+            {
+                // 腕にとまるカラス。
+                Material black = decor.Lit("Crow", new Color(0.04f, 0.04f, 0.05f));
+                decor.Sphere("CrowBody", root, new Vector3(1.6f, 4.42f, 0f), new Vector3(0.42f, 0.32f, 0.3f), black);
+                decor.Sphere("CrowHead", root, new Vector3(1.82f, 4.62f, 0f), new Vector3(0.2f, 0.2f, 0.2f), black);
+                decor.Box("CrowBeak", root, new Vector3(1.97f, 4.6f, 0f), new Vector3(0.14f, 0.05f, 0.05f), decor.Lit("CrowBeak", new Color(0.3f, 0.26f, 0.15f)));
+                decor.Box("CrowTail", root, new Vector3(1.33f, 4.4f, 0f), new Vector3(0.3f, 0.06f, 0.16f), black).transform.localRotation = Quaternion.Euler(0f, 0f, 20f);
+            }
+        }
+
         private static void Props(StageDecor decor)
         {
             ThirdPartyProps.Pack pack = ThirdPartyProps.Halloween;
@@ -398,31 +657,16 @@ namespace Airerage.Editor.Stages
         // 2026-11-18 の要望で空をリアルにした。前の平たい赤い円の位置と大きさのまま）。
         private static void Decorate(StageDecor decor)
         {
-            Material stone = decor.Lit("ManorStone", new Color(0.26f, 0.24f, 0.3f));
             Material roof = decor.Lit("ManorRoof", new Color(0.18f, 0.12f, 0.2f));
-            Material windowLight = decor.Unlit("ManorWindow", new Color(1f, 0.8f, 0.35f));
             Material dirt = decor.Lit("Dirt", new Color(0.18f, 0.13f, 0.1f));
-            Material leaf = decor.Lit("TomatoLeaf", new Color(0.15f, 0.32f, 0.12f));
-            Material tomato = decor.Unlit("Tomato", new Color(0.9f, 0.12f, 0.1f));
-            Material straw = decor.Lit("Straw", new Color(0.75f, 0.62f, 0.3f));
             Material abyss = decor.Lit("Abyss", new Color(0.03f, 0.02f, 0.05f));
             Material prisonStone = decor.Lit("PrisonStone", new Color(0.2f, 0.18f, 0.22f));
             Material chain = decor.Lit("Chain", new Color(0.3f, 0.3f, 0.32f));
             Material candle = decor.Unlit("Candle", new Color(1f, 0.6f, 0.25f));
             Material bone = decor.Lit("Bone", new Color(0.85f, 0.82f, 0.72f));
 
-            // 館の正面（遊ぶ面の奥）と窓、尖った屋根。
-            decor.Box("ManorFacade", new Vector3(0f, 10f, 6f), new Vector3(30f, 20f, 6f), stone);
-            for (int row = 0; row < 2; row++)
-            {
-                for (int col = 0; col < 5; col++)
-                {
-                    decor.Quad("Window", new Vector3(-10f + col * 5f, 6f + row * 8f, 2.9f), new Vector2(1.6f, 3f), windowLight);
-                }
-            }
-            GameObject spire = decor.Box("TowerSpire", new Vector3(0f, 36f, 3f), new Vector3(4.5f, 4.5f, 4f), roof);
-            spire.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
-            decor.Box("RoofBack", new Vector3(0f, 22f, 6f), new Vector3(30f, 4f, 6f), roof);
+            // 館（遊ぶ面の奥）。2026-11-18 の要望で精巧な館に: こげ茶が基調、ところどころ紫のアクセント、窓から紫の光が漏れる。
+            ManorHouse(decor);
             // 霧・月の光の筋・鬼火（2026-11-18 の要望: 手前の霧をリアルにし、怪しい空気感と雰囲気を出す）。
             Atmosphere(decor);
             // 墓場の丘の奥行き、墓石の並び、柵。
@@ -432,16 +676,10 @@ namespace Airerage.Editor.Stages
             Props(decor);
             // 農園の奥行き、トマトの株、カカシの頭と服。
             decor.Box("FarmBack", new Vector3(36f, -6f, 6f), new Vector3(24f, 12f, 8f), dirt);
-            for (float x = 25f; x <= 47f; x += 2.2f)
-            {
-                decor.Sphere("TomatoPlant", new Vector3(x, 0.8f, 3f), new Vector3(1.4f, 1.6f, 1.4f), leaf);
-                decor.Sphere("TomatoFruit", new Vector3(x + 0.3f, 1f, 2.3f), new Vector3(0.4f, 0.4f, 0.4f), tomato);
-            }
-            foreach (float x in new[] { 31f, 41f })
-            {
-                decor.Sphere("ScarecrowHead", new Vector3(x, 6.6f, 0f), new Vector3(1.2f, 1.2f, 1.2f), straw);
-                decor.Box("ScarecrowCoat", new Vector3(x, 3.6f, 0.3f), new Vector3(2.2f, 2.4f, 0.6f), decor.Lit("ScarecrowCoat", new Color(0.35f, 0.2f, 0.25f)));
-            }
+            // トマト農園とボロボロのカカシ（前の黒い球と赤い点〈トマトの株と実〉は消した。2026-11-18 の要望）。
+            TomatoFarm(decor);
+            Scarecrow(decor, 30.2f, 6.6f, 8f, true);
+            Scarecrow(decor, 42.4f, 6.6f, -12f, false);
             decor.Box("Barn", new Vector3(45f, 6f, 4f), new Vector3(6f, 12f, 6f), decor.Lit("Barn", new Color(0.4f, 0.1f, 0.1f)));
             // 谷の奥（底のない暗がり）と、遠くの森。
             decor.Box("AbyssBack", new Vector3(0f, -20f, 8f), new Vector3(140f, 24f, 12f), abyss);

@@ -588,6 +588,37 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
+        public void Manor_HasTheManorHouse_TheTomatoFarm_AndTatteredScarecrows()
+        {
+            // 2026-11-18 の要望: 中央を精巧な館に（こげ茶・紫のアクセント・紫の光の窓）、右の黒い球と赤い点を消してトマト農園と
+            // ボロボロのカカシ、左の門を地面の上に。
+            Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_Manor.unity");
+            Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+            Transform house = decor.Find("ManorHouse");
+            Assert.That(house, Is.Not.Null, "館がない");
+            Renderer[] parts = house.GetComponentsInChildren<Renderer>();
+            Assert.That(parts.Length, Is.GreaterThan(80), "館が作り込まれていない");
+            Renderer[] glass = parts.Where(r => r.name.Contains("Glass") || r.name.Contains("Rose") && !r.name.Contains("Frame") && !r.name.Contains("Spoke")).ToArray();
+            Assert.That(glass.Length, Is.GreaterThanOrEqualTo(10), "光る窓が少ない");
+            Color pane = glass[0].sharedMaterial.GetColor("_BaseColor");
+            Assert.That(pane.b > pane.g * 2f && pane.r > pane.g * 2f && pane.maxColorComponent > 1f, Is.True, $"窓の光が紫に光っていない（{pane}）");
+            Color wall = parts.First(r => r.name == "ManorHall").sharedMaterial.GetColor("_BaseColor");
+            Assert.That(wall.r > wall.b && wall.r < 0.4f, Is.True, $"館の壁がこげ茶でない（{wall}）");
+            Assert.That(parts.Count(r => r.sharedMaterial.name.StartsWith("ManorAccent")), Is.GreaterThan(5), "紫のアクセントが少ない");
+            Assert.That(parts.All(r => r.bounds.min.z > 2.5f), Is.True, "館が遊ぶ面に出ている");
+            Assert.That(InScene<Renderer>(scene).Any(r => r.name == "ManorFacade" || r.name == "TomatoPlant" || r.name == "TomatoFruit"), Is.False,
+                "前の館の箱かトマトの球が残っている");
+            Assert.That(decor.GetComponentsInChildren<Transform>().Count(t => t.name == "Prop_food_ingredient_tomato"), Is.GreaterThan(30), "トマトの実が少ない");
+            Transform[] scarecrows = decor.GetComponentsInChildren<Transform>().Where(t => t.name == "Scarecrow").ToArray();
+            Assert.That(scarecrows.Length, Is.EqualTo(2), "カカシが 2 体でない");
+            Assert.That(scarecrows.All(t => t.position.z > 4f && t.GetComponentsInChildren<Renderer>().Count(r => r.name == "ScarecrowRag") >= 7), Is.True,
+                "カカシが奥にいない・ぼろぼろでない");
+            // 門は墓場の地面（x -48〜-24）の上。
+            Renderer gate = decor.GetComponentsInChildren<Transform>().Single(t => t.name == "Prop_arch_gate").GetComponentInChildren<Renderer>();
+            Assert.That(gate.bounds.max.x, Is.LessThan(-24f), "門が墓場の地面の外へはみ出して宙に浮く");
+        }
+
+        [Test]
         public void Stadium_HasNoSimpleClouds()
         {
             // 2026-11-18 の要望: 陸上競技場の簡易な雲を消す（雲は空に描く）。
