@@ -233,6 +233,160 @@ namespace Airerage.Editor.Stages
         }
 
         // 研究所の奥の壁、実験室の培養槽、エレベーターの縦穴の枠、気送管のガラス、冷却水の奥、配管とモニター。
+        private const string SciFiPack = "Quaternius/SciFi";
+
+        // 壁の板（Quaternius の板は 4m × 3m。この倍率で並べる）。
+        private const float WallPanelScale = 2.6f;
+
+        /// <summary>
+        /// 研究所の奥: SF の壁の板を奥の壁いっぱいに並べ（下は帯の板、真ん中は窓と配線の板、上は天井の配線）、太い柱を等間隔に積み、
+        /// 左右の棟の床を奥へ延ばして、コンピューター・木箱・樽・金庫・照明を置く。見た目だけ（当たりはない）。
+        /// </summary>
+        private static void SciFiInterior(StageDecor decor, Material fallback)
+        {
+            System.Func<string, Material> materials = SciFiMaterials(decor);
+            // 壁の板を、奥の壁（手前の面 z 13）の前に並べる。向きは板の表がカメラを向くように（WallYaw）。
+            string[] middle = { "WallAstra_Straight", "WallWindow_Straight", "WallAstra_Straight_Window", "WallBand_Straight" };
+            float width = 4f * WallPanelScale;
+            float height = 3f * WallPanelScale;
+            int row = 0;
+            for (float y = -19f; y < 51f; y += height, row++)
+            {
+                for (float x = -70f + width * 0.5f; x < 70f; x += width)
+                {
+                    string model = row == 0 ? "WallBand_Straight"
+                        : y + height >= 51f ? "TopCables_Straight"
+                        : middle[(row * 3 + Mathf.RoundToInt((x + 70f) / width)) % middle.Length];
+                    PlaceAgainstWall(decor, model, new Vector3(x, y, 0f), Vector3.one * WallPanelScale, 13f, materials, fallback);
+                }
+            }
+            // 太い柱（10m の柱を積む）。
+            for (float x = -54f; x <= 54f; x += 12f)
+            {
+                for (float y = -19f; y < 51f; y += 13f)
+                {
+                    PlaceAgainstWall(decor, "Column_Large_Straight", new Vector3(x, y, 0f), Vector3.one * 1.3f, 12.6f, materials, fallback);
+                }
+            }
+            // 左右の棟の床を奥へ（遊ぶ面の床は z ±2 まで）。その上の小物。
+            Material floor = decor.Lit("LabBackFloor", new Color(0.2f, 0.22f, 0.26f));
+            foreach (float side in new[] { -1f, 1f })
+            {
+                decor.Box("BackFloor", new Vector3(side * 34.5f, -1f, 7.5f), new Vector3(29f, 2f, 11f), floor);
+                (string Model, float X, float Z, float Scale, float Yaw)[] props =
+                {
+                    ("Prop_Computer", 22.5f, 9.5f, 1.5f, 180f), ("Prop_Computer", 24f, 9.5f, 1.5f, 180f),
+                    ("Prop_Chest", 30f, 10f, 1.4f, 180f), ("Prop_Crate4", 33.5f, 9.5f, 1.6f, 15f), ("Prop_Crate3", 33.8f, 9.4f, 1.5f, -10f),
+                    ("Prop_Barrel_Large", 37f, 10.5f, 1.6f, 0f), ("Prop_Barrel_Large", 38.2f, 9.8f, 1.6f, 40f),
+                    ("Prop_PipeHolder", 41f, 11f, 1.5f, 180f), ("Prop_ItemHolder", 26.5f, 6.5f, 1.6f, 180f),
+                    ("Prop_AccessPoint", 44f, 6f, 1.6f, 90f), ("Prop_Fan_Small", 47f, 10f, 1.6f, 0f),
+                };
+                foreach (var prop in props)
+                {
+                    float y = prop.Model == "Prop_Crate3" ? 1.6f * 1.12f + 0.75f : prop.Model.StartsWith("Prop_Crate") ? 0.5f * prop.Scale : 0f;
+                    if (prop.Model == "Prop_AccessPoint")
+                    {
+                        y = 0f;
+                    }
+                    ThirdPartyProps.PlaceMulti(decor, SciFiPack, prop.Model, new Vector3(side * prop.X, y, prop.Z),
+                        Quaternion.Euler(0f, side > 0f ? prop.Yaw : -prop.Yaw, 0f), Vector3.one * prop.Scale, materials, fallback);
+                }
+            }
+            // 天井の照明（奥の壁の上の段）。
+            for (float x = -60f; x <= 60f; x += 15f)
+            {
+                ThirdPartyProps.PlaceMulti(decor, SciFiPack, "Prop_Light_Wide", new Vector3(x, 47f, 10f), Quaternion.identity, Vector3.one * 2f, materials, fallback);
+            }
+        }
+
+        // 板・柱をカメラへ向けて置き、奥の面（いちばん奥の z）が back になるように前後をそろえる。
+        private static void PlaceAgainstWall(StageDecor decor, string model, Vector3 position, Vector3 scale, float back,
+            System.Func<string, Material> materials, Material fallback)
+        {
+            GameObject go = ThirdPartyProps.PlaceMulti(decor, SciFiPack, model, position, Quaternion.Euler(0f, WallYaw, 0f), scale, materials, fallback);
+            if (go == null)
+            {
+                return;
+            }
+            Bounds bounds = default;
+            bool first = true;
+            foreach (Renderer renderer in go.GetComponentsInChildren<Renderer>())
+            {
+                if (first)
+                {
+                    bounds = renderer.bounds;
+                    first = false;
+                }
+                else
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+            }
+            if (!first)
+            {
+                // 横は板の真ん中を x に、縦は下の端を y に、奥は back にそろえる。
+                go.transform.position += new Vector3(position.x - bounds.center.x, position.y - bounds.min.y, back - bounds.max.z);
+            }
+        }
+
+        // 板の表をカメラ（-z）へ向ける回転（度）。
+        private const float WallYaw = -90f;
+
+        // SF の材質（OBJ の材質の名前ごと。色・法線・発光の絵。研究所らしく白と青を基調に、光は水色）。
+        private static System.Func<string, Material> SciFiMaterials(StageDecor decor)
+        {
+            var cache = new System.Collections.Generic.Dictionary<string, Material>();
+            Material Make(string name, string baseMap, string normalMap, string emissionMap, Color tint, Color emission, float metallic, float smoothness, float cutoff)
+            {
+                return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial($"SciFi_{name}", ThirdPartyProps.PropShader, m =>
+                {
+                    m.SetTexture("_BaseMap", baseMap != null ? ThirdPartyProps.LoadTexture(SciFiPack, baseMap, false) : null);
+                    m.SetColor("_BaseColor", tint);
+                    m.SetTexture("_BumpMap", normalMap != null ? ThirdPartyProps.LoadTexture(SciFiPack, normalMap, true) : null);
+                    m.SetFloat("_BumpScale", 1f);
+                    m.SetTexture("_EmissionMap", emissionMap != null ? ThirdPartyProps.LoadTexture(SciFiPack, emissionMap, false) : null);
+                    m.SetColor("_EmissionColor", emission);
+                    m.SetFloat("_Metallic", metallic);
+                    m.SetFloat("_Smoothness", smoothness);
+                    m.SetFloat("_Cutoff", cutoff);
+                }, decor.Folder);
+            }
+            var cyan = new Color(0.5f * 2.4f, 1f * 2.4f, 1.15f * 2.4f, 1f);
+            Material Resolve(string name)
+            {
+                switch (name)
+                {
+                    case "MI_Trim_01": return Make(name, "T_Trim_01_BaseColor", "T_Trim_01_Normal", "T_Trim_01_Emissive", Color.white, cyan, 0.5f, 0.5f, 0f);
+                    case "MI_Trim_02":
+                    case "MI_Trim_02_Rails": return Make("MI_Trim_02", "T_Trim_02_BaseColor", "T_Trim_02_Normal", null, Color.white, Color.black, 0.4f, 0.45f, 0f);
+                    case "MI_Trim_02_Variation": return Make(name, "T_Trim_02_BaseColor_Blue", "T_Trim_02_Normal", null, Color.white, Color.black, 0.4f, 0.45f, 0f);
+                    case "MI_Trim_03": return Make(name, "T_Trim_03_BaseColor", "T_Trim_03_Normal", null, Color.white, Color.black, 0.2f, 0.4f, 0f);
+                    case "MI_Trim_03_Dark": return Make(name, "T_Trim_03_BaseColor", "T_Trim_03_Normal", null, new Color(0.32f, 0.34f, 0.4f), Color.black, 0.3f, 0.4f, 0f);
+                    case "MI_Trim_03_Cables": return Make(name, "T_Trim_03_Cables", null, null, Color.white, Color.black, 0.1f, 0.35f, 0f);
+                    case "MI_Trim_03_Cables_Blue": return Make(name, "T_Trim_03_Cables", null, null, new Color(0.55f, 0.75f, 1f), Color.black, 0.1f, 0.35f, 0f);
+                    case "MI_PaddedWall": return Make(name, "T_PaddedWall_BaseColor", "T_PaddedWall_Normal", "T_PaddingWall_Emissive", Color.white, cyan, 0.2f, 0.35f, 0f);
+                    case "M_Decal_White":
+                    case "MI_Decal_Red":
+                    case "MI_Decal_Line": return Make(name, "T_Decals", null, null, Color.white, Color.black, 0f, 0.3f, 0.5f);
+                    case "M_Decal_Screen": return Make(name, "T_Decals", null, "T_Decals", Color.white, new Color(0.5f, 1.4f, 1.8f, 1f), 0f, 0.6f, 0.5f);
+                    case "M_Glass": return Make(name, null, null, null, new Color(0.12f, 0.22f, 0.3f), new Color(0.05f, 0.18f, 0.24f, 1f), 0.6f, 0.92f, 0f);
+                    case "M_Black": return Make(name, null, null, null, new Color(0.03f, 0.03f, 0.04f), Color.black, 0f, 0.3f, 0f);
+                    case "M_Light": return Make(name, null, null, null, Color.white, new Color(2.6f, 2.8f, 3f, 1f), 0f, 0.5f, 0f);
+                    case "M_LightFade_Red": return Make(name, null, null, null, new Color(1f, 0.2f, 0.2f), new Color(2.4f, 0.3f, 0.3f, 1f), 0f, 0.5f, 0f);
+                    default: return null;
+                }
+            }
+            return name =>
+            {
+                if (!cache.TryGetValue(name, out Material material))
+                {
+                    material = Resolve(name);
+                    cache[name] = material;
+                }
+                return material;
+            };
+        }
+
         private static void Decorate(StageDecor decor)
         {
             Material wall = decor.Lit("LabWall", new Color(0.62f, 0.67f, 0.72f));
@@ -244,12 +398,10 @@ namespace Airerage.Editor.Stages
             Material pit = decor.Lit("LabPit", new Color(0.08f, 0.09f, 0.12f));
             Material warning = decor.Unlit("Warning", new Color(1f, 0.82f, 0.1f));
 
-            // 奥の壁と、柱の並び。
+            // 奥の壁（後ろの埋め）と、その手前の SF の壁の板・柱・床の小物（Quaternius の Modular SciFi MegaKit。CC0。2026-11-18 の要望:
+            // 背景を無料のアセットで精巧に）。
             decor.Box("BackWall", new Vector3(0f, 16f, 14f), new Vector3(140f, 70f, 2f), wall);
-            for (float x = -54f; x <= 54f; x += 12f)
-            {
-                decor.Box("Pillar", new Vector3(x, 16f, 12.5f), new Vector3(1.6f, 70f, 1.2f), panel);
-            }
+            SciFiInterior(decor, panel);
             // 谷の奥（遊ぶ面より奥だけ）。
             decor.Box("PitBack", new Vector3(0f, -20f, 8f), new Vector3(140f, 28f, 12f), pit);
             // 実験室の培養槽と、モニター。

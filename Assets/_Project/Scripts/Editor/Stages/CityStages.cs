@@ -408,40 +408,59 @@ namespace Airerage.Editor.Stages
 
             // 背景のビル群（3 列。奥ほど高く、霧で薄くなる）。真ん中（CityVistaHalfWidth の内側）は奥の 2 列を置かず、手前の列も低くして、
             // 大通りの先の西新宿の高層ビル群（PLATEAU）を見通せるようにする（2026-11-17 の回答: ビル街の背景が変わって見えない）。
+            // ビルは Kenney の City Kit Commercial（CC0）のモデル（2026-11-18 の要望: 背景を無料のアセットで精巧に）。夜は窓の色の所だけが光る。
+            Color buildingTint = night ? new Color(0.4f, 0.41f, 0.52f) : new Color(0.86f, 0.88f, 0.94f);
+            Color windowGlow = night ? Glow(Color.white, 1.4f) : Color.black;
+            string emission = night ? ThirdPartyProps.CityCommercialNightEmission : null;
             float[] rows = { 18f, 38f, 70f };
             for (int row = 0; row < rows.Length; row++)
             {
                 float z = rows[row];
                 for (float x = -110f; x < 110f;)
                 {
-                    float width = decor.Range(5f, 12f);
                     float top = decor.Range(-2f, 22f) + row * 10f;
-                    if (Mathf.Abs(x + width * 0.5f) < CityVistaHalfWidth)
+                    // 高さに合うモデル（高いビルは高層ビルのモデル、低いビルは中くらいのビル）を選び、高さで大きさを決める。
+                    bool vista = Mathf.Abs(x + 6f) < CityVistaHalfWidth;
+                    if (vista)
                     {
                         if (row > 0)
                         {
-                            x += width + decor.Range(1f, 5f);
+                            x += decor.Range(6f, 17f);
                             continue;
                         }
                         top = decor.Range(-14f, -5f);
                     }
-                    var center = new Vector3(x + width * 0.5f, (top - 30f) * 0.5f, z);
-                    decor.Box("Skyline", center, new Vector3(width, top + 30f, decor.Range(6f, 12f)), decor.Random.NextDouble() < 0.5 ? facade : glass);
+                    float height = top + 30f;
+                    CityModel model = PickCityModel(decor, height);
+                    bool turned = decor.Random.NextDouble() < 0.5;
+                    float scale = Mathf.Min(height / model.Height, 15f / Mathf.Max(model.SizeX, model.SizeZ));
+                    float width = (turned ? model.SizeZ : model.SizeX) * scale;
+                    float depth = (turned ? model.SizeX : model.SizeZ) * scale;
+                    float centerX = x + width * 0.5f;
+                    if (vista && Mathf.Abs(centerX) >= CityVistaHalfWidth && row > 0)
+                    {
+                        x += width + decor.Range(1f, 5f);
+                        continue;
+                    }
+                    float realTop = -30f + model.Height * scale;
+                    ThirdPartyProps.Place(decor, ThirdPartyProps.CityCommercial, model.Name, new Vector3(centerX, -30f, z), scale,
+                        turned ? 270f : 180f, buildingTint, decor.Folder, emission, windowGlow);
                     if (night)
                     {
-                        // 窓の明かり（前の面）と、屋上の赤い航空障害灯。
-                        for (float y = top - 2f; y > -10f; y -= decor.Range(2.5f, 4f))
+                        // 窓の明かり（正面。ネオン風の色。前の箱のビルと同じ。モデルの窓の色は屋根と同じ色の所があり光らせられないため）。
+                        for (float y = realTop - 3f; y > -10f; y -= decor.Range(2.5f, 4f))
                         {
                             if (decor.Random.NextDouble() < 0.55)
                             {
-                                decor.Quad("Lights", new Vector3(center.x, y, z - 3.05f), new Vector2(width * decor.Range(0.3f, 0.85f), 0.7f),
+                                decor.Quad("Lights", new Vector3(centerX, y, z - depth * 0.5f - 0.08f), new Vector2(width * decor.Range(0.3f, 0.8f), 0.7f),
                                     SkyLight(decor, skyLights));
                             }
                         }
-                        if (decor.Random.NextDouble() < 0.4)
-                        {
-                            decor.Sphere("BeaconLight", new Vector3(center.x, top + 0.4f, z), new Vector3(0.6f, 0.6f, 0.6f), decor.Unlit("Beacon", new Color(1f, 0.2f, 0.15f)));
-                        }
+                    }
+                    if (night && decor.Random.NextDouble() < 0.4)
+                    {
+                        // 屋上の赤い航空障害灯。
+                        decor.Sphere("BeaconLight", new Vector3(centerX, realTop + 0.4f, z), new Vector3(0.6f, 0.6f, 0.6f), decor.Unlit("Beacon", new Color(1f, 0.2f, 0.15f)));
                     }
                     x += width + decor.Range(1f, 5f);
                 }
@@ -461,6 +480,47 @@ namespace Airerage.Editor.Stages
                         new Vector3(building.MaxX - building.MinX, 0.08f, 0.08f), building.MinX < 0f ? neonPink : neonCyan);
                 }
             }
+        }
+
+        /// <summary>Kenney の City Kit Commercial のビルのモデル（名前と、元の大きさの幅・高さ）。</summary>
+        private readonly struct CityModel
+        {
+            public readonly string Name;
+            public readonly float SizeX;
+            public readonly float Height;
+            public readonly float SizeZ;
+
+            public CityModel(string name, float sizeX, float height, float sizeZ)
+            {
+                Name = name;
+                SizeX = sizeX;
+                Height = height;
+                SizeZ = sizeZ;
+            }
+        }
+
+        // 高層ビル（細長い）と中くらいのビル。大きさ（x・高さ・z）は OBJ の頂点から測った値。
+        private static readonly CityModel[] TallCityModels =
+        {
+            new CityModel("building-skyscraper-a", 1.36f, 2.88f, 1.36f), new CityModel("building-skyscraper-b", 1.36f, 4.48f, 1.36f),
+            new CityModel("building-skyscraper-c", 1.28f, 4.08f, 1.39f), new CityModel("building-skyscraper-d", 1.28f, 5.47f, 1.39f),
+            new CityModel("building-skyscraper-e", 1.29f, 4.08f, 1.24f), new CityModel("building-m", 1.24f, 3.15f, 1.24f),
+            new CityModel("building-l", 1.37f, 2.27f, 1.4f),
+        };
+
+        private static readonly CityModel[] MidCityModels =
+        {
+            new CityModel("building-a", 0.88f, 1.29f, 0.94f), new CityModel("building-b", 0.97f, 1.29f, 0.94f), new CityModel("building-d", 0.84f, 1.29f, 0.9f),
+            new CityModel("building-f", 0.84f, 1.69f, 1.03f), new CityModel("building-g", 0.97f, 1.69f, 0.92f), new CityModel("building-h", 0.88f, 1.29f, 1.01f),
+            new CityModel("building-i", 1.24f, 1.68f, 1.3f), new CityModel("building-j", 2.08f, 1.69f, 1.34f), new CityModel("building-k", 2.08f, 1.47f, 0.94f),
+            new CityModel("building-n", 2.32f, 2.48f, 1.82f),
+        };
+
+        // 高さ（m）に合うモデルを選ぶ。低いビルは中くらいのビルを大きくすると窓が大きくなりすぎるので、高さ 30m 以下だけに使う。
+        private static CityModel PickCityModel(StageDecor decor, float height)
+        {
+            CityModel[] models = height > 30f ? TallCityModels : MidCityModels;
+            return models[decor.Random.Next(models.Length)];
         }
 
         // 明るさを掛けた光る色（不透明）。

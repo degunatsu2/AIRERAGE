@@ -226,12 +226,24 @@ namespace Airerage.Editor.Stages
                 GameObject icicle = decor.Box("CeilingIcicle", new Vector3(x, 2f - length * 0.35f, decor.Range(-1.5f, 1.5f)), new Vector3(0.25f, length, 0.25f), ice);
                 icicle.transform.rotation = Quaternion.Euler(0f, 45f, 0f);
             }
+            // 針葉樹: 幹と、雪をかぶった 3 段の葉（円錐。前は 45° 回した箱）。
+            Mesh cone = TerrainSculpt.Cone("SnowSea", "PineCone", 10);
+            Material trunk = decor.Lit("PineTrunk", new Color(0.3f, 0.21f, 0.15f));
             for (int i = 0; i < 9; i++)
             {
-                float size = decor.Range(1.6f, 3f);
-                GameObject tree = decor.Box("Pine", new Vector3(decor.Range(-47f, -26f), 6f + size * 0.5f, decor.Range(3f, 12f)),
-                    new Vector3(size, size, size), pine);
-                tree.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
+                float size = decor.Range(2.2f, 4f);
+                var foot = new Vector3(decor.Range(-47f, -26f), 6f, decor.Range(3.5f, 12f));
+                decor.Cylinder("PineTrunk", foot + new Vector3(0f, size * 0.12f, 0f), new Vector3(size * 0.12f, size * 0.12f, size * 0.12f), trunk);
+                float yaw = decor.Range(0f, 360f);
+                for (int tier = 0; tier < 3; tier++)
+                {
+                    float width = size * (0.95f - tier * 0.22f);
+                    float baseY = size * (0.2f + tier * 0.27f);
+                    TerrainSculpt.PlaceMesh(decor, "Pine", cone, pine, foot + new Vector3(0f, baseY, 0f), new Vector3(width, size * 0.48f, width), yaw + tier * 17f);
+                    // 葉の段の上の雪（少し小さい白い円錐を上へ）。
+                    TerrainSculpt.PlaceMesh(decor, "PineSnow", cone, snow, foot + new Vector3(0f, baseY + size * 0.2f, 0f),
+                        new Vector3(width * 0.62f, size * 0.3f, width * 0.62f), yaw + tier * 17f + 9f);
+                }
             }
             // 船の飾り（木の船体と見張り台、帆、船首）。地形の箱を少し大きな木の箱で覆う（上の面も地形より少し上にする。同じ高さだと
             // カメラが動くたびに地形の白とちらつく。ユーザーの指摘、2026-10-21）。
@@ -243,14 +255,9 @@ namespace Airerage.Editor.Stages
             decor.Box("CrowsNestSkin", new Vector3(42f, 16.2f, 0f), new Vector3(3.02f, 0.42f, 4.2f), wood);
             decor.Box("ShipBow", new Vector3(36f, -3.74f, 0f), new Vector3(2.02f, 4.52f, 4.2f), wood);
             decor.Quad("Sail", new Vector3(42f, 10f, 0.4f), new Vector2(6f, 8f), sail);
-            // 遠くの雪山と氷山。
-            for (int i = 0; i < 6; i++)
-            {
-                float size = decor.Range(35f, 60f);
-                GameObject mountain = decor.Box("Mountain", new Vector3(-130f + i * 50f + decor.Range(-8f, 8f), -20f, 120f + decor.Range(0f, 30f)),
-                    new Vector3(size, size, 20f), snow);
-                mountain.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
-            }
+            // 遠くの雪山（尖った尾根の雑音の高さの網。海から立ち上がり、高い所と平らな所に雪。霧で空の地平線の色に溶ける。2026-11-18 の
+            // 要望: 地面のモデリング）と氷山。
+            TerrainSculpt.PlaceSnowRange(decor, "SnowSea", 105f, 260f, -14f, 23);
             for (int i = 0; i < 8; i++)
             {
                 float width = decor.Range(4f, 12f);

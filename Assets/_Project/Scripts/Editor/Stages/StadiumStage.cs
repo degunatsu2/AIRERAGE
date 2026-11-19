@@ -183,12 +183,124 @@ namespace Airerage.Editor.Stages
         }
 
         // トラックのレーンの線と芝生、スタンドの観客、照明、得点板の画面、空の雲。
+        /// <summary>
+        /// 奥のスタンド: 段々の観客席（14 段。区画ごとに座席の色を変え、区画の間に階段の通路）、前の壁の広告の板、座っている観客
+        /// （体と頭の箱。色はまちまちで、4 割ほど空席）、上の屋根と鉄骨と屋根の下の照明、両端の照明塔（光る灯りの格子）。
+        /// 小さな箱は 1 つの網にまとめる（TerrainSculpt.BoxBatch）。見た目だけ（当たりはない）。
+        /// </summary>
+        private static void Grandstand(StageDecor decor)
+        {
+            const int Concrete = 0, SeatBlue = 1, SeatSky = 2, SeatWhite = 3, SeatRed = 4, Skin = 5, SkinDark = 6, Steel = 7, AdA = 8, AdB = 9;
+            const int ShirtFirst = 10, Shirts = 7, RoofLamp = 17;
+            Material[] materials =
+            {
+                decor.Lit("StandConcrete", new Color(0.62f, 0.62f, 0.64f)),
+                decor.Lit("SeatBlue", new Color(0.12f, 0.28f, 0.68f)),
+                decor.Lit("SeatSky", new Color(0.3f, 0.56f, 0.86f)),
+                decor.Lit("SeatWhite", new Color(0.88f, 0.9f, 0.92f)),
+                decor.Lit("SeatRed", new Color(0.78f, 0.16f, 0.16f)),
+                decor.Lit("FanSkin", new Color(0.86f, 0.67f, 0.53f)),
+                decor.Lit("FanSkinDark", new Color(0.55f, 0.38f, 0.27f)),
+                decor.Lit("StandSteel", new Color(0.36f, 0.38f, 0.42f)),
+                decor.Unlit("AdBoardA", new Color(0.1f, 0.75f, 0.45f)),
+                decor.Unlit("AdBoardB", new Color(1f, 0.62f, 0.12f)),
+                decor.Lit("ShirtRed", new Color(0.82f, 0.18f, 0.18f)),
+                decor.Lit("ShirtBlue", new Color(0.18f, 0.36f, 0.8f)),
+                decor.Lit("ShirtWhite", new Color(0.92f, 0.92f, 0.9f)),
+                decor.Lit("ShirtYellow", new Color(0.95f, 0.8f, 0.2f)),
+                decor.Lit("ShirtBlack", new Color(0.12f, 0.12f, 0.14f)),
+                decor.Lit("ShirtGreen", new Color(0.2f, 0.6f, 0.3f)),
+                decor.Lit("ShirtGray", new Color(0.5f, 0.5f, 0.52f)),
+                decor.Unlit("RoofLamp", new Color(1.6f, 1.55f, 1.35f)),
+            };
+            var batch = new TerrainSculpt.BoxBatch(materials.Length);
+            const int Tiers = 14;
+            const float Front = 31f, Depth = 1.5f, Rise = 0.95f, Bottom = 1.2f, HalfWidth = 92f;
+            const float Section = 12f, Aisle = 1.4f;
+            // 前の壁と広告の板。
+            batch.Add(new Vector3(0f, 0.7f, Front - 0.6f), new Vector3(HalfWidth * 2f, 1.4f, 0.3f), Concrete);
+            for (float x = -HalfWidth + 4f; x < HalfWidth; x += 8f)
+            {
+                batch.Add(new Vector3(x, 0.75f, Front - 0.78f), new Vector3(7.4f, 0.9f, 0.05f), ((int)((x + HalfWidth) / 8f) % 2 == 0) ? AdA : AdB);
+            }
+            for (int tier = 0; tier < Tiers; tier++)
+            {
+                float top = Bottom + tier * Rise;
+                float z = Front + tier * Depth;
+                // 段（床）。
+                batch.Add(new Vector3(0f, top * 0.5f, z + Depth * 0.5f), new Vector3(HalfWidth * 2f, top, Depth), Concrete);
+                for (float sx = -HalfWidth; sx < HalfWidth - Section * 0.5f; sx += Section)
+                {
+                    float left = sx + Aisle * 0.5f;
+                    float right = Mathf.Min(sx + Section, HalfWidth) - Aisle * 0.5f;
+                    int sectionIndex = Mathf.RoundToInt((sx + HalfWidth) / Section);
+                    // 座席の色: 真ん中の区画は赤、ほかは青と水色をかわるがわる、上の 3 段は白（模様）。
+                    int seat = Mathf.Abs(sx + Section * 0.5f) < Section ? SeatRed : tier >= Tiers - 3 ? SeatWhite : sectionIndex % 2 == 0 ? SeatBlue : SeatSky;
+                    // 座面と背もたれ（区画の長さの帯）。
+                    batch.Add(new Vector3((left + right) * 0.5f, top + 0.22f, z + 0.55f), new Vector3(right - left, 0.12f, 0.5f), seat);
+                    batch.Add(new Vector3((left + right) * 0.5f, top + 0.45f, z + 0.85f), new Vector3(right - left, 0.5f, 0.1f), seat);
+                    // 観客（6 割ほど埋まる。体と頭）。
+                    for (float x = left + 0.35f; x < right - 0.2f; x += 0.68f)
+                    {
+                        if (decor.Random.NextDouble() > 0.6)
+                        {
+                            continue;
+                        }
+                        int shirt = ShirtFirst + decor.Random.Next(Shirts);
+                        float lean = decor.Range(-0.06f, 0.06f);
+                        float height = decor.Range(0.5f, 0.62f);
+                        var body = new Vector3(x + lean, top + 0.28f + height * 0.5f, z + 0.62f);
+                        batch.Add(body, new Vector3(0.42f, height, 0.3f), shirt);
+                        bool standing = decor.Random.NextDouble() < 0.08;
+                        batch.Add(body + new Vector3(0f, height * 0.5f + 0.13f + (standing ? 0.3f : 0f), 0f), new Vector3(0.21f, 0.24f, 0.22f),
+                            decor.Random.NextDouble() < 0.3 ? SkinDark : Skin);
+                    }
+                }
+                // 通路の階段（区画の間の、段の半分の高さの小さな段）。
+                for (float sx = -HalfWidth + Section; sx < HalfWidth; sx += Section)
+                {
+                    batch.Add(new Vector3(sx, top + Rise * 0.25f, z + Depth * 0.25f), new Vector3(Aisle * 0.8f, Rise * 0.5f, Depth * 0.5f), Concrete);
+                }
+            }
+            float back = Front + Tiers * Depth;
+            float roofY = Bottom + Tiers * Rise + 7.5f;
+            // 後ろの壁と、屋根を支える柱、屋根（奥から手前へ少し下がる）と鉄骨の梁、屋根の下の照明。
+            batch.Add(new Vector3(0f, roofY * 0.5f, back + 0.3f), new Vector3(HalfWidth * 2f + 2f, roofY, 0.6f), Concrete);
+            for (float x = -HalfWidth; x <= HalfWidth + 0.1f; x += 18.4f)
+            {
+                batch.Add(new Vector3(x, roofY * 0.5f, back - 0.4f), new Vector3(0.8f, roofY, 0.8f), Steel);
+                // 片持ちの梁（奥の柱から手前の屋根の先まで）。
+                batch.Add(new Vector3(x, roofY + 0.9f, back - 9f), new Vector3(0.5f, 1.4f, 18f), Steel, 0f, true);
+            }
+            batch.Add(new Vector3(0f, roofY + 0.2f, back - 9f), new Vector3(HalfWidth * 2f + 2f, 0.4f, 18.4f), Steel, 0f, true);
+            for (float x = -HalfWidth + 3f; x < HalfWidth; x += 6f)
+            {
+                batch.Add(new Vector3(x, roofY - 0.25f, back - 17.4f), new Vector3(2.2f, 0.25f, 0.6f), RoofLamp, 0f, true);
+            }
+            batch.Place(decor, "Stadium", "Grandstand", materials);
+
+            // 両端の照明塔（スタンドの外。格子の灯りが光る）。
+            Material tower = decor.Lit("TowerSteel", new Color(0.4f, 0.42f, 0.46f));
+            Material lamp = decor.Unlit("TowerLamp", new Color(3f, 2.9f, 2.5f));
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var foot = new Vector3(side * 104f, 0f, 60f);
+                decor.Box("LightTower", foot + new Vector3(0f, 21f, 0f), new Vector3(1.4f, 42f, 1.4f), tower);
+                decor.Box("LightTowerHead", foot + new Vector3(-side * 1f, 44f, -1f), new Vector3(12f, 7f, 0.8f), tower);
+                for (int row = 0; row < 3; row++)
+                {
+                    for (int col = 0; col < 5; col++)
+                    {
+                        decor.Box("LightTowerLamp", foot + new Vector3(-side * 1f - 4.6f + col * 2.3f, 42f + row * 2.1f, -1.5f), new Vector3(1.8f, 1.5f, 0.3f), lamp);
+                    }
+                }
+            }
+        }
+
         private static void Decorate(StageDecor decor)
         {
             Material lane = decor.Unlit("LaneLine", new Color(1f, 1f, 1f));
             Material grass = decor.Lit("Grass", new Color(0.25f, 0.55f, 0.25f));
-            Material seats = decor.Lit("Seats", new Color(0.2f, 0.4f, 0.75f));
-            Material crowd = decor.Lit("Crowd", new Color(0.7f, 0.5f, 0.4f));
             Material light = decor.Unlit("Floodlight", new Color(1f, 0.98f, 0.85f));
             Material screen = decor.Unlit("ScoreScreen", new Color(0.15f, 0.9f, 0.5f));
             Material bar = decor.Lit("HighJumpBar", new Color(1f, 0.85f, 0.2f));
@@ -200,15 +312,8 @@ namespace Airerage.Editor.Stages
             {
                 decor.Box("Lane", new Vector3(0f, 0.02f, -1.5f + i * 1f), new Vector3(152f, 0.02f, 0.08f), lane);
             }
-            // 奥のスタンドと観客。
-            for (int tier = 0; tier < 5; tier++)
-            {
-                decor.Box("BackStand", new Vector3(0f, 3f + tier * 3f, 32f + tier * 3f), new Vector3(170f, 3f, 3f), seats);
-                for (int i = 0; i < 40; i++)
-                {
-                    decor.Box("Fan", new Vector3(-80f + i * 4f + decor.Range(-1f, 1f), 5f + tier * 3f, 31f + tier * 3f), new Vector3(0.8f, 1.2f, 0.5f), crowd);
-                }
-            }
+            // 奥のスタンド（2026-11-18 の要望: 背景を精巧に）。
+            Grandstand(decor);
             // 照明塔の灯り、得点板の画面、走り高跳びのバー、表彰台の金。
             decor.Box("FloodlampWest", new Vector3(-32.7f, 25.5f, 0.6f), new Vector3(5f, 1.6f, 0.4f), light);
             decor.Box("FloodlampEast", new Vector3(32.7f, 25.5f, 0.6f), new Vector3(5f, 1.6f, 0.4f), light);

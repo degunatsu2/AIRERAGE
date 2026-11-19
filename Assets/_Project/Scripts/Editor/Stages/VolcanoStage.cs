@@ -176,7 +176,6 @@ namespace Airerage.Editor.Stages
             Material lava = decor.Unlit("Lava", new Color(1f, 0.38f, 0.05f));
             Material lavaHot = decor.Unlit("LavaHot", new Color(1f, 0.75f, 0.2f));
             Material rock = decor.Lit("Rock", new Color(0.22f, 0.17f, 0.16f));
-            Material ash = decor.Lit("Ash", new Color(0.32f, 0.27f, 0.25f));
             Material ember = decor.Unlit("Ember", new Color(1f, 0.55f, 0.15f));
 
             decor.Box("LavaLake", new Vector3(0f, -20f, 5f), new Vector3(140f, 2f, 40f), lava);
@@ -184,12 +183,31 @@ namespace Airerage.Editor.Stages
             decor.Box("BubblingLavaWest", new Vector3(-20f, -18.9f, 0f), new Vector3(28f, 0.3f, 4f), lavaHot);
             decor.Box("BubblingLavaEast", new Vector3(20f, -18.9f, 0f), new Vector3(28f, 0.3f, 4f), lavaHot);
 
-            // 火口の壁（ステージの奥を囲む高い岩）。
-            for (float x = -70f; x <= 70f; x += 10f)
+            // 火口の壁（ステージの奥を囲む、ぎざぎざの岩の尾根。雑音で起伏をつけた高さの網。2026-11-18 の要望: 地面のモデリング）。
+            // 溶岩の湖から立ち上がり、外ほど高い。根元は溶岩で赤く光り、割れ目の筋も光る。上の平らな所は灰。
+            Material craterRock = TerrainSculpt.RockMaterial(decor, "CraterRock", m =>
             {
-                float height = 22f + Mathf.Abs(x) * 0.35f + decor.Range(-4f, 4f);
-                decor.Box("CraterWall", new Vector3(x, height * 0.5f - 20f, decor.Range(26f, 32f)), new Vector3(11f, height, 8f), decor.Random.NextDouble() < 0.5 ? rock : ash);
-            }
+                m.SetColor("_RockColor", new Color(0.3f, 0.23f, 0.21f));
+                m.SetColor("_RockDark", new Color(0.1f, 0.075f, 0.07f));
+                m.SetColor("_TopColor", new Color(0.42f, 0.38f, 0.36f));
+                m.SetFloat("_TopSlope", 0.72f);
+                m.SetFloat("_TopHeight", 8f);
+                m.SetFloat("_TopAmount", 0.7f);
+                m.SetFloat("_Strata", 0.45f);
+                m.SetFloat("_NoiseScale", 0.16f);
+                m.SetColor("_GlowColor", new Color(3.2f, 0.9f, 0.12f));
+                m.SetFloat("_GlowHeight", -19f);
+                m.SetFloat("_GlowFade", 3.5f);
+                m.SetFloat("_Cracks", 1.1f);
+                m.SetFloat("_Ambient", 0.9f);
+            });
+            TerrainSculpt.Place(decor, "Volcano", "CraterRidge", new TerrainSculpt.Field(-130f, 130f, 16f, 72f, 1f, (x, z) =>
+            {
+                float crest = 26f + Mathf.Abs(x) * 0.32f + (TerrainSculpt.Ridged(x * 0.035f, z * 0.035f, 11, 5) - 0.4f) * 24f;
+                float rise = TerrainSculpt.Smooth(17f, 38f, z) * (1f - 0.45f * TerrainSculpt.Smooth(46f, 72f, z));
+                float rough = (TerrainSculpt.Fbm(x * 0.18f, z * 0.18f, 5, 4) - 0.5f) * 5f;
+                return -21.5f + (crest + rough) * rise;
+            }), craterRock);
             // 縁と柱の奥行き（見た目だけ）。
             decor.Box("RimWestBack", new Vector3(-41f, -6f, 6f), new Vector3(14f, 32f, 8f), rock);
             decor.Box("RimEastBack", new Vector3(41f, -6f, 6f), new Vector3(14f, 32f, 8f), rock);
@@ -201,14 +219,29 @@ namespace Airerage.Editor.Stages
                 decor.Quad("Crack", new Vector3(x, decor.Range(-18f, 1f), -2.02f), new Vector2(decor.Range(0.15f, 0.35f), decor.Range(1.5f, 4f)), lava);
             }
 
-            // 遠くの火山（45° 回した箱で尖った山にする）。
-            for (int i = 0; i < 5; i++)
+            // 遠くの火山（火口のくぼみのある円錐が裾でつながる高さの網。霧で空の地平線の色に溶ける）。
+            Material farRock = TerrainSculpt.RockMaterial(decor, "FarVolcanoRock", m =>
             {
-                float size = decor.Range(40f, 70f);
-                GameObject peak = decor.Box("Mountain", new Vector3(-120f + i * 60f + decor.Range(-10f, 10f), -25f, 110f + decor.Range(0f, 30f)),
-                    new Vector3(size, size, 20f), rock);
-                peak.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
-            }
+                m.SetColor("_RockColor", new Color(0.32f, 0.25f, 0.23f));
+                m.SetColor("_RockDark", new Color(0.13f, 0.1f, 0.09f));
+                m.SetColor("_TopColor", new Color(0.5f, 0.45f, 0.42f));
+                m.SetFloat("_TopSlope", 0.8f);
+                m.SetFloat("_TopHeight", 40f);
+                m.SetFloat("_TopAmount", 0.5f);
+                m.SetFloat("_Strata", 0.3f);
+                m.SetFloat("_NoiseScale", 0.05f);
+                m.SetColor("_GlowColor", Color.black);
+                m.SetFloat("_Cracks", 0f);
+                m.SetFloat("_Ambient", 0.9f);
+            });
+            TerrainSculpt.Place(decor, "Volcano", "FarVolcanoes", new TerrainSculpt.Field(-340f, 340f, 90f, 270f, 4f, (x, z) =>
+            {
+                float cones = TerrainSculpt.Volcano(x, z, -210f, 175f, 105f, 125f, 13f) + TerrainSculpt.Volcano(x, z, -55f, 205f, 150f, 150f, 17f)
+                    + TerrainSculpt.Volcano(x, z, 95f, 165f, 85f, 105f, 11f) + TerrainSculpt.Volcano(x, z, 235f, 195f, 125f, 135f, 14f);
+                float gullies = (TerrainSculpt.Ridged(x * 0.03f, z * 0.03f, 41, 4) - 0.45f) * 14f * TerrainSculpt.Smooth(0f, 30f, cones);
+                float hills = TerrainSculpt.Fbm(x * 0.012f, z * 0.012f, 47, 3) * 18f;
+                return -26f + cones + gullies + hills;
+            }), farRock);
             // 火の粉。
             for (int i = 0; i < 40; i++)
             {

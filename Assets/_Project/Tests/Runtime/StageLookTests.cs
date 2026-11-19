@@ -467,7 +467,10 @@ namespace Airerage.Runtime.Tests
             int checkedCount = 0;
             foreach (Renderer renderer in decor.GetComponentsInChildren<Renderer>(true))
             {
-                if ((renderer.name != "Skyline" && renderer.name != "Block") || Mathf.Abs(renderer.bounds.center.x) > 40f)
+                // 箱のビルと、Kenney のビルのモデル（2026-11-18。Prop_building-*）。
+                bool building = renderer.name == "Skyline" || renderer.name == "Block"
+                    || renderer.GetComponentsInParent<Transform>(true).Any(t => t.name.StartsWith("Prop_building"));
+                if (!building || Mathf.Abs(renderer.bounds.center.x) > 40f)
                 {
                     continue;
                 }
@@ -522,10 +525,71 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
-        public void Kitchen_AndManor_UseTheKayKitProps()
+        public void Lab_HasTheSciFiInterior_WithEveryMaterialMapped()
         {
-            // 2026-11-18 のユーザーの指示: push したアセット（KayKit。CC0）を背景に組み込む。小物は色の絵の材質で、当たりはない。
-            foreach (string stage in new[] { "Stage_Kitchen", "Stage_Manor" })
+            // 2026-11-18 の要望（背景を無料のアセットで精巧に）: 研究所の奥は Quaternius の SF の壁の板・柱・小物。材質は OBJ の材質の
+            // 名前ごとに選ぶ（名前が分からず代わりの材質になった面がない）。
+            Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_Lab.unity");
+            Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+            Transform[] props = decor.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("Prop_")).ToArray();
+            Assert.That(props.Count(t => t.name.StartsWith("Prop_Wall") || t.name.StartsWith("Prop_Top")), Is.GreaterThan(80), "奥の壁の板が少ない");
+            Assert.That(props.Count(t => t.name == "Prop_Column_Large_Straight"), Is.GreaterThan(20), "柱が少ない");
+            foreach (Transform prop in props)
+            {
+                foreach (Renderer renderer in prop.GetComponentsInChildren<Renderer>(true))
+                {
+                    foreach (Material material in renderer.sharedMaterials)
+                    {
+                        Assert.That(material, Is.Not.Null, $"{prop.name} に材質がない");
+                        Assert.That(material.shader.name, Is.EqualTo("Airerage/PropLit"), $"{prop.name} の材質 {material.name}（代わりの材質になった）");
+                    }
+                    Assert.That(renderer.bounds.min.z, Is.GreaterThan(2f), $"{prop.name} が遊ぶ面に出ている");
+                }
+                Assert.That(prop.GetComponentsInChildren<Collider>(true), Is.Empty, $"{prop.name} に当たりがある");
+            }
+        }
+
+        [Test]
+        public void Stadium_HasAModeledGrandstand()
+        {
+            // 2026-11-18 の要望（背景を精巧に）: 奥のスタンドは段々の座席・通路・観客・屋根を 1 つの網にまとめたもの、両端に照明塔。
+            Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_Stadium.unity");
+            Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+            Transform stand = decor.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Grandstand");
+            Mesh mesh = stand.GetComponent<MeshFilter>().sharedMesh;
+            Assert.That(mesh.vertexCount, Is.GreaterThan(30000), "観客と座席が少ない");
+            Assert.That(AssetDatabase.GetAssetPath(mesh), Does.StartWith("Assets/_Project/Meshes/Stages/"), "網がアセットとして保存されていない");
+            Assert.That(stand.GetComponent<Renderer>().sharedMaterials.Length, Is.EqualTo(mesh.subMeshCount));
+            Assert.That(stand.GetComponent<Renderer>().bounds.min.z, Is.GreaterThan(25f), "遊ぶ面に近すぎる");
+            Assert.That(decor.GetComponentsInChildren<Transform>(true).Count(t => t.name == "LightTowerLamp"), Is.EqualTo(30), "照明塔の灯り");
+            Assert.That(decor.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Fan" || t.name == "BackStand"), Is.False, "前の箱のスタンドが残っている");
+        }
+
+        [TestCase("Stage_Volcano", "CraterRidge")]
+        [TestCase("Stage_Volcano", "FarVolcanoes")]
+        [TestCase("Stage_SnowSea", "FarMountains")]
+        [TestCase("Stage_Wharf", "FarMountains")]
+        public void BackgroundTerrain_IsSculpted(string stage, string name)
+        {
+            // 2026-11-18 の要望（地面のモデリングもしっかり）: 背景の山は箱ではなく、起伏のある高さの網（保存したメッシュ）を、斜面と高さで
+            // 岩・雪・灰・溶岩の光に塗る材質で描く。遊ぶ面より奥。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+            Transform terrain = decor.GetComponentsInChildren<Transform>(true).Single(t => t.name == name);
+            Mesh mesh = terrain.GetComponent<MeshFilter>().sharedMesh;
+            Assert.That(mesh.vertexCount, Is.GreaterThan(2000), "網が粗い");
+            Assert.That(AssetDatabase.GetAssetPath(mesh), Does.StartWith("Assets/_Project/Meshes/Stages/"), "網がアセットとして保存されていない");
+            Renderer renderer = terrain.GetComponent<Renderer>();
+            Assert.That(renderer.sharedMaterial.shader.name, Is.EqualTo("Airerage/TerrainRock"));
+            Assert.That(renderer.bounds.min.z, Is.GreaterThan(10f), "遊ぶ面に近すぎる");
+            Assert.That(renderer.bounds.size.y, Is.GreaterThan(30f), "起伏が小さい");
+        }
+
+        [Test]
+        public void Stages_UseTheReceivedAssetProps()
+        {
+            // 2026-11-18 のユーザーの指示: push したアセット（KayKit・Kenney。CC0）を背景に組み込む。小物は色の絵の材質で、当たりはない。
+            foreach (string stage in new[] { "Stage_Kitchen", "Stage_Manor", "Stage_SpaceStation", "Stage_CityDay", "Stage_CityNight" })
             {
                 Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
                 Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
@@ -536,9 +600,20 @@ namespace Airerage.Runtime.Tests
                     Renderer renderer = prop.GetComponentInChildren<Renderer>();
                     Assert.That(renderer, Is.Not.Null, $"{stage} の {prop.name} に見た目がない");
                     Assert.That(renderer.sharedMaterial.GetTexture("_BaseMap"), Is.Not.Null, $"{stage} の {prop.name} に色の絵がない");
+                    // キーワードに頼らない背景の小物のシェーダー（バッチモードで作った URP の Lit では発光・法線の絵が効かなかった）。
+                    Assert.That(renderer.sharedMaterial.shader.name, Is.EqualTo("Airerage/PropLit"), $"{stage} の {prop.name} の材質");
                     Assert.That(prop.GetComponentsInChildren<Collider>(true), Is.Empty, $"{stage} の {prop.name} に当たりがある");
                     // 遊ぶ面（z 0 のまわり）に出ない。
                     Assert.That(renderer.bounds.min.z, Is.GreaterThan(0f), $"{stage} の {prop.name} が遊ぶ面より手前に出ている");
+                }
+                if (stage == "Stage_CityNight")
+                {
+                    // 夜のビルは窓の色の所だけが光る（発光の絵）。
+                    Assert.That(props.Any(x =>
+                    {
+                        Material m = x.GetComponentInChildren<Renderer>().sharedMaterial;
+                        return m.GetTexture("_EmissionMap") != null && m.GetColor("_EmissionColor").maxColorComponent > 1f;
+                    }), Is.True, "夜のビルの窓が光らない");
                 }
             }
         }

@@ -156,10 +156,72 @@ namespace Airerage.Editor.Stages
             };
         }
 
+        private const string PropFolder = "Assets/_Project/Materials/Stages/SpaceStation";
+
+        /// <summary>
+        /// 奥の大きな宇宙ステーション: 長いトラス（梁と柱）に居住モジュール（KayKit の基地のモジュール）が並び、両端に大きな太陽電池パネルの翼、
+        /// モジュールの上に灯りと荷物。遊ぶ所の足場と見分けられるように、ずっと奥（z 170 あたり）の上のほうに、斜めに奥へ向けて置き、
+        /// 宇宙の暗さで色を落とす。見た目だけ（当たりはない）。
+        /// </summary>
+        private static void Station(StageDecor decor)
+        {
+            ThirdPartyProps.Pack pack = ThirdPartyProps.SpaceBase;
+            var tint = new Color(0.5f, 0.54f, 0.66f);
+            var root = new GameObject("FarStation").transform;
+            root.SetParent(decor.Root, false);
+            Material truss = decor.Lit("StationTruss", new Color(0.3f, 0.32f, 0.38f));
+            // ここでは原点のまわりに組んでから、最後に全体を奥へ動かして斜めに向ける。
+            void Keep(GameObject go)
+            {
+                if (go != null)
+                {
+                    go.transform.SetParent(root, true);
+                }
+            }
+            // 梁（上下 2 本）と、縦の柱・斜めの支え。
+            Keep(decor.Box("StationBeam", new Vector3(0f, -1.2f, 6f), new Vector3(240f, 1.2f, 1.2f), truss));
+            Keep(decor.Box("StationBeam", new Vector3(0f, 9f, 6f), new Vector3(240f, 1.2f, 1.2f), truss));
+            for (float x = -115f; x <= 115f; x += 10f)
+            {
+                Keep(decor.Box("StationStrut", new Vector3(x, 3.9f, 6f), new Vector3(0.5f, 10.2f, 0.5f), truss));
+                GameObject brace = decor.Box("StationBrace", new Vector3(x + 5f, 3.9f, 6f), new Vector3(0.35f, 11.2f, 0.35f), truss);
+                brace.transform.rotation = Quaternion.Euler(0f, 0f, 42f);
+                Keep(brace);
+            }
+            // 居住モジュールの並び（向きと種類を変えて）と、上の灯り・荷物。
+            string[] modules = { "basemodule_A", "basemodule_C", "basemodule_E", "basemodule_B", "basemodule_D" };
+            for (int i = 0; i < 8; i++)
+            {
+                float x = -87.5f + i * 25f + decor.Range(-3f, 3f);
+                Keep(ThirdPartyProps.Place(decor, pack, modules[i % modules.Length], new Vector3(x, 0f, 0f), decor.Range(6.5f, 8f), (i % 2) * 90f + decor.Range(-10f, 10f), tint, PropFolder));
+                if (i % 3 == 1)
+                {
+                    Keep(ThirdPartyProps.Place(decor, pack, "lights", new Vector3(x + 4f, 9.6f, 4f), 4f, 0f, tint, PropFolder));
+                }
+                else if (i % 3 == 2)
+                {
+                    Keep(ThirdPartyProps.Place(decor, pack, "roofmodule_cargo_A", new Vector3(x, 9.6f, 3f), 5f, 30f, tint, PropFolder));
+                }
+            }
+            // 両端の太陽電池パネルの翼（カメラの方へ起こして、面が見えるように）。
+            foreach (float x in new[] { -142f, -122f, 122f, 142f })
+            {
+                GameObject wing = ThirdPartyProps.Place(decor, pack, "roofmodule_solarpanels", new Vector3(x, 4f, 2f), 16f, 0f, tint, PropFolder);
+                if (wing != null)
+                {
+                    wing.transform.rotation = Quaternion.Euler(-72f, 0f, 0f);
+                    Keep(wing);
+                }
+            }
+            root.SetPositionAndRotation(new Vector3(-25f, 78f, 175f), Quaternion.Euler(0f, -24f, 6f));
+        }
+
         // 星、モジュールの奥行きと窓、トラスの骨組み、太陽電池パネルの面、ドッキングの灯り。惑星（地球）は空に描く（StageLook.ApplySky。
         // 2026-11-18 の要望で空をリアルにしたので、前の光を受ける青い球は置かない）。
         private static void Decorate(StageDecor decor)
         {
+            // 奥の大きな宇宙ステーション（KayKit Space Base Bits。CC0。2026-11-18 の要望: 背景を無料のアセットで精巧に）。
+            Station(decor);
             Material star = decor.Unlit("Star", Color.white);
             Material starBlue = decor.Unlit("StarBlue", new Color(0.7f, 0.8f, 1f));
             Material hull = decor.Lit("Hull", new Color(0.62f, 0.65f, 0.7f));

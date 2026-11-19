@@ -266,13 +266,8 @@ namespace Airerage.Editor.Stages
             decor.Box("FarShipHull", new Vector3(42f, -2f, 100f), new Vector3(14f, 4f, 6f), wood);
             decor.Box("FarShipMast", new Vector3(42f, 6f, 100f), new Vector3(0.6f, 12f, 0.6f), wood);
             decor.Quad("FarShipSail", new Vector3(42f, 7f, 99.6f), new Vector2(7f, 8f), sail);
-            for (int i = 0; i < 6; i++)
-            {
-                float size = decor.Range(40f, 70f);
-                GameObject mountain = decor.Box("Mountain", new Vector3(-120f + i * 50f + decor.Range(-8f, 8f), -15f, 150f + decor.Range(0f, 30f)),
-                    new Vector3(size, size, 20f), snow);
-                mountain.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
-            }
+            // 遠くの雪山（雑音の高さの網。2026-11-18 の要望: 地面のモデリング。前は 45° 回した箱）。
+            TerrainSculpt.PlaceSnowRange(decor, "Wharf", 140f, 310f, -12f, 57);
             // 岸壁の奥行きとボラード。
             // 桟橋の奥行き（遊ぶ面と同じ薄さ。下は海が続いて見えるように）。
             decor.Box("QuayWestBack", new Vector3(-34f, 0.2f, 6f), new Vector3(28f, 1.6f, 8f), concrete);
