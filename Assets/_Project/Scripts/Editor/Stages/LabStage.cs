@@ -235,37 +235,44 @@ namespace Airerage.Editor.Stages
         // 研究所の奥の壁、実験室の培養槽、エレベーターの縦穴の枠、気送管のガラス、冷却水の奥、配管とモニター。
         private const string SciFiPack = "Quaternius/SciFi";
 
-        // 壁の板（Quaternius の板は 4m × 3m。この倍率で並べる）。
-        private const float WallPanelScale = 2.6f;
+        // 壁の区画（柱の間隔 m。Quaternius の板は 4m × 3m なので、この幅に 1 枚を合わせる）と、左右の区画の数、壁のいちばん下。
+        private const float Bay = 12f;
+        private const int BayHalfCount = 6;
+        private const float WallBottom = -19f;
+
+        // 横の段の板（下から）。同じ段は同じ板にそろえる。
+        private static readonly string[] Rows =
+        {
+            "WallBand_Straight", "WallAstra_Straight", "WallAstra_Straight", "WallWindow_Straight",
+            "WallAstra_Straight", "WallWindow_Straight", "WallAstra_Straight", "TopCables_Straight",
+        };
 
         /// <summary>
-        /// 研究所の奥: SF の壁の板を奥の壁いっぱいに並べ（下は帯の板、真ん中は窓と配線の板、上は天井の配線）、太い柱を等間隔に積み、
-        /// 左右の棟の床を奥へ延ばして、コンピューター・木箱・樽・金庫・照明を置く。見た目だけ（当たりはない）。
+        /// 研究所の奥: SF の壁の板を、柱の格子の区画に 1 枚ずつ・横の段ごとに同じ種類で並べ（腰の帯・板・窓の帯・天井の配線）、
+        /// 左右の棟の床を奥へ延ばして、区画の真ん中に計算機の作業台と樽、天井に照明を置く。見た目だけ（当たりはない）。
         /// </summary>
         private static void SciFiInterior(StageDecor decor, Material fallback)
         {
             System.Func<string, Material> materials = SciFiMaterials(decor);
-            // 壁の板を、奥の壁（手前の面 z 13）の前に並べる。向きは板の表がカメラを向くように（WallYaw）。
-            string[] middle = { "WallAstra_Straight", "WallWindow_Straight", "WallAstra_Straight_Window", "WallBand_Straight" };
-            float width = 4f * WallPanelScale;
-            float height = 3f * WallPanelScale;
-            int row = 0;
-            for (float y = -19f; y < 51f; y += height, row++)
+            // 壁は柱の間隔（Bay）ごとの区画にちょうど 1 枚の板を入れ、横の段（Rows）ごとに同じ種類の板をそろえる（2026-11-19 の要望:
+            // 区画ごとにちぐはぐで「完成していないスライドパズル」のようだった。研究所のマップによくある、柱の格子と横の帯で整理した壁）。
+            // 下から: 腰の帯 → 板 2 段 → 窓の帯 → 板 → 窓の帯 → 天井の配線。板の向きは表がカメラを向くように（WallYaw）。
+            float scale = Bay / 4f;
+            float height = 3f * scale;
+            for (int row = 0; row < Rows.Length; row++)
             {
-                for (float x = -70f + width * 0.5f; x < 70f; x += width)
+                float y = WallBottom + row * height;
+                for (float x = -BayHalfCount * Bay + Bay * 0.5f; x < BayHalfCount * Bay; x += Bay)
                 {
-                    string model = row == 0 ? "WallBand_Straight"
-                        : y + height >= 51f ? "TopCables_Straight"
-                        : middle[(row * 3 + Mathf.RoundToInt((x + 70f) / width)) % middle.Length];
-                    PlaceAgainstWall(decor, model, new Vector3(x, y, 0f), Vector3.one * WallPanelScale, 13f, materials, fallback);
+                    PlaceAgainstWall(decor, Rows[row], new Vector3(x, y, 0f), Vector3.one * scale, 13f, materials, fallback);
                 }
             }
-            // 太い柱（10m の柱を積む）。
-            for (float x = -54f; x <= 54f; x += 12f)
+            // 柱（区画の境目ごと。1 段の高さにそろえた柱を段ごとに積む）。
+            for (float x = -BayHalfCount * Bay; x <= BayHalfCount * Bay + 0.1f; x += Bay)
             {
-                for (float y = -19f; y < 51f; y += 13f)
+                for (int row = 0; row < Rows.Length; row++)
                 {
-                    PlaceAgainstWall(decor, "Column_Large_Straight", new Vector3(x, y, 0f), Vector3.one * 1.3f, 12.6f, materials, fallback);
+                    PlaceAgainstWall(decor, "Column_Large_Straight", new Vector3(x, WallBottom + row * height, 0f), new Vector3(1.2f, height / 10f, 1.2f), 12.4f, materials, fallback);
                 }
             }
             // 左右の棟の床を奥へ（遊ぶ面の床は z ±2 まで）。その上の小物。
@@ -273,27 +280,20 @@ namespace Airerage.Editor.Stages
             foreach (float side in new[] { -1f, 1f })
             {
                 decor.Box("BackFloor", new Vector3(side * 34.5f, -1f, 7.5f), new Vector3(29f, 2f, 11f), floor);
+                // 小物は区画の真ん中にそろえて少なめに（左右対称）: 計算機の作業台 2 台と、樽 2 本。
                 (string Model, float X, float Z, float Scale, float Yaw)[] props =
                 {
-                    ("Prop_Computer", 22.5f, 9.5f, 1.5f, 180f), ("Prop_Computer", 24f, 9.5f, 1.5f, 180f),
-                    ("Prop_Chest", 30f, 10f, 1.4f, 180f), ("Prop_Crate4", 33.5f, 9.5f, 1.6f, 15f), ("Prop_Crate3", 33.8f, 9.4f, 1.5f, -10f),
-                    ("Prop_Barrel_Large", 37f, 10.5f, 1.6f, 0f), ("Prop_Barrel_Large", 38.2f, 9.8f, 1.6f, 40f),
-                    ("Prop_PipeHolder", 41f, 11f, 1.5f, 180f), ("Prop_ItemHolder", 26.5f, 6.5f, 1.6f, 180f),
-                    ("Prop_AccessPoint", 44f, 6f, 1.6f, 90f), ("Prop_Fan_Small", 47f, 10f, 1.6f, 0f),
+                    ("Prop_Computer", 28.8f, 10.5f, 1.6f, 180f), ("Prop_Computer", 31.2f, 10.5f, 1.6f, 180f),
+                    ("Prop_Barrel_Large", 41.2f, 10.5f, 1.7f, 0f), ("Prop_Barrel_Large", 42.8f, 10.5f, 1.7f, 0f),
                 };
                 foreach (var prop in props)
                 {
-                    float y = prop.Model == "Prop_Crate3" ? 1.6f * 1.12f + 0.75f : prop.Model.StartsWith("Prop_Crate") ? 0.5f * prop.Scale : 0f;
-                    if (prop.Model == "Prop_AccessPoint")
-                    {
-                        y = 0f;
-                    }
-                    ThirdPartyProps.PlaceMulti(decor, SciFiPack, prop.Model, new Vector3(side * prop.X, y, prop.Z),
+                    ThirdPartyProps.PlaceMulti(decor, SciFiPack, prop.Model, new Vector3(side * prop.X, 0f, prop.Z),
                         Quaternion.Euler(0f, side > 0f ? prop.Yaw : -prop.Yaw, 0f), Vector3.one * prop.Scale, materials, fallback);
                 }
             }
-            // 天井の照明（奥の壁の上の段）。
-            for (float x = -60f; x <= 60f; x += 15f)
+            // 天井の照明（区画の真ん中ごと）。
+            for (float x = -BayHalfCount * Bay + Bay * 0.5f; x < BayHalfCount * Bay; x += Bay)
             {
                 ThirdPartyProps.PlaceMulti(decor, SciFiPack, "Prop_Light_Wide", new Vector3(x, 47f, 10f), Quaternion.identity, Vector3.one * 2f, materials, fallback);
             }

@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: SnowGround
+  m_Shader: {fileID: 4800000, guid: 7d938f1404954c64b7747a8d95d47574, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _RockNormal:
+        m_Texture: {fileID: 2800000, guid: 7959c19e79fe728c289d5b8e9f898c65, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RockTex:
+        m_Texture: {fileID: 2800000, guid: 4c6979b3e5d8075ac8df857e23f0abe6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopNormal:
+        m_Texture: {fileID: 2800000, guid: 7959c19e79fe728c289d5b8e9f898c65, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopTex:
+        m_Texture: {fileID: 2800000, guid: 4c6979b3e5d8075ac8df857e23f0abe6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Ambient: 0.9
+    - _Cracks: 0
+    - _GlowFade: 6
+    - _GlowHeight: -100
+    - _NoiseScale: 0.2
+    - _NormalStrength: 0.6
+    - _RockTexGain: 2.58
+    - _Strata: 0
+    - _TexScale: 0.25
+    - _TexStrength: 0.65
+    - _TopAmount: 1
+    - _TopHeight: -1000
+    - _TopSlope: 0.6
+    - _TopTexGain: 2.58
+    m_Colors:
+    - _GlowColor: {r: 0, g: 0, b: 0, a: 1}
+    - _RockColor: {r: 0.82, g: 0.86, b: 0.92, a: 1}
+    - _RockDark: {r: 0.492, g: 0.51600003, b: 0.55200005, a: 0.6}
+    - _TopColor: {r: 0.93, g: 0.95, b: 0.98, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

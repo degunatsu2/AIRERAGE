@@ -240,13 +240,69 @@ namespace Airerage.Editor.Stages
         }
 
         // 奥の海（遠くの氷山と浮かぶ氷と船。FROST COAST）、ボラード、灯台の光、倉庫、岸壁の奥行き、遠くの雪山。
+        /// <summary>
+        /// 湾の向こうの工業港（Kenney の City Kit Industrial: 倉庫・工場・煙突・タンク・給水塔・コンテナ）と、湾に浮かぶ船
+        /// （Kenney の Watercraft: 貨物船・大きな船・タグボート・漁船・帆船・ブイ）。CC0。2026-11-19 にユーザーが追加。見た目だけ。
+        /// </summary>
+        private static void Harbor(StageDecor decor, Material concrete)
+        {
+            Color tint = new Color(0.9f, 0.92f, 0.96f);
+            string folder = decor.Folder;
+            const float landTop = -3f;
+            decor.Box("HarborLand", new Vector3(0f, landTop - 2f, 118f), new Vector3(460f, 4f, 30f), concrete);
+            string[] buildings = { "building-a", "building-b", "building-c", "building-e", "building-g", "building-j", "building-m", "building-q" };
+            for (float x = -210f; x < 210f;)
+            {
+                string model = buildings[decor.Random.Next(buildings.Length)];
+                float scale = decor.Range(8f, 10f);
+                ThirdPartyProps.Place(decor, ThirdPartyProps.CityIndustrial, model, new Vector3(x, landTop, 122f + decor.Range(-3f, 3f)), scale, 180f, tint, folder);
+                x += 2.2f * scale + decor.Range(2f, 8f);
+            }
+            foreach (float x in new[] { -150f, -64f, 38f, 120f })
+            {
+                ThirdPartyProps.Place(decor, ThirdPartyProps.CityIndustrial, "chimney-large", new Vector3(x, landTop, 128f), 10f, 0f, tint, folder);
+            }
+            foreach (float x in new[] { -96f, 76f, 160f })
+            {
+                ThirdPartyProps.Place(decor, ThirdPartyProps.CityIndustrial, "detail-tank-large", new Vector3(x, landTop, 110f), 9f, 30f, tint, folder);
+            }
+            ThirdPartyProps.Place(decor, ThirdPartyProps.CityIndustrial, "water-tower", new Vector3(-20f, landTop, 128f), 9f, 0f, tint, folder);
+            // 岸壁のコンテナの山（2 段）。
+            string[] containers = { "shipping-container-a", "shipping-container-b", "shipping-container-c" };
+            for (float x = -120f; x < 130f; x += decor.Range(10f, 22f))
+            {
+                int stack = decor.Random.Next(1, 3);
+                for (int level = 0; level < stack; level++)
+                {
+                    ThirdPartyProps.Place(decor, ThirdPartyProps.CityIndustrial, containers[decor.Random.Next(containers.Length)],
+                        new Vector3(x, landTop + level * 0.35f * 9f, 106.5f), 9f, 90f, tint, folder);
+                }
+            }
+            // 湾の船（水面 y -6。船底を少し沈める。横を向けて見せる）。
+            void Boat(string model, float x, float z, float scale, float yaw)
+            {
+                ThirdPartyProps.Place(decor, ThirdPartyProps.Watercraft, model, new Vector3(x, -6f - 0.25f * scale, z), scale, yaw, tint, folder);
+            }
+            Boat("ship-cargo-a", -78f, 66f, 3.2f, 90f);
+            Boat("ship-large", 70f, 80f, 2.8f, -84f);
+            Boat("boat-tug-a", -34f, 48f, 2.4f, 70f);
+            Boat("boat-fishing-small", 28f, 44f, 2f, -100f);
+            Boat("boat-sail-a", -130f, 84f, 2.6f, 80f);
+            Boat("ship-cargo-b", 150f, 92f, 3f, 95f);
+            foreach (float x in new[] { -46f, -18f, 18f, 46f })
+            {
+                ThirdPartyProps.Place(decor, ThirdPartyProps.Watercraft, "buoy", new Vector3(x, -6.2f, 30f), 1.6f, 0f, tint, folder);
+            }
+        }
+
         private static void Decorate(StageDecor decor)
         {
             // 海は水のシェーダーの水面（空を映し、さざ波と太陽のきらめき。2026-11-18 の要望: 水の表現をリアルに）。
             Material sea = decor.Water("SeaWater", new Color(0.18f, 0.46f, 0.6f), new Color(0.03f, 0.13f, 0.25f), false, -5f, true);
             Material ice = decor.Lit("Ice", new Color(0.7f, 0.88f, 0.96f));
             Material snow = decor.Lit("Snow", new Color(0.93f, 0.95f, 0.98f));
-            Material concrete = decor.Lit("Concrete", new Color(0.5f, 0.52f, 0.55f));
+            Material concrete = TerrainSculpt.GroundMaterial(decor, "ConcreteGround", new Color(0.5f, 0.52f, 0.55f), TerrainSculpt.Photos.Concrete,
+                new Color(0.55f, 0.56f, 0.58f), TerrainSculpt.Photos.Concrete, 0.25f);
             Material bollard = decor.Lit("Bollard", new Color(0.15f, 0.15f, 0.17f));
             Material beam = decor.Unlit("LighthouseBeam", new Color(1f, 0.95f, 0.7f));
             Material wood = decor.Lit("ShipWood", new Color(0.45f, 0.3f, 0.2f));
@@ -268,6 +324,7 @@ namespace Airerage.Editor.Stages
             decor.Quad("FarShipSail", new Vector3(42f, 7f, 99.6f), new Vector2(7f, 8f), sail);
             // 遠くの雪山（雑音の高さの網。2026-11-18 の要望: 地面のモデリング。前は 45° 回した箱）。
             TerrainSculpt.PlaceSnowRange(decor, "Wharf", 140f, 310f, -12f, 57);
+            Harbor(decor, concrete);
             // 岸壁の奥行きとボラード。
             // 桟橋の奥行き（遊ぶ面と同じ薄さ。下は海が続いて見えるように）。
             decor.Box("QuayWestBack", new Vector3(-34f, 0.2f, 6f), new Vector3(28f, 1.6f, 8f), concrete);

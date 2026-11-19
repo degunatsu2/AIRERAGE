@@ -69,7 +69,8 @@ namespace Airerage.Editor.Stages
                     // 真ん中の館（玄関のポーチ、バルコニー、屋根、鐘楼、煙突）。
                     new TerrainBox("Porch", -14f, -30f, 14f, 2f),
                     // バルコニー（真ん中に 1 つ。ポーチのジャンプ台の上を空け、跳んでも頭がぶつからない。ユーザーの要望、2026-10-26）。
-                    new TerrainBox("Balcony", -6f, 10f, 6f, 10.6f, attachable: true),
+                    // 2026-11-19: 館のポーチの屋根の幅（柱の外側まで）に合わせて x ±7 に広げた（ジャンプ台 x ±9〜11 の上は空けたまま）。
+                    new TerrainBox("Balcony", -7f, 10f, 7f, 10.6f, attachable: true),
                     new TerrainBox("RoofWest", -14f, 20f, -2f, 20.8f, attachable: true),
                     new TerrainBox("RoofEast", 2f, 20f, 14f, 20.8f, attachable: true),
                     new TerrainBox("BellTower", -2f, 20f, 2f, 32f, attachable: true),
@@ -353,8 +354,12 @@ namespace Airerage.Editor.Stages
         private static readonly Color ManorGlow = new Color(1.5f, 0.5f, 2.2f);
 
         /// <summary>
-        /// 館: 2 階建ての本館（こげ茶の石の壁・付け柱・階の帯と軒の紫の縁取り・切妻の屋根・煙突）、左右の小塔（細い窓と尖った屋根）、
-        /// 真ん中の高い塔（紫に光るばら窓と尖塔）、アーチの窓（紫の光・十字の桟・窓台）、真ん中の扉。見た目だけ（当たりはない）。
+        /// 館（2026-11-19 の要望: 大きさを足場に合わせ、洋館のパーツをそろえる）。2 階建ての本館に、マンサード屋根（急な下の斜面と
+        /// ドーマー、平らな上の屋上と手すり）、真ん中の塔屋（時計と鐘の開口と尖塔）、左右の小塔（とんがり屋根）、玄関のポーチ（柱と
+        /// 2 階のバルコニー、バラスターの手すり）、1 階の左右のベイウィンドウ、2 階の真ん中のペディメント、煙突。
+        /// 階の高さを足場に合わせる: ポーチの床 = 地面の足場（y 2）、ポーチの屋根 = バルコニーの足場（y 10.6）、屋上 = 左右の屋根の足場
+        /// （y 20.8）、塔屋 = 鐘楼の足場。足場（z ±2）のすぐ奥に正面（z 4.5）を置き、足場と館の間は床と屋根の延長でつなぐ。
+        /// 見た目だけ（当たりはない）。
         /// </summary>
         private static void ManorHouse(StageDecor decor)
         {
@@ -362,15 +367,27 @@ namespace Airerage.Editor.Stages
             Material trim = decor.Lit("ManorTrim", ManorTrim);
             Material roof = decor.Lit("ManorRoofTile", ManorRoofTile);
             Material accent = decor.Lit("ManorAccent", ManorAccent);
+            Material stone = decor.Lit("ManorStone", new Color(0.3f, 0.27f, 0.27f));
             Material glow = decor.Unlit("ManorWindowPurple", ManorGlow);
+            Mesh prism = TerrainSculpt.Prism("Manor", "Prism");
             Transform root = new GameObject("ManorHouse").transform;
             root.SetParent(decor.Root, false);
             GameObject Box(string name, Vector3 center, Vector3 size, Material material)
             {
-                GameObject go = decor.Box(name, root, center, size, material);
+                return decor.Box(name, root, center, size, material);
+            }
+            // 三角柱（底の中心 baseCenter、幅・高さ・奥行き）。切妻・ペディメント・ドーマーの屋根。
+            GameObject Gable(string name, Vector3 baseCenter, float width, float height, float depth, Material material)
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(root, false);
+                go.transform.localPosition = baseCenter;
+                go.transform.localScale = new Vector3(width, height, depth);
+                go.AddComponent<MeshFilter>().sharedMesh = prism;
+                go.AddComponent<MeshRenderer>().sharedMaterial = material;
                 return go;
             }
-            // 縦に伸ばした菱形（尖った屋根・尖塔）。下の半分は塔の中に隠れる。
+            // 縦に伸ばした菱形（尖塔・とんがり屋根）。下の半分は塔の中に隠れる。
             void Spire(string name, Vector3 center, float width, float depth, float stretch, Material material)
             {
                 var pivot = new GameObject(name).transform;
@@ -380,14 +397,13 @@ namespace Airerage.Editor.Stages
                 float side = width / Mathf.Sqrt(2f);
                 decor.Box(name + "Shape", pivot, Vector3.zero, new Vector3(side, side, depth), material).transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
             }
-            // 丸い板（アーチの上や、ばら窓）。
             GameObject Disc(string name, Vector3 center, float diameter, Material material)
             {
                 GameObject go = decor.Cylinder(name, root, center, new Vector3(diameter, 0.04f, diameter), material);
                 go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 return go;
             }
-            // アーチの窓（縁取り・紫の光・十字の桟・窓台）。center は光る窓の中心、front は壁の手前の面の z。
+            // アーチの窓（縁取り・紫の光・十字の桟・窓台）。front は壁の手前の面の z。
             void ArchWindow(string name, Vector2 center, float width, float height, float front)
             {
                 float z = front - 0.06f;
@@ -399,93 +415,149 @@ namespace Airerage.Editor.Stages
                 Box(name + "Transom", new Vector3(center.x, center.y + height * 0.12f, z - 0.07f), new Vector3(width, 0.12f, 0.06f), trim);
                 Box(name + "Sill", new Vector3(center.x, center.y - height * 0.5f - 0.2f, z - 0.2f), new Vector3(width + 0.8f, 0.22f, 0.5f), accent);
             }
+            // バラスターの手すり（x0〜x1、床の高さ floor、z。上下の横木と、つぼ形の小柱）。
+            void Balustrade(string name, float x0, float x1, float floor, float z, float height)
+            {
+                Box(name + "Rail", new Vector3((x0 + x1) * 0.5f, floor + height - 0.07f, z), new Vector3(x1 - x0, 0.14f, 0.22f), trim);
+                Box(name + "Base", new Vector3((x0 + x1) * 0.5f, floor + 0.06f, z), new Vector3(x1 - x0, 0.12f, 0.2f), trim);
+                int count = Mathf.Max(2, Mathf.RoundToInt((x1 - x0) / 0.42f));
+                for (int i = 0; i <= count; i++)
+                {
+                    float x = Mathf.Lerp(x0 + 0.15f, x1 - 0.15f, i / (float)count);
+                    decor.Cylinder(name + "Baluster", root, new Vector3(x, floor + height * 0.5f, z), new Vector3(0.11f, (height - 0.26f) * 0.5f, 0.11f), accent);
+                    decor.Sphere(name + "BalusterBelly", root, new Vector3(x, floor + height * 0.42f, z), new Vector3(0.18f, 0.22f, 0.18f), accent);
+                }
+            }
 
-            // 本館（x -11〜11、高さ 16、手前の面 z 4）と土台。
-            const float front = 4f;
-            Box("ManorHall", new Vector3(0f, 8f, 7.5f), new Vector3(22f, 16f, 7f), wall);
-            Box("ManorPlinth", new Vector3(0f, 0.6f, 7.5f), new Vector3(23f, 1.2f, 7.6f), trim);
-            // 付け柱と、階の帯・軒（紫の縁取り）。
-            foreach (float x in new[] { -11f, -6.6f, -2.2f, 2.2f, 6.6f, 11f })
+            const float front = 4.5f;
+            const float depth = 6.5f;
+            const float halfWidth = 14f;
+            float midZ = front + depth * 0.5f;
+            // 土台（足場の地面の高さ y 2 まで。下は谷へ続く石積み）と本館（y 2〜16）。
+            Box("ManorFoundation", new Vector3(0f, -4f, midZ), new Vector3(halfWidth * 2f + 1f, 12f, depth + 0.6f), stone);
+            Box("ManorHall", new Vector3(0f, 9f, midZ), new Vector3(halfWidth * 2f, 14f, depth), wall);
+            // 足場と館をつなぐ床（ポーチの床）。
+            Box("ManorPorchDeck", new Vector3(0f, 1.8f, (2f + front) * 0.5f), new Vector3(halfWidth * 2f, 0.4f, front - 2f), stone);
+            // 付け柱、階の帯（ポーチの屋根の高さ）、軒の蛇腹（紫の線）。
+            foreach (float x in new[] { -halfWidth, -7.6f, 7.6f, halfWidth })
             {
-                Box("ManorPilaster", new Vector3(x, 8f, front - 0.15f), new Vector3(0.6f, 16f, 0.3f), trim);
+                Box("ManorPilaster", new Vector3(x, 9f, front - 0.15f), new Vector3(0.7f, 14f, 0.3f), trim);
             }
-            Box("ManorBand", new Vector3(0f, 8f, front - 0.2f), new Vector3(22.4f, 0.45f, 0.4f), accent);
-            Box("ManorCornice", new Vector3(0f, 16.2f, front - 0.25f), new Vector3(23.2f, 0.7f, 0.6f), trim);
-            Box("ManorCorniceLine", new Vector3(0f, 15.65f, front - 0.3f), new Vector3(22.6f, 0.18f, 0.2f), accent);
-            // 窓（1 階は真ん中が扉）。
-            float[] bays = { -8.8f, -4.4f, 0f, 4.4f, 8.8f };
-            for (int floor = 0; floor < 2; floor++)
+            Box("ManorStringCourse", new Vector3(0f, 10f, front - 0.2f), new Vector3(halfWidth * 2f + 0.4f, 0.4f, 0.4f), accent);
+            Box("ManorCornice", new Vector3(0f, 16.2f, front - 0.3f), new Vector3(halfWidth * 2f + 1.2f, 0.7f, 0.7f), trim);
+            Box("ManorCorniceLine", new Vector3(0f, 15.7f, front - 0.35f), new Vector3(halfWidth * 2f + 0.6f, 0.16f, 0.2f), accent);
+
+            // 1 階: 真ん中の両開きの扉と明かり取り、扉の左右の窓、左右のベイウィンドウ（3 面に張り出した出窓）。
+            Box("ManorDoor", new Vector3(0f, 4.6f, front - 0.05f), new Vector3(2.6f, 5.2f, 0.15f), trim);
+            Box("ManorDoorSplit", new Vector3(0f, 4.6f, front - 0.14f), new Vector3(0.1f, 5.2f, 0.05f), accent);
+            Disc("ManorDoorArchFrame", new Vector3(0f, 7.2f, front - 0.04f), 3.1f, trim);
+            Disc("ManorDoorFanlight", new Vector3(0f, 7.2f, front - 0.1f), 2.4f, glow);
+            foreach (float x in new[] { -4.4f, 4.4f })
             {
-                foreach (float x in bays)
+                ArchWindow("ManorWindowLow", new Vector2(x, 5.6f), 1.5f, 3.2f, front);
+            }
+            foreach (float side in new[] { -1f, 1f })
+            {
+                float cx = side * 10.6f;
+                const float bayDepth = 1.6f;
+                float bayFront = front - bayDepth;
+                // 正面の面と、45° の左右の面（それぞれに光る窓）。
+                Box("ManorBayFront", new Vector3(cx, 5.4f, bayFront + 0.15f), new Vector3(3f, 6.4f, 0.3f), wall);
+                Box("ManorBayFrontGlass", new Vector3(cx, 5.6f, bayFront - 0.02f), new Vector3(2f, 3.8f, 0.05f), glow);
+                Box("ManorBayFrontMullion", new Vector3(cx, 5.6f, bayFront - 0.06f), new Vector3(0.12f, 3.8f, 0.05f), trim);
+                foreach (float s2 in new[] { -1f, 1f })
                 {
-                    if (floor == 0 && Mathf.Approximately(x, 0f))
-                    {
-                        continue;
-                    }
-                    ArchWindow($"ManorWindow{floor}", new Vector2(x, floor == 0 ? 3.9f : 11.6f), 1.6f, 2.8f, front);
+                    var center = new Vector3(cx + s2 * (1.5f + bayDepth * 0.5f), 5.4f, front - bayDepth * 0.5f);
+                    GameObject flank = Box("ManorBaySide", center, new Vector3(bayDepth * 1.414f, 6.4f, 0.3f), wall);
+                    flank.transform.localRotation = Quaternion.Euler(0f, s2 * 45f, 0f);
+                    GameObject pane = Box("ManorBaySideGlass", center + new Vector3(0f, 0.2f, -0.16f), new Vector3(bayDepth * 0.9f, 3.8f, 0.05f), glow);
+                    pane.transform.localRotation = Quaternion.Euler(0f, s2 * 45f, 0f);
                 }
+                Box("ManorBaySill", new Vector3(cx, 3.4f, bayFront + 0.6f), new Vector3(3.6f + bayDepth, 0.25f, bayDepth + 0.4f), accent);
+                Box("ManorBayRoof", new Vector3(cx, 8.8f, bayFront + 0.7f), new Vector3(3.8f + bayDepth, 0.35f, bayDepth + 0.8f), roof);
+                Box("ManorBayRoofEdge", new Vector3(cx, 8.6f, bayFront - 0.08f), new Vector3(3.6f, 0.14f, 0.14f), accent);
             }
-            // 扉（両開きの暗い木と、上の紫の光の明かり取り）と石段。
-            Box("ManorDoor", new Vector3(0f, 2.6f, front - 0.05f), new Vector3(2.6f, 4f, 0.15f), trim);
-            Box("ManorDoorSplit", new Vector3(0f, 2.6f, front - 0.14f), new Vector3(0.1f, 4f, 0.05f), accent);
-            Disc("ManorDoorArchFrame", new Vector3(0f, 4.6f, front - 0.04f), 3.1f, trim);
-            Disc("ManorDoorFanlight", new Vector3(0f, 4.6f, front - 0.1f), 2.4f, glow);
-            for (int i = 0; i < 3; i++)
+
+            // ポーチ: 4 本の柱（柱頭つき）が 2 階のバルコニー（ポーチの屋根）を支える。バルコニーの床は足場（x ±7、y 10〜10.6）の奥へ
+            // 延ばして正面につなぎ、足場の手前の縁にバラスターの手すり（低く、細く。人物を隠しすぎない）。
+            foreach (float x in new[] { -6.6f, -2.2f, 2.2f, 6.6f })
             {
-                Box("ManorStep", new Vector3(0f, 0.2f + i * 0.3f, front - 0.9f + i * 0.3f), new Vector3(4.6f - i * 0.6f, 0.3f, 0.6f), trim);
+                decor.Cylinder("ManorPorchColumn", root, new Vector3(x, 6f, 2.6f), new Vector3(0.6f, 4f, 0.6f), stone);
+                Box("ManorPorchCapital", new Vector3(x, 9.85f, 2.6f), new Vector3(0.9f, 0.3f, 0.9f), trim);
+                Box("ManorPorchBase", new Vector3(x, 2.15f, 2.6f), new Vector3(0.85f, 0.3f, 0.85f), trim);
             }
-            // 切妻の屋根（2 枚の板）と、妻壁（下の半分は本館の中に隠れる菱形）と、その丸い紫の窓。
-            const float slope = 28f;
-            float halfSpan = 11.6f;
-            float rise = halfSpan * Mathf.Tan(slope * Mathf.Deg2Rad);
-            float plank = halfSpan / Mathf.Cos(slope * Mathf.Deg2Rad) + 0.8f;
-            foreach (int side in new[] { -1, 1 })
+            Box("ManorBalconyDeck", new Vector3(0f, 10.3f, (2f + front) * 0.5f), new Vector3(14f, 0.6f, front - 2f), stone);
+            Box("ManorBalconyEdge", new Vector3(0f, 9.95f, -2.05f), new Vector3(14.2f, 0.25f, 0.1f), accent);
+            Balustrade("ManorBalcony", -7f, 7f, 10.6f, -1.95f, 0.75f);
+            // 2 階: 窓 4 つと、真ん中のバルコニーへの両開きの窓（フランス窓）と、その上のペディメント（三角の破風と紫の円窓）。
+            foreach (float x in new[] { -10.6f, -4.4f, 4.4f, 10.6f })
             {
-                GameObject roofPlank = Box("ManorRoof", new Vector3(side * halfSpan * 0.5f, 16f + rise * 0.5f, 7.5f), new Vector3(plank, 0.7f, 7.8f), roof);
-                roofPlank.transform.localRotation = Quaternion.Euler(0f, 0f, -side * slope);
-                GameObject edge = Box("ManorRoofEdge", new Vector3(side * halfSpan * 0.5f, 16f + rise * 0.5f + 0.42f, front - 0.3f), new Vector3(plank, 0.16f, 0.2f), accent);
-                edge.transform.localRotation = Quaternion.Euler(0f, 0f, -side * slope);
+                ArchWindow("ManorWindowHigh", new Vector2(x, 13f), 1.4f, 2.6f, front);
             }
-            var gable = new GameObject("ManorGable").transform;
-            gable.SetParent(root, false);
-            gable.localPosition = new Vector3(0f, 16f, front + 0.35f);
-            gable.localScale = new Vector3(1f, rise / halfSpan, 1f);
-            float gableSide = halfSpan * 2f / Mathf.Sqrt(2f);
-            decor.Box("ManorGableShape", gable, Vector3.zero, new Vector3(gableSide, gableSide, 0.4f), wall).transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
-            Disc("ManorGableWindowFrame", new Vector3(0f, 18.4f, front + 0.08f), 2.3f, trim);
-            Disc("ManorGableWindow", new Vector3(0f, 18.4f, front + 0.02f), 1.7f, glow);
-            // 煙突（紫の笠）。
-            foreach (float x in new[] { -8f, 8f })
+            Box("ManorFrenchDoorFrame", new Vector3(0f, 12.9f, front - 0.04f), new Vector3(2.8f, 4.4f, 0.12f), trim);
+            Box("ManorFrenchDoorGlass", new Vector3(0f, 12.9f, front - 0.1f), new Vector3(2.2f, 3.9f, 0.05f), glow);
+            Box("ManorFrenchDoorSplit", new Vector3(0f, 12.9f, front - 0.14f), new Vector3(0.1f, 3.9f, 0.05f), trim);
+            Box("ManorPedimentBase", new Vector3(0f, 16.7f, front - 0.45f), new Vector3(7.6f, 0.45f, 0.9f), trim);
+            Gable("ManorPediment", new Vector3(0f, 16.9f, front - 0.45f), 7.4f, 2.4f, 0.8f, wall);
+            Gable("ManorPedimentCap", new Vector3(0f, 16.9f, front - 0.55f), 7.9f, 2.65f, 0.6f, trim).transform.localPosition += new Vector3(0f, 0f, 0.4f);
+            Disc("ManorPedimentOculusFrame", new Vector3(0f, 17.8f, front - 0.88f), 1.4f, trim);
+            Disc("ManorPedimentOculus", new Vector3(0f, 17.8f, front - 0.92f), 1f, glow);
+
+            // マンサード屋根: 急な下の斜面（y 16〜20.6）と平らな屋上（y 20.8 = 左右の屋根の足場）。屋上の手前の縁に手すり、
+            // 斜面にドーマー（小さな切妻の屋根の窓）。足場（z ±2）と屋上の間は屋根の延長でつなぐ。
+            const float slopeRise = 4.6f;
+            const float slopeRun = 1.6f;
+            float slopeLength = Mathf.Sqrt(slopeRise * slopeRise + slopeRun * slopeRun);
+            float slopeAngle = Mathf.Atan2(slopeRun, slopeRise) * Mathf.Rad2Deg;
+            GameObject mansard = Box("ManorMansard", new Vector3(0f, 16f + slopeRise * 0.5f, front + slopeRun * 0.5f), new Vector3(halfWidth * 2f + 0.6f, slopeLength, 0.5f), roof);
+            mansard.transform.localRotation = Quaternion.Euler(slopeAngle, 0f, 0f);
+            Box("ManorMansardBack", new Vector3(0f, 18.4f, front + depth - 0.3f), new Vector3(halfWidth * 2f, 4.8f, 0.6f), roof);
+            Box("ManorRoofDeck", new Vector3(0f, 20.6f, front + (slopeRun + depth) * 0.5f), new Vector3(halfWidth * 2f, 0.4f, depth - slopeRun), roof);
+            Box("ManorRoofLedge", new Vector3(0f, 20.4f, (2f + front + slopeRun) * 0.5f), new Vector3(halfWidth * 2f, 0.8f, front + slopeRun - 2f), trim);
+            Balustrade("ManorRoofCrestWest", -halfWidth, -2.8f, 20.8f, front + slopeRun + 0.2f, 0.9f);
+            Balustrade("ManorRoofCrestEast", 2.8f, halfWidth, 20.8f, front + slopeRun + 0.2f, 0.9f);
+            foreach (float x in new[] { -11f, -6.4f, 6.4f, 11f })
             {
-                Box("ManorChimney", new Vector3(x, 20.5f, 9.5f), new Vector3(1.4f, 5f, 1.4f), trim);
-                Box("ManorChimneyCap", new Vector3(x, 23.1f, 9.5f), new Vector3(1.8f, 0.3f, 1.8f), accent);
+                Box("ManorDormer", new Vector3(x, 18.1f, front + 0.2f), new Vector3(2f, 2.6f, 1.8f), wall);
+                Box("ManorDormerFrame", new Vector3(x, 18f, front - 0.72f), new Vector3(1.5f, 1.9f, 0.1f), trim);
+                Box("ManorDormerGlass", new Vector3(x, 18f, front - 0.78f), new Vector3(1.1f, 1.5f, 0.05f), glow);
+                Gable("ManorDormerRoof", new Vector3(x, 19.4f, front + 0.1f), 2.6f, 1.1f, 2.2f, roof);
             }
-            // 左右の小塔（細い光る窓・紫の帯・尖った屋根と頂の針）。
-            foreach (float x in new[] { -13.6f, 13.6f })
+            // 煙突（右は足場の煙突と同じ場所。左は奥）。
+            Box("ManorChimney", new Vector3(10f, 22.4f, 3.5f), new Vector3(2f, 3.2f, 3f), stone);
+            Box("ManorChimneyCap", new Vector3(10f, 24.1f, 3.5f), new Vector3(2.4f, 0.3f, 3.2f), accent);
+            Box("ManorChimneyBack", new Vector3(-10f, 22.6f, 8.5f), new Vector3(1.6f, 3.6f, 1.6f), stone);
+            Box("ManorChimneyBackCap", new Vector3(-10f, 24.5f, 8.5f), new Vector3(2f, 0.3f, 2f), accent);
+
+            // 塔屋（真ん中。足場の鐘楼 x ±2 のすぐ奥。時計・鐘の開口・塔の蛇腹）と、その上の尖塔（足場の鐘楼の笠 y 32.6 から）。
+            Box("ManorTower", new Vector3(0f, 24.3f, 6.2f), new Vector3(5.2f, 16.6f, 4.4f), wall);
+            Box("ManorTowerLink", new Vector3(0f, 26f, 3f), new Vector3(4f, 12f, 2f), wall);
+            Box("ManorTowerBand", new Vector3(0f, 21.2f, 4f), new Vector3(5.6f, 0.4f, 0.4f), accent);
+            Disc("ManorClockFrame", new Vector3(0f, 24f, 3.96f), 2.6f, trim);
+            Disc("ManorClock", new Vector3(0f, 24f, 3.92f), 2.1f, glow);
+            Box("ManorClockHandHour", new Vector3(0.25f, 24.3f, 3.88f), new Vector3(0.12f, 0.7f, 0.04f), trim).transform.localRotation = Quaternion.Euler(0f, 0f, -40f);
+            Box("ManorClockHandMinute", new Vector3(-0.1f, 24.45f, 3.86f), new Vector3(0.08f, 0.95f, 0.04f), trim).transform.localRotation = Quaternion.Euler(0f, 0f, 12f);
+            foreach (float x in new[] { -1.1f, 1.1f })
             {
-                Box("ManorTurret", new Vector3(x, 11f, 7.5f), new Vector3(5f, 22f, 5.5f), wall);
-                Box("ManorTurretBand", new Vector3(x, 21.7f, 7.5f), new Vector3(5.5f, 0.5f, 6f), accent);
-                Box("ManorTurretBandLow", new Vector3(x, 8f, 7.5f), new Vector3(5.3f, 0.35f, 5.8f), trim);
-                foreach (float y in new[] { 4.5f, 12f, 18f })
+                ArchWindow("ManorBelfry", new Vector2(x, 28.6f), 0.9f, 2.4f, 4f);
+            }
+            Box("ManorTowerCornice", new Vector3(0f, 32.3f, 5.6f), new Vector3(6.4f, 0.6f, 5.4f), trim);
+            Spire("ManorSpire", new Vector3(0f, 32.6f, 6.2f), 6f, 4.4f, 2.1f, roof);
+            decor.Cylinder("ManorSpireFinial", root, new Vector3(0f, 41.6f, 6.2f), new Vector3(0.16f, 1.4f, 0.16f), trim);
+
+            // 左右の小塔（本館の外。細い光る窓・紫の帯・とんがり屋根と頂の針）。ガーゴイルのアンカー（x ±17、y 18）が角に来る。
+            foreach (float x in new[] { -16.7f, 16.7f })
+            {
+                Box("ManorTurret", new Vector3(x, 6f, 7f), new Vector3(5.2f, 32f, 5.2f), wall);
+                Box("ManorTurretBand", new Vector3(x, 21.7f, 7f), new Vector3(5.7f, 0.5f, 5.7f), accent);
+                Box("ManorTurretBandLow", new Vector3(x, 10f, 7f), new Vector3(5.5f, 0.35f, 5.5f), trim);
+                foreach (float y in new[] { 5.6f, 13f, 18.4f })
                 {
-                    ArchWindow("ManorTurretWindow", new Vector2(x, y), 0.9f, 2.2f, 4.75f);
+                    ArchWindow("ManorTurretWindow", new Vector2(x, y), 0.9f, 2.2f, 4.4f);
                 }
-                Spire("ManorTurretRoof", new Vector3(x, 22f, 7.5f), 6.4f, 6.4f, 1.9f, roof);
-                decor.Cylinder("ManorFinial", root, new Vector3(x, 29.4f, 7.5f), new Vector3(0.12f, 0.9f, 0.12f), trim);
+                Spire("ManorTurretRoof", new Vector3(x, 22f, 7f), 6.4f, 6.4f, 1.6f, roof);
+                decor.Cylinder("ManorFinial", root, new Vector3(x, 27.6f, 7f), new Vector3(0.12f, 0.9f, 0.12f), trim);
             }
-            // 真ん中の高い塔（本館より奥。紫に光るばら窓と尖塔）。
-            Box("ManorTower", new Vector3(0f, 23f, 8.2f), new Vector3(7f, 14f, 5f), wall);
-            Box("ManorTowerBand", new Vector3(0f, 29.8f, 8.2f), new Vector3(7.6f, 0.6f, 5.6f), accent);
-            Box("ManorTowerLedge", new Vector3(0f, 20.4f, 8.2f), new Vector3(7.4f, 0.35f, 5.4f), trim);
-            Disc("ManorRoseFrame", new Vector3(0f, 25f, 5.66f), 3.9f, trim);
-            Disc("ManorRose", new Vector3(0f, 25f, 5.6f), 3.1f, glow);
-            for (int i = 0; i < 4; i++)
-            {
-                GameObject spoke = Box("ManorRoseSpoke", new Vector3(0f, 25f, 5.55f), new Vector3(3.1f, 0.12f, 0.05f), trim);
-                spoke.transform.localRotation = Quaternion.Euler(0f, 0f, i * 45f);
-            }
-            Spire("ManorSpire", new Vector3(0f, 30f, 8.2f), 7.6f, 5.4f, 2.6f, roof);
-            decor.Cylinder("ManorSpireFinial", root, new Vector3(0f, 41.2f, 8.2f), new Vector3(0.16f, 1.4f, 0.16f), trim);
         }
 
         /// <summary>トマト農園（x 25〜47、地面 y 0、奥行き z 2〜10）: 3 列の畝に、支柱と葉の茂みと赤い実のトマトの株。</summary>
@@ -650,7 +722,8 @@ namespace Airerage.Editor.Stages
                 Put(model, decor.Range(-88f, 88f), ForestGround, decor.Range(ForestNear, ForestFar), decor.Range(2.2f, 4f), decor.Range(0f, 360f), pine ? ForestTint : PropTint * 0.6f);
             }
             decor.Box("ForestFloor", new Vector3(0f, ForestGround - 0.5f, (ForestNear + ForestFar) * 0.5f + 2f), new Vector3(190f, 1f, ForestFar - ForestNear + 12f),
-                decor.Lit("ForestFloor", new Color(0.08f, 0.06f, 0.09f)));
+                TerrainSculpt.GroundMaterial(decor, "ForestFloorGround", new Color(0.08f, 0.06f, 0.09f), TerrainSculpt.Photos.Soil,
+                    new Color(0.09f, 0.07f, 0.09f), TerrainSculpt.Photos.Soil, 0.2f));
         }
 
         // 館の正面（窓の明かり、尖った屋根）、墓場の柵と墓石、農園のトマトの株、霧、遠くの森。赤い満月は空に描く（StageLook.ApplySky。
@@ -658,7 +731,8 @@ namespace Airerage.Editor.Stages
         private static void Decorate(StageDecor decor)
         {
             Material roof = decor.Lit("ManorRoof", new Color(0.18f, 0.12f, 0.2f));
-            Material dirt = decor.Lit("Dirt", new Color(0.18f, 0.13f, 0.1f));
+            Material dirt = TerrainSculpt.GroundMaterial(decor, "DirtGround", new Color(0.18f, 0.13f, 0.1f), TerrainSculpt.Photos.Soil,
+                new Color(0.2f, 0.15f, 0.11f), TerrainSculpt.Photos.Soil, 0.25f);
             Material abyss = decor.Lit("Abyss", new Color(0.03f, 0.02f, 0.05f));
             Material prisonStone = decor.Lit("PrisonStone", new Color(0.2f, 0.18f, 0.22f));
             Material chain = decor.Lit("Chain", new Color(0.3f, 0.3f, 0.32f));

@@ -22,7 +22,23 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _RockNormal:
+        m_Texture: {fileID: 2800000, guid: 307e64d9d8d051632be9f9eb01503419, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RockTex:
+        m_Texture: {fileID: 2800000, guid: d392e6b972931322aa7c9364e0f0b877, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopNormal:
+        m_Texture: {fileID: 2800000, guid: 7959c19e79fe728c289d5b8e9f898c65, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TopTex:
+        m_Texture: {fileID: 2800000, guid: 4c6979b3e5d8075ac8df857e23f0abe6, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _Ambient: 1
@@ -30,10 +46,15 @@ Material:
     - _GlowFade: 6
     - _GlowHeight: -100
     - _NoiseScale: 0.06
+    - _NormalStrength: 0.5
+    - _RockTexGain: 6.2
     - _Strata: 0.15
+    - _TexScale: 0.06
+    - _TexStrength: 0.5
     - _TopAmount: 1
     - _TopHeight: 4
     - _TopSlope: 0.5
+    - _TopTexGain: 2.58
     m_Colors:
     - _GlowColor: {r: 0, g: 0, b: 0, a: 1}
     - _RockColor: {r: 0.36, g: 0.4, b: 0.47, a: 1}

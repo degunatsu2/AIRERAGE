@@ -3,6 +3,9 @@
 //   岩: 暗い岩と明るい岩を雑音で混ぜ、横縞の地層（_Strata）を少し。急な斜面ほど暗い岩の色。
 //   上の色（雪・灰）: 上を向いた面（_TopSlope より平ら）で、_TopHeight より高い所。境目は雑音で崩す。
 //   光（溶岩）: _GlowHeight より低い所ほど _GlowColor で光り、割れ目の筋（_Cracks）も光る。
+//   写真の絵（2026-11-19 の要望: 地面の写真の絵。Poly Haven の CC0 の絵）: 岩と上の色の部分に、世界の位置から三方向に投影した
+//   絵（_RockTex・_TopTex と法線の絵）を重ねる。色は台本の色のまま、絵は明暗と凹凸の細かさだけを足す（_TexGain は絵の平均の
+//   明るさの逆数。_TexStrength 0 なら絵を使わない）。
 // 光は主の光と環境光。影を受ける（影は落とさない。遠くの物なので）。霧に溶ける。
 Shader "Airerage/TerrainRock"
 {
@@ -21,6 +24,15 @@ Shader "Airerage/TerrainRock"
         _GlowFade ("Glow fade height (m)", Float) = 6
         _Cracks ("Glowing cracks", Range(0, 2)) = 0
         _Ambient ("Ambient strength", Range(0, 2)) = 0.8
+        _RockTex ("Rock photo", 2D) = "white" {}
+        [Normal] _RockNormal ("Rock photo normal", 2D) = "bump" {}
+        _RockTexGain ("Rock photo gain (1 / mean)", Float) = 1
+        _TopTex ("Top photo", 2D) = "white" {}
+        [Normal] _TopNormal ("Top photo normal", 2D) = "bump" {}
+        _TopTexGain ("Top photo gain (1 / mean)", Float) = 1
+        _TexScale ("Photo repeats per meter", Float) = 0.25
+        _TexStrength ("Photo strength", Range(0, 1)) = 0
+        _NormalStrength ("Photo normal strength", Range(0, 1)) = 0
     }
 
     SubShader
@@ -44,6 +56,11 @@ Shader "Airerage/TerrainRock"
             float _GlowFade;
             half _Cracks;
             half _Ambient;
+            half _RockTexGain;
+            half _TopTexGain;
+            float _TexScale;
+            half _TexStrength;
+            half _NormalStrength;
         CBUFFER_END
         ENDHLSL
 
@@ -60,6 +77,15 @@ Shader "Airerage/TerrainRock"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            TEXTURE2D(_RockTex);
+            SAMPLER(sampler_RockTex);
+            TEXTURE2D(_RockNormal);
+            SAMPLER(sampler_RockNormal);
+            TEXTURE2D(_TopTex);
+            SAMPLER(sampler_TopTex);
+            TEXTURE2D(_TopNormal);
+            SAMPLER(sampler_TopNormal);
 
             struct Attributes
             {
@@ -116,6 +142,30 @@ Shader "Airerage/TerrainRock"
                 return sum / 0.9375;
             }
 
+            // 三方向の投影の重み（面の向きに近い方向ほど強く）。
+            float3 TriWeights(float3 n)
+            {
+                float3 w = pow(abs(n), 4.0);
+                return w / max(w.x + w.y + w.z, 1e-4);
+            }
+
+            half3 TriColor(TEXTURE2D_PARAM(tex, samp), float3 p, float3 w)
+            {
+                return SAMPLE_TEXTURE2D(tex, samp, p.zy).rgb * w.x + SAMPLE_TEXTURE2D(tex, samp, p.xz).rgb * w.y + SAMPLE_TEXTURE2D(tex, samp, p.xy).rgb * w.z;
+            }
+
+            // 三方向の法線の絵を、面の法線に「ホワイトアウト」で重ねる。
+            float3 TriNormal(TEXTURE2D_PARAM(tex, samp), float3 p, float3 n, float3 w)
+            {
+                half3 tx = UnpackNormal(SAMPLE_TEXTURE2D(tex, samp, p.zy));
+                half3 ty = UnpackNormal(SAMPLE_TEXTURE2D(tex, samp, p.xz));
+                half3 tz = UnpackNormal(SAMPLE_TEXTURE2D(tex, samp, p.xy));
+                tx = half3(tx.xy + n.zy, abs(tx.z) * n.x);
+                ty = half3(ty.xy + n.xz, abs(ty.z) * n.y);
+                tz = half3(tz.xy + n.xy, abs(tz.z) * n.z);
+                return normalize(tx.zyx * w.x + ty.xzy * w.y + tz.xyz * w.z);
+            }
+
             Varyings Vert(Attributes input)
             {
                 Varyings output;
@@ -130,7 +180,10 @@ Shader "Airerage/TerrainRock"
             half4 Frag(Varyings input) : SV_Target
             {
                 float3 p = input.positionWS;
-                float3 n = normalize(input.normalWS);
+                float3 geometric = normalize(input.normalWS);
+                float3 n = geometric;
+                float3 w = TriWeights(geometric);
+                float3 uvw = p * _TexScale;
                 float detail = Fbm3(p * _NoiseScale);
                 float fine = Noise3(p * _NoiseScale * 6.0);
                 // 岩: 雑音で明暗、急な斜面は暗く、横縞の地層。
@@ -143,7 +196,22 @@ Shader "Airerage/TerrainRock"
                 half flat = smoothstep(_TopSlope - 0.08, _TopSlope + 0.1, n.y + (detail - 0.5) * 0.25);
                 half high = smoothstep(_TopHeight - 4.0, _TopHeight + 4.0, p.y + (detail - 0.5) * 10.0);
                 half top = saturate(flat * high * _TopAmount);
-                half3 albedo = lerp(rock, _TopColor.rgb * (0.92 + fine * 0.08), top);
+                half3 topColor = _TopColor.rgb * (0.92 + fine * 0.08);
+                if (_TexStrength > 0.0)
+                {
+                    half3 rockPhoto = TriColor(TEXTURE2D_ARGS(_RockTex, sampler_RockTex), uvw, w) * _RockTexGain;
+                    half3 topPhoto = TriColor(TEXTURE2D_ARGS(_TopTex, sampler_TopTex), uvw, w) * _TopTexGain;
+                    // 絵の色合いは捨て、明るさの変化だけを掛ける（台本の色を保つ）。
+                    rock *= lerp(1.0, dot(rockPhoto, half3(0.3, 0.5, 0.2)), _TexStrength);
+                    topColor *= lerp(1.0, dot(topPhoto, half3(0.3, 0.5, 0.2)), _TexStrength);
+                }
+                if (_NormalStrength > 0.0)
+                {
+                    float3 rockN = TriNormal(TEXTURE2D_ARGS(_RockNormal, sampler_RockNormal), uvw, geometric, w);
+                    float3 topN = TriNormal(TEXTURE2D_ARGS(_TopNormal, sampler_TopNormal), uvw, geometric, w);
+                    n = normalize(lerp(geometric, lerp(rockN, topN, top), _NormalStrength));
+                }
+                half3 albedo = lerp(rock, topColor, top);
 
                 // 光: 主の光（影を受ける）と環境光。
                 Light light = GetMainLight(TransformWorldToShadowCoord(p));

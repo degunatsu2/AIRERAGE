@@ -30,6 +30,10 @@ namespace Airerage.Editor.Stages
         public static readonly Pack Restaurant = new Pack("KayKit/Restaurant", "restaurantbits_texture.png");
         public static readonly Pack SpaceBase = new Pack("KayKit/SpaceBase", "spacebits_texture.png");
         public static readonly Pack CityCommercial = new Pack("Kenney/CityCommercial", "colormap.png");
+        public static readonly Pack CityIndustrial = new Pack("Kenney/CityIndustrial", "colormap.png");
+        public static readonly Pack Watercraft = new Pack("Kenney/Watercraft", "colormap.png");
+        public static readonly Pack Holiday = new Pack("Kenney/Holiday", "colormap.png");
+        public static readonly Pack CityRoads = new Pack("Kenney/CityRoads", "colormap.png");
 
         /// <summary>夜に窓だけを光らせる発光の絵（tools/assets/kenney_night_emission.py で色の絵から作る）。</summary>
         public const string CityCommercialNightEmission = "colormap_night_emission.png";
@@ -115,6 +119,135 @@ namespace Airerage.Editor.Stages
                 renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             }
             return go;
+        }
+
+        /// <summary>
+        /// 材質の色や絵が .mtl に書いてあるモデル（Kenney の Nature・Furniture・Racing、Quaternius の Nature など）を置く。
+        /// .mtl の Kd（色）・map_Kd（色の絵）・map_Bump（法線の絵）・map_d（切り抜き）から、材質の名前ごとに背景の小物の材質を作る
+        /// （色の絵があるときは Kd の代わりに tint だけを掛ける）。絵はモデルと同じフォルダに置く（.mtl の絵の行はファイル名だけ）。
+        /// </summary>
+        public static GameObject PlaceMtl(StageDecor decor, string packFolder, string model, Vector3 position, float yaw, float scale, Color tint, string folder)
+        {
+            Dictionary<string, MtlEntry> entries = ReadMtl($"{Root}/{packFolder}/{model}.mtl");
+            Material fallback = MtlMaterial(packFolder, "Fallback", new MtlEntry { Color = new Color(0.6f, 0.6f, 0.6f) }, tint, folder);
+            return PlaceMulti(decor, packFolder, model, position, Quaternion.Euler(0f, yaw, 0f), Vector3.one * scale,
+                name => entries.TryGetValue(name, out MtlEntry entry) ? MtlMaterial(packFolder, name, entry, tint, folder) : null, fallback);
+        }
+
+        private struct MtlEntry
+        {
+            public Color Color;
+            public string ColorMap;
+            public string NormalMap;
+            public bool Cutout;
+        }
+
+        // .mtl を読む（newmtl ごとの Kd・map_Kd・map_Bump・map_d）。
+        private static Dictionary<string, MtlEntry> ReadMtl(string path)
+        {
+            var result = new Dictionary<string, MtlEntry>();
+            if (!System.IO.File.Exists(path))
+            {
+                Debug.LogWarning($"背景の小物の .mtl がない（{path}）。代わりの材質にする");
+                return result;
+            }
+            string current = null;
+            var entry = new MtlEntry { Color = Color.white };
+            foreach (string raw in System.IO.File.ReadAllLines(path))
+            {
+                string line = raw.Trim();
+                string[] parts = line.Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2)
+                {
+                    continue;
+                }
+                switch (parts[0])
+                {
+                    case "newmtl":
+                        if (current != null)
+                        {
+                            result[current] = entry;
+                        }
+                        current = parts[1];
+                        entry = new MtlEntry { Color = Color.white };
+                        break;
+                    case "Kd" when parts.Length >= 4:
+                        entry.Color = new Color(Parse(parts[1]), Parse(parts[2]), Parse(parts[3]));
+                        break;
+                    case "map_Kd":
+                        entry.ColorMap = parts[parts.Length - 1];
+                        break;
+                    case "map_Bump":
+                    case "bump":
+                        entry.NormalMap = parts[parts.Length - 1];
+                        break;
+                    case "map_d":
+                        entry.Cutout = true;
+                        break;
+                }
+            }
+            if (current != null)
+            {
+                result[current] = entry;
+            }
+            return result;
+        }
+
+        private static float Parse(string text)
+        {
+            return float.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        // .mtl の 1 つの材質から背景の小物の材質を作る（パック・名前・色合いごとに 1 つ。ステージの材質のフォルダに保存）。
+        private static Material MtlMaterial(string packFolder, string name, MtlEntry entry, Color tint, string folder)
+        {
+            string key = $"{folder}|{packFolder}|{name}|{ColorUtility.ToHtmlStringRGB(tint)}";
+            if (Materials.TryGetValue(key, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+            Texture2D colorMap = entry.ColorMap != null ? LoadTextureFile($"{Root}/{packFolder}/{entry.ColorMap}", false) : null;
+            Texture2D normalMap = entry.NormalMap != null ? LoadTextureFile($"{Root}/{packFolder}/{entry.NormalMap}", true) : null;
+            Color color = colorMap != null ? tint : entry.Color * tint;
+            color.a = 1f;
+            string asset = $"Mtl{packFolder.Replace("/", string.Empty)}_{name}_{ColorUtility.ToHtmlStringRGB(tint)}";
+            Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(asset, PropShader, m =>
+            {
+                m.SetTexture("_BaseMap", colorMap);
+                m.SetColor("_BaseColor", color);
+                m.SetTexture("_BumpMap", normalMap);
+                m.SetFloat("_BumpScale", 1f);
+                m.SetTexture("_EmissionMap", null);
+                m.SetColor("_EmissionColor", Color.black);
+                m.SetFloat("_Smoothness", 0.2f);
+                m.SetFloat("_Metallic", 0f);
+                m.SetFloat("_Cutoff", entry.Cutout ? 0.5f : 0f);
+                m.SetFloat("_Cull", entry.Cutout ? 0f : 2f);
+            }, folder);
+            Materials[key] = material;
+            return material;
+        }
+
+        // 絵のファイルを読む（拡張子つきのパス）。normalMap なら法線の絵として読み込み直す。なければ警告して null。
+        private static Texture2D LoadTextureFile(string path, bool normalMap)
+        {
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer)
+            {
+                TextureImporterType type = normalMap ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                if (importer.textureType != type || importer.sRGBTexture == normalMap || !importer.mipmapEnabled)
+                {
+                    importer.textureType = type;
+                    importer.sRGBTexture = !normalMap;
+                    importer.mipmapEnabled = true;
+                    importer.SaveAndReimport();
+                }
+            }
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (texture == null)
+            {
+                Debug.LogWarning($"背景の小物の絵がない（{path}）");
+            }
+            return texture;
         }
 
         /// <summary>パックのフォルダの絵を読む（normalMap なら法線の絵として読み込み直す。色の絵は sRGB）。なければ警告して null。</summary>

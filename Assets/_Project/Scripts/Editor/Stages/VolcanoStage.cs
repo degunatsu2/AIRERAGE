@@ -171,11 +171,22 @@ namespace Airerage.Editor.Stages
         }
 
         // 溶岩の湖、火口の壁、遠くの山、火の粉。
+        // 火口の壁の高さ（x, z → y。網と、裾に置く物の高さに使う）。
+        private static float CraterHeight(float x, float z)
+        {
+            float crest = 26f + Mathf.Abs(x) * 0.32f + (TerrainSculpt.Ridged(x * 0.035f, z * 0.035f, 11, 5) - 0.4f) * 24f;
+            float rise = TerrainSculpt.Smooth(17f, 38f, z) * (1f - 0.45f * TerrainSculpt.Smooth(46f, 72f, z));
+            float rough = (TerrainSculpt.Fbm(x * 0.18f, z * 0.18f, 5, 4) - 0.5f) * 5f;
+            return -21.5f + (crest + rough) * rise;
+        }
+
         private static void Decorate(StageDecor decor)
         {
             Material lava = decor.Unlit("Lava", new Color(1f, 0.38f, 0.05f));
             Material lavaHot = decor.Unlit("LavaHot", new Color(1f, 0.75f, 0.2f));
-            Material rock = decor.Lit("Rock", new Color(0.22f, 0.17f, 0.16f));
+            // 縁と柱の奥行きの岩は、写真の絵の岩（2026-11-19 の要望: 地面の写真の絵）。
+            Material rock = TerrainSculpt.GroundMaterial(decor, "RockGround", new Color(0.22f, 0.17f, 0.16f), TerrainSculpt.Photos.Rock,
+                new Color(0.3f, 0.25f, 0.23f), TerrainSculpt.Photos.Rock, 0.2f);
             Material ember = decor.Unlit("Ember", new Color(1f, 0.55f, 0.15f));
 
             decor.Box("LavaLake", new Vector3(0f, -20f, 5f), new Vector3(140f, 2f, 40f), lava);
@@ -200,14 +211,28 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_GlowFade", 3.5f);
                 m.SetFloat("_Cracks", 1.1f);
                 m.SetFloat("_Ambient", 0.9f);
+                TerrainSculpt.ApplyPhotos(m, TerrainSculpt.Photos.Rock, TerrainSculpt.Photos.Rock, 0.16f, 0.6f, 0.6f);
             });
-            TerrainSculpt.Place(decor, "Volcano", "CraterRidge", new TerrainSculpt.Field(-130f, 130f, 16f, 72f, 1f, (x, z) =>
+            TerrainSculpt.Place(decor, "Volcano", "CraterRidge", new TerrainSculpt.Field(-130f, 130f, 16f, 72f, 1f, CraterHeight), craterRock);
+            // 火口の壁の裾の焦げた枯れ木（Quaternius の Stylized Nature MegaKit）と、溶岩の湖の縁の岩（Kenney の Nature Kit）。
+            // CC0。2026-11-19 にユーザーが追加。
+            Color charred = new Color(0.32f, 0.24f, 0.22f);
+            for (int i = 0; i < 9; i++)
             {
-                float crest = 26f + Mathf.Abs(x) * 0.32f + (TerrainSculpt.Ridged(x * 0.035f, z * 0.035f, 11, 5) - 0.4f) * 24f;
-                float rise = TerrainSculpt.Smooth(17f, 38f, z) * (1f - 0.45f * TerrainSculpt.Smooth(46f, 72f, z));
-                float rough = (TerrainSculpt.Fbm(x * 0.18f, z * 0.18f, 5, 4) - 0.5f) * 5f;
-                return -21.5f + (crest + rough) * rise;
-            }), craterRock);
+                float x = -108f + i * 27f + decor.Range(-5f, 5f);
+                if (Mathf.Abs(x) < 50f)
+                {
+                    continue;
+                }
+                ThirdPartyProps.PlaceMtl(decor, "Quaternius/Nature", $"DeadTree_{1 + i % 5}", new Vector3(x, CraterHeight(x, 27f) - 0.5f, 27f),
+                    decor.Range(0f, 360f), decor.Range(0.9f, 1.3f), charred, decor.Folder);
+            }
+            string[] rocks = { "rock_tallA", "rock_tallB", "rock_largeB", "rock_largeD", "rock_tallC" };
+            foreach (float x in new[] { -66f, -58f, -52f, 52f, 59f, 67f, -24f, 26f })
+            {
+                ThirdPartyProps.PlaceMtl(decor, "Kenney/Nature", rocks[decor.Random.Next(rocks.Length)], new Vector3(x, -20f, decor.Range(14f, 22f)),
+                    decor.Range(0f, 360f), decor.Range(5f, 9f), new Color(0.45f, 0.32f, 0.3f), decor.Folder);
+            }
             // 縁と柱の奥行き（見た目だけ）。
             decor.Box("RimWestBack", new Vector3(-41f, -6f, 6f), new Vector3(14f, 32f, 8f), rock);
             decor.Box("RimEastBack", new Vector3(41f, -6f, 6f), new Vector3(14f, 32f, 8f), rock);
@@ -233,6 +258,7 @@ namespace Airerage.Editor.Stages
                 m.SetColor("_GlowColor", Color.black);
                 m.SetFloat("_Cracks", 0f);
                 m.SetFloat("_Ambient", 0.9f);
+                TerrainSculpt.ApplyPhotos(m, TerrainSculpt.Photos.Rock, TerrainSculpt.Photos.Rock, 0.05f, 0.45f, 0.4f);
             });
             TerrainSculpt.Place(decor, "Volcano", "FarVolcanoes", new TerrainSculpt.Field(-340f, 340f, 90f, 270f, 4f, (x, z) =>
             {

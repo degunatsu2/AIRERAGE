@@ -371,6 +371,17 @@ namespace Airerage.Editor.Stages
             // 奥の壁（手前の面 z 15）の棚（窓より外側）。
             Put("shelf_papertowel_decorated", -52f, 14f, 13f, 6.5f);
             Put("shelf_papertowel_decorated", 52f, 14f, 13f, 6.5f);
+            // 家具（Kenney の Furniture Kit。CC0。2026-11-19 にユーザーが追加）: 調理台の外の大きな冷蔵庫、調理台の上の電子レンジと
+            // コーヒーメーカー、床の観葉植物。台所の大きさに合わせて大きくする（吊り戸棚は大きくすると平らな板に見えたので置かない）。
+            void Furniture(string model, float x, float y, float z, float scale, float yaw = 180f)
+            {
+                ThirdPartyProps.PlaceMtl(decor, "Kenney/Furniture", model, new Vector3(x, y, z), yaw, scale, Color.white, PropFolder);
+            }
+            Furniture("kitchenFridgeLarge", -60f, -21f, 9.5f, 24f);
+            Furniture("kitchenFridgeLarge", 70f, -21f, 9.5f, 24f);
+            Furniture("kitchenMicrowave", -24f, 2f, 7f, 14f);
+            Furniture("kitchenCoffeeMachine", 44f, 2f, 6.5f, 14f);
+            Furniture("pottedPlant", -64f, -21f, 2f, 14f, 0f);
         }
 
         // 奥の壁とタイル、大きなオーブン（火柱の口）、コンロのつまみ、窓、調理台の奥行き、吊るしたおたま。

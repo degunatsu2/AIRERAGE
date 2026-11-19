@@ -184,6 +184,39 @@ namespace Airerage.Editor.Stages
 
         // トラックのレーンの線と芝生、スタンドの観客、照明、得点板の画面、空の雲。
         /// <summary>
+        /// Kenney の Racing Kit（CC0。2026-11-19 にユーザーが追加）の小物: スタンドの屋根の旗、スタンドの両端の旗の塔、芝生のテント、
+        /// トラックと芝生の境の赤白の縁石。見た目だけ（当たりはない）。
+        /// </summary>
+        private static void RacingProps(StageDecor decor)
+        {
+            const string pack = "Kenney/Racing";
+            string folder = decor.Folder;
+            Color tint = Color.white;
+            // 屋根の手前の縁の旗（赤・緑・チェッカーをかわるがわる）。
+            string[] flags = { "flagRed", "flagGreen", "flagCheckers" };
+            int index = 0;
+            for (float x = -84f; x <= 84f; x += 14f)
+            {
+                ThirdPartyProps.PlaceMtl(decor, pack, flags[index++ % flags.Length], new Vector3(x + 0.6f, 22.4f, 43.6f), 0f, 5f, tint, folder);
+            }
+            // スタンドの両端の旗の塔。
+            ThirdPartyProps.PlaceMtl(decor, pack, "bannerTowerRed", new Vector3(-96f, 0f, 34f), 0f, 9f, tint, folder);
+            ThirdPartyProps.PlaceMtl(decor, pack, "bannerTowerGreen", new Vector3(98f, 0f, 34f), 0f, 9f, tint, folder);
+            // 芝生のテント（大会の本部と救護所）。
+            ThirdPartyProps.PlaceMtl(decor, pack, "tentLong", new Vector3(-30f, 0f, 20f), 0f, 5f, tint, folder);
+            ThirdPartyProps.PlaceMtl(decor, pack, "tentClosed", new Vector3(-40f, 0f, 21f), 0f, 5f, tint, folder);
+            ThirdPartyProps.PlaceMtl(decor, pack, "tentRoof", new Vector3(42f, 0f, 20f), 0f, 5f, tint, folder);
+            ThirdPartyProps.PlaceMtl(decor, pack, "tentRoof", new Vector3(50f, 0f, 20f), 0f, 5f, tint, folder);
+            ThirdPartyProps.PlaceMtl(decor, pack, "billboardLow", new Vector3(8f, 0f, 26f), 0f, 6f, tint, folder);
+            // トラックと芝生の境の縁石（赤と白をかわるがわる）。
+            int segment = 0;
+            for (float x = -76f; x < 76f; x += 2f)
+            {
+                ThirdPartyProps.PlaceMtl(decor, pack, segment++ % 2 == 0 ? "barrierRed" : "barrierWhite", new Vector3(x + 2f, 0f, 3.2f), 0f, 8f, tint, folder);
+            }
+        }
+
+        /// <summary>
         /// 奥のスタンド: 段々の観客席（14 段。区画ごとに座席の色を変え、区画の間に階段の通路）、前の壁の広告の板、座っている観客
         /// （体と頭の箱。色はまちまちで、4 割ほど空席）、上の屋根と鉄骨と屋根の下の照明、両端の照明塔（光る灯りの格子）。
         /// 小さな箱は 1 つの網にまとめる（TerrainSculpt.BoxBatch）。見た目だけ（当たりはない）。
@@ -300,7 +333,8 @@ namespace Airerage.Editor.Stages
         private static void Decorate(StageDecor decor)
         {
             Material lane = decor.Unlit("LaneLine", new Color(1f, 1f, 1f));
-            Material grass = decor.Lit("Grass", new Color(0.25f, 0.55f, 0.25f));
+            Material grass = TerrainSculpt.GroundMaterial(decor, "GrassGround", new Color(0.2f, 0.42f, 0.2f), TerrainSculpt.Photos.Grass,
+                new Color(0.25f, 0.55f, 0.25f), TerrainSculpt.Photos.Grass, 0.3f);
             Material light = decor.Unlit("Floodlight", new Color(1f, 0.98f, 0.85f));
             Material screen = decor.Unlit("ScoreScreen", new Color(0.15f, 0.9f, 0.5f));
             Material bar = decor.Lit("HighJumpBar", new Color(1f, 0.85f, 0.2f));
@@ -314,6 +348,7 @@ namespace Airerage.Editor.Stages
             }
             // 奥のスタンド（2026-11-18 の要望: 背景を精巧に）。
             Grandstand(decor);
+            RacingProps(decor);
             // 照明塔の灯り、得点板の画面、走り高跳びのバー、表彰台の金。
             decor.Box("FloodlampWest", new Vector3(-32.7f, 25.5f, 0.6f), new Vector3(5f, 1.6f, 0.4f), light);
             decor.Box("FloodlampEast", new Vector3(32.7f, 25.5f, 0.6f), new Vector3(5f, 1.6f, 0.4f), light);

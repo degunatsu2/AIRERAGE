@@ -382,6 +382,25 @@ namespace Airerage.Editor.Stages
             decor.Box("Street", new Vector3(0f, -24f, 6f), new Vector3(110f, 0.5f, 30f), street);
             // 大通りは西新宿の道路の地面（CityStreetsFront から奥。StageDressing）の手前まで。
             decor.Box("Avenue", new Vector3(0f, -24.25f, (20f + CityStreetsFront) * 0.5f), new Vector3(1600f, 0.5f, CityStreetsFront - 20f), street);
+            // 谷の底の道路と大通りの街灯・信号（Kenney の City Kit Roads。CC0。2026-11-19 にユーザーが追加）。夜は灯りの所を光らせる。
+            Material lampGlow = night ? decor.Unlit("StreetLamp", Glow(new Color(1f, 0.86f, 0.6f), 3f)) : null;
+            for (float z = 14f; z < 260f; z += 26f)
+            {
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    float x = side * 13f;
+                    ThirdPartyProps.Place(decor, ThirdPartyProps.CityRoads, "light-curved", new Vector3(x, -24f, z), 11f, side < 0f ? -90f : 90f,
+                        night ? new Color(0.45f, 0.46f, 0.55f) : Color.white, decor.Folder);
+                    if (night)
+                    {
+                        decor.Sphere("StreetLampGlow", new Vector3(x - side * 1.9f, -24f + 7.2f, z), new Vector3(0.7f, 0.35f, 0.7f), lampGlow);
+                    }
+                }
+            }
+            ThirdPartyProps.Place(decor, ThirdPartyProps.CityRoads, "traffic-light", new Vector3(-12f, -24f, 40f), 11f, 90f,
+                night ? new Color(0.45f, 0.46f, 0.55f) : Color.white, decor.Folder);
+            ThirdPartyProps.Place(decor, ThirdPartyProps.CityRoads, "traffic-light", new Vector3(12f, -24f, 40f), 11f, -90f,
+                night ? new Color(0.45f, 0.46f, 0.55f) : Color.white, decor.Folder);
             // 大通りの両側の低い街並み（見通しの奥を空っぽに見せない。高層ビルを隠さない低さ）。
             for (float z = 110f; z < 300f; z += decor.Range(40f, 60f))
             {

@@ -51,67 +51,6 @@ namespace Airerage.Editor.Stages
         }
 
         /// <summary>
-        /// 円錐（底の半径 0.5・高さ 1・底は y 0。底の面つき）の網。木の葉の段などに使う。segments は周りの分け方。
-        /// </summary>
-        public static Mesh Cone(string stage, string name, int segments)
-        {
-            Mesh mesh = LoadOrCreateMesh(stage, name);
-            var vertices = new System.Collections.Generic.List<Vector3>();
-            var normals = new System.Collections.Generic.List<Vector3>();
-            var triangles = new System.Collections.Generic.List<int>();
-            float slope = 0.5f;
-            for (int i = 0; i < segments; i++)
-            {
-                float a0 = i * Mathf.PI * 2f / segments;
-                float a1 = (i + 1) * Mathf.PI * 2f / segments;
-                var p0 = new Vector3(Mathf.Cos(a0) * 0.5f, 0f, Mathf.Sin(a0) * 0.5f);
-                var p1 = new Vector3(Mathf.Cos(a1) * 0.5f, 0f, Mathf.Sin(a1) * 0.5f);
-                float mid = (a0 + a1) * 0.5f;
-                Vector3 n = new Vector3(Mathf.Cos(mid), slope, Mathf.Sin(mid)).normalized;
-                int b = vertices.Count;
-                vertices.Add(p0);
-                vertices.Add(Vector3.up);
-                vertices.Add(p1);
-                normals.Add(new Vector3(Mathf.Cos(a0), slope, Mathf.Sin(a0)).normalized);
-                normals.Add(n);
-                normals.Add(new Vector3(Mathf.Cos(a1), slope, Mathf.Sin(a1)).normalized);
-                triangles.Add(b);
-                triangles.Add(b + 1);
-                triangles.Add(b + 2);
-                // 底の面。
-                int c = vertices.Count;
-                vertices.Add(Vector3.zero);
-                vertices.Add(p0);
-                vertices.Add(p1);
-                normals.Add(Vector3.down);
-                normals.Add(Vector3.down);
-                normals.Add(Vector3.down);
-                triangles.Add(c);
-                triangles.Add(c + 1);
-                triangles.Add(c + 2);
-            }
-            mesh.Clear();
-            mesh.SetVertices(vertices);
-            mesh.SetNormals(normals);
-            mesh.SetTriangles(triangles, 0);
-            mesh.RecalculateBounds();
-            EditorUtility.SetDirty(mesh);
-            return mesh;
-        }
-
-        /// <summary>網を置く（見た目だけ）。</summary>
-        public static GameObject PlaceMesh(StageDecor decor, string name, Mesh mesh, Material material, Vector3 position, Vector3 scale, float yaw)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(decor.Root, false);
-            go.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
-            go.transform.localScale = scale;
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            go.AddComponent<MeshRenderer>().sharedMaterial = material;
-            return go;
-        }
-
-        /// <summary>
         /// 遠くの雪山の連なり（尖った尾根の雑音。海から立ち上がり、高い所と平らな所に雪。真ん中は低め。霧で空の地平線の色に溶ける）。
         /// FROST COAST と埠頭の奥。front〜back は奥行き、baseY は根元の高さ（海より下）、seed で形を変える。
         /// </summary>
@@ -130,6 +69,7 @@ namespace Airerage.Editor.Stages
                 m.SetColor("_GlowColor", Color.black);
                 m.SetFloat("_Cracks", 0f);
                 m.SetFloat("_Ambient", 1f);
+                ApplyPhotos(m, Photos.Rock, Photos.Snow, 0.06f, 0.5f, 0.5f);
             });
             float rampEnd = front + (back - front) * 0.42f;
             return Place(decor, stage, "FarMountains", new Field(-360f, 360f, front, back, 4f, (x, z) =>
@@ -243,6 +183,148 @@ namespace Airerage.Editor.Stages
                 go.AddComponent<MeshRenderer>().sharedMaterials = materials;
                 return go;
             }
+        }
+
+        private const string PhotoRoot = "Assets/_Project/ThirdParty/PolyHaven";
+
+        /// <summary>
+        /// 地面の写真の絵（Poly Haven。CC0。2026-11-19 の要望）の名前と、絵の平均の明るさの逆数（線形の色の輝度の平均から。
+        /// シェーダーは絵の明暗だけを掛けるので、平均が 1 になるようにする）。
+        /// </summary>
+        public static class Photos
+        {
+            public const string Rock = "rock_face_03";
+            public const string Snow = "snow_02";
+            public const string Grass = "leafy_grass";
+            public const string Soil = "forest_ground_04";
+            public const string Concrete = "concrete_floor_02";
+
+            public static float Gain(string id)
+            {
+                switch (id)
+                {
+                    case Rock: return 6.2f;
+                    case Snow: return 2.58f;
+                    case Grass: return 4.19f;
+                    case Soil: return 8.9f;
+                    case Concrete: return 5.9f;
+                    default: throw new ArgumentException($"地面の写真の絵の明るさが分からない: {id}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 地面の材質に写真の絵を当てる（rock は岩の部分、top は上の色の部分。scale は 1m あたりのくり返し、strength は明暗の強さ、
+        /// normal は凹凸の強さ）。
+        /// </summary>
+        public static void ApplyPhotos(Material m, string rock, string top, float scale, float strength, float normal)
+        {
+            m.SetTexture("_RockTex", PhotoTexture(rock, false));
+            m.SetTexture("_RockNormal", PhotoTexture(rock, true));
+            m.SetFloat("_RockTexGain", Photos.Gain(rock));
+            m.SetTexture("_TopTex", PhotoTexture(top, false));
+            m.SetTexture("_TopNormal", PhotoTexture(top, true));
+            m.SetFloat("_TopTexGain", Photos.Gain(top));
+            m.SetFloat("_TexScale", scale);
+            m.SetFloat("_TexStrength", strength);
+            m.SetFloat("_NormalStrength", normal);
+        }
+
+        // 写真の絵を読む（法線の絵は法線として読み込み直す）。なければ例外（黙って白い地面にしない）。
+        private static Texture2D PhotoTexture(string id, bool normal)
+        {
+            string path = $"{PhotoRoot}/{id}/{id}_{(normal ? "nor_gl" : "diff")}_1k.jpg";
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer)
+            {
+                TextureImporterType type = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                if (importer.textureType != type || importer.sRGBTexture == normal || importer.wrapMode != TextureWrapMode.Repeat || importer.anisoLevel < 8)
+                {
+                    importer.textureType = type;
+                    importer.sRGBTexture = !normal;
+                    importer.wrapMode = TextureWrapMode.Repeat;
+                    importer.mipmapEnabled = true;
+                    importer.anisoLevel = 8;
+                    importer.SaveAndReimport();
+                }
+            }
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (texture == null)
+            {
+                throw new InvalidOperationException($"地面の写真の絵がない: {path}（git lfs pull で取り込めているか確かめる）");
+            }
+            return texture;
+        }
+
+        /// <summary>
+        /// 三角柱（底の幅 1・高さ 1・奥行き 1。底の中心が原点、頂は y 1。手前・奥の三角と 2 つの斜面と底）の網。切妻・ペディメント・
+        /// ドーマーの屋根に使う（大きさは置くときの倍率で）。stage はメッシュのフォルダの名前。
+        /// </summary>
+        public static Mesh Prism(string stage, string name)
+        {
+            Mesh mesh = LoadOrCreateMesh(stage, name);
+            var a = new Vector3(-0.5f, 0f, -0.5f);
+            var b = new Vector3(0.5f, 0f, -0.5f);
+            var c = new Vector3(0f, 1f, -0.5f);
+            var d = new Vector3(-0.5f, 0f, 0.5f);
+            var e = new Vector3(0.5f, 0f, 0.5f);
+            var f = new Vector3(0f, 1f, 0.5f);
+            var vertices = new System.Collections.Generic.List<Vector3>();
+            var triangles = new System.Collections.Generic.List<int>();
+            // 面を足す（Unity の表は Cross(b - a, c - a) の向き。外向きになるように並べ替える）。
+            void Face(params Vector3[] corners)
+            {
+                Vector3 center = Vector3.zero;
+                foreach (Vector3 corner in corners)
+                {
+                    center += corner;
+                }
+                center /= corners.Length;
+                Vector3 normal = Vector3.Cross(corners[1] - corners[0], corners[2] - corners[0]);
+                bool outward = Vector3.Dot(normal, center - new Vector3(0f, 0.33f, 0f)) > 0f;
+                int start = vertices.Count;
+                vertices.AddRange(corners);
+                for (int i = 1; i < corners.Length - 1; i++)
+                {
+                    triangles.Add(start);
+                    triangles.Add(start + (outward ? i : i + 1));
+                    triangles.Add(start + (outward ? i + 1 : i));
+                }
+            }
+            Face(a, b, c);
+            Face(d, e, f);
+            Face(a, c, f, d);
+            Face(b, e, f, c);
+            Face(a, d, e, b);
+            mesh.Clear();
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            EditorUtility.SetDirty(mesh);
+            return mesh;
+        }
+
+        /// <summary>
+        /// 写真の絵を貼った地面の箱の材質（Airerage/TerrainRock を使う。世界の位置から投影するので、箱の大きさで絵が伸びない）。
+        /// 上を向いた面は top の色と絵、横の面は side の色と絵。
+        /// </summary>
+        public static Material GroundMaterial(StageDecor decor, string name, Color side, string sidePhoto, Color top, string topPhoto, float scale)
+        {
+            return RockMaterial(decor, name, m =>
+            {
+                m.SetColor("_RockColor", side);
+                m.SetColor("_RockDark", side * 0.6f);
+                m.SetColor("_TopColor", top);
+                m.SetFloat("_TopSlope", 0.6f);
+                m.SetFloat("_TopHeight", -1000f);
+                m.SetFloat("_TopAmount", 1f);
+                m.SetFloat("_Strata", 0f);
+                m.SetFloat("_NoiseScale", 0.2f);
+                m.SetColor("_GlowColor", Color.black);
+                m.SetFloat("_Cracks", 0f);
+                m.SetFloat("_Ambient", 0.9f);
+                ApplyPhotos(m, sidePhoto, topPhoto, scale, 0.65f, 0.6f);
+            });
         }
 
         /// <summary>地面の材質（Airerage/TerrainRock。ステージの材質のフォルダに保存）。</summary>

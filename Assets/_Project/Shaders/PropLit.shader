@@ -2,7 +2,7 @@
 // （UniversalFragmentPBR）で、色の絵・法線の絵・発光の絵をいつも使う（キーワードで切り替えない）。バッチモードで作った材質では
 // URP の Lit の _EMISSION・_NORMALMAP のキーワードが保存されず、夜の窓が光らず法線の絵も効かなかったため。
 // 絵がない所は既定の絵（色は白、法線は平ら、発光は黒）になるので、使わない絵は空のままでよい。
-// _Cutoff が 0 より大きいと、色の絵の不透明度がそれより小さい所を描かない（デカールの切り抜き）。
+// _Cutoff が 0 より大きいと、色の絵の不透明度がそれより小さい所を描かない（デカール・葉の切り抜き）。_Cull 0 で裏も描く（葉の板）。
 // 光は主の光と環境光（と追加の光）。影を受け、影を落とす。霧に溶ける。
 Shader "Airerage/PropLit"
 {
@@ -17,6 +17,7 @@ Shader "Airerage/PropLit"
         _Smoothness ("Smoothness", Range(0, 1)) = 0.3
         _Metallic ("Metallic", Range(0, 1)) = 0
         _Cutoff ("Alpha cutoff (0 = off)", Range(0, 1)) = 0
+        [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
 
     SubShader
@@ -53,7 +54,7 @@ Shader "Airerage/PropLit"
         {
             Name "ForwardLit"
             Tags { "LightMode" = "UniversalForward" }
-            Cull Back
+            Cull [_Cull]
 
             HLSLPROGRAM
             #pragma vertex Vert
@@ -151,7 +152,7 @@ Shader "Airerage/PropLit"
             ZWrite On
             ZTest LEqual
             ColorMask 0
-            Cull Back
+            Cull [_Cull]
 
             HLSLPROGRAM
             #pragma vertex ShadowVert
@@ -213,7 +214,7 @@ Shader "Airerage/PropLit"
             Tags { "LightMode" = "DepthOnly" }
             ZWrite On
             ColorMask R
-            Cull Back
+            Cull [_Cull]
 
             HLSLPROGRAM
             #pragma vertex DepthVert
@@ -255,7 +256,7 @@ Shader "Airerage/PropLit"
             Name "DepthNormals"
             Tags { "LightMode" = "DepthNormals" }
             ZWrite On
-            Cull Back
+            Cull [_Cull]
 
             HLSLPROGRAM
             #pragma vertex NormalsVert

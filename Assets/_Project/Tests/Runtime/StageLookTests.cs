@@ -534,6 +534,17 @@ namespace Airerage.Runtime.Tests
             Transform[] props = decor.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("Prop_")).ToArray();
             Assert.That(props.Count(t => t.name.StartsWith("Prop_Wall") || t.name.StartsWith("Prop_Top")), Is.GreaterThan(80), "奥の壁の板が少ない");
             Assert.That(props.Count(t => t.name == "Prop_Column_Large_Straight"), Is.GreaterThan(20), "柱が少ない");
+            // 2026-11-19 の要望（区画ごとにちぐはぐ）: 同じ高さの段の板は同じ種類にそろえ、柱は区画の境目（12m ごと）に立つ。
+            foreach (var row in props.Where(t => t.name.StartsWith("Prop_Wall") || t.name.StartsWith("Prop_Top"))
+                         .GroupBy(t => Mathf.RoundToInt(t.GetComponentInChildren<Renderer>().bounds.min.y)))
+            {
+                Assert.That(row.Select(t => t.name).Distinct().Count(), Is.EqualTo(1), $"高さ {row.Key} の段の板がそろっていない: " + string.Join(", ", row.Select(t => t.name).Distinct()));
+            }
+            foreach (Transform column in props.Where(t => t.name == "Prop_Column_Large_Straight"))
+            {
+                float x = column.GetComponentInChildren<Renderer>().bounds.center.x;
+                Assert.That(Mathf.Abs(x / 12f - Mathf.Round(x / 12f)), Is.LessThan(0.05f), $"柱が区画の境目にない（x {x}）");
+            }
             foreach (Transform prop in props)
             {
                 foreach (Renderer renderer in prop.GetComponentsInChildren<Renderer>(true))
@@ -563,6 +574,53 @@ namespace Airerage.Runtime.Tests
             Assert.That(stand.GetComponent<Renderer>().bounds.min.z, Is.GreaterThan(25f), "遊ぶ面に近すぎる");
             Assert.That(decor.GetComponentsInChildren<Transform>(true).Count(t => t.name == "LightTowerLamp"), Is.EqualTo(30), "照明塔の灯り");
             Assert.That(decor.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Fan" || t.name == "BackStand"), Is.False, "前の箱のスタンドが残っている");
+        }
+
+        [TestCase("Stage_Stadium", "Prop_flagRed", "Prop_tentLong", "Prop_barrierRed")]
+        [TestCase("Stage_Wharf", "Prop_ship-cargo-a", "Prop_water-tower", "Prop_building-")]
+        [TestCase("Stage_SnowSea", "Prop_tree-snow-a", "Prop_rocks-large", "Prop_boat-sail-a")]
+        [TestCase("Stage_Volcano", "Prop_DeadTree_1", "Prop_DeadTree_2", "Prop_rock_")]
+        [TestCase("Stage_Kitchen", "Prop_kitchenFridgeLarge", "Prop_kitchenMicrowave", "Prop_pottedPlant")]
+        [TestCase("Stage_CityNight", "Prop_light-curved", "Prop_traffic-light", "Prop_building-")]
+        public void NewAssetPacks_ArePlacedBehindThePlayPlane(string stage, string a, string b, string c)
+        {
+            // 2026-11-19 にユーザーが追加したアセット（Kenney の Racing・Industrial・Watercraft・Holiday・Nature・Furniture・Roads、
+            // Quaternius の Nature）。材質はすべて背景の小物のシェーダー、当たりはなく、遊ぶ面より奥。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+            Transform[] props = decor.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("Prop_")).ToArray();
+            foreach (string name in new[] { a, b })
+            {
+                Assert.That(props.Any(t => t.name == name), Is.True, $"{stage} に {name} がない");
+            }
+            Assert.That(props.Any(t => t.name.StartsWith(c)), Is.True, $"{stage} に {c} がない");
+            foreach (Transform prop in props)
+            {
+                foreach (Renderer renderer in prop.GetComponentsInChildren<Renderer>(true))
+                {
+                    Assert.That(renderer.sharedMaterials.All(m => m != null && m.shader.name == "Airerage/PropLit"), Is.True, $"{stage} の {prop.name} の材質");
+                    Assert.That(renderer.bounds.min.z, Is.GreaterThan(0f), $"{stage} の {prop.name} が遊ぶ面より手前に出ている");
+                }
+                Assert.That(prop.GetComponentsInChildren<Collider>(true), Is.Empty, $"{stage} の {prop.name} に当たりがある");
+            }
+        }
+
+        [TestCase("Stage_Volcano", "CraterRock")]
+        [TestCase("Stage_SnowSea", "SnowMountain")]
+        [TestCase("Stage_Stadium", "GrassGround")]
+        [TestCase("Stage_Wharf", "ConcreteGround")]
+        [TestCase("Stage_Manor", "DirtGround")]
+        public void GroundMaterials_UseThePhotoTextures(string stage, string material)
+        {
+            // 2026-11-19 の要望（地面の写真の絵。Poly Haven の CC0）: 地面と岩山の材質に、写真の絵と法線の絵が当たっている。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            Material found = InScene<Renderer>(scene).SelectMany(r => r.sharedMaterials).FirstOrDefault(m => m != null && m.name == material);
+            Assert.That(found, Is.Not.Null, $"{stage} に {material} がない");
+            Assert.That(found.shader.name, Is.EqualTo("Airerage/TerrainRock"));
+            Assert.That(found.GetTexture("_RockTex"), Is.Not.Null, "写真の絵がない");
+            Assert.That(found.GetTexture("_RockNormal"), Is.Not.Null, "法線の絵がない");
+            Assert.That(AssetDatabase.GetAssetPath(found.GetTexture("_RockTex")), Does.StartWith("Assets/_Project/ThirdParty/PolyHaven/"));
+            Assert.That(found.GetFloat("_TexStrength"), Is.GreaterThan(0f));
         }
 
         [TestCase("Stage_Volcano", "CraterRidge")]
@@ -599,7 +657,11 @@ namespace Airerage.Runtime.Tests
                 {
                     Renderer renderer = prop.GetComponentInChildren<Renderer>();
                     Assert.That(renderer, Is.Not.Null, $"{stage} の {prop.name} に見た目がない");
-                    Assert.That(renderer.sharedMaterial.GetTexture("_BaseMap"), Is.Not.Null, $"{stage} の {prop.name} に色の絵がない");
+                    // 色の絵のパックは絵がある（.mtl の色から作る材質〈Mtl*。Furniture など〉は絵がなくてよい）。
+                    if (!renderer.sharedMaterial.name.StartsWith("Mtl"))
+                    {
+                        Assert.That(renderer.sharedMaterial.GetTexture("_BaseMap"), Is.Not.Null, $"{stage} の {prop.name} に色の絵がない");
+                    }
                     // キーワードに頼らない背景の小物のシェーダー（バッチモードで作った URP の Lit では発光・法線の絵が効かなかった）。
                     Assert.That(renderer.sharedMaterial.shader.name, Is.EqualTo("Airerage/PropLit"), $"{stage} の {prop.name} の材質");
                     Assert.That(prop.GetComponentsInChildren<Collider>(true), Is.Empty, $"{stage} の {prop.name} に当たりがある");
@@ -680,7 +742,22 @@ namespace Airerage.Runtime.Tests
             Color wall = parts.First(r => r.name == "ManorHall").sharedMaterial.GetColor("_BaseColor");
             Assert.That(wall.r > wall.b && wall.r < 0.4f, Is.True, $"館の壁がこげ茶でない（{wall}）");
             Assert.That(parts.Count(r => r.sharedMaterial.name.StartsWith("ManorAccent")), Is.GreaterThan(5), "紫のアクセントが少ない");
-            Assert.That(parts.All(r => r.bounds.min.z > 2.5f), Is.True, "館が遊ぶ面に出ている");
+            // 足場（z ±2）より奥。例外はバルコニーの足場の手前の縁のバラスターの手すり（2026-11-19。低く細い）。
+            Renderer[] protruding = parts.Where(r => r.bounds.min.z < 1.9f && !r.name.StartsWith("ManorBalcony")).ToArray();
+            Assert.That(protruding, Is.Empty, "館が遊ぶ面に出ている: " + string.Join(", ", protruding.Select(r => r.name)));
+            // 洋館のパーツ（2026-11-19 の要望）: 尖塔・塔屋・マンサード屋根・ドーマー・ペディメント・ベイウィンドウ・ポーチの柱・
+            // バルコニー・バラスター。
+            foreach (string part in new[] { "ManorSpireShape", "ManorTower", "ManorMansard", "ManorDormer", "ManorPediment", "ManorBayFront",
+                "ManorPorchColumn", "ManorBalconyDeck", "ManorBalconyBaluster" })
+            {
+                Assert.That(parts.Any(r => r.name == part), Is.True, $"{part} がない");
+            }
+            Assert.That(parts.Count(r => r.name.EndsWith("Baluster")), Is.GreaterThan(40), "バラスターが少ない");
+            // 館の階の高さが足場に合う: バルコニーの足場（y 10.6）= ポーチの屋根、左右の屋根の足場（y 20.8）= マンサード屋根の屋上。
+            Renderer deck = parts.Single(r => r.name == "ManorBalconyDeck");
+            Assert.That(deck.bounds.max.y, Is.EqualTo(10.6f).Within(0.05f), "ポーチの屋根がバルコニーの足場の高さでない");
+            Renderer roofDeck = parts.Single(r => r.name == "ManorRoofDeck");
+            Assert.That(roofDeck.bounds.max.y, Is.EqualTo(20.8f).Within(0.05f), "屋上が屋根の足場の高さでない");
             Assert.That(InScene<Renderer>(scene).Any(r => r.name == "ManorFacade" || r.name == "TomatoPlant" || r.name == "TomatoFruit"), Is.False,
                 "前の館の箱かトマトの球が残っている");
             Assert.That(decor.GetComponentsInChildren<Transform>().Count(t => t.name == "Prop_food_ingredient_tomato"), Is.GreaterThan(30), "トマトの実が少ない");

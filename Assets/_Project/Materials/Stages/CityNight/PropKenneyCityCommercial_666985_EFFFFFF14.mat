@@ -38,6 +38,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _BumpScale: 1
+    - _Cull: 2
     - _Cutoff: 0
     - _Metallic: 0
     - _Smoothness: 0.25

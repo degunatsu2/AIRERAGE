@@ -202,9 +202,9 @@ namespace Airerage.Editor.Stages
             // 海は水のシェーダーの水面（空を映し、さざ波と太陽のきらめき。2026-11-18 の要望: 水の表現をリアルに）。
             Material sea = decor.Water("SeaWater", new Color(0.2f, 0.5f, 0.62f), new Color(0.04f, 0.14f, 0.26f), false, -6f, true);
             Material foam = decor.Unlit("Foam", new Color(0.92f, 0.97f, 1f));
-            Material snow = decor.Lit("Snow", new Color(0.93f, 0.95f, 0.98f));
+            Material snow = TerrainSculpt.GroundMaterial(decor, "SnowGround", new Color(0.82f, 0.86f, 0.92f), TerrainSculpt.Photos.Snow,
+                new Color(0.93f, 0.95f, 0.98f), TerrainSculpt.Photos.Snow, 0.25f);
             Material ice = decor.Lit("Ice", new Color(0.65f, 0.85f, 0.95f));
-            Material pine = decor.Lit("Pine", new Color(0.14f, 0.32f, 0.24f));
             Material wood = decor.Lit("Wood", new Color(0.45f, 0.3f, 0.2f));
             Material sail = decor.Lit("Sail", new Color(0.92f, 0.9f, 0.85f));
             Material flake = decor.Unlit("Snowflake", Color.white);
@@ -226,25 +226,18 @@ namespace Airerage.Editor.Stages
                 GameObject icicle = decor.Box("CeilingIcicle", new Vector3(x, 2f - length * 0.35f, decor.Range(-1.5f, 1.5f)), new Vector3(0.25f, length, 0.25f), ice);
                 icicle.transform.rotation = Quaternion.Euler(0f, 45f, 0f);
             }
-            // 針葉樹: 幹と、雪をかぶった 3 段の葉（円錐。前は 45° 回した箱）。
-            Mesh cone = TerrainSculpt.Cone("SnowSea", "PineCone", 10);
-            Material trunk = decor.Lit("PineTrunk", new Color(0.3f, 0.21f, 0.15f));
-            for (int i = 0; i < 9; i++)
+            // 針葉樹と岩（Kenney の Holiday Kit の雪の木と岩。CC0。2026-11-19 にユーザーが追加）。
+            string[] trees = { "tree-snow-a", "tree-snow-b", "tree-snow-c" };
+            for (int i = 0; i < 10; i++)
             {
-                float size = decor.Range(2.2f, 4f);
-                var foot = new Vector3(decor.Range(-47f, -26f), 6f, decor.Range(3.5f, 12f));
-                decor.Cylinder("PineTrunk", foot + new Vector3(0f, size * 0.12f, 0f), new Vector3(size * 0.12f, size * 0.12f, size * 0.12f), trunk);
-                float yaw = decor.Range(0f, 360f);
-                for (int tier = 0; tier < 3; tier++)
-                {
-                    float width = size * (0.95f - tier * 0.22f);
-                    float baseY = size * (0.2f + tier * 0.27f);
-                    TerrainSculpt.PlaceMesh(decor, "Pine", cone, pine, foot + new Vector3(0f, baseY, 0f), new Vector3(width, size * 0.48f, width), yaw + tier * 17f);
-                    // 葉の段の上の雪（少し小さい白い円錐を上へ）。
-                    TerrainSculpt.PlaceMesh(decor, "PineSnow", cone, snow, foot + new Vector3(0f, baseY + size * 0.2f, 0f),
-                        new Vector3(width * 0.62f, size * 0.3f, width * 0.62f), yaw + tier * 17f + 9f);
-                }
+                ThirdPartyProps.Place(decor, ThirdPartyProps.Holiday, trees[i % trees.Length], new Vector3(decor.Range(-47f, -26f), 6f, decor.Range(3.5f, 12f)),
+                    decor.Range(1.6f, 2.4f), decor.Range(0f, 360f), Color.white, decor.Folder);
             }
+            ThirdPartyProps.Place(decor, ThirdPartyProps.Holiday, "rocks-large", new Vector3(-30f, 6f, 10f), 1.8f, 20f, Color.white, decor.Folder);
+            ThirdPartyProps.Place(decor, ThirdPartyProps.Holiday, "rocks-medium", new Vector3(-44f, 6f, 9f), 2f, -40f, Color.white, decor.Folder);
+            // 沖の船（Kenney の Watercraft）。
+            ThirdPartyProps.Place(decor, ThirdPartyProps.Watercraft, "boat-fishing-small", new Vector3(78f, -6.5f, 58f), 2.2f, -95f, Color.white, decor.Folder);
+            ThirdPartyProps.Place(decor, ThirdPartyProps.Watercraft, "boat-sail-a", new Vector3(-90f, -6.6f, 74f), 2.4f, 85f, Color.white, decor.Folder);
             // 船の飾り（木の船体と見張り台、帆、船首）。地形の箱を少し大きな木の箱で覆う（上の面も地形より少し上にする。同じ高さだと
             // カメラが動くたびに地形の白とちらつく。ユーザーの指摘、2026-10-21）。
             decor.Box("ShipDeckSkin", new Vector3(42f, 2.5f, 0f), new Vector3(10.02f, 1.02f, 4.2f), wood);
