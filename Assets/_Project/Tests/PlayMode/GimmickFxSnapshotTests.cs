@@ -51,7 +51,8 @@ namespace Airerage.PlayMode.Tests
                     var kinds = new Dictionary<string, int>();
                     foreach (StageZoneView view in Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.InstanceID))
                     {
-                        if (view.GetComponentInChildren<ParticleSystem>(true) == null && view.GetComponentInChildren<LightningStrikeView>(true) == null)
+                        if (view.GetComponentInChildren<ParticleSystem>(true) == null && view.GetComponentInChildren<LightningStrikeView>(true) == null
+                            && view.GetComponentInChildren<PlasmaGlobeView>(true) == null)
                         {
                             continue;
                         }

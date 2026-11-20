@@ -941,6 +941,19 @@ namespace Airerage.Runtime.Tests
             Assert.That(InScene<ParticleSystem>(stadium).Any(p => p.name == "DustCore"), Is.True, "つむじ風の塵");
             Scene kitchen = Open("Assets/_Project/Scenes/Stages/Stage_Kitchen.unity");
             Assert.That(InScene<HazardEffectRig>(kitchen).Any(r => r.name == "SteamFx"), Is.True, "やかんの湯気");
+            Assert.That(InScene<ParticleSystem>(kitchen).Any(p => p.name == "DustCore"), Is.True, "ミキサーの粉の渦");
+
+            // 第 3 弾: 吹雪（雪は地形にぶつかると消える）・プラズマ球・噴石・噴気孔。
+            snow = Open("Assets/_Project/Scenes/Stages/Stage_SnowSea.unity");
+            ParticleSystem blizzard = InScene<ParticleSystem>(snow).Single(p => p.name == "Snow");
+            Assert.That(blizzard.collision.enabled, Is.True, "吹雪の雪が地形を通り抜ける（陰の判定と合わない）");
+            Assert.That(InScene<Transform>(snow).Any(t => t.name == "Storm" && t.GetComponent<Renderer>() != null), Is.False, "吹雪の白い板が残っている");
+            lab = Open("Assets/_Project/Scenes/Stages/Stage_Lab.unity");
+            Assert.That(InScene<PlasmaGlobeView>(lab).Count(), Is.EqualTo(2), "プラズマ球");
+            Scene volcano = Open("Assets/_Project/Scenes/Stages/Stage_Volcano.unity");
+            Assert.That(InScene<Renderer>(volcano).Count(r => r.sharedMaterial != null && r.sharedMaterial.shader.name == "Airerage/MagmaRock"), Is.EqualTo(5),
+                "噴石（ひび割れて奥が光る岩）");
+            Assert.That(InScene<Transform>(volcano).Count(t => t.name == "Fumarole"), Is.EqualTo(2), "噴気孔");
         }
 
         [Test]

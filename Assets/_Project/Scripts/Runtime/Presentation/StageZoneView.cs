@@ -57,6 +57,12 @@ namespace Airerage.Runtime.Presentation
 
             /// <summary>上昇気流をつむじ風にする（回りながら昇る塵の柱。線は出さない。2026-11-20 の方針）。</summary>
             DustDevil = 7,
+
+            /// <summary>跳ね返す物をプラズマ球にする（ガラスの球の中の光の筋。枠は出さない。PlasmaGlobeView。2026-11-20 の方針）。</summary>
+            Plasma = 8,
+
+            /// <summary>跳ね返す物を噴石にする（ひび割れて奥が光る溶岩の塊。枠は出さない。Airerage/MagmaRock。2026-11-20 の方針）。</summary>
+            MagmaRock = 9,
         }
 
         private const int RingSegments = 40;
@@ -595,6 +601,13 @@ namespace Airerage.Runtime.Presentation
         // 脈打つ二重の枠。
         private void RenderBumper(Vector3 center, Vector2 half, float time)
         {
+            if (_look == ZoneLook.Plasma || _look == ZoneLook.MagmaRock)
+            {
+                // プラズマ球と噴石は物の見た目で見せる（脈打つ枠は出さない）。
+                SetColor(_ring, 0f);
+                SetColor(_inner, 0f);
+                return;
+            }
             float pulse = Mathf.Sin(time * Mathf.PI * 2f);
             Box(_ring, center, half, 1f + 0.06f * pulse, 1f);
             Box(_inner, center, half, 0.7f - 0.08f * pulse, 0.5f + 0.3f * pulse);
@@ -916,20 +929,11 @@ namespace Airerage.Runtime.Presentation
                 _warningIcons.AddRange(_exposedIcons);
             }
             ShowWarning(warning);
-            Box(_ring, center, half, 1f, active ? 0.5f : 0f);
-            Vector2 side = new Vector2(_direction.y, -_direction.x);
-            for (int i = 0; i < _marks.Count; i++)
+            // 吹雪の雪と白いもやは粒で見せる（2026-11-20 の方針。枠と雪の線は出さない。凍る所の予告の斜線と記号はそのまま）。
+            Box(_ring, center, half, 1f, 0f);
+            foreach (LineRenderer line in _marks)
             {
-                float u = Mathf.Repeat(i * 0.618f, 1f);
-                float phase = Mathf.Repeat(time * 1.6f + i * 0.29f, 1f);
-                // 範囲を斜めに横切る雪（風下へ流れながら少し落ちる）。
-                Vector2 start = new Vector2(center.x, center.y) - _direction * (half.x + half.y) * 0.5f;
-                Vector2 point = start + _direction * phase * (half.x + half.y) + side * (u - 0.5f) * (half.x + half.y) * 1.2f;
-                point.y -= phase * 2f;
-                point = Vector2.Max(new Vector2(center.x - half.x, center.y - half.y), Vector2.Min(new Vector2(center.x + half.x, center.y + half.y), point));
-                _marks[i].SetPosition(0, ToWorld(point));
-                _marks[i].SetPosition(1, ToWorld(point + _direction * 1.4f + Vector2.down * 0.2f));
-                SetColor(_marks[i], active ? Fade(phase) : 0f);
+                SetColor(line, 0f);
             }
         }
 

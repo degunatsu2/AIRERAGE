@@ -113,14 +113,14 @@ namespace Airerage.Editor.Stages
                     new ZoneSpec("GeyserLowEast", StageZoneKind.Launcher, new Vector2(31.5f, -6.5f), new Vector2(5f, 5f), new Vector2(-1f, 0.8f), 32f)
                         .Every(20f, 3.6f, 0f, 0f, 2f).Styled(StageZoneView.ZoneLook.Steam),
                     // 噴火口: 縁の低い段から、火口の真ん中の柱へ飛ばす。
-                    ZoneSpec.OnFloor("VentWest", StageZoneKind.Launcher, -37f, -35f, 2f, new Vector2(0.7f, 1f), 32f),
-                    ZoneSpec.OnFloor("VentEast", StageZoneKind.Launcher, 35f, 37f, 2f, new Vector2(-0.7f, 1f), 32f),
-                    // 噴石（浮かぶ溶けた岩）: 当たると外へ弾かれる。
-                    new ZoneSpec("BombWest", StageZoneKind.Bumper, new Vector2(-20f, 18f), new Vector2(1.8f, 1.8f), Vector2.up, 18f),
-                    new ZoneSpec("BombEast", StageZoneKind.Bumper, new Vector2(20f, 18f), new Vector2(1.8f, 1.8f), Vector2.up, 18f),
-                    new ZoneSpec("BombHighWest", StageZoneKind.Bumper, new Vector2(-33f, 24f), new Vector2(2f, 2f), Vector2.up, 18f),
-                    new ZoneSpec("BombHighEast", StageZoneKind.Bumper, new Vector2(33f, 24f), new Vector2(2f, 2f), Vector2.up, 18f),
-                    new ZoneSpec("BombTop", StageZoneKind.Bumper, new Vector2(0f, 33f), new Vector2(2.2f, 2.2f), Vector2.up, 18f),
+                    ZoneSpec.OnFloor("VentWest", StageZoneKind.Launcher, -37f, -35f, 2f, new Vector2(0.7f, 1f), 32f).Styled(StageZoneView.ZoneLook.Steam),
+                    ZoneSpec.OnFloor("VentEast", StageZoneKind.Launcher, 35f, 37f, 2f, new Vector2(-0.7f, 1f), 32f).Styled(StageZoneView.ZoneLook.Steam),
+                    // 噴石（浮かぶ溶けた岩）: 当たると外へ弾かれる。見た目はひび割れて奥が光るパン皮状火山弾（2026-11-20 の方針）。
+                    new ZoneSpec("BombWest", StageZoneKind.Bumper, new Vector2(-20f, 18f), new Vector2(1.8f, 1.8f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
+                    new ZoneSpec("BombEast", StageZoneKind.Bumper, new Vector2(20f, 18f), new Vector2(1.8f, 1.8f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
+                    new ZoneSpec("BombHighWest", StageZoneKind.Bumper, new Vector2(-33f, 24f), new Vector2(2f, 2f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
+                    new ZoneSpec("BombHighEast", StageZoneKind.Bumper, new Vector2(33f, 24f), new Vector2(2f, 2f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
+                    new ZoneSpec("BombTop", StageZoneKind.Bumper, new Vector2(0f, 33f), new Vector2(2.2f, 2.2f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
                 },
                 Coins = new (Vector2, int)[]
                 {

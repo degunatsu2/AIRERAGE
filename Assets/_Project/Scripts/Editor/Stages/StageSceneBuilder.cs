@@ -357,8 +357,16 @@ namespace Airerage.Editor.Stages
                     {
                         return CreateGeyser(parent, root, zone, color, decor);
                     }
+                    if (zone.Look == StageZoneView.ZoneLook.Steam)
+                    {
+                        return CreateFumarole(parent, zone, decor);
+                    }
                     return decor.Box("Vent", parent, new Vector3(0f, -size.y * 0.5f + 0.15f, 0f), new Vector3(size.x, 0.3f, 1.8f),
                         decor.Lit(kind, Color.Lerp(color, Color.black, 0.4f)));
+                case StageZoneKind.Bumper when zone.Look == StageZoneView.ZoneLook.Plasma:
+                    return CreatePlasmaGlobe(parent, zone, decor);
+                case StageZoneKind.Bumper when zone.Look == StageZoneView.ZoneLook.MagmaRock:
+                    return CreateVolcanicBomb(parent, zone, decor);
                 case StageZoneKind.Bumper:
                     // 正方形の範囲は球（噴石など）、長方形は板（看板など）。
                     var bodySize = new Vector3(size.x * 0.9f, size.y * 0.9f, Mathf.Min(size.x, size.y) * 0.9f);
@@ -426,10 +434,7 @@ namespace Airerage.Editor.Stages
                     return front;
                 }
                 case StageZoneKind.Blizzard:
-                {
-                    // 範囲の全体の幕（手前。キャラクターの前にかかる）。
-                    return decor.Quad("Storm", parent, new Vector3(0f, 0f, -2.5f), size, decor.Transparent(kind, WithAlpha(color, 0.22f)));
-                }
+                    return CreateBlizzard(parent, root, zone, decor);
                 case StageZoneKind.Grab:
                     return CreateDemonHand(parent, zone, color, decor);
                 default:
@@ -700,6 +705,10 @@ namespace Airerage.Editor.Stages
         private static GameObject CreateDustDevil(Transform parent, ZoneSpec zone, StageDecor decor)
         {
             Vector2 size = zone.Size;
+            // 塵の色（ZoneSpec.Tinted があればその色。キッチンのミキサーの渦は粉と砂糖の白）。
+            Color dust = zone.Color ?? new Color(0.72f, 0.6f, 0.46f);
+            Color dark = Color.Lerp(dust, Color.black, 0.55f);
+            Color light = Color.Lerp(dust, Color.white, 0.3f);
             var visual = new GameObject("DustDevil").transform;
             visual.SetParent(parent, false);
             Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
@@ -709,7 +718,7 @@ namespace Airerage.Editor.Stages
                 Name = "DustCore", Rate = 40f, LifetimeMin = 2.4f, LifetimeMax = 3.4f, SpeedMin = 5f, SpeedMax = 8f, SizeMin = 0.7f, SizeMax = 1.3f,
                 GrowFrom = 0.8f, GrowTo = 2.4f, ConeAngle = 6f, ConeRadius = 0.9f, Orbit = 260f, Radial = -0.15f, EdgeNoise = 0.6f, Softness = 0.85f,
                 Turbulence = 0.4f, Spin = 60f, MaxParticles = 220,
-                Colors = ParticleFx.Ramp(new[] { (new Color(0.68f, 0.56f, 0.42f), 0f), (new Color(0.8f, 0.72f, 0.6f), 1f) },
+                Colors = ParticleFx.Ramp(new[] { (dust, 0f), (light, 1f) },
                     new[] { (0f, 0f), (0.55f, 0.08f), (0.32f, 0.5f), (0f, 1f) }),
             }.Build(visual, ground, up, decor.Folder);
             new ParticleFx
@@ -717,17 +726,161 @@ namespace Airerage.Editor.Stages
                 Name = "DustSkirt", Rate = 26f, LifetimeMin = 1f, LifetimeMax = 1.6f, SpeedMin = 0.8f, SpeedMax = 1.8f, SizeMin = 1f, SizeMax = 2f, GrowFrom = 1f,
                 GrowTo = 2.2f, ConeAngle = 80f, ConeRadius = 1.6f, Orbit = 200f, Radial = 0.6f, EdgeNoise = 0.6f, Softness = 0.9f, Turbulence = 0.3f,
                 MaxParticles = 80,
-                Colors = ParticleFx.Ramp(new[] { (new Color(0.66f, 0.55f, 0.42f), 0f), (new Color(0.76f, 0.68f, 0.56f), 1f) },
+                Colors = ParticleFx.Ramp(new[] { (dust, 0f), (light, 1f) },
                     new[] { (0f, 0f), (0.45f, 0.15f), (0f, 1f) }),
             }.Build(visual, ground, up, decor.Folder);
             new ParticleFx
             {
                 Name = "Debris", Rate = 10f, LifetimeMin = 2f, LifetimeMax = 3.2f, SpeedMin = 4f, SpeedMax = 8f, SizeMin = 0.06f, SizeMax = 0.16f,
                 ConeAngle = 10f, ConeRadius = 1f, Orbit = 340f, Spin = 400f, Softness = 0.2f, EdgeNoise = 0.5f, MaxParticles = 60,
-                Colors = ParticleFx.Ramp(new[] { (new Color(0.32f, 0.26f, 0.2f), 0f), (new Color(0.45f, 0.38f, 0.3f), 1f) },
+                Colors = ParticleFx.Ramp(new[] { (dark, 0f), (Color.Lerp(dark, dust, 0.4f), 1f) },
                     new[] { (1f, 0f), (1f, 0.8f), (0f, 1f) }),
             }.Build(visual, ground, up, decor.Folder);
             return visual.gameObject;
+        }
+
+        // 吹雪（2026-11-20 の方針: 実際の吹雪は、強い風で雪が横に流れ、地面と空の区別がつかないほど白くなる〈ホワイトアウト。NWS・
+        // 英国気象庁〉）。吹いている間は、範囲の全体で風下へ流れる雪の筋（地形にぶつかると消える。足場の陰には雪が届かず、判定の
+        // 「風上に地形があると凍らない」と見た目が合う）と、風下へ流れる白いもやの塊。吹き始める前は、ちらつく雪が舞い始める。
+        private static GameObject CreateBlizzard(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            var visual = new GameObject("Storm");
+            visual.transform.SetParent(parent, false);
+            var fx = new GameObject("BlizzardFx").transform;
+            fx.SetParent(root, false);
+            Vector2 wind = zone.Direction.normalized;
+            var box = new Vector3(size.x, size.y, 5f);
+            ParticleSystem snow = new ParticleFx
+            {
+                Name = "Snow", LifetimeMin = 1f, LifetimeMax = 1.6f, SizeMin = 0.06f, SizeMax = 0.14f, BoxSize = box,
+                WorldVelocity = new Vector3(wind.x, wind.y, 0f) * 17f, VelocityJitter = 0.25f, Stretch = 0.035f, Softness = 0.5f, Collide = true,
+                MaxParticles = 2600,
+                Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (new Color(0.9f, 0.95f, 1f), 1f) }, new[] { (0f, 0f), (0.85f, 0.1f), (0.7f, 0.8f), (0f, 1f) }),
+            }.Build(fx, new Vector3(0f, 0f, 0.5f), Quaternion.identity, decor.Folder);
+            ParticleSystem whiteout = new ParticleFx
+            {
+                Name = "Whiteout", LifetimeMin = 2.5f, LifetimeMax = 4f, SizeMin = 7f, SizeMax = 13f, GrowFrom = 0.8f, GrowTo = 1.4f, BoxSize = box,
+                WorldVelocity = new Vector3(wind.x, wind.y, 0f) * 9f, EdgeNoise = 0.6f, Softness = 1f, Turbulence = 0.3f, MaxParticles = 220,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.94f, 0.96f, 1f), 0f), (new Color(0.88f, 0.92f, 0.98f), 1f) },
+                    new[] { (0f, 0f), (0.22f, 0.2f), (0.18f, 0.7f), (0f, 1f) }),
+            }.Build(fx, new Vector3(0f, 0f, -1f), Quaternion.identity, decor.Folder);
+            ParticleSystem flurry = new ParticleFx
+            {
+                Name = "Flurry", LifetimeMin = 1.6f, LifetimeMax = 2.4f, SizeMin = 0.08f, SizeMax = 0.16f, BoxSize = box,
+                WorldVelocity = new Vector3(wind.x, wind.y - 0.4f, 0f) * 6f, VelocityJitter = 0.4f, Softness = 0.6f, Turbulence = 0.6f, Collide = true,
+                MaxParticles = 500,
+                Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (Color.white, 1f) }, new[] { (0f, 0f), (0.8f, 0.15f), (0f, 1f) }),
+            }.Build(fx, new Vector3(0f, 0f, 0.5f), Quaternion.identity, decor.Folder);
+            fx.gameObject.AddComponent<HazardEffectRig>().Configure(root.GetComponent<StageZoneView>(), null,
+                new[] { flurry }, new[] { 160f }, new[] { whiteout }, new[] { 25 }, new[] { snow, whiteout }, new[] { 1300f, 50f });
+            return visual;
+        }
+
+        // プラズマ球（跳ね返す物 + ZoneLook.Plasma。2026-11-20 の方針: 手本はプラズマボール。ガラスの球の真ん中の電極から、気体が光る
+        // 細い筋がガラスへ伸び、熱でゆらゆら昇る〈PlasmaGlobeView〉。色は封入した気体の色〈ネオンの赤紫と、アルゴンなどの青紫〉）。
+        // ガラス・ほのかに光る中の気体・電極・下の金属の台。判定は跳ね返す範囲（球はその範囲に収まる）。
+        private static GameObject CreatePlasmaGlobe(Transform parent, ZoneSpec zone, StageDecor decor)
+        {
+            float radius = Mathf.Min(zone.Size.x, zone.Size.y) * 0.45f;
+            var globe = new GameObject("PlasmaGlobe").transform;
+            globe.SetParent(parent, false);
+            decor.Sphere("Glass", globe, Vector3.zero, Vector3.one * radius * 2f, decor.Transparent("PlasmaGlass", new Color(0.75f, 0.8f, 1f, 0.16f)));
+            Material gas = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("PlasmaGas", "Airerage/SoftParticle", m =>
+            {
+                m.SetFloat("_Softness", 1f);
+                m.SetFloat("_Noise", 0.2f);
+                m.SetFloat("_Intensity", 1f);
+                m.SetColor("_Tint", new Color(0.45f, 0.2f, 0.7f, 0.6f));
+                m.SetFloat("_SrcBlend", (float)BlendMode.One);
+                m.SetFloat("_DstBlend", (float)BlendMode.One);
+            }, decor.Folder);
+            decor.Quad("Gas", globe, new Vector3(0f, 0f, 0.05f), Vector2.one * radius * 2.3f, gas);
+            Material electrode = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("PlasmaElectrode", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(1f, 0.7f, 1f));
+                m.SetFloat("_Intensity", 3f);
+            }, decor.Folder);
+            decor.Sphere("Electrode", globe, Vector3.zero, Vector3.one * radius * 0.32f, electrode);
+            Material metal = decor.Lit("PlasmaBase", new Color(0.18f, 0.19f, 0.22f));
+            metal.SetFloat("_Smoothness", 0.75f);
+            metal.SetFloat("_Metallic", 0.8f);
+            decor.Cylinder("Base", globe, new Vector3(0f, -radius * 1.02f, 0f), new Vector3(radius * 0.9f, radius * 0.12f, radius * 0.9f), metal);
+            decor.Cylinder("Stem", globe, new Vector3(0f, -radius * 0.65f, 0f), new Vector3(radius * 0.12f, radius * 0.3f, radius * 0.12f), metal);
+            Material line = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("PlasmaFilament", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", 3f);
+                m.SetFloat("_Core", 1.5f);
+            }, decor.Folder);
+            globe.gameObject.AddComponent<PlasmaGlobeView>().Configure(line, radius * 0.95f, 8);
+            return globe.gameObject;
+        }
+
+        // 噴石（跳ね返す物 + ZoneLook.MagmaRock。2026-11-20 の方針: 手本は USGS のパン皮状火山弾。冷えた皮がひび割れ、割れ目の奥がまだ
+        // 赤く光る〈Airerage/MagmaRock〉）。少しいびつな塊に、昇る火の粉と熱い煙。判定は跳ね返す範囲（塊はその範囲に収まる）。
+        private static GameObject CreateVolcanicBomb(Transform parent, ZoneSpec zone, StageDecor decor)
+        {
+            float diameter = Mathf.Min(zone.Size.x, zone.Size.y) * 0.9f;
+            var bomb = new GameObject("VolcanicBomb").transform;
+            bomb.SetParent(parent, false);
+            Material crust = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("MagmaRock", "Airerage/MagmaRock", m =>
+            {
+                m.SetFloat("_CellScale", 2.6f);
+                m.SetFloat("_CrackWidth", 0.12f);
+            }, decor.Folder);
+            GameObject body = decor.Sphere("Body", bomb, Vector3.zero, new Vector3(diameter, diameter * 0.86f, diameter * 0.92f), crust);
+            body.transform.localRotation = Quaternion.Euler(decor.Range(0f, 40f), decor.Range(0f, 360f), decor.Range(-20f, 20f));
+            Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
+            new ParticleFx
+            {
+                Name = "Embers", Rate = 7f, LifetimeMin = 1f, LifetimeMax = 2f, SpeedMin = 0.6f, SpeedMax = 1.6f, SizeMin = 0.03f, SizeMax = 0.07f,
+                ConeAngle = 40f, ConeRadius = diameter * 0.4f, Additive = true, Turbulence = 1f, Intensity = 3f, MaxParticles = 40,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.7f, 0.25f), 0f), (new Color(0.8f, 0.2f, 0.03f), 1f) }, new[] { (1f, 0f), (0f, 1f) }),
+            }.Build(bomb, new Vector3(0f, diameter * 0.3f, 0f), up, decor.Folder);
+            new ParticleFx
+            {
+                Name = "HeatSmoke", Rate = 3f, LifetimeMin = 1.6f, LifetimeMax = 2.6f, SpeedMin = 0.5f, SpeedMax = 1f, SizeMin = 0.5f, SizeMax = 0.9f,
+                GrowFrom = 0.7f, GrowTo = 2f, ConeAngle = 20f, ConeRadius = diameter * 0.3f, EdgeNoise = 0.6f, Softness = 0.9f, Turbulence = 0.5f,
+                MaxParticles = 20,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.3f, 0.2f, 0.17f), 0f), (new Color(0.18f, 0.16f, 0.16f), 1f) },
+                    new[] { (0f, 0f), (0.35f, 0.2f), (0f, 1f) }),
+            }.Build(bomb, new Vector3(0f, diameter * 0.35f, 0.1f), up, decor.Folder);
+            return bomb.gameObject;
+        }
+
+        // 噴気孔（いつも噴く発射台 + ZoneLook.Steam。2026-11-20 の方針: 手本は USGS の噴気孔。地面の穴から白い湯気〈ほとんど水蒸気〉が
+        // いつも昇り、口のまわりの岩に硫黄の黄色い結晶が付く）。黒い口・まわりの岩・黄色い硫黄・いつも出る湯気。判定は発射台の範囲
+        // （口のすぐ上の濃い湯気の所）。
+        private static GameObject CreateFumarole(Transform parent, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            var vent = new GameObject("Fumarole").transform;
+            vent.SetParent(parent, false);
+            float floor = -size.y * 0.5f;
+            Material rock = decor.Lit("FumaroleRock", new Color(0.22f, 0.2f, 0.19f));
+            Material sulfur = decor.Lit("FumaroleSulfur", new Color(0.86f, 0.76f, 0.22f));
+            Material hole = decor.Unlit("FumaroleHole", new Color(0.03f, 0.02f, 0.02f));
+            decor.Cylinder("Mouth", vent, new Vector3(0f, floor + 0.04f, 0.3f), new Vector3(size.x * 0.45f, 0.02f, 0.9f), hole);
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i / 6f * Mathf.PI * 2f + decor.Range(-0.3f, 0.3f);
+                var at = new Vector3(Mathf.Cos(a) * size.x * 0.42f, floor + 0.1f, 0.3f + Mathf.Sin(a) * 0.7f);
+                decor.Sphere("Rock", vent, at, new Vector3(decor.Range(0.4f, 0.7f), decor.Range(0.25f, 0.4f), decor.Range(0.4f, 0.6f)), rock);
+                // 硫黄の結晶（岩の内側の縁に黄色く付く）。
+                decor.Sphere("Sulfur", vent, Vector3.Lerp(at, new Vector3(0f, floor + 0.12f, 0.3f), 0.35f) + Vector3.up * 0.05f,
+                    new Vector3(decor.Range(0.25f, 0.45f), 0.08f, decor.Range(0.2f, 0.35f)), sulfur);
+            }
+            Vector2 direction = zone.Direction.normalized;
+            Quaternion along = Quaternion.LookRotation(new Vector3(direction.x, direction.y, 0f), Vector3.back);
+            new ParticleFx
+            {
+                Name = "Steam", Rate = 34f, LifetimeMin = 1.6f, LifetimeMax = 2.4f, SpeedMin = 3.5f, SpeedMax = 6f, SizeMin = 0.3f, SizeMax = 0.55f,
+                GrowFrom = 0.6f, GrowTo = 5f, ConeAngle = 8f, ConeRadius = size.x * 0.2f, EdgeNoise = 0.55f, Softness = 0.9f, Turbulence = 0.8f, Spin = 25f,
+                MaxParticles = 120,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.95f, 0.95f, 0.93f), 0f), (new Color(0.85f, 0.85f, 0.84f), 1f) },
+                    new[] { (0f, 0f), (0.05f, 0.06f), (0.45f, 0.2f), (0.25f, 0.6f), (0f, 1f) }),
+            }.Build(vent, new Vector3(0f, floor + 0.1f, 0.3f), along, decor.Folder);
+            return vent.gameObject;
         }
 
         // 悪魔の手の根元の瘴気（2026-11-20 の指摘: 紫の四角い板 → 禍々しい煙に。手本は実際の煙〈渦を巻いてふくらみ、上へ昇りながら

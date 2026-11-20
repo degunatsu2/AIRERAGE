@@ -45,6 +45,13 @@ namespace Airerage.Editor.Stages
         /// <summary>回転しながら昇る（つむじ風の塵）: 出す所の軸の周りを回る速さ（度/秒）と、軸へ寄せる速さ（負で外へ）。</summary>
         public float Orbit;
         public float Radial;
+        /// <summary>箱の範囲（0 でなければ、出す形を円錐でなく、この大きさの箱の中のどこからでも。吹雪を範囲の全体に）。</summary>
+        public Vector3 BoxSize;
+        /// <summary>ワールドの向きの速さ（0 でなければ、出す速さの代わりにこの速さで流す。吹雪の風下へ）と、そのばらつき（割合）。</summary>
+        public Vector3 WorldVelocity;
+        public float VelocityJitter = 0.2f;
+        /// <summary>地形（シーンの箱の当たり）にぶつかったら消える（吹雪の雪は足場の陰に届かない。判定の「陰に隠れると凍らない」と合う）。</summary>
+        public bool Collide;
         /// <summary>色の明るさの倍率（粒の色は 1 までなので、光らせる粒はここで明るくする。仕上げのにじみが出る）。</summary>
         public float Intensity = 1f;
 
@@ -105,9 +112,38 @@ namespace Airerage.Editor.Stages
             }
             ParticleSystem.ShapeModule shape = system.shape;
             shape.enabled = true;
-            shape.shapeType = ParticleSystemShapeType.Cone;
-            shape.angle = ConeAngle;
-            shape.radius = Mathf.Max(0.001f, ConeRadius);
+            if (BoxSize != Vector3.zero)
+            {
+                shape.shapeType = ParticleSystemShapeType.Box;
+                shape.scale = BoxSize;
+            }
+            else
+            {
+                shape.shapeType = ParticleSystemShapeType.Cone;
+                shape.angle = ConeAngle;
+                shape.radius = Mathf.Max(0.001f, ConeRadius);
+            }
+            if (WorldVelocity != Vector3.zero)
+            {
+                main.startSpeed = 0f;
+                ParticleSystem.VelocityOverLifetimeModule velocity = system.velocityOverLifetime;
+                velocity.enabled = true;
+                velocity.space = ParticleSystemSimulationSpace.World;
+                velocity.x = Spread(WorldVelocity.x);
+                velocity.y = Spread(WorldVelocity.y);
+                velocity.z = new ParticleSystem.MinMaxCurve(WorldVelocity.z - 0.8f, WorldVelocity.z + 0.8f);
+            }
+            if (Collide)
+            {
+                ParticleSystem.CollisionModule collision = system.collision;
+                collision.enabled = true;
+                collision.type = ParticleSystemCollisionType.World;
+                collision.mode = ParticleSystemCollisionMode.Collision3D;
+                collision.lifetimeLoss = 1f;
+                collision.quality = ParticleSystemCollisionQuality.Medium;
+                collision.radiusScale = 0.5f;
+                collision.enableDynamicColliders = false;
+            }
             if (Colors != null)
             {
                 ParticleSystem.ColorOverLifetimeModule color = system.colorOverLifetime;
@@ -150,6 +186,13 @@ namespace Airerage.Editor.Stages
                 renderer.renderMode = ParticleSystemRenderMode.Billboard;
             }
             return system;
+        }
+
+        // 速さのばらつき（VelocityJitter の割合）。
+        private ParticleSystem.MinMaxCurve Spread(float speed)
+        {
+            float jitter = Mathf.Abs(speed) * VelocityJitter;
+            return new ParticleSystem.MinMaxCurve(speed - jitter, speed + jitter);
         }
 
         private Material Material(string folder)
