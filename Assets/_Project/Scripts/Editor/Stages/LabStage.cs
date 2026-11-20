@@ -242,46 +242,78 @@ namespace Airerage.Editor.Stages
 
         // 横の段の板（下から）。同じ段は同じ板にそろえる。
         // 2026-11-20 の要望（2 回目）: マークの板は他の部品とのつなぎ目がちぐはぐなので全部無地に、無地の板の半分は下の黒いラインのない版に。
-        // 並び（上から）: 無地（なし）・無地（黒ライン）・無地（なし）・窓・無地（なし）・無地（黒ライン）・無地（なし）・無地（黒ライン）。
         // パックに黒いラインのない無地の板はないので、同じ板の黒いラインの部分（MI_Trim_03_Dark）を板と同じ明るい材質にした版を使う（Plain）。
+        // 2026-11-20 の要望（3 回目。A 版をもとに B 版の一部を採用）: いちばん上は B 版の青い天井の板（下の灰色の帯も青で塗る）、
+        // いちばん下の黒いラインの段の 1 つ下は B 版の暗い板とトラスの帯、窓の 1 つ下の段は真ん中から 1 つ外側の区画（x ±18）だけ
+        // B 版の丸い窓の板（黒いラインは塗る）。上から: 青い天井・黒・なし・窓・なし（±18 は丸い窓）・黒・暗い板とトラス・黒。
         private const string FlatPanel = "WallAstra_Straight_Flat";
 
         private readonly struct WallRow
         {
-            // 下から積む板（短い板は積んで 1 段の高さにする）。Plain は黒いラインを明るい板の材質にする。
+            // 下から積む板（短い板は積んで 1 段の高さにする）。Plain は黒いライン（青い天井の板は灰色の帯）を板と同じ材質にする。
+            // AccentBays の区画（x）だけ AccentModel に替える。
             public readonly string[] Models;
             public readonly bool Plain;
+            public readonly string AccentModel;
+            public readonly float[] AccentBays;
 
             public WallRow(bool plain, params string[] models)
             {
                 Models = models;
                 Plain = plain;
+                AccentModel = null;
+                AccentBays = null;
+            }
+
+            public WallRow(bool plain, string model, string accentModel, float[] accentBays)
+            {
+                Models = new[] { model };
+                Plain = plain;
+                AccentModel = accentModel;
+                AccentBays = accentBays;
+            }
+
+            public string[] ModelsAt(float x)
+            {
+                if (AccentBays != null)
+                {
+                    foreach (float bay in AccentBays)
+                    {
+                        if (Mathf.Abs(bay - x) < 0.5f)
+                        {
+                            return new[] { AccentModel };
+                        }
+                    }
+                }
+                return Models;
             }
         }
 
-        private static readonly WallRow[] RowsA =
+        private static readonly WallRow[] Rows =
         {
-            new WallRow(false, FlatPanel), new WallRow(true, FlatPanel), new WallRow(false, FlatPanel), new WallRow(true, FlatPanel),
-            new WallRow(false, "WallWindow_Straight"), new WallRow(true, FlatPanel), new WallRow(false, FlatPanel), new WallRow(true, FlatPanel),
-        };
-
-        // B 版（見比べるための案。ユーザーが選んだら片方を消す）: パックの見本の画像（Preview_2・3）の、暗い腰壁と明るい上の壁の 2 色の壁。
-        // 下から: 暗い板 3 段（短い板を積む。いちばん上はトラスの帯）→ 明るい無地 → 丸い窓の板 → 明るい無地 → 青い天井の板。
-        private static readonly WallRow[] RowsB =
-        {
-            new WallRow(false, "ShortWall_DarkPlastic_Straight", "ShortWall_DarkPlastic_Straight", "ShortWall_DarkPlastic_Straight"),
-            new WallRow(false, "ShortWall_DarkPlastic_Straight", "ShortWall_DarkPlastic_Straight", "ShortWall_DarkPlastic_Straight"),
-            new WallRow(false, "ShortWall_DarkMetal2_Straight", "ShortWall_DarkPlastic_Straight"),
+            new WallRow(false, FlatPanel),
             new WallRow(false, "ShortWall_DarkMetal2_Straight", "ShortWall_Triangles_Straight"),
-            new WallRow(true, FlatPanel), new WallRow(true, "WallAstra_Straight_Flat_Window"), new WallRow(true, FlatPanel),
-            new WallRow(false, "TopPlastic_Straight"),
+            new WallRow(false, FlatPanel),
+            new WallRow(true, FlatPanel, "WallAstra_Straight_Flat_Window", new[] { -18f, 18f }),
+            new WallRow(false, "WallWindow_Straight"),
+            new WallRow(true, FlatPanel),
+            new WallRow(false, FlatPanel),
+            new WallRow(true, "TopPlastic_Straight"),
         };
 
-        // 撮り比べ用: 環境変数 AIRERAGE_LAB_WALLS=B でビルドすると B 版になる（ふだんは A 版）。
-        private static WallRow[] Rows => System.Environment.GetEnvironmentVariable("AIRERAGE_LAB_WALLS") == "B" ? RowsB : RowsA;
+        // 黒いライン（帯）を塗る材質の置き換え: 無地の板の濃い帯は明るい板の材質に、青い天井の板の灰色の帯は青い材質に。
+        private static string PlainMaterial(string name)
+        {
+            switch (name)
+            {
+                case "MI_Trim_03_Dark": return "MI_Trim_03";
+                case "MI_Trim_02": return "MI_Trim_02_Variation";
+                default: return name;
+            }
+        }
 
         /// <summary>
-        /// 研究所の奥: SF の壁の板を、柱の格子の区画に 1 枚ずつ・横の段ごとに同じ種類で並べ（無地の板 2 種類と窓の帯 1 段）、
+        /// 研究所の奥: SF の壁の板を、柱の格子の区画に 1 枚ずつ・横の段ごとに同じ種類で並べ（無地の板 2 種類・窓の帯・暗い板とトラス・青い天井）、
         /// 左右の棟の床を奥へ延ばして、区画の真ん中に計算機の作業台と樽、天井に照明を置く。見た目だけ（当たりはない）。
         /// </summary>
         private static void SciFiInterior(StageDecor decor, Material fallback)
@@ -292,14 +324,17 @@ namespace Airerage.Editor.Stages
             // 段の並びは Rows。板の向きは表がカメラを向くように（WallYaw）。
             float scale = Bay / 4f;
             float height = 3f * scale;
-            System.Func<string, Material> plain = name => materials(name == "MI_Trim_03_Dark" ? "MI_Trim_03" : name);
+            System.Func<string, Material> plain = name => materials(PlainMaterial(name));
             WallRow[] rows = Rows;
+            // 段ごとの高さ（柱をその高さに積む。青い天井の板はほかの段より低い）。
+            var rowHeights = new float[rows.Length];
             for (int row = 0; row < rows.Length; row++)
             {
                 for (float x = -BayHalfCount * Bay + Bay * 0.5f; x < BayHalfCount * Bay; x += Bay)
                 {
                     float y = WallBottom + row * height;
-                    foreach (string model in rows[row].Models)
+                    float rowBottom = y;
+                    foreach (string model in rows[row].ModelsAt(x))
                     {
                         GameObject panel = PlaceAgainstWall(decor, model, new Vector3(x, y, 0f), Vector3.one * scale, 13f,
                             rows[row].Plain ? plain : materials, fallback);
@@ -313,14 +348,17 @@ namespace Airerage.Editor.Stages
                         }
                         y += ModelHeight(panel);
                     }
+                    rowHeights[row] = Mathf.Max(rowHeights[row], Mathf.Min(height, y - rowBottom));
                 }
             }
-            // 柱（区画の境目ごと。1 段の高さにそろえた柱を段ごとに積む）。
-            for (float x = -BayHalfCount * Bay; x <= BayHalfCount * Bay + 0.1f; x += Bay)
+            // 柱（区画の境目 2 つに 1 つ。2026-11-20 の要望: 柱が多すぎるので、ある・ない・ある……と半分に。端と真ん中は立つ）。
+            // 段の高さにそろえた柱を段ごとに積む。
+            for (float x = -BayHalfCount * Bay; x <= BayHalfCount * Bay + 0.1f; x += Bay * 2f)
             {
                 for (int row = 0; row < rows.Length; row++)
                 {
-                    PlaceAgainstWall(decor, "Column_Large_Straight", new Vector3(x, WallBottom + row * height, 0f), new Vector3(1.2f, height / 10f, 1.2f), 12.4f, materials, fallback);
+                    PlaceAgainstWall(decor, "Column_Large_Straight", new Vector3(x, WallBottom + row * height, 0f), new Vector3(1.2f, rowHeights[row] / 10f, 1.2f), 12.4f,
+                        materials, fallback);
                 }
             }
             // 左右の棟の床を奥へ（遊ぶ面の床は z ±2 まで）。その上の小物。

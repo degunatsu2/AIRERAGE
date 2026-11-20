@@ -532,35 +532,40 @@ namespace Airerage.Runtime.Tests
             Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_Lab.unity");
             Transform decor = scene.GetRootGameObjects().Single(g => g.name == "Decor").transform;
             Transform[] props = decor.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("Prop_")).ToArray();
-            Assert.That(props.Count(t => t.name.StartsWith("Prop_Wall") || t.name.StartsWith("Prop_Top")), Is.GreaterThanOrEqualTo(96), "奥の壁の板が少ない");
+            Assert.That(props.Count(t => t.name.StartsWith("Prop_Wall") || t.name.StartsWith("Prop_Top") || t.name.StartsWith("Prop_ShortWall")),
+                Is.GreaterThanOrEqualTo(96), "奥の壁の板が少ない");
             Assert.That(props.Count(t => t.name == "Prop_Column_Large_Straight"), Is.GreaterThan(20), "柱が少ない");
-            // 2026-11-19 の要望（区画ごとにちぐはぐ）: 同じ高さの段の板は同じ種類にそろえ、柱は区画の境目（12m ごと）に立つ。
-            foreach (var row in props.Where(t => t.name.StartsWith("Prop_Wall") || t.name.StartsWith("Prop_Top"))
+            // 2026-11-19 の要望（区画ごとにちぐはぐ）: 同じ高さの段の板は同じ種類にそろえる（真ん中から 1 つ外側の丸い窓の板だけは別）。
+            bool IsPanel(Transform t) => t.name.StartsWith("Prop_Wall") || t.name.StartsWith("Prop_Top") || t.name.StartsWith("Prop_ShortWall");
+            foreach (var row in props.Where(t => IsPanel(t) && t.name != "Prop_WallAstra_Straight_Flat_Window_Plain")
                          .GroupBy(t => Mathf.RoundToInt(t.GetComponentInChildren<Renderer>().bounds.min.y)))
             {
                 Assert.That(row.Select(t => t.name).Distinct().Count(), Is.EqualTo(1), $"高さ {row.Key} の段の板がそろっていない: " + string.Join(", ", row.Select(t => t.name).Distinct()));
             }
-            // 2026-11-20 の要望: 窓の列は 1 段、マークの板はなし（つなぎ目がちぐはぐ）。無地の板は黒いラインあり・なしを半分ずつ、
-            // 上から なし・黒・なし・窓・なし・黒・なし・黒。
-            Assert.That(props.Count(t => t.name == "Prop_WallWindow_Straight"), Is.EqualTo(12), "窓の列は 1 段（12 区画）");
-            Assert.That(props.Any(t => t.name == "Prop_WallAstra_Straight"), Is.False, "マークの板が残っている");
-            Assert.That(props.Any(t => t.name == "Prop_TopCables_Straight"), Is.False, "天井の配線（出っ張り）が残っている");
-            string[] fromTop = props.Where(t => t.name.StartsWith("Prop_Wall") && Mathf.Abs(t.GetComponentInChildren<Renderer>().bounds.center.x - 6f) < 1f)
+            // 2026-11-20 の要望（3 回目）: 上から 青い天井・黒・なし・窓・なし・黒・暗い板とトラス・黒。
+            string[] fromTop = props.Where(t => IsPanel(t) && Mathf.Abs(t.GetComponentInChildren<Renderer>().bounds.center.x - 6f) < 1f)
                 .OrderByDescending(t => t.GetComponentInChildren<Renderer>().bounds.min.y).Select(t => t.name.Substring("Prop_".Length)).ToArray();
             Assert.That(fromTop, Is.EqualTo(new[]
             {
-                "WallAstra_Straight_Flat_Plain", "WallAstra_Straight_Flat", "WallAstra_Straight_Flat_Plain", "WallWindow_Straight",
-                "WallAstra_Straight_Flat_Plain", "WallAstra_Straight_Flat", "WallAstra_Straight_Flat_Plain", "WallAstra_Straight_Flat",
+                "TopPlastic_Straight_Plain", "WallAstra_Straight_Flat", "WallAstra_Straight_Flat_Plain", "WallWindow_Straight",
+                "WallAstra_Straight_Flat_Plain", "WallAstra_Straight_Flat", "ShortWall_Triangles_Straight", "ShortWall_DarkMetal2_Straight",
+                "WallAstra_Straight_Flat",
             }), "段の並び（上から）");
-            // 黒いラインのない板は、黒いラインの材質を明るい板の材質にしている。
-            Transform plainPanel = props.First(t => t.name == "Prop_WallAstra_Straight_Flat_Plain");
-            Assert.That(plainPanel.GetComponentsInChildren<Renderer>().SelectMany(r => r.sharedMaterials).Any(m => m.name.Contains("Trim_03_Dark")), Is.False,
-                "黒いラインの材質が残っている");
+            Assert.That(props.Where(t => t.name == "Prop_WallAstra_Straight_Flat_Window_Plain").Select(t => Mathf.RoundToInt(t.GetComponentInChildren<Renderer>().bounds.center.x))
+                .OrderBy(x => x).ToArray(), Is.EqualTo(new[] { -18, 18 }), "丸い窓は真ん中から 1 つ外側の区画だけ");
+            Assert.That(props.Any(t => t.name == "Prop_WallAstra_Straight"), Is.False, "マークの板が残っている");
+            // 黒いライン（帯）を塗った板には、帯の材質が残っていない。
+            foreach (Transform plainPanel in props.Where(t => t.name.EndsWith("_Plain")))
+            {
+                string[] names = plainPanel.GetComponentsInChildren<Renderer>().SelectMany(r => r.sharedMaterials).Select(m => m.name).ToArray();
+                Assert.That(names.Any(n => n.EndsWith("MI_Trim_03_Dark") || n.EndsWith("MI_Trim_02")), Is.False, $"{plainPanel.name} に帯の材質が残っている");
+            }
             Assert.That(props.Count(t => t.name == "Prop_Prop_Computer"), Is.EqualTo(2), "操作盤は左右 1 台ずつ");
+            // 柱は区画の境目 2 つに 1 つ（24m ごと。端と真ん中に立つ）。
             foreach (Transform column in props.Where(t => t.name == "Prop_Column_Large_Straight"))
             {
                 float x = column.GetComponentInChildren<Renderer>().bounds.center.x;
-                Assert.That(Mathf.Abs(x / 12f - Mathf.Round(x / 12f)), Is.LessThan(0.05f), $"柱が区画の境目にない（x {x}）");
+                Assert.That(Mathf.Abs(x / 24f - Mathf.Round(x / 24f)), Is.LessThan(0.03f), $"柱が 24m ごとの境目にない（x {x}）");
             }
             foreach (Transform prop in props)
             {
