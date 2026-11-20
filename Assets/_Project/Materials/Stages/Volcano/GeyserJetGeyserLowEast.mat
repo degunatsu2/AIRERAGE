@@ -25,14 +25,14 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Emission: 0.35
-    - _Foam: 0.55
+    - _Emission: 0
+    - _Foam: 0.4
     - _Seed: 84
-    - _Speed: 2.4
+    - _Speed: 3
     m_Colors:
-    - _Color: {r: 1, g: 0.685, b: 0.595, a: 0.6}
-    - _EdgeColor: {r: 1, g: 0.3, b: 0.1, a: 0.8}
-    - _FoamColor: {r: 1, g: 1, b: 1, a: 0.85}
-    - _StreakScale: {r: 6, g: 2, b: 0, a: 0}
+    - _Color: {r: 1, g: 0.97, b: 0.92, a: 0.18}
+    - _EdgeColor: {r: 0.9, g: 0.88, b: 0.85, a: 0.25}
+    - _FoamColor: {r: 1, g: 1, b: 1, a: 0.5}
+    - _StreakScale: {r: 5, g: 1.6, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

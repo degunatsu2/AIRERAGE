@@ -33,6 +33,9 @@ namespace Airerage.Runtime.Presentation
         /// <summary>今、予告の粒を出しているか（テスト用）。</summary>
         public bool Warning { get; private set; }
 
+        /// <summary>状態を見るギミックの表示（テストと撮影用）。</summary>
+        public StageZoneView View => _view;
+
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(StageZoneView view, Transform follow, ParticleSystem[] warning, float[] warningRates, ParticleSystem[] burst, int[] burstCounts,
             ParticleSystem[] active, float[] activeRates)
