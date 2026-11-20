@@ -33,6 +33,7 @@ Material:
     - _ImpactSeconds: 0.45
     - _ImpactSpeed: 6
     - _ImpactWidth: 0.16
+    - _LightNeutral: 0
     - _LocalGradient: 0.55
     - _Occlusion: 0.45
     - _RimStrength: 0.45

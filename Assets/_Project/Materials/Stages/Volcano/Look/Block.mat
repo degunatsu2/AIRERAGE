@@ -33,6 +33,7 @@ Material:
     - _ImpactSeconds: 0.45
     - _ImpactSpeed: 6
     - _ImpactWidth: 0.16
+    - _LightNeutral: 0.8
     - _LocalGradient: 0.65
     - _Occlusion: 0.5
     - _RimStrength: 0.3
@@ -47,6 +48,6 @@ Material:
     - _RimColor: {r: 0.78, g: 0.9, b: 1, a: 1}
     - _ShadeColor: {r: 0.84, g: 0.92, b: 1.2, a: 1}
     - _TopColor: {r: 0.52, g: 0.47500002, b: 0.46, a: 1}
-    - _TrimColor: {r: 2.6, g: 1.1, b: 0.45, a: 1}
+    - _TrimColor: {r: 0.55, g: 2.1, b: 2.6, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
