@@ -907,6 +907,43 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
+        public void NaturalGimmicks_HaveTheirLooks_AndFitTheirStages()
+        {
+            // 2026-11-20 の方針（ギミックを実際の現象に寄せ、判定を見た目に合わせる）の第 2 弾と、同じ日の指摘。
+            Scene lab = Open("Assets/_Project/Scenes/Stages/Stage_Lab.unity");
+            Transform labDecor = lab.GetRootGameObjects().Single(g => g.name == "Decor").transform;
+            Transform window = labDecor.GetComponentsInChildren<Transform>(true).First(t => t.name == "Prop_WallAstra_Straight_Flat_Window_Plain");
+            float windowFront = window.GetComponentsInChildren<Renderer>().Min(r => r.bounds.min.z);
+            float windowBottom = window.GetComponentsInChildren<Renderer>().Min(r => r.bounds.min.y);
+            float flatFront = labDecor.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Prop_WallAstra_Straight_Flat_Plain")
+                .Select(t => t.GetComponentsInChildren<Renderer>()).Where(rs => Mathf.Abs(rs.Min(r => r.bounds.min.y) - windowBottom) < 0.5f)
+                .Select(rs => rs.Min(r => r.bounds.min.z)).First();
+            Assert.That(windowFront, Is.EqualTo(flatFront).Within(0.02f), "丸い窓の板の表が、同じ段の板の表とそろっていない（手前へ浮く）");
+
+            Scene manor = Open("Assets/_Project/Scenes/Stages/Stage_Manor.unity");
+            Bounds cave = InScene<Renderer>(manor).Single(r => r.name == "CaveWall").bounds;
+            Assert.That(cave.min.x, Is.GreaterThanOrEqualTo(-48.05f), "洞窟の岩壁が左へはみ出している");
+            Assert.That(cave.max.x, Is.LessThanOrEqualTo(-23.95f), "洞窟の岩壁が右へはみ出している");
+            Assert.That(InScene<LightningStrikeView>(manor).Count(), Is.EqualTo(2), "落雷の見た目");
+            Assert.That(InScene<Transform>(manor).Any(t => t.name == "Mist"), Is.False, "悪魔の手の紫の四角い板が残っている");
+            Assert.That(InScene<ParticleSystem>(manor).Count(p => p.name == "MiasmaSmoke"), Is.EqualTo(2), "悪魔の手の瘴気の煙");
+
+            Scene snow = Open("Assets/_Project/Scenes/Stages/Stage_SnowSea.unity");
+            IcicleFallView icicles = InScene<IcicleFallView>(snow).Single();
+            Assert.That(new SerializedObject(icicles).FindProperty("_hanging").arraySize, Is.GreaterThanOrEqualTo(15), "天井のつらら");
+            StageZone icicleZone = InScene<StageZoneAuthoring>(snow).Single(z => z.name == "Icicles").ToZone();
+            Assert.That(icicleZone.FallLength, Is.EqualTo(1.5f), "つららの判定は落ちてくるつららの所だけ");
+
+            Scene wharf = Open("Assets/_Project/Scenes/Stages/Stage_Wharf.unity");
+            Assert.That(InScene<Light>(wharf).Any(l => l.name == "LampLight"), Is.False, "灯台の点の光は外した（まぶしさ）");
+
+            Scene stadium = Open("Assets/_Project/Scenes/Stages/Stage_Stadium.unity");
+            Assert.That(InScene<ParticleSystem>(stadium).Any(p => p.name == "DustCore"), Is.True, "つむじ風の塵");
+            Scene kitchen = Open("Assets/_Project/Scenes/Stages/Stage_Kitchen.unity");
+            Assert.That(InScene<HazardEffectRig>(kitchen).Any(r => r.name == "SteamFx"), Is.True, "やかんの湯気");
+        }
+
+        [Test]
         public void DefaultPostProcessing_IsNeutral_SoStagesWithoutAVolumeLookTheSame()
         {
             // URP の設定のアセットの既定の Volume（テンプレートの Bloom・モーションブラーなど）は外した。ステージの Volume だけが効く。

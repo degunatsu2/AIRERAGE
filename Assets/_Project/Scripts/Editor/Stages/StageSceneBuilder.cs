@@ -308,7 +308,7 @@ namespace Airerage.Editor.Stages
                 authoring.Configure(zone.Kind, zone.Size, zone.Direction, zone.Power, zone.Limit);
                 authoring.ConfigureTiming(zone.PeriodSeconds, zone.ActiveSeconds, zone.PhaseSeconds, zone.JitterSeconds, zone.WarningSeconds);
                 authoring.ConfigureTarget(zone.Target);
-                authoring.ConfigureShape(zone.Width, zone.Travel, zone.TravelSeconds, zone.DwellSeconds, zone.CapHeight);
+                authoring.ConfigureShape(zone.Width, zone.Travel, zone.TravelSeconds, zone.DwellSeconds, zone.CapHeight, zone.FallLength);
                 Color color = zone.Color ?? (theme.ZoneColors.TryGetValue(zone.Kind, out Color themed) ? themed : DefaultColor(zone.Kind));
                 var view = go.AddComponent<StageZoneView>();
                 view.Configure(lineMaterial, color);
@@ -367,8 +367,12 @@ namespace Airerage.Editor.Stages
                         : decor.Box("Body", parent, Vector3.zero, new Vector3(bodySize.x, bodySize.y, 1.2f), decor.Unlit(kind, color * 0.85f));
                 case StageZoneKind.Ice:
                     return decor.Box("Sheet", parent, new Vector3(0f, -size.y * 0.5f + 0.03f, 0f), new Vector3(size.x, 0.06f, 4.1f), decor.Lit(kind, color));
+                case StageZoneKind.Updraft when zone.Look == StageZoneView.ZoneLook.DustDevil:
+                    return CreateDustDevil(parent, zone, decor);
                 case StageZoneKind.Updraft:
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, 1f), size, decor.Transparent(kind, WithAlpha(color, 0.12f)));
+                case StageZoneKind.Gust when zone.Look == StageZoneView.ZoneLook.Steam:
+                    return CreateKettleSteam(parent, root, zone, decor);
                 case StageZoneKind.Gust when IsSteadyDraft(zone):
                     // いつも吹いている縦の風は、上昇気流と同じ見た目（StageZoneView も同じ筋を流す。ユーザーの要望、2026-10-29）。
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, 1f), size, decor.Transparent(kind + "Draft", WithAlpha(color, 0.12f)));
@@ -393,6 +397,14 @@ namespace Airerage.Editor.Stages
                     if (zone.Look == StageZoneView.ZoneLook.Lava)
                     {
                         return CreateLavaFountain(parent, root, zone, decor);
+                    }
+                    if (zone.Look == StageZoneView.ZoneLook.Lightning)
+                    {
+                        return CreateLightning(parent, root, zone, decor);
+                    }
+                    if (zone.Look == StageZoneView.ZoneLook.Icicle)
+                    {
+                        return CreateIcicles(parent, root, zone, decor);
                     }
                     // 幅 1 の柱の板（StageZoneView が周期ごとの柱の位置と幅に合わせる）。
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, -0.5f), new Vector2(1f, size.y), decor.Transparent(kind, WithAlpha(color, 0.78f)));
@@ -426,7 +438,7 @@ namespace Airerage.Editor.Stages
         }
 
         // 悪魔の手（2026-11-20 の要望で精巧に）: 地面の紫に光る裂け目から生えた、骨ばった黒い手。前腕・手のひら・拳の節・
-        // 3 つの節で曲がる指 4 本と親指・長く鋭い爪・紫に光る血管と、手首のまわりの紫のもや。指の付け根と節は DemonHandView が曲げる
+        // 3 つの節で曲がる指 4 本と親指・長く鋭い爪・紫に光る血管と、根元から昇る瘴気の煙（CreateDemonMiasma）。指の付け根と節は DemonHandView が曲げる
         // （這う間は交互に曲げ伸ばし、握るときは内へ深く曲げる）。大きさは範囲（幅 2.6m・高さ 2.4m）に合わせる。
         private static GameObject CreateDemonHand(Transform parent, ZoneSpec zone, Color color, StageDecor decor)
         {
@@ -500,10 +512,242 @@ namespace Airerage.Editor.Stages
                 // 爪（先が少し手前へ曲がる）。
                 ProceduralMesh.Place("Claw", at, clawMesh, Vector3.zero, Quaternion.Euler(-18f, 0f, 0f), Vector3.one * scale, claw);
             }
-            decor.Quad("Mist", hand, new Vector3(0f, 0.22f, -0.7f), new Vector2(size.x * 1.4f, 1f),
-                decor.Transparent("DemonMist", WithAlpha(new Color(0.55f, 0.15f, 0.8f), 0.32f)));
+            CreateDemonMiasma(hand, size, decor);
             hand.gameObject.AddComponent<DemonHandView>().Configure(fingers, joints.ToArray());
             return hand.gameObject;
+        }
+
+        // 落雷（ZoneLook.Lightning。2026-11-20 の方針: 実際の現象に寄せる。NOAA・NWS の雷の解説と、ゲームの落雷の演出の分解を手本にする）:
+        // 稲妻・お迎え放電・地面の閃光の光・焼けた跡・火花・煙は LightningStrikeView（表示だけ）。判定は危険の柱のまま（本線は柱の幅の中）。
+        private static GameObject CreateLightning(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            float ground = zone.Center.y - size.y * 0.5f;
+            var visual = new GameObject("Lightning");
+            visual.transform.SetParent(parent, false);
+            var fx = new GameObject("LightningFx").transform;
+            fx.SetParent(root, false);
+            Material line = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("LightningLine", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", 3.2f);
+                m.SetFloat("_Core", 1.6f);
+            }, decor.Folder);
+            var flash = new GameObject("Flash").AddComponent<Light>();
+            flash.transform.SetParent(fx, false);
+            flash.transform.localPosition = new Vector3(0f, -size.y * 0.5f + 1.5f, -1f);
+            flash.type = LightType.Point;
+            flash.color = new Color(0.75f, 0.8f, 1f);
+            flash.range = 18f;
+            flash.intensity = 0f;
+            flash.shadows = LightShadows.None;
+            // 赤く焼けた跡（地面に寝かせた、縁のぼけた光の板）。
+            Material scorchMaterial = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("LightningScorch", "Airerage/SoftParticle", m =>
+            {
+                m.SetFloat("_Softness", 0.9f);
+                m.SetFloat("_Noise", 0.5f);
+                m.SetFloat("_NoiseScale", 4f);
+                m.SetFloat("_Intensity", 1.5f);
+                m.SetColor("_Tint", new Color(1f, 0.42f, 0.14f, 0f));
+                m.SetFloat("_SrcBlend", (float)BlendMode.One);
+                m.SetFloat("_DstBlend", (float)BlendMode.One);
+            }, decor.Folder);
+            GameObject scorch = decor.Quad("Scorch", fx, new Vector3(0f, -size.y * 0.5f + 0.05f, 0.2f), new Vector2(2.6f, 1.3f), scorchMaterial);
+            scorch.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
+            // 火花: 青白く光って、飛びながら橙へ冷える。
+            ParticleSystem sparks = new ParticleFx
+            {
+                Name = "Sparks", LifetimeMin = 0.35f, LifetimeMax = 0.9f, SpeedMin = 4f, SpeedMax = 11f, SizeMin = 0.04f, SizeMax = 0.1f, Gravity = 1.2f,
+                ConeAngle = 60f, ConeRadius = 0.2f, Additive = true, Stretch = 0.02f, Intensity = 3f, MaxParticles = 200,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.85f, 0.9f, 1f), 0f), (new Color(1f, 0.75f, 0.35f), 0.4f), (new Color(0.8f, 0.25f, 0.05f), 1f) },
+                    new[] { (1f, 0f), (0.9f, 0.6f), (0f, 1f) }),
+            }.Build(fx, new Vector3(0f, -size.y * 0.5f + 0.1f, 0f), up, decor.Folder);
+            // 煙: 焼けた所から灰色の煙が昇って薄れる。
+            ParticleSystem smoke = new ParticleFx
+            {
+                Name = "Smoke", LifetimeMin = 1.5f, LifetimeMax = 2.6f, SpeedMin = 0.8f, SpeedMax = 1.6f, SizeMin = 0.6f, SizeMax = 1.2f, GrowFrom = 0.7f,
+                GrowTo = 2.6f, ConeAngle = 25f, ConeRadius = 0.4f, EdgeNoise = 0.6f, Softness = 0.85f, Turbulence = 0.6f, Spin = 30f, MaxParticles = 60,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.38f, 0.35f, 0.42f), 0f), (new Color(0.22f, 0.21f, 0.25f), 1f) },
+                    new[] { (0f, 0f), (0.5f, 0.15f), (0.3f, 0.6f), (0f, 1f) }),
+            }.Build(fx, new Vector3(0f, -size.y * 0.5f + 0.3f, 0.2f), up, decor.Folder);
+            fx.gameObject.AddComponent<LightningStrikeView>().Configure(root.GetComponent<StageZoneView>(), line, zone.Center.y + size.y * 0.5f, ground, 0.3f,
+                flash, scorch.GetComponent<Renderer>(), sparks, smoke);
+            return visual;
+        }
+
+        // 落ちてくるつらら（ZoneLook.Icicle。2026-11-20 の方針: 判定は落ちてくるつららの所だけ〈Core の StageZone.FallLength〉）。
+        // 範囲の上の端（天井）に、波打つ回転体のつららを並べて下げる。予告の間は落ちるつららが揺れて氷のかけらとしずくが落ち、効いている
+        // 間はそのつららが判定と同じ動きで落ち、床で砕けて氷のかけらと氷の粉が飛ぶ（IcicleFallView・HazardEffectRig）。
+        private static GameObject CreateIcicles(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            float length = zone.FallLength > 0f ? zone.FallLength : 1.5f;
+            var visual = new GameObject("IcicleColumn");
+            visual.transform.SetParent(parent, false);
+            Material ice = decor.Lit("Icicle", new Color(0.8f, 0.92f, 1f));
+            ice.SetFloat("_Smoothness", 0.92f);
+            // 根元が太く先が細い、表面が波打つつらら（根元が y 0、先が y 1。下へ向けて置く）。
+            var profile = new Vector2[11];
+            for (int i = 0; i < profile.Length; i++)
+            {
+                float u = i / (float)(profile.Length - 1);
+                profile[i] = new Vector2(0.17f * Mathf.Pow(1f - u, 1.15f) * (1f + 0.12f * Mathf.Sin(u * Mathf.PI * 6f)), u);
+            }
+            Mesh mesh = ProceduralMesh.Lathe("Gimmicks", "Icicle", profile, 14);
+            Transform Icicle(string name, Vector3 at, Vector3 scale)
+            {
+                var holder = new GameObject(name).transform;
+                holder.SetParent(root, false);
+                holder.localPosition = at;
+                holder.localScale = scale;
+                ProceduralMesh.Place("Mesh", holder, mesh, Vector3.zero, Quaternion.Euler(180f, decor.Range(0f, 360f), 0f), Vector3.one, ice)
+                    .GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+                return holder;
+            }
+            var hanging = new List<Transform>();
+            for (float x = -size.x * 0.5f + 0.5f; x < size.x * 0.5f - 0.4f; x += decor.Range(0.75f, 1.05f))
+            {
+                float thick = decor.Range(0.85f, 1.2f);
+                hanging.Add(Icicle("Icicle", new Vector3(x, size.y * 0.5f, decor.Range(0.15f, 0.55f)), new Vector3(thick, length * decor.Range(0.8f, 1f), thick)));
+            }
+            Transform falling = Icicle("FallingIcicle", new Vector3(0f, size.y * 0.5f, 0.3f), new Vector3(1f, length, 1f));
+            falling.gameObject.SetActive(false);
+
+            var fx = new GameObject("IcicleFx").transform;
+            fx.SetParent(root, false);
+            Quaternion down = Quaternion.Euler(90f, 0f, 0f);
+            Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
+            Gradient iceColors = ParticleFx.Ramp(new[] { (new Color(0.9f, 0.97f, 1f), 0f), (new Color(0.75f, 0.88f, 1f), 1f) },
+                new[] { (0.95f, 0f), (0.85f, 0.7f), (0f, 1f) });
+            // 予告: ひびが入って氷のかけらとしずくが落ちる。
+            ParticleSystem crumbs = new ParticleFx
+            {
+                Name = "Crumbs", LifetimeMin = 0.6f, LifetimeMax = 1f, SpeedMin = 0.3f, SpeedMax = 1.2f, SizeMin = 0.03f, SizeMax = 0.07f, Gravity = 1f,
+                ConeAngle = 20f, ConeRadius = 0.25f, Colors = iceColors, Softness = 0.25f, EdgeNoise = 0.3f, Spin = 300f, MaxParticles = 80,
+            }.Build(fx, new Vector3(0f, size.y * 0.5f - 0.2f, 0.3f), down, decor.Folder);
+            ParticleSystem drips = new ParticleFx
+            {
+                Name = "Drips", LifetimeMin = 0.5f, LifetimeMax = 0.8f, SpeedMin = 0.2f, SpeedMax = 0.6f, SizeMin = 0.025f, SizeMax = 0.04f, Gravity = 1f,
+                ConeAngle = 3f, ConeRadius = 0.05f, Stretch = 0.03f, Softness = 0.4f, MaxParticles = 40,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.8f, 0.92f, 1f), 0f), (new Color(0.7f, 0.85f, 1f), 1f) }, new[] { (0.8f, 0f), (0.6f, 0.8f), (0f, 1f) }),
+            }.Build(fx, new Vector3(0f, size.y * 0.5f - length * 0.9f, 0.3f), down, decor.Folder);
+            // 床で砕ける: 氷のかけら（回りながら跳ねて落ちる）と、白い氷の粉。
+            ParticleSystem shards = new ParticleFx
+            {
+                Name = "Shards", LifetimeMin = 0.6f, LifetimeMax = 1.1f, SpeedMin = 3f, SpeedMax = 7f, SizeMin = 0.06f, SizeMax = 0.2f, Gravity = 1.6f,
+                ConeAngle = 70f, ConeRadius = 0.3f, Colors = iceColors, Softness = 0.2f, EdgeNoise = 0.45f, Spin = 420f, MaxParticles = 120,
+            }.Build(fx, new Vector3(0f, -size.y * 0.5f + 0.1f, 0.2f), up, decor.Folder);
+            ParticleSystem powder = new ParticleFx
+            {
+                Name = "Powder", LifetimeMin = 0.8f, LifetimeMax = 1.4f, SpeedMin = 0.5f, SpeedMax = 1.5f, SizeMin = 0.5f, SizeMax = 1f, GrowFrom = 0.6f,
+                GrowTo = 2.4f, ConeAngle = 80f, ConeRadius = 0.4f, EdgeNoise = 0.55f, Softness = 0.9f, Turbulence = 0.4f, MaxParticles = 30,
+                Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (new Color(0.88f, 0.94f, 1f), 1f) }, new[] { (0.6f, 0f), (0.35f, 0.4f), (0f, 1f) }),
+            }.Build(fx, new Vector3(0f, -size.y * 0.5f + 0.2f, 0.2f), up, decor.Folder);
+            var rig = fx.gameObject.AddComponent<HazardEffectRig>();
+            rig.Configure(root.GetComponent<StageZoneView>(), fx, new[] { crumbs, drips }, new[] { 14f, 6f }, new[] { crumbs }, new[] { 25 },
+                new ParticleSystem[0], new float[0]);
+            rig.ConfigureEndBurst(new[] { shards, powder }, new[] { 45, 10 });
+            fx.gameObject.AddComponent<IcicleFallView>().Configure(root.GetComponent<StageZoneView>(), hanging.ToArray(), falling);
+            return visual;
+        }
+
+        // やかんの湯気（風 + ZoneLook.Steam。2026-11-20 の方針: 注ぎ口のすぐ外は見えず〈湯気はまだ気体〉、少し上で冷えて白い湯気になり、
+        // ふくらみながら昇って薄れる）。判定は風の範囲（幅 2m）のまま。湯気の幅も上で範囲の幅くらい。
+        private static GameObject CreateKettleSteam(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            var visual = new GameObject("SteamPlume");
+            visual.transform.SetParent(parent, false);
+            var fx = new GameObject("SteamFx").transform;
+            fx.SetParent(root, false);
+            Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
+            float speed = size.y / 1.6f;
+            var spout = new Vector3(0f, -size.y * 0.5f, 0f);
+            ParticleSystem steam = new ParticleFx
+            {
+                Name = "Steam", LifetimeMin = 1.4f, LifetimeMax = 2f, SpeedMin = speed * 0.7f, SpeedMax = speed, SizeMin = 0.25f, SizeMax = 0.45f,
+                GrowFrom = 0.6f, GrowTo = 6.5f, ConeAngle = 5f, ConeRadius = 0.12f, EdgeNoise = 0.55f, Softness = 0.9f, Turbulence = 0.9f, Spin = 30f,
+                MaxParticles = 300,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.96f, 0.96f, 0.97f), 0f), (new Color(0.9f, 0.9f, 0.92f), 1f) },
+                    new[] { (0f, 0f), (0f, 0.06f), (0.5f, 0.2f), (0.3f, 0.6f), (0f, 1f) }),
+            }.Build(fx, spout, up, decor.Folder);
+            ParticleSystem wisps = new ParticleFx
+            {
+                Name = "Wisps", LifetimeMin = 1f, LifetimeMax = 1.6f, SpeedMin = 1f, SpeedMax = 2f, SizeMin = 0.15f, SizeMax = 0.3f, GrowFrom = 0.6f, GrowTo = 4f,
+                ConeAngle = 10f, ConeRadius = 0.1f, EdgeNoise = 0.5f, Softness = 0.9f, Turbulence = 0.5f, MaxParticles = 40,
+                Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (new Color(0.9f, 0.9f, 0.9f), 1f) }, new[] { (0f, 0f), (0.35f, 0.25f), (0f, 1f) }),
+            }.Build(fx, spout, up, decor.Folder);
+            fx.gameObject.AddComponent<HazardEffectRig>().Configure(root.GetComponent<StageZoneView>(), null,
+                new[] { wisps }, new[] { 8f }, new[] { steam }, new[] { 15 }, new[] { steam }, new[] { 70f });
+            return visual;
+        }
+
+        // つむじ風（上昇気流 + ZoneLook.DustDevil。2026-11-20 の方針: 実際のつむじ風は、地面から巻き上げた塵が回りながら昇る柱。根元が
+        // 広く〈椀の形〉、上へ行くほど薄れて見えなくなる。紙くずや葉も一緒に回る）。いつも出し続け、動くつむじ風と一緒に動く。判定は
+        // 上昇気流の範囲（幅 6m）のまま（塵の柱と根元の広がりはその幅に収まる）。
+        private static GameObject CreateDustDevil(Transform parent, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            var visual = new GameObject("DustDevil").transform;
+            visual.SetParent(parent, false);
+            Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
+            var ground = new Vector3(0f, -size.y * 0.5f + 0.2f, 0.3f);
+            new ParticleFx
+            {
+                Name = "DustCore", Rate = 40f, LifetimeMin = 2.4f, LifetimeMax = 3.4f, SpeedMin = 5f, SpeedMax = 8f, SizeMin = 0.7f, SizeMax = 1.3f,
+                GrowFrom = 0.8f, GrowTo = 2.4f, ConeAngle = 6f, ConeRadius = 0.9f, Orbit = 260f, Radial = -0.15f, EdgeNoise = 0.6f, Softness = 0.85f,
+                Turbulence = 0.4f, Spin = 60f, MaxParticles = 220,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.68f, 0.56f, 0.42f), 0f), (new Color(0.8f, 0.72f, 0.6f), 1f) },
+                    new[] { (0f, 0f), (0.55f, 0.08f), (0.32f, 0.5f), (0f, 1f) }),
+            }.Build(visual, ground, up, decor.Folder);
+            new ParticleFx
+            {
+                Name = "DustSkirt", Rate = 26f, LifetimeMin = 1f, LifetimeMax = 1.6f, SpeedMin = 0.8f, SpeedMax = 1.8f, SizeMin = 1f, SizeMax = 2f, GrowFrom = 1f,
+                GrowTo = 2.2f, ConeAngle = 80f, ConeRadius = 1.6f, Orbit = 200f, Radial = 0.6f, EdgeNoise = 0.6f, Softness = 0.9f, Turbulence = 0.3f,
+                MaxParticles = 80,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.66f, 0.55f, 0.42f), 0f), (new Color(0.76f, 0.68f, 0.56f), 1f) },
+                    new[] { (0f, 0f), (0.45f, 0.15f), (0f, 1f) }),
+            }.Build(visual, ground, up, decor.Folder);
+            new ParticleFx
+            {
+                Name = "Debris", Rate = 10f, LifetimeMin = 2f, LifetimeMax = 3.2f, SpeedMin = 4f, SpeedMax = 8f, SizeMin = 0.06f, SizeMax = 0.16f,
+                ConeAngle = 10f, ConeRadius = 1f, Orbit = 340f, Spin = 400f, Softness = 0.2f, EdgeNoise = 0.5f, MaxParticles = 60,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.32f, 0.26f, 0.2f), 0f), (new Color(0.45f, 0.38f, 0.3f), 1f) },
+                    new[] { (1f, 0f), (1f, 0.8f), (0f, 1f) }),
+            }.Build(visual, ground, up, decor.Folder);
+            return visual.gameObject;
+        }
+
+        // 悪魔の手の根元の瘴気（2026-11-20 の指摘: 紫の四角い板 → 禍々しい煙に。手本は実際の煙〈渦を巻いてふくらみ、上へ昇りながら
+        // 薄れる〉と、ゲームの闇の瘴気の演出〈黒に近い紫の煙・下から照らす紫の光・漂う火の粉〉）。地面の裂け目から、
+        // ① 黒紫の濃い煙が渦を巻いて昇り（ふつうに重ねる）、② 裂け目の紫の光に下から照らされた薄い紫のもや（足し算）が揺れ、
+        // ③ 紫の火の粉が漂って昇る。いつも出し続け、手が動くと煙は後ろへ尾を引く（粒はワールドの空間で動く）。当たりはない。
+        private static void CreateDemonMiasma(Transform hand, Vector2 size, StageDecor decor)
+        {
+            Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
+            float radius = size.x * 0.35f;
+            new ParticleFx
+            {
+                Name = "MiasmaSmoke", Rate = 16f, LifetimeMin = 1.8f, LifetimeMax = 3f, SpeedMin = 0.5f, SpeedMax = 1.3f, SizeMin = 0.7f, SizeMax = 1.3f,
+                GrowFrom = 0.6f, GrowTo = 2.6f, ConeAngle = 22f, ConeRadius = radius, EdgeNoise = 0.65f, Softness = 0.85f, Turbulence = 0.7f, Spin = 40f,
+                Gravity = -0.03f, MaxParticles = 120,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.2f, 0.06f, 0.26f), 0f), (new Color(0.08f, 0.03f, 0.11f), 0.45f), (new Color(0.04f, 0.02f, 0.06f), 1f) },
+                    new[] { (0f, 0f), (0.75f, 0.15f), (0.5f, 0.6f), (0f, 1f) }),
+            }.Build(hand, new Vector3(0f, 0.15f, 0f), up, decor.Folder);
+            new ParticleFx
+            {
+                Name = "MiasmaGlow", Rate = 7f, LifetimeMin = 1.2f, LifetimeMax = 2f, SpeedMin = 0.3f, SpeedMax = 0.8f, SizeMin = 0.9f, SizeMax = 1.6f,
+                GrowFrom = 0.7f, GrowTo = 1.8f, ConeAngle = 15f, ConeRadius = radius * 0.8f, EdgeNoise = 0.5f, Softness = 0.95f, Turbulence = 0.4f,
+                Additive = true, Intensity = 1.2f, MaxParticles = 40,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.6f, 0.15f, 0.9f), 0f), (new Color(0.35f, 0.05f, 0.55f), 1f) },
+                    new[] { (0f, 0f), (0.35f, 0.2f), (0.15f, 0.6f), (0f, 1f) }),
+            }.Build(hand, new Vector3(0f, 0.05f, 0f), up, decor.Folder);
+            new ParticleFx
+            {
+                Name = "MiasmaEmbers", Rate = 9f, LifetimeMin = 1.2f, LifetimeMax = 2.4f, SpeedMin = 0.6f, SpeedMax = 1.6f, SizeMin = 0.04f, SizeMax = 0.09f,
+                ConeAngle = 30f, ConeRadius = radius, Turbulence = 1.2f, Additive = true, Intensity = 3f, MaxParticles = 60,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.85f, 0.45f, 1f), 0f), (new Color(0.5f, 0.1f, 0.85f), 1f) }, new[] { (1f, 0f), (0.8f, 0.6f), (0f, 1f) }),
+            }.Build(hand, new Vector3(0f, 0.1f, 0f), up, decor.Folder);
         }
 
         // 流れる液体の筋の材質（Airerage/Stream）。

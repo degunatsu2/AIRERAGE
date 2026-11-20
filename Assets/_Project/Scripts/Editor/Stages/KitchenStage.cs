@@ -117,7 +117,8 @@ namespace Airerage.Editor.Stages
                     // カップケーキのベルトコンベア（シンクとは逆、真ん中へ運ぶ）。
                     ZoneSpec.OnFloor("CupcakeConveyor", StageZoneKind.SpeedLane, 26.5f, 31f, 2f, Vector2.left, 11f),
                     // やかんの湯気: 6 秒ごとに 2 秒、上へ。
-                    new ZoneSpec("KettleSteam", StageZoneKind.Gust, new Vector2(33f, 7f), new Vector2(2f, 10f), Vector2.up, 60f, 16f).Every(6f, 2f, 1f, 0f, 1f),
+                    new ZoneSpec("KettleSteam", StageZoneKind.Gust, new Vector2(33f, 7f), new Vector2(2f, 10f), Vector2.up, 60f, 16f).Every(6f, 2f, 1f, 0f, 1f)
+                        .Styled(StageZoneView.ZoneLook.Steam),
                     // ゼリーのジャンプ台（まな板とボウルの上）。
                     ZoneSpec.OnFloor("JellyBoard", StageZoneKind.JumpPad, -19f, -17f, 6.5f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("JellyBowl", StageZoneKind.JumpPad, 17f, 19f, 6.5f, Vector2.up, 24f, 0.4f),

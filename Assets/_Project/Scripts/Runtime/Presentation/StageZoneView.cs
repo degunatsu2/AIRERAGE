@@ -49,8 +49,14 @@ namespace Airerage.Runtime.Presentation
             /// <summary>危険を溶岩の噴泉にする（下から噴き上がる光る溶岩と飛び散る塊・煙。線は出さない。2026-11-20 の要望）。</summary>
             Lava = 4,
 
-            /// <summary>周期のある発射台を噴気の湯気にする（白い湯気としぶき。火山の間欠泉。2026-11-20 の方針）。</summary>
+            /// <summary>周期のある発射台・風を湯気にする（白い湯気としぶき。火山の間欠泉・やかんの湯気。線は出さない。2026-11-20 の方針）。</summary>
             Steam = 5,
+
+            /// <summary>危険を落ちてくるつららにする（天井のつららが落ちて床で砕ける。線は出さない。IcicleFallView。2026-11-20 の方針）。</summary>
+            Icicle = 6,
+
+            /// <summary>上昇気流をつむじ風にする（回りながら昇る塵の柱。線は出さない。2026-11-20 の方針）。</summary>
+            DustDevil = 7,
         }
 
         private const int RingSegments = 40;
@@ -204,6 +210,12 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>危険の柱の今の横の範囲（予告か噴いている間。テスト用）。</summary>
         public Vector2 ShownColumn { get; private set; }
+
+        /// <summary>効き始めてからのティック数（効いている間だけ。止んでいる間は -1）。落ちてくるつらら・落雷の段階の表示に使う。</summary>
+        public int ActiveElapsedTicks { get; private set; } = -1;
+
+        /// <summary>Core のギミック（表示が落ちてくる物の帯 FallBand などを読む）。</summary>
+        public StageZone CoreZone => _core;
 
         private void Awake()
         {
@@ -603,6 +615,15 @@ namespace Airerage.Runtime.Presentation
                 RenderDraft(center, half, time);
                 return;
             }
+            if (_look == ZoneLook.Steam)
+            {
+                // 湯気（やかん）は湯気の粒だけで見せる（筋と吹く向きの矢印は出さない。予告の斜線と記号はそのまま）。
+                foreach (LineRenderer line in _marks)
+                {
+                    SetColor(line, 0f);
+                }
+                return;
+            }
             RenderGustWarningArrows(center, half, time, warning);
             if (warning)
             {
@@ -742,8 +763,10 @@ namespace Airerage.Runtime.Presentation
             if (index >= 0 && tick - start < _core.ActiveTicks)
             {
                 cycle = index;
+                ActiveElapsedTicks = tick - start;
                 return 1f;
             }
+            ActiveElapsedTicks = -1;
             cycle = index + 1;
             int untilActive = next - tick;
             int warningTicks = _core.Timing.WarningTicks > 0 ? _core.Timing.WarningTicks : SimTime.SecondsToTicks(GustWarningSeconds);
@@ -822,14 +845,10 @@ namespace Airerage.Runtime.Presentation
             }
             ShowWarning(warning);
             Box(_ring, column, columnHalf, 1f, warning ? 0f : 0.9f);
-            if (_look == ZoneLook.Lightning)
+            if (_look == ZoneLook.Flame || _look == ZoneLook.Lava || _look == ZoneLook.Lightning || _look == ZoneLook.Icicle)
             {
-                RenderBolt(minX, maxX, center.y - half.y, center.y + half.y, active);
-                return;
-            }
-            if (_look == ZoneLook.Flame || _look == ZoneLook.Lava)
-            {
-                // 炎と溶岩は見た目の物体（_activeVisual）で見せる。線の枠と流れる印は出さない（予告の斜線と記号だけ）。
+                // 炎・溶岩・雷・つららは見た目の物体（_activeVisual・LightningStrikeView・IcicleFallView）で見せる。線の枠と流れる印は
+                // 出さない（予告の斜線と記号だけ）。
                 SetColor(_ring, 0f);
                 foreach (LineRenderer line in _marks)
                 {
@@ -851,28 +870,6 @@ namespace Airerage.Runtime.Presentation
                 _marks[i].SetPosition(0, ToWorld(new Vector2(from.x, Mathf.Clamp(from.y, center.y - half.y, center.y + half.y))));
                 _marks[i].SetPosition(1, ToWorld(new Vector2(to.x, Mathf.Clamp(to.y, center.y - half.y, center.y + half.y))));
                 SetColor(_marks[i], active ? Fade(phase) : 0f);
-            }
-        }
-
-        // 雷: 柱の上から下へ、ぎざぎざの稲妻（線の並び）。落ちている間だけ、細かく揺れて光る（落雷。ユーザーの要望、2026-10-26）。
-        private void RenderBolt(float minX, float maxX, float bottom, float top, bool active)
-        {
-            float middle = (minX + maxX) * 0.5f;
-            float swing = (maxX - minX) * 0.45f;
-            int seed = Mathf.FloorToInt(Time.time * 18f);
-            float x = middle;
-            float y = top;
-            float step = (top - bottom) / Mathf.Max(1, _marks.Count);
-            for (int i = 0; i < _marks.Count; i++)
-            {
-                float u = Mathf.Repeat(Mathf.Sin((seed + 1) * 12.9898f + i * 78.233f) * 43758.5453f, 1f);
-                float nextX = middle + (u * 2f - 1f) * swing;
-                float nextY = y - step;
-                _marks[i].SetPosition(0, ToWorld(new Vector2(x, y)));
-                _marks[i].SetPosition(1, ToWorld(new Vector2(nextX, nextY)));
-                SetColor(_marks[i], active ? 1f : 0f);
-                x = nextX;
-                y = nextY;
             }
         }
 
@@ -1185,6 +1182,15 @@ namespace Airerage.Runtime.Presentation
         // 下から上へ流れる筋（間隔をずらして並べる）。
         private void RenderUpdraft(Vector3 center, Vector2 half, float time)
         {
+            if (_look == ZoneLook.DustDevil)
+            {
+                // つむじ風は回りながら昇る塵の粒で見せる（筋は出さない）。
+                foreach (LineRenderer line in _marks)
+                {
+                    SetColor(line, 0f);
+                }
+                return;
+            }
             RenderDraft(center, half, time);
         }
 

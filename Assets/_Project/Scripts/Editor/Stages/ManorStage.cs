@@ -223,8 +223,9 @@ namespace Airerage.Editor.Stages
             Material cap = decor.Unlit("CaveFungusCap", new Color(0.7f, 0.35f, 1f));
             // 奥の暗がり（岩壁の隙間から見える）。
             decor.Box("CaveBack", new Vector3(-36f, -3.5f, 4.2f), new Vector3(24f, 3.8f, 1f), abyss);
-            // 奥の岩壁: 横 24m・縦 6m の網を立てて（高さが手前への出っ張り）、手前へ 0〜1.1m ごつごつ出る。
-            var wall = new TerrainSculpt.Field(CaveLeft - 1f, CaveRight + 1f, -1f, 1f, 0.35f, (x, y) =>
+            // 奥の岩壁: 横 24m・縦 6m の網を立てて（高さが手前への出っ張り）、手前へ 0〜1.1m ごつごつ出る。横は足場（丘）の幅に収める
+            // （2026-11-20 の指摘: 左右に 1m ずつはみ出していた）。
+            var wall = new TerrainSculpt.Field(CaveLeft, CaveRight, -1f, 1f, 0.35f, (x, y) =>
                 1.1f * TerrainSculpt.Ridged(x * 0.35f, y * 0.9f, 71, 4) * TerrainSculpt.Smooth(0f, 0.6f, Mathf.Abs(y) < 0.8f ? 1f : 0.4f));
             GameObject rockWall = TerrainSculpt.Place(decor, "Manor", "CaveWall", wall, rock);
             // 網の y（高さ）を手前（-z）へ、網の z を上下へ: X の軸の周りに 90° 回す。

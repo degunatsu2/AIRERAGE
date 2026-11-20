@@ -335,6 +335,8 @@ namespace Airerage.Editor.Stages
             WallRow[] rows = Rows;
             // 段ごとの高さ（柱をその高さに積む。青い天井の板はほかの段より低い）。
             var rowHeights = new float[rows.Length];
+            // 段のふつうの板の表の面の z（窓の板の表をそろえる）。
+            var rowFront = new float[rows.Length];
             // 段の板を x に積んで置く（width は横の幅の倍率。半分の幅の板は 0.5）。
             void Place(int row, string[] models, float x, float width)
             {
@@ -347,6 +349,17 @@ namespace Airerage.Editor.Stages
                     if (panel == null)
                     {
                         break;
+                    }
+                    float front = Front(panel);
+                    if (model == rows[row].AccentModel)
+                    {
+                        // 丸い窓の板は無地の板より手前へ厚い（窓の枠の出っ張り）ので、奥の面でそろえると手前へ浮く（2026-11-20 の指摘）。
+                        // 表の面を同じ段のふつうの板の表の面にそろえる（はみ出した奥は壁の裏に隠れる）。
+                        panel.transform.position += new Vector3(0f, 0f, rowFront[row] - front);
+                    }
+                    else if (rowFront[row] == 0f)
+                    {
+                        rowFront[row] = front;
                     }
                     if (rows[row].Plain)
                     {
@@ -438,6 +451,17 @@ namespace Airerage.Editor.Stages
                 go.transform.position += new Vector3(position.x - bounds.center.x, position.y - bounds.min.y, back - bounds.max.z);
             }
             return go;
+        }
+
+        // 置いた板の表（カメラ側。いちばん手前）の面の z。
+        private static float Front(GameObject go)
+        {
+            float front = float.MaxValue;
+            foreach (Renderer renderer in go.GetComponentsInChildren<Renderer>())
+            {
+                front = Mathf.Min(front, renderer.bounds.min.z);
+            }
+            return front;
         }
 
         // 板の大きさ（横の幅だけ width 倍。板は WallYaw で回すので、ワールドの x になる板の軸を縮める）。

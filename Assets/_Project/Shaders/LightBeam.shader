@@ -1,4 +1,4 @@
-// 灯台の回る光の筋（2026-11-20 の要望: 灯台の光をモデルに合わせた光源として精巧に）。円錐の網（先が原点、+Y へ伸びる）に足し算で
+// 灯台の回る光の筋（2026-11-20 の要望: 灯台の光をモデルに合わせた光源として精巧に。同じ日の指摘でまぶしさを抑えた）。円錐の網（先が原点、+Y へ伸びる）に足し算で
 // 塗る。根元ほど明るく先へ消え、円錐の真ん中の軸に近いほど明るい（縁は柔らかい）。光の向きがカメラの方を向くほど薄くする（回って
 // 手前へ来たときに画面いっぱいに光らないように）。光は使わない。
 Shader "Airerage/LightBeam"
@@ -67,16 +67,20 @@ Shader "Airerage/LightBeam"
 
             half4 Frag(Varyings input) : SV_Target
             {
-                float3 n = normalize(input.normalWS);
-                float3 v = normalize(input.viewWS);
+                // 長さ 0 のベクトルを正規化しない（NaN が出ると、仕上げのにじみで画面いっぱいの白い光になる）。
+                float3 n = input.normalWS * rsqrt(max(dot(input.normalWS, input.normalWS), 1e-8));
+                float3 v = input.viewWS * rsqrt(max(dot(input.viewWS, input.viewWS), 1e-8));
                 // 縁（視線とすれ違う面）ほど薄く、真ん中ほど濃い。
                 float core = pow(saturate(abs(dot(n, v))), 1.5);
                 float along = pow(1.0 - input.along, _Falloff);
                 // 光の向きがカメラの方を向くほど早めに消し（2026-11-20 の要望: 手前を向くと画面がまぶしい）、カメラの近くの部分も消す。
+                // 2026-11-20 の 2 回目の指摘（まだまぶしい）: 向きがカメラの方へ 70° より寄ったら消え始め、45° で消える。
                 float facing = abs(dot(input.axisWS, v));
-                float fade = 1.0 - _FacingFade * smoothstep(0.15, 0.55, facing);
+                float fade = 1.0 - _FacingFade * smoothstep(0.08, 0.35, facing);
                 fade *= smoothstep(_NearFade * 0.5, _NearFade, input.cameraDistance);
-                return half4(_Color.rgb * core * along * fade, 0.0);
+                // 明るさの上限（重なっても白く飛ばない）。
+                half3 color = min(_Color.rgb * core * along * fade, half3(0.6, 0.6, 0.6));
+                return half4(max(color, 0.0), 0.0);
             }
             ENDHLSL
         }

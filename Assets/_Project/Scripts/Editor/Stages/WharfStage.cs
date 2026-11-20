@@ -496,16 +496,17 @@ namespace Airerage.Editor.Stages
                 Vector3.zero, Quaternion.identity, Vector3.one, roof);
             decor.Sphere("Vent", root, new Vector3(0f, roofY + 2.2f, 0f), Vector3.one * 0.55f, iron);
             decor.Cylinder("Rod", root, new Vector3(0f, roofY + 3.1f, 0f), new Vector3(0.06f, 0.75f, 0.06f), iron);
-            // 光: 灯室の真ん中から 2 本の光の筋が、ゆっくり回る（手前を向くと薄くなる）。灯室とまわりを照らす点の光も。
+            // 光: 灯室の真ん中から 2 本の光の筋が、ゆっくり回る（手前を向くと薄くなる）。
             var pivot = new GameObject("BeamPivot").transform;
             pivot.SetParent(root, false);
             pivot.localPosition = new Vector3(0f, lampY, 0f);
             Material beam = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("LighthouseBeam", "Airerage/LightBeam", m =>
             {
-                m.SetColor("_Color", new Color(0.85f, 0.8f, 0.58f, 1f));
-                m.SetFloat("_Falloff", 1.6f);
+                // まぶしさを抑える（2026-11-20 の 2 回目の指摘）: 色を控えめに、カメラから 50m より近い所は薄く。
+                m.SetColor("_Color", new Color(0.55f, 0.52f, 0.38f, 1f));
+                m.SetFloat("_Falloff", 1.8f);
                 m.SetFloat("_FacingFade", 1f);
-                m.SetFloat("_NearFade", 34f);
+                m.SetFloat("_NearFade", 50f);
             }, decor.Folder);
             Mesh cone = ProceduralMesh.Lathe(stage, "LighthouseBeamCone", new[] { new Vector2(0.02f, 0f), new Vector2(1f, 1f) }, 24);
             foreach (float yaw in new[] { 0f, 180f })
@@ -517,14 +518,7 @@ namespace Airerage.Editor.Stages
                     .GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
             pivot.gameObject.AddComponent<BackdropMotion>().ConfigureSpin(new Vector3(0f, 36f, 0f));
-            var light = new GameObject("LampLight").AddComponent<Light>();
-            light.transform.SetParent(root, false);
-            light.transform.localPosition = new Vector3(0f, lampY, 0f);
-            light.type = LightType.Point;
-            light.color = new Color(1f, 0.9f, 0.65f);
-            light.range = 16f;
-            light.intensity = 3f;
-            light.shadows = LightShadows.None;
+            // 灯室の点の光は外した（2026-11-20 の 2 回目の指摘: まぶしい。すぐ近くの面とキャラクターに強い照り返しを作る恐れ）。
         }
 
         // 塔の半径（土台からの高さ y の所。上ほど細い）。

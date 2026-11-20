@@ -86,6 +86,7 @@ namespace Airerage.Editor.Stages
         public float TravelSeconds;
         public float DwellSeconds;
         public float CapHeight;
+        public float FallLength;
 
         /// <summary>予告の間に警告音を鳴らすか（危険・吹雪）。</summary>
         public bool WarningSound = true;
@@ -166,6 +167,16 @@ namespace Airerage.Editor.Stages
         public ZoneSpec Capped(float height)
         {
             CapHeight = height;
+            return this;
+        }
+
+        /// <summary>
+        /// 危険の柱を「落ちてくる物」にする（長さ m の帯が上の端から下の端へだんだん速く落ち、帯の所だけ当たる。つらら。判定も見た目も
+        /// この動き。2026-11-20 の方針）。
+        /// </summary>
+        public ZoneSpec Falling(float length)
+        {
+            FallLength = length;
             return this;
         }
 

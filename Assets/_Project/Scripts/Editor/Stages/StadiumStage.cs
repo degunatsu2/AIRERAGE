@@ -1,4 +1,5 @@
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
 using UnityEngine;
 using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
@@ -118,7 +119,7 @@ namespace Airerage.Editor.Stages
                     ZoneSpec.OnFloor("StandPadEast", StageZoneKind.JumpPad, 45.5f, 47f, 5f, Vector2.up, 26f, 0.4f),
                     // つむじ風: 表彰台の上を左右に行き来する上昇気流（前の幅 2 倍・高さ 1.6 倍。得点板の 2m 下まで。ユーザーの要望、2026-10-26）。
                     new ZoneSpec("DustDevil", StageZoneKind.Updraft, new Vector2(-6f, 13f), new Vector2(6f, 26f), Vector2.up, 50f, 14f)
-                        .Moving(new Vector2(12f, 0f), 12f),
+                        .Moving(new Vector2(12f, 0f), 12f).Styled(StageZoneView.ZoneLook.DustDevil),
                     // 得点板へ向かう加速リング。
                     new ZoneSpec("RingWest", StageZoneKind.BoostRing, new Vector2(-20f, 16f), new Vector2(2.4f, 3f), new Vector2(1f, 0.5f), 18f),
                     new ZoneSpec("RingEast", StageZoneKind.BoostRing, new Vector2(20f, 16f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.5f), 18f),

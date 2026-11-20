@@ -1,4 +1,5 @@
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
 using UnityEngine;
 using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
@@ -121,7 +122,9 @@ namespace Airerage.Editor.Stages
                     // 警告音は鳴らさない。ユーザーの要望、2026-10-20）。
                     // 威力 15（その枚数のコインを落とす）。吹き飛ばす速さは今までどおり 15.5 m/s（2026-10-21）。
                     new ZoneSpec("Icicles", StageZoneKind.Hazard, new Vector2(-35.5f, -0.5f), new Vector2(20f, 5f), Vector2.down, 15f, 15.5f)
-                        .Every(3.5f, 0.5f, 1f, 0f, 1.2f).Column(1.6f).Silent(),
+                        .Every(3.5f, 0.5f, 1f, 0f, 1.2f).Column(1.6f).Silent()
+                        // 2026-11-20 の方針: 天井のつららが落ちて床で砕ける。当たるのは落ちてくるつらら（長さ 1.5m）の所だけ。
+                        .Styled(StageZoneView.ZoneLook.Icicle).Falling(1.5f),
                     // 吹雪: 30〜40 秒ごとに 1.5 秒、左上から吹きつける。風上 14m の中に地形がない（何かの影に隠れていない）と 2 秒凍る。
                     // 5 秒前から、当たる場所（影の外）にだけ警告（黄色の斜線と記号。ユーザーの要望、2026-10-20）と警告音。
                     // 凍ると威力 20 の枚数のコインを落とす（凍るのは 2 秒。StageZones.BlizzardFreezeTicks。2026-10-21）。

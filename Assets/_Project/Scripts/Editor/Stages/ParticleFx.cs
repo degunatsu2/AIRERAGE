@@ -5,7 +5,8 @@ namespace Airerage.Editor.Stages
 {
     /// <summary>
     /// ギミックの粒（ParticleSystem）を作る（2026-11-20 の方針: ギミックを実際の現象・ゲームの演出に寄せる。溶岩の噴泉の塊・火の粉・煙・
-    /// 湯気・しぶき）。粒は Airerage/SoftParticle の丸い柔らかい板。出す量は HazardEffectRig が状態に合わせて変える（ここでは 0）。
+    /// 湯気・しぶき）。粒は Airerage/SoftParticle の丸い柔らかい板。出す量は HazardEffectRig が状態に合わせて変える（ここでは 0）か、
+    /// いつも出し続ける（Rate。悪魔の手の煙・つむじ風の塵）。
     /// 見た目だけ（当たりはない。巻き戻しとも関係ない）。
     /// </summary>
     internal sealed class ParticleFx
@@ -39,6 +40,11 @@ namespace Airerage.Editor.Stages
         /// <summary>回転（度/秒の範囲）。</summary>
         public float Spin;
         public int MaxParticles = 300;
+        /// <summary>いつも出し続ける量（個/秒。0 なら HazardEffectRig が状態に合わせて決める）。出し続ける粒は始まりから出そろっている（prewarm）。</summary>
+        public float Rate;
+        /// <summary>回転しながら昇る（つむじ風の塵）: 出す所の軸の周りを回る速さ（度/秒）と、軸へ寄せる速さ（負で外へ）。</summary>
+        public float Orbit;
+        public float Radial;
         /// <summary>色の明るさの倍率（粒の色は 1 までなので、光らせる粒はここで明るくする。仕上げのにじみが出る）。</summary>
         public float Intensity = 1f;
 
@@ -87,7 +93,16 @@ namespace Airerage.Editor.Stages
                 main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
             }
             ParticleSystem.EmissionModule emission = system.emission;
-            emission.rateOverTime = 0f;
+            emission.rateOverTime = Rate;
+            main.prewarm = Rate > 0f;
+            if (!Mathf.Approximately(Orbit, 0f) || !Mathf.Approximately(Radial, 0f))
+            {
+                ParticleSystem.VelocityOverLifetimeModule velocity = system.velocityOverLifetime;
+                velocity.enabled = true;
+                velocity.space = ParticleSystemSimulationSpace.Local;
+                velocity.orbitalZ = new ParticleSystem.MinMaxCurve(Orbit * Mathf.Deg2Rad);
+                velocity.radial = new ParticleSystem.MinMaxCurve(Radial);
+            }
             ParticleSystem.ShapeModule shape = system.shape;
             shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Cone;
