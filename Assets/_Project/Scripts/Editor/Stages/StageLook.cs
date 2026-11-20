@@ -109,6 +109,8 @@ namespace Airerage.Editor.Stages
         public Color RimColor;
         public float RimStrength;
         public Color TrimColor;
+        /// <summary>足場の光の色を中立に寄せる割合（0〜1。火山の橙の光で刺さらない足場が刺さる足場の色に見えないように。2026-11-20 の要望）。</summary>
+        public float SurfaceLightNeutral;
         public Color ImpactColor;
         public float HeightLow;
         public float HeightHigh;
@@ -368,7 +370,9 @@ namespace Airerage.Editor.Stages
             else if (mood == StageMood.Lava)
             {
                 look.WindColor = new Color(1.1f, 0.85f, 0.65f);
-                look.TrimColor = new Color(2.6f, 1.1f, 0.45f);
+                // 刺さらない足場の縁の線はほかのステージと同じ水色のまま、足場は溶岩の橙の光に染めない（2026-11-20 の要望: 刺さらない足場が
+                // オレンジ色に見えて、刺さる足場〈オレンジの縁〉と見間違える。前は縁の線も橙だった）。
+                look.SurfaceLightNeutral = 0.8f;
                 look.BloomThreshold = 1f;
                 look.BloomIntensity = 0.85f;
                 look.Vignette = 0.24f;

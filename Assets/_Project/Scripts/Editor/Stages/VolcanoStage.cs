@@ -1,4 +1,5 @@
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
 using UnityEngine;
 using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
@@ -94,9 +95,9 @@ namespace Airerage.Editor.Stages
                     // 当たる柱の全体に警告。当たると威力 30 の枚数のコインを落とし、上へ 40 m/s で吹き飛ぶ（2026-10-21: 威力を 60 から 30 に、
                     // 吹き飛ぶ高さを約 3 倍に。速さ 23 → 40 m/s）。
                     new ZoneSpec("LavaFlowWest", StageZoneKind.Hazard, new Vector2(-20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 30f, 40f)
-                        .Every(25f, 3f, 0f, 0f, 2f).Column(6f),
+                        .Every(25f, 3f, 0f, 0f, 2f).Column(6f).Styled(StageZoneView.ZoneLook.Lava),
                     new ZoneSpec("LavaFlowEast", StageZoneKind.Hazard, new Vector2(20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 30f, 40f)
-                        .Every(25f, 3f, 12.5f, 0f, 2f).Column(6f),
+                        .Every(25f, 3f, 12.5f, 0f, 2f).Column(6f).Styled(StageZoneView.ZoneLook.Lava),
                     // 壁の間欠泉: 縁の上の段（x = ±45）の上のほうと、下の段（x = ±34）の下のほうの内側の壁から、火口の内側へ斜めに噴く
                     // （4 つが一斉に、20 秒ごとに 3.6 秒。ユーザーの要望、2026-10-20。2 秒前から口に警告）。触れると速度をまるごと噴く向きにする
                     // （強い風より強い）。

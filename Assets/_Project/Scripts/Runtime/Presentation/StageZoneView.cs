@@ -42,6 +42,12 @@ namespace Airerage.Runtime.Presentation
 
             /// <summary>風を水の流れにする（速く長い筋。キッチンの排水溝）。</summary>
             Flow = 2,
+
+            /// <summary>危険を炎にする（オーブンの口から噴き出す炎の舌。線は出さない。2026-11-20 の要望）。</summary>
+            Flame = 3,
+
+            /// <summary>危険を溶岩の流れにする（下から噴き上がる光る溶岩。線は出さない。2026-11-20 の要望）。</summary>
+            Lava = 4,
         }
 
         private const int RingSegments = 40;
@@ -63,6 +69,10 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _period = 0.9f;
         [Tooltip("効いている間だけ出す見た目（溶岩の柱、蒸気、吹雪の幕など。なくてもよい）")]
         [SerializeField] private GameObject _activeVisual;
+        [Tooltip("効いている間に開く扉の蝶番（なければ使わない）と、開く角度（度）")]
+        [SerializeField] private Transform _hinge;
+        [SerializeField] private float _hingeOpenDegrees = 40f;
+        private float _hingeOpen;
         [Tooltip("予告の間に警告音を鳴らすか（危険と吹雪。つららは鳴らさない。ユーザーの要望、2026-10-20）")]
         [SerializeField] private bool _warningSound = true;
         [Tooltip("動くギミックで、一緒に動かす見た目の親（なくてもよい）")]
@@ -139,6 +149,19 @@ namespace Airerage.Runtime.Presentation
         {
             _activeVisual = visual;
         }
+
+        /// <summary>
+        /// 効き始めると開き、終わると閉じる扉を決める（オーブンの扉。下の辺の蝶番の周り〈ローカルの X の軸〉に openDegrees 度、手前へ倒れる。
+        /// シーンのビルダー用。2026-11-20 の要望: 発動と同時にオーブンの口が開き、中から炎が噴き出す）。
+        /// </summary>
+        public void ConfigureHinge(Transform hinge, float openDegrees)
+        {
+            _hinge = hinge;
+            _hingeOpenDegrees = openDegrees;
+        }
+
+        /// <summary>扉の開き具合（0〜1。テスト用）。</summary>
+        public float HingeOpen => _hingeOpen;
 
         /// <summary>予告の間に警告音を鳴らすかを決める（シーンのビルダー用）。</summary>
         public void ConfigureWarningSound(bool sound)
@@ -691,6 +714,18 @@ namespace Airerage.Runtime.Presentation
             return Mathf.Repeat(Time.unscaledTime * WarningBlinkPerSecond, 1f) < 0.55f;
         }
 
+        // 扉: 効き始めたらすぐに開き（約 0.2 秒）、終わったらゆっくり閉じる（約 0.8 秒）。開くときは勢いよく、閉じるときはなめらかに。
+        private void UpdateHinge(bool active)
+        {
+            if (_hinge == null)
+            {
+                return;
+            }
+            _hingeOpen = Mathf.MoveTowards(_hingeOpen, active ? 1f : 0f, Time.deltaTime * (active ? 5f : 1.25f));
+            float eased = active ? 1f - (1f - _hingeOpen) * (1f - _hingeOpen) : _hingeOpen * _hingeOpen * (3f - 2f * _hingeOpen);
+            _hinge.localRotation = Quaternion.Euler(-_hingeOpenDegrees * eased, 0f, 0f);
+        }
+
         private void SetActiveVisual(bool active)
         {
             ShowsActive = active;
@@ -708,6 +743,7 @@ namespace Airerage.Runtime.Presentation
             float strength = PeriodicStrength(tick, out bool warning, out int cycle);
             bool active = strength >= 1f;
             SetActiveVisual(active);
+            UpdateHinge(active);
             if (warning && cycle != _warnedCycle)
             {
                 _warnedCycle = cycle;
@@ -741,6 +777,16 @@ namespace Airerage.Runtime.Presentation
             if (_look == ZoneLook.Lightning)
             {
                 RenderBolt(minX, maxX, center.y - half.y, center.y + half.y, active);
+                return;
+            }
+            if (_look == ZoneLook.Flame || _look == ZoneLook.Lava)
+            {
+                // 炎と溶岩は見た目の物体（_activeVisual）で見せる。線の枠と流れる印は出さない（予告の斜線と記号だけ）。
+                SetColor(_ring, 0f);
+                foreach (LineRenderer line in _marks)
+                {
+                    SetColor(line, 0f);
+                }
                 return;
             }
             // 上向きなら下から上へ（溶岩流）、下向きなら上から下へ（つらら）流れる。

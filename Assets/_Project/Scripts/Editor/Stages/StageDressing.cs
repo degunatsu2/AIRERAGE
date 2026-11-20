@@ -131,6 +131,7 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_Shininess", 48f);
                 m.SetFloat("_EdgeGlint", look.EdgeGlint);
                 m.SetColor("_TrimColor", look.TrimColor);
+                m.SetFloat("_LightNeutral", look.SurfaceLightNeutral);
                 // 触れたときの光の輪はかなり控えめに（2026-11-17 のユーザーの要望）: 暗い色・細い輪・短い時間・小さな広がり（約 2.7m）。
                 m.SetColor("_ImpactColor", look.ImpactColor);
                 m.SetFloat("_ImpactSpeed", 6f);

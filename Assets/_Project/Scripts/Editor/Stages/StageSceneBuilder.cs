@@ -386,6 +386,14 @@ namespace Airerage.Editor.Stages
                     return gate;
                 case StageZoneKind.Hazard:
                 {
+                    if (zone.Look == StageZoneView.ZoneLook.Flame)
+                    {
+                        return CreateFlames(parent, zone, decor);
+                    }
+                    if (zone.Look == StageZoneView.ZoneLook.Lava)
+                    {
+                        return CreateLavaFlow(parent, zone, color, decor);
+                    }
                     // 幅 1 の柱の板（StageZoneView が周期ごとの柱の位置と幅に合わせる）。
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, -0.5f), new Vector2(1f, size.y), decor.Transparent(kind, WithAlpha(color, 0.78f)));
                 }
@@ -417,34 +425,168 @@ namespace Airerage.Editor.Stages
             }
         }
 
-        // 悪魔の手: 地面から生えた黒い手のひらと、長い爪の指 5 本（DemonHandView が指を曲げる）と、手首のまわりの紫のもや。
+        // 悪魔の手（2026-11-20 の要望で精巧に）: 地面の紫に光る裂け目から生えた、骨ばった黒い手。前腕・手のひら・拳の節・
+        // 3 つの節で曲がる指 4 本と親指・長く鋭い爪・紫に光る血管と、手首のまわりの紫のもや。指の付け根と節は DemonHandView が曲げる
+        // （這う間は交互に曲げ伸ばし、握るときは内へ深く曲げる）。大きさは範囲（幅 2.6m・高さ 2.4m）に合わせる。
         private static GameObject CreateDemonHand(Transform parent, ZoneSpec zone, Color color, StageDecor decor)
         {
             Vector2 size = zone.Size;
+            const string meshes = "Gimmicks";
             var hand = new GameObject("DemonHand").transform;
             hand.SetParent(parent, false);
             // 地面より少しだけ上（地形の上の面と飾りの面が重なってちらつかないように）。
             hand.localPosition = new Vector3(0f, -size.y * 0.5f + 0.02f, 0f);
-            Material skin = decor.Lit("DemonSkin", Color.Lerp(color, Color.black, 0.6f));
-            Material claw = decor.Unlit("DemonClaw", Color.Lerp(color, Color.white, 0.3f));
-            decor.Box("Wrist", hand, new Vector3(0f, 0.3f, 0f), new Vector3(size.x * 0.45f, 0.6f, 1.2f), skin);
-            decor.Box("Palm", hand, new Vector3(0f, 0.75f, 0f), new Vector3(size.x * 0.7f, 0.5f, 1.4f), skin);
+            Material skin = decor.Lit("DemonSkin", new Color(0.13f, 0.08f, 0.13f));
+            skin.SetFloat("_Smoothness", 0.62f);
+            Material knuckle = decor.Lit("DemonKnuckle", new Color(0.2f, 0.13f, 0.19f));
+            knuckle.SetFloat("_Smoothness", 0.7f);
+            Material claw = decor.Lit("DemonClaw", new Color(0.86f, 0.8f, 0.7f));
+            claw.SetFloat("_Smoothness", 0.85f);
+            Material vein = decor.Unlit("DemonVein", Color.Lerp(color, new Color(0.75f, 0.25f, 1f), 0.7f));
+            Material rift = decor.Unlit("DemonRift", new Color(0.65f, 0.2f, 1f));
+            Material pit = decor.Lit("DemonPit", new Color(0.02f, 0.01f, 0.03f));
+            float scale = size.y / 2.4f;
+
+            // 地面の裂け目（黒い穴と、紫に光る縁）。
+            decor.Cylinder("RiftGlow", hand, new Vector3(0f, 0.012f, 0f), new Vector3(1.9f, 0.01f, 1.25f) * scale, rift);
+            decor.Cylinder("RiftPit", hand, new Vector3(0f, 0.02f, 0f), new Vector3(1.6f, 0.012f, 1.0f) * scale, pit);
+            // 前腕（裂け目から斜めに）と手のひら。
+            Mesh forearm = ProceduralMesh.Tube(meshes, "DemonForearm",
+                new[] { new Vector3(0f, -0.2f, 0.05f), new Vector3(0f, 0.25f, 0.02f), new Vector3(0f, 0.62f, 0f) }, new[] { 0.36f, 0.31f, 0.3f }, 12);
+            ProceduralMesh.Place("Forearm", hand, forearm, Vector3.zero, Quaternion.identity, Vector3.one * scale, skin);
+            decor.Sphere("Palm", hand, new Vector3(0f, 0.82f, 0f) * scale, new Vector3(1.05f, 0.62f, 0.62f) * scale, skin);
+            decor.Sphere("Wrist", hand, new Vector3(0f, 0.6f, 0f) * scale, new Vector3(0.7f, 0.38f, 0.58f) * scale, skin);
+            // 光る血管（手の甲から前腕へ）。
+            Mesh veinA = ProceduralMesh.Tube(meshes, "DemonVeinA",
+                new[] { new Vector3(-0.28f, 1.0f, -0.28f), new Vector3(-0.12f, 0.8f, -0.31f), new Vector3(-0.05f, 0.45f, -0.31f), new Vector3(0.06f, 0.05f, -0.34f) },
+                new[] { 0.025f, 0.03f, 0.03f, 0.022f }, 6);
+            Mesh veinB = ProceduralMesh.Tube(meshes, "DemonVeinB",
+                new[] { new Vector3(0.3f, 1.0f, -0.27f), new Vector3(0.14f, 0.78f, -0.31f), new Vector3(0.1f, 0.4f, -0.31f) },
+                new[] { 0.022f, 0.028f, 0.02f }, 6);
+            ProceduralMesh.Place("VeinA", hand, veinA, Vector3.zero, Quaternion.identity, Vector3.one * scale, vein);
+            ProceduralMesh.Place("VeinB", hand, veinB, Vector3.zero, Quaternion.identity, Vector3.one * scale, vein);
+
+            // 指: 付け根（Finger）→ 節（Joint）→ 節（Joint）。どの節も短い管と、節の丸み。先に爪。
+            Mesh segment = ProceduralMesh.Tube(meshes, "DemonFingerSegment", new[] { Vector3.zero, new Vector3(0f, 1f, 0f) }, new[] { 0.1f, 0.085f }, 8);
+            Mesh clawMesh = ProceduralMesh.Lathe(meshes, "DemonClaw",
+                new[] { new Vector2(0.085f, 0f), new Vector2(0.075f, 0.12f), new Vector2(0.045f, 0.32f), new Vector2(0f, 0.55f) }, 10);
             var fingers = new Transform[5];
+            var joints = new List<Transform>();
+            float[] lengths = { 0.34f, 0.46f, 0.5f, 0.46f, 0.38f };
             for (int i = 0; i < 5; i++)
             {
-                float x = (i - 2) * size.x * 0.17f;
-                var pivot = new GameObject($"Finger{i + 1}").transform;
-                pivot.SetParent(hand, false);
-                pivot.localPosition = new Vector3(x, 1f, 0f);
-                float length = i == 0 || i == 4 ? size.y * 0.42f : size.y * 0.55f;
-                decor.Box("Bone", pivot, new Vector3(0f, length * 0.5f, 0f), new Vector3(0.22f, length, 0.3f), skin);
-                decor.Box("Claw", pivot, new Vector3(0f, length + 0.18f, -0.05f), new Vector3(0.12f, 0.4f, 0.16f), claw);
-                fingers[i] = pivot;
+                bool thumb = i == 0;
+                float x = thumb ? -0.5f : -0.3f + (i - 1) * 0.2f;
+                var root = new GameObject($"Finger{i + 1}").transform;
+                root.SetParent(hand, false);
+                root.localPosition = new Vector3(x, thumb ? 0.8f : 1.06f, -0.04f) * scale;
+                // 親指は外へ開き、ほかは少し扇に広げる。
+                root.localRotation = Quaternion.Euler(0f, 0f, thumb ? 55f : (1.5f - i) * 6f);
+                fingers[i] = root;
+                Transform at = root;
+                float length = lengths[i] * scale;
+                for (int k = 0; k < 3; k++)
+                {
+                    float part = length * (k == 0 ? 1f : k == 1 ? 0.78f : 0.6f);
+                    float thickness = scale * (1f - k * 0.12f);
+                    ProceduralMesh.Place("Segment", at, segment, Vector3.zero, Quaternion.identity, new Vector3(thickness, part, thickness), skin);
+                    decor.Sphere("Knuckle", at, Vector3.zero, Vector3.one * 0.23f * thickness, knuckle);
+                    var next = new GameObject("Joint").transform;
+                    next.SetParent(at, false);
+                    next.localPosition = new Vector3(0f, part, 0f);
+                    joints.Add(next);
+                    at = next;
+                }
+                // 爪（先が少し手前へ曲がる）。
+                ProceduralMesh.Place("Claw", at, clawMesh, Vector3.zero, Quaternion.Euler(-18f, 0f, 0f), Vector3.one * scale, claw);
             }
-            decor.Quad("Mist", hand, new Vector3(0f, 0.2f, -0.6f), new Vector2(size.x * 1.3f, 0.9f),
-                decor.Transparent("DemonMist", WithAlpha(new Color(0.55f, 0.15f, 0.8f), 0.35f)));
-            hand.gameObject.AddComponent<DemonHandView>().Configure(fingers);
+            decor.Quad("Mist", hand, new Vector3(0f, 0.22f, -0.7f), new Vector2(size.x * 1.4f, 1f),
+                decor.Transparent("DemonMist", WithAlpha(new Color(0.55f, 0.15f, 0.8f), 0.32f)));
+            hand.gameObject.AddComponent<DemonHandView>().Configure(fingers, joints.ToArray());
             return hand.gameObject;
+        }
+
+        // 流れる液体の筋の材質（Airerage/Stream）。
+        internal static Material StreamMaterial(string name, Color liquid, Color edge, Color foam, float speed, Vector2 streakScale, float foamAmount,
+            float emission, string folder)
+        {
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/Stream", m =>
+            {
+                m.SetColor("_Color", liquid);
+                m.SetColor("_EdgeColor", edge);
+                m.SetColor("_FoamColor", foam);
+                m.SetFloat("_Speed", speed);
+                m.SetVector("_StreakScale", new Vector4(streakScale.x, streakScale.y, 0f, 0f));
+                m.SetFloat("_Foam", foamAmount);
+                m.SetFloat("_Emission", emission);
+                // 名前から決まる模様のずれ（作り直しても同じ値）。
+                int seed = 0;
+                foreach (char c in name)
+                {
+                    seed = (seed * 31 + c) % 97;
+                }
+                m.SetFloat("_Seed", seed);
+            }, folder);
+        }
+
+        // 炎の材質（Airerage/Flame。seed で板ごとに模様をずらす）。
+        internal static Material FlameMaterial(string name, float intensity, float seed, string folder)
+        {
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/Flame", m =>
+            {
+                m.SetFloat("_Intensity", intensity);
+                m.SetFloat("_Seed", seed);
+            }, folder);
+        }
+
+        // オーブンの炎（ZoneLook.Flame。2026-11-20 の要望: 発動と同時にオーブンの口が開き、中から炎が噴き出す）: 幅 1 の箱の中に作り
+        // （StageZoneView が柱の幅に合わせて横に伸ばす）、奥（オーブンの口）から手前へ、炎の舌の板を重ねる。正面の板 3 枚（奥ほど明るい）と、
+        // 口から手前の上へ斜めに噴き出す板 3 枚。効いている間だけ出す。
+        private static GameObject CreateFlames(Transform parent, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            var flames = new GameObject("Flames").transform;
+            flames.SetParent(parent, false);
+            float bottom = -size.y * 0.5f;
+            float[] sheetZ = { 5.6f, 3.4f, 1.2f };
+            for (int i = 0; i < sheetZ.Length; i++)
+            {
+                float height = size.y * (1.05f - i * 0.12f);
+                decor.Quad($"Sheet{i + 1}", flames, new Vector3(0f, bottom + height * 0.5f, sheetZ[i]), new Vector2(0.98f - i * 0.06f, height),
+                    FlameMaterial($"Flame{zone.Name}{i + 1}", 1.1f - i * 0.2f, i * 3.7f, decor.Folder));
+            }
+            // 口（奥 z 6、下から 4 割の高さ）から手前の上へ噴き出す板（上の端が手前へ倒れる）。
+            for (int i = 0; i < 3; i++)
+            {
+                float length = size.y * 0.8f;
+                float tilt = -48f - i * 9f;
+                float rad = tilt * Mathf.Deg2Rad;
+                var up = new Vector3(0f, Mathf.Cos(rad), Mathf.Sin(rad));
+                Vector3 baseAt = new Vector3((i - 1) * 0.28f, bottom + size.y * 0.28f, 6f);
+                GameObject jet = decor.Quad($"Jet{i + 1}", flames, baseAt + up * length * 0.5f, new Vector2(0.42f, length),
+                    FlameMaterial($"Flame{zone.Name}Jet{i + 1}", 0.9f, 11f + i * 5.3f, decor.Folder));
+                jet.transform.localRotation = Quaternion.Euler(tilt, 0f, 0f);
+            }
+            return flames.gameObject;
+        }
+
+        // 溶岩の流れ（ZoneLook.Lava。2026-11-20 の要望: ギミックをそれぞれのイメージに合わせて精巧に）: 幅 1 の箱の中に、下から上へ
+        // 流れる光る溶岩の筋の板 2 枚（手前と奥）と、上の熱のゆらぎ（弱い炎の板）。効いている間だけ出す。
+        private static GameObject CreateLavaFlow(Transform parent, ZoneSpec zone, Color color, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            var lava = new GameObject("Lava").transform;
+            lava.SetParent(parent, false);
+            Color hot = Color.Lerp(color, new Color(1f, 0.85f, 0.35f), 0.35f);
+            decor.Quad("Back", lava, new Vector3(0f, 0f, 1.6f), new Vector2(0.92f, size.y),
+                StreamMaterial($"Lava{zone.Name}Back", WithAlpha(color * 0.9f, 0.95f), new Color(0.35f, 0.05f, 0.02f, 1f), WithAlpha(hot, 1f), 0.45f,
+                    new Vector2(5f, 1.2f), 0.5f, 1.4f, decor.Folder));
+            decor.Quad("Front", lava, new Vector3(0f, 0f, -0.5f), new Vector2(0.98f, size.y),
+                StreamMaterial($"Lava{zone.Name}Front", WithAlpha(color, 0.86f), new Color(0.3f, 0.04f, 0.02f, 0.95f), WithAlpha(hot, 1f), 0.6f,
+                    new Vector2(7f, 1.6f), 0.45f, 1.8f, decor.Folder));
+            decor.Quad("Heat", lava, new Vector3(0f, size.y * 0.15f, -0.9f), new Vector2(0.9f, size.y * 0.8f),
+                FlameMaterial($"Lava{zone.Name}Heat", 0.35f, 5f, decor.Folder));
+            return lava.gameObject;
         }
 
         // 壁の間欠泉: 噴き出し口（範囲の、向きと反対側の辺の真ん中）と、向きへ斜めに伸びる噴き出し（噴いている間だけ出す）。
@@ -463,8 +605,10 @@ namespace Airerage.Editor.Stages
             float length = toEdge * 2f + 2f;
             float width = Mathf.Min(zone.Size.x, zone.Size.y) * 0.8f;
             Vector2 middle = mouth + direction * length * 0.5f;
+            // 噴き出しは流れる液体の筋（口から外へ流れる。2026-11-20 の要望: ギミックをそれぞれのイメージに合わせて精巧に）。
             GameObject jet = decor.Quad("Jet", parent, new Vector3(middle.x, middle.y, -0.4f), new Vector2(width, length),
-                decor.Transparent("GeyserJet", WithAlpha(Color.Lerp(color, Color.white, 0.55f), 0.55f)));
+                StreamMaterial($"GeyserJet{zone.Name}", WithAlpha(Color.Lerp(color, Color.white, 0.55f), 0.6f), WithAlpha(color, 0.8f),
+                    new Color(1f, 1f, 1f, 0.85f), 2.4f, new Vector2(6f, 2f), 0.55f, 0.35f, decor.Folder));
             jet.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
             return jet;
         }

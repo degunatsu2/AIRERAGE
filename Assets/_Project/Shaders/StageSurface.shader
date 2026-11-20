@@ -37,6 +37,7 @@ Shader "Airerage/StageSurface"
         _ImpactSpeed ("Impact ring speed (m/s)", Float) = 6
         _ImpactSeconds ("Impact seconds", Float) = 0.45
         _ImpactWidth ("Impact ring width (m)", Float) = 0.16
+        _LightNeutral ("Neutralize the light color", Range(0, 1)) = 0
     }
 
     SubShader
@@ -69,6 +70,8 @@ Shader "Airerage/StageSurface"
             float _ImpactSpeed;
             float _ImpactSeconds;
             float _ImpactWidth;
+
+            half _LightNeutral;
         CBUFFER_END
         ENDHLSL
 
@@ -188,9 +191,13 @@ Shader "Airerage/StageSurface"
                 Light mainLight = GetMainLight(shadowCoord);
                 half lambert = saturate(dot(n, mainLight.direction));
                 half shadow = mainLight.shadowAttenuation;
-                half3 direct = mainLight.color * (lambert * shadow);
+                // 光の色を足場では中立に寄せる（_LightNeutral。火山の橙の光で、刺さらない足場が刺さる足場の色に見えないように。
+                // 2026-11-20 の要望）。明るさはそのまま、色だけを灰色へ。
+                half3 lightColor = lerp(mainLight.color, dot(mainLight.color, half3(0.299, 0.587, 0.114)).xxx, _LightNeutral);
+                half3 direct = lightColor * (lambert * shadow);
                 // V11: 光の当たらない所は灰色ではなく、ステージの影の色に寄せる。環境光は控えめにして、面ごとの明暗の差を出す。
-                half3 ambient = SampleSH(n) * _ShadeColor.rgb * _Ambient;
+                half3 sh = SampleSH(n);
+                half3 ambient = lerp(sh, dot(sh, half3(0.299, 0.587, 0.114)).xxx, _LightNeutral) * _ShadeColor.rgb * _Ambient;
                 #if defined(_SCREEN_SPACE_OCCLUSION)
                     AmbientOcclusionFactor ao = GetScreenSpaceAmbientOcclusion(GetNormalizedScreenSpaceUV(input.positionCS));
                     ambient *= ao.indirectAmbientOcclusion;
@@ -204,7 +211,7 @@ Shader "Airerage/StageSurface"
                 // 面取りの面（軸の向きでない面）は、光を受けて縁が明るく光る。
                 half bevel = saturate((1.0 - max(abs(n.x), max(abs(n.y), abs(n.z)))) * 3.5);
                 half glint = bevel * _EdgeGlint * (0.35 + 0.65 * lambert * shadow);
-                color += mainLight.color * (gloss + glint) * occlusion;
+                color += lightColor * (gloss + glint) * occlusion;
 
                 // V8: 縁の光（視線とすれ違う面ほど強い）。
                 half fresnel = pow(1.0 - saturate(dot(n, viewDir)), 3.0);

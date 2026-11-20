@@ -200,15 +200,71 @@ namespace Airerage.Editor.Stages
             return PlatformSpec.TimedDoor(name, new Vector2(x, 30.1f), new Vector2(0.6f, 5f), 5.6f, 0.4f, 0.8f, 10f, 3f).Looks(BarsLooks);
         }
 
-        // 鎖の昇降台: 古い木の板と鉄の縁、上へ伸びる 2 本の鎖（台と一緒に動く）。
+        // 鎖の昇降台: 古い木の板と鉄の縁（上へ伸びる黒い棒〈吊り上げの鎖〉は消した。2026-11-20 の要望）。
         private static void ChainLiftLooks(StageDecor decor, Transform visual, PlatformSpec spec)
         {
             decor.Box("Plank", visual, Vector3.zero, new Vector3(spec.Size.x, spec.Size.y, 4f), decor.Lit("LiftWood", new Color(0.3f, 0.2f, 0.14f)));
             Material iron = decor.Lit("LiftIron", new Color(0.2f, 0.2f, 0.22f));
             decor.Box("RimFront", visual, new Vector3(0f, -spec.Size.y * 0.25f, -2.05f), new Vector3(spec.Size.x * 1.02f, spec.Size.y * 0.4f, 0.1f), iron);
-            foreach (float x in new[] { -spec.Size.x * 0.42f, spec.Size.x * 0.42f })
+        }
+
+        // 洞窟の通路の範囲（墓場の丘の下。床 y -5.4、天井 y -1.6、x -48〜-24）。
+        private const float CaveLeft = -48f;
+        private const float CaveRight = -24f;
+        private const float CaveFloor = -5.4f;
+        private const float CaveCeiling = -1.6f;
+
+        // 洞窟: 奥の岩壁（雑音の高さの網を立てる）、鍾乳石と石筍（回転体）、岩、光る茸。どれも遊ぶ面より奥（z 0.6 より奥）で、当たりはない。
+        private static void Cave(StageDecor decor, Material abyss)
+        {
+            Material rock = TerrainSculpt.GroundMaterial(decor, "CaveRock", new Color(0.16f, 0.13f, 0.17f), TerrainSculpt.Photos.Rock,
+                new Color(0.2f, 0.17f, 0.2f), TerrainSculpt.Photos.Rock, 0.35f);
+            Material glow = decor.Unlit("CaveFungus", new Color(0.55f, 0.95f, 0.85f));
+            Material cap = decor.Unlit("CaveFungusCap", new Color(0.7f, 0.35f, 1f));
+            // 奥の暗がり（岩壁の隙間から見える）。
+            decor.Box("CaveBack", new Vector3(-36f, -3.5f, 4.2f), new Vector3(24f, 3.8f, 1f), abyss);
+            // 奥の岩壁: 横 24m・縦 6m の網を立てて（高さが手前への出っ張り）、手前へ 0〜1.1m ごつごつ出る。
+            var wall = new TerrainSculpt.Field(CaveLeft - 1f, CaveRight + 1f, -1f, 1f, 0.35f, (x, y) =>
+                1.1f * TerrainSculpt.Ridged(x * 0.35f, y * 0.9f, 71, 4) * TerrainSculpt.Smooth(0f, 0.6f, Mathf.Abs(y) < 0.8f ? 1f : 0.4f));
+            GameObject rockWall = TerrainSculpt.Place(decor, "Manor", "CaveWall", wall, rock);
+            // 網の y（高さ）を手前（-z）へ、網の z を上下へ: X の軸の周りに 90° 回す。
+            rockWall.transform.SetPositionAndRotation(new Vector3(0f, (CaveFloor + CaveCeiling) * 0.5f, 3.6f), Quaternion.Euler(-90f, 0f, 0f));
+            rockWall.transform.localScale = new Vector3(1f, 1f, (CaveCeiling - CaveFloor) * 0.5f + 0.4f);
+            // 鍾乳石（天井から下へ）と石筍（床から上へ）。
+            Mesh spike = ProceduralMesh.Lathe("Manor", "CaveSpike",
+                new[] { new Vector2(0.32f, 0f), new Vector2(0.27f, 0.25f), new Vector2(0.16f, 0.6f), new Vector2(0.07f, 0.85f), new Vector2(0f, 1f) }, 9);
+            float x = CaveLeft + 1.2f;
+            int i = 0;
+            while (x < CaveRight - 1f)
             {
-                decor.Box("Chain", visual, new Vector3(x, 4.2f, 1.7f), new Vector3(0.12f, 8f, 0.12f), iron);
+                float length = decor.Range(0.5f, 1.3f);
+                float z = decor.Range(0.9f, 2.4f);
+                ProceduralMesh.Place("Stalactite", decor.Root, spike, new Vector3(x, CaveCeiling + 0.05f, z), Quaternion.Euler(180f, decor.Range(0f, 360f), 0f),
+                    new Vector3(decor.Range(0.8f, 1.3f), length, decor.Range(0.8f, 1.3f)), rock);
+                if (i % 2 == 0)
+                {
+                    ProceduralMesh.Place("Stalagmite", decor.Root, spike, new Vector3(x + decor.Range(-0.6f, 0.6f), CaveFloor - 0.05f, decor.Range(1.2f, 2.6f)),
+                        Quaternion.Euler(0f, decor.Range(0f, 360f), 0f), new Vector3(decor.Range(1f, 1.6f), decor.Range(0.4f, 0.9f), decor.Range(1f, 1.6f)), rock);
+                }
+                x += decor.Range(1.1f, 2.3f);
+                i++;
+            }
+            // 床の岩（奥）と、ぼんやり光る茸（青緑の柄と紫の傘）。
+            for (int k = 0; k < 9; k++)
+            {
+                float rx = decor.Range(CaveLeft + 1f, CaveRight - 1f);
+                decor.Sphere("CaveRock", new Vector3(rx, CaveFloor + 0.15f, decor.Range(1.4f, 2.8f)),
+                    new Vector3(decor.Range(0.6f, 1.4f), decor.Range(0.35f, 0.7f), decor.Range(0.6f, 1.2f)), rock);
+            }
+            foreach (float fx in new[] { -46.2f, -41.5f, -36.8f, -31.4f, -26.6f })
+            {
+                for (int k = 0; k < 3; k++)
+                {
+                    var at = new Vector3(fx + k * 0.32f, CaveFloor + 0.12f, 1.6f + k * 0.25f);
+                    float h = 0.18f + k * 0.07f;
+                    decor.Cylinder("FungusStem", at + Vector3.up * h * 0.5f, new Vector3(0.05f, h * 0.5f, 0.05f), glow);
+                    decor.Sphere("FungusCap", at + Vector3.up * h, new Vector3(0.22f, 0.09f, 0.22f), cap);
+                }
             }
         }
 
@@ -757,8 +813,9 @@ namespace Airerage.Editor.Stages
             decor.Box("Barn", new Vector3(45f, 6f, 4f), new Vector3(6f, 12f, 6f), decor.Lit("Barn", new Color(0.4f, 0.1f, 0.1f)));
             // 谷の奥（底のない暗がり）と、遠くの森。
             decor.Box("AbyssBack", new Vector3(0f, -20f, 8f), new Vector3(140f, 24f, 12f), abyss);
-            // 丘の下の洞窟: 奥の暗い岩壁と、ろうそく、骨。
-            decor.Box("CaveBack", new Vector3(-36f, -3.5f, 3f), new Vector3(24f, 3.8f, 2f), abyss);
+            // 丘の下の洞窟（2026-11-20 の要望: 納骨堂の下の通路を洞窟のような見た目に）: 奥のごつごつした岩壁、天井から垂れる鍾乳石と
+            // 床から伸びる石筍、転がる岩、ぼんやり光る茸。ろうそくと骨はそのまま。
+            Cave(decor, abyss);
             foreach (float x in new[] { -45f, -38f, -29f })
             {
                 decor.Sphere("Candle", new Vector3(x, -4.9f, 1.4f), new Vector3(0.25f, 0.5f, 0.25f), candle);

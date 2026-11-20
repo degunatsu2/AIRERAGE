@@ -100,7 +100,7 @@ namespace Airerage.Editor.Stages
                     // オーブンの火柱（ユーザーの案）: 40 秒ごとに 3 秒、奥のオーブンから手前へ（コンロの上の全体。3 秒前に予告）。当たると威力 25 の
                     // 枚数のコインを落とし、上へ吹き飛ぶ。始まって 30 秒は噴かない。
                     new ZoneSpec("OvenFire", StageZoneKind.Hazard, new Vector2(0f, 8.5f), new Vector2(22f, 15f), Vector2.up, 25f, 26f)
-                        .Every(40f, 3f, 10f, 0f, 3f).Column(22f),
+                        .Every(40f, 3f, 10f, 0f, 3f).Column(22f).Styled(StageZoneView.ZoneLook.Flame),
                     // トースター: 7 秒ごとにポンと跳ね上げる（1.5 秒前に予告）。
                     new ZoneSpec("Toaster", StageZoneKind.Launcher, new Vector2(-35.5f, 3.2f), new Vector2(3f, 2.4f), Vector2.up, 30f).Every(7f, 0.5f, 3f, 0f, 1.5f),
                     // シンク（水）。
@@ -189,21 +189,51 @@ namespace Airerage.Editor.Stages
             };
         }
 
-        // ロールケーキ: 横に寝かせた円柱（スポンジ）と、手前の面のクリームの渦巻き。
+        // ロールケーキ（2026-11-20 の要望で精巧に）: 焼き色の付いたスポンジの筒を少し斜めに向けて、端の面のクリームの渦巻きが見えるように
+        // （当たりの箱より大きく見えないよう、長さを少し詰める）。上にクリームの帯と絞り、いちご、ミントの葉、粉砂糖。
         private static void RollCakeLooks(StageDecor decor, Transform visual, PlatformSpec spec)
         {
-            GameObject sponge = decor.Cylinder("Sponge", visual, Vector3.zero, new Vector3(spec.Size.y, spec.Size.x * 0.5f, spec.Size.y),
-                decor.Lit("RollSponge", new Color(0.95f, 0.75f, 0.45f)));
-            sponge.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-            Material cream = decor.Unlit("RollCream", new Color(1f, 0.97f, 0.92f));
-            for (int i = 0; i < 3; i++)
+            const string stage = "Kitchen";
+            float radius = spec.Size.y * 0.5f;
+            float length = spec.Size.x * 0.8f;
+            Material skin = decor.Lit("RollSkin", new Color(0.72f, 0.42f, 0.18f));
+            Material sponge = decor.Lit("RollSponge", new Color(1f, 0.82f, 0.5f));
+            Material cream = decor.Lit("RollCream", new Color(1f, 0.98f, 0.94f));
+            cream.SetFloat("_Smoothness", 0.35f);
+            Material berry = decor.Lit("RollStrawberry", new Color(0.86f, 0.08f, 0.12f));
+            berry.SetFloat("_Smoothness", 0.75f);
+            Material leaf = decor.Lit("RollMint", new Color(0.25f, 0.65f, 0.3f));
+            var cake = new GameObject("Cake").transform;
+            cake.SetParent(visual, false);
+            cake.localRotation = Quaternion.Euler(0f, -24f, 0f);
+            // 筒（軸は X）: 外側の焼き色。
+            ProceduralMesh.Place("Skin", cake, ProceduralMesh.Lathe(stage, "RollCakeSkin",
+                new[] { new Vector2(radius * 0.97f, -length * 0.5f), new Vector2(radius, -length * 0.48f), new Vector2(radius, length * 0.48f),
+                    new Vector2(radius * 0.97f, length * 0.5f) }, 36), Vector3.zero, Quaternion.Euler(0f, 0f, 90f), Vector3.one, skin);
+            // 端の面: スポンジの円と、クリームの渦巻き（両端）。
+            Mesh swirl = ProceduralMesh.Spiral(stage, "RollCakeSwirl", radius * 0.06f, radius * 0.86f, 3.2f, radius * 0.16f, 160);
+            foreach (float side in new[] { -1f, 1f })
             {
-                float r = 0.35f + i * 0.35f;
-                GameObject ring = decor.Cylinder("Swirl", visual, new Vector3(-spec.Size.x * 0.5f - 0.02f, 0f, 0f), new Vector3(r * 2f, 0.03f, r * 2f), cream);
-                ring.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                float x = side * (length * 0.5f + 0.01f);
+                GameObject disc = decor.Cylinder("Face", cake, new Vector3(x, 0f, 0f), new Vector3(radius * 1.9f, 0.01f, radius * 1.9f), sponge);
+                disc.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                // 渦巻きの表（-Z）を端の面の外へ向ける。
+                ProceduralMesh.Place("Swirl", cake, swirl, new Vector3(x + side * 0.02f, 0f, 0f), Quaternion.Euler(0f, side > 0f ? -90f : 90f, 0f), Vector3.one, cream);
             }
-            decor.Box("Frosting", visual, new Vector3(0f, spec.Size.y * 0.5f - 0.05f, 0f), new Vector3(spec.Size.x * 0.95f, 0.15f, spec.Size.y * 0.8f),
-                decor.Lit("RollFrosting", new Color(1f, 0.85f, 0.9f)));
+            // 上のクリームの帯と絞り、いちごとミント（上の面に沿って並べる）。
+            decor.Box("CreamBand", cake, new Vector3(0f, radius * 0.96f, 0f), new Vector3(length * 0.9f, 0.18f, radius * 0.7f), cream);
+            for (int i = 0; i < 5; i++)
+            {
+                float x = -length * 0.36f + i * length * 0.18f;
+                decor.Sphere("Dollop", cake, new Vector3(x, radius + 0.18f, 0f), new Vector3(0.75f, 0.5f, 0.75f), cream);
+                decor.Sphere("DollopTip", cake, new Vector3(x, radius + 0.45f, 0f), new Vector3(0.3f, 0.35f, 0.3f), cream);
+                if (i % 2 == 0)
+                {
+                    decor.Sphere("Strawberry", cake, new Vector3(x + 0.3f, radius + 0.55f, -0.25f), new Vector3(0.55f, 0.65f, 0.55f), berry);
+                    GameObject mint = decor.Box("Mint", cake, new Vector3(x + 0.3f, radius + 0.92f, -0.25f), new Vector3(0.35f, 0.05f, 0.2f), leaf);
+                    mint.transform.localRotation = Quaternion.Euler(0f, 30f, 20f);
+                }
+            }
         }
 
         // 見た目の台本: 室内。窓の外に実在の西新宿の街並み（2026-11-18 の要望: 窓に窓枠と鍵を付けて、外にビル街の街並みが見えるように）。
@@ -366,8 +396,8 @@ namespace Airerage.Editor.Stages
             Put("ketchup", 33.6f, 2f, 5.6f, 6f);
             Put("mustard", 35.2f, 2f, 5.6f, 6f, 30f);
             // オーブンの上（上の面 y 17、奥行き z 5〜13）の鍋。
-            Put("pot_A_stew", -6.5f, 17f, 9.2f, 6.5f, 8f);
-            Put("pot_B", 6.5f, 17f, 9.2f, 6.5f, -12f);
+            Put("pot_A_stew", -6.5f, 17f, OvenFront + 4f, 6.5f, 8f);
+            Put("pot_B", 6.5f, 17f, OvenFront + 4f, 6.5f, -12f);
             // 奥の壁（手前の面 z 15）の棚（窓より外側）。
             Put("shelf_papertowel_decorated", -52f, 14f, 13f, 6.5f);
             Put("shelf_papertowel_decorated", 52f, 14f, 13f, 6.5f);
@@ -389,39 +419,31 @@ namespace Airerage.Editor.Stages
         {
             Material tile = decor.Lit("Tile", new Color(0.92f, 0.95f, 0.97f));
             Material tileLine = decor.Lit("TileLine", new Color(0.78f, 0.82f, 0.86f));
-            Material oven = decor.Lit("Oven", new Color(0.25f, 0.24f, 0.26f));
-            Material ovenGlow = decor.Unlit("OvenGlow", new Color(1f, 0.55f, 0.15f));
             Material steel = decor.Lit("Steel", new Color(0.75f, 0.77f, 0.8f));
             Material wood = decor.Lit("CabinetWood", new Color(0.62f, 0.42f, 0.3f));
             Material marble = decor.Lit("Marble", new Color(0.96f, 0.94f, 0.92f));
             Material floor = decor.Lit("KitchenFloor", new Color(0.55f, 0.35f, 0.28f));
-            Material sinkWater = decor.Lit("SinkBack", new Color(0.55f, 0.78f, 0.92f));
 
             // 奥の壁のタイル（窓の所はくりぬく。窓の外に街が見える）。全体を映すカメラでも端と上が見えないように広く高く。
             BackWall(decor, tile, tileLine);
-            // 大きなオーブン（コンロの奥。口が光る）と、扉の窓。
-            decor.Box("OvenBody", new Vector3(0f, 6f, 9f), new Vector3(26f, 22f, 8f), oven);
-            decor.Box("OvenMouth", new Vector3(0f, 8f, 4.9f), new Vector3(20f, 12f, 0.2f), ovenGlow);
-            for (int i = 0; i < 5; i++)
-            {
-                decor.Cylinder("Knob", new Vector3(-8f + i * 4f, 16f, 4.8f), new Vector3(1.2f, 0.2f, 1.2f), steel).transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            }
+            // 大きなオーブン（コンロの奥。2026-11-20 の要望で精巧に。火柱が噴くと同時に扉が開く）。
+            Oven(decor);
             // 調理台の奥行き（大理石と木）。
             decor.Box("CounterBackWest", new Vector3(-37f, -6f, 4.5f), new Vector3(22f, 16f, 5f), wood);
             decor.Box("CounterBackEast", new Vector3(37f, -6f, 4.5f), new Vector3(22f, 16f, 5f), wood);
             decor.Box("MarbleBackWest", new Vector3(-37f, 1.5f, 4.5f), new Vector3(22f, 1f, 5f), marble);
             decor.Box("MarbleBackEast", new Vector3(37f, 1.5f, 4.5f), new Vector3(22f, 1f, 5f), marble);
-            // シンクの奥と蛇口。
-            decor.Box("SinkBack", new Vector3(38f, -3f, 2.2f), new Vector3(8f, 6f, 0.4f), sinkWater);
-            decor.Box("FaucetNeck", new Vector3(38f, 9.5f, 1.5f), new Vector3(0.5f, 3f, 0.5f), steel);
-            decor.Box("FaucetSpout", new Vector3(38f, 11f, 0.8f), new Vector3(0.5f, 0.5f, 1.8f), steel);
-            // やかんとトースター。
-            decor.Sphere("Kettle", new Vector3(33f, 3.2f, 1.2f), new Vector3(2.2f, 2.2f, 2.2f), decor.Lit("Kettle", new Color(0.85f, 0.25f, 0.25f)));
+            // シンク（ステンレスの槽。水は槽の中だけ）と蛇口（台に立ち、下へ水が流れる）。2026-11-20 の要望: 水が手前に浮いて見える、
+            // 蛇口が浮いている。
+            Sink(decor, steel);
+            // やかん（前の赤い球。湯気の出る所）とトースター。
+            Kettle(decor, new Vector3(33f, 2f, 1.2f));
             decor.Box("Toaster", new Vector3(-35.5f, 3.2f, 1.2f), new Vector3(3.2f, 2.4f, 2.4f), steel);
-            // 排水溝の管（奥の側の半透明の管と、口の格子）。
+            // 排水溝の管（奥の側の半透明の管と、口の格子）と、中を流れる水（2026-11-20 の要望: 水流も水に合わせて精巧に）。
             Material pipeGlass = decor.Transparent("DrainPipe", new Color(0.6f, 0.85f, 1f, 0.16f));
             decor.Box("DrainPipeLow", new Vector3(45.8f, -0.65f, 1.4f), new Vector3(7f, 3.3f, 1.2f), pipeGlass);
             decor.Box("DrainPipeUp", new Vector3(47.9f, 7.65f, 1.4f), new Vector3(2.9f, 19.9f, 1.2f), pipeGlass);
+            DrainWater(decor);
             for (int i = 0; i < 4; i++)
             {
                 decor.Box("DrainGrate", new Vector3(42.15f, -2f + i * 0.8f, -1.6f), new Vector3(0.12f, 0.12f, 0.6f), steel);
@@ -439,6 +461,213 @@ namespace Airerage.Editor.Stages
             foreach (Vector2 hook in new[] { new Vector2(-15f, 25f), new Vector2(15f, 25f), new Vector2(0f, 36f), new Vector2(-28f, 27f), new Vector2(28f, 27f) })
             {
                 decor.Box("LadleHandle", new Vector3(hook.x, hook.y + 3f, 0.6f), new Vector3(0.15f, 6f, 0.15f), steel);
+            }
+        }
+
+        // オーブンの前の面の奥行き（z）。扉の蝶番は前の面の下の辺。奥の壁（z 15）の手前に収まる。
+        private const float OvenFront = 6.4f;
+
+        // オーブン（2026-11-20 の要望: ギミックが発動すると同時にオーブンの口が開き、中から炎が噴き出す。オーブンの見た目も精巧に）:
+        // ステンレスの枠（左右・上・下・奥）、上の黒いガラスの操作盤（つまみ 4 つと光る表示）、中の庫内（暗い琺瑯の壁・奥の熱の光・上の
+        // ヒーター・網 2 段）、下の辺の蝶番で手前へ倒れる扉（ステンレスの枠・黒いガラス・取っ手）。扉はオーブンの火柱
+        // （Gimmicks/OvenFire の StageZoneView）が効いている間だけ開く。
+        private static void Oven(StageDecor decor)
+        {
+            Material stainless = decor.Lit("OvenSteel", new Color(0.72f, 0.74f, 0.78f));
+            stainless.SetFloat("_Metallic", 0.85f);
+            stainless.SetFloat("_Smoothness", 0.62f);
+            Material blackGlass = decor.Lit("OvenBlackGlass", new Color(0.04f, 0.04f, 0.05f));
+            blackGlass.SetFloat("_Smoothness", 0.92f);
+            Material enamel = decor.Lit("OvenEnamel", new Color(0.12f, 0.1f, 0.1f));
+            Material heat = decor.Unlit("OvenHeat", new Color(0.75f, 0.28f, 0.06f));
+            Material element = decor.Unlit("OvenElement", new Color(1f, 0.45f, 0.1f));
+            Material display = decor.Unlit("OvenDisplay", new Color(1f, 0.4f, 0.08f));
+            Material doorGlass = decor.Transparent("OvenDoorGlass", new Color(0.05f, 0.04f, 0.04f, 0.72f));
+            Material rack = decor.Lit("OvenRack", new Color(0.8f, 0.82f, 0.85f));
+            rack.SetFloat("_Metallic", 0.9f);
+            rack.SetFloat("_Smoothness", 0.7f);
+
+            const float depth = 8f;
+            float back = OvenFront + depth;
+            float midZ = OvenFront + depth * 0.5f;
+            // 枠: 左右の側板、上（操作盤の後ろ）、下、奥。庫内は x -10〜10、y 1〜13。
+            decor.Box("OvenSideWest", new Vector3(-11.5f, 6f, midZ), new Vector3(3f, 22f, depth), stainless);
+            decor.Box("OvenSideEast", new Vector3(11.5f, 6f, midZ), new Vector3(3f, 22f, depth), stainless);
+            decor.Box("OvenTop", new Vector3(0f, 15f, midZ), new Vector3(20f, 4f, depth), stainless);
+            decor.Box("OvenBottom", new Vector3(0f, -2f, midZ), new Vector3(20f, 6f, depth), stainless);
+            decor.Box("OvenKick", new Vector3(0f, -4.6f, OvenFront - 0.05f), new Vector3(26f, 0.8f, 0.2f), blackGlass);
+            // 庫内: 暗い琺瑯の壁と、奥の熱の光（扉の黒いガラス越しにほんのり見える）、上のヒーター（ジグザグ）、網 2 段。
+            decor.Box("CavityBack", new Vector3(0f, 7f, back - 0.4f), new Vector3(20f, 12f, 0.2f), enamel);
+            decor.Quad("CavityHeat", new Vector3(0f, 7f, back - 0.55f), new Vector2(17f, 9f), heat);
+            decor.Box("CavityTop", new Vector3(0f, 12.9f, midZ), new Vector3(20f, 0.2f, depth - 0.6f), enamel);
+            decor.Box("CavityFloor", new Vector3(0f, 1.1f, midZ), new Vector3(20f, 0.2f, depth - 0.6f), enamel);
+            for (int i = 0; i < 6; i++)
+            {
+                decor.Box("Element", new Vector3(0f, 12.5f, OvenFront + 1.2f + i * 1.1f), new Vector3(17f, 0.18f, 0.18f), element);
+            }
+            foreach (float y in new[] { 4.6f, 8.6f })
+            {
+                decor.Box("RackFront", new Vector3(0f, y, OvenFront + 0.9f), new Vector3(19.4f, 0.12f, 0.12f), rack);
+                for (int i = 0; i < 14; i++)
+                {
+                    decor.Box("RackWire", new Vector3(-9f + i * 1.385f, y, midZ + 0.3f), new Vector3(0.08f, 0.08f, depth - 1.8f), rack);
+                }
+            }
+            // 操作盤: 黒いガラスの帯、つまみ 4 つ（目盛りの印つき）、光る表示。
+            decor.Box("ControlPanel", new Vector3(0f, 15f, OvenFront - 0.12f), new Vector3(25.6f, 3.4f, 0.25f), blackGlass);
+            foreach (float x in new[] { -9.5f, -6f, 6f, 9.5f })
+            {
+                GameObject knob = decor.Cylinder("Knob", new Vector3(x, 15f, OvenFront - 0.55f), new Vector3(1.5f, 0.3f, 1.5f), stainless);
+                knob.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                decor.Box("KnobMark", new Vector3(x, 15.45f, OvenFront - 0.86f), new Vector3(0.12f, 0.45f, 0.04f), blackGlass);
+            }
+            decor.Box("Display", new Vector3(0f, 15f, OvenFront - 0.26f), new Vector3(5.6f, 1.6f, 0.04f), blackGlass);
+            for (int i = 0; i < 3; i++)
+            {
+                decor.Box("Digit", new Vector3(-1.5f + i * 1.5f, 15f, OvenFront - 0.3f), new Vector3(0.9f, 1.1f, 0.02f), display);
+            }
+            // 扉（下の辺の蝶番。開くと手前へ倒れる）: ステンレスの枠と黒いガラスの窓、上の取っ手。
+            var hinge = new GameObject("OvenDoorHinge").transform;
+            hinge.SetParent(decor.Root, false);
+            hinge.position = new Vector3(0f, 1f, OvenFront - 0.3f);
+            decor.Box("DoorFrameBottom", hinge, new Vector3(0f, 0.8f, 0f), new Vector3(20f, 1.6f, 0.5f), stainless);
+            decor.Box("DoorFrameTop", hinge, new Vector3(0f, 10.9f, 0f), new Vector3(20f, 2.2f, 0.5f), stainless);
+            decor.Box("DoorFrameWest", hinge, new Vector3(-9.1f, 5.8f, 0f), new Vector3(1.8f, 8.4f, 0.5f), stainless);
+            decor.Box("DoorFrameEast", hinge, new Vector3(9.1f, 5.8f, 0f), new Vector3(1.8f, 8.4f, 0.5f), stainless);
+            decor.Box("DoorGlass", hinge, new Vector3(0f, 5.8f, 0f), new Vector3(16.4f, 8.4f, 0.12f), doorGlass);
+            decor.Cylinder("Handle", hinge, new Vector3(0f, 11.2f, -0.95f), new Vector3(0.45f, 8f, 0.45f), stainless).transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            foreach (float x in new[] { -7.4f, 7.4f })
+            {
+                decor.Box("HandlePost", hinge, new Vector3(x, 11.2f, -0.55f), new Vector3(0.35f, 0.35f, 0.8f), stainless);
+            }
+            StageZoneView fire = GameObject.Find("Gimmicks/OvenFire")?.GetComponent<StageZoneView>();
+            if (fire == null)
+            {
+                Debug.LogError("オーブンの火柱（Gimmicks/OvenFire）が見つからない。扉が開かない");
+                return;
+            }
+            fire.ConfigureHinge(hinge, 42f);
+        }
+
+        // シンク（2026-11-20 の要望: 洗面台の水が手前に浮いている → 台を水に合わせて立体的に）: 槽はステンレス（奥の壁・底・左右の内側）、
+        // 手前の縁、水の手前の面は調理台の正面と同じ奥行きに、水面は槽の中（奥行き z -2〜2）だけにする。蛇口は奥の台に立ち、首が槽の上へ
+        // 曲がって、下へ水が流れる（2026-11-20 の要望: 蛇口が浮いている）。
+        private static void Sink(StageDecor decor, Material steel)
+        {
+            Material basin = decor.Lit("SinkSteel", new Color(0.78f, 0.8f, 0.83f));
+            basin.SetFloat("_Metallic", 0.85f);
+            basin.SetFloat("_Smoothness", 0.7f);
+            Material chrome = decor.Lit("FaucetChrome", new Color(0.86f, 0.88f, 0.92f));
+            chrome.SetFloat("_Metallic", 1f);
+            chrome.SetFloat("_Smoothness", 0.85f);
+            const float left = 34f;
+            const float right = 42f;
+            const float bottom = -6f;
+            const float rim = 2f;
+            // 槽: 奥の壁・底・左右の内側の壁（調理台の箱の内側に貼る）。
+            decor.Box("BasinBack", new Vector3((left + right) * 0.5f, (bottom + rim) * 0.5f, 2.05f), new Vector3(right - left, rim - bottom, 0.1f), basin);
+            decor.Box("BasinFloor", new Vector3((left + right) * 0.5f, bottom - 0.05f, 0f), new Vector3(right - left, 0.1f, 4.1f), basin);
+            decor.Box("BasinWallWest", new Vector3(left + 0.05f, (bottom + rim) * 0.5f, 0f), new Vector3(0.1f, rim - bottom, 4.1f), basin);
+            decor.Box("BasinWallEast", new Vector3(right - 0.05f, (bottom + rim) * 0.5f, 0f), new Vector3(0.1f, rim - bottom, 4.1f), basin);
+            // 手前の縁（槽の口の手前の辺。調理台の天板の高さ）と、排水口。
+            decor.Box("BasinLip", new Vector3((left + right) * 0.5f, rim - 0.15f, -2.05f), new Vector3(right - left + 0.2f, 0.3f, 0.12f), basin);
+            decor.Cylinder("Drain", new Vector3((left + right) * 0.5f, bottom + 0.02f, 0.4f), new Vector3(1f, 0.02f, 1f), steel);
+            // 水: 手前の面を調理台の正面（z -2）に、水面を槽の中だけに（前は水面の板が手前へ 8m 出ていた）。
+            Transform water = GameObject.Find("Gimmicks/Sink")?.transform;
+            if (water == null)
+            {
+                Debug.LogError("シンクの水（Gimmicks/Sink）が見つからない");
+            }
+            else
+            {
+                Transform front = water.Find("Front");
+                if (front != null)
+                {
+                    front.localPosition = new Vector3(front.localPosition.x, front.localPosition.y, -1.98f);
+                }
+                Transform surface = water.Find("Surface");
+                if (surface != null)
+                {
+                    surface.localPosition = new Vector3(surface.localPosition.x, surface.localPosition.y, 0f);
+                    surface.localScale = new Vector3(right - left - 0.2f, 3.95f, 1f);
+                }
+            }
+            // 蛇口: 奥の台（y 2、z 2〜7）に立つ台座と、上へ伸びて槽の上へ曲がる首（管）、レバー。
+            var faucetBase = new Vector3(38f, 2f, 3.3f);
+            decor.Cylinder("FaucetBase", faucetBase + new Vector3(0f, 0.25f, 0f), new Vector3(1.1f, 0.25f, 1.1f), chrome);
+            Mesh neck = ProceduralMesh.Tube("Kitchen", "FaucetNeck", new[]
+            {
+                new Vector3(0f, 0.4f, 0f), new Vector3(0f, 3.5f, 0f), new Vector3(0f, 5.6f, -0.3f), new Vector3(0f, 6.6f, -1.2f), new Vector3(0f, 6.7f, -2f),
+                new Vector3(0f, 6.2f, -2.5f), new Vector3(0f, 5.5f, -2.55f),
+            }, new[] { 0.32f, 0.3f, 0.28f, 0.27f, 0.26f, 0.25f, 0.24f }, 12);
+            ProceduralMesh.Place("FaucetNeck", decor.Root, neck, faucetBase, Quaternion.identity, Vector3.one, chrome);
+            GameObject lever = decor.Box("FaucetLever", faucetBase + new Vector3(0.7f, 1.6f, 0.1f), new Vector3(0.16f, 1.4f, 0.16f), chrome);
+            lever.transform.rotation = Quaternion.Euler(0f, 0f, -25f);
+            // 下へ流れる水（蛇口の口から水面まで。流れる筋の板。下向きに流れるように上下を返す）と、水面のしぶき。
+            float spoutY = faucetBase.y + 5.5f;
+            float spoutZ = faucetBase.z - 2.55f;
+            Material stream = StageSceneBuilder.StreamMaterial("FaucetStream", new Color(0.7f, 0.88f, 1f, 0.55f), new Color(0.35f, 0.6f, 0.9f, 0.75f),
+                new Color(1f, 1f, 1f, 0.85f), 2.6f, new Vector2(5f, 3f), 0.35f, 0f, decor.Folder);
+            float waterTop = 0f;
+            GameObject fall = decor.Quad("FaucetWater", new Vector3(38f, (spoutY + waterTop) * 0.5f, spoutZ), new Vector2(0.42f, spoutY - waterTop), stream);
+            fall.transform.rotation = Quaternion.Euler(0f, 0f, 180f);
+            Material splash = decor.Transparent("FaucetSplash", new Color(0.95f, 0.98f, 1f, 0.55f));
+            for (int i = 0; i < 5; i++)
+            {
+                float a = i * Mathf.PI * 2f / 5f;
+                decor.Sphere("Splash", new Vector3(38f + Mathf.Cos(a) * 0.45f, waterTop + 0.12f, spoutZ + Mathf.Sin(a) * 0.3f), new Vector3(0.28f, 0.16f, 0.28f), splash);
+            }
+        }
+
+        // やかん（2026-11-20 の要望: 洗面台の赤い球 → その場に合う精巧な置物。湯気〈KettleSteam〉の出る所）: 赤い琺瑯の胴（回転体）、
+        // 黒いつまみのふた、上の取っ手（管）、注ぎ口（管）。bottom は底の中心。
+        private static void Kettle(StageDecor decor, Vector3 bottom)
+        {
+            Material enamel = decor.Lit("KettleEnamel", new Color(0.82f, 0.16f, 0.14f));
+            enamel.SetFloat("_Smoothness", 0.8f);
+            Material black = decor.Lit("KettleBlack", new Color(0.06f, 0.06f, 0.07f));
+            Material chrome = decor.Lit("KettleChrome", new Color(0.85f, 0.86f, 0.9f));
+            chrome.SetFloat("_Metallic", 0.9f);
+            chrome.SetFloat("_Smoothness", 0.8f);
+            var kettle = new GameObject("Kettle").transform;
+            kettle.SetParent(decor.Root, false);
+            kettle.position = bottom;
+            ProceduralMesh.Place("Body", kettle, ProceduralMesh.Lathe("Kitchen", "KettleBody", new[]
+            {
+                new Vector2(1.05f, 0f), new Vector2(1.25f, 0.25f), new Vector2(1.3f, 0.7f), new Vector2(1.18f, 1.25f), new Vector2(0.85f, 1.65f),
+                new Vector2(0.55f, 1.82f), new Vector2(0f, 1.84f),
+            }, 28), Vector3.zero, Quaternion.identity, Vector3.one, enamel);
+            decor.Cylinder("Lid", kettle, new Vector3(0f, 1.86f, 0f), new Vector3(1.05f, 0.05f, 1.05f), chrome);
+            decor.Sphere("LidKnob", kettle, new Vector3(0f, 2.02f, 0f), new Vector3(0.36f, 0.28f, 0.36f), black);
+            Mesh handle = ProceduralMesh.Tube("Kitchen", "KettleHandle", new[]
+            {
+                new Vector3(-0.75f, 1.55f, 0f), new Vector3(-0.7f, 2.35f, 0f), new Vector3(0f, 2.6f, 0f), new Vector3(0.7f, 2.35f, 0f), new Vector3(0.75f, 1.55f, 0f),
+            }, new[] { 0.09f, 0.1f, 0.1f, 0.1f, 0.09f }, 10);
+            ProceduralMesh.Place("Handle", kettle, handle, Vector3.zero, Quaternion.identity, Vector3.one, black);
+            Mesh spout = ProceduralMesh.Tube("Kitchen", "KettleSpout", new[]
+            {
+                new Vector3(0f, 0.55f, -1.05f), new Vector3(0f, 0.95f, -1.55f), new Vector3(0f, 1.45f, -1.85f), new Vector3(0f, 1.75f, -1.95f),
+            }, new[] { 0.24f, 0.16f, 0.12f, 0.11f }, 10);
+            ProceduralMesh.Place("Spout", kettle, spout, Vector3.zero, Quaternion.Euler(0f, 75f, 0f), Vector3.one, enamel);
+        }
+
+        // 排水溝の管の中を流れる水（2026-11-20 の要望: 洗面台の右の水流も水に合わせて精巧に）: 管の 3 つの区間（右へ・上へ・左へ）に、
+        // 流れの向きへ流れる水の筋の板を入れる。
+        private static void DrainWater(StageDecor decor)
+        {
+            Material flow = StageSceneBuilder.StreamMaterial("DrainStream", new Color(0.45f, 0.75f, 1f, 0.6f), new Color(0.15f, 0.42f, 0.8f, 0.8f),
+                new Color(0.95f, 0.98f, 1f, 0.9f), 3.2f, new Vector2(6f, 2.2f), 0.45f, 0f, decor.Folder);
+            // 区間: 中心・長さ（流れの向き）・幅・回転（板の上が流れの向きを向く）。
+            (Vector3 Center, float Length, float Width, float Roll)[] parts =
+            {
+                (new Vector3(45.8f, -0.65f, 1.3f), 7f, 3f, -90f),
+                (new Vector3(47.9f, 7.65f, 1.3f), 19.6f, 2.6f, 0f),
+                (new Vector3(46.2f, 16.1f, 1.3f), 6.4f, 2.6f, 90f),
+            };
+            foreach (var part in parts)
+            {
+                GameObject water = decor.Quad("DrainWater", part.Center, new Vector2(part.Width, part.Length), flow);
+                water.transform.rotation = Quaternion.Euler(0f, 0f, part.Roll);
             }
         }
     }

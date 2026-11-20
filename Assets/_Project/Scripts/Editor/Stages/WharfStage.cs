@@ -74,9 +74,10 @@ namespace Airerage.Editor.Stages
                     new TerrainBox("TugHull", -6f, -7f, 6f, -3f, attachable: true),
                     new TerrainBox("TugCabin", -2f, -3f, 2.5f, 0f, attachable: true),
                     new TerrainBox("TugMast", 0.8f, 0f, 1.2f, 6f, attachable: true),
-                    // 灯台。
+                    // 灯台（2026-11-20 の要望: すぐ奥に灯台の模型を置き、真ん中に柱の形の足場。てっぺんはバルコニー〈灯台の展望台〉に合わせた
+                    // 床。前は x -49〜-45、今は展望台の幅に合わせて -50.6〜-43.4）。
                     new TerrainBox("Lighthouse", -48f, 1f, -46f, 22f, attachable: true),
-                    new TerrainBox("LighthouseDeck", -49f, 22f, -45f, 22.6f, attachable: true),
+                    new TerrainBox("LighthouseDeck", LighthouseX - GalleryRadius, 22f, LighthouseX + GalleryRadius, 22.6f, attachable: true),
                     // 積み上げたコンテナ（鉄。ワイヤーがつながる）。
                     new TerrainBox("StackWestLow", -42f, 1f, -36f, 3.6f, attachable: true),
                     new TerrainBox("StackWestHigh", -42f, 3.6f, -36f, 6.2f, attachable: true),
@@ -190,6 +191,11 @@ namespace Airerage.Editor.Stages
             };
         }
 
+        // 灯台の中心（x）と奥行き（z。塔の手前の面が遊ぶ面のすぐ奥 z 2.5 に来る）、展望台の半径。
+        private const float LighthouseX = -47f;
+        private const float LighthouseZ = 5.8f;
+        private const float GalleryRadius = 3.6f;
+
         // 右の岸壁（右端 x = 48）の右端のボラードの位置（端ぎりぎり。柱の右の縁が岸壁の端から 0.2m 出る。右の海から、浮いたまま
         // 岸壁の角に遮られずにつなげる）。
         private const float EastEdgeBollardX = 47.85f;
@@ -284,7 +290,8 @@ namespace Airerage.Editor.Stages
                 ThirdPartyProps.Place(decor, ThirdPartyProps.Watercraft, model, new Vector3(x, -6f - 0.25f * scale, z), scale, yaw, tint, folder);
             }
             Boat("ship-cargo-a", -78f, 66f, 3.2f, 90f);
-            Boat("ship-large", 70f, 80f, 2.8f, -84f);
+            // 右の船は貨物船の別の型（前の大きな帆船は中世の西洋すぎた。2026-11-20 の要望）。
+            Boat("ship-cargo-c", 70f, 80f, 3f, -84f);
             Boat("boat-tug-a", -34f, 48f, 2.4f, 70f);
             Boat("boat-fishing-small", 28f, 44f, 2f, -100f);
             Boat("boat-sail-a", -130f, 84f, 2.6f, 80f);
@@ -304,11 +311,7 @@ namespace Airerage.Editor.Stages
             Material concrete = TerrainSculpt.GroundMaterial(decor, "ConcreteGround", new Color(0.5f, 0.52f, 0.55f), TerrainSculpt.Photos.Concrete,
                 new Color(0.55f, 0.56f, 0.58f), TerrainSculpt.Photos.Concrete, 0.25f);
             Material bollard = decor.Lit("Bollard", new Color(0.15f, 0.15f, 0.17f));
-            Material beam = decor.Unlit("LighthouseBeam", new Color(1f, 0.95f, 0.7f));
-            Material wood = decor.Lit("ShipWood", new Color(0.45f, 0.3f, 0.2f));
-            Material sail = decor.Lit("Sail", new Color(0.92f, 0.9f, 0.85f));
             Material warehouse = decor.Lit("Warehouse", new Color(0.55f, 0.6f, 0.68f));
-            Material stripe = decor.Unlit("LighthouseStripe", new Color(0.85f, 0.15f, 0.12f));
 
             // 奥の海（遊ぶ面より奥だけ）。
             // 海は奥の山の向こうまで続け、霧で空の地平線の色に溶かす（水平線。2026-11-18 の要望: 最後面は空、地平線の処理）。
@@ -319,9 +322,9 @@ namespace Airerage.Editor.Stages
             decor.Box("FarIceberg", new Vector3(10f, 2f, 98f), new Vector3(10f, 16f, 10f), ice);
             decor.Box("FarIcebergPeak", new Vector3(12f, 12f, 98f), new Vector3(5f, 6f, 6f), snow);
             decor.Box("FarFloeC", new Vector3(26f, -3.5f, 96f), new Vector3(8f, 5f, 7f), ice);
-            decor.Box("FarShipHull", new Vector3(42f, -2f, 100f), new Vector3(14f, 4f, 6f), wood);
-            decor.Box("FarShipMast", new Vector3(42f, 6f, 100f), new Vector3(0.6f, 12f, 0.6f), wood);
-            decor.Quad("FarShipSail", new Vector3(42f, 7f, 99.6f), new Vector2(7f, 8f), sail);
+            // 遠くの船も貨物船に（前は木の船体と帆。2026-11-20 の要望）。
+            ThirdPartyProps.Place(decor, ThirdPartyProps.Watercraft, "ship-cargo-b", new Vector3(42f, -6f - 0.6f, 100f), 2.4f, -96f,
+                new Color(0.9f, 0.92f, 0.96f), decor.Folder);
             // 遠くの雪山（雑音の高さの網。2026-11-18 の要望: 地面のモデリング。前は 45° 回した箱）。
             TerrainSculpt.PlaceSnowRange(decor, "Wharf", 140f, 310f, -12f, 57);
             Harbor(decor, concrete);
@@ -347,13 +350,8 @@ namespace Airerage.Editor.Stages
             {
                 decor.Cylinder("TugBollard", new Vector3(x, -2.55f, 0f), new Vector3(0.5f, 0.45f, 0.5f), bollard);
             }
-            // 灯台の縞と光。
-            for (int i = 0; i < 4; i++)
-            {
-                decor.Box("LighthouseStripe", new Vector3(-47f, 4f + i * 5f, 0f), new Vector3(2.05f, 1.2f, 4.05f), stripe);
-            }
-            GameObject ray = decor.Quad("LighthouseBeam", new Vector3(-30f, 24f, 4f), new Vector2(34f, 1.2f), beam);
-            ray.transform.rotation = Quaternion.Euler(0f, 0f, 6f);
+            // 灯台の模型（柱の足場のすぐ奥）と、回る光。
+            Lighthouse(decor);
             // 倉庫の壁（屋根の下。見た目だけ）。
             decor.Box("Warehouse", new Vector3(43f, 6.6f, 3f), new Vector3(10f, 10.8f, 4f), warehouse);
             // 桟橋の下の杭（奥だけ。泳いで通る所には立てない）。
@@ -365,32 +363,241 @@ namespace Airerage.Editor.Stages
             // 赤いコンテナを運ぶ大きなフォークリフト（奥の岸壁の上を走り、マストを伸ばして、爪でコンテナを下から支える。ユーザーの要望、2026-10-26）。
             Material backPier = concrete;
             decor.Box("BackPier", new Vector3(0f, -1.5f, 11f), new Vector3(52f, 5f, 8f), backPier);
-            Material yellow = decor.Lit("ForkliftYellow", new Color(0.95f, 0.72f, 0.12f));
-            Material dark = decor.Lit("ForkliftDark", new Color(0.15f, 0.15f, 0.17f));
             Transform target = GameObject.Find("Platforms/ContainerFloor/Visual")?.transform;
             var rig = new GameObject("Forklift");
             rig.transform.SetParent(decor.Root, false);
-            var body = new GameObject("Body").transform;
-            body.SetParent(rig.transform, false);
-            body.position = new Vector3(-12f, 3f, 9f);
-            decor.Box("Chassis", body, Vector3.zero, new Vector3(6f, 2.6f, 4.4f), yellow);
-            decor.Box("Cab", body, new Vector3(1f, 2.4f, 0.4f), new Vector3(2.6f, 2.4f, 2.6f), dark);
-            decor.Box("Counterweight", body, new Vector3(2.4f, 0.3f, 0f), new Vector3(1.4f, 2f, 4.4f), dark);
-            foreach (float wx in new[] { -2f, 2f })
+            Forklift(decor, rig.transform, out Transform body, out Transform mast, out Transform carriage);
+            rig.AddComponent<ForkliftRig>().Configure(target, body, mast, carriage, 1f, 9f, 5.4f, PlateThickness * 0.5f + 0.1f);
+        }
+
+        // 灯台の模型（2026-11-20 の要望: 精巧な灯台をすぐ奥に置き、頂上の展望台と足場を合わせ、光も模型に合わせた光源に）:
+        // 石の土台 → 赤白の縞の塔（上ほど細い）→ 張り出した展望台と手すり → ガラスの灯室と枠 → 中の明かり（レンズ）→ 丸い屋根と換気の玉と
+        // 避雷針。窓と扉は塔の手前の左右（真ん中は柱の足場が前に立つ）。光は灯室の真ん中から 2 本の筋が回る（BackdropMotion）。
+        private static void Lighthouse(StageDecor decor)
+        {
+            const string stage = "Wharf";
+            var root = new GameObject("Lighthouse").transform;
+            root.SetParent(decor.Root, false);
+            root.position = new Vector3(LighthouseX, 1f, LighthouseZ);
+            Material stone = decor.Lit("LighthouseStone", new Color(0.52f, 0.5f, 0.48f));
+            Material white = decor.Lit("LighthouseWhite", new Color(0.93f, 0.93f, 0.9f));
+            Material red = decor.Lit("LighthouseRed", new Color(0.78f, 0.12f, 0.1f));
+            Material iron = decor.Lit("LighthouseIron", new Color(0.12f, 0.13f, 0.15f));
+            iron.SetFloat("_Smoothness", 0.6f);
+            Material roof = decor.Lit("LighthouseRoof", new Color(0.55f, 0.08f, 0.07f));
+            roof.SetFloat("_Smoothness", 0.55f);
+            Material glass = decor.Transparent("LighthouseGlass", new Color(1f, 0.95f, 0.7f, 0.22f));
+            Material lamp = decor.Unlit("LighthouseLamp", new Color(1f, 0.93f, 0.7f));
+            Material window = decor.Lit("LighthouseWindow", new Color(0.08f, 0.1f, 0.14f));
+
+            // 土台（八角形の石）。
+            ProceduralMesh.Place("Plinth", root, ProceduralMesh.Lathe(stage, "LighthousePlinth",
+                new[] { new Vector2(4f, -0.05f), new Vector2(4f, 0.9f), new Vector2(3.6f, 1.25f) }, 8), Vector3.zero, Quaternion.Euler(0f, 22.5f, 0f), Vector3.one, stone);
+            // 塔: 半径 3.3 → 2.35（高さ 1.2 → 21）。縞は 4 本（白・赤の交互）。
+            const float towerBottom = 1.2f;
+            const float towerTop = 21f;
+            const int bands = 6;
+            for (int i = 0; i < bands; i++)
             {
-                GameObject wheel = decor.Cylinder("Wheel", body, new Vector3(wx, -1.3f, -2.3f), new Vector3(1.6f, 0.3f, 1.6f), dark);
-                wheel.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                float y0 = Mathf.Lerp(towerBottom, towerTop, (float)i / bands);
+                float y1 = Mathf.Lerp(towerBottom, towerTop, (float)(i + 1) / bands);
+                Mesh band = ProceduralMesh.Lathe(stage, $"LighthouseBand{i + 1}",
+                    new[] { new Vector2(TowerRadius(y0), y0), new Vector2(TowerRadius(y1), y1) }, 40);
+                ProceduralMesh.Place($"Band{i + 1}", root, band, Vector3.zero, Quaternion.identity, Vector3.one, i % 2 == 0 ? white : red);
             }
-            GameObject mast = decor.Box("Mast", rig.transform, new Vector3(-12f, 4f, 5.4f), new Vector3(1.2f, 1f, 0.8f), dark);
-            var carriage = new GameObject("Carriage").transform;
-            carriage.SetParent(rig.transform, false);
+            // 窓と扉（塔の手前の左右。面に沿って少し回す）。
+            foreach (float side in new[] { -1f, 1f })
+            {
+                for (int k = 0; k < 3; k++)
+                {
+                    float y = 5.5f + k * 5.2f;
+                    float r = TowerRadius(y);
+                    float angle = side * 32f;
+                    var at = new Vector3(Mathf.Sin(angle * Mathf.Deg2Rad) * r, y, -Mathf.Cos(angle * Mathf.Deg2Rad) * r);
+                    GameObject w = decor.Box("Window", root, at, new Vector3(0.7f, 1.2f, 0.25f), window);
+                    w.transform.localRotation = Quaternion.Euler(0f, -angle, 0f);
+                    GameObject sill = decor.Box("Sill", root, at + new Vector3(0f, -0.7f, 0f), new Vector3(1f, 0.15f, 0.4f), stone);
+                    sill.transform.localRotation = Quaternion.Euler(0f, -angle, 0f);
+                }
+            }
+            // 展望台（張り出した床と、下の受け）。上の面は足場の上の面（y 22.6）にそろえる。
+            float galleryY = 22.6f - 1f;
+            ProceduralMesh.Place("Gallery", root, ProceduralMesh.Lathe(stage, "LighthouseGallery",
+                new[] { new Vector2(TowerRadius(towerTop), galleryY - 1.6f), new Vector2(GalleryRadius - 0.3f, galleryY - 0.6f), new Vector2(GalleryRadius, galleryY - 0.6f),
+                    new Vector2(GalleryRadius, galleryY) }, 40), Vector3.zero, Quaternion.identity, Vector3.one, iron);
+            // 手すり（展望台の縁をぐるりと。手前の足場に立つ人より奥）: 支柱と、上の横木。
+            const int posts = 28;
+            float railR = GalleryRadius - 0.12f;
+            for (int i = 0; i < posts; i++)
+            {
+                float a = i * Mathf.PI * 2f / posts;
+                var p = new Vector3(Mathf.Cos(a) * railR, galleryY + 0.55f, Mathf.Sin(a) * railR);
+                decor.Box("RailPost", root, p, new Vector3(0.07f, 1.1f, 0.07f), iron);
+                float a2 = (i + 1) * Mathf.PI * 2f / posts;
+                var q = new Vector3(Mathf.Cos(a2) * railR, galleryY + 1.1f, Mathf.Sin(a2) * railR);
+                var top = new Vector3(p.x, galleryY + 1.1f, p.z);
+                GameObject rail = decor.Box("Rail", root, (top + q) * 0.5f, new Vector3(0.09f, 0.09f, Vector3.Distance(top, q) + 0.05f), iron);
+                rail.transform.localRotation = Quaternion.LookRotation(q - top);
+            }
+            // 灯室: 下の腰壁・ガラスの筒・縦の枠・上の帯。
+            const float roomBottom = 22.6f - 1f;
+            const float roomRadius = 1.75f;
+            ProceduralMesh.Place("LanternBase", root, ProceduralMesh.Lathe(stage, "LighthouseLanternBase",
+                new[] { new Vector2(roomRadius + 0.1f, roomBottom), new Vector2(roomRadius + 0.1f, roomBottom + 0.7f) }, 32), Vector3.zero, Quaternion.identity, Vector3.one, red);
+            ProceduralMesh.Place("LanternGlass", root, ProceduralMesh.Lathe(stage, "LighthouseLanternGlass",
+                new[] { new Vector2(roomRadius, roomBottom + 0.7f), new Vector2(roomRadius, roomBottom + 3.3f) }, 32), Vector3.zero, Quaternion.identity, Vector3.one, glass);
+            for (int i = 0; i < 10; i++)
+            {
+                float a = i * Mathf.PI * 2f / 10f;
+                decor.Box("Mullion", root, new Vector3(Mathf.Cos(a) * roomRadius, roomBottom + 2f, Mathf.Sin(a) * roomRadius), new Vector3(0.09f, 2.6f, 0.09f), iron);
+            }
+            ProceduralMesh.Place("LanternRing", root, ProceduralMesh.Lathe(stage, "LighthouseLanternRing",
+                new[] { new Vector2(roomRadius + 0.15f, roomBottom + 3.3f), new Vector2(roomRadius + 0.15f, roomBottom + 3.6f) }, 32), Vector3.zero, Quaternion.identity, Vector3.one, iron);
+            // 中の明かり（段のあるレンズの形）。
+            float lampY = roomBottom + 2f;
+            ProceduralMesh.Place("Lens", root, ProceduralMesh.Lathe(stage, "LighthouseLens",
+                new[] { new Vector2(0.35f, -0.75f), new Vector2(0.62f, -0.45f), new Vector2(0.72f, 0f), new Vector2(0.62f, 0.45f), new Vector2(0.35f, 0.75f) }, 20),
+                new Vector3(0f, lampY, 0f), Quaternion.identity, Vector3.one, lamp);
+            // 丸い屋根と換気の玉、避雷針。
+            float roofY = roomBottom + 3.6f;
+            ProceduralMesh.Place("Dome", root, ProceduralMesh.Lathe(stage, "LighthouseDome",
+                new[] { new Vector2(2.15f, roofY), new Vector2(1.95f, roofY + 0.45f), new Vector2(1.5f, roofY + 1.2f), new Vector2(0.8f, roofY + 1.75f), new Vector2(0f, roofY + 1.95f) }, 32),
+                Vector3.zero, Quaternion.identity, Vector3.one, roof);
+            decor.Sphere("Vent", root, new Vector3(0f, roofY + 2.2f, 0f), Vector3.one * 0.55f, iron);
+            decor.Cylinder("Rod", root, new Vector3(0f, roofY + 3.1f, 0f), new Vector3(0.06f, 0.75f, 0.06f), iron);
+            // 光: 灯室の真ん中から 2 本の光の筋が、ゆっくり回る（手前を向くと薄くなる）。灯室とまわりを照らす点の光も。
+            var pivot = new GameObject("BeamPivot").transform;
+            pivot.SetParent(root, false);
+            pivot.localPosition = new Vector3(0f, lampY, 0f);
+            Material beam = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("LighthouseBeam", "Airerage/LightBeam", m =>
+            {
+                m.SetColor("_Color", new Color(1.3f, 1.2f, 0.85f, 1f));
+                m.SetFloat("_Falloff", 1.4f);
+                m.SetFloat("_FacingFade", 0.92f);
+            }, decor.Folder);
+            Mesh cone = ProceduralMesh.Lathe(stage, "LighthouseBeamCone", new[] { new Vector2(0.02f, 0f), new Vector2(1f, 1f) }, 24);
+            foreach (float yaw in new[] { 0f, 180f })
+            {
+                var arm = new GameObject("Beam").transform;
+                arm.SetParent(pivot, false);
+                arm.localRotation = Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(0f, 0f, -90f);
+                ProceduralMesh.Place("Cone", arm, cone, Vector3.zero, Quaternion.identity, new Vector3(2.4f, 46f, 2.4f), beam)
+                    .GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            pivot.gameObject.AddComponent<BackdropMotion>().ConfigureSpin(new Vector3(0f, 36f, 0f));
+            var light = new GameObject("LampLight").AddComponent<Light>();
+            light.transform.SetParent(root, false);
+            light.transform.localPosition = new Vector3(0f, lampY, 0f);
+            light.type = LightType.Point;
+            light.color = new Color(1f, 0.9f, 0.65f);
+            light.range = 16f;
+            light.intensity = 3f;
+            light.shadows = LightShadows.None;
+        }
+
+        // 塔の半径（土台からの高さ y の所。上ほど細い）。
+        private static float TowerRadius(float y)
+        {
+            return Mathf.Lerp(3.3f, 2.35f, Mathf.InverseLerp(1.2f, 21f, y));
+        }
+
+        // 赤いコンテナを運ぶ大きなフォークリフト（2026-11-20 の要望で精巧に）: 黄色い車体（面取りした箱を重ねる）・黒と黄色の縞の
+        // 重り・運転席の柱と屋根のガード・座席とハンドル・前後のタイヤとホイール・前の明かりと上の回転灯・マスト（2 本の溝の柱と
+        // 油圧の筒と鎖。ForkliftRig が高さを伸ばすので縦の部品だけ）・爪の台（背板と L 字の爪 2 本）。
+        private static void Forklift(StageDecor decor, Transform rig, out Transform body, out Transform mast, out Transform carriage)
+        {
+            Material yellow = decor.Lit("ForkliftYellow", new Color(0.95f, 0.72f, 0.12f));
+            yellow.SetFloat("_Smoothness", 0.55f);
+            Material dark = decor.Lit("ForkliftDark", new Color(0.15f, 0.15f, 0.17f));
+            Material steel = decor.Lit("ForkliftSteel", new Color(0.55f, 0.57f, 0.6f));
+            steel.SetFloat("_Metallic", 0.7f);
+            steel.SetFloat("_Smoothness", 0.6f);
+            Material tire = decor.Lit("ForkliftTire", new Color(0.06f, 0.06f, 0.07f));
+            Material stripeBlack = decor.Lit("ForkliftStripe", new Color(0.05f, 0.05f, 0.05f));
+            Material glass = decor.Transparent("ForkliftGlass", new Color(0.55f, 0.7f, 0.8f, 0.3f));
+            Material headlight = decor.Unlit("ForkliftHeadlight", new Color(1f, 0.95f, 0.8f));
+            Material beacon = decor.Unlit("ForkliftBeacon", new Color(1f, 0.5f, 0.05f));
+
+            body = new GameObject("Body").transform;
+            body.SetParent(rig, false);
+            body.position = new Vector3(-12f, 3f, 9f);
+            // 車体（下の太い台、上の細い台、前の傾き）。
+            decor.Box("Chassis", body, new Vector3(0f, -0.4f, 0f), new Vector3(6.2f, 1.8f, 4.4f), yellow);
+            decor.Box("Deck", body, new Vector3(0.6f, 0.75f, 0f), new Vector3(4.6f, 0.5f, 4.2f), yellow);
+            decor.Box("Skirt", body, new Vector3(0f, -1.25f, 0f), new Vector3(6.4f, 0.3f, 4.5f), dark);
+            // 重り（後ろ。黒と黄色の斜めの縞）。
+            decor.Box("Counterweight", body, new Vector3(2.75f, 0.35f, 0f), new Vector3(1.2f, 2.4f, 4.3f), yellow);
+            for (int i = 0; i < 5; i++)
+            {
+                GameObject stripe = decor.Box("WeightStripe", body, new Vector3(3.36f, -0.45f + i * 0.45f, -1.2f + (i % 2) * 0.1f), new Vector3(0.05f, 0.18f, 1.6f), stripeBlack);
+                stripe.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            }
+            // 運転席: 4 本の柱と屋根のガード（格子）、座席、ハンドル、背もたれ。
+            foreach (float px in new[] { -1.2f, 1.6f })
+            {
+                foreach (float pz in new[] { -1.8f, 1.8f })
+                {
+                    decor.Box("GuardPost", body, new Vector3(px, 2.4f, pz), new Vector3(0.18f, 2.9f, 0.18f), dark);
+                }
+            }
+            decor.Box("GuardFrame", body, new Vector3(0.2f, 3.9f, 0f), new Vector3(3.1f, 0.16f, 3.9f), dark);
+            for (int i = 0; i < 6; i++)
+            {
+                decor.Box("GuardSlat", body, new Vector3(-1.1f + i * 0.55f, 3.9f, 0f), new Vector3(0.1f, 0.12f, 3.8f), dark);
+            }
+            decor.Box("Seat", body, new Vector3(0.9f, 1.35f, 0f), new Vector3(1f, 0.35f, 1.2f), dark);
+            decor.Box("SeatBack", body, new Vector3(1.4f, 1.9f, 0f), new Vector3(0.25f, 1f, 1.2f), dark);
+            GameObject wheel = decor.Cylinder("SteeringWheel", body, new Vector3(-0.4f, 2.1f, 0f), new Vector3(0.7f, 0.04f, 0.7f), dark);
+            wheel.transform.localRotation = Quaternion.Euler(0f, 0f, 55f);
+            decor.Box("SteeringColumn", body, new Vector3(-0.6f, 1.55f, 0f), new Vector3(0.12f, 1.1f, 0.12f), dark).transform.localRotation = Quaternion.Euler(0f, 0f, 35f);
+            decor.Box("Windscreen", body, new Vector3(-1.25f, 2.6f, 0f), new Vector3(0.04f, 1.6f, 3.4f), glass);
+            // タイヤ（前は大きく 2 本ずつ、後ろは小さく）とホイール。
+            foreach (float wx in new[] { -1.9f, 2.1f })
+            {
+                float size = wx < 0f ? 1.9f : 1.5f;
+                foreach (float wz in new[] { -2.35f, 2.35f })
+                {
+                    GameObject t = decor.Cylinder("Tire", body, new Vector3(wx, -1.25f, wz), new Vector3(size, 0.35f, size), tire);
+                    t.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameObject hub = decor.Cylinder("Hub", body, new Vector3(wx, -1.25f, wz + Mathf.Sign(wz) * 0.36f), new Vector3(size * 0.55f, 0.04f, size * 0.55f), steel);
+                    hub.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                }
+            }
+            // 明かり（前）と回転灯（屋根の上）。
+            foreach (float hz in new[] { -1.5f, 1.5f })
+            {
+                decor.Sphere("Headlight", body, new Vector3(-3.15f, 0.3f, hz), new Vector3(0.12f, 0.35f, 0.35f), headlight);
+            }
+            decor.Cylinder("BeaconBase", body, new Vector3(0.6f, 4.05f, 0f), new Vector3(0.35f, 0.08f, 0.35f), dark);
+            decor.Sphere("Beacon", body, new Vector3(0.6f, 4.3f, 0f), new Vector3(0.38f, 0.42f, 0.38f), beacon);
+
+            // マスト（原点が中心の高さ 1 の箱。ForkliftRig が高さを伸ばす）: 2 本の溝の柱、真ん中の油圧の筒、鎖。
+            mast = new GameObject("Mast").transform;
+            mast.SetParent(rig, false);
+            mast.position = new Vector3(-12f, 4f, 5.4f);
+            foreach (float mx in new[] { -1.15f, 1.15f })
+            {
+                decor.Box("Upright", mast, new Vector3(mx, 0f, 0f), new Vector3(0.26f, 1f, 0.8f), steel);
+                decor.Box("Flange", mast, new Vector3(mx - Mathf.Sign(mx) * 0.2f, 0f, -0.36f), new Vector3(0.3f, 1f, 0.1f), steel);
+                decor.Box("Chain", mast, new Vector3(mx * 0.55f, 0f, 0.15f), new Vector3(0.12f, 1f, 0.08f), dark);
+            }
+            decor.Cylinder("Cylinder", mast, new Vector3(0f, 0f, 0.25f), new Vector3(0.36f, 0.5f, 0.36f), steel);
+
+            // 爪の台（コンテナの下）: 背板と横の桁、L 字の爪 2 本。
+            carriage = new GameObject("Carriage").transform;
+            carriage.SetParent(rig, false);
             carriage.position = new Vector3(-12f, 4.4f, 3.4f);
-            decor.Box("Plate", carriage, new Vector3(0f, 0.3f, 1.8f), new Vector3(3.2f, 1f, 0.3f), dark);
+            decor.Box("Backrest", carriage, new Vector3(0f, 0.75f, 1.85f), new Vector3(3f, 1.5f, 0.15f), dark);
+            for (int i = 0; i < 4; i++)
+            {
+                decor.Box("BackrestBar", carriage, new Vector3(-1.1f + i * 0.73f, 0.75f, 1.75f), new Vector3(0.12f, 1.5f, 0.12f), steel);
+            }
+            decor.Box("Plate", carriage, new Vector3(0f, 0.1f, 1.8f), new Vector3(3.2f, 0.5f, 0.3f), steel);
             foreach (float fx in new[] { -3f, 3f })
             {
                 decor.Box("Fork", carriage, new Vector3(fx, -0.08f, 0f), new Vector3(0.4f, 0.16f, 4f), yellow);
+                decor.Box("ForkHeel", carriage, new Vector3(fx, 0.35f, 1.85f), new Vector3(0.4f, 0.9f, 0.18f), yellow);
             }
-            rig.AddComponent<ForkliftRig>().Configure(target, body, mast.transform, carriage, 1f, 9f, 5.4f, PlateThickness * 0.5f + 0.1f);
         }
     }
 }
