@@ -753,17 +753,17 @@ namespace Airerage.Editor.Stages
             var box = new Vector3(size.x, size.y, 5f);
             ParticleSystem snow = new ParticleFx
             {
-                Name = "Snow", LifetimeMin = 1f, LifetimeMax = 1.6f, SizeMin = 0.06f, SizeMax = 0.14f, BoxSize = box,
-                WorldVelocity = new Vector3(wind.x, wind.y, 0f) * 17f, VelocityJitter = 0.25f, Stretch = 0.035f, Softness = 0.5f, Collide = true,
-                MaxParticles = 2600,
+                Name = "Snow", LifetimeMin = 1f, LifetimeMax = 1.6f, SizeMin = 0.08f, SizeMax = 0.18f, BoxSize = box,
+                WorldVelocity = new Vector3(wind.x, wind.y, 0f) * 17f, VelocityJitter = 0.25f, Stretch = 0.055f, Softness = 0.5f, Collide = true,
+                MaxParticles = 4200,
                 Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (new Color(0.9f, 0.95f, 1f), 1f) }, new[] { (0f, 0f), (0.85f, 0.1f), (0.7f, 0.8f), (0f, 1f) }),
             }.Build(fx, new Vector3(0f, 0f, 0.5f), Quaternion.identity, decor.Folder);
             ParticleSystem whiteout = new ParticleFx
             {
-                Name = "Whiteout", LifetimeMin = 2.5f, LifetimeMax = 4f, SizeMin = 7f, SizeMax = 13f, GrowFrom = 0.8f, GrowTo = 1.4f, BoxSize = box,
-                WorldVelocity = new Vector3(wind.x, wind.y, 0f) * 9f, EdgeNoise = 0.6f, Softness = 1f, Turbulence = 0.3f, MaxParticles = 220,
+                Name = "Whiteout", LifetimeMin = 2.5f, LifetimeMax = 4f, SizeMin = 9f, SizeMax = 16f, GrowFrom = 0.8f, GrowTo = 1.4f, BoxSize = box,
+                WorldVelocity = new Vector3(wind.x, wind.y, 0f) * 9f, EdgeNoise = 0.6f, Softness = 1f, Turbulence = 0.3f, MaxParticles = 400,
                 Colors = ParticleFx.Ramp(new[] { (new Color(0.94f, 0.96f, 1f), 0f), (new Color(0.88f, 0.92f, 0.98f), 1f) },
-                    new[] { (0f, 0f), (0.22f, 0.2f), (0.18f, 0.7f), (0f, 1f) }),
+                    new[] { (0f, 0f), (0.34f, 0.2f), (0.28f, 0.7f), (0f, 1f) }),
             }.Build(fx, new Vector3(0f, 0f, -1f), Quaternion.identity, decor.Folder);
             ParticleSystem flurry = new ParticleFx
             {
@@ -773,7 +773,7 @@ namespace Airerage.Editor.Stages
                 Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (Color.white, 1f) }, new[] { (0f, 0f), (0.8f, 0.15f), (0f, 1f) }),
             }.Build(fx, new Vector3(0f, 0f, 0.5f), Quaternion.identity, decor.Folder);
             fx.gameObject.AddComponent<HazardEffectRig>().Configure(root.GetComponent<StageZoneView>(), null,
-                new[] { flurry }, new[] { 160f }, new[] { whiteout }, new[] { 25 }, new[] { snow, whiteout }, new[] { 1300f, 50f });
+                new[] { flurry }, new[] { 160f }, new[] { whiteout }, new[] { 40 }, new[] { snow, whiteout }, new[] { 2400f, 85f });
             return visual;
         }
 
@@ -858,7 +858,7 @@ namespace Airerage.Editor.Stages
             vent.SetParent(parent, false);
             float floor = -size.y * 0.5f;
             Material rock = decor.Lit("FumaroleRock", new Color(0.22f, 0.2f, 0.19f));
-            Material sulfur = decor.Lit("FumaroleSulfur", new Color(0.86f, 0.76f, 0.22f));
+            Material sulfur = decor.Lit("FumaroleSulfur", new Color(0.95f, 0.85f, 0.2f));
             Material hole = decor.Unlit("FumaroleHole", new Color(0.03f, 0.02f, 0.02f));
             decor.Cylinder("Mouth", vent, new Vector3(0f, floor + 0.04f, 0.3f), new Vector3(size.x * 0.45f, 0.02f, 0.9f), hole);
             for (int i = 0; i < 6; i++)
@@ -867,8 +867,8 @@ namespace Airerage.Editor.Stages
                 var at = new Vector3(Mathf.Cos(a) * size.x * 0.42f, floor + 0.1f, 0.3f + Mathf.Sin(a) * 0.7f);
                 decor.Sphere("Rock", vent, at, new Vector3(decor.Range(0.4f, 0.7f), decor.Range(0.25f, 0.4f), decor.Range(0.4f, 0.6f)), rock);
                 // 硫黄の結晶（岩の内側の縁に黄色く付く）。
-                decor.Sphere("Sulfur", vent, Vector3.Lerp(at, new Vector3(0f, floor + 0.12f, 0.3f), 0.35f) + Vector3.up * 0.05f,
-                    new Vector3(decor.Range(0.25f, 0.45f), 0.08f, decor.Range(0.2f, 0.35f)), sulfur);
+                decor.Sphere("Sulfur", vent, Vector3.Lerp(at, new Vector3(0f, floor + 0.12f, 0.3f), 0.3f) + Vector3.up * 0.14f,
+                    new Vector3(decor.Range(0.4f, 0.6f), 0.16f, decor.Range(0.35f, 0.5f)), sulfur);
             }
             Vector2 direction = zone.Direction.normalized;
             Quaternion along = Quaternion.LookRotation(new Vector3(direction.x, direction.y, 0f), Vector3.back);

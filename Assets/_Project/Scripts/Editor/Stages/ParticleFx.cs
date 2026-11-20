@@ -140,7 +140,8 @@ namespace Airerage.Editor.Stages
                 collision.type = ParticleSystemCollisionType.World;
                 collision.mode = ParticleSystemCollisionMode.Collision3D;
                 collision.lifetimeLoss = 1f;
-                collision.quality = ParticleSystemCollisionQuality.Medium;
+                // 粒が多いので、当たりは軽い計算で（地形の箱は動かない）。
+                collision.quality = ParticleSystemCollisionQuality.Low;
                 collision.radiusScale = 0.5f;
                 collision.enableDynamicColliders = false;
             }

@@ -127,8 +127,8 @@ namespace Airerage.Editor.Stages
                     new ZoneSpec("DonutEast", StageZoneKind.BoostRing, new Vector2(26f, 15f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.3f), 19f),
                     // ミキサーの渦（左の棚の上から上へ）。
                     new ZoneSpec("MixerWhirl", StageZoneKind.Updraft, new Vector2(-42f, 19f), new Vector2(4f, 9f), Vector2.up, 45f, 12f)
-                        // 2026-11-20 の方針: 小麦粉と砂糖が回りながら舞い上がる渦（つむじ風と同じ回る粒。色は粉の白）。
-                        .Styled(StageZoneView.ZoneLook.DustDevil).Tinted(new Color(0.96f, 0.93f, 0.86f)),
+                        // 2026-11-20 の方針: 小麦粉と砂糖が回りながら舞い上がる渦（つむじ風と同じ回る粒。色は粉の色。明るい壁の上で見えるように少し濃く）。
+                        .Styled(StageZoneView.ZoneLook.DustDevil).Tinted(new Color(0.8f, 0.76f, 0.68f)),
                 },
                 Platforms = new[]
                 {
