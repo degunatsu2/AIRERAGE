@@ -30,6 +30,10 @@ jobs:
       - name: Unity の .meta ファイルを検査
         run: python3 tools/unity_meta.py --check
 
+      # Windows PowerShell 5.1 は BOM のない .ps1 を Shift_JIS で読むので、日本語が入ると壊れる（docs/21）。
+      - name: PowerShell のスクリプトが ASCII だけか
+        run: "! LC_ALL=C grep -nP '[^\\x00-\\x7F]' tools/release/*.ps1"
+
       # 技の性能表 docs/17_move_data.md がコードの値と合っているかも、ここで調べる（MoveTableTests）。
       - name: Core のテストを実行
         run: dotnet test tools/CoreTests/Airerage.Core.Tests --nologo

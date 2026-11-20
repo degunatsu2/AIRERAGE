@@ -1,31 +1,68 @@
-# AIRERAGE のビルドを itch.io へ上げる（Windows の PowerShell で実行。docs/21_distribution.md）。
-# 友達は itch のアプリでゲームを入れておけば、起動のたびに新しい版へ自動で更新される（差分だけを落とす）。
+# Upload the AIRERAGE Windows build to itch.io with butler (see docs/21_distribution.md).
 #
-# 使い方（リポジトリのいちばん上で）:
-#   powershell -ExecutionPolicy Bypass -File tools\release\push_itch.ps1 -BuildDir "Builds\Windows" -Target "あなたのitchのユーザー名/airerage:windows"
+# Keep this file ASCII only. Windows PowerShell 5.1 reads a .ps1 without a BOM in the
+# system code page (Shift_JIS on Japanese Windows), so any Japanese text here breaks
+# the script (CI checks this).
 #
-# 前もって 1 回だけ: butler を入れて（https://itch.io/docs/butler/installing.html）、`butler login` でログインしておく。
+# Usage (from the top of the repository):
+#   powershell -ExecutionPolicy Bypass -File tools\release\push_itch.ps1 -BuildDir "Builds\Windows" -Target "USER/airerage:windows"
+# Preview the file list without uploading:
+#   powershell -ExecutionPolicy Bypass -File tools\release\push_itch.ps1 -BuildDir "Builds\Windows" -Target "USER/airerage:windows" -DryRun
+#
+# Once: install butler (https://itch.io/docs/butler/installing.html) and run "butler login".
 param(
     [Parameter(Mandatory = $true)][string]$BuildDir,
-    [Parameter(Mandatory = $true)][string]$Target
+    [Parameter(Mandatory = $true)][string]$Target,
+    [switch]$DryRun
 )
 $ErrorActionPreference = "Stop"
 
 if (-not (Get-Command butler -ErrorAction SilentlyContinue)) {
-    throw "butler が見つからない。https://itch.io/docs/butler/installing.html の手順で入れて、PATH を通してから実行する。"
+    throw "butler was not found. Install it (https://itch.io/docs/butler/installing.html) and add its folder to PATH, then open a new PowerShell window."
 }
-if (-not (Test-Path (Join-Path $BuildDir "*.exe"))) {
-    throw "$BuildDir にゲームの .exe がない。Unity の Build で Windows のビルドを作ってから実行する。"
+if (-not (Test-Path -Path $BuildDir -PathType Container)) {
+    throw "Build folder not found: $BuildDir (build the Windows player from Unity into this folder first)."
+}
+# The whole folder is the game: the .exe alone does not run without *_Data, UnityPlayer.dll and so on.
+$exe = Get-ChildItem -Path $BuildDir -Filter "*.exe" -File | Where-Object { $_.Name -ne "UnityCrashHandler64.exe" }
+if (-not $exe) {
+    throw "No game .exe in $BuildDir. Build the Windows player from Unity into this folder first."
+}
+$data = Get-ChildItem -Path $BuildDir -Filter "*_Data" -Directory
+if (-not $data) {
+    throw "No *_Data folder in $BuildDir. Point -BuildDir at the whole build folder, not at the .exe."
 }
 
-# 版の名前: git のコミット（例 2784b70）と日付。itch のアプリの版の表示に出る。
-$commit = (git rev-parse --short HEAD).Trim()
-$version = "{0}-{1}" -f (Get-Date -Format "yyyy.MM.dd.HHmm"), $commit
+# Folders that Unity writes next to the game but that must not be shipped.
+$ignore = @(
+    "--ignore", "*_BurstDebugInformation_DoNotShip",
+    "--ignore", "*_BackUpThisFolder_ButDontShipItWithYourGame"
+)
 
-Write-Host "上げる: $BuildDir -> $Target（版 $version）"
-butler push $BuildDir $Target --userversion $version --if-changed
+if ($DryRun) {
+    butler push $BuildDir $Target @ignore --dry-run
+    exit $LASTEXITCODE
+}
+
+# Version label shown in the itch app: date and the short git commit (if git is available).
+$version = Get-Date -Format "yyyy.MM.dd.HHmm"
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    # Windows PowerShell 5.1 turns redirected stderr of a native command into an error under "Stop".
+    $ErrorActionPreference = "Continue"
+    $commit = (git rev-parse --short HEAD 2>$null)
+    $gitExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($gitExit -eq 0 -and $commit) {
+        $version = "$version-$($commit.Trim())"
+    } else {
+        Write-Host "No git commit found; the version is the date only."
+    }
+}
+
+Write-Host "Pushing $BuildDir to $Target (version $version)"
+butler push $BuildDir $Target @ignore --userversion $version
 if ($LASTEXITCODE -ne 0) {
-    throw "butler push が失敗した（終了コード $LASTEXITCODE）。上のメッセージを見る。"
+    throw "butler push failed (exit code $LASTEXITCODE). See the messages above."
 }
 butler status $Target
-Write-Host "済み。友達の itch のアプリは、次にゲームを起動するときに自動で更新する。"
+Write-Host "Done. Friends' itch apps will update the game the next time they launch it."
