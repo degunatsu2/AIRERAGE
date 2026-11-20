@@ -366,9 +366,10 @@ namespace Airerage.Editor.Stages
             }
             // 動くボラードの溝（クレーンの右の脚の両側。見た目だけ）と、フォークリフトの荷台の柱（奥）。
             Material rail = decor.Lit("BollardRail", new Color(0.25f, 0.27f, 0.3f));
-            foreach (float x in new[] { 24.45f, 27.5f })
+            // 内側のボラードは梁の下まで（溝は梁の中で止める。梁の上の面と重ねない）、外側は梁の上まで。
+            foreach ((float x, float top) in new[] { (24.45f, BeamBottom + 0.3f), (27.5f, BeamTop) })
             {
-                decor.Box("BollardRail", new Vector3(x, (1.2f + BeamTop) * 0.5f, 1.2f), new Vector3(0.3f, BeamTop - 1.2f, 0.3f), rail);
+                decor.Box("BollardRail", new Vector3(x, (1.2f + top) * 0.5f, 1.2f), new Vector3(0.3f, top - 1.2f, 0.3f), rail);
             }
             foreach (float x in new[] { -32.4f, -29.6f, WestPalletX - 1.4f, WestPalletX + 1.4f })
             {

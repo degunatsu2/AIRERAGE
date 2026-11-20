@@ -247,14 +247,18 @@ namespace Airerage.Editor.Stages
         // いちばん下の黒いラインの段の 1 つ下は B 版の暗い板とトラスの帯、窓の 1 つ下の段は真ん中から 1 つ外側の区画（x ±18）だけ
         // B 版の丸い窓の板（黒いラインは塗る）。上から: 青い天井・黒・なし・窓・なし（丸い窓）・黒・暗い板とトラス・黒。
         // 2026-11-20 の要望（4 回目）: 柱を半分にしたので、丸い窓は柱と柱の間のちょうど真ん中（x ±12）に、間の 2 枚の板の境目を
-        // またいで置く（両側は同じ板を半分の幅にして埋める）。
+        // またいで置く。5 回目: 窓の段だけずらすと上下の段の模様（青い帯の出っ張り・トラスの三角・継ぎ目）と合わないので、真ん中の柱の
+        // 両側の 2 区画（x −24〜24。ShiftedHalfWidth）は、すべての段で板を半分ずらして並べる（柱の脇の半分の板・板・板・板・半分の板）。
+        // ずらした並びとふつうの並びの切り替わりは x ±24 の柱の裏。
         private const string FlatPanel = "WallAstra_Straight_Flat";
+
+        // 板を半分ずらして並べる真ん中の範囲（x −24〜24。両端は柱）。
+        private const float ShiftedHalfWidth = Bay * 2f;
 
         private readonly struct WallRow
         {
             // 下から積む板（短い板は積んで 1 段の高さにする）。Plain は黒いライン（青い天井の板は灰色の帯）を板と同じ材質にする。
-            // AccentCenters（x。柱と柱の間の真ん中）には AccentModel を 1 枚、間の 2 枚の板の境目をまたいで置く（その 2 枚は置かず、
-            // 両側の残りは同じ板を半分の幅にして埋める）。
+            // AccentCenters（x）の板だけ AccentModel に替える。
             public readonly string[] Models;
             public readonly bool Plain;
             public readonly string AccentModel;
@@ -276,20 +280,19 @@ namespace Airerage.Editor.Stages
                 AccentCenters = accentCenters;
             }
 
-            // x の区画の板を AccentModel が覆う（その区画にはふつうの板を置かない）か。
-            public bool CoveredByAccent(float x)
+            public string[] ModelsAt(float x)
             {
                 if (AccentCenters != null)
                 {
                     foreach (float center in AccentCenters)
                     {
-                        if (Mathf.Abs(Mathf.Abs(center - x) - Bay * 0.5f) < 0.5f)
+                        if (Mathf.Abs(center - x) < 0.5f)
                         {
-                            return true;
+                            return new[] { AccentModel };
                         }
                     }
                 }
-                return false;
+                return Models;
             }
         }
 
@@ -355,22 +358,21 @@ namespace Airerage.Editor.Stages
             }
             for (int row = 0; row < rows.Length; row++)
             {
+                // ふつうの並び（真ん中の範囲の外）。
                 for (float x = -BayHalfCount * Bay + Bay * 0.5f; x < BayHalfCount * Bay; x += Bay)
                 {
-                    if (!rows[row].CoveredByAccent(x))
+                    if (Mathf.Abs(x) > ShiftedHalfWidth)
                     {
-                        Place(row, rows[row].Models, x, 1f);
+                        Place(row, rows[row].ModelsAt(x), x, 1f);
                     }
                 }
-                if (rows[row].AccentCenters != null)
+                // 真ん中の範囲は半分ずらす: 板の真ん中が 0・±12、柱の脇は半分の幅の板（真ん中は ±21）。
+                for (float x = -ShiftedHalfWidth + Bay; x < ShiftedHalfWidth - 0.1f; x += Bay)
                 {
-                    foreach (float center in rows[row].AccentCenters)
-                    {
-                        Place(row, new[] { rows[row].AccentModel }, center, 1f);
-                        Place(row, rows[row].Models, center - Bay * 0.75f, 0.5f);
-                        Place(row, rows[row].Models, center + Bay * 0.75f, 0.5f);
-                    }
+                    Place(row, rows[row].ModelsAt(x), x, 1f);
                 }
+                Place(row, rows[row].Models, -ShiftedHalfWidth + Bay * 0.25f, 0.5f);
+                Place(row, rows[row].Models, ShiftedHalfWidth - Bay * 0.25f, 0.5f);
             }
             // 柱（区画の境目 2 つに 1 つ。2026-11-20 の要望: 柱が多すぎるので、ある・ない・ある……と半分に。端と真ん中は立つ）。
             // 段の高さにそろえた柱を段ごとに積む。
