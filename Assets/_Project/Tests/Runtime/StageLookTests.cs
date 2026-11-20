@@ -556,7 +556,7 @@ namespace Airerage.Runtime.Tests
             Transform plainPanel = props.First(t => t.name == "Prop_WallAstra_Straight_Flat_Plain");
             Assert.That(plainPanel.GetComponentsInChildren<Renderer>().SelectMany(r => r.sharedMaterials).Any(m => m.name.Contains("Trim_03_Dark")), Is.False,
                 "黒いラインの材質が残っている");
-            Assert.That(props.Count(t => t.name == "Prop_Computer"), Is.EqualTo(2), "操作盤は左右 1 台ずつ");
+            Assert.That(props.Count(t => t.name == "Prop_Prop_Computer"), Is.EqualTo(2), "操作盤は左右 1 台ずつ");
             foreach (Transform column in props.Where(t => t.name == "Prop_Column_Large_Straight"))
             {
                 float x = column.GetComponentInChildren<Renderer>().bounds.center.x;

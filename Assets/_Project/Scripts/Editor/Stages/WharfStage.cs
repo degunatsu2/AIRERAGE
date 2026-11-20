@@ -75,7 +75,7 @@ namespace Airerage.Editor.Stages
                     new TerrainBox("TugCabin", -2f, -3f, 2.5f, 0f, attachable: true),
                     new TerrainBox("TugMast", 0.8f, 0f, 1.2f, 6f, attachable: true),
                     // 灯台（2026-11-20 の要望: すぐ奥に灯台の模型を置き、真ん中に柱の形の足場。てっぺんはバルコニー〈灯台の展望台〉に合わせた
-                    // 床。前は x -49〜-45、今は展望台の幅に合わせて -50.6〜-43.4）。
+                    // 床。前は x -49〜-45、今は展望台の幅に合わせて -50〜-44）。
                     new TerrainBox("Lighthouse", -48f, 1f, -46f, 22f, attachable: true),
                     new TerrainBox("LighthouseDeck", LighthouseX - GalleryRadius, 22f, LighthouseX + GalleryRadius, 22.6f, attachable: true),
                     // 積み上げたコンテナ（鉄。ワイヤーがつながる）。
@@ -194,7 +194,8 @@ namespace Airerage.Editor.Stages
         // 灯台の中心（x）と奥行き（z。塔の手前の面が遊ぶ面のすぐ奥 z 2.5 に来る）、展望台の半径。
         private const float LighthouseX = -47f;
         private const float LighthouseZ = 5.8f;
-        private const float GalleryRadius = 3.6f;
+        // 展望台の半径（床の左の端 x -50 が左の撃破の線 x -60 から 10m 以上離れるように。StageLayoutTests）。
+        private const float GalleryRadius = 3f;
 
         // 右の岸壁（右端 x = 48）の右端のボラードの位置（端ぎりぎり。柱の右の縁が岸壁の端から 0.2m 出る。右の海から、浮いたまま
         // 岸壁の角に遮られずにつなげる）。

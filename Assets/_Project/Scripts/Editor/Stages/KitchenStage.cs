@@ -565,13 +565,14 @@ namespace Airerage.Editor.Stages
             const float bottom = -6f;
             const float rim = 2f;
             // 槽: 奥の壁・底・左右の内側の壁（調理台の箱の内側に貼る）。
-            decor.Box("BasinBack", new Vector3((left + right) * 0.5f, (bottom + rim) * 0.5f, 2.05f), new Vector3(right - left, rim - bottom, 0.1f), basin);
-            decor.Box("BasinFloor", new Vector3((left + right) * 0.5f, bottom - 0.05f, 0f), new Vector3(right - left, 0.1f, 4.1f), basin);
-            decor.Box("BasinWallWest", new Vector3(left + 0.05f, (bottom + rim) * 0.5f, 0f), new Vector3(0.1f, rim - bottom, 4.1f), basin);
-            decor.Box("BasinWallEast", new Vector3(right - 0.05f, (bottom + rim) * 0.5f, 0f), new Vector3(0.1f, rim - bottom, 4.1f), basin);
+            // 地形の面と重ならないように、どれも地形から少し離す（面が重なるとちらつく。StageLayoutTests が検査する）。
+            decor.Box("BasinBack", new Vector3((left + right) * 0.5f, (bottom + rim) * 0.5f, 2.08f), new Vector3(right - left, rim - bottom, 0.1f), basin);
+            decor.Box("BasinFloor", new Vector3((left + right) * 0.5f, bottom + 0.07f, 0f), new Vector3(right - left - 0.3f, 0.1f, 3.9f), basin);
+            decor.Box("BasinWallWest", new Vector3(left + 0.08f, (bottom + rim) * 0.5f, 0f), new Vector3(0.1f, rim - bottom, 3.9f), basin);
+            decor.Box("BasinWallEast", new Vector3(right - 0.08f, (bottom + rim) * 0.5f, 0f), new Vector3(0.1f, rim - bottom, 3.9f), basin);
             // 手前の縁（槽の口の手前の辺。調理台の天板の高さ）と、排水口。
             decor.Box("BasinLip", new Vector3((left + right) * 0.5f, rim - 0.15f, -2.05f), new Vector3(right - left + 0.2f, 0.3f, 0.12f), basin);
-            decor.Cylinder("Drain", new Vector3((left + right) * 0.5f, bottom + 0.02f, 0.4f), new Vector3(1f, 0.02f, 1f), steel);
+            decor.Cylinder("Drain", new Vector3((left + right) * 0.5f, bottom + 0.14f, 0.4f), new Vector3(1f, 0.02f, 1f), steel);
             // 水: 手前の面を調理台の正面（z -2）に、水面を槽の中だけに（前は水面の板が手前へ 8m 出ていた）。
             Transform water = GameObject.Find("Gimmicks/Sink")?.transform;
             if (water == null)
