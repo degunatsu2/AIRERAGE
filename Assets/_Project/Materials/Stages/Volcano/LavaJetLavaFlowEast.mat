@@ -25,15 +25,17 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _Aspect: 5.5
     - _BaseWidth: 0.55
+    - _Clots: 5.4545455
     - _Crown: 0.09090909
     - _Rise: 1
     - _Seed: 1.7
-    - _Speed: 1.6
+    - _Speed: 14
     m_Colors:
-    - _CoolColor: {r: 1.1, g: 0.18, b: 0.04, a: 1}
-    - _CrustColor: {r: 0.079999976, g: 0.03, b: 0.02, a: 1}
-    - _HotColor: {r: 5, g: 3.6, b: 1.4, a: 1}
-    - _WarmColor: {r: 3.2, g: 1.2, b: 0.2, a: 1}
+    - _CoolColor: {r: 0.75, g: 0.1, b: 0.025, a: 1}
+    - _CrustColor: {r: 0.07, g: 0.03, b: 0.02, a: 1}
+    - _HotColor: {r: 2, g: 1.05, b: 0.2, a: 1}
+    - _WarmColor: {r: 1.7, g: 0.45, b: 0.06, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

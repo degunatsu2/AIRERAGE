@@ -25,15 +25,15 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Intensity: 1.1
+    - _Intensity: 0.55
     - _NoiseScale: 3.2
     - _Radial: 1
     - _Seed: 0
-    - _Speed: 2.2
+    - _Speed: 1.6
     - _Taper: 0.75
     m_Colors:
-    - _CoreColor: {r: 3.2, g: 2.6, b: 1.4, a: 1}
-    - _EdgeColor: {r: 1.1, g: 0.16, b: 0.03, a: 1}
-    - _MidColor: {r: 2.6, g: 1, b: 0.18, a: 1}
+    - _CoreColor: {r: 2.2, g: 1.45, b: 0.3, a: 1}
+    - _EdgeColor: {r: 0.75, g: 0.11, b: 0.02, a: 1}
+    - _MidColor: {r: 1.9, g: 0.62, b: 0.08, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
