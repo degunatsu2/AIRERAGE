@@ -94,20 +94,24 @@ Shader "Airerage/Flame"
                 return output;
             }
 
-            // 放射の炎（_Radial 1）: 真ん中から外へ噴き出す炎の塊（カメラの方へ噴き出す炎を正面から見た形。2026-11-20 の要望:
-            // オーブンの奥から火が勢いよく噴き出す）。真ん中ほど熱く、外へ流れる雑音で縁が舌のようにちぎれる。
+            // 放射の炎（_Radial 1）: 真ん中から外へ押し出される炎の塊（カメラの方へ噴き出す炎を正面から見た形。2026-11-20 の要望:
+            // オーブンの奥から火が勢いよく噴き出す。手本はバックドラフトの映像: 炎の塊が渦を巻きながらふくらみ、縁は黒ずんだ赤の舌に
+            // ちぎれる。白く飛ばない）。ゆがめた雑音を外へ流して渦を作り、尾根の形（1 - |2n - 1|）で炎の舌の筋を出す。
             half4 Radial(float2 uv)
             {
                 float t = _Time.y * _Speed;
                 float2 p = uv * 2.0 - 1.0;
                 float r = length(p);
                 float2 dir = p / max(r, 1e-3);
-                float n = Fbm(p * _NoiseScale * 0.8 - dir * t * 1.8 + _Seed);
-                float detail = Fbm(p * _NoiseScale * 2.1 - dir * t * 2.6 - _Seed);
-                float heat = saturate(1.0 - r * (1.05 - _Taper * 0.3) + (n - 0.5) * 0.7 + (detail - 0.5) * 0.25);
-                half3 color = lerp(_EdgeColor.rgb, _MidColor.rgb, smoothstep(0.15, 0.5, heat));
-                color = lerp(color, _CoreColor.rgb, smoothstep(0.55, 0.9, heat));
-                half alpha = smoothstep(0.05, 0.35, heat) * smoothstep(1.0, 0.8, r);
+                float2 q = p * _NoiseScale * 0.7;
+                float2 warp = float2(Fbm(q * 0.8 + float2(t * 0.35, _Seed)), Fbm(q * 0.8 + float2(_Seed * 1.3, -t * 0.35))) - 0.5;
+                float n = Fbm(q - dir * t * 1.2 + warp * 1.8 + _Seed);
+                float ridge = 1.0 - abs(n * 2.0 - 1.0);
+                float heat = (1.0 - r * 1.2) + (n - 0.5) * 1.1 + ridge * 0.22;
+                heat = saturate(heat);
+                half3 color = lerp(_EdgeColor.rgb, _MidColor.rgb, smoothstep(0.1, 0.45, heat));
+                color = lerp(color, _CoreColor.rgb, smoothstep(0.6, 1.0, heat));
+                half alpha = smoothstep(0.06, 0.4, heat) * smoothstep(1.0, 0.7, r);
                 return half4(color * alpha * _Intensity, 0.0);
             }
 

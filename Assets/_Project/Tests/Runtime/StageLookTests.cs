@@ -543,7 +543,8 @@ namespace Airerage.Runtime.Tests
                 Assert.That(row.Select(t => t.name).Distinct().Count(), Is.EqualTo(1), $"高さ {row.Key} の段の板がそろっていない: " + string.Join(", ", row.Select(t => t.name).Distinct()));
             }
             // 2026-11-20 の要望（3 回目）: 上から 青い天井・黒・なし・窓・なし・黒・暗い板とトラス・黒。
-            string[] fromTop = props.Where(t => IsPanel(t) && Mathf.Abs(t.GetComponentInChildren<Renderer>().bounds.center.x - 6f) < 1f)
+            // 窓のない区画（x 30。真ん中の柱の隣の区画は窓の段の板が窓と半分の幅の板になる）で調べる。
+            string[] fromTop = props.Where(t => IsPanel(t) && Mathf.Abs(t.GetComponentInChildren<Renderer>().bounds.center.x - 30f) < 1f)
                 .OrderByDescending(t => t.GetComponentInChildren<Renderer>().bounds.min.y).Select(t => t.name.Substring("Prop_".Length)).ToArray();
             Assert.That(fromTop, Is.EqualTo(new[]
             {
@@ -552,7 +553,14 @@ namespace Airerage.Runtime.Tests
                 "WallAstra_Straight_Flat",
             }), "段の並び（上から）");
             Assert.That(props.Where(t => t.name == "Prop_WallAstra_Straight_Flat_Window_Plain").Select(t => Mathf.RoundToInt(t.GetComponentInChildren<Renderer>().bounds.center.x))
-                .OrderBy(x => x).ToArray(), Is.EqualTo(new[] { -18, 18 }), "丸い窓は真ん中から 1 つ外側の区画だけ");
+                .OrderBy(x => x).ToArray(), Is.EqualTo(new[] { -12, 12 }), "丸い窓は真ん中の柱と隣の柱の間のちょうど真ん中（2 枚の板の境目をまたぐ）");
+            // 窓の段: 窓の両側は同じ板を半分の幅にして埋め、隙間も重なりもない（窓の左右の端から隣の柱まで 6m ずつ）。
+            Renderer[] windowRow = props.Where(t => t.name == "Prop_WallAstra_Straight_Flat_Window_Plain" || t.name == "Prop_WallAstra_Straight_Flat_Plain")
+                .Select(t => t.GetComponentInChildren<Renderer>())
+                .Where(r => Mathf.Abs(r.bounds.min.y - props.First(t => t.name == "Prop_WallAstra_Straight_Flat_Window_Plain").GetComponentInChildren<Renderer>().bounds.min.y) < 0.5f)
+                .Where(r => r.bounds.center.x > 0f && r.bounds.center.x < 24f).OrderBy(r => r.bounds.center.x).ToArray();
+            Assert.That(windowRow.Select(r => Mathf.RoundToInt(r.bounds.center.x)).ToArray(), Is.EqualTo(new[] { 3, 12, 21 }), "柱の間の窓の段の板の並び");
+            Assert.That(windowRow.Select(r => Mathf.RoundToInt(r.bounds.size.x)).ToArray(), Is.EqualTo(new[] { 6, 12, 6 }), "窓の両側は半分の幅の板");
             Assert.That(props.Any(t => t.name == "Prop_WallAstra_Straight"), Is.False, "マークの板が残っている");
             // 黒いライン（帯）を塗った板には、帯の材質が残っていない。
             foreach (Transform plainPanel in props.Where(t => t.name.EndsWith("_Plain")))

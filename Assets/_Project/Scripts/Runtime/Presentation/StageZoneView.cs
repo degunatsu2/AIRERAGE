@@ -564,7 +564,9 @@ namespace Airerage.Runtime.Presentation
                 WarnWholeZone(center, half);
             }
             ShowWarning(warning);
-            float frameAlpha = _core.Period <= 0 ? 1f : 0.25f + 0.75f * strength;
+            // 蒸気の噴出（ZoneLook.Steam）は湯気の粒だけで見せる（枠と流れる印は出さない。予告の斜線と記号はそのまま。2026-11-20 の方針）。
+            float shown = _look == ZoneLook.Steam ? 0f : 1f;
+            float frameAlpha = (_core.Period <= 0 ? 1f : 0.25f + 0.75f * strength) * shown;
             Box(_ring, center, half, 1f + 0.05f * Mathf.Sin(time * Mathf.PI * 4f), frameAlpha);
             Vector2 side = new Vector2(_direction.y, -_direction.x);
             float width = Mathf.Min(Mathf.Max(half.x, half.y) * 0.9f, 1.1f);
@@ -574,7 +576,7 @@ namespace Airerage.Runtime.Presentation
             {
                 float phase = Mathf.Repeat(time * speed + i / (float)_marks.Count, 1f);
                 Vector2 tip = origin + _direction * (0.4f + phase * 3.5f);
-                Chevron(_marks[i], tip, _direction, side, width, 0.5f, Fade(phase) * (warning ? 0f : strength));
+                Chevron(_marks[i], tip, _direction, side, width, 0.5f, Fade(phase) * (warning ? 0f : strength) * shown);
             }
         }
 

@@ -120,6 +120,12 @@ namespace Airerage.Editor
                         ("DetailCenter", new Vector3(-2f, 3f, -12f), 40f),
                         ("DetailRing", new Vector3(-12f, 12f, -15f), 40f),
                     };
+                    // AIRERAGE_LOOK_SHOTS（「名前:x:y:z:画角」を ; で区切る）があれば、その位置だけ撮る（ギミックの近くなど）。
+                    string extra = Environment.GetEnvironmentVariable("AIRERAGE_LOOK_SHOTS");
+                    if (!string.IsNullOrEmpty(extra))
+                    {
+                        shots = extra.Split(';').Select(ParseShot).ToArray();
+                    }
                     foreach (var shot in shots)
                     {
                         camera.fieldOfView = shot.Fov;
@@ -132,6 +138,18 @@ namespace Airerage.Editor
                     Object.DestroyImmediate(go);
                 }
             }
+        }
+
+        // 「名前:x:y:z:画角」を読む。
+        private static (string Tag, Vector3 Position, float Fov) ParseShot(string text)
+        {
+            string[] parts = text.Split(':');
+            if (parts.Length != 5)
+            {
+                throw new ArgumentException($"撮る位置の書き方が違う（名前:x:y:z:画角）: {text}");
+            }
+            float Parse(string value) => float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+            return (parts[0], new Vector3(Parse(parts[1]), Parse(parts[2]), Parse(parts[3])), Parse(parts[4]));
         }
 
         /// <summary>

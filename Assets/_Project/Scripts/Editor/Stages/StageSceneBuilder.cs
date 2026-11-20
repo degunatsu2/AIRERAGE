@@ -538,7 +538,11 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_Intensity", intensity);
                 m.SetFloat("_Seed", seed);
                 m.SetFloat("_Radial", radial ? 1f : 0f);
-                m.SetFloat("_Speed", radial ? 2.2f : 1.6f);
+                m.SetFloat("_Speed", radial ? 1.6f : 1.6f);
+                // 芯は黄色まで（青を抑えて白く飛ばさない）、縁は黒ずんだ赤。
+                m.SetColor("_CoreColor", new Color(2.2f, 1.45f, 0.3f));
+                m.SetColor("_MidColor", new Color(1.9f, 0.62f, 0.08f));
+                m.SetColor("_EdgeColor", new Color(0.75f, 0.11f, 0.02f));
             }, folder);
         }
 
@@ -556,7 +560,8 @@ namespace Airerage.Editor.Stages
             float mouthY = -size.y * 0.5f + size.y * 0.4f;
             float lipY = -size.y * 0.5f + size.y * 0.8f;
             // 奥から手前へふくらむ炎の塊（放射の板。奥ほど小さく明るい）。
-            (float Z, float Diameter, float Intensity)[] bursts = { (11f, 7f, 1.1f), (8.5f, 10f, 1f), (6f, 13f, 0.85f), (3.5f, 16f, 0.65f), (1f, 18f, 0.45f) };
+            // 重ねすぎると白く飛ぶので 3 枚（足し算）。奥ほど小さく濃い。
+            (float Z, float Diameter, float Intensity)[] bursts = { (9f, 9f, 0.6f), (5.5f, 13f, 0.45f), (2f, 17f, 0.32f) };
             for (int i = 0; i < bursts.Length; i++)
             {
                 GameObject disc = decor.Quad($"Burst{i + 1}", flames, new Vector3(0f, mouthY + i * 0.5f, bursts[i].Z), new Vector2(bursts[i].Diameter / width, bursts[i].Diameter),
@@ -568,7 +573,7 @@ namespace Airerage.Editor.Stages
             {
                 float height = (size.y * 0.5f - lipY + 1f) * (1f - i * 0.15f);
                 decor.Quad($"Rollover{i + 1}", flames, new Vector3(0f, lipY + height * 0.45f, 4.5f - i * 2f), new Vector2(0.92f - i * 0.12f, height),
-                    FlameMaterial($"Flame{zone.Name}Roll{i + 1}", 0.8f - i * 0.15f, 20f + i * 3.1f, decor.Folder, false));
+                    FlameMaterial($"Flame{zone.Name}Roll{i + 1}", 0.55f - i * 0.1f, 20f + i * 3.1f, decor.Folder, false));
             }
             // 粒: 手前へ飛び散る火の粉（効き始めに一度にも）、上に昇る黒い煙。予告の間は、扉の隙間からの煙と少しの火の粉。
             var fx = new GameObject("FireFx").transform;
@@ -579,8 +584,8 @@ namespace Airerage.Editor.Stages
                 new[] { (1f, 0f), (1f, 0.6f), (0f, 1f) });
             ParticleSystem sparks = new ParticleFx
             {
-                Name = "Sparks", LifetimeMin = 0.6f, LifetimeMax = 1.4f, SpeedMin = 9f, SpeedMax = 18f, SizeMin = 0.06f, SizeMax = 0.16f, Gravity = 0.5f,
-                ConeAngle = 35f, ConeRadius = 3f, Colors = sparkColors, Additive = true, Stretch = 0.05f, Turbulence = 1f, Intensity = 4f, MaxParticles = 400,
+                Name = "Sparks", LifetimeMin = 0.6f, LifetimeMax = 1.4f, SpeedMin = 6f, SpeedMax = 13f, SizeMin = 0.05f, SizeMax = 0.12f, Gravity = 0.5f,
+                ConeAngle = 35f, ConeRadius = 3f, Colors = sparkColors, Additive = true, Stretch = 0.015f, Turbulence = 1.2f, Intensity = 2.5f, MaxParticles = 200,
             }.Build(fx, new Vector3(0f, mouthY, 6f), outward, decor.Folder);
             ParticleSystem smoke = new ParticleFx
             {
@@ -596,7 +601,7 @@ namespace Airerage.Editor.Stages
                 Colors = ParticleFx.Ramp(new[] { (new Color(0.3f, 0.28f, 0.27f), 0f), (new Color(0.2f, 0.2f, 0.2f), 1f) }, new[] { (0f, 0f), (0.35f, 0.25f), (0f, 1f) }),
             }.Build(fx, new Vector3(0f, lipY, 6f), up, decor.Folder);
             fx.gameObject.AddComponent<HazardEffectRig>().Configure(root.GetComponent<StageZoneView>(), null,
-                new[] { wisps, sparks }, new[] { 6f, 8f }, new[] { sparks }, new[] { 90 }, new[] { sparks, smoke }, new[] { 140f, 18f });
+                new[] { wisps, sparks }, new[] { 6f, 4f }, new[] { sparks }, new[] { 35 }, new[] { sparks, smoke }, new[] { 28f, 18f });
             return flames.gameObject;
         }
 
@@ -611,14 +616,18 @@ namespace Airerage.Editor.Stages
             float crown = zone.CapHeight > 0f ? zone.CapHeight / size.y : 0f;
             var lava = new GameObject("Lava").transform;
             lava.SetParent(parent, false);
-            Material Jet(string name, float seed) => SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/LavaJet", m =>
+            // 塊の大きさは約 1m（柱の幅の塊の数 _Clots）。後ろの板は少し小さな塊で、奥行きのある柱に見せる。
+            Material Jet(string name, float seed, float clots, float speed) => SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/LavaJet", m =>
             {
                 m.SetFloat("_Crown", crown);
                 m.SetFloat("_Seed", seed);
+                m.SetFloat("_Aspect", size.y / width);
+                m.SetFloat("_Clots", clots);
+                m.SetFloat("_Speed", speed);
             }, decor.Folder);
-            decor.Quad("Jet", lava, new Vector3(0f, 0f, -0.4f), new Vector2(1f, size.y), Jet($"LavaJet{zone.Name}", 1.7f))
+            decor.Quad("Jet", lava, new Vector3(0f, 0f, -0.4f), new Vector2(1f, size.y), Jet($"LavaJet{zone.Name}", 1.7f, width / 1.1f, 14f))
                 .GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            decor.Quad("JetBack", lava, new Vector3(0f, -size.y * 0.02f, 1.4f), new Vector2(0.9f, size.y * 0.96f), Jet($"LavaJet{zone.Name}Back", 6.1f))
+            decor.Quad("JetBack", lava, new Vector3(0f, -size.y * 0.02f, 1.4f), new Vector2(0.92f, size.y * 0.96f), Jet($"LavaJet{zone.Name}Back", 6.1f, width / 0.8f, 11f))
                 .GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
 
             var fx = new GameObject("LavaFx").transform;
@@ -629,18 +638,19 @@ namespace Airerage.Editor.Stages
             // 冷えていく塊: 黄（約 1100°C）→ 橙 → 赤 → 黒（USGS: 空中で毎秒数百度冷え、黒い塊になって落ちる）。
             Gradient cooling = ParticleFx.Ramp(new[]
             {
-                (new Color(1f, 0.85f, 0.4f), 0f), (new Color(1f, 0.45f, 0.08f), 0.3f), (new Color(0.55f, 0.07f, 0.02f), 0.6f), (new Color(0.05f, 0.03f, 0.02f), 0.85f),
-            }, new[] { (1f, 0f), (1f, 0.85f), (0f, 1f) });
+                (new Color(1f, 0.62f, 0.16f), 0f), (new Color(0.95f, 0.32f, 0.05f), 0.25f), (new Color(0.5f, 0.06f, 0.02f), 0.5f), (new Color(0.06f, 0.03f, 0.02f), 0.75f),
+            }, new[] { (1f, 0f), (1f, 0.88f), (0f, 1f) });
             ParticleSystem fragments = new ParticleFx
             {
-                Name = "Fragments", LifetimeMin = 1.2f, LifetimeMax = 2.1f, SpeedMin = 8f, SpeedMax = 17f, SizeMin = 0.25f, SizeMax = 0.75f, Gravity = 1.2f,
-                ConeAngle = 32f, ConeRadius = width * 0.35f, Colors = cooling, EdgeNoise = 0.25f, Softness = 0.35f, Stretch = 0.05f, Intensity = 3f,
+                // 冠から外へ放り出されて落ちる塊（ぎざぎざの丸い塊。伸ばさない。黒く冷えても見えるように重ね塗り）。
+                Name = "Fragments", LifetimeMin = 1.4f, LifetimeMax = 2.4f, SpeedMin = 5f, SpeedMax = 12f, SizeMin = 0.3f, SizeMax = 0.85f, Gravity = 1.1f,
+                ConeAngle = 55f, ConeRadius = width * 0.4f, Colors = cooling, EdgeNoise = 0.45f, Softness = 0.25f, Intensity = 1.8f, Spin = 90f,
                 MaxParticles = 500,
             }.Build(fx, new Vector3(0f, crownY, -0.3f), up, decor.Folder);
             ParticleSystem embers = new ParticleFx
             {
-                Name = "Embers", LifetimeMin = 1f, LifetimeMax = 2.4f, SpeedMin = 3f, SpeedMax = 8f, SizeMin = 0.05f, SizeMax = 0.14f, Gravity = -0.05f,
-                ConeAngle = 35f, ConeRadius = width * 0.4f, Additive = true, Turbulence = 1.4f, Intensity = 4f, MaxParticles = 400,
+                Name = "Embers", LifetimeMin = 1f, LifetimeMax = 2.4f, SpeedMin = 3f, SpeedMax = 8f, SizeMin = 0.04f, SizeMax = 0.1f, Gravity = -0.05f,
+                ConeAngle = 35f, ConeRadius = width * 0.4f, Additive = true, Turbulence = 1.4f, Intensity = 2.5f, MaxParticles = 300,
                 Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.8f, 0.35f), 0f), (new Color(1f, 0.35f, 0.05f), 0.5f), (new Color(0.5f, 0.05f, 0f), 1f) },
                     new[] { (1f, 0f), (0.8f, 0.6f), (0f, 1f) }),
             }.Build(fx, new Vector3(0f, crownY, -0.3f), up, decor.Folder);
@@ -656,7 +666,7 @@ namespace Airerage.Editor.Stages
             ParticleSystem bubbling = new ParticleFx
             {
                 Name = "VentSpatter", LifetimeMin = 0.5f, LifetimeMax = 0.9f, SpeedMin = 2f, SpeedMax = 5f, SizeMin = 0.2f, SizeMax = 0.45f, Gravity = 1f,
-                ConeAngle = 30f, ConeRadius = width * 0.3f, Colors = cooling, EdgeNoise = 0.2f, Softness = 0.35f, Intensity = 3f, MaxParticles = 120,
+                ConeAngle = 30f, ConeRadius = width * 0.3f, Colors = cooling, EdgeNoise = 0.45f, Softness = 0.25f, Intensity = 1.8f, Spin = 90f, MaxParticles = 120,
             }.Build(fx, new Vector3(0f, ventY, -0.3f), up, decor.Folder);
             ParticleSystem ventEmbers = new ParticleFx
             {
@@ -665,7 +675,7 @@ namespace Airerage.Editor.Stages
                 Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.7f, 0.3f), 0f), (new Color(0.8f, 0.2f, 0.03f), 1f) }, new[] { (1f, 0f), (0f, 1f) }),
             }.Build(fx, new Vector3(0f, ventY, -0.3f), up, decor.Folder);
             fx.gameObject.AddComponent<HazardEffectRig>().Configure(root.GetComponent<StageZoneView>(), fx,
-                new[] { bubbling, ventEmbers }, new[] { 30f, 25f }, new[] { fragments }, new[] { 70 }, new[] { fragments, embers, plume }, new[] { 80f, 100f, 14f });
+                new[] { bubbling, ventEmbers }, new[] { 30f, 18f }, new[] { fragments }, new[] { 60 }, new[] { fragments, embers, plume }, new[] { 55f, 50f, 14f });
             return lava.gameObject;
         }
 
@@ -686,18 +696,18 @@ namespace Airerage.Editor.Stages
             float width = Mathf.Min(zone.Size.x, zone.Size.y) * 0.8f;
             Vector2 middle = mouth + direction * length * 0.5f;
             // 噴き出しは流れる液体の筋（口から外へ流れる。2026-11-20 の要望: ギミックをそれぞれのイメージに合わせて精巧に）。
-            bool steam = zone.Look == StageZoneView.ZoneLook.Steam;
-            GameObject jet = decor.Quad("Jet", parent, new Vector3(middle.x, middle.y, -0.4f), new Vector2(width, length),
-                steam
-                    ? StreamMaterial($"GeyserJet{zone.Name}", new Color(1f, 0.97f, 0.92f, 0.18f), new Color(0.9f, 0.88f, 0.85f, 0.25f),
-                        new Color(1f, 1f, 1f, 0.5f), 3f, new Vector2(5f, 1.6f), 0.4f, 0f, decor.Folder)
-                    : StreamMaterial($"GeyserJet{zone.Name}", WithAlpha(Color.Lerp(color, Color.white, 0.55f), 0.6f), WithAlpha(color, 0.8f),
-                        new Color(1f, 1f, 1f, 0.85f), 2.4f, new Vector2(6f, 2f), 0.55f, 0.35f, decor.Folder));
-            jet.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
-            if (steam)
+            // 蒸気（ZoneLook.Steam）は湯気の粒だけで見せる（平たい板は四角く見えたので使わない。2026-11-20 の方針）。
+            if (zone.Look == StageZoneView.ZoneLook.Steam)
             {
+                var plume = new GameObject("SteamJet");
+                plume.transform.SetParent(parent, false);
                 CreateSteamVent(root, zone, mouth, direction, length, width, decor);
+                return plume;
             }
+            GameObject jet = decor.Quad("Jet", parent, new Vector3(middle.x, middle.y, -0.4f), new Vector2(width, length),
+                StreamMaterial($"GeyserJet{zone.Name}", WithAlpha(Color.Lerp(color, Color.white, 0.55f), 0.6f), WithAlpha(color, 0.8f),
+                    new Color(1f, 1f, 1f, 0.85f), 2.4f, new Vector2(6f, 2f), 0.55f, 0.35f, decor.Folder));
+            jet.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
             return jet;
         }
 
@@ -716,13 +726,13 @@ namespace Airerage.Editor.Stages
                 SizeMax = width * 0.45f, GrowFrom = 0.5f, GrowTo = 3f, ConeAngle = 7f, ConeRadius = 0.35f, EdgeNoise = 0.55f, Softness = 0.9f,
                 Turbulence = 0.9f, Spin = 30f, MaxParticles = 300,
                 // 口のすぐ外は透明、少し離れて白く、ふくらんで消える。
-                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.95f, 0.9f), 0f), (new Color(0.92f, 0.9f, 0.88f), 1f) },
-                    new[] { (0f, 0f), (0.05f, 0.08f), (0.6f, 0.25f), (0.35f, 0.65f), (0f, 1f) }),
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.92f, 0.9f, 0.88f), 0f), (new Color(0.8f, 0.79f, 0.78f), 1f) },
+                    new[] { (0f, 0f), (0.04f, 0.08f), (0.38f, 0.25f), (0.2f, 0.65f), (0f, 1f) }),
             }.Build(fx, new Vector3(mouth.x, mouth.y, -0.3f), along, decor.Folder);
             ParticleSystem droplets = new ParticleFx
             {
-                Name = "Droplets", LifetimeMin = 0.5f, LifetimeMax = 0.9f, SpeedMin = speed * 0.9f, SpeedMax = speed * 1.3f, SizeMin = 0.06f, SizeMax = 0.14f,
-                Gravity = 1f, ConeAngle = 12f, ConeRadius = 0.3f, Stretch = 0.04f, Softness = 0.4f, MaxParticles = 200,
+                Name = "Droplets", LifetimeMin = 0.5f, LifetimeMax = 0.9f, SpeedMin = speed * 0.9f, SpeedMax = speed * 1.3f, SizeMin = 0.03f, SizeMax = 0.07f,
+                Gravity = 1f, ConeAngle = 12f, ConeRadius = 0.3f, Stretch = 0.01f, Softness = 0.4f, MaxParticles = 120,
                 Colors = ParticleFx.Ramp(new[] { (new Color(0.9f, 0.96f, 1f), 0f), (new Color(0.8f, 0.9f, 1f), 1f) }, new[] { (0.9f, 0f), (0.7f, 0.6f), (0f, 1f) }),
             }.Build(fx, new Vector3(mouth.x, mouth.y, -0.3f), along, decor.Folder);
             ParticleSystem wisps = new ParticleFx
@@ -732,7 +742,7 @@ namespace Airerage.Editor.Stages
                 Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (new Color(0.9f, 0.9f, 0.9f), 1f) }, new[] { (0f, 0f), (0.35f, 0.25f), (0f, 1f) }),
             }.Build(fx, new Vector3(mouth.x, mouth.y, -0.3f), along, decor.Folder);
             fx.gameObject.AddComponent<HazardEffectRig>().Configure(root.GetComponent<StageZoneView>(), null,
-                new[] { wisps }, new[] { 10f }, new[] { steam }, new[] { 30 }, new[] { steam, droplets }, new[] { 90f, 60f });
+                new[] { wisps }, new[] { 10f }, new[] { steam }, new[] { 30 }, new[] { steam, droplets }, new[] { 90f, 25f });
         }
 
         // いつも吹いている縦の風（周期のない上下向きの風。水の流れは除く）か（StageZoneView.IsSteadyDraft と同じ決め方）。

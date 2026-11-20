@@ -1,19 +1,25 @@
 // 溶岩の噴泉（2026-11-20 の方針: ギミックを実際の現象に寄せる。火山の「溶岩流」は真上へ噴き上がるので、ハワイの火山の
 // 溶岩の噴泉〈fire fountain〉を手本にする）。板の UV の v が下（火口）から上、u が横。
-// - 形: 火口では細く、上へ広がり、頂きは丸い冠（判定の上の丸み CapHeight と同じ形。_Crown は高さに対する丸みの割合）。縁は雑音で揺らぐ。
-// - 色: 温度で決まる（USGS: 黄 約 1000〜1200°C、橙 約 800〜1000°C、赤 約 600〜800°C）。芯と火口に近いほど黄白、外側と上ほど橙から赤、
-//   冷えて黒くなりかけたかけらが混じる。上へ速く流れる筋と、ちぎれていく冠の塊。_Rise（0〜1）で下から噴き上がる途中を描く。
+// 実際の噴泉は、ガスに乗って噴き上がる無数の溶岩のしぶき（塊）の柱: 光る線の柱ではなく、ひとつひとつの塊が見え、塊の間は
+// 薄い光るしぶきで、芯と火口ほど詰まって明るく、外と上ほどまばらで冷えている。頂きは塊がほどけて広がる。
+// - 形: 火口では細く（_BaseWidth）、すぐに柱の幅いっぱいへ広がり、頂きは丸い冠（判定の上の丸み CapHeight と同じ形。_Crown は
+//   高さに対する丸みの割合）。縁は塊の出入りでぎざぎざに揺らぐ。
+// - 塊: 上へ流れるセル状の模様（ボロノイ）で塊を作る。火口の近くは速さで縦に伸び、上ほど丸い。_Aspect（高さ / 幅）で塊を丸くする。
+// - 色: 温度で決まる（USGS: 黄 約 1000〜1200°C、橙 約 800〜1000°C、赤 約 600〜800°C）。塊ごとに温度がばらつき、外と上の塊ほど
+//   赤から黒い殻へ冷える。白く飛ばさない（芯も黄色まで）。_Rise（0〜1）で下から噴き上がる途中を描く。
 Shader "Airerage/LavaJet"
 {
     Properties
     {
-        [HDR] _HotColor ("Hot core (yellow-white)", Color) = (5.0, 3.6, 1.4, 1)
-        [HDR] _WarmColor ("Warm (orange)", Color) = (3.2, 1.2, 0.2, 1)
-        [HDR] _CoolColor ("Cool (red)", Color) = (1.1, 0.18, 0.04, 1)
-        _CrustColor ("Cooled crust (dark)", Color) = (0.08, 0.03, 0.02, 1)
-        _BaseWidth ("Width at the vent (fraction)", Range(0.1, 1)) = 0.55
+        [HDR] _HotColor ("Hot core (yellow)", Color) = (2.6, 1.55, 0.35, 1)
+        [HDR] _WarmColor ("Warm (orange)", Color) = (2.0, 0.6, 0.08, 1)
+        [HDR] _CoolColor ("Cool (red)", Color) = (0.85, 0.12, 0.03, 1)
+        _CrustColor ("Cooled crust (dark)", Color) = (0.07, 0.03, 0.02, 1)
+        _BaseWidth ("Width at the vent (fraction)", Range(0.1, 1)) = 0.5
         _Crown ("Crown height (fraction of the height)", Range(0, 0.5)) = 0.1
-        _Speed ("Rise speed", Float) = 1.6
+        _Aspect ("Height / width of the board", Float) = 5
+        _Clots ("Clots across", Float) = 6
+        _Speed ("Rise speed (clots per second)", Float) = 14
         _Rise ("Rise (0..1)", Range(0, 1)) = 1
         _Seed ("Seed", Float) = 0
     }
@@ -42,6 +48,8 @@ Shader "Airerage/LavaJet"
                 half4 _CrustColor;
                 half _BaseWidth;
                 half _Crown;
+                float _Aspect;
+                float _Clots;
                 float _Speed;
                 half _Rise;
                 float _Seed;
@@ -66,6 +74,12 @@ Shader "Airerage/LavaJet"
                 return frac(p.x * p.y);
             }
 
+            float2 Hash22(float2 p)
+            {
+                float n = Hash21(p);
+                return float2(n, Hash21(p + n * 17.31));
+            }
+
             float Noise(float2 p)
             {
                 float2 i = floor(p);
@@ -88,6 +102,33 @@ Shader "Airerage/LavaJet"
                 return sum / 0.9375;
             }
 
+            // セル状の模様: いちばん近い点までの距離（塊の中心ほど 0）と、その点の乱数（塊ごとの温度のばらつき）。
+            float Cells(float2 p, out float id)
+            {
+                float2 cell = floor(p);
+                float2 f = frac(p);
+                float best = 8.0;
+                id = 0.0;
+                [unroll]
+                for (int y = -1; y <= 1; y++)
+                {
+                    [unroll]
+                    for (int x = -1; x <= 1; x++)
+                    {
+                        float2 offset = float2(x, y);
+                        float2 h = Hash22(cell + offset + _Seed);
+                        float2 d = offset + 0.15 + h * 0.7 - f;
+                        float distance = dot(d, d);
+                        if (distance < best)
+                        {
+                            best = distance;
+                            id = Hash21(cell + offset + _Seed * 3.1);
+                        }
+                    }
+                }
+                return sqrt(best);
+            }
+
             Varyings Vert(Attributes input)
             {
                 Varyings output;
@@ -99,33 +140,54 @@ Shader "Airerage/LavaJet"
             half4 Frag(Varyings input) : SV_Target
             {
                 float2 uv = input.uv;
-                float t = _Time.y * _Speed;
-                // 噴き上がる途中: _Rise より上はまだない（頂きは同じ丸み）。
+                float t = _Time.y;
                 float top = max(_Rise, 0.001);
                 float v = uv.y / top;
-                // 横の幅: 火口で細く、上へ広がる。縁は上へ流れる雑音で揺らぐ。
-                float width = lerp(_BaseWidth, 1.0, smoothstep(0.0, 0.75, v));
-                float wobble = (Fbm(float2(uv.y * 6.0 - t * 2.0, _Seed)) - 0.5) * 0.18 * (0.3 + v);
+                // 横の幅: 火口で細く、すぐに柱の幅いっぱいへ。
+                float width = lerp(_BaseWidth, 1.0, smoothstep(0.0, 0.3, v));
+                float wobble = (Fbm(float2(uv.y * _Aspect * 0.35 - t * 1.3, _Seed)) - 0.5) * 0.16;
                 float across = abs(uv.x - 0.5 + wobble) * 2.0 / width;
                 // 頂きの丸い冠。
                 float crownStart = 1.0 - _Crown;
-                float crown = v > crownStart ? length(float2(across, (v - crownStart) / max(_Crown, 0.001))) : across;
-                // 上へ速く流れる筋（芯ほど細かく速い）と、冠でちぎれる塊。
-                float streak = Fbm(float2(uv.x * 7.0 + _Seed, uv.y * 3.0 - t * 3.2));
-                float blobs = Fbm(float2(uv.x * 5.0 - _Seed, uv.y * 5.0 - t * 2.4));
-                float breakup = smoothstep(0.55, 1.0, v) * (blobs - 0.35) * 1.6;
-                float mask = 1.0 - smoothstep(0.82 - streak * 0.2, 1.0, crown + breakup * 0.4);
-                if (mask <= 0.001)
+                float shape = v > crownStart ? length(float2(across, (v - crownStart) / max(_Crown, 0.001))) : across;
+                if (shape > 1.08)
                 {
                     discard;
                 }
-                // 温度: 芯（横の真ん中）と火口に近いほど高い。外側と上ほど冷える。冷えかけの黒いかけらが混じる。
-                float heat = saturate((1.0 - across) * 1.15 - v * 0.45 + (streak - 0.5) * 0.5);
-                half3 color = lerp(_CoolColor.rgb, _WarmColor.rgb, smoothstep(0.15, 0.5, heat));
-                color = lerp(color, _HotColor.rgb, smoothstep(0.55, 0.9, heat));
-                float crust = smoothstep(0.62, 0.8, Noise(float2(uv.x * 14.0 + _Seed, uv.y * 9.0 - t * 2.8))) * smoothstep(0.35, 0.0, heat);
-                color = lerp(color, _CrustColor.rgb, crust * 0.85);
-                return half4(color, saturate(mask * (0.75 + heat * 0.25)));
+                // 塊: 上へ流れるセル。火口の近くは縦に伸び（速い）、上ほど丸い。
+                float stretch = lerp(2.2, 1.0, smoothstep(0.0, 0.45, v));
+                float2 p = float2(uv.x * _Clots, uv.y * _Clots * _Aspect / stretch - t * _Speed / stretch);
+                float id;
+                float d = Cells(p, id);
+                float id2;
+                float d2 = Cells(p * 1.9 + float2(3.7, -t * _Speed * 0.6), id2);
+                // 芯ほど塊が詰まり、外と上ほどまばら（塊が小さく、間が空く）。
+                float core = saturate(1.0 - shape);
+                float density = lerp(0.18, 0.46, core) * lerp(1.0, 0.7, smoothstep(0.6, 1.0, v));
+                float clot = smoothstep(density, density - 0.12, d);
+                float small = smoothstep(density * 0.8, density * 0.8 - 0.1, d2) * 0.8;
+                clot = max(clot, small * step(0.35, core));
+                // 塊の間の薄い光るしぶき（芯と火口ほど濃い）。
+                float spray = Fbm(float2(uv.x * 9.0 + _Seed, uv.y * _Aspect * 1.6 - t * _Speed * 0.5));
+                float haze = saturate(core * 1.4) * (0.25 + spray * 0.35) * (1.0 - v * 0.55);
+                float edgeFade = 1.0 - smoothstep(0.85, 1.08, shape);
+                float alpha = saturate(max(clot, haze)) * edgeFade;
+                if (alpha <= 0.003)
+                {
+                    discard;
+                }
+                // 温度: 芯と火口ほど高い。塊ごとにばらつき、外と上の塊ほど冷えて赤から黒い殻へ。
+                float heat = saturate(core * 0.9 + (1.0 - v) * 0.35 - 0.1 + (id - 0.5) * 0.45);
+                heat = lerp(heat * 0.75, heat, clot);
+                half3 color = lerp(_CoolColor.rgb, _WarmColor.rgb, smoothstep(0.2, 0.55, heat));
+                color = lerp(color, _HotColor.rgb, smoothstep(0.6, 0.95, heat));
+                // 冷えた塊（外と上ほど多い）: 中は暗く、縁だけ赤く光る。
+                float cooled = step(0.6 + core * 0.35 - v * 0.3, frac(id * 7.13)) * clot;
+                half3 crust = lerp(_CoolColor.rgb * 0.8, _CrustColor.rgb, smoothstep(0.0, density * 0.7, density - d));
+                color = lerp(color, crust, cooled * 0.85);
+                // 塊の中心ほど明るく、縁は少し暗い（丸みのある塊に見える）。
+                color *= lerp(0.7, 1.1, smoothstep(density, 0.0, d)) * lerp(1.0, 0.85, 1.0 - clot);
+                return half4(color, alpha);
             }
             ENDHLSL
         }

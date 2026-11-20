@@ -245,47 +245,51 @@ namespace Airerage.Editor.Stages
         // パックに黒いラインのない無地の板はないので、同じ板の黒いラインの部分（MI_Trim_03_Dark）を板と同じ明るい材質にした版を使う（Plain）。
         // 2026-11-20 の要望（3 回目。A 版をもとに B 版の一部を採用）: いちばん上は B 版の青い天井の板（下の灰色の帯も青で塗る）、
         // いちばん下の黒いラインの段の 1 つ下は B 版の暗い板とトラスの帯、窓の 1 つ下の段は真ん中から 1 つ外側の区画（x ±18）だけ
-        // B 版の丸い窓の板（黒いラインは塗る）。上から: 青い天井・黒・なし・窓・なし（±18 は丸い窓）・黒・暗い板とトラス・黒。
+        // B 版の丸い窓の板（黒いラインは塗る）。上から: 青い天井・黒・なし・窓・なし（丸い窓）・黒・暗い板とトラス・黒。
+        // 2026-11-20 の要望（4 回目）: 柱を半分にしたので、丸い窓は柱と柱の間のちょうど真ん中（x ±12）に、間の 2 枚の板の境目を
+        // またいで置く（両側は同じ板を半分の幅にして埋める）。
         private const string FlatPanel = "WallAstra_Straight_Flat";
 
         private readonly struct WallRow
         {
             // 下から積む板（短い板は積んで 1 段の高さにする）。Plain は黒いライン（青い天井の板は灰色の帯）を板と同じ材質にする。
-            // AccentBays の区画（x）だけ AccentModel に替える。
+            // AccentCenters（x。柱と柱の間の真ん中）には AccentModel を 1 枚、間の 2 枚の板の境目をまたいで置く（その 2 枚は置かず、
+            // 両側の残りは同じ板を半分の幅にして埋める）。
             public readonly string[] Models;
             public readonly bool Plain;
             public readonly string AccentModel;
-            public readonly float[] AccentBays;
+            public readonly float[] AccentCenters;
 
             public WallRow(bool plain, params string[] models)
             {
                 Models = models;
                 Plain = plain;
                 AccentModel = null;
-                AccentBays = null;
+                AccentCenters = null;
             }
 
-            public WallRow(bool plain, string model, string accentModel, float[] accentBays)
+            public WallRow(bool plain, string model, string accentModel, float[] accentCenters)
             {
                 Models = new[] { model };
                 Plain = plain;
                 AccentModel = accentModel;
-                AccentBays = accentBays;
+                AccentCenters = accentCenters;
             }
 
-            public string[] ModelsAt(float x)
+            // x の区画の板を AccentModel が覆う（その区画にはふつうの板を置かない）か。
+            public bool CoveredByAccent(float x)
             {
-                if (AccentBays != null)
+                if (AccentCenters != null)
                 {
-                    foreach (float bay in AccentBays)
+                    foreach (float center in AccentCenters)
                     {
-                        if (Mathf.Abs(bay - x) < 0.5f)
+                        if (Mathf.Abs(Mathf.Abs(center - x) - Bay * 0.5f) < 0.5f)
                         {
-                            return new[] { AccentModel };
+                            return true;
                         }
                     }
                 }
-                return Models;
+                return false;
             }
         }
 
@@ -294,7 +298,7 @@ namespace Airerage.Editor.Stages
             new WallRow(false, FlatPanel),
             new WallRow(false, "ShortWall_DarkMetal2_Straight", "ShortWall_Triangles_Straight"),
             new WallRow(false, FlatPanel),
-            new WallRow(true, FlatPanel, "WallAstra_Straight_Flat_Window", new[] { -18f, 18f }),
+            new WallRow(true, FlatPanel, "WallAstra_Straight_Flat_Window", new[] { -Bay, Bay }),
             new WallRow(false, "WallWindow_Straight"),
             new WallRow(true, FlatPanel),
             new WallRow(false, FlatPanel),
@@ -328,27 +332,44 @@ namespace Airerage.Editor.Stages
             WallRow[] rows = Rows;
             // 段ごとの高さ（柱をその高さに積む。青い天井の板はほかの段より低い）。
             var rowHeights = new float[rows.Length];
+            // 段の板を x に積んで置く（width は横の幅の倍率。半分の幅の板は 0.5）。
+            void Place(int row, string[] models, float x, float width)
+            {
+                float y = WallBottom + row * height;
+                float rowBottom = y;
+                foreach (string model in models)
+                {
+                    GameObject panel = PlaceAgainstWall(decor, model, new Vector3(x, y, 0f), WidthScaled(scale, width), 13f,
+                        rows[row].Plain ? plain : materials, fallback);
+                    if (panel == null)
+                    {
+                        break;
+                    }
+                    if (rows[row].Plain)
+                    {
+                        panel.name += "_Plain";
+                    }
+                    y += ModelHeight(panel);
+                }
+                rowHeights[row] = Mathf.Max(rowHeights[row], Mathf.Min(height, y - rowBottom));
+            }
             for (int row = 0; row < rows.Length; row++)
             {
                 for (float x = -BayHalfCount * Bay + Bay * 0.5f; x < BayHalfCount * Bay; x += Bay)
                 {
-                    float y = WallBottom + row * height;
-                    float rowBottom = y;
-                    foreach (string model in rows[row].ModelsAt(x))
+                    if (!rows[row].CoveredByAccent(x))
                     {
-                        GameObject panel = PlaceAgainstWall(decor, model, new Vector3(x, y, 0f), Vector3.one * scale, 13f,
-                            rows[row].Plain ? plain : materials, fallback);
-                        if (panel == null)
-                        {
-                            break;
-                        }
-                        if (rows[row].Plain)
-                        {
-                            panel.name += "_Plain";
-                        }
-                        y += ModelHeight(panel);
+                        Place(row, rows[row].Models, x, 1f);
                     }
-                    rowHeights[row] = Mathf.Max(rowHeights[row], Mathf.Min(height, y - rowBottom));
+                }
+                if (rows[row].AccentCenters != null)
+                {
+                    foreach (float center in rows[row].AccentCenters)
+                    {
+                        Place(row, new[] { rows[row].AccentModel }, center, 1f);
+                        Place(row, rows[row].Models, center - Bay * 0.75f, 0.5f);
+                        Place(row, rows[row].Models, center + Bay * 0.75f, 0.5f);
+                    }
                 }
             }
             // 柱（区画の境目 2 つに 1 つ。2026-11-20 の要望: 柱が多すぎるので、ある・ない・ある……と半分に。端と真ん中は立つ）。
@@ -415,6 +436,16 @@ namespace Airerage.Editor.Stages
                 go.transform.position += new Vector3(position.x - bounds.center.x, position.y - bounds.min.y, back - bounds.max.z);
             }
             return go;
+        }
+
+        // 板の大きさ（横の幅だけ width 倍。板は WallYaw で回すので、ワールドの x になる板の軸を縮める）。
+        private static Vector3 WidthScaled(float scale, float width)
+        {
+            Vector3 axis = Quaternion.Inverse(Quaternion.Euler(0f, WallYaw, 0f)) * Vector3.right;
+            return new Vector3(
+                scale * (Mathf.Abs(axis.x) > 0.5f ? width : 1f),
+                scale * (Mathf.Abs(axis.y) > 0.5f ? width : 1f),
+                scale * (Mathf.Abs(axis.z) > 0.5f ? width : 1f));
         }
 
         // 置いた板の高さ（短い板を積むとき、次の板の下の端にする）。
