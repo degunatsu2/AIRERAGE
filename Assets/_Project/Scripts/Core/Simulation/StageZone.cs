@@ -170,6 +170,18 @@ namespace Airerage.Core.Simulation
         public readonly int TravelPeriod;
 
         /// <summary>
+        /// 動く端（行きの前と帰りの前）で止まって待つティック数（TravelPeriod の中に含む。0 なら止まらない）。悪魔の手が端で少し待ち、
+        /// 次に向かう方へ控えめな矢印を出してから動く（2026-11-20 の要望）。
+        /// </summary>
+        public readonly int TravelDwell;
+
+        /// <summary>
+        /// 危険の柱の上の丸み（m。0 なら四角）。柱の上の端から CapHeight の所より上は、横の半径が柱の幅の半分・縦の半径が CapHeight の
+        /// 楕円の内側だけが当たる（溶岩が噴き上がる頭のような丸い形。見た目を自然にして、判定を見た目に合わせる。2026-11-20 の方針）。
+        /// </summary>
+        public readonly float CapHeight;
+
+        /// <summary>
         /// 置いた人のチーム（チーム対戦。THIEF が置いたギミック。1〜4。0 ならステージのギミックかチームなし）。害のある面（危険・吹雪・
         /// 悪魔の手）は、このチームの人に効かない（D-81。ステージのギミックはチームに関係なく全員に効く）。
         /// </summary>
@@ -200,8 +212,11 @@ namespace Airerage.Core.Simulation
         /// <param name="width">危険の柱の幅。</param>
         /// <param name="travel">動く量（行きの分）。</param>
         /// <param name="travelPeriod">1 往復のティック数（0 なら動かない）。</param>
+        /// <param name="travelDwell">動く端で止まって待つティック数（1 往復の中に含む）。</param>
+        /// <param name="capHeight">危険の柱の上の丸みの高さ（m。0 なら四角）。</param>
         public StageZone(StageZoneKind kind, float minX, float minY, float maxX, float maxY, Vector2 direction, float power, float limit,
-            StageZoneTiming timing, Vector2 target, float width = 0f, Vector2 travel = default, int travelPeriod = 0)
+            StageZoneTiming timing, Vector2 target, float width = 0f, Vector2 travel = default, int travelPeriod = 0, int travelDwell = 0,
+            float capHeight = 0f)
         {
             if (!(minX < maxX) || !(minY < maxY))
             {
@@ -248,6 +263,17 @@ namespace Airerage.Core.Simulation
             {
                 width = 0f;
             }
+            if (kind == StageZoneKind.Hazard)
+            {
+                if (capHeight < 0f || float.IsNaN(capHeight) || capHeight > maxY - minY)
+                {
+                    throw new ArgumentException($"危険の柱の上の丸みは 0 以上で、範囲の高さ以下にします（{capHeight}）");
+                }
+            }
+            else
+            {
+                capHeight = 0f;
+            }
             if (travelPeriod < 0 || (travelPeriod > 0 && (float.IsNaN(travel.X) || float.IsNaN(travel.Y) || float.IsInfinity(travel.X)
                 || float.IsInfinity(travel.Y))))
             {
@@ -256,6 +282,11 @@ namespace Airerage.Core.Simulation
             if (travelPeriod == 0)
             {
                 travel = Vector2.Zero;
+                travelDwell = 0;
+            }
+            else if (travelDwell < 0 || travelDwell * 2 >= travelPeriod)
+            {
+                throw new ArgumentException($"動く端で待つ長さは 0 以上で、1 往復の半分より短くします（{travelDwell} / {travelPeriod} ティック）");
             }
             else if (kind == StageZoneKind.Hazard || kind == StageZoneKind.Blizzard || timing.JitterTicks > 0)
             {
@@ -288,6 +319,8 @@ namespace Airerage.Core.Simulation
             Width = width;
             Travel = travel;
             TravelPeriod = travelPeriod;
+            TravelDwell = travelDwell;
+            CapHeight = capHeight;
             OwnerTeam = 0;
         }
 
@@ -307,6 +340,8 @@ namespace Airerage.Core.Simulation
             Width = source.Width;
             Travel = Vector2.Zero;
             TravelPeriod = 0;
+            TravelDwell = 0;
+            CapHeight = source.CapHeight;
             OwnerTeam = source.OwnerTeam;
         }
 
@@ -326,6 +361,8 @@ namespace Airerage.Core.Simulation
             Width = source.Width;
             Travel = source.Travel;
             TravelPeriod = source.TravelPeriod;
+            TravelDwell = source.TravelDwell;
+            CapHeight = source.CapHeight;
             OwnerTeam = ownerTeam;
         }
 
@@ -398,7 +435,10 @@ namespace Airerage.Core.Simulation
             return new StageZone(this, Travel.X * t, Travel.Y * t);
         }
 
-        /// <summary>試合のティック tick の、動く量に対する進み（0〜1。行きで 0→1、帰りで 1→0）。</summary>
+        /// <summary>
+        /// 試合のティック tick の、動く量に対する進み（0〜1。行きで 0→1、帰りで 1→0）。端で待つ（TravelDwell）ときは、1 往復の初めに
+        /// 0 のまま、行きの後に 1 のまま待つ。
+        /// </summary>
         public float OffsetFraction(int tick)
         {
             if (TravelPeriod <= 0)
@@ -406,12 +446,48 @@ namespace Airerage.Core.Simulation
                 return 0f;
             }
             int phase = (int)(((long)tick % TravelPeriod + TravelPeriod) % TravelPeriod);
-            int half = TravelPeriod / 2;
+            int moving = TravelPeriod - TravelDwell * 2;
+            int half = moving / 2;
             if (half <= 0)
             {
                 return 0f;
             }
-            return phase < half ? (float)phase / half : (float)(TravelPeriod - phase) / (TravelPeriod - half);
+            if (phase < TravelDwell)
+            {
+                return 0f;
+            }
+            phase -= TravelDwell;
+            if (phase < half)
+            {
+                return (float)phase / half;
+            }
+            phase -= half;
+            if (phase < TravelDwell)
+            {
+                return 1f;
+            }
+            phase -= TravelDwell;
+            int back = moving - half;
+            return back > 0 ? 1f - Math.Min(1f, (float)phase / back) : 0f;
+        }
+
+        /// <summary>
+        /// 試合のティック tick に端で待っているか（待っていれば、次に動く向き: 行きの前は +1、帰りの前は -1。動いている間は 0）。
+        /// </summary>
+        public int DwellDirection(int tick)
+        {
+            if (TravelPeriod <= 0 || TravelDwell <= 0)
+            {
+                return 0;
+            }
+            int phase = (int)(((long)tick % TravelPeriod + TravelPeriod) % TravelPeriod);
+            int half = (TravelPeriod - TravelDwell * 2) / 2;
+            if (phase < TravelDwell)
+            {
+                return 1;
+            }
+            int endWait = TravelDwell + half;
+            return phase >= endWait && phase < endWait + TravelDwell ? -1 : 0;
         }
 
         /// <summary>試合のティック tick に効いているか（周期のあるギミックだけが止まる）。seed は試合の種（ばらつきのある周期で使う）。</summary>
@@ -483,6 +559,36 @@ namespace Airerage.Core.Simulation
             float fraction = (StageRandom.Hash(seed, Salt, cycle) & 0xFFFFFF) / 16777216f;
             minX = MinX + span * fraction;
             maxX = minX + Width;
+        }
+
+        /// <summary>
+        /// 中心 position、半分の大きさ halfExtents の箱が、危険の柱（横は minX〜maxX、縦は範囲の高さ）と重なるか。上の丸み（CapHeight）が
+        /// あれば、柱の上の端から CapHeight の所より上は、楕円の内側と重なるときだけ当たる。
+        /// </summary>
+        public bool OverlapsColumn(Vector3 position, Vector2 halfExtents, float minX, float maxX)
+        {
+            if (position.X + halfExtents.X < minX || position.X - halfExtents.X > maxX || position.Y + halfExtents.Y < MinY
+                || position.Y - halfExtents.Y > MaxY)
+            {
+                return false;
+            }
+            if (!(CapHeight > 0f))
+            {
+                return true;
+            }
+            float capBottom = MaxY - CapHeight;
+            if (position.Y - halfExtents.Y <= capBottom)
+            {
+                return true;
+            }
+            // 楕円（中心は柱の真ん中・丸みの下の端）に、箱のいちばん近い点が入るか。
+            float centerX = (minX + maxX) * 0.5f;
+            float radiusX = (maxX - minX) * 0.5f;
+            float nearX = Math.Max(position.X - halfExtents.X, Math.Min(centerX, position.X + halfExtents.X));
+            float nearY = Math.Max(position.Y - halfExtents.Y, Math.Min(capBottom, position.Y + halfExtents.Y));
+            float dx = (nearX - centerX) / radiusX;
+            float dy = (nearY - capBottom) / CapHeight;
+            return dx * dx + dy * dy <= 1f;
         }
 
         /// <summary>中心 position、半分の大きさ halfExtents の箱が範囲と重なるか（辺が触れているだけでも重なるとみなす）。</summary>
@@ -599,7 +705,15 @@ namespace Airerage.Core.Simulation
             {
                 c = Travel.Y.CompareTo(other.Travel.Y);
             }
-            return c != 0 ? c : TravelPeriod.CompareTo(other.TravelPeriod);
+            if (c == 0)
+            {
+                c = TravelPeriod.CompareTo(other.TravelPeriod);
+            }
+            if (c == 0)
+            {
+                c = TravelDwell.CompareTo(other.TravelDwell);
+            }
+            return c != 0 ? c : CapHeight.CompareTo(other.CapHeight);
         }
 
         public bool Equals(StageZone other)
@@ -607,7 +721,8 @@ namespace Airerage.Core.Simulation
             return Kind == other.Kind && MinX.Equals(other.MinX) && MinY.Equals(other.MinY) && MaxX.Equals(other.MaxX)
                 && MaxY.Equals(other.MaxY) && Direction.Equals(other.Direction) && Power.Equals(other.Power) && Limit.Equals(other.Limit)
                 && Timing.Equals(other.Timing) && Target.Equals(other.Target) && Width.Equals(other.Width) && Travel.Equals(other.Travel)
-                && TravelPeriod == other.TravelPeriod && OwnerTeam == other.OwnerTeam;
+                && TravelPeriod == other.TravelPeriod && TravelDwell == other.TravelDwell && CapHeight.Equals(other.CapHeight)
+                && OwnerTeam == other.OwnerTeam;
         }
 
         public override bool Equals(object obj)
@@ -618,7 +733,7 @@ namespace Airerage.Core.Simulation
         public override int GetHashCode()
         {
             return HashCode.Combine(HashCode.Combine(Kind, MinX, MinY, MaxX, MaxY, Direction, Power, Limit), Timing, Target, Width, Travel, TravelPeriod,
-                OwnerTeam);
+                HashCode.Combine(TravelDwell, CapHeight, OwnerTeam));
         }
 
         public override string ToString()

@@ -485,7 +485,7 @@ namespace Airerage.Core.Simulation
                 return;
             }
             Vector3 p = state.Position;
-            if (p.X + halfExtents.X < minX || p.X - halfExtents.X > maxX || p.Y + halfExtents.Y < zone.MinY || p.Y - halfExtents.Y > zone.MaxY)
+            if (!zone.OverlapsColumn(p, halfExtents, minX, maxX))
             {
                 return;
             }

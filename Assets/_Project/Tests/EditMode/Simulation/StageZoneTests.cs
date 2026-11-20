@@ -847,5 +847,42 @@ namespace Airerage.Core.Tests.Simulation
             Assert.That(world.GetState(0).Combat.Falls, Is.EqualTo(1), "前提: 撃破された");
             Assert.That(world.GetState(0).JumpPadCount, Is.GreaterThanOrEqualTo(1), "撃破で数が 0 に戻った（表示が増えたことを見逃す）");
         }
+
+        [Test]
+        public void MovingZone_WaitsAtBothEnds_AndTellsWhichWayItGoesNext()
+        {
+            // 2026-11-20 の要望: 悪魔の手は端で少し待ち、次に向かう方へ矢印を出してから動く。1 往復 100 ティック、端で 10 ティック待つ。
+            var zone = new StageZone(StageZoneKind.Grab, -1f, 0f, 1f, 2f, Vector2.UnitY, 1f, 0f, default, new Vector2(0f, 30f), 0f,
+                new Vector2(10f, 0f), 100, 10);
+            Assert.That(zone.OffsetFraction(0), Is.EqualTo(0f), "行きの前で待つ");
+            Assert.That(zone.OffsetFraction(9), Is.EqualTo(0f));
+            Assert.That(zone.DwellDirection(5), Is.EqualTo(1), "次は行き");
+            Assert.That(zone.OffsetFraction(35), Is.EqualTo(0.625f).Within(1e-5f), "行きの途中");
+            Assert.That(zone.DwellDirection(35), Is.EqualTo(0), "動いている間は矢印なし");
+            Assert.That(zone.OffsetFraction(55), Is.EqualTo(1f), "向こうの端で待つ");
+            Assert.That(zone.DwellDirection(55), Is.EqualTo(-1), "次は帰り");
+            Assert.That(zone.OffsetFraction(80), Is.EqualTo(0.5f).Within(1e-5f), "帰りの途中");
+            Assert.That(zone.OffsetFraction(100), Is.EqualTo(0f), "1 往復で元へ");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Grab, -1f, 0f, 1f, 2f, Vector2.UnitY, 1f, 0f, default,
+                new Vector2(0f, 30f), 0f, new Vector2(10f, 0f), 100, 50), "待つ長さが 1 往復の半分以上");
+        }
+
+        [Test]
+        public void HazardColumn_WithARoundedTop_OnlyHitsInsideTheCrown()
+        {
+            // 2026-11-20 の方針（見た目を自然にして、判定を見た目に合わせる）: 柱の上の丸み。幅 6m・高さ 20m、上の 3m が丸い。
+            var zone = new StageZone(StageZoneKind.Hazard, -3f, 0f, 3f, 20f, Vector2.UnitY, 10f, 20f, new StageZoneTiming(60, 30, 0), default,
+                6f, default, 0, 0, 3f);
+            var half = new Vector2(0.4f, 0.4f);
+            Assert.That(zone.OverlapsColumn(new Vector3(0f, 10f, 0f), half, -3f, 3f), Is.True, "柱の真ん中");
+            Assert.That(zone.OverlapsColumn(new Vector3(0f, 20.3f, 0f), half, -3f, 3f), Is.True, "頭のてっぺん");
+            Assert.That(zone.OverlapsColumn(new Vector3(2.9f, 19.9f, 0f), half, -3f, 3f), Is.False, "四角の角（丸みの外）は当たらない");
+            Assert.That(zone.OverlapsColumn(new Vector3(2.9f, 16.5f, 0f), half, -3f, 3f), Is.True, "丸みより下の端は当たる");
+            Assert.That(zone.OverlapsColumn(new Vector3(5f, 10f, 0f), half, -3f, 3f), Is.False, "柱の外");
+            var square = new StageZone(StageZoneKind.Hazard, -3f, 0f, 3f, 20f, Vector2.UnitY, 10f, 20f, new StageZoneTiming(60, 30, 0), default, 6f);
+            Assert.That(square.OverlapsColumn(new Vector3(2.9f, 19.9f, 0f), half, -3f, 3f), Is.True, "丸みのない柱は四角のまま");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Hazard, -3f, 0f, 3f, 20f, Vector2.UnitY, 10f, 20f,
+                new StageZoneTiming(60, 30, 0), default, 6f, default, 0, 0, 25f), "丸みが範囲の高さより高い");
+        }
     }
 }

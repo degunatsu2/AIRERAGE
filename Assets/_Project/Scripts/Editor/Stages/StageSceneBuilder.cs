@@ -308,7 +308,7 @@ namespace Airerage.Editor.Stages
                 authoring.Configure(zone.Kind, zone.Size, zone.Direction, zone.Power, zone.Limit);
                 authoring.ConfigureTiming(zone.PeriodSeconds, zone.ActiveSeconds, zone.PhaseSeconds, zone.JitterSeconds, zone.WarningSeconds);
                 authoring.ConfigureTarget(zone.Target);
-                authoring.ConfigureShape(zone.Width, zone.Travel, zone.TravelSeconds);
+                authoring.ConfigureShape(zone.Width, zone.Travel, zone.TravelSeconds, zone.DwellSeconds, zone.CapHeight);
                 Color color = zone.Color ?? (theme.ZoneColors.TryGetValue(zone.Kind, out Color themed) ? themed : DefaultColor(zone.Kind));
                 var view = go.AddComponent<StageZoneView>();
                 view.Configure(lineMaterial, color);

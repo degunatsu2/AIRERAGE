@@ -84,6 +84,8 @@ namespace Airerage.Editor.Stages
         public float Width;
         public Vector2 Travel;
         public float TravelSeconds;
+        public float DwellSeconds;
+        public float CapHeight;
 
         /// <summary>予告の間に警告音を鳴らすか（危険・吹雪）。</summary>
         public bool WarningSound = true;
@@ -149,6 +151,21 @@ namespace Airerage.Editor.Stages
         {
             Travel = travel;
             TravelSeconds = seconds;
+            return this;
+        }
+
+        /// <summary>travel だけ行って戻る動きにし、両端で dwellSeconds 秒ずつ止まって待つ（1 往復 seconds 秒に含む）。</summary>
+        public ZoneSpec Moving(Vector2 travel, float seconds, float dwellSeconds)
+        {
+            Moving(travel, seconds);
+            DwellSeconds = dwellSeconds;
+            return this;
+        }
+
+        /// <summary>危険の柱の上を丸くする（丸みの高さ m。判定も見た目もこの形。2026-11-20 の方針: 見た目を自然にして判定を合わせる）。</summary>
+        public ZoneSpec Capped(float height)
+        {
+            CapHeight = height;
             return this;
         }
 
