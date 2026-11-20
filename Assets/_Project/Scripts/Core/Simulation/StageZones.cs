@@ -450,8 +450,15 @@ namespace Airerage.Core.Simulation
         /// </summary>
         public static bool HazardColumnAt(in StageZone zone, int tick, int seed, out float minX, out float maxX)
         {
+            return HazardColumnAt(zone, tick, seed, out minX, out maxX, out _);
+        }
+
+        /// <summary>HazardColumnAt と同じ。elapsed は効き始めてからのティック数（落ちてくる物の帯 StageZone.FallBand に使う）。</summary>
+        public static bool HazardColumnAt(in StageZone zone, int tick, int seed, out float minX, out float maxX, out int elapsed)
+        {
             zone.Cycle(tick, seed, out int cycle, out int start, out _);
-            if (cycle < 0 || tick - start >= zone.ActiveTicks)
+            elapsed = tick - start;
+            if (cycle < 0 || elapsed >= zone.ActiveTicks)
             {
                 minX = 0f;
                 maxX = 0f;
@@ -480,12 +487,13 @@ namespace Airerage.Core.Simulation
 
         private static void TryHazard(ref CharacterState state, StageZone zone, Vector2 halfExtents, int tick, int seed, WireTuning wire)
         {
-            if (!HazardColumnAt(zone, tick, seed, out float minX, out float maxX))
+            if (!HazardColumnAt(zone, tick, seed, out float minX, out float maxX, out int elapsed))
             {
                 return;
             }
             Vector3 p = state.Position;
-            if (!zone.OverlapsColumn(p, halfExtents, minX, maxX))
+            bool hit = zone.FallLength > 0f ? zone.OverlapsFallBand(p, halfExtents, minX, maxX, elapsed) : zone.OverlapsColumn(p, halfExtents, minX, maxX);
+            if (!hit)
             {
                 return;
             }

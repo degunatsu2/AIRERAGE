@@ -182,6 +182,13 @@ namespace Airerage.Core.Simulation
         public readonly float CapHeight;
 
         /// <summary>
+        /// 危険の柱が「落ちてくる物」のとき、その物の長さ（m。0 ならふつうの柱で、効いている間は柱の全体が当たる）。効いている間、長さ
+        /// FallLength の帯が範囲の上の端から下の端まで、だんだん速く（重力のように）落ちていき、その帯の所だけが当たる（つららが落ちる。
+        /// 見た目を自然にして、判定を見た目に合わせる。2026-11-20 の方針）。帯の位置は FallBand。
+        /// </summary>
+        public readonly float FallLength;
+
+        /// <summary>
         /// 置いた人のチーム（チーム対戦。THIEF が置いたギミック。1〜4。0 ならステージのギミックかチームなし）。害のある面（危険・吹雪・
         /// 悪魔の手）は、このチームの人に効かない（D-81。ステージのギミックはチームに関係なく全員に効く）。
         /// </summary>
@@ -214,9 +221,10 @@ namespace Airerage.Core.Simulation
         /// <param name="travelPeriod">1 往復のティック数（0 なら動かない）。</param>
         /// <param name="travelDwell">動く端で止まって待つティック数（1 往復の中に含む）。</param>
         /// <param name="capHeight">危険の柱の上の丸みの高さ（m。0 なら四角）。</param>
+        /// <param name="fallLength">危険の柱が落ちてくる物のとき、その長さ（m。0 ならふつうの柱）。</param>
         public StageZone(StageZoneKind kind, float minX, float minY, float maxX, float maxY, Vector2 direction, float power, float limit,
             StageZoneTiming timing, Vector2 target, float width = 0f, Vector2 travel = default, int travelPeriod = 0, int travelDwell = 0,
-            float capHeight = 0f)
+            float capHeight = 0f, float fallLength = 0f)
         {
             if (!(minX < maxX) || !(minY < maxY))
             {
@@ -269,10 +277,15 @@ namespace Airerage.Core.Simulation
                 {
                     throw new ArgumentException($"危険の柱の上の丸みは 0 以上で、範囲の高さ以下にします（{capHeight}）");
                 }
+                if (fallLength < 0f || float.IsNaN(fallLength) || fallLength > maxY - minY)
+                {
+                    throw new ArgumentException($"落ちてくる物の長さは 0 以上で、範囲の高さ以下にします（{fallLength}）");
+                }
             }
             else
             {
                 capHeight = 0f;
+                fallLength = 0f;
             }
             if (travelPeriod < 0 || (travelPeriod > 0 && (float.IsNaN(travel.X) || float.IsNaN(travel.Y) || float.IsInfinity(travel.X)
                 || float.IsInfinity(travel.Y))))
@@ -321,6 +334,7 @@ namespace Airerage.Core.Simulation
             TravelPeriod = travelPeriod;
             TravelDwell = travelDwell;
             CapHeight = capHeight;
+            FallLength = fallLength;
             OwnerTeam = 0;
         }
 
@@ -342,6 +356,7 @@ namespace Airerage.Core.Simulation
             TravelPeriod = 0;
             TravelDwell = 0;
             CapHeight = source.CapHeight;
+            FallLength = source.FallLength;
             OwnerTeam = source.OwnerTeam;
         }
 
@@ -363,6 +378,7 @@ namespace Airerage.Core.Simulation
             TravelPeriod = source.TravelPeriod;
             TravelDwell = source.TravelDwell;
             CapHeight = source.CapHeight;
+            FallLength = source.FallLength;
             OwnerTeam = ownerTeam;
         }
 
@@ -591,6 +607,32 @@ namespace Airerage.Core.Simulation
             return dx * dx + dy * dy <= 1f;
         }
 
+        /// <summary>
+        /// 落ちてくる物（FallLength）の、効き始めてから elapsed ティック目の帯（下の端 bottom・上の端 top）。効いている間に、物の上の端が
+        /// 範囲の上の端から、下の端（物の先）が範囲の下の端に着くまで、進みの 2 乗で（だんだん速く）落ちる。FallLength が 0 なら柱の全体。
+        /// </summary>
+        public void FallBand(int elapsed, out float bottom, out float top)
+        {
+            if (!(FallLength > 0f))
+            {
+                bottom = MinY;
+                top = MaxY;
+                return;
+            }
+            float progress = ActiveTicks > 0 ? Math.Min(1f, (elapsed + 1) / (float)ActiveTicks) : 1f;
+            float drop = (MaxY - MinY - FallLength) * progress * progress;
+            top = MaxY - drop;
+            bottom = top - FallLength;
+        }
+
+        /// <summary>中心 position、半分の大きさ halfExtents の箱が、落ちてくる物の帯（FallBand）と、横は minX〜maxX で重なるか。</summary>
+        public bool OverlapsFallBand(Vector3 position, Vector2 halfExtents, float minX, float maxX, int elapsed)
+        {
+            FallBand(elapsed, out float bottom, out float top);
+            return position.X + halfExtents.X >= minX && position.X - halfExtents.X <= maxX
+                && position.Y + halfExtents.Y >= bottom && position.Y - halfExtents.Y <= top;
+        }
+
         /// <summary>中心 position、半分の大きさ halfExtents の箱が範囲と重なるか（辺が触れているだけでも重なるとみなす）。</summary>
         public bool Overlaps(Vector3 position, Vector2 halfExtents)
         {
@@ -713,7 +755,11 @@ namespace Airerage.Core.Simulation
             {
                 c = TravelDwell.CompareTo(other.TravelDwell);
             }
-            return c != 0 ? c : CapHeight.CompareTo(other.CapHeight);
+            if (c == 0)
+            {
+                c = CapHeight.CompareTo(other.CapHeight);
+            }
+            return c != 0 ? c : FallLength.CompareTo(other.FallLength);
         }
 
         public bool Equals(StageZone other)
@@ -722,6 +768,7 @@ namespace Airerage.Core.Simulation
                 && MaxY.Equals(other.MaxY) && Direction.Equals(other.Direction) && Power.Equals(other.Power) && Limit.Equals(other.Limit)
                 && Timing.Equals(other.Timing) && Target.Equals(other.Target) && Width.Equals(other.Width) && Travel.Equals(other.Travel)
                 && TravelPeriod == other.TravelPeriod && TravelDwell == other.TravelDwell && CapHeight.Equals(other.CapHeight)
+                && FallLength.Equals(other.FallLength)
                 && OwnerTeam == other.OwnerTeam;
         }
 
@@ -733,7 +780,7 @@ namespace Airerage.Core.Simulation
         public override int GetHashCode()
         {
             return HashCode.Combine(HashCode.Combine(Kind, MinX, MinY, MaxX, MaxY, Direction, Power, Limit), Timing, Target, Width, Travel, TravelPeriod,
-                HashCode.Combine(TravelDwell, CapHeight, OwnerTeam));
+                HashCode.Combine(TravelDwell, CapHeight, FallLength, OwnerTeam));
         }
 
         public override string ToString()

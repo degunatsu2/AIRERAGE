@@ -884,5 +884,27 @@ namespace Airerage.Core.Tests.Simulation
             Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Hazard, -3f, 0f, 3f, 20f, Vector2.UnitY, 10f, 20f,
                 new StageZoneTiming(60, 30, 0), default, 6f, default, 0, 0, 25f), "丸みが範囲の高さより高い");
         }
+
+        [Test]
+        public void FallingHazard_OnlyHitsWhereTheFallingPieceIs_AndSpeedsUp()
+        {
+            // 2026-11-20 の方針: つららは落ちてくる氷柱の所だけ当たる。高さ 5m（y -3〜2）、長さ 1.5m、効いている 30 ティックで落ちる。
+            var zone = new StageZone(StageZoneKind.Hazard, -10f, -3f, 10f, 2f, -Vector2.UnitY, 10f, 15f, new StageZoneTiming(120, 30, 0), default,
+                1.6f, default, 0, 0, 0f, 1.5f);
+            zone.FallBand(0, out float bottom0, out float top0);
+            Assert.That(top0, Is.EqualTo(2f).Within(0.05f), "初めは天井から下がっている");
+            Assert.That(top0 - bottom0, Is.EqualTo(1.5f).Within(1e-4f));
+            zone.FallBand(29, out float bottomEnd, out float topEnd);
+            Assert.That(bottomEnd, Is.EqualTo(-3f).Within(1e-4f), "最後に先が床に着く");
+            zone.FallBand(14, out _, out float topMid);
+            Assert.That(2f - topMid, Is.LessThan((2f - topEnd) * 0.5f), "だんだん速く落ちる（半分の時間では半分も落ちていない）");
+            var half = new Vector2(0.4f, 0.5f);
+            Assert.That(zone.OverlapsFallBand(new Vector3(0f, -2.5f, 0f), half, -0.8f, 0.8f, 0), Is.False, "落ち始めは床の人に当たらない");
+            Assert.That(zone.OverlapsFallBand(new Vector3(0f, -2.5f, 0f), half, -0.8f, 0.8f, 29), Is.True, "床に着いたときは当たる");
+            Assert.That(zone.OverlapsFallBand(new Vector3(0f, 1.2f, 0f), half, -0.8f, 0.8f, 0), Is.True, "天井の近くは落ち始めに当たる");
+            Assert.That(zone.OverlapsFallBand(new Vector3(2f, 1.2f, 0f), half, -0.8f, 0.8f, 0), Is.False, "柱の横の外は当たらない");
+            Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Hazard, -10f, -3f, 10f, 2f, -Vector2.UnitY, 10f, 15f,
+                new StageZoneTiming(120, 30, 0), default, 1.6f, default, 0, 0, 0f, 6f), "物の長さが範囲の高さより長い");
+        }
     }
 }

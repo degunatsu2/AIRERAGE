@@ -44,6 +44,8 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private float _dwellSeconds;
         [Tooltip("危険の柱の上の丸みの高さ（m。0 なら四角）")]
         [SerializeField] private float _capHeight;
+        [Tooltip("危険の柱が落ちてくる物のとき、その長さ（m。0 ならふつうの柱）")]
+        [SerializeField] private float _fallLength;
 
         public StageZoneKind Kind => _kind;
 
@@ -74,8 +76,9 @@ namespace Airerage.Runtime.Simulation
         }
 
         /// <summary>危険の柱の幅と、動き（行きの量と 1 往復の秒数）を決める（シーンのビルダー用）。</summary>
-        public void ConfigureShape(float width, Vector2 travel, float travelSeconds, float dwellSeconds = 0f, float capHeight = 0f)
+        public void ConfigureShape(float width, Vector2 travel, float travelSeconds, float dwellSeconds = 0f, float capHeight = 0f, float fallLength = 0f)
         {
+            _fallLength = fallLength;
             _width = width;
             _travel = travel;
             _travelSeconds = travelSeconds;
@@ -113,6 +116,7 @@ namespace Airerage.Runtime.Simulation
             _travelSeconds = 0f;
             _dwellSeconds = 0f;
             _capHeight = zone.CapHeight;
+            _fallLength = zone.FallLength;
         }
 
         /// <summary>Core のギミックにする。値が不正なら ArgumentException。</summary>
@@ -125,7 +129,7 @@ namespace Airerage.Runtime.Simulation
                 SimTime.SecondsToTicks(_phaseSeconds), SimTime.SecondsToTicks(_jitterSeconds), SimTime.SecondsToTicks(_warningSeconds));
             return new StageZone(_kind, center.x - half.x, center.y - half.y, center.x + half.x, center.y + half.y, direction, _power, _limit,
                 timing, new System.Numerics.Vector2(_target.x, _target.y), _width, new System.Numerics.Vector2(_travel.x, _travel.y),
-                SimTime.SecondsToTicks(_travelSeconds), SimTime.SecondsToTicks(_dwellSeconds), _capHeight);
+                SimTime.SecondsToTicks(_travelSeconds), SimTime.SecondsToTicks(_dwellSeconds), _capHeight, _fallLength);
         }
 
         /// <summary>
