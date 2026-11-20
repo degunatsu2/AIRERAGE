@@ -11,9 +11,9 @@ Shader "Airerage/LavaJet"
 {
     Properties
     {
-        [HDR] _HotColor ("Hot core (yellow)", Color) = (2.6, 1.55, 0.35, 1)
-        [HDR] _WarmColor ("Warm (orange)", Color) = (2.0, 0.6, 0.08, 1)
-        [HDR] _CoolColor ("Cool (red)", Color) = (0.85, 0.12, 0.03, 1)
+        [HDR] _HotColor ("Hot core (yellow)", Color) = (2.0, 1.05, 0.2, 1)
+        [HDR] _WarmColor ("Warm (orange)", Color) = (1.7, 0.45, 0.06, 1)
+        [HDR] _CoolColor ("Cool (red)", Color) = (0.75, 0.1, 0.025, 1)
         _CrustColor ("Cooled crust (dark)", Color) = (0.07, 0.03, 0.02, 1)
         _BaseWidth ("Width at the vent (fraction)", Range(0.1, 1)) = 0.5
         _Crown ("Crown height (fraction of the height)", Range(0, 0.5)) = 0.1
@@ -116,13 +116,15 @@ Shader "Airerage/LavaJet"
                     for (int x = -1; x <= 1; x++)
                     {
                         float2 offset = float2(x, y);
-                        float2 h = Hash22(cell + offset + _Seed);
+                        float2 c = cell + offset;
+                        c.y -= 256.0 * floor(c.y / 256.0);
+                        float2 h = Hash22(c + _Seed);
                         float2 d = offset + 0.15 + h * 0.7 - f;
                         float distance = dot(d, d);
                         if (distance < best)
                         {
                             best = distance;
-                            id = Hash21(cell + offset + _Seed * 3.1);
+                            id = Hash21(c + _Seed * 3.1);
                         }
                     }
                 }
@@ -140,7 +142,8 @@ Shader "Airerage/LavaJet"
             half4 Frag(Varyings input) : SV_Target
             {
                 float2 uv = input.uv;
-                float t = _Time.y;
+                // 時間は 10 分でくり返す（大きな値で雑音の乱数が崩れない）。
+                float t = fmod(_Time.y, 600.0);
                 float top = max(_Rise, 0.001);
                 float v = uv.y / top;
                 // 横の幅: 火口で細く、すぐに柱の幅いっぱいへ。
@@ -163,13 +166,14 @@ Shader "Airerage/LavaJet"
                 float d2 = Cells(p * 1.9 + float2(3.7, -t * _Speed * 0.6), id2);
                 // 芯ほど塊が詰まり、外と上ほどまばら（塊が小さく、間が空く）。
                 float core = saturate(1.0 - shape);
-                float density = lerp(0.18, 0.46, core) * lerp(1.0, 0.7, smoothstep(0.6, 1.0, v));
+                float density = lerp(0.24, 0.56, core) * lerp(1.0, 0.72, smoothstep(0.6, 1.0, v));
                 float clot = smoothstep(density, density - 0.12, d);
                 float small = smoothstep(density * 0.8, density * 0.8 - 0.1, d2) * 0.8;
                 clot = max(clot, small * step(0.35, core));
                 // 塊の間の薄い光るしぶき（芯と火口ほど濃い）。
                 float spray = Fbm(float2(uv.x * 9.0 + _Seed, uv.y * _Aspect * 1.6 - t * _Speed * 0.5));
-                float haze = saturate(core * 1.4) * (0.25 + spray * 0.35) * (1.0 - v * 0.55);
+                float jet = 1.0 - smoothstep(0.05, 0.4, v);
+                float haze = saturate(core * 1.4) * (0.3 + spray * 0.4 + jet * 0.45) * (1.0 - v * 0.6);
                 float edgeFade = 1.0 - smoothstep(0.85, 1.08, shape);
                 float alpha = saturate(max(clot, haze)) * edgeFade;
                 if (alpha <= 0.003)

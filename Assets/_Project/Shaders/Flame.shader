@@ -97,15 +97,21 @@ Shader "Airerage/Flame"
             // 放射の炎（_Radial 1）: 真ん中から外へ押し出される炎の塊（カメラの方へ噴き出す炎を正面から見た形。2026-11-20 の要望:
             // オーブンの奥から火が勢いよく噴き出す。手本はバックドラフトの映像: 炎の塊が渦を巻きながらふくらみ、縁は黒ずんだ赤の舌に
             // ちぎれる。白く飛ばない）。ゆがめた雑音を外へ流して渦を作り、尾根の形（1 - |2n - 1|）で炎の舌の筋を出す。
+            // 外へ流す雑音は、ずらす量が時間とともに大きくなると角度の方向に細かくちぎれて放射状の細い線になる（1 回目の撮影の不具合）。
+            // ずらす量を 0〜1 でくり返す 2 つの位相を、半周期ずらして交互に重ねる（フローマップの手法）。
             half4 Radial(float2 uv)
             {
-                float t = _Time.y * _Speed;
+                float t = fmod(_Time.y, 600.0) * _Speed;
                 float2 p = uv * 2.0 - 1.0;
                 float r = length(p);
                 float2 dir = p / max(r, 1e-3);
                 float2 q = p * _NoiseScale * 0.7;
                 float2 warp = float2(Fbm(q * 0.8 + float2(t * 0.35, _Seed)), Fbm(q * 0.8 + float2(_Seed * 1.3, -t * 0.35))) - 0.5;
-                float n = Fbm(q - dir * t * 1.2 + warp * 1.8 + _Seed);
+                float phase1 = frac(t * 0.45);
+                float phase2 = frac(t * 0.45 + 0.5);
+                float n1 = Fbm(q - dir * phase1 * 2.4 + warp * 1.8 + _Seed);
+                float n2 = Fbm(q - dir * phase2 * 2.4 + warp * 1.8 + _Seed + 17.3);
+                float n = lerp(n1, n2, abs(phase1 * 2.0 - 1.0));
                 float ridge = 1.0 - abs(n * 2.0 - 1.0);
                 float heat = (1.0 - r * 1.2) + (n - 0.5) * 1.1 + ridge * 0.22;
                 heat = saturate(heat);
@@ -122,7 +128,7 @@ Shader "Airerage/Flame"
                 {
                     return Radial(uv);
                 }
-                float t = _Time.y * _Speed;
+                float t = fmod(_Time.y, 600.0) * _Speed;
                 // 根元から先へ流れる雑音（先ほど細かく速い）。
                 float2 p = float2(uv.x * _NoiseScale + _Seed * 13.1, uv.y * _NoiseScale * 1.4 - t * 2.2);
                 float n = Fbm(p);

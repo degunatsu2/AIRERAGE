@@ -561,10 +561,11 @@ namespace Airerage.Editor.Stages
             float lipY = -size.y * 0.5f + size.y * 0.8f;
             // 奥から手前へふくらむ炎の塊（放射の板。奥ほど小さく明るい）。
             // 重ねすぎると白く飛ぶので 3 枚（足し算）。奥ほど小さく濃い。
-            (float Z, float Diameter, float Intensity)[] bursts = { (9f, 9f, 0.6f), (5.5f, 13f, 0.45f), (2f, 17f, 0.32f) };
+            // 口を出た炎は上へ昇る（手前の塊ほど上へずれる）。いちばん手前は判定の範囲（口の下から上の端まで）を覆う。
+            (float Z, float Diameter, float Intensity)[] bursts = { (9f, 9f, 0.6f), (5.5f, 13f, 0.48f), (2f, 17f, 0.4f) };
             for (int i = 0; i < bursts.Length; i++)
             {
-                GameObject disc = decor.Quad($"Burst{i + 1}", flames, new Vector3(0f, mouthY + i * 0.5f, bursts[i].Z), new Vector2(bursts[i].Diameter / width, bursts[i].Diameter),
+                GameObject disc = decor.Quad($"Burst{i + 1}", flames, new Vector3(0f, mouthY + i * 1.2f, bursts[i].Z), new Vector2(bursts[i].Diameter / width, bursts[i].Diameter),
                     FlameMaterial($"Flame{zone.Name}Burst{i + 1}", bursts[i].Intensity, i * 4.3f, decor.Folder, true));
                 disc.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
             }
@@ -573,7 +574,7 @@ namespace Airerage.Editor.Stages
             {
                 float height = (size.y * 0.5f - lipY + 1f) * (1f - i * 0.15f);
                 decor.Quad($"Rollover{i + 1}", flames, new Vector3(0f, lipY + height * 0.45f, 4.5f - i * 2f), new Vector2(0.92f - i * 0.12f, height),
-                    FlameMaterial($"Flame{zone.Name}Roll{i + 1}", 0.55f - i * 0.1f, 20f + i * 3.1f, decor.Folder, false));
+                    FlameMaterial($"Flame{zone.Name}Roll{i + 1}", 0.7f - i * 0.12f, 20f + i * 3.1f, decor.Folder, false));
             }
             // 粒: 手前へ飛び散る火の粉（効き始めに一度にも）、上に昇る黒い煙。予告の間は、扉の隙間からの煙と少しの火の粉。
             var fx = new GameObject("FireFx").transform;
@@ -624,6 +625,11 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_Aspect", size.y / width);
                 m.SetFloat("_Clots", clots);
                 m.SetFloat("_Speed", speed);
+                // 温度の色（白く飛ばさない。芯も黄色まで）。
+                m.SetColor("_HotColor", new Color(2f, 1.05f, 0.2f));
+                m.SetColor("_WarmColor", new Color(1.7f, 0.45f, 0.06f));
+                m.SetColor("_CoolColor", new Color(0.75f, 0.1f, 0.025f));
+                m.SetColor("_CrustColor", new Color(0.07f, 0.03f, 0.02f));
             }, decor.Folder);
             decor.Quad("Jet", lava, new Vector3(0f, 0f, -0.4f), new Vector2(1f, size.y), Jet($"LavaJet{zone.Name}", 1.7f, width / 1.1f, 14f))
                 .GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
