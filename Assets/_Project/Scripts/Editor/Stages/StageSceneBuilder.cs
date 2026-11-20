@@ -308,6 +308,7 @@ namespace Airerage.Editor.Stages
                 authoring.Configure(zone.Kind, zone.Size, zone.Direction, zone.Power, zone.Limit);
                 authoring.ConfigureTiming(zone.PeriodSeconds, zone.ActiveSeconds, zone.PhaseSeconds, zone.JitterSeconds, zone.WarningSeconds);
                 authoring.ConfigureTarget(zone.Target);
+                authoring.ConfigureElectric(zone.Electric);
                 authoring.ConfigureShape(zone.Width, zone.Travel, zone.TravelSeconds, zone.DwellSeconds, zone.CapHeight, zone.FallLength);
                 Color color = zone.Color ?? (theme.ZoneColors.TryGetValue(zone.Kind, out Color themed) ? themed : DefaultColor(zone.Kind));
                 var view = go.AddComponent<StageZoneView>();
@@ -328,7 +329,8 @@ namespace Airerage.Editor.Stages
                     view.ConfigureMoving(propParent);
                 }
                 GameObject active = CreateProp(propParent, go.transform, zone, color, decor);
-                bool periodic = zone.PeriodSeconds > 0f;
+                // いつも効いている危険（周期と効く長さが同じ。プラズマ球）は、いつも出しておく。
+                bool periodic = zone.PeriodSeconds > 0f && zone.ActiveSeconds < zone.PeriodSeconds;
                 if (zone.Kind == StageZoneKind.Gust || zone.Kind == StageZoneKind.Hazard || zone.Kind == StageZoneKind.Blizzard
                     || (zone.Kind == StageZoneKind.Launcher && periodic))
                 {
@@ -352,21 +354,15 @@ namespace Airerage.Editor.Stages
                 case StageZoneKind.SpeedLane:
                     return decor.Box("Lane", parent, new Vector3(0f, -size.y * 0.5f + 0.05f, 0f), new Vector3(size.x, 0.1f, 2.4f),
                         decor.Lit(kind, Color.Lerp(color, Color.black, 0.75f)));
+                case StageZoneKind.Launcher when zone.Look == StageZoneView.ZoneLook.Toaster:
+                    return CreateToaster(parent, root, zone, decor);
                 case StageZoneKind.Launcher:
                     if (zone.PeriodSeconds > 0f)
                     {
                         return CreateGeyser(parent, root, zone, color, decor);
                     }
-                    if (zone.Look == StageZoneView.ZoneLook.Steam)
-                    {
-                        return CreateFumarole(parent, zone, decor);
-                    }
                     return decor.Box("Vent", parent, new Vector3(0f, -size.y * 0.5f + 0.15f, 0f), new Vector3(size.x, 0.3f, 1.8f),
                         decor.Lit(kind, Color.Lerp(color, Color.black, 0.4f)));
-                case StageZoneKind.Bumper when zone.Look == StageZoneView.ZoneLook.Plasma:
-                    return CreatePlasmaGlobe(parent, zone, decor);
-                case StageZoneKind.Bumper when zone.Look == StageZoneView.ZoneLook.MagmaRock:
-                    return CreateVolcanicBomb(parent, zone, decor);
                 case StageZoneKind.Bumper:
                     // 正方形の範囲は球（噴石など）、長方形は板（看板など）。
                     var bodySize = new Vector3(size.x * 0.9f, size.y * 0.9f, Mathf.Min(size.x, size.y) * 0.9f);
@@ -380,7 +376,8 @@ namespace Airerage.Editor.Stages
                 case StageZoneKind.Updraft:
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, 1f), size, decor.Transparent(kind, WithAlpha(color, 0.12f)));
                 case StageZoneKind.Gust when zone.Look == StageZoneView.ZoneLook.Steam:
-                    return CreateKettleSteam(parent, root, zone, decor);
+                    // 周期のある湯気（やかん）と、いつも噴く噴気（噴気孔。とても強い風。2026-11-20 の要望）。
+                    return zone.PeriodSeconds > 0f ? CreateKettleSteam(parent, root, zone, decor) : CreateFumarole(parent, zone, decor);
                 case StageZoneKind.Gust when IsSteadyDraft(zone):
                     // いつも吹いている縦の風は、上昇気流と同じ見た目（StageZoneView も同じ筋を流す。ユーザーの要望、2026-10-29）。
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, 1f), size, decor.Transparent(kind + "Draft", WithAlpha(color, 0.12f)));
@@ -413,6 +410,18 @@ namespace Airerage.Editor.Stages
                     if (zone.Look == StageZoneView.ZoneLook.Icicle)
                     {
                         return CreateIcicles(parent, root, zone, decor);
+                    }
+                    if (zone.Look == StageZoneView.ZoneLook.Plasma)
+                    {
+                        return CreatePlasmaGlobe(parent, zone, decor);
+                    }
+                    if (zone.Look == StageZoneView.ZoneLook.MagmaRock)
+                    {
+                        return CreateRollingBomb(parent, root, zone, decor);
+                    }
+                    if (zone.Look == StageZoneView.ZoneLook.Laser)
+                    {
+                        return CreateLaserGrid(parent, root, zone, decor);
                     }
                     // 幅 1 の柱の板（StageZoneView が周期ごとの柱の位置と幅に合わせる）。
                     return decor.Quad("Column", parent, new Vector3(0f, 0f, -0.5f), new Vector2(1f, size.y), decor.Transparent(kind, WithAlpha(color, 0.78f)));
@@ -669,7 +678,8 @@ namespace Airerage.Editor.Stages
         }
 
         // やかんの湯気（風 + ZoneLook.Steam。2026-11-20 の方針: 注ぎ口のすぐ外は見えず〈湯気はまだ気体〉、少し上で冷えて白い湯気になり、
-        // ふくらみながら昇って薄れる）。判定は風の範囲（幅 2m）のまま。湯気の幅も上で範囲の幅くらい。
+        // ふくらみながら昇って薄れる）。湯気は注ぎ口の先（ZoneSpec.Source）から出し、判定の風の範囲も注ぎ口の先から上（2026-11-20 の指摘:
+        // 湯気が地面から生えている）。湯気の幅も上で範囲の幅くらい。
         private static GameObject CreateKettleSteam(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
         {
             Vector2 size = zone.Size;
@@ -677,9 +687,11 @@ namespace Airerage.Editor.Stages
             visual.transform.SetParent(parent, false);
             var fx = new GameObject("SteamFx").transform;
             fx.SetParent(root, false);
-            Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
+            // 注ぎ口の先から、風の向き（注ぎ口の向きに少し傾けて上へ）に出す。
+            Vector2 direction = zone.Direction.normalized;
+            Quaternion up = Quaternion.LookRotation(new Vector3(direction.x, direction.y, 0f), Vector3.back);
             float speed = size.y / 1.6f;
-            var spout = new Vector3(0f, -size.y * 0.5f, 0f);
+            Vector3 spout = zone.LocalSource;
             ParticleSystem steam = new ParticleFx
             {
                 Name = "Steam", LifetimeMin = 1.4f, LifetimeMax = 2f, SpeedMin = speed * 0.7f, SpeedMax = speed, SizeMin = 0.25f, SizeMax = 0.45f,
@@ -777,12 +789,13 @@ namespace Airerage.Editor.Stages
             return visual;
         }
 
-        // プラズマ球（跳ね返す物 + ZoneLook.Plasma。2026-11-20 の方針: 手本はプラズマボール。ガラスの球の真ん中の電極から、気体が光る
-        // 細い筋がガラスへ伸び、熱でゆらゆら昇る〈PlasmaGlobeView〉。色は封入した気体の色〈ネオンの赤紫と、アルゴンなどの青紫〉）。
-        // ガラス・ほのかに光る中の気体・電極・下の金属の台。判定は跳ね返す範囲（球はその範囲に収まる）。
+        // プラズマ球（いつも効く電気の危険 + ZoneLook.Plasma。2026-11-20 の方針: 手本はプラズマボール。ガラスの球の真ん中の電極から、
+        // 気体が光る細い筋がガラスへ伸び、熱でゆらゆら昇る〈PlasmaGlobeView〉。色は封入した気体の色〈ネオンの赤紫と、アルゴンなどの
+        // 青紫〉。黒い台に載る）。ガラス・ほのかに光る中の気体・電極・黒い台。判定はガラスの球（範囲の上の丸み CapHeight が球の上半分。
+        // 2026-11-20 の要望: 触れるとダメージ・真ん中にワイヤーがつながる）。
         private static GameObject CreatePlasmaGlobe(Transform parent, ZoneSpec zone, StageDecor decor)
         {
-            float radius = Mathf.Min(zone.Size.x, zone.Size.y) * 0.45f;
+            float radius = Mathf.Min(zone.Size.x, zone.Size.y) * 0.5f;
             var globe = new GameObject("PlasmaGlobe").transform;
             globe.SetParent(parent, false);
             decor.Sphere("Glass", globe, Vector3.zero, Vector3.one * radius * 2f, decor.Transparent("PlasmaGlass", new Color(0.75f, 0.8f, 1f, 0.16f)));
@@ -802,11 +815,17 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_Intensity", 3f);
             }, decor.Folder);
             decor.Sphere("Electrode", globe, Vector3.zero, Vector3.one * radius * 0.32f, electrode);
-            Material metal = decor.Lit("PlasmaBase", new Color(0.18f, 0.19f, 0.22f));
+            Material metal = decor.Lit("PlasmaBase", new Color(0.05f, 0.05f, 0.06f));
             metal.SetFloat("_Smoothness", 0.75f);
             metal.SetFloat("_Metallic", 0.8f);
-            decor.Cylinder("Base", globe, new Vector3(0f, -radius * 1.02f, 0f), new Vector3(radius * 0.9f, radius * 0.12f, radius * 0.9f), metal);
-            decor.Cylinder("Stem", globe, new Vector3(0f, -radius * 0.65f, 0f), new Vector3(radius * 0.12f, radius * 0.3f, radius * 0.12f), metal);
+            // 黒い台（下ほど広い円錐台。ガラスの球の下の端が少し沈む）と、台の上の首。台の下の端は柱の上面（LabStage.PlasmaBaseHeight）。
+            float neck = -radius * 0.92f;
+            ProceduralMesh.Place("Base", globe, ProceduralMesh.Lathe("Lab", "PlasmaBase", new[]
+            {
+                new Vector2(0.62f, 0f), new Vector2(0.6f, 0.08f), new Vector2(0.48f, 0.3f), new Vector2(0.36f, 0.42f), new Vector2(0.3f, 0.45f),
+                new Vector2(0f, 0.45f),
+            }, 24), new Vector3(0f, neck - 0.45f, 0f), Quaternion.identity, Vector3.one, metal);
+            decor.Cylinder("Stem", globe, new Vector3(0f, -radius * 0.55f, 0f), new Vector3(radius * 0.12f, radius * 0.38f, radius * 0.12f), metal);
             Material line = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("PlasmaFilament", "Airerage/GlowLine", m =>
             {
                 m.SetFloat("_Intensity", 3f);
@@ -816,41 +835,278 @@ namespace Airerage.Editor.Stages
             return globe.gameObject;
         }
 
-        // 噴石（跳ね返す物 + ZoneLook.MagmaRock。2026-11-20 の方針: 手本は USGS のパン皮状火山弾。冷えた皮がひび割れ、割れ目の奥がまだ
-        // 赤く光る〈Airerage/MagmaRock〉）。少しいびつな塊に、昇る火の粉と熱い煙。判定は跳ね返す範囲（塊はその範囲に収まる）。
-        private static GameObject CreateVolcanicBomb(Transform parent, ZoneSpec zone, StageDecor decor)
+        // 転がる噴石（危険 + ZoneLook.MagmaRock。2026-11-20 の要望と方針: 奥の山から手前へ転がってくる。手本は、噴火で弾道を描いて飛ぶ
+        // 火山弾〈USGS の用語集・UNDRR〉と、斜面を落ちる岩〈落石の研究: 自由落下・跳ね・転がり・滑りを組み合わせ、斜面に当たるたびに
+        // 跳ね返る〉。噴石の見た目は USGS のパン皮状火山弾〈冷えた皮がひび割れ、割れ目の奥がまだ赤く光る。Airerage/MagmaRock〉）。
+        // 動きは RollingBombView（予告で尾根の上に警告の記号と土煙 → 尾根の向こうから飛び出す → 斜面で跳ねて転がる → 跳ねて遊ぶ面を
+        // 横切る）。判定は遊ぶ面を横切る所（柱の範囲。噴石の大きさ）だけ。奥の地面の高さ（ZoneSpec.Backdrop）を格子に焼いて渡す。
+        // 返す物（効いている間だけ出す物）は空（噴石は予告の間も動くので、RollingBombView が出し入れする）。
+        private static GameObject CreateRollingBomb(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
         {
-            float diameter = Mathf.Min(zone.Size.x, zone.Size.y) * 0.9f;
-            var bomb = new GameObject("VolcanicBomb").transform;
-            bomb.SetParent(parent, false);
+            float radius = zone.Size.y * 0.5f;
+            var crossing = new GameObject("BombCrossing");
+            crossing.transform.SetParent(parent, false);
+            var rig = new GameObject("RollingBombRig").transform;
+            rig.SetParent(root, false);
+            var bomb = new GameObject("Bomb").transform;
+            bomb.SetParent(rig, false);
             Material crust = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("MagmaRock", "Airerage/MagmaRock", m =>
             {
-                m.SetFloat("_CellScale", 2.6f);
+                m.SetFloat("_CellScale", 1.6f);
                 m.SetFloat("_CrackWidth", 0.12f);
             }, decor.Folder);
-            GameObject body = decor.Sphere("Body", bomb, Vector3.zero, new Vector3(diameter, diameter * 0.86f, diameter * 0.92f), crust);
+            GameObject body = decor.Sphere("Body", bomb, Vector3.zero, new Vector3(radius * 2f, radius * 1.74f, radius * 1.86f), crust);
             body.transform.localRotation = Quaternion.Euler(decor.Range(0f, 40f), decor.Range(0f, 360f), decor.Range(-20f, 20f));
+            // 少しいびつな塊（こぶ）。
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 at = Random3(decor) * radius * 0.55f;
+                decor.Sphere("Lump", bomb, at, Vector3.one * radius * decor.Range(0.9f, 1.2f), crust);
+            }
             Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
-            new ParticleFx
+            ParticleSystem smoke = new ParticleFx
             {
-                Name = "Embers", Rate = 7f, LifetimeMin = 1f, LifetimeMax = 2f, SpeedMin = 0.6f, SpeedMax = 1.6f, SizeMin = 0.03f, SizeMax = 0.07f,
-                ConeAngle = 40f, ConeRadius = diameter * 0.4f, Additive = true, Turbulence = 1f, Intensity = 3f, MaxParticles = 40,
-                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.7f, 0.25f), 0f), (new Color(0.8f, 0.2f, 0.03f), 1f) }, new[] { (1f, 0f), (0f, 1f) }),
-            }.Build(bomb, new Vector3(0f, diameter * 0.3f, 0f), up, decor.Folder);
-            new ParticleFx
+                Name = "TrailSmoke", Rate = 30f, LifetimeMin = 1.2f, LifetimeMax = 2f, SpeedMin = 0.5f, SpeedMax = 1.5f, SizeMin = radius * 0.5f,
+                SizeMax = radius * 0.8f, GrowFrom = 0.7f, GrowTo = 2.6f, ConeAngle = 40f, ConeRadius = radius * 0.6f, EdgeNoise = 0.6f, Softness = 0.9f,
+                Turbulence = 0.6f, Spin = 30f, MaxParticles = 120,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.32f, 0.24f, 0.2f), 0f), (new Color(0.2f, 0.18f, 0.18f), 1f) },
+                    new[] { (0f, 0f), (0.55f, 0.12f), (0.3f, 0.6f), (0f, 1f) }),
+            }.Build(rig, Vector3.zero, up, decor.Folder);
+            ParticleSystem embers = new ParticleFx
             {
-                Name = "HeatSmoke", Rate = 3f, LifetimeMin = 1.6f, LifetimeMax = 2.6f, SpeedMin = 0.5f, SpeedMax = 1f, SizeMin = 0.5f, SizeMax = 0.9f,
-                GrowFrom = 0.7f, GrowTo = 2f, ConeAngle = 20f, ConeRadius = diameter * 0.3f, EdgeNoise = 0.6f, Softness = 0.9f, Turbulence = 0.5f,
-                MaxParticles = 20,
-                Colors = ParticleFx.Ramp(new[] { (new Color(0.3f, 0.2f, 0.17f), 0f), (new Color(0.18f, 0.16f, 0.16f), 1f) },
-                    new[] { (0f, 0f), (0.35f, 0.2f), (0f, 1f) }),
-            }.Build(bomb, new Vector3(0f, diameter * 0.35f, 0.1f), up, decor.Folder);
-            return bomb.gameObject;
+                Name = "TrailEmbers", Rate = 28f, LifetimeMin = 0.6f, LifetimeMax = 1.2f, SpeedMin = 1f, SpeedMax = 3f, SizeMin = 0.05f, SizeMax = 0.12f,
+                Gravity = 1f, ConeAngle = 70f, ConeRadius = radius * 0.7f, Additive = true, Intensity = 3f, MaxParticles = 80,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.75f, 0.3f), 0f), (new Color(0.85f, 0.2f, 0.03f), 1f) }, new[] { (1f, 0f), (0f, 1f) }),
+            }.Build(rig, Vector3.zero, up, decor.Folder);
+            ParticleSystem dust = new ParticleFx
+            {
+                Name = "ImpactDust", LifetimeMin = 1f, LifetimeMax = 1.8f, SpeedMin = 3f, SpeedMax = 7f, SizeMin = radius * 0.5f, SizeMax = radius * 0.9f,
+                GrowFrom = 0.6f, GrowTo = 2.4f, ConeAngle = 60f, ConeRadius = radius * 0.8f, EdgeNoise = 0.6f, Softness = 0.9f, Turbulence = 0.5f,
+                Gravity = 0.15f, MaxParticles = 120,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.4f, 0.32f, 0.28f), 0f), (new Color(0.26f, 0.22f, 0.21f), 1f) },
+                    new[] { (0f, 0f), (0.7f, 0.08f), (0.35f, 0.6f), (0f, 1f) }),
+            }.Build(rig, Vector3.zero, up, decor.Folder);
+            ParticleSystem sparks = new ParticleFx
+            {
+                Name = "ImpactEmbers", LifetimeMin = 0.6f, LifetimeMax = 1.3f, SpeedMin = 4f, SpeedMax = 9f, SizeMin = 0.06f, SizeMax = 0.14f,
+                Gravity = 1.5f, ConeAngle = 70f, ConeRadius = radius * 0.6f, Stretch = 0.02f, Additive = true, Intensity = 3.5f, MaxParticles = 120,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.8f, 0.35f), 0f), (new Color(0.9f, 0.25f, 0.04f), 1f) }, new[] { (1f, 0f), (0f, 1f) }),
+            }.Build(rig, Vector3.zero, up, decor.Folder);
+            ParticleSystem rumble = new ParticleFx
+            {
+                Name = "RidgeRumble", LifetimeMin = 1.5f, LifetimeMax = 2.5f, SpeedMin = 1.5f, SpeedMax = 3f, SizeMin = 1.6f, SizeMax = 2.6f, GrowFrom = 0.6f,
+                GrowTo = 2.2f, ConeAngle = 25f, ConeRadius = 1.5f, EdgeNoise = 0.6f, Softness = 0.9f, Turbulence = 0.5f, MaxParticles = 60,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.36f, 0.28f, 0.24f), 0f), (new Color(0.24f, 0.21f, 0.2f), 1f) },
+                    new[] { (0f, 0f), (0.6f, 0.15f), (0.3f, 0.6f), (0f, 1f) }),
+            }.Build(rig, Vector3.zero, up, decor.Folder);
+            // 予告が始まるまでは出さない（RollingBombView が出し入れする）。
+            bomb.gameObject.SetActive(false);
+            var view = rig.gameObject.AddComponent<RollingBombView>();
+            view.Configure(root.GetComponent<StageZoneView>(), bomb, radius, new[] { smoke, embers }, new[] { dust, sparks }, rumble,
+                AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"));
+            if (zone.Backdrop != null)
+            {
+                // 奥の地面の高さを 1m ごとの格子に焼く（柱の横の範囲と、奥行き 14〜74m）。
+                const float step = 1f;
+                float minX = zone.Center.x - zone.Size.x * 0.5f - 2f;
+                const float minZ = 14f;
+                int columns = Mathf.CeilToInt(zone.Size.x + 4f) + 1;
+                const int rows = 61;
+                var heights = new float[columns * rows];
+                for (int j = 0; j < rows; j++)
+                {
+                    for (int i = 0; i < columns; i++)
+                    {
+                        heights[j * columns + i] = zone.Backdrop(minX + i * step, minZ + j * step);
+                    }
+                }
+                view.ConfigureTerrain(heights, columns, rows, minX, minZ, step);
+            }
+            return crossing;
         }
 
-        // 噴気孔（いつも噴く発射台 + ZoneLook.Steam。2026-11-20 の方針: 手本は USGS の噴気孔。地面の穴から白い湯気〈ほとんど水蒸気〉が
-        // いつも昇り、口のまわりの岩に硫黄の黄色い結晶が付く）。黒い口・まわりの岩・黄色い硫黄・いつも出る湯気。判定は発射台の範囲
-        // （口のすぐ上の濃い湯気の所）。
+        // トースターの動く物（周期のある発射台 + ZoneLook.Toaster。2026-11-20 の方針: 手本はポップアップ式のトースター〈レバーを下げると
+        // ニクロム線の電熱線が赤く光ってパンを焼き、時間が来るとばねで台が跳ね上がってパンが飛び出す。HowStuffWorks・Wikipedia〉）。
+        // 本体の模型は KitchenStage.Toaster（乗れる地形）。2 枚のパン、正面のレバー、溝の電熱線の光と溝の上の熱の光、電源の灯。
+        // 予告（焼いている間）は光がだんだん強くなって熱気がゆらぎ、効き始めにパンが跳ね上がってパンくずが散る（ToasterView・
+        // HazardEffectRig）。判定は溝の上に乗っている所（パンと一緒に跳ね上がる）。返す物（効いている間だけ出す物）は空。
+        private static GameObject CreateToaster(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            var popped = new GameObject("ToastPop");
+            popped.transform.SetParent(parent, false);
+            var rig = new GameObject("ToasterRig").transform;
+            rig.SetParent(root, false);
+            Vector3 top = zone.LocalSource;
+            float width = zone.Size.x + 0.4f;
+            Material crust = decor.Lit("ToastCrust", new Color(0.42f, 0.22f, 0.08f));
+            Material crumb = decor.Lit("ToastCrumb", new Color(0.86f, 0.6f, 0.3f));
+            var toast = new Transform[2];
+            float[] slots = { -0.45f, 0.45f };
+            for (int i = 0; i < 2; i++)
+            {
+                var slice = new GameObject($"Toast{i + 1}").transform;
+                slice.SetParent(rig, false);
+                // 溝の中で焼いている位置（パンの上の端が溝の口の少し下）。
+                slice.localPosition = new Vector3(0f, top.y - 0.83f, top.z + slots[i]);
+                // 食パン: 四角い下と、山なりの上（皮は焼き色の濃い茶、中は小麦色）。
+                decor.Box("Crust", slice, Vector3.zero, new Vector3(2.0f, 1.5f, 0.2f), crust);
+                decor.Box("Crumb", slice, Vector3.zero, new Vector3(1.8f, 1.3f, 0.22f), crumb);
+                decor.Cylinder("CrustTop", slice, new Vector3(0f, 0.72f, 0f), new Vector3(2.0f, 0.1f, 0.7f), crust).transform.localRotation =
+                    Quaternion.Euler(90f, 0f, 0f);
+                decor.Cylinder("CrumbTop", slice, new Vector3(0f, 0.68f, 0f), new Vector3(1.8f, 0.11f, 0.5f), crumb).transform.localRotation =
+                    Quaternion.Euler(90f, 0f, 0f);
+                toast[i] = slice;
+            }
+            Material black = decor.Lit("ToasterBlack", new Color(0.05f, 0.05f, 0.06f));
+            var lever = new GameObject("Lever").transform;
+            lever.SetParent(rig, false);
+            lever.localPosition = new Vector3(width * 0.5f - 0.45f, top.y - 1.75f, top.z - 1.35f);
+            decor.Box("Knob", lever, Vector3.zero, new Vector3(0.5f, 0.18f, 0.3f), black);
+            Material element = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("ToasterElement", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(1f, 0.32f, 0.06f));
+                m.SetFloat("_Intensity", 0f);
+            }, decor.Folder);
+            Material heat = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("ToasterHeat", "Airerage/SoftParticle", m =>
+            {
+                m.SetFloat("_Softness", 1f);
+                m.SetFloat("_Noise", 0.25f);
+                m.SetFloat("_Intensity", 0f);
+                m.SetColor("_Tint", new Color(1f, 0.4f, 0.08f, 0.55f));
+                m.SetFloat("_SrcBlend", (float)BlendMode.One);
+                m.SetFloat("_DstBlend", (float)BlendMode.One);
+            }, decor.Folder);
+            var elements = new System.Collections.Generic.List<Renderer>();
+            foreach (float z in slots)
+            {
+                elements.Add(decor.Box("Element", rig, new Vector3(0f, top.y + 0.03f, top.z + z), new Vector3(width - 0.8f, 0.02f, 0.12f), element)
+                    .GetComponent<Renderer>());
+            }
+            elements.Add(decor.Quad("HeatGlow", rig, new Vector3(0f, top.y + 0.35f, top.z - 0.6f), new Vector2(width + 0.6f, 1.1f), heat).GetComponent<Renderer>());
+            elements.Add(decor.Sphere("PowerLamp", rig, new Vector3(-width * 0.5f + 1.1f, top.y - 1.65f, top.z - 1.22f), Vector3.one * 0.12f, element)
+                .GetComponent<Renderer>());
+            rig.gameObject.AddComponent<ToasterView>().Configure(root.GetComponent<StageZoneView>(), toast, lever, elements.ToArray());
+            // 焼いている間の熱気（ゆらぐ薄いもや）と、跳ね上がったときのパンくずと湯気。
+            Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
+            var fx = new GameObject("ToasterFx").transform;
+            fx.SetParent(root, false);
+            ParticleSystem shimmer = new ParticleFx
+            {
+                Name = "Heat", LifetimeMin = 0.8f, LifetimeMax = 1.4f, SpeedMin = 1f, SpeedMax = 2f, SizeMin = 0.4f, SizeMax = 0.7f, GrowFrom = 0.6f,
+                GrowTo = 2f, ConeAngle = 10f, ConeRadius = 0.9f, EdgeNoise = 0.5f, Softness = 0.95f, Turbulence = 0.6f, MaxParticles = 40,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.85f, 0.7f), 0f), (new Color(0.9f, 0.88f, 0.85f), 1f) },
+                    new[] { (0f, 0f), (0.12f, 0.25f), (0f, 1f) }),
+            }.Build(fx, top + new Vector3(0f, 0.05f, 0f), up, decor.Folder);
+            ParticleSystem crumbs = new ParticleFx
+            {
+                Name = "Crumbs", LifetimeMin = 0.6f, LifetimeMax = 1.1f, SpeedMin = 2f, SpeedMax = 5f, SizeMin = 0.04f, SizeMax = 0.09f, Gravity = 1f,
+                ConeAngle = 35f, ConeRadius = 0.9f, Softness = 0.3f, MaxParticles = 60,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.7f, 0.45f, 0.2f), 0f), (new Color(0.5f, 0.3f, 0.12f), 1f) }, new[] { (1f, 0f), (1f, 0.8f), (0f, 1f) }),
+            }.Build(fx, top + new Vector3(0f, 0.1f, -0.2f), up, decor.Folder);
+            ParticleSystem puff = new ParticleFx
+            {
+                Name = "Puff", LifetimeMin = 0.8f, LifetimeMax = 1.3f, SpeedMin = 1.5f, SpeedMax = 3f, SizeMin = 0.4f, SizeMax = 0.7f, GrowFrom = 0.6f,
+                GrowTo = 2.2f, ConeAngle = 20f, ConeRadius = 0.8f, EdgeNoise = 0.55f, Softness = 0.9f, Turbulence = 0.6f, MaxParticles = 30,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.95f, 0.93f, 0.9f), 0f), (new Color(0.85f, 0.84f, 0.82f), 1f) },
+                    new[] { (0f, 0f), (0.3f, 0.12f), (0.15f, 0.6f), (0f, 1f) }),
+            }.Build(fx, top + new Vector3(0f, 0.1f, -0.1f), up, decor.Folder);
+            fx.gameObject.AddComponent<HazardEffectRig>().Configure(root.GetComponent<StageZoneView>(), null,
+                new[] { shimmer }, new[] { 6f }, new[] { crumbs, puff }, new[] { 30, 8 }, new ParticleSystem[0], new float[0]);
+            return popped;
+        }
+
+        // レーザーの網（危険 + ZoneLook.Laser。2026-11-20 の方針: レーザーの光は、きれいな空気の中では横から見えず、煙やちりの小さな粒が
+        // 光を散らす所だけが見える〈チンダル現象。ブリタニカ・Wikipedia〉）。両端に、下のキャットウォークに立てた発光装置（暗い金属の箱と赤いレンズ）。
+        // 効いている間は判定の高さに細い赤い光線を 3 本（返す物。StageZoneView が効いている間だけ出す）と、光線の上できらめくちり。予告の
+        // 間は照準の弱い光線とレンズの点滅（LaserGridView）。判定は光線の帯（範囲の高さ）のまま。
+        private static GameObject CreateLaserGrid(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 half = zone.Size * 0.5f;
+            Material beam = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("LaserBeam", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", 4f);
+                m.SetFloat("_Core", 1.6f);
+            }, decor.Folder);
+            var beams = new GameObject("LaserBeams");
+            beams.transform.SetParent(parent, false);
+            var lines = new LineRenderer[3];
+            Color red = new Color(1f, 0.08f, 0.05f);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                float y = (i - 1) * half.y * 0.6f;
+                lines[i] = Line($"Beam{i + 1}", beams.transform, beam, new Vector3(-half.x, y, -0.2f), new Vector3(half.x, y, -0.2f), red, 0.08f);
+            }
+            var rig = new GameObject("LaserRig").transform;
+            rig.SetParent(root, false);
+            LineRenderer aim = Line("AimBeam", rig, beam, new Vector3(-half.x, 0f, -0.2f), new Vector3(half.x, 0f, -0.2f), new Color(1f, 0.15f, 0.1f, 0.5f), 0.03f);
+            aim.enabled = false;
+            Material housing = decor.Lit("LaserHousing", new Color(0.12f, 0.13f, 0.16f));
+            housing.SetFloat("_Metallic", 0.6f);
+            housing.SetFloat("_Smoothness", 0.6f);
+            Material lens = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("LaserLens", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(1f, 0.1f, 0.06f));
+                m.SetFloat("_Intensity", 0.8f);
+            }, decor.Folder);
+            var lenses = new System.Collections.Generic.List<Renderer>();
+            foreach (float side in new[] { -1f, 1f })
+            {
+                float x = side * (half.x + 0.4f);
+                decor.Box("Emitter", rig, new Vector3(x, 0f, 0f), new Vector3(0.8f, 1.3f, 0.9f), housing);
+                lenses.Add(decor.Box("Lens", rig, new Vector3(x - side * 0.41f, 0f, -0.1f), new Vector3(0.04f, 0.9f, 0.5f), lens).GetComponent<Renderer>());
+                // 下のキャットウォーク（上面 y = 6.5）に立てた支柱（上には動く足場が通るので、下から支える）。
+                float stand = zone.Center.y - 0.65f - 6.5f;
+                if (stand > 0f)
+                {
+                    decor.Box("Stand", rig, new Vector3(x, -0.65f - stand * 0.5f, 0.2f), new Vector3(0.14f, stand, 0.14f), housing);
+                    decor.Box("Foot", rig, new Vector3(x, -0.65f - stand + 0.04f, 0.2f), new Vector3(0.6f, 0.08f, 0.6f), housing);
+                }
+            }
+            rig.gameObject.AddComponent<LaserGridView>().Configure(root.GetComponent<StageZoneView>(), lines, aim, lenses.ToArray());
+            // 光線の上できらめくちり（効いている間だけ）。
+            var fx = new GameObject("LaserFx").transform;
+            fx.SetParent(root, false);
+            ParticleSystem motes = new ParticleFx
+            {
+                Name = "Motes", LifetimeMin = 0.25f, LifetimeMax = 0.6f, SpeedMin = 0f, SpeedMax = 0.2f, SizeMin = 0.05f, SizeMax = 0.11f,
+                BoxSize = new Vector3(zone.Size.x, zone.Size.y * 0.8f, 0.3f), Additive = true, Intensity = 3f, MaxParticles = 300,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.45f, 0.35f), 0f), (new Color(1f, 0.15f, 0.1f), 1f) }, new[] { (0f, 0f), (1f, 0.3f), (0f, 1f) }),
+            }.Build(fx, new Vector3(0f, 0f, -0.2f), Quaternion.identity, decor.Folder);
+            fx.gameObject.AddComponent<HazardEffectRig>().Configure(root.GetComponent<StageZoneView>(), null,
+                new ParticleSystem[0], new float[0], new[] { motes }, new[] { 40 }, new[] { motes }, new[] { 220f });
+            return beams;
+        }
+
+        private static LineRenderer Line(string name, Transform parent, Material material, Vector3 from, Vector3 to, Color color, float width)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var line = go.AddComponent<LineRenderer>();
+            line.sharedMaterial = material;
+            line.useWorldSpace = false;
+            line.positionCount = 2;
+            line.SetPosition(0, from);
+            line.SetPosition(1, to);
+            line.startColor = color;
+            line.endColor = color;
+            line.startWidth = width;
+            line.endWidth = width;
+            line.numCapVertices = 2;
+            line.shadowCastingMode = ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            return line;
+        }
+
+        // 単位球の中のばらばらな向き（飾りの決まった乱数）。
+        private static Vector3 Random3(StageDecor decor)
+        {
+            return new Vector3(decor.Range(-1f, 1f), decor.Range(-0.6f, 0.6f), decor.Range(-1f, 1f)).normalized;
+        }
+
+        // 噴気孔（いつも吹く風 + ZoneLook.Steam。2026-11-20 の方針: 手本は USGS の噴気孔と、圧力の高い噴気〈ごうごうと音を立てて噴く〉の
+        // 映像。地面の穴から白い湯気〈ほとんど水蒸気〉が勢いよく噴き上がる。口のすぐ外は透明に近く〈まだ冷えて白くなっていない〉、
+        // 少し上で白い塊になってふくらみ、上で渦を巻いてゆっくり広がる。口のまわりの岩に硫黄の黄色い結晶が付く）。黒い口・まわりの岩・
+        // 黄色い硫黄・勢いよく噴く湯気（柱の上まで）・上でたなびく湯気。判定は湯気の柱の範囲（とても強い風。2026-11-20 の要望）。
         private static GameObject CreateFumarole(Transform parent, ZoneSpec zone, StageDecor decor)
         {
             Vector2 size = zone.Size;
@@ -872,14 +1128,25 @@ namespace Airerage.Editor.Stages
             }
             Vector2 direction = zone.Direction.normalized;
             Quaternion along = Quaternion.LookRotation(new Vector3(direction.x, direction.y, 0f), Vector3.back);
+            // 勢いよく噴く湯気: 柱の高さを 1 秒ほどで昇る（風の範囲の上まで）。
+            float jet = size.y / 1.05f;
             new ParticleFx
             {
-                Name = "Steam", Rate = 34f, LifetimeMin = 1.6f, LifetimeMax = 2.4f, SpeedMin = 3.5f, SpeedMax = 6f, SizeMin = 0.3f, SizeMax = 0.55f,
-                GrowFrom = 0.6f, GrowTo = 5f, ConeAngle = 8f, ConeRadius = size.x * 0.2f, EdgeNoise = 0.55f, Softness = 0.9f, Turbulence = 0.8f, Spin = 25f,
-                MaxParticles = 120,
+                Name = "Steam", Rate = 75f, LifetimeMin = 0.9f, LifetimeMax = 1.35f, SpeedMin = jet * 0.8f, SpeedMax = jet * 1.15f, SizeMin = 0.35f,
+                SizeMax = 0.6f, GrowFrom = 0.5f, GrowTo = 4.2f, ConeAngle = 6f, ConeRadius = size.x * 0.16f, EdgeNoise = 0.55f, Softness = 0.9f,
+                Turbulence = 1f, Spin = 30f, MaxParticles = 220,
                 Colors = ParticleFx.Ramp(new[] { (new Color(0.95f, 0.95f, 0.93f), 0f), (new Color(0.85f, 0.85f, 0.84f), 1f) },
-                    new[] { (0f, 0f), (0.05f, 0.06f), (0.45f, 0.2f), (0.25f, 0.6f), (0f, 1f) }),
+                    new[] { (0f, 0f), (0.04f, 0.07f), (0.5f, 0.22f), (0.28f, 0.65f), (0f, 1f) }),
             }.Build(vent, new Vector3(0f, floor + 0.1f, 0.3f), along, decor.Folder);
+            // 柱の上でゆっくり広がってたなびく湯気。
+            new ParticleFx
+            {
+                Name = "Billow", Rate = 9f, LifetimeMin = 1.6f, LifetimeMax = 2.4f, SpeedMin = 0.8f, SpeedMax = 1.8f, SizeMin = 1.2f, SizeMax = 2f,
+                GrowFrom = 0.7f, GrowTo = 2.2f, ConeAngle = 35f, ConeRadius = size.x * 0.4f, EdgeNoise = 0.6f, Softness = 0.92f, Turbulence = 0.6f,
+                Spin = 20f, MaxParticles = 40,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.9f, 0.9f, 0.88f), 0f), (new Color(0.78f, 0.77f, 0.76f), 1f) },
+                    new[] { (0f, 0f), (0.22f, 0.25f), (0.12f, 0.6f), (0f, 1f) }),
+            }.Build(vent, new Vector3(direction.x * size.y * 0.75f, floor + size.y * 0.8f, 0.3f), along, decor.Folder);
             return vent.gameObject;
         }
 
@@ -1165,7 +1432,7 @@ namespace Airerage.Editor.Stages
         private static bool IsSteadyDraft(ZoneSpec zone)
         {
             return zone.Kind == StageZoneKind.Gust && zone.PeriodSeconds <= 0f && zone.Look != StageZoneView.ZoneLook.Flow
-                && Mathf.Abs(zone.Direction.y) > Mathf.Abs(zone.Direction.x);
+                && zone.Look != StageZoneView.ZoneLook.Steam && Mathf.Abs(zone.Direction.y) > Mathf.Abs(zone.Direction.x);
         }
 
         private static Color DefaultColor(StageZoneKind kind)

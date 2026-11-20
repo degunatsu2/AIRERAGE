@@ -17,8 +17,26 @@ namespace Airerage.Editor.Stages
     /// </summary>
     internal static class KitchenStage
     {
+        // やかんの底の中心と、注ぎ口の向き（y の回り）・注ぎ口の先（やかんの中の位置）。湯気（KettleSteam）は注ぎ口の先から出す
+        // （2026-11-20 の指摘: 湯気が地面から生えている）。
+        private static readonly Vector3 KettleBottom = new Vector3(33f, 2f, 1.2f);
+        private const float KettleSpoutYaw = 75f;
+        private static readonly Vector3 KettleSpoutEnd = new Vector3(0f, 1.75f, -1.95f);
+
+        // トースター（左の調理台の上。2026-11-20 の方針: 判定を見た目に合わせる。前は通り抜けられる飾りの箱だったので、乗れる地形にした）:
+        // 本体の範囲と奥行き。上の 2 本の溝からパンが跳ね上がる（ToasterPop の発射台は溝の上）。
+        internal const float ToasterMinX = -37.1f;
+        internal const float ToasterMaxX = -33.9f;
+        internal const float ToasterTop = 4.4f;
+        private const float ToasterZ = 1.2f;
+        private const float ToasterDepth = 2.4f;
+
+        /// <summary>やかんの注ぎ口の先（ワールドの位置）。</summary>
+        internal static Vector3 KettleSpoutTip => KettleBottom + Quaternion.Euler(0f, KettleSpoutYaw, 0f) * KettleSpoutEnd;
+
         public static StageLayout Create()
         {
+            Vector3 spout = KettleSpoutTip;
             var theme = new StageTheme
             {
                 Terrain = new Color(0.94f, 0.9f, 0.86f),
@@ -65,6 +83,8 @@ namespace Airerage.Editor.Stages
                 {
                     // 左の調理台（大理石の天板と、ワイヤーがつながる木の戸棚）。
                     new TerrainBox("CounterTopWest", -48f, 1f, -26f, 2f),
+                    // トースター（乗れる。見た目は自前の模型。Toaster）。
+                    new TerrainBox("Toaster", ToasterMinX, 2f, ToasterMaxX, ToasterTop),
                     new TerrainBox("CabinetWest", -47f, -30f, -27f, 1f, attachable: true),
                     // 右の調理台（真ん中にシンク。シンクの右の排水溝は、調理台の下を通って右の端で上へ曲がり、棚の上に出る）。
                     new TerrainBox("CounterTopEastA", 26f, 1f, 34f, 2f),
@@ -101,8 +121,9 @@ namespace Airerage.Editor.Stages
                     // 枚数のコインを落とし、上へ吹き飛ぶ。始まって 30 秒は噴かない。
                     new ZoneSpec("OvenFire", StageZoneKind.Hazard, new Vector2(0f, 8.5f), new Vector2(22f, 15f), Vector2.up, 25f, 26f)
                         .Every(40f, 3f, 10f, 0f, 3f).Column(22f).Styled(StageZoneView.ZoneLook.Flame).Capped(7f),
-                    // トースター: 7 秒ごとにポンと跳ね上げる（1.5 秒前に予告）。
-                    new ZoneSpec("Toaster", StageZoneKind.Launcher, new Vector2(-35.5f, 3.2f), new Vector2(3f, 2.4f), Vector2.up, 30f).Every(7f, 0.5f, 3f, 0f, 1.5f),
+                    // トースター: 7 秒ごとに、上の溝の上に乗っている人をパンと一緒にポンと跳ね上げる（1.5 秒前から焼いて電熱線が光る）。
+                    ZoneSpec.OnFloor("ToasterPop", StageZoneKind.Launcher, ToasterMinX + 0.2f, ToasterMaxX - 0.2f, ToasterTop, Vector2.up, 30f, 0.9f)
+                        .Every(7f, 0.5f, 3f, 0f, 1.5f).Styled(StageZoneView.ZoneLook.Toaster).From(new Vector3((ToasterMinX + ToasterMaxX) * 0.5f, ToasterTop, ToasterZ)),
                     // シンク（水）。
                     new ZoneSpec("Sink", StageZoneKind.Water, new Vector2(38f, -3f), new Vector2(8f, 6f), Vector2.zero, 5f, 20f),
                     // 排水溝の水流（ユーザーの要望、2026-10-26）: 貯水槽の右の口から調理台の下を右へ、右の端で上へ、上で左へ流して棚の上に出す。
@@ -116,9 +137,11 @@ namespace Airerage.Editor.Stages
                     ZoneSpec.OnFloor("Butter", StageZoneKind.Ice, -31f, -27f, 2f, Vector2.zero, 0.06f),
                     // カップケーキのベルトコンベア（シンクとは逆、真ん中へ運ぶ）。
                     ZoneSpec.OnFloor("CupcakeConveyor", StageZoneKind.SpeedLane, 26.5f, 31f, 2f, Vector2.left, 11f),
-                    // やかんの湯気: 6 秒ごとに 2 秒、上へ。
-                    new ZoneSpec("KettleSteam", StageZoneKind.Gust, new Vector2(33f, 7f), new Vector2(2f, 10f), Vector2.up, 60f, 16f).Every(6f, 2f, 1f, 0f, 1f)
-                        .Styled(StageZoneView.ZoneLook.Steam),
+                    // やかんの湯気: 6 秒ごとに 2 秒、注ぎ口の先から上へ（注ぎ口の向きに少し左へ傾いて昇る。範囲も注ぎ口の先から。
+                    // 2026-11-20 の指摘: 湯気が地面から生えている）。
+                    new ZoneSpec("KettleSteam", StageZoneKind.Gust, new Vector2(spout.x - 0.75f, spout.y + 4.5f), new Vector2(3.3f, 9f),
+                            new Vector2(-0.2f, 1f), 60f, 16f).Every(6f, 2f, 1f, 0f, 1f)
+                        .Styled(StageZoneView.ZoneLook.Steam).From(spout),
                     // ゼリーのジャンプ台（まな板とボウルの上）。
                     ZoneSpec.OnFloor("JellyBoard", StageZoneKind.JumpPad, -19f, -17f, 6.5f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("JellyBowl", StageZoneKind.JumpPad, 17f, 19f, 6.5f, Vector2.up, 24f, 0.4f),
@@ -440,8 +463,8 @@ namespace Airerage.Editor.Stages
             // 蛇口が浮いている。
             Sink(decor, steel);
             // やかん（前の赤い球。湯気の出る所）とトースター。
-            Kettle(decor, new Vector3(33f, 2f, 1.2f));
-            decor.Box("Toaster", new Vector3(-35.5f, 3.2f, 1.2f), new Vector3(3.2f, 2.4f, 2.4f), steel);
+            Kettle(decor, KettleBottom);
+            Toaster(decor);
             // 排水溝の管（奥の側の半透明の管と、口の格子）と、中を流れる水（2026-11-20 の要望: 水流も水に合わせて精巧に）。
             Material pipeGlass = decor.Transparent("DrainPipe", new Color(0.6f, 0.85f, 1f, 0.16f));
             decor.Box("DrainPipeLow", new Vector3(45.8f, -0.65f, 1.4f), new Vector3(7f, 3.3f, 1.2f), pipeGlass);
@@ -633,6 +656,50 @@ namespace Airerage.Editor.Stages
             }
         }
 
+        // トースターの本体（2026-11-20 の方針: 手本はポップアップ式のトースター。つやのあるステンレスの胴、上に 2 本のパンの溝、黒い樹脂の
+        // 底と脚、横のレバーの溝と焼き加減のつまみ、電源の小さな灯）。乗れる地形「Toaster」の見た目を外して、この模型で見せる。動く物
+        // （パン・レバー・電熱線の光）は StageSceneBuilder.CreateToaster。
+        private static void Toaster(StageDecor decor)
+        {
+            Transform box = GameObject.Find("Terrain").transform.Find("Toaster");
+            Object.DestroyImmediate(box.GetComponent<MeshRenderer>());
+            Object.DestroyImmediate(box.GetComponent<MeshFilter>());
+            Material chrome = decor.Lit("ToasterChrome", new Color(0.82f, 0.84f, 0.88f));
+            chrome.SetFloat("_Metallic", 0.85f);
+            chrome.SetFloat("_Smoothness", 0.78f);
+            Material black = decor.Lit("ToasterBlack", new Color(0.05f, 0.05f, 0.06f));
+            Material slot = decor.Unlit("ToasterSlot", new Color(0.02f, 0.015f, 0.01f));
+            float width = ToasterMaxX - ToasterMinX;
+            float centerX = (ToasterMinX + ToasterMaxX) * 0.5f;
+            var toaster = new GameObject("ToasterModel").transform;
+            toaster.SetParent(decor.Root, false);
+            toaster.position = new Vector3(centerX, 2f, ToasterZ);
+            // 黒い底と脚、丸みのある胴（角を落とした箱を重ねる）。
+            decor.Box("Base", toaster, new Vector3(0f, 0.12f, 0f), new Vector3(width, 0.24f, ToasterDepth), black);
+            foreach (float fx in new[] { -1f, 1f })
+            {
+                foreach (float fz in new[] { -1f, 1f })
+                {
+                    decor.Box("Foot", toaster, new Vector3(fx * (width * 0.5f - 0.3f), 0.03f, fz * (ToasterDepth * 0.5f - 0.3f)), new Vector3(0.3f, 0.06f, 0.3f), black);
+                }
+            }
+            float bodyHeight = ToasterTop - 2f - 0.24f;
+            decor.Box("Body", toaster, new Vector3(0f, 0.24f + bodyHeight * 0.5f, 0f), new Vector3(width - 0.12f, bodyHeight - 0.12f, ToasterDepth), chrome);
+            decor.Box("BodyRound", toaster, new Vector3(0f, 0.24f + bodyHeight * 0.5f, 0f), new Vector3(width, bodyHeight - 0.3f, ToasterDepth - 0.12f), chrome);
+            decor.Box("Top", toaster, new Vector3(0f, ToasterTop - 2f - 0.04f, 0f), new Vector3(width - 0.3f, 0.08f, ToasterDepth - 0.3f), chrome);
+            // 上の 2 本の溝（パンが入る。手前と奥）。
+            foreach (float z in new[] { -0.45f, 0.45f })
+            {
+                decor.Box("Slot", toaster, new Vector3(0f, ToasterTop - 2f + 0.005f, z), new Vector3(width - 0.7f, 0.02f, 0.34f), slot);
+            }
+            // 正面のレバーの溝と、焼き加減のつまみ、電源の灯の台。
+            decor.Box("LeverSlot", toaster, new Vector3(width * 0.5f - 0.45f, 1.2f, -ToasterDepth * 0.5f - 0.005f), new Vector3(0.12f, 1.2f, 0.02f), slot);
+            Transform dial = decor.Cylinder("Dial", toaster, new Vector3(-width * 0.5f + 0.55f, 0.75f, -ToasterDepth * 0.5f - 0.05f),
+                new Vector3(0.36f, 0.05f, 0.36f), black).transform;
+            dial.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            decor.Box("DialMark", toaster, new Vector3(-width * 0.5f + 0.55f, 0.84f, -ToasterDepth * 0.5f - 0.1f), new Vector3(0.04f, 0.12f, 0.02f), chrome);
+        }
+
         // やかん（2026-11-20 の要望: 洗面台の赤い球 → その場に合う精巧な置物。湯気〈KettleSteam〉の出る所）: 赤い琺瑯の胴（回転体）、
         // 黒いつまみのふた、上の取っ手（管）、注ぎ口（管）。bottom は底の中心。
         private static void Kettle(StageDecor decor, Vector3 bottom)
@@ -660,9 +727,9 @@ namespace Airerage.Editor.Stages
             ProceduralMesh.Place("Handle", kettle, handle, Vector3.zero, Quaternion.identity, Vector3.one, black);
             Mesh spout = ProceduralMesh.Tube("Kitchen", "KettleSpout", new[]
             {
-                new Vector3(0f, 0.55f, -1.05f), new Vector3(0f, 0.95f, -1.55f), new Vector3(0f, 1.45f, -1.85f), new Vector3(0f, 1.75f, -1.95f),
+                new Vector3(0f, 0.55f, -1.05f), new Vector3(0f, 0.95f, -1.55f), new Vector3(0f, 1.45f, -1.85f), KettleSpoutEnd,
             }, new[] { 0.24f, 0.16f, 0.12f, 0.11f }, 10);
-            ProceduralMesh.Place("Spout", kettle, spout, Vector3.zero, Quaternion.Euler(0f, 75f, 0f), Vector3.one, enamel);
+            ProceduralMesh.Place("Spout", kettle, spout, Vector3.zero, Quaternion.Euler(0f, KettleSpoutYaw, 0f), Vector3.one, enamel);
         }
 
         // 排水溝の管の中を流れる水（2026-11-20 の要望: 洗面台の右の水流も水に合わせて精巧に）: 管の 3 つの区間（右へ・上へ・左へ）に、

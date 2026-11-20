@@ -351,7 +351,9 @@ namespace Airerage.Runtime.Tests
             Assert.That(RenderSettings.skybox.shader.name, Is.EqualTo("Airerage/GradientSky"), "グラデーションの空でない");
             BoxCollider[] terrain = scene.GetRootGameObjects().Single(g => g.name == "Terrain").GetComponentsInChildren<BoxCollider>();
             StageBlock[] blocks = scene.GetRootGameObjects().Single(g => g.name == "TerrainVisuals").GetComponentsInChildren<StageBlock>();
-            Assert.That(blocks.Length, Is.EqualTo(terrain.Length), "地形の箱ごとに面取りした見た目がない");
+            // 自前の模型で見せる地形（名前 + "Model" の飾り。キッチンのトースター）は、面取りした見た目を作らない。
+            int models = terrain.Count(b => InScene<Transform>(scene).Any(t => t.name == b.name + "Model"));
+            Assert.That(blocks.Length, Is.EqualTo(terrain.Length - models), "地形の箱ごとに面取りした見た目がない");
             foreach (BoxCollider box in terrain)
             {
                 Assert.That(box.GetComponent<MeshRenderer>(), Is.Null, $"{box.name}: 元の箱の見た目が残っている");
@@ -951,9 +953,48 @@ namespace Airerage.Runtime.Tests
             lab = Open("Assets/_Project/Scenes/Stages/Stage_Lab.unity");
             Assert.That(InScene<PlasmaGlobeView>(lab).Count(), Is.EqualTo(2), "プラズマ球");
             Scene volcano = Open("Assets/_Project/Scenes/Stages/Stage_Volcano.unity");
-            Assert.That(InScene<Renderer>(volcano).Count(r => r.sharedMaterial != null && r.sharedMaterial.shader.name == "Airerage/MagmaRock"), Is.EqualTo(5),
-                "噴石（ひび割れて奥が光る岩）");
             Assert.That(InScene<Transform>(volcano).Count(t => t.name == "Fumarole"), Is.EqualTo(2), "噴気孔");
+
+            // 2026-11-20 の要望（見た目と効果を合わせる。汎用のギミックは見た目に合わせて効果と配置も変える）。
+            // プラズマ球: 制御甲板の両端の柱の上に載り、触れると当たる電気の危険で、真ん中がアンカーポイント。
+            StageZone[] globes = InScene<StageZoneAuthoring>(lab).Where(z => z.name.StartsWith("Plasma")).Select(z => z.ToZone()).ToArray();
+            Assert.That(globes.Length, Is.EqualTo(2));
+            foreach (StageZone globe in globes)
+            {
+                Assert.That(globe.Kind, Is.EqualTo(StageZoneKind.Hazard), "プラズマ球が触れると当たる危険でない");
+                Assert.That(globe.Electric, Is.True, "プラズマ球につないだワイヤーが電気を帯びない");
+                Assert.That(globe.ActiveTicks, Is.EqualTo(globe.Period), "プラズマ球がいつも効いていない");
+                Assert.That(Mathf.Abs(globe.Center.X), Is.EqualTo(16.3f).Within(0.01f), "柱の上にない");
+                Assert.That(globe.MinY, Is.GreaterThanOrEqualTo(26.5f), "柱に埋まっている");
+            }
+            Transform globeView = InScene<PlasmaGlobeView>(lab).First().transform;
+            Assert.That(globeView.gameObject.activeInHierarchy, Is.True, "プラズマ球がいつも見えていない");
+            // 噴石: 浮かぶ跳ね返す物はなくし、奥の山から転がってくる危険 1 つ（15〜25 秒ごと）。
+            StageZone[] volcanoZones = InScene<StageZoneAuthoring>(volcano).Select(z => z.ToZone()).ToArray();
+            Assert.That(volcanoZones.Any(z => z.Kind == StageZoneKind.Bumper), Is.False, "浮かぶ噴石が残っている");
+            StageZone rolling = InScene<StageZoneAuthoring>(volcano).Single(z => z.name == "RollingBomb").ToZone();
+            Assert.That(rolling.Period, Is.EqualTo(15 * 60));
+            Assert.That(rolling.Timing.JitterTicks, Is.EqualTo(10 * 60), "15〜25 秒のばらつき");
+            RollingBombView bomb = InScene<RollingBombView>(volcano).Single();
+            Assert.That(bomb.HeightAt(0f, 40f), Is.GreaterThan(-15f), "奥の火口の壁の高さが焼かれていない");
+            Assert.That(InScene<Renderer>(volcano).Any(r => r.sharedMaterial != null && r.sharedMaterial.shader.name == "Airerage/MagmaRock"), Is.True,
+                "噴石（ひび割れて奥が光る岩）");
+            // 噴気孔: ジャンプ台の効果でなく、湯気の柱の中のとても強い風。
+            foreach (StageZone vent in InScene<StageZoneAuthoring>(volcano).Where(z => z.name.StartsWith("Vent")).Select(z => z.ToZone()))
+            {
+                Assert.That(vent.Kind, Is.EqualTo(StageZoneKind.Gust), "噴気孔が風でない");
+                Assert.That(vent.Limit, Is.GreaterThanOrEqualTo(28f), "噴気孔の風が弱い");
+                Assert.That(vent.MaxY - vent.MinY, Is.GreaterThan(8f), "湯気の柱の高さまで吹かない");
+            }
+            // やかんの湯気: 注ぎ口の先から（地面から生えない）。
+            kitchen = Open("Assets/_Project/Scenes/Stages/Stage_Kitchen.unity");
+            StageZone steam = InScene<StageZoneAuthoring>(kitchen).Single(z => z.name == "KettleSteam").ToZone();
+            Transform spout = InScene<Transform>(kitchen).Single(t => t.name == "Spout");
+            float spoutTop = spout.GetComponent<Renderer>().bounds.max.y;
+            Assert.That(steam.MinY, Is.EqualTo(spoutTop).Within(0.4f), "湯気の範囲が注ぎ口の先から始まらない");
+            ParticleSystem kettleSteam = InScene<ParticleSystem>(kitchen).First(p => p.name == "Steam" && p.transform.parent.name == "SteamFx"
+                && p.transform.parent.parent.name == "KettleSteam");
+            Assert.That(kettleSteam.transform.position.y, Is.EqualTo(spoutTop).Within(0.4f), "湯気が注ぎ口から出ない");
         }
 
         [Test]

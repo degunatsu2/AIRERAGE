@@ -6,6 +6,7 @@ using Airerage.Core.Input;
 using Airerage.Core.Movement;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
 namespace Airerage.Core.Tests.Simulation
@@ -905,6 +906,113 @@ namespace Airerage.Core.Tests.Simulation
             Assert.That(zone.OverlapsFallBand(new Vector3(2f, 1.2f, 0f), half, -0.8f, 0.8f, 0), Is.False, "柱の横の外は当たらない");
             Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Hazard, -10f, -3f, 10f, 2f, -Vector2.UnitY, 10f, 15f,
                 new StageZoneTiming(120, 30, 0), default, 1.6f, default, 0, 0, 0f, 6f), "物の長さが範囲の高さより長い");
+        }
+    
+        // 研究所のプラズマ球（2026-11-20 の要望）: いつも効いている電気の危険（触れると当たる）。中心 (0, 10)、半径 0.9m。
+        private static StageZone Globe(float x = 0f)
+        {
+            return new StageZone(StageZoneKind.Hazard, x - 0.9f, 9.1f, x + 0.9f, 10.9f, Vector2.UnitY, 8f, 12f, new StageZoneTiming(30, 30, 0), default,
+                1.8f, default, 0, 0, 0.9f, 0f, electric: true);
+        }
+
+        // 接続点 anchor につないだワイヤーを持ち、position にいる人。
+        private static CharacterState Holder(Vector3 position, Vector3 anchor)
+        {
+            var state = new CharacterState { Position = position };
+            state.Wire.Phase = WirePhase.Attached;
+            state.Wire.Anchor = anchor;
+            state.Wire.RopeLength = Vector3.Distance(position, anchor);
+            return state;
+        }
+
+        [Test]
+        public void ChargedWire_ShocksWhoTouchesTheRope_WhileAttachedToTheGlobe()
+        {
+            var zones = new List<StageZone> { Globe() };
+            var configs = new List<CharacterConfig> { new CharacterConfig(), new CharacterConfig(), new CharacterConfig() };
+            var states = new List<CharacterState>
+            {
+                // 球の中心につないで、真下 6m にぶら下がる。
+                Holder(new Vector3(0f, 4f, 0f), new Vector3(0f, 10f, 0f)),
+                // ロープの途中（y = 7）の少し右に触れている人と、離れている人。
+                new CharacterState { Position = new Vector3(0.5f, 7f, 0f) },
+                new CharacterState { Position = new Vector3(5f, 7f, 0f) },
+            };
+            Assert.That(StageZones.IsWireCharged(states[0], zones), Is.True, "球につないだワイヤーが電気を帯びない");
+            var hits = new List<HitRecord>();
+            StageZones.StepChargedWires(zones, states, configs, hits);
+            Assert.That(hits.Count, Is.EqualTo(1), "ロープに触れた人だけに当たる");
+            Assert.That(hits[0].Attacker, Is.EqualTo(0), "当てたのはつないだ人");
+            Assert.That(hits[0].Victim, Is.EqualTo(1));
+            Assert.That(hits[0].Facing, Is.EqualTo(1), "ロープから離れる向き（右）に弾かない");
+            Assert.That(hits[0].Data.Damage, Is.GreaterThan(0));
+            Assert.That(states[1].Combat.WhipGuardTicks, Is.EqualTo(StageZones.ChargedWireRehitTicks));
+            hits.Clear();
+            StageZones.StepChargedWires(zones, states, configs, hits);
+            Assert.That(hits.Count, Is.Zero, "続けて当たった（同じ相手には間を空ける）");
+
+            // 球の外の接続点（ふつうのアンカー）なら電気を帯びない。
+            states[0] = Holder(new Vector3(10f, 4f, 0f), new Vector3(10f, 10f, 0f));
+            states[1] = new CharacterState { Position = new Vector3(10.3f, 7f, 0f) };
+            Assert.That(StageZones.IsWireCharged(states[0], zones), Is.False);
+            StageZones.StepChargedWires(zones, states, configs, hits);
+            Assert.That(hits.Count, Is.Zero, "ふつうのワイヤーで当たった");
+
+            // 味方（チーム対戦）には当たらない。
+            states[0] = Holder(new Vector3(0f, 4f, 0f), new Vector3(0f, 10f, 0f));
+            CharacterState ally = new CharacterState { Position = new Vector3(0.2f, 6f, 0f) };
+            CharacterState owner = states[0];
+            owner.Combat.Team = 1;
+            ally.Combat.Team = 1;
+            states[0] = owner;
+            states[1] = ally;
+            StageZones.StepChargedWires(zones, states, configs, hits);
+            Assert.That(hits.Count, Is.Zero, "味方に当たった");
+        }
+
+        [Test]
+        public void ChargedWire_FollowsTheRopeAroundCorners()
+        {
+            // ロープが角に巻き付いたとき（D-33）は、接続点 → 支点 → キャラクターの折れ線の全部が電気を帯びる。
+            var zones = new List<StageZone> { Globe() };
+            var configs = new List<CharacterConfig> { new CharacterConfig(), new CharacterConfig() };
+            CharacterState owner = Holder(new Vector3(8f, 2f, 0f), new Vector3(0f, 10f, 0f));
+            owner.Wire.Pivots.Push(new Vector3(4f, 6f, 0f), 1);
+            // 支点の先（支点からキャラクターまで）の区間に触れている人。接続点からキャラクターへのまっすぐな線からは離れている。
+            var states = new List<CharacterState> { owner, new CharacterState { Position = new Vector3(6f, 4f, 0f) } };
+            var hits = new List<HitRecord>();
+            StageZones.StepChargedWires(zones, states, configs, hits);
+            Assert.That(hits.Count, Is.EqualTo(1), "巻き付いた先のロープで当たらない");
+        }
+
+        [Test]
+        public void ChargedWire_InTheWorld_HitsAndIsCreditedToTheHolder()
+        {
+            var terrain = Floor().AddAnchor(0f, 10f);
+            var world = new SimWorld(terrain, null, new[] { Globe() });
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, 4f, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(0.4f, Movement.HalfHeight, 0f), 1);
+            world.SetState(0, Holder(new Vector3(0f, 4f, 0f), new Vector3(0f, 10f, 0f)));
+            // 相手を、ロープの途中に置く（空中で止める）。
+            CharacterState target = world.GetState(1);
+            target.Position = new Vector3(0.4f, 6.5f, 0f);
+            world.SetState(1, target);
+            var inputs = new[] { new PlayerInput(0, 0, InputButtons.Wire), default(PlayerInput) };
+            world.Step(inputs);
+            Assert.That(world.GetState(0).Wire.Phase, Is.EqualTo(WirePhase.Attached), "前提: つないだまま");
+            Assert.That(world.GetState(1).Combat.HasLastAttacker, Is.True, "電気のワイヤーが当たらない");
+            Assert.That(world.GetState(1).Combat.LastAttacker, Is.EqualTo(0), "手柄がつないだ人にならない");
+            Assert.That(world.GetState(1).Action.Kind, Is.EqualTo(ActionKind.Hitstun), "のけぞらない");
+        }
+
+        [Test]
+        public void ElectricFlag_IsOnlyForHazards_AndPartOfTheZone()
+        {
+            Assert.That(Globe().Electric, Is.True);
+            Assert.That(Globe(), Is.Not.EqualTo(new StageZone(StageZoneKind.Hazard, -0.9f, 9.1f, 0.9f, 10.9f, Vector2.UnitY, 8f, 12f,
+                new StageZoneTiming(30, 30, 0), default, 1.8f, default, 0, 0, 0.9f, 0f)), "電気の有無が比べられない");
+            var gust = new StageZone(StageZoneKind.Gust, 0f, 0f, 1f, 1f, Vector2.UnitY, 10f, 5f, default, default, electric: true);
+            Assert.That(gust.Electric, Is.False, "危険のほかの種類に電気を持たせた");
         }
     }
 }

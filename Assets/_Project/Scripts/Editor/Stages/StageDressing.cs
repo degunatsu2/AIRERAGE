@@ -228,7 +228,9 @@ namespace Airerage.Editor.Stages
             foreach (Transform box in terrain.transform)
             {
                 var collider = box.GetComponent<BoxCollider>();
-                if (collider == null)
+                // ステージの飾り（Decorate）が見た目を外した地形は、自前の模型（名前 + "Model" の飾り。キッチンのトースター）で見せる。
+                // ブロックを作らない。
+                if (collider == null || box.GetComponent<MeshRenderer>() == null)
                 {
                     continue;
                 }

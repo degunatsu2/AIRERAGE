@@ -88,6 +88,18 @@ namespace Airerage.Editor.Stages
         public float CapHeight;
         public float FallLength;
 
+        /// <summary>
+        /// 見た目の出どころ（ワールドの位置。やかんの注ぎ口など。なければ範囲の下の辺の真ん中）。判定の範囲は出どころに合わせて決める
+        /// （2026-11-20 の方針: 判定を見た目に合わせる）。
+        /// </summary>
+        public Vector3? Source;
+
+        /// <summary>危険が電気を帯びているか（中のアンカーポイントにつないだワイヤーが電気を帯びる。研究所のプラズマ球）。</summary>
+        public bool Electric;
+
+        /// <summary>奥の地面の高さ（x, z → y。転がる噴石が飛び出して転がる火口の壁。見た目だけ）。</summary>
+        public System.Func<float, float, float> Backdrop;
+
         /// <summary>予告の間に警告音を鳴らすか（危険・吹雪）。</summary>
         public bool WarningSound = true;
 
@@ -179,6 +191,32 @@ namespace Airerage.Editor.Stages
             FallLength = length;
             return this;
         }
+
+        /// <summary>危険に電気を帯びさせる（中のアンカーポイントにつないだワイヤーが電気を帯び、ロープに触れた相手に電気の攻撃）。</summary>
+        public ZoneSpec Electrified()
+        {
+            Electric = true;
+            return this;
+        }
+
+        /// <summary>奥の地面の高さを決める（転がる噴石が、その地面の上を飛び出して転がる）。</summary>
+        public ZoneSpec Behind(System.Func<float, float, float> height)
+        {
+            Backdrop = height;
+            return this;
+        }
+
+        /// <summary>見た目の出どころ（ワールドの位置）を決める。</summary>
+        public ZoneSpec From(Vector3 source)
+        {
+            Source = source;
+            return this;
+        }
+
+        /// <summary>見た目の出どころの、ギミックの物体からの位置（なければ範囲の下の辺の真ん中）。</summary>
+        public Vector3 LocalSource => Source.HasValue
+            ? new Vector3(Source.Value.x - Center.x, Source.Value.y - Center.y, Source.Value.z)
+            : new Vector3(0f, -Size.y * 0.5f, 0f);
 
         /// <summary>ワープゲートの出口を決める。</summary>
         public ZoneSpec To(Vector2 target)

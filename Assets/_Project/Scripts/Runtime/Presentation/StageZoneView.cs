@@ -58,11 +58,26 @@ namespace Airerage.Runtime.Presentation
             /// <summary>上昇気流をつむじ風にする（回りながら昇る塵の柱。線は出さない。2026-11-20 の方針）。</summary>
             DustDevil = 7,
 
-            /// <summary>跳ね返す物をプラズマ球にする（ガラスの球の中の光の筋。枠は出さない。PlasmaGlobeView。2026-11-20 の方針）。</summary>
+            /// <summary>
+            /// いつも効く電気の危険をプラズマ球にする（ガラスの球の中の光の筋。枠は出さない。PlasmaGlobeView。2026-11-20 の方針。
+            /// 前は跳ね返す物だったが、見た目に合わせて触れると感電する危険にした）。
+            /// </summary>
             Plasma = 8,
 
-            /// <summary>跳ね返す物を噴石にする（ひび割れて奥が光る溶岩の塊。枠は出さない。Airerage/MagmaRock。2026-11-20 の方針）。</summary>
+            /// <summary>
+            /// 危険を転がる噴石にする（ひび割れて奥が光る溶岩の塊が、奥の山の向こうから飛び出して斜面を転がり、遊ぶ面を横切る。枠は
+            /// 出さない。RollingBombView・Airerage/MagmaRock。2026-11-20 の方針。前は浮かぶ跳ね返す物だった）。
+            /// </summary>
             MagmaRock = 9,
+
+            /// <summary>
+            /// 周期のある発射台をトースターにする（焼いている間は溝の電熱線が光り、効き始めにパンが跳ね上がる。枠と印は出さない。
+            /// ToasterView。2026-11-20 の方針）。
+            /// </summary>
+            Toaster = 10,
+
+            /// <summary>危険をレーザーの網にする（両端の装置の間の細い赤い光線と、光線できらめくちり。枠と印は出さない。LaserGridView）。</summary>
+            Laser = 11,
         }
 
         private const int RingSegments = 40;
@@ -219,6 +234,9 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>効き始めてからのティック数（効いている間だけ。止んでいる間は -1）。落ちてくるつらら・落雷の段階の表示に使う。</summary>
         public int ActiveElapsedTicks { get; private set; } = -1;
+
+        /// <summary>周期のある危険が次に効き始めるまでのティック数（効いている間といつも効く物は 0。転がる噴石の時間割に使う）。</summary>
+        public int TicksUntilActive { get; private set; }
 
         /// <summary>Core のギミック（表示が落ちてくる物の帯 FallBand などを読む）。</summary>
         public StageZone CoreZone => _core;
@@ -575,7 +593,8 @@ namespace Airerage.Runtime.Presentation
             if (strength >= 1f && _core.Period > 0 && cycle != _soundedCycle)
             {
                 _soundedCycle = cycle;
-                PlayInMatch(SoundId.Geyser, 0.7f);
+                // トースターはパンが跳ね上がる音（ばねのジャンプ台の音）。
+                PlayInMatch(_look == ZoneLook.Toaster ? SoundId.JumpPad : SoundId.Geyser, 0.7f);
             }
             if (warning)
             {
@@ -583,7 +602,7 @@ namespace Airerage.Runtime.Presentation
             }
             ShowWarning(warning);
             // 蒸気の噴出（ZoneLook.Steam）は湯気の粒だけで見せる（枠と流れる印は出さない。予告の斜線と記号はそのまま。2026-11-20 の方針）。
-            float shown = _look == ZoneLook.Steam ? 0f : 1f;
+            float shown = _look == ZoneLook.Steam || _look == ZoneLook.Toaster ? 0f : 1f;
             float frameAlpha = (_core.Period <= 0 ? 1f : 0.25f + 0.75f * strength) * shown;
             Box(_ring, center, half, 1f + 0.05f * Mathf.Sin(time * Mathf.PI * 4f), frameAlpha);
             Vector2 side = new Vector2(_direction.y, -_direction.x);
@@ -601,13 +620,6 @@ namespace Airerage.Runtime.Presentation
         // 脈打つ二重の枠。
         private void RenderBumper(Vector3 center, Vector2 half, float time)
         {
-            if (_look == ZoneLook.Plasma || _look == ZoneLook.MagmaRock)
-            {
-                // プラズマ球と噴石は物の見た目で見せる（脈打つ枠は出さない）。
-                SetColor(_ring, 0f);
-                SetColor(_inner, 0f);
-                return;
-            }
             float pulse = Mathf.Sin(time * Mathf.PI * 2f);
             Box(_ring, center, half, 1f + 0.06f * pulse, 1f);
             Box(_inner, center, half, 0.7f - 0.08f * pulse, 0.5f + 0.3f * pulse);
@@ -630,7 +642,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (_look == ZoneLook.Steam)
             {
-                // 湯気（やかん）は湯気の粒だけで見せる（筋と吹く向きの矢印は出さない。予告の斜線と記号はそのまま）。
+                // 湯気（やかん・噴気孔）は湯気の粒だけで見せる（筋と吹く向きの矢印は出さない。予告の斜線と記号はそのまま）。
                 foreach (LineRenderer line in _marks)
                 {
                     SetColor(line, 0f);
@@ -770,6 +782,7 @@ namespace Airerage.Runtime.Presentation
             if (_core.Period <= 0)
             {
                 cycle = 0;
+                TicksUntilActive = 0;
                 return 1f;
             }
             _core.Cycle(tick, CurrentSeed(), out int index, out int start, out int next);
@@ -777,11 +790,13 @@ namespace Airerage.Runtime.Presentation
             {
                 cycle = index;
                 ActiveElapsedTicks = tick - start;
+                TicksUntilActive = 0;
                 return 1f;
             }
             ActiveElapsedTicks = -1;
             cycle = index + 1;
             int untilActive = next - tick;
+            TicksUntilActive = untilActive;
             int warningTicks = _core.Timing.WarningTicks > 0 ? _core.Timing.WarningTicks : SimTime.SecondsToTicks(GustWarningSeconds);
             if (untilActive <= warningTicks)
             {
@@ -858,10 +873,11 @@ namespace Airerage.Runtime.Presentation
             }
             ShowWarning(warning);
             Box(_ring, column, columnHalf, 1f, warning ? 0f : 0.9f);
-            if (_look == ZoneLook.Flame || _look == ZoneLook.Lava || _look == ZoneLook.Lightning || _look == ZoneLook.Icicle)
+            if (_look == ZoneLook.Flame || _look == ZoneLook.Lava || _look == ZoneLook.Lightning || _look == ZoneLook.Icicle
+                || _look == ZoneLook.Plasma || _look == ZoneLook.MagmaRock || _look == ZoneLook.Laser)
             {
-                // 炎・溶岩・雷・つららは見た目の物体（_activeVisual・LightningStrikeView・IcicleFallView）で見せる。線の枠と流れる印は
-                // 出さない（予告の斜線と記号だけ）。
+                // 炎・溶岩・雷・つらら・プラズマ球・転がる噴石は見た目の物体（_activeVisual・LightningStrikeView・IcicleFallView・
+                // PlasmaGlobeView・RollingBombView・LaserGridView）で見せる。線の枠と流れる印は出さない（予告の斜線と記号だけ）。
                 SetColor(_ring, 0f);
                 foreach (LineRenderer line in _marks)
                 {
@@ -1200,7 +1216,8 @@ namespace Airerage.Runtime.Presentation
 
         // いつも吹いている縦の風（上昇気流と、上下向きの周期のない風）か。同じ見た目にする。
         private bool IsSteadyDraft => _zone.Kind == StageZoneKind.Updraft
-            || (_zone.Kind == StageZoneKind.Gust && _core.Period <= 0 && _look != ZoneLook.Flow && Mathf.Abs(_direction.y) > Mathf.Abs(_direction.x));
+            || (_zone.Kind == StageZoneKind.Gust && _core.Period <= 0 && _look != ZoneLook.Flow && _look != ZoneLook.Steam
+                && Mathf.Abs(_direction.y) > Mathf.Abs(_direction.x));
 
         // 縦の風の筋（幅 0.8m ごとの列、2〜8 列。1 列に 2 本）。
         private void CreateDraftStreaks()

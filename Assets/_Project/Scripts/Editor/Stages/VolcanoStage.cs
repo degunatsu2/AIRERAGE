@@ -9,8 +9,8 @@ namespace Airerage.Editor.Stages
     /// 火山の火口（CRATER）。左右の火口の縁（段になった岩）と、溶岩の湖の真ん中の岩の柱、浮かぶ岩。溶岩に落ちると撃破。
     /// 固有のギミック（ユーザーの要望、2026-10-19 に変え、2026-10-20 に間隔と太さを変えた）: 溶岩流（Hazard。溶岩の湖のランダムな場所から、
     /// 黒曜石の段の高さまで噴き出す。威力 30（その枚数のコインを落とす）で、高く吹き飛ばす。噴く前に当たる柱の全体に警告と警告音）、壁の間欠泉（周期のある Launcher。縁の上の段と
-    /// 下の段の内側の壁から、火口の内側へ斜めに一斉に噴き出し、強い風よりも強く吹き飛ばす）、噴火口（Launcher。縁から火口の真ん中へ
-    /// 飛ばす）、噴石（Bumper）。
+    /// 下の段の内側の壁から、火口の内側へ斜めに一斉に噴き出し、強い風よりも強く吹き飛ばす）、噴気孔（いつも噴く湯気の柱。とても強い風の
+    /// Gust。2026-11-20）、転がる噴石（Hazard。奥の火口の壁の向こうから飛び出し、斜面を転がって跳ね、遊ぶ面を横切る。2026-11-20）。
     /// </summary>
     internal static class VolcanoStage
     {
@@ -112,22 +112,25 @@ namespace Airerage.Editor.Stages
                         .Every(20f, 3.6f, 0f, 0f, 2f).Styled(StageZoneView.ZoneLook.Steam),
                     new ZoneSpec("GeyserLowEast", StageZoneKind.Launcher, new Vector2(31.5f, -6.5f), new Vector2(5f, 5f), new Vector2(-1f, 0.8f), 32f)
                         .Every(20f, 3.6f, 0f, 0f, 2f).Styled(StageZoneView.ZoneLook.Steam),
-                    // 噴火口: 縁の低い段から、火口の真ん中の柱へ飛ばす。
-                    ZoneSpec.OnFloor("VentWest", StageZoneKind.Launcher, -37f, -35f, 2f, new Vector2(0.7f, 1f), 32f).Styled(StageZoneView.ZoneLook.Steam),
-                    ZoneSpec.OnFloor("VentEast", StageZoneKind.Launcher, 35f, 37f, 2f, new Vector2(-0.7f, 1f), 32f).Styled(StageZoneView.ZoneLook.Steam),
-                    // 噴石（浮かぶ溶けた岩）: 当たると外へ弾かれる。見た目はひび割れて奥が光るパン皮状火山弾（2026-11-20 の方針）。
-                    new ZoneSpec("BombWest", StageZoneKind.Bumper, new Vector2(-20f, 18f), new Vector2(1.8f, 1.8f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
-                    new ZoneSpec("BombEast", StageZoneKind.Bumper, new Vector2(20f, 18f), new Vector2(1.8f, 1.8f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
-                    new ZoneSpec("BombHighWest", StageZoneKind.Bumper, new Vector2(-33f, 24f), new Vector2(2f, 2f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
-                    new ZoneSpec("BombHighEast", StageZoneKind.Bumper, new Vector2(33f, 24f), new Vector2(2f, 2f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
-                    new ZoneSpec("BombTop", StageZoneKind.Bumper, new Vector2(0f, 33f), new Vector2(2.2f, 2.2f), Vector2.up, 18f).Styled(StageZoneView.ZoneLook.MagmaRock),
+                    // 噴気孔: 縁の低い段の穴から、いつも湯気が勢いよく噴き上がる。湯気の柱（穴から 11m）の中は、間欠泉と同じくらい
+                    // とても強い風（火口の内側へ少し傾けて上へ、30 m/s まで。2026-11-20 の要望: ジャンプ台の効果は見た目と合わない）。
+                    new ZoneSpec("VentWest", StageZoneKind.Gust, new Vector2(-36f, 7.5f), new Vector2(3.2f, 11f), new Vector2(0.3f, 1f), 240f, 30f)
+                        .Styled(StageZoneView.ZoneLook.Steam),
+                    new ZoneSpec("VentEast", StageZoneKind.Gust, new Vector2(36f, 7.5f), new Vector2(3.2f, 11f), new Vector2(-0.3f, 1f), 240f, 30f)
+                        .Styled(StageZoneView.ZoneLook.Steam),
+                    // 転がる噴石（2026-11-20 の要望: 浮かんでいるのは不自然 → 奥の山から転がってくる）: 15〜25 秒ごとのばらつきのある
+                    // 周期で、奥の火口の壁の尾根の上に警告が出て（6 秒前）、尾根の向こうから噴石が飛び出し、斜面を跳ねて転がり、大きく跳ねて
+                    // 遊ぶ面を横切る（RollingBombView）。横切る所（柱の横の位置はランダム。高さ 6〜10m・幅 3.6m、0.25 秒）だけ当たり、
+                    // 威力 20 の枚数のコインを落として上へ吹き飛ぶ。
+                    new ZoneSpec("RollingBomb", StageZoneKind.Hazard, new Vector2(0f, 8f), new Vector2(60f, 4f), Vector2.up, 20f, 22f)
+                        .Every(15f, 0.25f, 0f, 10f, 6f).Column(3.6f).Capped(1.8f).Behind(CraterHeight).Styled(StageZoneView.ZoneLook.MagmaRock),
                 },
                 Coins = new (Vector2, int)[]
                 {
                     // 柱のジャンプ台の上と、加速リングの上。
                     (new Vector2(0f, 3.5f), 1), (new Vector2(0f, 10.5f), 1), (new Vector2(0f, 13.5f), 1), (new Vector2(0f, 20f), 1), (new Vector2(0f, 23f), 1),
-                    // 噴火口で飛ぶ道。
-                    (new Vector2(-30f, 9.8f), 1), (new Vector2(-20f, 13.6f), 1), (new Vector2(30f, 9.8f), 1), (new Vector2(20f, 13.6f), 1),
+                    // 噴気孔の風で昇る道（湯気の柱の中と、抜けた先）。
+                    (new Vector2(-35.6f, 10.5f), 1), (new Vector2(-29f, 23.5f), 1), (new Vector2(35.6f, 10.5f), 1), (new Vector2(29f, 23.5f), 1),
                     // 浮かぶ岩のジャンプ台の上、浮かぶ岩と柱の間、縁の中段のジャンプ台の上。
                     (new Vector2(-21.5f, 9f), 1), (new Vector2(-21.5f, 12.5f), 1), (new Vector2(21.5f, 9f), 1), (new Vector2(21.5f, 12.5f), 1),
                     (new Vector2(-14f, 4f), 1), (new Vector2(-14f, 12f), 1), (new Vector2(-14f, 17f), 1),

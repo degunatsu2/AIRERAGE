@@ -219,7 +219,10 @@ namespace Airerage.Core.Combat
         public int StunGuardTicks;
         public int StunCount;
 
-        /// <summary>鞭（インバータのワイヤー）にもう当たらない残り（ティック。同じ鞭に続けて当たらないように）。</summary>
+        /// <summary>
+        /// 鞭（インバータのワイヤー）と電気を帯びたワイヤー（研究所のプラズマ球。StageZones.StepChargedWires）に、もう当たらない残り
+        /// （ティック。同じ電気の線に続けて当たらないように）。
+        /// </summary>
         public int WhipGuardTicks;
 
         /// <summary>雷の波動（インバータの間に足場につなぐ）を次に出せるまでの残り（ティック。InverterTuning.WaveCooldownTicks）。</summary>

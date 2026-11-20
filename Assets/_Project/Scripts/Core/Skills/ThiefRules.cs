@@ -627,6 +627,7 @@ namespace Airerage.Core.Skills
             // 危険の上の丸みは、置いた大きさに収まる分だけ写す。
             float cap = source.Kind == StageZoneKind.Hazard ? MathF.Min(source.CapHeight, half.Y * 2f) : 0f;
             float fall = source.Kind == StageZoneKind.Hazard ? MathF.Min(source.FallLength, half.Y * 2f) : 0f;
+            // 電気を帯びた危険（プラズマ球）は、触れると当たる危険として写す（置いた所にアンカーポイントはないので、ワイヤーの電気は写さない）。
             return new StageZone(source.Kind, item.Position.X - half.X, item.Position.Y - half.Y, item.Position.X + half.X, item.Position.Y + half.Y,
                 direction, source.Power, source.Limit, timing, source.Target, width, default, 0, 0, cap, fall);
         }

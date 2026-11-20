@@ -424,6 +424,8 @@ namespace Airerage.Core.Simulation
             // アイテム（使っているアイテムの攻撃と風、落ちているアイテム・エネルギーショット・砂岩ボール、アイテムドロップ）。
             ItemRules.StepWorld(_states, _tickConfigs, ItemTuning, _objects, _collision, Bounds, Rules, CoinSpawns, Tick,
                 phase == MatchPhase.Playing || phase == MatchPhase.Overtime, _projectileHits, Coins);
+            // 電気を帯びたワイヤー（研究所のプラズマ球にワイヤーをつないでいる間、ロープに触れた相手に電気の攻撃）。
+            StageZones.StepChargedWires(Zones, _states, _tickConfigs, _projectileHits);
             _hits.Resolve(_states, _tickConfigs, Tick, _objects, Rules.Seed, _projectileHits);
             ThiefRules.PopClones(_clones, _states, _tickConfigs, _objects, Tick);
             SkillRules.EndObjects(_objects, Coins, _states, _tickConfigs, Rules, Tick, BankSpots,

@@ -67,9 +67,15 @@ namespace Airerage.PlayMode.Tests
                     Assert.That(views, Is.Not.Empty, $"{scene}: 演出のあるギミックがない");
                     foreach (StageZoneView view in views)
                     {
-                        if (view.CoreZone.Period <= 0)
+                        if (view.GetComponentInChildren<RollingBombView>(true) != null)
                         {
-                            // いつも効いているギミック（つむじ風・悪魔の手の煙）は 1 枚。
+                            // 転がる噴石は、試合のカメラの位置から道のりの全体を撮る（CaptureRollingBomb）。
+                            yield return CaptureRollingBomb(camera, $"Fx_{scene}_{view.name}", view);
+                            continue;
+                        }
+                        if (view.CoreZone.Period <= 0 || view.CoreZone.ActiveTicks >= view.CoreZone.Period)
+                        {
+                            // いつも効いているギミック（つむじ風・悪魔の手の煙・プラズマ球）は 1 枚。
                             Capture(camera, view, view.GetComponent<StageZoneAuthoring>(), $"Fx_{scene}_{view.name}_Steady");
                             continue;
                         }
@@ -223,6 +229,100 @@ namespace Airerage.PlayMode.Tests
             }
             yield return Wait(0.7f);
             Capture(camera, view, authoring, $"{name}_6After");
+        }
+
+        // 転がる噴石: 予告が来たら、予告の始まりから 0.5（尾根の上の警告）・1.6（飛び出し）・2.8（飛んでいる）・4.0（斜面で跳ねて
+        // 転がる）・5.0（跳ねた）・6.1（遊ぶ面を横切る）・6.6 秒（手前へ落ちる）に、試合のカメラと同じ向き（柱の前 32m）から撮る。
+        private static IEnumerator CaptureRollingBomb(Camera camera, string name, StageZoneView view)
+        {
+            Time.timeScale = 4f;
+            float limit = Time.realtimeSinceStartup + 90f;
+            while (!view.ShowsWarning && Time.realtimeSinceStartup < limit)
+            {
+                yield return null;
+            }
+            Assert.That(view.ShowsWarning, $"{name}: 90 秒待っても予告が来ない");
+            Time.timeScale = 1f;
+            int warning = view.CoreZone.Timing.WarningTicks;
+            // 時間はシミュレーションのティックで数える（撮影の環境ではフレームが遅く、シミュレーションが実際の時間より遅れるため）。
+            float lastElapsed = 0f;
+            float Elapsed()
+            {
+                if (view.ShowsWarning)
+                {
+                    lastElapsed = (warning - view.TicksUntilActive) / 60f;
+                }
+                else if (view.ShowsActive && view.ActiveElapsedTicks >= 0)
+                {
+                    lastElapsed = (warning + view.ActiveElapsedTicks) / 60f;
+                }
+                else
+                {
+                    lastElapsed += Time.deltaTime;
+                }
+                return lastElapsed;
+            }
+            float[] at = { 0.5f, 1.6f, 2.8f, 4.0f, 5.0f, 6.12f, 6.6f };
+            string[] tags = { "1Sign", "2Eject", "3Flight", "4Roll", "5Hop", "6Cross", "7Away" };
+            for (int i = 0; i < at.Length; i++)
+            {
+                while (Elapsed() < at[i])
+                {
+                    yield return null;
+                }
+                Vector2 column = view.ShownColumn;
+                float x = (column.x + column.y) * 0.5f;
+                Shoot(camera, new Vector3(x, view.transform.position.y + 6f, -32f), $"{name}_{tags[i]}");
+            }
+        }
+
+        /// <summary>
+        /// 研究所のプラズマ球の電気を帯びたワイヤー: トレーニングの自分を球の真ん中につないだ状態にし、ダミーをロープの途中に置いて撮る
+        /// （Logs/Snapshots/Fx_ChargedWire_*）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureChargedWire()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            Directory.CreateDirectory(Folder);
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Lab"));
+            while (flow.Current != GameFlow.FlowScreen.Training || flow.IsLoading || SceneManager.GetActiveScene().name != "Stage_Lab")
+            {
+                yield return null;
+            }
+            yield return Wait(7f);
+            Camera camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            var world = (Airerage.Core.Simulation.SimWorld)typeof(SimulationRunner)
+                .GetField("_world", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(runner);
+            Transform globe = Object.FindObjectsByType<PlasmaGlobeView>(FindObjectsSortMode.InstanceID).OrderBy(g => g.transform.position.x).First().transform;
+            var anchor = new System.Numerics.Vector3(globe.position.x, globe.position.y, 0f);
+            // シミュレーションを止めて（表示は続く）、置いた状態のまま撮る（ボタンを押していないのでワイヤーが外れないように）。
+            ((IPauseTarget)runner).SpeedScale = 0f;
+            for (int frame = 0; frame < 6; frame++)
+            {
+                Airerage.Core.Simulation.CharacterState player = world.GetState(0);
+                player.Position = new System.Numerics.Vector3(anchor.X - 5f, anchor.Y - 4f, 0f);
+                player.Velocity = System.Numerics.Vector3.Zero;
+                player.Wire.Phase = Airerage.Core.Wire.WirePhase.Attached;
+                player.Wire.Anchor = anchor;
+                player.Wire.AnchorBody = 0;
+                player.Wire.PhaseTicks = 0;
+                player.Wire.RopeLength = System.Numerics.Vector3.Distance(player.Position, anchor);
+                world.SetState(0, player);
+                yield return null;
+            }
+            var wire = Object.FindObjectsByType<WireView>(FindObjectsSortMode.InstanceID).FirstOrDefault(w => w.ShowsCharged);
+            Assert.That(wire, Is.Not.Null, "球につないだワイヤーが電気を帯びて見えない");
+            Shoot(camera, new Vector3(anchor.X - 2.5f, anchor.Y - 1.5f, -14f), "Fx_ChargedWire_Close");
+            Shoot(camera, new Vector3(anchor.X, anchor.Y - 3f, -30f), "Fx_ChargedWire_Wide");
+            ((IPauseTarget)runner).SpeedScale = 1f;
         }
 
         // ギミックの範囲（溶岩は今の柱）が収まるように、正面から撮る。

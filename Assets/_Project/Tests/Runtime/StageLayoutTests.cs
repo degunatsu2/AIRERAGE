@@ -49,12 +49,14 @@ namespace Airerage.Runtime.Tests
         {
             { "Stage_CityDay", new[] { StageZoneKind.SpeedLane, StageZoneKind.Launcher, StageZoneKind.Gust } },
             { "Stage_CityNight", new[] { StageZoneKind.Bumper, StageZoneKind.Gust } },
-            { "Stage_Volcano", new[] { StageZoneKind.Hazard, StageZoneKind.Launcher, StageZoneKind.Bumper } },
+            // 2026-11-20: 火山の浮かぶ噴石（バンパー）は転がる噴石（危険）に、噴火口（発射台）は噴気孔の強い風に。研究所のプラズマ球
+            // （バンパー）は柱の上の電気の危険に（見た目に合わせて効果と配置も変える）。
+            { "Stage_Volcano", new[] { StageZoneKind.Hazard, StageZoneKind.Launcher, StageZoneKind.Gust } },
             { "Stage_SnowSea", new[] { StageZoneKind.Ice, StageZoneKind.SpeedLane, StageZoneKind.Launcher, StageZoneKind.Hazard, StageZoneKind.Blizzard, StageZoneKind.Water } },
             { "Stage_SpaceStation", new[] { StageZoneKind.LowGravity, StageZoneKind.Warp, StageZoneKind.Launcher } },
             // 2026-10-26 のユーザーの要望で消したもの: 研究所のワープ・低重力・水、恐怖の館の水・風・ワープ・バンパー・低重力、競技場の風と
             // バンパー、埠頭の風。
-            { "Stage_Lab", new[] { StageZoneKind.Gust, StageZoneKind.Hazard, StageZoneKind.SpeedLane, StageZoneKind.Bumper } },
+            { "Stage_Lab", new[] { StageZoneKind.Gust, StageZoneKind.Hazard, StageZoneKind.SpeedLane } },
             { "Stage_Kitchen", new[] { StageZoneKind.Hazard, StageZoneKind.Launcher, StageZoneKind.Water, StageZoneKind.Ice, StageZoneKind.SpeedLane, StageZoneKind.Gust } },
             { "Stage_Manor", new[] { StageZoneKind.Hazard, StageZoneKind.Grab, StageZoneKind.Launcher } },
             { "Stage_Stadium", new[] { StageZoneKind.SpeedLane, StageZoneKind.Launcher } },
@@ -64,7 +66,8 @@ namespace Airerage.Runtime.Tests
         // ユーザーの要望で消したギミック（2026-10-26）。残っていたら失敗する。
         private static readonly Dictionary<string, StageZoneKind[]> RemovedGimmicks = new Dictionary<string, StageZoneKind[]>
         {
-            { "Stage_Lab", new[] { StageZoneKind.Warp, StageZoneKind.LowGravity, StageZoneKind.Water } },
+            { "Stage_Lab", new[] { StageZoneKind.Warp, StageZoneKind.LowGravity, StageZoneKind.Water, StageZoneKind.Bumper } },
+            { "Stage_Volcano", new[] { StageZoneKind.Bumper } },
             { "Stage_Manor", new[] { StageZoneKind.Warp, StageZoneKind.Water, StageZoneKind.LowGravity, StageZoneKind.Bumper, StageZoneKind.Gust } },
             { "Stage_Stadium", new[] { StageZoneKind.Gust, StageZoneKind.Bumper } },
             { "Stage_Wharf", new[] { StageZoneKind.Gust } },
@@ -327,7 +330,8 @@ namespace Airerage.Runtime.Tests
         public void HazardsAndBlizzards_WarnBeforeTheyStrike(string stage)
         {
             Open(stage);
-            foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.Hazard || z.Kind == StageZoneKind.Blizzard))
+            // いつも効いている危険（周期と効く長さが同じ。研究所のプラズマ球）は、いつも見えているので予告しない。
+            foreach (StageZone zone in _zones.Where(z => (z.Kind == StageZoneKind.Hazard || z.Kind == StageZoneKind.Blizzard) && z.ActiveTicks < z.Period))
             {
                 Assert.That(zone.Timing.WarningTicks, Is.GreaterThanOrEqualTo(zone.Kind == StageZoneKind.Blizzard ? 5 * 60 : 60),
                     $"{zone} の予告が短い");
@@ -359,7 +363,8 @@ namespace Airerage.Runtime.Tests
         {
             Open("Stage_Volcano");
             // 溶岩流は 25 秒ごとに 3 秒、幅 6m で黒曜石の段（y = 13）まで噴く（ユーザーの要望、2026-10-20）。
-            StageZone[] lava = _zones.Where(z => z.Kind == StageZoneKind.Hazard).ToArray();
+            // 転がる噴石（ばらつきのある周期の危険。2026-11-20）は除く。
+            StageZone[] lava = _zones.Where(z => z.Kind == StageZoneKind.Hazard && z.Timing.JitterTicks == 0).ToArray();
             Assert.That(lava.Length, Is.EqualTo(2), "溶岩流が左右にない");
             foreach (StageZone zone in lava)
             {
@@ -433,7 +438,11 @@ namespace Airerage.Runtime.Tests
         {
             Open(stage);
             // 地形の箱と同じ向きの面が同じ位置にある飾りの箱は、カメラが動くとちらつく（z-fighting。雪原の船の白い部分。2026-10-21）。
-            Bounds[] terrain = Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None).Select(b => b.bounds).ToArray();
+            // 自前の模型で見せる地形（見た目のない当たり。キッチンのトースター。名前 + "Model" の飾り）は、面が見えないので数えない。
+            var models = new HashSet<string>(Object.FindObjectsByType<Transform>(FindObjectsSortMode.None).Where(t => t.name.EndsWith("Model"))
+                .Select(t => t.name.Substring(0, t.name.Length - "Model".Length)));
+            Bounds[] terrain = Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None).Where(b => !models.Contains(b.name))
+                .Select(b => b.bounds).ToArray();
             var problems = new List<string>();
             foreach (MeshRenderer renderer in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
             {

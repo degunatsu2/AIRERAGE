@@ -480,7 +480,7 @@ namespace Airerage.Runtime.Simulation
                 _characterViews[p].Render(_previous[p], current, alpha, config.Movement.HalfExtents.ToUnity());
                 _characterViews[p].RenderAction(current, config.Combat, _world.Rules.RespawnDelayTicks, config.Movement, config.Skills);
                 _characterViews[p].SetCostume(CharacterOf(p));
-                _wireViews[p].Render(_previous[p], current, alpha, config.Wire);
+                _wireViews[p].Render(_previous[p], current, alpha, config.Wire, StageZones.IsWireCharged(current, _world.Zones));
                 bool cloned = SimWorldFeed.TryGetClone(_world, p, out CharacterState clone);
                 _characterViews[p].RenderClone(cloned, clone, config.Movement.HalfExtents.ToUnity(), _world.Tick, _wireViews[p]);
 

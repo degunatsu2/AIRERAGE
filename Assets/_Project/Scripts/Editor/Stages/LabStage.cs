@@ -23,6 +23,12 @@ namespace Airerage.Editor.Stages
         private const float DoorOpenSeconds = 0.45f;
         private const float DoorCloseSeconds = 3.6f;
 
+        // プラズマ球（制御甲板の両端の柱の上。柱の上面 y = 26.5 に台 0.45m、その上にガラスの球）: 球の半径と、球の真ん中（アンカーポイント）。
+        internal const float PlasmaRadius = 0.85f;
+        internal const float PlasmaBaseHeight = 0.45f;
+        internal static readonly Vector2 PlasmaWest = new Vector2(-16.3f, 26.5f + PlasmaBaseHeight + PlasmaRadius * 0.92f);
+        internal static readonly Vector2 PlasmaEast = new Vector2(16.3f, 26.5f + PlasmaBaseHeight + PlasmaRadius * 0.92f);
+
         // 赤外線とミサイル: 速さ 55 m/s、威力 60、吹き飛び 42 m/s、触れてから 0.5 秒の予告、飛び終わってから 4 秒で、また撃てる【仮】。
         private const float MissileSpeed = 55f;
         private const int MissilePower = 60;
@@ -104,6 +110,8 @@ namespace Airerage.Editor.Stages
                 {
                     new Vector2(0f, 43f), new Vector2(-24f, 26f), new Vector2(24f, 26f), new Vector2(-36f, 24f), new Vector2(36f, 24f),
                     new Vector2(-8f, 15.5f), new Vector2(8f, 15.5f), new Vector2(-18f, 34f), new Vector2(18f, 34f),
+                    // プラズマ球の真ん中（つないだワイヤーは電気を帯びる）。
+                    PlasmaWest, PlasmaEast,
                 },
                 // 谷の底が撃破の線。
                 BoundsMin = new Vector2(-60f, -12f),
@@ -121,14 +129,20 @@ namespace Airerage.Editor.Stages
                     ZoneSpec.OnFloor("ConveyorWest", StageZoneKind.SpeedLane, -16f, -4.5f, 22.6f, Vector2.left, 9f),
                     ZoneSpec.OnFloor("ConveyorEast", StageZoneKind.SpeedLane, 4.5f, 16f, 22.6f, Vector2.right, 9f),
                     // レーザーの網: 縦穴を横切る線が、8 秒ごとに 1.2 秒（1.5 秒前に警告）。当たると威力 10 の枚数のコインを落とし、上へ弾かれる。
+                    // 見た目は両端の発光装置の間の細い赤い光線 3 本と、光線できらめくちり（2026-11-20 の方針。LaserGridView）。
                     new ZoneSpec("LaserGrid", StageZoneKind.Hazard, new Vector2(0f, 12f), new Vector2(32f, 0.8f), Vector2.up, 10f, 14f)
-                        .Every(8f, 1.2f, 2f, 0f, 1.5f).Column(32f),
+                        .Every(8f, 1.2f, 2f, 0f, 1.5f).Column(32f).Styled(StageZoneView.ZoneLook.Laser),
                     // 粒子加速器のリング: 換気口から縦穴へ向かって加速する。
                     new ZoneSpec("AcceleratorWest", StageZoneKind.BoostRing, new Vector2(-22f, 19f), new Vector2(2.4f, 3f), new Vector2(1f, 0.2f), 20f),
                     new ZoneSpec("AcceleratorEast", StageZoneKind.BoostRing, new Vector2(22f, 19f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.2f), 20f),
-                    // プラズマ球（バンパー）。
-                    new ZoneSpec("PlasmaWest", StageZoneKind.Bumper, new Vector2(-12f, 29f), new Vector2(2f, 2f), Vector2.up, 16f).Styled(StageZoneView.ZoneLook.Plasma),
-                    new ZoneSpec("PlasmaEast", StageZoneKind.Bumper, new Vector2(12f, 29f), new Vector2(2f, 2f), Vector2.up, 16f).Styled(StageZoneView.ZoneLook.Plasma),
+                    // プラズマ球（2026-11-20 の要望: 見た目と効果を合わせる）: 制御甲板の両端の柱（ワイヤーがつながらない）の上に置いた
+                    // プラズマボール。ガラスの球に触れると感電して威力 8 の枚数のコインを落とし、上へ弾かれる（いつも効く危険。0.5 秒ごとの
+                    // 周期で数える）。球の真ん中はアンカーポイントで、そこへつないだワイヤーは電気を帯び、つないでいる間はロープに触れた相手に
+                    // 電気の攻撃が当たる（StageZones.StepChargedWires）。
+                    new ZoneSpec("PlasmaWest", StageZoneKind.Hazard, PlasmaWest, new Vector2(PlasmaRadius * 2f, PlasmaRadius * 2f), Vector2.up, 8f, 12f)
+                        .Every(0.5f, 0.5f, 0f).Column(PlasmaRadius * 2f).Capped(PlasmaRadius).Electrified().Silent().Styled(StageZoneView.ZoneLook.Plasma),
+                    new ZoneSpec("PlasmaEast", StageZoneKind.Hazard, PlasmaEast, new Vector2(PlasmaRadius * 2f, PlasmaRadius * 2f), Vector2.up, 8f, 12f)
+                        .Every(0.5f, 0.5f, 0f).Column(PlasmaRadius * 2f).Capped(PlasmaRadius).Electrified().Silent().Styled(StageZoneView.ZoneLook.Plasma),
                 },
                 Platforms = new[]
                 {

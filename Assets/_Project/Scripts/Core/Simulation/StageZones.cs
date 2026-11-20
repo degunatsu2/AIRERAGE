@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Numerics;
 using Airerage.Core.Combat;
 using Airerage.Core.Common;
+using Airerage.Core.Match;
 using Airerage.Core.Physics;
+using Airerage.Core.Skills;
 using Airerage.Core.Wire;
 
 namespace Airerage.Core.Simulation
@@ -70,6 +72,19 @@ namespace Airerage.Core.Simulation
         /// <summary>溺れてから沈む速さ（m/s）と、撃破の線に届かなくても撃破にするティック数【仮】。</summary>
         public const float DrownSinkSpeed = 2.5f;
         public const int DrownKnockoutTicks = 180;
+
+        /// <summary>電気を帯びたワイヤー（研究所のプラズマ球）のロープの太さ（半分。m）と、同じ相手にもう一度当たるまで（ティック）【仮】。</summary>
+        public const float ChargedWireHalfThickness = 0.3f;
+        public const int ChargedWireRehitTicks = 40;
+
+        /// <summary>
+        /// 電気を帯びたワイヤーが当たったときの判定のデータ【仮】（呼ぶたびに作る。静的な可変の値を持たない）。威力 4、ロープから離れる
+        /// 向きへ小さく弾く（ロープに触れ続けないように）。
+        /// </summary>
+        public static AttackHit ChargedWireHit()
+        {
+            return new AttackHit { Damage = 4, Gauge = 60, HitstopTicks = 6, HitstunTicks = 22, KnockbackX = 9f, KnockbackY = 7f };
+        }
 
         /// <summary>危険の吹き飛ばす速さ（m/s）を決めていない（Limit が 0）ときの、威力からの速さ: 8 + 威力 × 0.25【仮】。</summary>
         public static float HazardKnockbackSpeed(float power)
@@ -443,6 +458,106 @@ namespace Airerage.Core.Simulation
         private static StageZone Before(in StageZone source, in StageZone now, int tick)
         {
             return source.Moves ? source.At(tick - 1) : now;
+        }
+
+        /// <summary>
+        /// キャラクターのワイヤーが電気を帯びているか: 動かない接続点（地形・アンカーポイント）につないでいて、接続点が電気を帯びた危険
+        /// （StageZone.Electric。研究所のプラズマ球）の範囲の中にある。
+        /// </summary>
+        public static bool IsWireCharged(in CharacterState state, IReadOnlyList<StageZone> zones)
+        {
+            if (zones == null || state.Wire.Phase != WirePhase.Attached || state.Wire.AnchorBody != 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < zones.Count; i++)
+            {
+                StageZone zone = zones[i];
+                if (zone.Electric && zone.Contains(state.Wire.Anchor))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 電気を帯びたワイヤー（2026-11-20 の要望: 研究所のプラズマ球にワイヤーをつないでいる間、ワイヤーに電気の攻撃判定を纏わせる）:
+        /// 接続点から支点を順にたどってキャラクターまでのロープのどこかに触れた相手（つないだ人とその味方・干渉されない人以外）に、
+        /// ChargedWireHit を当てる（hits に加える。当てたのはつないだ人。同じ相手には ChargedWireRehitTicks ごと。鞭と同じ
+        /// CombatState.WhipGuardTicks で数える）。ロープから離れる向きに弾く。
+        /// </summary>
+        public static void StepChargedWires(IReadOnlyList<StageZone> zones, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+            List<HitRecord> hits)
+        {
+            if (zones == null)
+            {
+                return;
+            }
+            for (int a = 0; a < states.Count; a++)
+            {
+                CharacterState owner = states[a];
+                if (owner.Combat.IsUntouchable || !IsWireCharged(owner, zones))
+                {
+                    continue;
+                }
+                WireState wire = owner.Wire;
+                for (int v = 0; v < states.Count; v++)
+                {
+                    CharacterState target = states[v];
+                    if (v == a || target.Combat.IsUntouchable || target.Combat.WhipGuardTicks > 0 || TeamRules.Allies(states, a, v))
+                    {
+                        continue;
+                    }
+                    Vector3 half = configs[v].Movement.HalfExtents;
+                    var center = new Vector2(target.Position.X, target.Position.Y);
+                    var reach = new Vector2(half.X + ChargedWireHalfThickness, half.Y + ChargedWireHalfThickness);
+                    if (!TouchesRope(wire, owner.Position, center, reach, out Vector2 near))
+                    {
+                        continue;
+                    }
+                    target.Combat.WhipGuardTicks = ChargedWireRehitTicks;
+                    states[v] = target;
+                    // ロープから離れる向き（触れた所の左右。真上・真下なら、つないだ人から離れる向き）。
+                    float side = center.X - near.X;
+                    int facing = MathF.Abs(side) > 1e-3f ? (side > 0f ? 1 : -1) : (center.X >= owner.Position.X ? 1 : -1);
+                    hits.Add(new HitRecord(a, v, AttackSlot.Ground, 0, ChargedWireHit(), facing, AttackPower.Normal, fromObject: true));
+                }
+            }
+        }
+
+        // ロープ（接続点 → 支点 → キャラクター）のどこかが、中心 center・半分の大きさ half の箱に触れるか。near は触れた区間の、
+        // 箱の中心にいちばん近い点。
+        private static bool TouchesRope(in WireState wire, Vector3 holder, Vector2 center, Vector2 half, out Vector2 near)
+        {
+            var from = new Vector2(wire.Anchor.X, wire.Anchor.Y);
+            int pivots = wire.Pivots.Count;
+            for (int i = 0; i <= pivots; i++)
+            {
+                Vector3 next = i < pivots ? wire.Pivots[i] : holder;
+                var to = new Vector2(next.X, next.Y);
+                if (ElectricRules.SegmentTouchesBox(from, to, center, half))
+                {
+                    near = NearestOnSegment(from, to, center);
+                    return true;
+                }
+                from = to;
+            }
+            near = default;
+            return false;
+        }
+
+        private static Vector2 NearestOnSegment(Vector2 from, Vector2 to, Vector2 point)
+        {
+            Vector2 d = to - from;
+            float length = d.LengthSquared();
+            if (!(length > 1e-8f))
+            {
+                return from;
+            }
+            float t = Vector2.Dot(point - from, d) / length;
+            t = t < 0f ? 0f : t > 1f ? 1f : t;
+            return from + d * t;
         }
 
         /// <summary>

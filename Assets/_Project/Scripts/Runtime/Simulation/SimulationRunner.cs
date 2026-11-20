@@ -420,7 +420,7 @@ namespace Airerage.Runtime.Simulation
             }
             if (_wireView != null)
             {
-                _wireView.Render(_previous, current, alpha, PlayerConfig.Wire);
+                _wireView.Render(_previous, current, alpha, PlayerConfig.Wire, StageZones.IsWireCharged(current, _world.Zones));
             }
             if (_aimIndicator != null)
             {

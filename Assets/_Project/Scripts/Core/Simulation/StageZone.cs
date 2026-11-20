@@ -189,6 +189,13 @@ namespace Airerage.Core.Simulation
         public readonly float FallLength;
 
         /// <summary>
+        /// 危険が電気を帯びているか（研究所のプラズマ球。2026-11-20 の要望）。範囲の中のアンカーポイントにつないだワイヤーが電気を
+        /// 帯び、つないでいる間、ロープに触れた相手（つないだ人とその味方以外）に電気の攻撃を当てる（StageZones.StepChargedWires）。
+        /// 危険のほかの種類では false。
+        /// </summary>
+        public readonly bool Electric;
+
+        /// <summary>
         /// 置いた人のチーム（チーム対戦。THIEF が置いたギミック。1〜4。0 ならステージのギミックかチームなし）。害のある面（危険・吹雪・
         /// 悪魔の手）は、このチームの人に効かない（D-81。ステージのギミックはチームに関係なく全員に効く）。
         /// </summary>
@@ -222,9 +229,10 @@ namespace Airerage.Core.Simulation
         /// <param name="travelDwell">動く端で止まって待つティック数（1 往復の中に含む）。</param>
         /// <param name="capHeight">危険の柱の上の丸みの高さ（m。0 なら四角）。</param>
         /// <param name="fallLength">危険の柱が落ちてくる物のとき、その長さ（m。0 ならふつうの柱）。</param>
+        /// <param name="electric">危険が電気を帯びているか（中のアンカーポイントにつないだワイヤーが電気を帯びる）。</param>
         public StageZone(StageZoneKind kind, float minX, float minY, float maxX, float maxY, Vector2 direction, float power, float limit,
             StageZoneTiming timing, Vector2 target, float width = 0f, Vector2 travel = default, int travelPeriod = 0, int travelDwell = 0,
-            float capHeight = 0f, float fallLength = 0f)
+            float capHeight = 0f, float fallLength = 0f, bool electric = false)
         {
             if (!(minX < maxX) || !(minY < maxY))
             {
@@ -286,6 +294,7 @@ namespace Airerage.Core.Simulation
             {
                 capHeight = 0f;
                 fallLength = 0f;
+                electric = false;
             }
             if (travelPeriod < 0 || (travelPeriod > 0 && (float.IsNaN(travel.X) || float.IsNaN(travel.Y) || float.IsInfinity(travel.X)
                 || float.IsInfinity(travel.Y))))
@@ -335,6 +344,7 @@ namespace Airerage.Core.Simulation
             TravelDwell = travelDwell;
             CapHeight = capHeight;
             FallLength = fallLength;
+            Electric = electric;
             OwnerTeam = 0;
         }
 
@@ -357,6 +367,7 @@ namespace Airerage.Core.Simulation
             TravelDwell = 0;
             CapHeight = source.CapHeight;
             FallLength = source.FallLength;
+            Electric = source.Electric;
             OwnerTeam = source.OwnerTeam;
         }
 
@@ -379,6 +390,7 @@ namespace Airerage.Core.Simulation
             TravelDwell = source.TravelDwell;
             CapHeight = source.CapHeight;
             FallLength = source.FallLength;
+            Electric = source.Electric;
             OwnerTeam = ownerTeam;
         }
 
@@ -633,6 +645,12 @@ namespace Airerage.Core.Simulation
                 && position.Y + halfExtents.Y >= bottom && position.Y - halfExtents.Y <= top;
         }
 
+        /// <summary>点 point が範囲の中か（辺の上も中とみなす）。</summary>
+        public bool Contains(Vector3 point)
+        {
+            return point.X >= MinX && point.X <= MaxX && point.Y >= MinY && point.Y <= MaxY;
+        }
+
         /// <summary>中心 position、半分の大きさ halfExtents の箱が範囲と重なるか（辺が触れているだけでも重なるとみなす）。</summary>
         public bool Overlaps(Vector3 position, Vector2 halfExtents)
         {
@@ -759,7 +777,11 @@ namespace Airerage.Core.Simulation
             {
                 c = CapHeight.CompareTo(other.CapHeight);
             }
-            return c != 0 ? c : FallLength.CompareTo(other.FallLength);
+            if (c == 0)
+            {
+                c = FallLength.CompareTo(other.FallLength);
+            }
+            return c != 0 ? c : Electric.CompareTo(other.Electric);
         }
 
         public bool Equals(StageZone other)
@@ -768,7 +790,7 @@ namespace Airerage.Core.Simulation
                 && MaxY.Equals(other.MaxY) && Direction.Equals(other.Direction) && Power.Equals(other.Power) && Limit.Equals(other.Limit)
                 && Timing.Equals(other.Timing) && Target.Equals(other.Target) && Width.Equals(other.Width) && Travel.Equals(other.Travel)
                 && TravelPeriod == other.TravelPeriod && TravelDwell == other.TravelDwell && CapHeight.Equals(other.CapHeight)
-                && FallLength.Equals(other.FallLength)
+                && FallLength.Equals(other.FallLength) && Electric == other.Electric
                 && OwnerTeam == other.OwnerTeam;
         }
 
@@ -780,7 +802,7 @@ namespace Airerage.Core.Simulation
         public override int GetHashCode()
         {
             return HashCode.Combine(HashCode.Combine(Kind, MinX, MinY, MaxX, MaxY, Direction, Power, Limit), Timing, Target, Width, Travel, TravelPeriod,
-                HashCode.Combine(TravelDwell, CapHeight, FallLength, OwnerTeam));
+                HashCode.Combine(TravelDwell, CapHeight, FallLength, Electric, OwnerTeam));
         }
 
         public override string ToString()

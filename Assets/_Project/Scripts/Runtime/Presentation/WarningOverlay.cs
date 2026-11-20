@@ -75,6 +75,12 @@ namespace Airerage.Runtime.Presentation
             Destroy(_iconTexture);
         }
 
+        /// <summary>縞と記号を出す奥行き（世界の z）を変える（奥の山の上の予告。転がる噴石）。</summary>
+        public void SetDepth(float z)
+        {
+            _z = z;
+        }
+
         /// <summary>範囲 areas（世界の xy の長方形）を縞で塗り、icons の位置に記号を置く。alpha は明滅の強さ（0〜1）。</summary>
         public void Show(IReadOnlyList<Rect> areas, IReadOnlyList<Vector2> icons, float alpha)
         {

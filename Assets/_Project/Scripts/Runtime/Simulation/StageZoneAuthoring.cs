@@ -46,6 +46,8 @@ namespace Airerage.Runtime.Simulation
         [SerializeField] private float _capHeight;
         [Tooltip("危険の柱が落ちてくる物のとき、その長さ（m。0 ならふつうの柱）")]
         [SerializeField] private float _fallLength;
+        [Tooltip("危険が電気を帯びているか（中のアンカーポイントにつないだワイヤーが電気を帯びる。研究所のプラズマ球）")]
+        [SerializeField] private bool _electric;
 
         public StageZoneKind Kind => _kind;
 
@@ -86,6 +88,12 @@ namespace Airerage.Runtime.Simulation
             _capHeight = capHeight;
         }
 
+        /// <summary>危険が電気を帯びているかを決める（シーンのビルダー用）。</summary>
+        public void ConfigureElectric(bool electric)
+        {
+            _electric = electric;
+        }
+
         /// <summary>ワープゲートの出口を決める（シーンのビルダー用）。</summary>
         public void ConfigureTarget(Vector2 target)
         {
@@ -117,6 +125,7 @@ namespace Airerage.Runtime.Simulation
             _dwellSeconds = 0f;
             _capHeight = zone.CapHeight;
             _fallLength = zone.FallLength;
+            _electric = zone.Electric;
         }
 
         /// <summary>Core のギミックにする。値が不正なら ArgumentException。</summary>
@@ -129,7 +138,7 @@ namespace Airerage.Runtime.Simulation
                 SimTime.SecondsToTicks(_phaseSeconds), SimTime.SecondsToTicks(_jitterSeconds), SimTime.SecondsToTicks(_warningSeconds));
             return new StageZone(_kind, center.x - half.x, center.y - half.y, center.x + half.x, center.y + half.y, direction, _power, _limit,
                 timing, new System.Numerics.Vector2(_target.x, _target.y), _width, new System.Numerics.Vector2(_travel.x, _travel.y),
-                SimTime.SecondsToTicks(_travelSeconds), SimTime.SecondsToTicks(_dwellSeconds), _capHeight, _fallLength);
+                SimTime.SecondsToTicks(_travelSeconds), SimTime.SecondsToTicks(_dwellSeconds), _capHeight, _fallLength, _electric);
         }
 
         /// <summary>
