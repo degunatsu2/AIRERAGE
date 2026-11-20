@@ -540,6 +540,12 @@ namespace Airerage.Runtime.Tests
             {
                 Assert.That(row.Select(t => t.name).Distinct().Count(), Is.EqualTo(1), $"高さ {row.Key} の段の板がそろっていない: " + string.Join(", ", row.Select(t => t.name).Distinct()));
             }
+            // 2026-11-20 の要望（もっとスッキリ）: 窓の列は 1 段（前の半分）、三角のマークと大きな出っ張りのある板は 1 段（前の 1/4）、
+            // ほかの段は出っ張りもマークもない平らな板。
+            Assert.That(props.Count(t => t.name == "Prop_WallWindow_Straight"), Is.EqualTo(12), "窓の列は 1 段（12 区画）");
+            Assert.That(props.Count(t => t.name == "Prop_WallAstra_Straight"), Is.EqualTo(12), "マークの板は 1 段（12 区画）");
+            Assert.That(props.Count(t => t.name == "Prop_WallAstra_Straight_Flat"), Is.GreaterThanOrEqualTo(48), "平らな板が少ない");
+            Assert.That(props.Any(t => t.name == "Prop_TopCables_Straight"), Is.False, "天井の配線（出っ張り）が残っている");
             foreach (Transform column in props.Where(t => t.name == "Prop_Column_Large_Straight"))
             {
                 float x = column.GetComponentInChildren<Renderer>().bounds.center.x;

@@ -240,15 +240,18 @@ namespace Airerage.Editor.Stages
         private const int BayHalfCount = 6;
         private const float WallBottom = -19f;
 
-        // 横の段の板（下から）。同じ段は同じ板にそろえる。
+        // 横の段の板（下から）。同じ段は同じ板にそろえる。2026-11-20 の要望（もっとスッキリ: 窓の列を半分・三角のマークと出っ張りを
+        // 1/4・でっぱりもマークもないループ用の壁を多く）: 主の板は WallAstra_Straight_Flat（マークの板と同じ柄の平らな板。出っ張り 0.3m・
+        // マークなし）。三角のマークと大きな出っ張り（2.3m）のある WallAstra_Straight は腰の 1 段だけ（4 段 → 1 段）、窓は 1 段（2 段 → 1 段）、
+        // 天井の配線（TopCables）は平らな TopSimple に。
         private static readonly string[] Rows =
         {
-            "WallBand_Straight", "WallAstra_Straight", "WallAstra_Straight", "WallWindow_Straight",
-            "WallAstra_Straight", "WallWindow_Straight", "WallAstra_Straight", "TopCables_Straight",
+            "WallBand_Straight", "WallAstra_Straight_Flat", "WallAstra_Straight", "WallAstra_Straight_Flat",
+            "WallAstra_Straight_Flat", "WallWindow_Straight", "WallAstra_Straight_Flat", "TopSimple_Straight",
         };
 
         /// <summary>
-        /// 研究所の奥: SF の壁の板を、柱の格子の区画に 1 枚ずつ・横の段ごとに同じ種類で並べ（腰の帯・板・窓の帯・天井の配線）、
+        /// 研究所の奥: SF の壁の板を、柱の格子の区画に 1 枚ずつ・横の段ごとに同じ種類で並べ（腰の帯・平らな板・マークの板 1 段・窓の帯 1 段）、
         /// 左右の棟の床を奥へ延ばして、区画の真ん中に計算機の作業台と樽、天井に照明を置く。見た目だけ（当たりはない）。
         /// </summary>
         private static void SciFiInterior(StageDecor decor, Material fallback)
@@ -256,7 +259,8 @@ namespace Airerage.Editor.Stages
             System.Func<string, Material> materials = SciFiMaterials(decor);
             // 壁は柱の間隔（Bay）ごとの区画にちょうど 1 枚の板を入れ、横の段（Rows）ごとに同じ種類の板をそろえる（2026-11-19 の要望:
             // 区画ごとにちぐはぐで「完成していないスライドパズル」のようだった。研究所のマップによくある、柱の格子と横の帯で整理した壁）。
-            // 下から: 腰の帯 → 板 2 段 → 窓の帯 → 板 → 窓の帯 → 天井の配線。板の向きは表がカメラを向くように（WallYaw）。
+            // 下から: 腰の帯 → 平らな板 → マークの板（腰の 1 段）→ 平らな板 2 段 → 窓の帯 → 平らな板 → 平らな天井。板の向きは表がカメラを
+            // 向くように（WallYaw）。
             float scale = Bay / 4f;
             float height = 3f * scale;
             for (int row = 0; row < Rows.Length; row++)
