@@ -29,6 +29,8 @@ namespace Airerage.Runtime.Presentation
         [Tooltip("落ちた所で一度に出す火花と煙（一撃ごと）")]
         [SerializeField] private ParticleSystem _sparks;
         [SerializeField] private ParticleSystem _smoke;
+        [Tooltip("空の光（奥の大きな板。雲の中の放電で空が一瞬明るくなる）")]
+        [SerializeField] private Renderer _skyFlash;
 
         private const int MainPoints = 34;
         private const int BranchCount = 4;
@@ -55,6 +57,7 @@ namespace Airerage.Runtime.Presentation
         private bool _wasActive;
         private bool _linesOn = true;
         private float _scorchAlpha = -1f;
+        private float _skyAlpha = -1f;
         private float _nextStreamerFlicker;
 
         /// <summary>今の稲妻の明るさ（0〜。テスト用）。</summary>
@@ -65,8 +68,9 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(StageZoneView view, Material lineMaterial, float top, float ground, float depth, Light flash, Renderer scorch,
-            ParticleSystem sparks, ParticleSystem smoke)
+            ParticleSystem sparks, ParticleSystem smoke, Renderer skyFlash)
         {
+            _skyFlash = skyFlash;
             _view = view;
             _lineMaterial = lineMaterial;
             _top = top;
@@ -99,6 +103,7 @@ namespace Airerage.Runtime.Presentation
                 _flash.intensity = 0f;
             }
             SetScorch(0f);
+            SetGlow(_skyFlash, ref _skyAlpha, new Color(0.55f, 0.5f, 0.85f), 0f);
         }
 
         private LineRenderer CreateLine(string name, int points)
@@ -240,24 +245,26 @@ namespace Airerage.Runtime.Presentation
                     {
                         _flash.intensity = 0f;
                     }
+                    SetGlow(_skyFlash, ref _skyAlpha, new Color(0.55f, 0.5f, 0.85f), 0f);
                 }
                 SetScorch(t < 3f ? 1f - t / 3f : 0f);
                 return;
             }
             _linesOn = true;
             Vector3[] path = stroke >= 2 ? _fork : _main;
-            SetLine(_mainCore, path, 0.14f, 0.08f, CoreColor, brightness);
-            SetLine(_mainHalo, path, 1.1f, 0.6f, HaloColor, brightness * 0.45f);
+            SetLine(_mainCore, path, 0.24f, 0.14f, CoreColor, brightness);
+            SetLine(_mainHalo, path, 1.7f, 0.9f, HaloColor, brightness * 0.5f);
+            SetGlow(_skyFlash, ref _skyAlpha, new Color(0.55f, 0.5f, 0.85f), Mathf.Clamp01(flash) * 0.5f);
             // 枝は最初の一撃だけ（再放電は枝分かれしない）。
             float branch = t >= 0f ? Mathf.Exp(-t / 0.05f) : 0f;
             for (int b = 0; b < BranchCount; b++)
             {
-                SetLine(_branchCore[b], _branches[b], 0.08f, 0.01f, CoreColor, branch);
-                SetLine(_branchHalo[b], _branches[b], 0.6f, 0.15f, HaloColor, branch * 0.35f);
+                SetLine(_branchCore[b], _branches[b], 0.12f, 0.02f, CoreColor, branch);
+                SetLine(_branchHalo[b], _branches[b], 0.9f, 0.2f, HaloColor, branch * 0.4f);
             }
             if (_flash != null)
             {
-                _flash.intensity = brightness * 6f;
+                _flash.intensity = brightness * 10f;
             }
             SetScorch(Mathf.Clamp01(1f - t / 3f));
         }
@@ -325,15 +332,22 @@ namespace Airerage.Runtime.Presentation
 
         private void SetScorch(float alpha)
         {
-            if (_scorch == null || Mathf.Abs(alpha - _scorchAlpha) < 0.004f)
+            SetGlow(_scorch, ref _scorchAlpha, new Color(1f, 0.42f, 0.14f), alpha);
+        }
+
+        // 縁のぼけた光の板（Airerage/SoftParticle の _Tint）の濃さ。
+        private void SetGlow(Renderer glow, ref float current, Color color, float alpha)
+        {
+            if (glow == null || Mathf.Abs(alpha - current) < 0.004f)
             {
                 return;
             }
-            _scorchAlpha = alpha;
-            _scorch.enabled = alpha > 0.01f;
-            _scorch.GetPropertyBlock(_scorchBlock);
-            _scorchBlock.SetColor("_Tint", new Color(1f, 0.42f, 0.14f, alpha));
-            _scorch.SetPropertyBlock(_scorchBlock);
+            current = alpha;
+            glow.enabled = alpha > 0.01f;
+            glow.GetPropertyBlock(_scorchBlock);
+            color.a = alpha;
+            _scorchBlock.SetColor("_Tint", color);
+            glow.SetPropertyBlock(_scorchBlock);
         }
     }
 }

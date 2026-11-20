@@ -570,8 +570,20 @@ namespace Airerage.Editor.Stages
                 Colors = ParticleFx.Ramp(new[] { (new Color(0.38f, 0.35f, 0.42f), 0f), (new Color(0.22f, 0.21f, 0.25f), 1f) },
                     new[] { (0f, 0f), (0.5f, 0.15f), (0.3f, 0.6f), (0f, 1f) }),
             }.Build(fx, new Vector3(0f, -size.y * 0.5f + 0.3f, 0.2f), up, decor.Folder);
+            // 空の光（落ちる所の奥の大きな縁のぼけた板。雲の中の放電で空が一瞬明るくなる）。
+            Material skyMaterial = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("LightningSky", "Airerage/SoftParticle", m =>
+            {
+                m.SetFloat("_Softness", 1f);
+                m.SetFloat("_Noise", 0.3f);
+                m.SetFloat("_NoiseScale", 2f);
+                m.SetFloat("_Intensity", 1f);
+                m.SetColor("_Tint", new Color(0.55f, 0.5f, 0.85f, 0f));
+                m.SetFloat("_SrcBlend", (float)BlendMode.One);
+                m.SetFloat("_DstBlend", (float)BlendMode.One);
+            }, decor.Folder);
+            GameObject sky = decor.Quad("SkyFlash", fx, new Vector3(0f, size.y * 0.35f, 30f), new Vector2(70f, 46f), skyMaterial);
             fx.gameObject.AddComponent<LightningStrikeView>().Configure(root.GetComponent<StageZoneView>(), line, zone.Center.y + size.y * 0.5f, ground, 0.3f,
-                flash, scorch.GetComponent<Renderer>(), sparks, smoke);
+                flash, scorch.GetComponent<Renderer>(), sparks, smoke, sky.GetComponent<Renderer>());
             return visual;
         }
 

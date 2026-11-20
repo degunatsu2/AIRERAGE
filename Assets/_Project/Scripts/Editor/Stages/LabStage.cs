@@ -354,8 +354,19 @@ namespace Airerage.Editor.Stages
                     if (model == rows[row].AccentModel)
                     {
                         // 丸い窓の板は無地の板より手前へ厚い（窓の枠の出っ張り）ので、奥の面でそろえると手前へ浮く（2026-11-20 の指摘）。
-                        // 表の面を同じ段のふつうの板の表の面にそろえる（はみ出した奥は壁の裏に隠れる）。
-                        panel.transform.position += new Vector3(0f, 0f, rowFront[row] - front);
+                        // 奥へずらすと窓の縁とガラスが壁の裏に隠れたので、奥行きだけを同じ段のふつうの板の厚さに縮め、奥の面をそろえ直す
+                        // （表の面がそろう）。
+                        float depth = 13f - front;
+                        float target = 13f - rowFront[row];
+                        if (depth > target + 0.01f)
+                        {
+                            Vector3 axis = Quaternion.Inverse(Quaternion.Euler(0f, WallYaw, 0f)) * Vector3.forward;
+                            float k = target / depth;
+                            Vector3 s = panel.transform.localScale;
+                            panel.transform.localScale = new Vector3(Mathf.Abs(axis.x) > 0.5f ? s.x * k : s.x, Mathf.Abs(axis.y) > 0.5f ? s.y * k : s.y,
+                                Mathf.Abs(axis.z) > 0.5f ? s.z * k : s.z);
+                            panel.transform.position += new Vector3(0f, 0f, 13f - Back(panel));
+                        }
                     }
                     else if (rowFront[row] == 0f)
                     {
@@ -451,6 +462,17 @@ namespace Airerage.Editor.Stages
                 go.transform.position += new Vector3(position.x - bounds.center.x, position.y - bounds.min.y, back - bounds.max.z);
             }
             return go;
+        }
+
+        // 置いた板の奥（いちばん奥）の面の z。
+        private static float Back(GameObject go)
+        {
+            float back = float.MinValue;
+            foreach (Renderer renderer in go.GetComponentsInChildren<Renderer>())
+            {
+                back = Mathf.Max(back, renderer.bounds.max.z);
+            }
+            return back;
         }
 
         // 置いた板の表（カメラ側。いちばん手前）の面の z。
