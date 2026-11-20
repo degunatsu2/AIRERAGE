@@ -318,6 +318,15 @@ namespace Airerage.Runtime.Presentation
                         _marks.Add(CreateLine($"Snow{i + 1}", 2, 0.1f));
                     }
                     break;
+                case StageZoneKind.Grab:
+                    // 端で待っている間の、次に向かう方への控えめな矢印（「>」を 3 つ。2026-11-20 の要望）。
+                    for (int i = 0; i < 3; i++)
+                    {
+                        LineRenderer chevron = CreateLine($"NextArrow{i + 1}", 3, 0.12f);
+                        chevron.enabled = false;
+                        _marks.Add(chevron);
+                    }
+                    break;
             }
             if (_zone.Kind == StageZoneKind.Gust && _core.Period > 0 && !IsSteadyDraft)
             {
@@ -452,12 +461,46 @@ namespace Airerage.Runtime.Presentation
                     RenderWater(center, half);
                     break;
                 case StageZoneKind.Grab:
-                    // 悪魔の手の見た目は _moving の子（DemonHandView が指を動かす）。線はない。
+                    // 悪魔の手の見た目は _moving の子（DemonHandView が指を動かす）。端で待つ間だけ、次に向かう方へ矢印。
+                    RenderDwellArrows(center, half, tick);
                     break;
             }
         }
 
         private const int WaterPoints = 48;
+
+        /// <summary>端で待っている間に出す、次に向かう向き（+1・-1。出していなければ 0。テスト用）。</summary>
+        public int ShownDwellDirection { get; private set; }
+
+        // 悪魔の手が端で待つ間: 次に動く向きへ、手の上で「>」が 3 つ流れる（控えめな黄色。待ち時間の終わりほど濃い）。
+        private void RenderDwellArrows(Vector3 center, Vector2 half, int tick)
+        {
+            int direction = _core.DwellDirection(tick);
+            ShownDwellDirection = direction;
+            if (direction == 0)
+            {
+                foreach (LineRenderer line in _marks)
+                {
+                    line.enabled = false;
+                }
+                return;
+            }
+            Vector2 travel = new Vector2(_core.Travel.X, _core.Travel.Y).normalized * direction;
+            Vector2 side = new Vector2(-travel.y, travel.x);
+            float time = Time.time;
+            for (int i = 0; i < _marks.Count; i++)
+            {
+                LineRenderer line = _marks[i];
+                line.enabled = true;
+                float phase = Mathf.Repeat(time * 1.6f + i / (float)_marks.Count, 1f);
+                Vector2 tip = new Vector2(center.x, center.y + half.y + 0.9f) + travel * (half.x + 0.4f + phase * 1.8f);
+                Vector2 back = tip - travel * 0.45f;
+                line.SetPosition(0, new Vector3(back.x + side.x * 0.38f, back.y + side.y * 0.38f, WarningArrowDepth));
+                line.SetPosition(1, new Vector3(tip.x, tip.y, WarningArrowDepth));
+                line.SetPosition(2, new Vector3(back.x - side.x * 0.38f, back.y - side.y * 0.38f, WarningArrowDepth));
+                SetLineColor(line, WarningArrowColor, 0.55f * Fade(phase));
+            }
+        }
 
         // 水面の波（ゆっくり揺れる線）と、水の中を上がっていく泡（シミュレーションの水面は動かない。見た目だけ）。
         private void RenderWater(Vector3 center, Vector2 half)

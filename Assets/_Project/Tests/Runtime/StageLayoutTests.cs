@@ -843,9 +843,21 @@ namespace Airerage.Runtime.Tests
         public void Wharf_ConnectsTheMiddleAndTheOutside_ThroughTheBeamAndUnderThePiers()
         {
             Open("Stage_Wharf");
-            // 梁の真ん中の穴と、その上のアンカー。
-            Assert.That(_terrain.IsOverlapping(new NVector3(0f, 30.7f, 0f), CharacterHalf), Is.False, "クレーンの梁の真ん中に穴がない");
-            Assert.That(_terrain.AnchorPoints.Any(a => System.MathF.Abs(a.X) < 1f && a.Y > 31.4f), Is.True, "梁の穴の上にアンカーがない");
+            // 梁の真ん中の穴と、その上のアンカー（梁は左の荷台のいちばん上〈24.5m〉まで下げた。2026-11-20 の要望）。
+            BoxTerrain.Box beam = _terrain.Boxes.Where(b => b.Min.X > 2f && b.Max.X < 28f && b.Max.Y - b.Min.Y < 2f && b.Max.X - b.Min.X > 20f).Single();
+            Assert.That(beam.Min.Y, Is.EqualTo(24.5f).Within(0.01f), "梁が荷台のいちばん上の高さにない");
+            Assert.That(_terrain.IsOverlapping(new NVector3(0f, (beam.Min.Y + beam.Max.Y) * 0.5f, 0f), CharacterHalf), Is.False, "クレーンの梁の真ん中に穴がない");
+            Assert.That(_terrain.AnchorPoints.Any(a => System.MathF.Abs(a.X) < 1f && a.Y > beam.Max.Y), Is.True, "梁の穴の上にアンカーがない");
+            // 梁の上に積んだコンテナと、そのいちばん上の赤いコイン（2026-11-20 の要望）。
+            foreach (float side in new[] { -1f, 1f })
+            {
+                BoxTerrain.Box[] onBeam = _terrain.Boxes.Where(b => System.MathF.Sign(b.Min.X + b.Max.X) == side && b.Min.Y >= beam.Max.Y - 0.01f
+                    && System.MathF.Abs(b.Min.X) < 28f && System.MathF.Abs(b.Max.X) < 28f).ToArray();
+                Assert.That(onBeam.Length, Is.GreaterThanOrEqualTo(3), "梁の上のコンテナが少ない");
+                float top = onBeam.Max(b => b.Max.Y);
+                Assert.That(_coins.Any(c => c.Value >= 20 && System.MathF.Sign(c.Position.X) == side && c.Position.Y > top), Is.True,
+                    "梁の上のコンテナの上に赤いコインがない");
+            }
             // 岸壁の下を海が続き、休める浮かぶコンテナ（ワイヤーはつながらない）が左右に 1 つずつある（ユーザーの要望、2026-10-26）。
             StageZone sea = _zones.Single(z => z.Kind == StageZoneKind.Water);
             foreach (float side in new[] { -1f, 1f })
@@ -919,11 +931,24 @@ namespace Airerage.Runtime.Tests
             float innerTop = Enumerable.Range(0, inner.Period).Max(t => { inner.TryGetCenter(t, 0, out NVector2 c); return c.Y; }) + inner.HalfSize.Y;
             Assert.That(_terrain.IsOverlapping(new NVector3(inner.Origin.X, innerTop + CharacterHalf.Y + 0.02f, 0f), CharacterHalf), Is.False,
                 "内側のボラードに乗って上がると梁にぶつかる");
-            // フォークリフトの荷台は、灯台のてっぺんより少し上まで上がる。
+            // フォークリフトの荷台（灯台の右）と灯台の左の昇降台は、灯台のてっぺんより少し上まで上がり、周期が逆（2026-11-20 の要望）。
             BoxTerrain.Box lighthouseTop = _terrain.Boxes.Where(b => b.Max.X < -40f && b.Min.Y > 15f).OrderByDescending(b => b.Max.Y).First();
-            StagePlatform pallet = _platforms.Single(p => !p.HasAnchor && p.Period != 60 * SimTime.TicksPerSecond && p.Origin.X < 0f);
-            float palletTop = Enumerable.Range(0, pallet.Period).Max(t => { pallet.TryGetCenter(t, 0, out NVector2 c); return c.Y; }) + pallet.HalfSize.Y;
-            Assert.That(palletTop, Is.GreaterThan(lighthouseTop.Max.Y).And.LessThan(lighthouseTop.Max.Y + 4f), "荷台が灯台のてっぺんの少し上まで上がらない");
+            StagePlatform[] pallets = _platforms.Where(p => !p.HasAnchor && p.Period != 60 * SimTime.TicksPerSecond && p.Origin.X < 0f).OrderBy(p => p.Origin.X).ToArray();
+            Assert.That(pallets.Length, Is.EqualTo(2), "灯台の左右に上下する足場がない");
+            Assert.That(pallets[0].Origin.X, Is.LessThan(lighthouseTop.Min.X), "灯台の左に上下する足場がない");
+            foreach (StagePlatform pallet in pallets)
+            {
+                float palletTop = Enumerable.Range(0, pallet.Period).Max(t => { pallet.TryGetCenter(t, 0, out NVector2 c); return c.Y; }) + pallet.HalfSize.Y;
+                Assert.That(palletTop, Is.GreaterThan(lighthouseTop.Max.Y).And.LessThan(lighthouseTop.Max.Y + 4f), "荷台が灯台のてっぺんの少し上まで上がらない");
+            }
+            pallets[0].TryGetCenter(0, 0, out NVector2 westAtStart);
+            pallets[1].TryGetCenter(0, 0, out NVector2 eastAtStart);
+            int halfway = pallets[0].Period / 2;
+            pallets[0].TryGetCenter(halfway, 0, out NVector2 westHalfway);
+            pallets[1].TryGetCenter(halfway, 0, out NVector2 eastHalfway);
+            Assert.That((westAtStart.Y - pallets[0].Origin.Y) * (eastAtStart.Y - pallets[1].Origin.Y) < 1f
+                && System.MathF.Abs((westHalfway.Y - pallets[0].Origin.Y) - (eastHalfway.Y - pallets[1].Origin.Y)) > 10f, Is.True,
+                "左右の荷台の周期が逆でない");
             // 左右の高い所の赤いコインの下に、アンカー（積み上げたコンテナの上から届く）。
             foreach (float side in new[] { -1f, 1f })
             {

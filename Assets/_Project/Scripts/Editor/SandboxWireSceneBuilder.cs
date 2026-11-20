@@ -468,8 +468,7 @@ namespace Airerage.Editor
             var capture = new GameObject(name + "CaptureEffect");
             capture.transform.SetParent(parent, false);
             CaptureEffectView captureView = capture.AddComponent<CaptureEffectView>();
-            captureView.Configure(LoadOrCreateMaterial("DemonClaw", new Color(0.12f, 0.05f, 0.12f)),
-                AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), new Color(0.7f, 0.3f, 1f, 0.9f));
+            captureView.Configure(AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat"), new Color(0.7f, 0.3f, 1f, 0.9f));
             SetReference(view, "_captureEffect", captureView);
             // 押し続けている間は続く技（JUGGERNAUT の地上技）を続けられる限界までの残り（オレンジ。回る砲塔の外。ユーザーの要望、2026-10-29）。
             SetReference(view, "_sustainGauge", CreateRingGauge(name + "SustainGauge", parent, "SPIN", 2.1f, new Color(1f, 0.6f, 0.2f, 0.85f)));

@@ -189,13 +189,13 @@ namespace Airerage.Editor.Stages
             };
         }
 
-        // ロールケーキ（2026-11-20 の要望で精巧に）: 焼き色の付いたスポンジの筒を少し斜めに向けて、端の面のクリームの渦巻きが見えるように
-        // （当たりの箱より大きく見えないよう、長さを少し詰める）。上にクリームの帯と絞り、いちご、ミントの葉、粉砂糖。
+        // ロールケーキ（2026-11-20 の要望で精巧に）: 焼き色の付いたスポンジの筒を真横に寝かせ（斜めは違和感があった。2026-11-20 の要望）、
+        // 両端の面にクリームの渦巻き。上にクリームの帯と絞り、いちご、ミントの葉。
         private static void RollCakeLooks(StageDecor decor, Transform visual, PlatformSpec spec)
         {
             const string stage = "Kitchen";
             float radius = spec.Size.y * 0.5f;
-            float length = spec.Size.x * 0.8f;
+            float length = spec.Size.x * 0.96f;
             Material skin = decor.Lit("RollSkin", new Color(0.72f, 0.42f, 0.18f));
             Material sponge = decor.Lit("RollSponge", new Color(1f, 0.82f, 0.5f));
             Material cream = decor.Lit("RollCream", new Color(1f, 0.98f, 0.94f));
@@ -205,7 +205,7 @@ namespace Airerage.Editor.Stages
             Material leaf = decor.Lit("RollMint", new Color(0.25f, 0.65f, 0.3f));
             var cake = new GameObject("Cake").transform;
             cake.SetParent(visual, false);
-            cake.localRotation = Quaternion.Euler(0f, -24f, 0f);
+            cake.localRotation = Quaternion.identity;
             // 筒（軸は X）: 外側の焼き色。
             ProceduralMesh.Place("Skin", cake, ProceduralMesh.Lathe(stage, "RollCakeSkin",
                 new[] { new Vector2(radius * 0.97f, -length * 0.5f), new Vector2(radius, -length * 0.48f), new Vector2(radius, length * 0.48f),
@@ -546,7 +546,8 @@ namespace Airerage.Editor.Stages
                 Debug.LogError("オーブンの火柱（Gimmicks/OvenFire）が見つからない。扉が開かない");
                 return;
             }
-            fire.ConfigureHinge(hinge, 42f);
+            // 扉はほぼいっぱいまで開く（2026-11-20 の要望）。
+            fire.ConfigureHinge(hinge, 84f);
         }
 
         // シンク（2026-11-20 の要望: 洗面台の水が手前に浮いている → 台を水に合わせて立体的に）: 槽はステンレス（奥の壁・底・左右の内側）、

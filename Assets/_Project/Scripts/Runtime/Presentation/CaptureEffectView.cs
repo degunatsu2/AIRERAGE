@@ -3,22 +3,19 @@ using UnityEngine;
 namespace Airerage.Runtime.Presentation
 {
     /// <summary>
-    /// 悪魔の手に握られた人の見た目（恐怖の館。ユーザーの要望、2026-10-26。表示だけ）: 体の下から黒い手の指が閉じて体を握り（grip 0→1）、
-    /// その後に紫の時空の渦が広がって体を吸い込む（suck 0→1。体は CharacterView が小さくして回す）。牢屋に現れたときは渦が一瞬広がって
-    /// 消える（Arrive）。指と渦は起動時に、渡された材質で作る。
+    /// 悪魔の手に握られた人の見た目（恐怖の館。ユーザーの要望、2026-10-26。表示だけ）: 紫の時空の渦が広がって体を吸い込む（suck 0→1。
+    /// 体は CharacterView が小さくして回す）。牢屋に現れたときは渦が一瞬広がって消える（Arrive）。渦は起動時に、渡された材質で作る。
+    /// 握る手はステージの悪魔の手そのもの（DemonHandView が指を閉じる）。前はここで箱の指を別に出していて、手を作り直した後に古い手が
+    /// 残って見えた（2026-11-20 の指摘）ので、出さない。
     /// </summary>
     public sealed class CaptureEffectView : MonoBehaviour
     {
-        private const int Fingers = 4;
         private const int SpiralPoints = 64;
         private const float ArriveSeconds = 0.6f;
 
-        [SerializeField] private Material _clawMaterial;
         [SerializeField] private Material _lineMaterial;
         [SerializeField] private Color _vortexColor = new Color(0.65f, 0.25f, 1f, 0.9f);
 
-        private Transform _claw;
-        private readonly Transform[] _fingers = new Transform[Fingers];
         private LineRenderer _spiral;
         private LineRenderer _rim;
         private float _arriveStarted = -10f;
@@ -31,44 +28,14 @@ namespace Airerage.Runtime.Presentation
         public bool ShowsVortex => _spiral != null && _spiral.enabled;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(Material clawMaterial, Material lineMaterial, Color vortexColor)
+        public void Configure(Material lineMaterial, Color vortexColor)
         {
-            _clawMaterial = clawMaterial;
             _lineMaterial = lineMaterial;
             _vortexColor = vortexColor;
         }
 
         private void Awake()
         {
-            _claw = new GameObject("Claw").transform;
-            _claw.SetParent(transform, false);
-            for (int i = 0; i < Fingers; i++)
-            {
-                var pivot = new GameObject($"Finger{i + 1}").transform;
-                pivot.SetParent(_claw, false);
-                pivot.localPosition = new Vector3(-0.45f + i * 0.3f, -0.2f, i % 2 == 0 ? -0.25f : 0.25f);
-                GameObject bone = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                bone.name = "Bone";
-                Destroy(bone.GetComponent<Collider>());
-                bone.transform.SetParent(pivot, false);
-                bone.transform.localPosition = new Vector3(0f, 0.55f, 0f);
-                bone.transform.localScale = new Vector3(0.18f, 1.1f, 0.18f);
-                if (_clawMaterial != null)
-                {
-                    bone.GetComponent<MeshRenderer>().sharedMaterial = _clawMaterial;
-                }
-                _fingers[i] = pivot;
-            }
-            GameObject palm = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            palm.name = "Palm";
-            Destroy(palm.GetComponent<Collider>());
-            palm.transform.SetParent(_claw, false);
-            palm.transform.localPosition = new Vector3(0f, -0.35f, 0f);
-            palm.transform.localScale = new Vector3(1.3f, 0.35f, 0.8f);
-            if (_clawMaterial != null)
-            {
-                palm.GetComponent<MeshRenderer>().sharedMaterial = _clawMaterial;
-            }
             _spiral = CreateLine("Spiral", SpiralPoints, 0.12f);
             _rim = CreateLine("Rim", 40, 0.08f);
             _rim.loop = true;
@@ -97,16 +64,6 @@ namespace Airerage.Runtime.Presentation
         public void Show(Vector3 center, float grip, float suck)
         {
             Showing = true;
-            _claw.gameObject.SetActive(suck < 0.6f);
-            _claw.position = center + new Vector3(0f, -0.9f, -0.2f);
-            for (int i = 0; i < Fingers; i++)
-            {
-                // 外へ開いた指が、体を包むように内へ閉じる。
-                float side = i < Fingers / 2 ? 1f : -1f;
-                float open = 40f * side;
-                float closed = -25f * side;
-                _fingers[i].localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(open, closed, grip));
-            }
             float radius = Mathf.Lerp(0.2f, 1.8f, Mathf.Sin(Mathf.Clamp01(suck) * Mathf.PI * 0.85f));
             DrawVortex(center, suck > 0f ? radius : 0f, suck > 0f ? 1f : 0f);
         }
@@ -130,10 +87,6 @@ namespace Airerage.Runtime.Presentation
         private void HideAll()
         {
             Showing = false;
-            if (_claw != null)
-            {
-                _claw.gameObject.SetActive(false);
-            }
             if (_spiral != null)
             {
                 _spiral.enabled = false;

@@ -107,11 +107,11 @@ namespace Airerage.Editor.Stages
                         .Every(10f, 0.4f, 4f, 6f, 1.5f).Column(1.6f).Silent().Styled(StageZoneView.ZoneLook.Lightning),
                     new ZoneSpec("LightningFarm", StageZoneKind.Hazard, new Vector2(36f, 13f), new Vector2(24f, 26f), Vector2.up, 12f, 16f)
                         .Every(10f, 0.4f, 9f, 6f, 1.5f).Column(1.6f).Silent().Styled(StageZoneView.ZoneLook.Lightning),
-                    // 悪魔の手（ユーザーの要望、2026-10-26）: 墓場と農園の地面を 16 秒で往復し、触れた人を握って、1.2 秒でその側の牢屋へ移す。
+                    // 悪魔の手（ユーザーの要望、2026-10-26）: 墓場と農園の地面を往復し（片道 8 秒。端で 1.5 秒待ち、次に向かう方へ矢印を出す。2026-11-20 の要望）、触れた人を握って、1.2 秒でその側の牢屋へ移す。
                     new ZoneSpec("DemonHandWest", StageZoneKind.Grab, new Vector2(-45f, 1.2f), new Vector2(2.6f, 2.4f), Vector2.up, 1.2f)
-                        .To(prisonWest).Moving(new Vector2(19f, 0f), 16f),
+                        .To(prisonWest).Moving(new Vector2(19f, 0f), 19f, 1.5f),
                     new ZoneSpec("DemonHandEast", StageZoneKind.Grab, new Vector2(45f, 1.2f), new Vector2(2.6f, 2.4f), Vector2.up, 1.2f)
-                        .To(prisonEast).Moving(new Vector2(-19f, 0f), 16f),
+                        .To(prisonEast).Moving(new Vector2(-19f, 0f), 19f, 1.5f),
                     // カボチャの発射台: 農園から館の東のバルコニーへ。
                     ZoneSpec.OnFloor("PumpkinLauncher", StageZoneKind.Launcher, 26f, 28f, 0f, new Vector2(-0.5f, 1f), 32f),
                     // 鬼火の輪（加速リング）: 墓場と農園の上から館の屋根へ。
@@ -256,16 +256,29 @@ namespace Airerage.Editor.Stages
                 decor.Sphere("CaveRock", new Vector3(rx, CaveFloor + 0.15f, decor.Range(1.4f, 2.8f)),
                     new Vector3(decor.Range(0.6f, 1.4f), decor.Range(0.35f, 0.7f), decor.Range(0.6f, 1.2f)), rock);
             }
-            foreach (float fx in new[] { -46.2f, -41.5f, -36.8f, -31.4f, -26.6f })
+            // 光る茸は、洞窟の左の手前に大きい株を 1 つと、その脇に小さい株を 1 つだけ（2026-11-20 の要望: 壁に埋まっていて、並びが
+            // 均等すぎた）。株は大きさの違う茸を寄せて、傘は丸い回転体。
+            Mesh capMesh = ProceduralMesh.Lathe("Manor", "FungusCap", new[]
             {
-                for (int k = 0; k < 3; k++)
+                new Vector2(0.18f, 0f), new Vector2(0.95f, 0.05f), new Vector2(1f, 0.18f), new Vector2(0.85f, 0.42f), new Vector2(0.5f, 0.62f), new Vector2(0f, 0.7f),
+            }, 20);
+            void Cluster(Vector3 at, float size, int count)
+            {
+                for (int k = 0; k < count; k++)
                 {
-                    var at = new Vector3(fx + k * 0.32f, CaveFloor + 0.12f, 1.6f + k * 0.25f);
-                    float h = 0.18f + k * 0.07f;
-                    decor.Cylinder("FungusStem", at + Vector3.up * h * 0.5f, new Vector3(0.05f, h * 0.5f, 0.05f), glow);
-                    decor.Sphere("FungusCap", at + Vector3.up * h, new Vector3(0.22f, 0.09f, 0.22f), cap);
+                    float a = k * 2.4f;
+                    float spread = k == 0 ? 0f : size * (0.35f + 0.1f * k);
+                    float scale = size * (k == 0 ? 1f : 0.75f - 0.12f * k);
+                    var p = at + new Vector3(Mathf.Cos(a) * spread, 0f, Mathf.Sin(a) * spread * 0.6f);
+                    float h = scale * 0.9f;
+                    decor.Cylinder("FungusStem", p + Vector3.up * h * 0.5f, new Vector3(0.12f * scale, h * 0.5f, 0.12f * scale), glow)
+                        .transform.rotation = Quaternion.Euler(0f, 0f, (k % 2 == 0 ? 1f : -1f) * 6f * k);
+                    ProceduralMesh.Place("FungusCap", decor.Root, capMesh, p + Vector3.up * h, Quaternion.Euler(0f, a * 30f, (k % 2 == 0 ? 1f : -1f) * 5f * k),
+                        Vector3.one * 0.42f * scale, cap);
                 }
             }
+            Cluster(new Vector3(CaveLeft + 3.2f, CaveFloor + 0.05f, 1.1f), 1.25f, 5);
+            Cluster(new Vector3(CaveLeft + 5.1f, CaveFloor + 0.05f, 1.3f), 0.6f, 3);
         }
 
         // 格子: 黒い鉄の縦の棒と、上下の横の帯。

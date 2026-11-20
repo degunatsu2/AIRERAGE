@@ -7,7 +7,8 @@ Shader "Airerage/LightBeam"
     {
         [HDR] _Color ("Color", Color) = (1.6, 1.5, 1.1, 1)
         _Falloff ("Falloff along the beam", Float) = 1.6
-        _FacingFade ("Fade when pointing at the camera", Range(0, 1)) = 0.9
+        _FacingFade ("Fade when pointing at the camera", Range(0, 1)) = 1
+        _NearFade ("Fade within this distance from the camera (m)", Float) = 30
     }
 
     SubShader
@@ -31,6 +32,7 @@ Shader "Airerage/LightBeam"
                 half4 _Color;
                 float _Falloff;
                 half _FacingFade;
+                float _NearFade;
             CBUFFER_END
 
             struct Attributes
@@ -46,6 +48,7 @@ Shader "Airerage/LightBeam"
                 float3 normalWS : TEXCOORD1;
                 float3 viewWS : TEXCOORD2;
                 float3 axisWS : TEXCOORD3;
+                float cameraDistance : TEXCOORD4;
             };
 
             Varyings Vert(Attributes input)
@@ -58,6 +61,7 @@ Shader "Airerage/LightBeam"
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.viewWS = GetWorldSpaceNormalizeViewDir(position.positionWS);
                 output.axisWS = normalize(TransformObjectToWorldDir(float3(0, 1, 0)));
+                output.cameraDistance = distance(position.positionWS, GetCameraPositionWS());
                 return output;
             }
 
@@ -68,8 +72,10 @@ Shader "Airerage/LightBeam"
                 // 縁（視線とすれ違う面）ほど薄く、真ん中ほど濃い。
                 float core = pow(saturate(abs(dot(n, v))), 1.5);
                 float along = pow(1.0 - input.along, _Falloff);
+                // 光の向きがカメラの方を向くほど早めに消し（2026-11-20 の要望: 手前を向くと画面がまぶしい）、カメラの近くの部分も消す。
                 float facing = abs(dot(input.axisWS, v));
-                float fade = 1.0 - _FacingFade * smoothstep(0.4, 0.95, facing);
+                float fade = 1.0 - _FacingFade * smoothstep(0.15, 0.55, facing);
+                fade *= smoothstep(_NearFade * 0.5, _NearFade, input.cameraDistance);
                 return half4(_Color.rgb * core * along * fade, 0.0);
             }
             ENDHLSL

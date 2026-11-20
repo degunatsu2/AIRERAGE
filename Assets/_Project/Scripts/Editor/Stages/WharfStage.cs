@@ -76,18 +76,27 @@ namespace Airerage.Editor.Stages
                     new TerrainBox("TugMast", 0.8f, 0f, 1.2f, 6f, attachable: true),
                     // 灯台（2026-11-20 の要望: すぐ奥に灯台の模型を置き、真ん中に柱の形の足場。てっぺんはバルコニー〈灯台の展望台〉に合わせた
                     // 床。前は x -49〜-45、今は展望台の幅に合わせて -50〜-44）。
-                    new TerrainBox("Lighthouse", -48f, 1f, -46f, 22f, attachable: true),
+                    // 柱は細く（幅 2 → 1m。後ろの灯台がよく見えるように。2026-11-20 の要望）。
+                    new TerrainBox("Lighthouse", -47.5f, 1f, -46.5f, 22f, attachable: true),
                     new TerrainBox("LighthouseDeck", LighthouseX - GalleryRadius, 22f, LighthouseX + GalleryRadius, 22.6f, attachable: true),
                     // 積み上げたコンテナ（鉄。ワイヤーがつながる）。
                     new TerrainBox("StackWestLow", -42f, 1f, -36f, 3.6f, attachable: true),
                     new TerrainBox("StackWestHigh", -42f, 3.6f, -36f, 6.2f, attachable: true),
                     new TerrainBox("StackEastLow", 36f, 1f, 42f, 3.6f, attachable: true),
                     new TerrainBox("StackEastHigh", 36f, 3.6f, 42f, 6.2f, attachable: true),
-                    // ガントリークレーン（脚と上の梁。梁の真ん中に穴があり、外へ抜けられる。ユーザーの要望、2026-10-26）。
-                    new TerrainBox("CraneLegWest", -26f, 1f, -25f, 30f, attachable: true),
-                    new TerrainBox("CraneLegEast", 25f, 1f, 26f, 30f, attachable: true),
-                    new TerrainBox("CraneBeamWest", -27f, 30f, -3f, 31.4f, attachable: true),
-                    new TerrainBox("CraneBeamEast", 3f, 30f, 27f, 31.4f, attachable: true),
+                    // ガントリークレーン（脚と上の梁。梁の真ん中に穴があり、外へ抜けられる。ユーザーの要望、2026-10-26）。梁は左の荷台の
+                    // いちばん上（24.5m）まで下げた（前は 30m。2026-11-20 の要望）。
+                    new TerrainBox("CraneLegWest", -26f, 1f, -25f, BeamBottom, attachable: true),
+                    new TerrainBox("CraneLegEast", 25f, 1f, 26f, BeamBottom, attachable: true),
+                    new TerrainBox("CraneBeamWest", -27f, BeamBottom, -3f, BeamTop, attachable: true),
+                    new TerrainBox("CraneBeamEast", 3f, BeamBottom, 27f, BeamTop, attachable: true),
+                    // 梁の上に積んだコンテナ（左右に 2 つずつと、その上に 1 つ。鉄。ワイヤーがつながる。2026-11-20 の要望: 天井の上が寂しい）。
+                    new TerrainBox("BeamContainerWestOuter", -24f, BeamTop, -18f, BeamTop + 2.6f, attachable: true),
+                    new TerrainBox("BeamContainerWestInner", -12f, BeamTop, -6f, BeamTop + 2.6f, attachable: true),
+                    new TerrainBox("BeamContainerWestTop", -23.5f, BeamTop + 2.6f, -18.5f, BeamTop + 5.2f, attachable: true),
+                    new TerrainBox("BeamContainerEastOuter", 18f, BeamTop, 24f, BeamTop + 2.6f, attachable: true),
+                    new TerrainBox("BeamContainerEastInner", 6f, BeamTop, 12f, BeamTop + 2.6f, attachable: true),
+                    new TerrainBox("BeamContainerEastTop", 18.5f, BeamTop + 2.6f, 23.5f, BeamTop + 5.2f, attachable: true),
                     // 倉庫の屋根。
                     new TerrainBox("WarehouseRoof", 38f, 12f, 48f, 12.6f, attachable: true),
                 },
@@ -98,8 +107,8 @@ namespace Airerage.Editor.Stages
                 Anchors = new[]
                 {
                     new Vector2(-21f, 1.9f), new Vector2(-44f, 1.9f), new Vector2(21f, 1.9f), new Vector2(EastEdgeBollardX, 1.9f), new Vector2(-5f, -2.1f),
-                    new Vector2(5f, -2.1f), new Vector2(-27.5f, 1.9f), new Vector2(-14f, 26f), new Vector2(14f, 26f),
-                    new Vector2(-47f, 27f), new Vector2(0f, 37f), new Vector2(-37f, 17f), new Vector2(37f, 17f),
+                    new Vector2(5f, -2.1f), new Vector2(-27.5f, 1.9f), new Vector2(-14f, BeamBottom - 4f), new Vector2(14f, BeamBottom - 4f),
+                    new Vector2(-47f, 27f), new Vector2(0f, BeamTop + 5.6f), new Vector2(-37f, 17f), new Vector2(37f, 17f),
                 },
                 // 海の底が撃破の線。
                 BoundsMin = new Vector2(-60f, -12f),
@@ -129,15 +138,14 @@ namespace Airerage.Editor.Stages
                     ContainerPlate("ContainerFloor", spotA - new Vector2(0f, plateOffset), spotA, spotC, spotB, containerRed, roof: false),
                     // フォークリフトの荷台: 左の岸壁で、灯台のてっぺんより少し上（上面 24.5m）まで上下する（14 秒で 1 往復。ユーザーの要望、
                     // 2026-10-26）。
-                    new PlatformSpec("ForkliftPallet", new Vector2(-31f, 1.25f), new Vector2(3.2f, 0.5f), true)
-                        .Path(14f, (0f, Vector2.zero), (1.5f, Vector2.zero), (6.5f, new Vector2(0f, PalletRise)), (8.5f, new Vector2(0f, PalletRise)),
-                            (13.5f, Vector2.zero))
-                        .Eased().Tinted(new Color(0.85f, 0.65f, 0.3f)),
+                    Pallet("ForkliftPallet", -31f, 0f),
+                    // 灯台の左の昇降台（右の荷台と周期が逆。上と下が入れ替わる。2026-11-20 の要望）。
+                    Pallet("LighthousePallet", WestPalletX, 7f),
                     // クレーンの右の脚の両側のボラード（ユーザーの要望、2026-10-26）: 9 秒ごとに、岸壁の上で 3.3 秒待ち、1.2 秒で上へ、上で
                     // 3.3 秒待ち、1.2 秒で下へ。内側と外側は半分ずらす（片方が上なら、もう片方は下）。中心がアンカー（ワイヤーはつないだまま
                     // 運ばれる）。内側は梁の下（乗っても頭がぶつからない高さ）まで、外側は梁の上面の高さまで上がる。
-                    Bollard("BollardInner", new Vector2(24.45f, 1.46f), 27.6f, 0f),
-                    Bollard("BollardOuter", new Vector2(27.5f, 1.46f), 30.95f, 4.5f),
+                    Bollard("BollardInner", new Vector2(24.45f, 1.46f), BeamBottom - 2.4f, 0f),
+                    Bollard("BollardOuter", new Vector2(27.5f, 1.46f), BeamTop - 0.45f, 4.5f),
                 },
                 Coins = new (Vector2, int)[]
                 {
@@ -160,27 +168,30 @@ namespace Airerage.Editor.Stages
                     (new Vector2(-41f, -4f), 1), (new Vector2(41f, -4f), 1),
                     // 漁網の周りと加速リング。
                     (new Vector2(-18f, 16.5f), 1), (new Vector2(18f, 16.5f), 1), (new Vector2(-11f, 12f), 1), (new Vector2(11f, 12f), 1),
-                    // クレーンの脚と梁。
-                    (new Vector2(-24f, 12f), 1), (new Vector2(24f, 12f), 1), (new Vector2(-24f, 22f), 1), (new Vector2(24f, 22f), 1),
-                    (new Vector2(-18f, 33f), 1), (new Vector2(-6f, 33f), 1), (new Vector2(6f, 33f), 1), (new Vector2(18f, 33f), 1), (new Vector2(0f, 27.5f), 20),
-                    (new Vector2(-14f, 28.5f), 3), (new Vector2(14f, 28.5f), 3),
+                    // クレーンの脚と梁（梁を下げた分だけ下げ、梁の上はコンテナの間と上。2026-11-20 の要望）。
+                    (new Vector2(-24f, 12f), 1), (new Vector2(24f, 12f), 1), (new Vector2(-22f, 18f), 1), (new Vector2(22f, 18f), 1),
+                    (new Vector2(-15f, BeamTop + 1.5f), 1), (new Vector2(15f, BeamTop + 1.5f), 1), (new Vector2(0f, BeamBottom - 2.5f), 20),
+                    (new Vector2(-14f, BeamBottom - 2f), 3), (new Vector2(14f, BeamBottom - 2f), 3),
+                    (new Vector2(-9f, BeamTop + 4f), 3), (new Vector2(9f, BeamTop + 4f), 3),
+                    // 梁の上に積んだコンテナのいちばん上の赤いコイン（前は梁の左右の空中に浮いていた）。
+                    (new Vector2(-21f, BeamTop + 6.7f), 20), (new Vector2(21f, BeamTop + 6.7f), 20),
                     // 灯台と倉庫の屋根。
                     (new Vector2(-47f, 24.5f), 3), (new Vector2(-45f, 14f), 1), (new Vector2(-43f, 20f), 1), (new Vector2(44f, 14.5f), 3),
                     (new Vector2(40f, 14.5f), 1), (new Vector2(47f, 17f), 1),
                     // 高い所とステージの端。
-                    (new Vector2(-34f, 30f), 20), (new Vector2(34f, 30f), 20), (new Vector2(-53f, 10f), 20), (new Vector2(53f, 10f), 20),
+                    (new Vector2(-53f, 10f), 20), (new Vector2(53f, 10f), 20),
                     (new Vector2(-53f, 24f), 3), (new Vector2(53f, 24f), 3), (new Vector2(-30f, 20f), 20), (new Vector2(30f, 20f), 20),
                     (new Vector2(-40f, 22f), 20), (new Vector2(40f, 22f), 20),
                 },
                 Jackpots = new[]
                 {
-                    new Vector2(0f, 40f), new Vector2(-47f, 32f), new Vector2(47f, 32f), new Vector2(-13f, -10f), new Vector2(13f, -10f),
+                    new Vector2(0f, BeamTop + 8.6f), new Vector2(-47f, 32f), new Vector2(47f, 32f), new Vector2(-13f, -10f), new Vector2(13f, -10f),
                     new Vector2(0f, 14f),
                 },
                 Banks = new[]
                 {
                     new Vector2(0f, 4.5f), new Vector2(-39f, 9.5f), new Vector2(39f, 9.5f), new Vector2(-46.5f, 27.5f), new Vector2(43f, 17f),
-                    new Vector2(0f, 33.5f), new Vector2(-24f, 17f), new Vector2(24f, 17f),
+                    new Vector2(0f, BeamTop + 2.1f), new Vector2(-24f, 17f), new Vector2(24f, 17f),
                 },
                 Spawns = new[] { new Vector3(-21.5f, 2f, 0f), new Vector3(21.5f, 2f, 0f), new Vector3(-44f, 2f, 0f), new Vector3(44f, 2f, 0f),
                     // 5〜8 人目（チーム対戦。docs/19 T9-4。散らして置く D-84）。
@@ -203,6 +214,22 @@ namespace Airerage.Editor.Stages
 
         // フォークリフトの荷台の上がる高さ（m。上面が灯台のてっぺん 22.6m より少し上の 24.5m）。
         private const float PalletRise = 23f;
+
+        // クレーンの梁の下の面と上の面（下の面は荷台のいちばん上 24.5m にそろえる）。
+        private const float BeamBottom = 24.5f;
+        private const float BeamTop = 25.9f;
+
+        // 灯台の左の昇降台の位置（x）。
+        private const float WestPalletX = -53f;
+
+        // 上下する荷台（14 秒で 1 往復。phase 秒ずらす）。
+        private static PlatformSpec Pallet(string name, float x, float phase)
+        {
+            return new PlatformSpec(name, new Vector2(x, 1.25f), new Vector2(3.2f, 0.5f), true)
+                .Path(14f, (0f, Vector2.zero), (1.5f, Vector2.zero), (6.5f, new Vector2(0f, PalletRise)), (8.5f, new Vector2(0f, PalletRise)),
+                    (13.5f, Vector2.zero))
+                .Eased().Phase(phase).Tinted(new Color(0.85f, 0.65f, 0.3f));
+        }
 
         // クレーンの脚の横の動くボラード（下の中心 bottom から、top の高さまで。ずれ phase 秒）。
         private static PlatformSpec Bollard(string name, Vector2 bottom, float top, float phase)
@@ -341,11 +368,13 @@ namespace Airerage.Editor.Stages
             Material rail = decor.Lit("BollardRail", new Color(0.25f, 0.27f, 0.3f));
             foreach (float x in new[] { 24.45f, 27.5f })
             {
-                decor.Box("BollardRail", new Vector3(x, 16.2f, 1.2f), new Vector3(0.3f, 30f, 0.3f), rail);
+                decor.Box("BollardRail", new Vector3(x, (1.2f + BeamTop) * 0.5f, 1.2f), new Vector3(0.3f, BeamTop - 1.2f, 0.3f), rail);
             }
-            foreach (float x in new[] { -32.4f, -29.6f })
+            foreach (float x in new[] { -32.4f, -29.6f, WestPalletX - 1.4f, WestPalletX + 1.4f })
             {
-                decor.Box("PalletMast", new Vector3(x, 13.2f, 2.4f), new Vector3(0.4f, 24.2f, 0.4f), rail);
+                // 灯台の左の荷台の柱は海の中から立つ。
+                float bottom = x < -50f ? -8f : 1f;
+                decor.Box("PalletMast", new Vector3(x, (bottom + 25.2f) * 0.5f, 2.4f), new Vector3(0.4f, 25.2f - bottom, 0.4f), rail);
             }
             foreach (float x in new[] { -5f, 5f })
             {
@@ -472,9 +501,10 @@ namespace Airerage.Editor.Stages
             pivot.localPosition = new Vector3(0f, lampY, 0f);
             Material beam = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("LighthouseBeam", "Airerage/LightBeam", m =>
             {
-                m.SetColor("_Color", new Color(1.3f, 1.2f, 0.85f, 1f));
-                m.SetFloat("_Falloff", 1.4f);
-                m.SetFloat("_FacingFade", 0.92f);
+                m.SetColor("_Color", new Color(0.85f, 0.8f, 0.58f, 1f));
+                m.SetFloat("_Falloff", 1.6f);
+                m.SetFloat("_FacingFade", 1f);
+                m.SetFloat("_NearFade", 34f);
             }, decor.Folder);
             Mesh cone = ProceduralMesh.Lathe(stage, "LighthouseBeamCone", new[] { new Vector2(0.02f, 0f), new Vector2(1f, 1f) }, 24);
             foreach (float yaw in new[] { 0f, 180f })
