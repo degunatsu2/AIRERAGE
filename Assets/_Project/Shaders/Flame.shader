@@ -13,6 +13,7 @@ Shader "Airerage/Flame"
         _Taper ("Taper toward the tip", Range(0, 1)) = 0.75
         _Intensity ("Intensity", Float) = 1
         _Seed ("Seed", Float) = 0
+        _Radial ("Radial burst (0 tongues up / 1 burst outward)", Range(0, 1)) = 0
     }
 
     SubShader
@@ -41,6 +42,7 @@ Shader "Airerage/Flame"
                 half _Taper;
                 half _Intensity;
                 float _Seed;
+                half _Radial;
             CBUFFER_END
 
             struct Attributes
@@ -92,9 +94,30 @@ Shader "Airerage/Flame"
                 return output;
             }
 
+            // 放射の炎（_Radial 1）: 真ん中から外へ噴き出す炎の塊（カメラの方へ噴き出す炎を正面から見た形。2026-11-20 の要望:
+            // オーブンの奥から火が勢いよく噴き出す）。真ん中ほど熱く、外へ流れる雑音で縁が舌のようにちぎれる。
+            half4 Radial(float2 uv)
+            {
+                float t = _Time.y * _Speed;
+                float2 p = uv * 2.0 - 1.0;
+                float r = length(p);
+                float2 dir = p / max(r, 1e-3);
+                float n = Fbm(p * _NoiseScale * 0.8 - dir * t * 1.8 + _Seed);
+                float detail = Fbm(p * _NoiseScale * 2.1 - dir * t * 2.6 - _Seed);
+                float heat = saturate(1.0 - r * (1.05 - _Taper * 0.3) + (n - 0.5) * 0.7 + (detail - 0.5) * 0.25);
+                half3 color = lerp(_EdgeColor.rgb, _MidColor.rgb, smoothstep(0.15, 0.5, heat));
+                color = lerp(color, _CoreColor.rgb, smoothstep(0.55, 0.9, heat));
+                half alpha = smoothstep(0.05, 0.35, heat) * smoothstep(1.0, 0.8, r);
+                return half4(color * alpha * _Intensity, 0.0);
+            }
+
             half4 Frag(Varyings input) : SV_Target
             {
                 float2 uv = input.uv;
+                if (_Radial > 0.5)
+                {
+                    return Radial(uv);
+                }
                 float t = _Time.y * _Speed;
                 // 根元から先へ流れる雑音（先ほど細かく速い）。
                 float2 p = float2(uv.x * _NoiseScale + _Seed * 13.1, uv.y * _NoiseScale * 1.4 - t * 2.2);

@@ -46,8 +46,11 @@ namespace Airerage.Runtime.Presentation
             /// <summary>危険を炎にする（オーブンの口から噴き出す炎の舌。線は出さない。2026-11-20 の要望）。</summary>
             Flame = 3,
 
-            /// <summary>危険を溶岩の流れにする（下から噴き上がる光る溶岩。線は出さない。2026-11-20 の要望）。</summary>
+            /// <summary>危険を溶岩の噴泉にする（下から噴き上がる光る溶岩と飛び散る塊・煙。線は出さない。2026-11-20 の要望）。</summary>
             Lava = 4,
+
+            /// <summary>周期のある発射台を噴気の湯気にする（白い湯気としぶき。火山の間欠泉。2026-11-20 の方針）。</summary>
+            Steam = 5,
         }
 
         private const int RingSegments = 40;

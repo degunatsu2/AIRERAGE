@@ -14,6 +14,9 @@ namespace Airerage.Editor.Stages
     /// </summary>
     internal static class VolcanoStage
     {
+        // 溶岩の噴泉の頂きの丸み（m。柱の幅 6m の半分の半円。見た目の冠と判定を合わせる。2026-11-20 の方針）。
+        private const float LavaCrown = 3f;
+
         public static StageLayout Create()
         {
             var theme = new StageTheme
@@ -95,20 +98,20 @@ namespace Airerage.Editor.Stages
                     // 当たる柱の全体に警告。当たると威力 30 の枚数のコインを落とし、上へ 40 m/s で吹き飛ぶ（2026-10-21: 威力を 60 から 30 に、
                     // 吹き飛ぶ高さを約 3 倍に。速さ 23 → 40 m/s）。
                     new ZoneSpec("LavaFlowWest", StageZoneKind.Hazard, new Vector2(-20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 30f, 40f)
-                        .Every(25f, 3f, 0f, 0f, 2f).Column(6f).Styled(StageZoneView.ZoneLook.Lava),
+                        .Every(25f, 3f, 0f, 0f, 2f).Column(6f).Styled(StageZoneView.ZoneLook.Lava).Capped(LavaCrown),
                     new ZoneSpec("LavaFlowEast", StageZoneKind.Hazard, new Vector2(20f, -3.5f), new Vector2(28f, 33f), Vector2.up, 30f, 40f)
-                        .Every(25f, 3f, 12.5f, 0f, 2f).Column(6f).Styled(StageZoneView.ZoneLook.Lava),
+                        .Every(25f, 3f, 12.5f, 0f, 2f).Column(6f).Styled(StageZoneView.ZoneLook.Lava).Capped(LavaCrown),
                     // 壁の間欠泉: 縁の上の段（x = ±45）の上のほうと、下の段（x = ±34）の下のほうの内側の壁から、火口の内側へ斜めに噴く
                     // （4 つが一斉に、20 秒ごとに 3.6 秒。ユーザーの要望、2026-10-20。2 秒前から口に警告）。触れると速度をまるごと噴く向きにする
                     // （強い風より強い）。
                     new ZoneSpec("GeyserHighWest", StageZoneKind.Launcher, new Vector2(-42.5f, 14f), new Vector2(5f, 5f), new Vector2(1f, 0.35f), 34f)
-                        .Every(20f, 3.6f, 0f, 0f, 2f),
+                        .Every(20f, 3.6f, 0f, 0f, 2f).Styled(StageZoneView.ZoneLook.Steam),
                     new ZoneSpec("GeyserHighEast", StageZoneKind.Launcher, new Vector2(42.5f, 14f), new Vector2(5f, 5f), new Vector2(-1f, 0.35f), 34f)
-                        .Every(20f, 3.6f, 0f, 0f, 2f),
+                        .Every(20f, 3.6f, 0f, 0f, 2f).Styled(StageZoneView.ZoneLook.Steam),
                     new ZoneSpec("GeyserLowWest", StageZoneKind.Launcher, new Vector2(-31.5f, -6.5f), new Vector2(5f, 5f), new Vector2(1f, 0.8f), 32f)
-                        .Every(20f, 3.6f, 0f, 0f, 2f),
+                        .Every(20f, 3.6f, 0f, 0f, 2f).Styled(StageZoneView.ZoneLook.Steam),
                     new ZoneSpec("GeyserLowEast", StageZoneKind.Launcher, new Vector2(31.5f, -6.5f), new Vector2(5f, 5f), new Vector2(-1f, 0.8f), 32f)
-                        .Every(20f, 3.6f, 0f, 0f, 2f),
+                        .Every(20f, 3.6f, 0f, 0f, 2f).Styled(StageZoneView.ZoneLook.Steam),
                     // 噴火口: 縁の低い段から、火口の真ん中の柱へ飛ばす。
                     ZoneSpec.OnFloor("VentWest", StageZoneKind.Launcher, -37f, -35f, 2f, new Vector2(0.7f, 1f), 32f),
                     ZoneSpec.OnFloor("VentEast", StageZoneKind.Launcher, 35f, 37f, 2f, new Vector2(-0.7f, 1f), 32f),

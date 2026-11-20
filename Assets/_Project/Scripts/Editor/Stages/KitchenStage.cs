@@ -100,7 +100,7 @@ namespace Airerage.Editor.Stages
                     // オーブンの火柱（ユーザーの案）: 40 秒ごとに 3 秒、奥のオーブンから手前へ（コンロの上の全体。3 秒前に予告）。当たると威力 25 の
                     // 枚数のコインを落とし、上へ吹き飛ぶ。始まって 30 秒は噴かない。
                     new ZoneSpec("OvenFire", StageZoneKind.Hazard, new Vector2(0f, 8.5f), new Vector2(22f, 15f), Vector2.up, 25f, 26f)
-                        .Every(40f, 3f, 10f, 0f, 3f).Column(22f).Styled(StageZoneView.ZoneLook.Flame),
+                        .Every(40f, 3f, 10f, 0f, 3f).Column(22f).Styled(StageZoneView.ZoneLook.Flame).Capped(7f),
                     // トースター: 7 秒ごとにポンと跳ね上げる（1.5 秒前に予告）。
                     new ZoneSpec("Toaster", StageZoneKind.Launcher, new Vector2(-35.5f, 3.2f), new Vector2(3f, 2.4f), Vector2.up, 30f).Every(7f, 0.5f, 3f, 0f, 1.5f),
                     // シンク（水）。
