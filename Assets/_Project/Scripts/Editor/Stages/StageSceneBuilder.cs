@@ -561,8 +561,9 @@ namespace Airerage.Editor.Stages
             float lipY = -size.y * 0.5f + size.y * 0.8f;
             // 奥から手前へふくらむ炎の塊（放射の板。奥ほど小さく明るい）。
             // 重ねすぎると白く飛ぶので 3 枚（足し算）。奥ほど小さく濃い。
-            // 口を出た炎は上へ昇る（手前の塊ほど上へずれる）。いちばん手前は判定の範囲（口の下から上の端まで）を覆う。
-            (float Z, float Diameter, float Intensity)[] bursts = { (9f, 9f, 0.6f), (5.5f, 13f, 0.48f), (2f, 17f, 0.4f) };
+            // 口を出た炎は上へ昇る（手前の塊ほど上へずれる）。いちばん手前は判定の範囲（口の下から上の端まで）を覆う。いちばん奥は庫内の
+            // 奥の熱の光の板を覆う大きさ（板の四角い縁が炎の中に見えないように）。
+            (float Z, float Diameter, float Intensity)[] bursts = { (9f, 14f, 0.55f), (5.5f, 14f, 0.48f), (2f, 17f, 0.4f) };
             for (int i = 0; i < bursts.Length; i++)
             {
                 GameObject disc = decor.Quad($"Burst{i + 1}", flames, new Vector3(0f, mouthY + i * 1.2f, bursts[i].Z), new Vector2(bursts[i].Diameter / width, bursts[i].Diameter),
