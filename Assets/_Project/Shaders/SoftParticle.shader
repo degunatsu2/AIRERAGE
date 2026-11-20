@@ -1,6 +1,7 @@
 // ギミックの粒（2026-11-20 の方針: ギミックを実際の現象・ゲームの演出に寄せる。溶岩の飛び散る塊・火の粉・煙・しぶき・湯気）。
 // 絵は使わず、板の UV から丸い柔らかい形を作る。色は粒の色（頂点の色。ParticleSystem の色の変化）。_Noise が 0 より大きいと、
 // 縁を雑音で崩して煙やしぶきの塊らしくする。_SrcBlend / _DstBlend で、重ねて光らせる（足し算）か、ふつうに重ねるかを決める。
+// _Tint は頂点の色に掛ける色（頂点の色のない板を縁のぼけた光にするとき。オーブンの庫内の奥の熱の光）。
 Shader "Airerage/SoftParticle"
 {
     Properties
@@ -9,6 +10,7 @@ Shader "Airerage/SoftParticle"
         _Noise ("Edge noise", Range(0, 1)) = 0
         _NoiseScale ("Noise scale", Float) = 3
         _Intensity ("Intensity", Float) = 1
+        _Tint ("Tint (multiplies the vertex color; for plain boards without vertex colors)", Color) = (1, 1, 1, 1)
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend ("Src blend", Float) = 5
         [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend ("Dst blend", Float) = 10
     }
@@ -36,6 +38,7 @@ Shader "Airerage/SoftParticle"
                 half _Noise;
                 float _NoiseScale;
                 half _Intensity;
+                half4 _Tint;
                 float _SrcBlend;
                 float _DstBlend;
             CBUFFER_END
@@ -90,8 +93,8 @@ Shader "Airerage/SoftParticle"
                 float n = Noise(p * _NoiseScale + seed * 13.0) * 0.6 + Noise(p * _NoiseScale * 2.3 - seed * 7.0) * 0.4;
                 r += (n - 0.5) * _Noise;
                 float shape = 1.0 - smoothstep(1.0 - _Softness, 1.0, r);
-                half alpha = input.color.a * shape;
-                half3 rgb = input.color.rgb * _Intensity;
+                half alpha = input.color.a * _Tint.a * shape;
+                half3 rgb = input.color.rgb * _Tint.rgb * _Intensity;
                 rgb = MixFog(rgb, input.fogFactor);
                 // 足し算（_DstBlend = One）なら色に濃さを掛け、ふつうの重ねなら濃さを透明度に。
                 return _DstBlend == 1.0 ? half4(rgb * alpha, 0.0) : half4(rgb, alpha);

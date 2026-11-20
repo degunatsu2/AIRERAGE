@@ -170,7 +170,7 @@ namespace Airerage.Editor.Stages
                     (new Vector2(-18f, 16.5f), 1), (new Vector2(18f, 16.5f), 1), (new Vector2(-11f, 12f), 1), (new Vector2(11f, 12f), 1),
                     // クレーンの脚と梁（梁を下げた分だけ下げ、梁の上はコンテナの間と上。2026-11-20 の要望）。
                     (new Vector2(-24f, 12f), 1), (new Vector2(24f, 12f), 1), (new Vector2(-22f, 18f), 1), (new Vector2(22f, 18f), 1),
-                    (new Vector2(-15f, BeamTop + 1.5f), 1), (new Vector2(15f, BeamTop + 1.5f), 1), (new Vector2(0f, BeamBottom - 2.5f), 20),
+                    (new Vector2(-15f, BeamTop + 1.5f), 1), (new Vector2(15f, BeamTop + 1.5f), 1), (new Vector2(0f, BeamBottom - 1.3f), 20),
                     (new Vector2(-14f, BeamBottom - 2f), 3), (new Vector2(14f, BeamBottom - 2f), 3),
                     (new Vector2(-9f, BeamTop + 4f), 3), (new Vector2(9f, BeamTop + 4f), 3),
                     // 梁の上に積んだコンテナのいちばん上の赤いコイン（前は梁の左右の空中に浮いていた）。

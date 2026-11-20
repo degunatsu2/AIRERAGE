@@ -479,7 +479,16 @@ namespace Airerage.Editor.Stages
             Material blackGlass = decor.Lit("OvenBlackGlass", new Color(0.04f, 0.04f, 0.05f));
             blackGlass.SetFloat("_Smoothness", 0.92f);
             Material enamel = decor.Lit("OvenEnamel", new Color(0.12f, 0.1f, 0.1f));
-            Material heat = decor.Unlit("OvenHeat", new Color(0.75f, 0.28f, 0.06f));
+            // 庫内の奥の熱の光は縁のぼけた楕円の光（四角い板の縁が炎の中に見えた。2026-11-20）。
+            Material heat = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("OvenHeatGlow", "Airerage/SoftParticle", m =>
+            {
+                m.SetFloat("_Softness", 0.95f);
+                m.SetFloat("_Noise", 0f);
+                m.SetFloat("_Intensity", 1f);
+                m.SetColor("_Tint", new Color(0.85f, 0.3f, 0.06f, 1f));
+                m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+                m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            }, decor.Folder);
             Material element = decor.Unlit("OvenElement", new Color(1f, 0.45f, 0.1f));
             Material display = decor.Unlit("OvenDisplay", new Color(1f, 0.4f, 0.08f));
             Material doorGlass = decor.Transparent("OvenDoorGlass", new Color(0.05f, 0.04f, 0.04f, 0.72f));
