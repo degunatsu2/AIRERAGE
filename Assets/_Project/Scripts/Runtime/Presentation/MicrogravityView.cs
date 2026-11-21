@@ -32,7 +32,7 @@ namespace Airerage.Runtime.Presentation
         public const float PushShare = 0.35f;
 
         /// <summary>漂う物（水の玉のほか）のおよその半径（m。壁で跳ね返る所と、人に押される範囲に使う）。</summary>
-        public const float ItemRadius = 0.3f;
+        public const float ItemRadius = 0.4f;
 
         /// <summary>押されて飛んでいく速さの上限（m/s）。</summary>
         public const float MaxSpeed = 5f;

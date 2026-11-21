@@ -5,7 +5,9 @@
 // 描き方（カメラの不透明の絵 _CameraOpaqueTexture と深さを使う。URP の設定で Opaque Texture と Depth Texture を使う）:
 // - 口の外（半径 _Radius から _Halo 倍まで）: 点の重力レンズの式 β = θ (1 − θE² / θ²) で、後ろの景色を引く所をずらす（θE は
 //   _Einstein 倍の半径）。外へ行くほどずらしを弱めて、板の端で元の景色につなぐ。引いた所が口より手前の物（キャラクターや足場）なら、
-//   ずらさない（手前の物の像をゆがめて写さない）。
+//   ずらさない（手前の物の像をゆがめて写さない）。カメラの不透明の絵には半透明の背景（星や星雲の板・光の格子）が入らないので、
+//   口の外は縁から外へ向かって不透明さを下げてもとの背景を残し、引いた所の星（絵を使わない星）を足す（ずらした所から引くので、
+//   口の近くでは星が弧に伸びて輪〈アインシュタインリング〉になる）。
 // - 口の中: 向こう側の口（_OtherCenter）のまわりの景色を魚眼のように縮めて写す（真ん中が向こうの口のすぐ後ろ、縁ほど遠く）。
 //   向こうの口が画面の外なら、向こう側の星空（絵を使わない星）で代わりにする。
 // - 縁: 薄く光る輪（光子の球の名残り。見分けやすさのために少し強め）と、ワープしたときの波紋（_Pulse）。
@@ -97,6 +99,25 @@ Shader "Airerage/Wormhole"
                 return frac(p.x * p.y);
             }
 
+            // 星（絵を使わない。p は口の半径を 1 とした位置。2 層）。
+            half3 Stars(float2 p, float time, float density)
+            {
+                half3 sum = 0;
+                for (int layer = 0; layer < 2; layer++)
+                {
+                    float scale = layer == 0 ? 2.6 : 5.5;
+                    float2 g = p * scale + layer * 31.0;
+                    float2 cell = floor(g);
+                    float h = Hash(cell + 11.0);
+                    float2 star = cell + 0.5 + (float2(Hash(cell + 5.3), Hash(cell + 9.1)) - 0.5) * 0.7;
+                    float dist = length(g - star);
+                    float bright = step(1.0 - density, h) * exp(-dist * dist * (layer == 0 ? 90.0 : 200.0));
+                    float twinkle = 0.8 + 0.2 * sin(time * (1.5 + h * 3.0) + h * 50.0);
+                    sum += bright * twinkle * lerp(half3(0.85, 0.9, 1.0), half3(1.0, 0.85, 0.95), h);
+                }
+                return sum;
+            }
+
             // 向こう側の星空（絵を使わない。2 層の星と、向こう側の色のもや）。
             half3 OtherSky(float2 d, float time)
             {
@@ -160,7 +181,9 @@ Shader "Airerage/Wormhole"
                     float3 world = float3(input.centerWS.xy + source * _Radius, input.centerWS.z);
                     color = Background(world, screenUV, planeDepth);
                     // 口のすぐ外は光が回り込んで暗く縮んだ像になる（縁の近くを少しだけ暗く）。
-                    color *= lerp(0.55, 1.0, smoothstep(1.0, 1.25, r));
+                    color *= lerp(0.7, 1.0, smoothstep(1.0, 1.25, r));
+                    // ずらした所の星（半透明の星の板は不透明の絵に入らないので、ここで足す。口の近くで弧に伸びる）。
+                    color += Stars(source, time, 0.22) * fade * 1.2;
                 }
                 else
                 {
@@ -186,8 +209,10 @@ Shader "Airerage/Wormhole"
                 float rimOffset = (r - 1.0) / 0.035;
                 float rim = exp(-rimOffset * rimOffset);
                 color += _Color.rgb * (rim * (0.9 + 0.6 * _Pulse) + ripple * 0.8);
-                float alpha = 1.0 - smoothstep(halo * 0.92, halo, r);
-                return half4(color, alpha);
+                // 口の中は不透明。外は縁から外へ不透明さを下げて、もとの背景（半透明の層を含む）を残す。
+                float alpha = r < 1.0 ? 1.0 : pow(saturate(1.0 - (r - 1.0) / (halo - 1.0)), 0.8) * 0.9;
+                alpha = max(alpha, rim);
+                return half4(color, saturate(alpha));
             }
             ENDHLSL
         }

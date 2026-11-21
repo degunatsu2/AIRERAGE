@@ -153,7 +153,7 @@ namespace Airerage.Editor.Stages
         // 主の光、空、環境光、霧（V11・V15）。ステージのシーンを最初に読み込むので、試合とメニューの背景で使われる。
         private static void ApplyLighting(StageLook look, string folder)
         {
-            Light light = Object.FindFirstObjectByType<Light>();
+            Light light = StageSceneBuilder.MainLight();
             if (light == null)
             {
                 throw new InvalidOperationException("ステージのシーンに光がない");

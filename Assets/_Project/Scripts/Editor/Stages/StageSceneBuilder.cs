@@ -496,10 +496,26 @@ namespace Airerage.Editor.Stages
             return seed;
         }
 
+        /// <summary>
+        /// ステージの主の光（太陽・月の平行光源）。ギミックの点の光（宇宙船の船内の照明など）を取り違えないように、平行光源だけから探す
+        /// （FindFirstObjectByType は順番が決まらず、船内の照明に主の光の設定を上書きしていた。2026-11-21）。
+        /// </summary>
+        internal static Light MainLight()
+        {
+            foreach (Light candidate in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID))
+            {
+                if (candidate.type == LightType.Directional)
+                {
+                    return candidate;
+                }
+            }
+            return null;
+        }
+
         // 光、空（Skybox/Procedural）、環境光、霧。ステージのシーンを最初に読み込むので、このシーンの設定が試合とメニューの背景で使われる。
         private static void ApplyLighting(StageTheme theme, StageDecor decor)
         {
-            Light light = Object.FindFirstObjectByType<Light>();
+            Light light = StageSceneBuilder.MainLight();
             if (light != null)
             {
                 light.color = theme.Light;
@@ -790,6 +806,18 @@ namespace Airerage.Editor.Stages
             {
                 decor.Box("CabinLight", cabin, new Vector3(x, half.y - 0.08f, 0.9f), new Vector3(1.6f, 0.06f, 0.5f), light);
             }
+            // 船内の照明（ISS の船内は LED の照明で明るい。外の光は船体に遮られるので、中を照らす点の光を 2 つ。影は落とさない）。
+            foreach (float x in new[] { -half.x * 0.5f, half.x * 0.5f })
+            {
+                var lamp = new GameObject("CabinLamp").AddComponent<Light>();
+                lamp.transform.SetParent(cabin, false);
+                lamp.transform.localPosition = new Vector3(x, half.y - 0.6f, -0.8f);
+                lamp.type = LightType.Point;
+                lamp.color = new Color(0.9f, 0.95f, 1f);
+                lamp.range = 9f;
+                lamp.intensity = 2.2f;
+                lamp.shadows = LightShadows.None;
+            }
             // 漂う物（ISS の映像でよく見る物）。
             Material bag = decor.Lit("CargoBag", new Color(0.88f, 0.87f, 0.82f));
             Material strap = decor.Lit("CargoStrap", new Color(0.18f, 0.24f, 0.4f));
@@ -816,27 +844,27 @@ namespace Airerage.Editor.Stages
             for (int i = 0; i < 2; i++)
             {
                 Transform cargo = Item("CargoBag");
-                decor.Box("Bag", cargo, Vector3.zero, new Vector3(0.62f, 0.4f, 0.36f), bag);
-                decor.Box("Strap", cargo, Vector3.zero, new Vector3(0.64f, 0.06f, 0.38f), strap);
-                decor.Box("Handle", cargo, new Vector3(0f, 0.22f, 0f), new Vector3(0.24f, 0.04f, 0.06f), strap);
+                decor.Box("Bag", cargo, Vector3.zero, new Vector3(0.9f, 0.56f, 0.5f), bag);
+                decor.Box("Strap", cargo, Vector3.zero, new Vector3(0.92f, 0.08f, 0.52f), strap);
+                decor.Box("Handle", cargo, new Vector3(0f, 0.31f, 0f), new Vector3(0.34f, 0.05f, 0.08f), strap);
             }
             Transform wrench = Item("Wrench");
-            decor.Box("Handle", wrench, Vector3.zero, new Vector3(0.42f, 0.05f, 0.02f), tool);
-            ProceduralMesh.Place("Head", wrench, Torus(meshes, "WrenchHead", 0.055f, 0.018f), new Vector3(0.23f, 0f, 0f), Quaternion.Euler(90f, 0f, 0f),
+            decor.Box("Handle", wrench, Vector3.zero, new Vector3(0.6f, 0.07f, 0.03f), tool);
+            ProceduralMesh.Place("Head", wrench, Torus(meshes, "WrenchHead", 0.08f, 0.026f), new Vector3(0.33f, 0f, 0f), Quaternion.Euler(90f, 0f, 0f),
                 Vector3.one, tool);
             Transform penItem = Item("Pen");
-            decor.Cylinder("Body", penItem, Vector3.zero, new Vector3(0.022f, 0.08f, 0.022f), pen);
+            decor.Cylinder("Body", penItem, Vector3.zero, new Vector3(0.035f, 0.12f, 0.035f), pen);
             Transform checklist = Item("Checklist");
-            decor.Box("Sheet", checklist, Vector3.zero, new Vector3(0.3f, 0.4f, 0.008f), paper);
+            decor.Box("Sheet", checklist, Vector3.zero, new Vector3(0.45f, 0.6f, 0.01f), paper);
             for (int line = 0; line < 4; line++)
             {
-                decor.Box("Line", checklist, new Vector3(-0.02f, 0.12f - line * 0.07f, -0.006f), new Vector3(0.22f, 0.012f, 0.002f), ink);
+                decor.Box("Line", checklist, new Vector3(-0.03f, 0.18f - line * 0.1f, -0.008f), new Vector3(0.33f, 0.018f, 0.002f), ink);
             }
             Transform food = Item("FoodPacket");
-            decor.Box("Packet", food, Vector3.zero, new Vector3(0.16f, 0.22f, 0.04f), foil);
+            decor.Box("Packet", food, Vector3.zero, new Vector3(0.24f, 0.33f, 0.06f), foil);
             Transform loop = Item("CableBundle");
-            ProceduralMesh.Place("Loop", loop, Torus(meshes, "CableLoop", 0.16f, 0.018f), Vector3.zero, Quaternion.identity, Vector3.one, cable);
-            ProceduralMesh.Place("Loop", loop, Torus(meshes, "CableLoop", 0.16f, 0.018f), new Vector3(0.03f, 0f, 0.02f),
+            ProceduralMesh.Place("Loop", loop, Torus(meshes, "CableLoop", 0.24f, 0.026f), Vector3.zero, Quaternion.identity, Vector3.one, cable);
+            ProceduralMesh.Place("Loop", loop, Torus(meshes, "CableLoop", 0.24f, 0.026f), new Vector3(0.04f, 0f, 0.03f),
                 Quaternion.Euler(0f, 25f, 0f), Vector3.one, cable);
             // 水の玉（大中小。後ろの景色を逆さに映す）。
             Material water = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WaterDrop", "Airerage/WaterDrop", m =>
@@ -844,7 +872,7 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_Invert", 1.6f);
             }, decor.Folder);
             var drops = new List<Transform>();
-            foreach (float size in new[] { 0.62f, 0.4f, 0.22f })
+            foreach (float size in new[] { 0.8f, 0.55f, 0.32f })
             {
                 Transform drop = decor.Sphere("WaterDrop", cabin, new Vector3(decor.Range(-half.x + 1.5f, half.x - 1.5f), decor.Range(-half.y + 1.2f, half.y - 1.2f),
                     decor.Range(0.75f, 1.2f)), Vector3.one * size, water).transform;

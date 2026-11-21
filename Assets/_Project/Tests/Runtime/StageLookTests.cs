@@ -1127,9 +1127,11 @@ namespace Airerage.Runtime.Tests
                 Assert.That(drops.Length, Is.EqualTo(3), "水の玉");
                 Assert.That(drops.All(d => d.sharedMaterial.shader.name == "Airerage/WaterDrop"), Is.True, "水の玉の材質");
                 Assert.That(cabin.GetComponentsInChildren<Transform>(true).Count(t => t.name == "Handrail"), Is.EqualTo(2), "床と天井の手すり");
+                Assert.That(cabin.GetComponentsInChildren<Light>(true).Count(l => l.type == LightType.Point && l.shadows == LightShadows.None), Is.EqualTo(2),
+                    "船内の照明（影を落とさない点の光）");
                 foreach (Transform child in cabin.transform)
                 {
-                    if (child.name != "Handrail" && child.name != "HandrailPost" && child.name != "CabinLight")
+                    if (child.name != "Handrail" && child.name != "HandrailPost" && child.name != "CabinLight" && child.name != "CabinLamp")
                     {
                         Assert.That(child.localPosition.z, Is.GreaterThan(0.5f), $"{child.name} が遊ぶ面の手前に漂う（キャラクターを隠す）");
                     }
