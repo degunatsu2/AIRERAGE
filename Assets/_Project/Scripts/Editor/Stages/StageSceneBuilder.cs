@@ -118,6 +118,10 @@ namespace Airerage.Editor.Stages
                 {
                     authoring.ConfigureButton(spec.Size, spec.Group);
                 }
+                else if (spec.Kind == StagePlatformKind.Hoist)
+                {
+                    authoring.ConfigureHoist(spec.Size, spec.OpenHeight, spec.BouncePower, spec.AnchorRadius);
+                }
                 else
                 {
                     authoring.ConfigurePath(spec.Size, spec.Attachable, spec.Keys, spec.PeriodSeconds, spec.PhaseSeconds, spec.ActiveFromSeconds,
@@ -135,7 +139,8 @@ namespace Airerage.Editor.Stages
                     Color color = spec.Color ?? (spec.Attachable ? theme.Attachable : theme.Terrain);
                     decor.Box("Body", visual, Vector3.zero, new Vector3(spec.Size.x, spec.Size.y, 4f), decor.Lit(spec.Name + "Body", color));
                 }
-                if (spec.Attachable)
+                // 刺さる足場の縁の光（荷役の網は真ん中のアンカーにつながる網なので、縁は光らせない）。
+                if (spec.Attachable && spec.Kind != StagePlatformKind.Hoist)
                 {
                     AddGlowRims(decor, visual, spec.Size);
                 }
@@ -195,6 +200,14 @@ namespace Airerage.Editor.Stages
                 go.transform.SetParent(root, false);
                 go.transform.position = new Vector3(spec.Center.x, spec.Center.y, 0f);
                 var authoring = go.AddComponent<StageTrapAuthoring>();
+                if (spec.Kind == StageTrapKind.WispRing)
+                {
+                    // 鬼火の輪は飛び回るので、見た目は WispRingView が動かす（StageTrapView は使わない）。
+                    authoring.ConfigureWispRing(spec.Waypoints, spec.Speed, spec.HoverSeconds, spec.RingSize, spec.Reward, spec.RespawnMinSeconds,
+                        spec.RespawnMaxSeconds);
+                    CreateWispRingTrap(go.transform, spec, decor);
+                    continue;
+                }
                 var view = go.AddComponent<StageTrapView>();
                 if (spec.Kind == StageTrapKind.Tripwire)
                 {
@@ -571,10 +584,6 @@ namespace Airerage.Editor.Stages
                     return CreateToaster(parent, root, zone, decor);
                 case StageZoneKind.Launcher when zone.Look == StageZoneView.ZoneLook.Catapult:
                     return CreateCatapult(parent, root, zone, decor);
-                case StageZoneKind.Bumper when zone.Look == StageZoneView.ZoneLook.Net:
-                    return CreateCargoNet(parent, root, zone, decor);
-                case StageZoneKind.BoostRing when zone.Look == StageZoneView.ZoneLook.Wisp:
-                    return CreateWispRing(parent, root, zone, decor);
                 case StageZoneKind.Gust when zone.Look == StageZoneView.ZoneLook.Pneumatic:
                     return CreatePneumaticTube(parent, root, zone, decor);
                 case StageZoneKind.Launcher:
@@ -1553,21 +1562,21 @@ namespace Airerage.Editor.Stages
             return release;
         }
 
-        // 鬼火の輪（加速リング + ZoneLook.Wisp。2026-11-21 の方針: 汎用の加速リングの見た目を変えるので、配置も見た目に合わせて輪を漂わせる
-        // 〈ZoneSpec.Moving〉。鬼火は墓地や沼の地面から数メートルの所に浮かぶ小さな青白い火の玉で、煙を出さず、ゆらゆら漂う〈記録と伝承の
-        // まとめ〉）。青白い鬼火が輪に連なって回り（WispRingView）、輪の中から加速する向きへ鬼火の粒がこぼれて流れる。くぐると散る。
-        // 当たり（加速）は輪の中（範囲のまま。動く）。前は金属の枠の輪だった。
-        private static GameObject CreateWispRing(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        // 鬼火の輪（ステージの仕掛け StageTrapKind.WispRing。2026-11-21 の要望: 1 つだけ、6 地点の間を速く飛び回り、くぐった人の周りを
+        // 回ってコインを渡し、上空へ消えてしばらくしてまた現れる。前は 2 つの加速リングだった）。鬼火は墓地や沼の地面から数メートルの所に浮かぶ
+        // 小さな青白い火の玉で、煙を出さず、ゆらゆら漂う〈記録と伝承のまとめ〉。輪の形に連なる鬼火（WispRingView が動かす）、飛んだ跡に残る
+        // 鬼火の粒、くぐられたときに散る粒。当たり（くぐる）は輪の大きさ（Core の StageTraps.StepWispRings）。
+        private static void CreateWispRingTrap(Transform trap, TrapSpec spec, StageDecor decor)
         {
-            var ring = new GameObject("WispRing").transform;
-            ring.SetParent(parent, false);
+            var ring = new GameObject("Ring").transform;
+            ring.SetParent(trap, false);
             Mesh card = ProceduralMesh.GlowCard("Gimmicks", "GlowCard");
             Material flame = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WispRingFlame", "Airerage/Wisp", m =>
             {
                 m.SetColor("_Color", new Color(0.9f, 1.7f, 1.4f));
                 m.SetFloat("_Core", 7f);
             }, decor.Folder);
-            var radii = new Vector2(zone.Size.x * 0.5f + 0.15f, zone.Size.y * 0.5f + 0.15f);
+            var radii = new Vector2(spec.RingSize.x * 0.5f + 0.15f, spec.RingSize.y * 0.5f + 0.15f);
             const int Count = 9;
             var wisps = new Transform[Count];
             for (int i = 0; i < Count; i++)
@@ -1579,37 +1588,35 @@ namespace Airerage.Editor.Stages
                 wisp.GetComponent<Renderer>().receiveShadows = false;
                 wisps[i] = wisp.transform;
             }
-            Vector2 direction = zone.Direction.normalized;
             Gradient pale = ParticleFx.Ramp(new[] { (new Color(0.6f, 1f, 0.95f), 0f), (new Color(0.45f, 0.75f, 1f), 1f) }, new[] { (0f, 0f), (0.8f, 0.25f), (0f, 1f) });
-            new ParticleFx
+            ParticleSystem trail = new ParticleFx
             {
-                Name = "WispFlow", LifetimeMin = 1.2f, LifetimeMax = 2f, SizeMin = 0.1f, SizeMax = 0.26f, Additive = true, Intensity = 2.4f,
-                BoxSize = new Vector3(radii.x * 1.1f, radii.y * 1.3f, 0.4f), WorldVelocity = new Vector3(direction.x, direction.y, 0f) * 2.4f, VelocityJitter = 0.4f,
-                Rate = 7f, MaxParticles = 40, Turbulence = 0.5f, Colors = pale,
+                Name = "WispTrail", LifetimeMin = 0.6f, LifetimeMax = 1.2f, SpeedMin = 0f, SpeedMax = 0.4f, SizeMin = 0.12f, SizeMax = 0.3f, Additive = true,
+                Intensity = 2.4f, BoxSize = new Vector3(radii.x * 1.6f, radii.y * 1.6f, 0.4f), Rate = 34f, MaxParticles = 80, Turbulence = 0.5f, Colors = pale,
             }.Build(ring, new Vector3(0f, 0f, -0.1f), Quaternion.identity, decor.Folder);
+            ParticleSystem.MainModule trailMain = trail.main;
+            trailMain.prewarm = false;
             ParticleSystem burst = new ParticleFx
             {
-                Name = "WispBurst", LifetimeMin = 0.5f, LifetimeMax = 0.9f, SpeedMin = 0f, SpeedMax = 0f, SizeMin = 0.14f, SizeMax = 0.34f, Additive = true,
+                Name = "WispBurst", LifetimeMin = 0.5f, LifetimeMax = 1.0f, SpeedMin = 0f, SpeedMax = 0f, SizeMin = 0.14f, SizeMax = 0.34f, Additive = true,
                 Intensity = 3f, BoxSize = new Vector3(0.6f, 0.6f, 0.1f), Radial = -6f, MaxParticles = 60, Turbulence = 0.8f, Colors = pale,
-            }.Build(root, new Vector3(0f, 0f, -0.2f), Quaternion.identity, decor.Folder);
-            ring.gameObject.AddComponent<WispRingView>().Configure(root.GetComponent<StageZoneView>(), wisps, radii, burst);
-            return ring.gameObject;
+            }.Build(trap, new Vector3(0f, 0f, -0.2f), Quaternion.identity, decor.Folder);
+            trap.gameObject.AddComponent<WispRingView>().Configure(ring, wisps, radii, burst, trail);
         }
 
-        // 荷役の網（跳ね返す物 + ZoneLook.Net。2026-11-21 の方針: 実際の現象に寄せる。手本は港の荷役の網〈カーゴネット〉: 四隅の輪を
-        // 4 本足の吊り具でクレーンの鉤に掛け、吊り具の下に枠〈スプレッダー〉を入れると網が張ったまま広がる。落ちてきた物を受けた網は
-        // 深く沈んでから跳ね返す）。上のクレーンの梁の吊る所（ZoneSpec.From の出どころ）からワイヤーで吊った鉤、4 本足の吊り具、鉄の枠、
-        // 縦横の綱の網目（CargoNetView が乗った所を沈める）。当たり（跳ね返す）は網の所（範囲のまま）。前は光る看板の板だった。
-        private static GameObject CreateCargoNet(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        // 荷役の網（動く足場 StagePlatformKind.Hoist の見た目。2026-11-21 の要望: ワイヤーがつながり、ぶら下がると吊り具が伸びて網が下がり
+        // 〈バンジーのように少し跳ね返る〉、外すとゆっくり戻る。前は跳ね返す物〈光る板〉→ 吊った網だった）。手本は港の荷役の網〈カーゴネット〉:
+        // 四隅の輪を 4 本足の吊り具でクレーンの鉤に掛け、吊り具の下に枠〈スプレッダー〉を入れると網が張ったまま広がる。落ちてきた物を受けた網は
+        // 深く沈んでから跳ね返す。クレーンの梁の下のトロリー（動かない。beamBottom）から伸びるワイヤー、滑車つきの鉤のブロック、4 本足の吊り具、
+        // 鉄の枠、縦横の綱の網目。visual（足場と一緒に動く）には鉤から下を入れ、トロリーは足場の物体（動かない）に置く。ワイヤーの長さと、
+        // 網目の沈み・吊り具の揺れは CargoNetView。
+        internal static void BuildCargoNet(StageDecor decor, Transform visual, PlatformSpec spec, float beamBottom)
         {
-            var rigRoot = new GameObject("CargoNet").transform;
-            rigRoot.SetParent(parent, false);
-            var half = new Vector2(zone.Size.x * 0.5f + 0.1f, 1.1f);
-            float netY = zone.Size.y * 0.5f - 0.15f;
+            var half = new Vector2(spec.Size.x * 0.5f + 0.1f, 1.1f);
+            float netY = spec.Size.y * 0.5f - 0.15f;
             const float HookAbove = 3.9f;
-            // 揺らす吊り具（鉤の所が軸）。
             var hoist = new GameObject("Hoist").transform;
-            hoist.SetParent(rigRoot, false);
+            hoist.SetParent(visual, false);
             hoist.localPosition = new Vector3(0f, netY + HookAbove, 0f);
             Material steel = decor.Lit("NetSteel", new Color(0.86f, 0.62f, 0.12f));
             steel.SetFloat("_Metallic", 0.6f);
@@ -1619,18 +1626,18 @@ namespace Airerage.Editor.Stages
             Material cable = decor.Unlit("NetCable", new Color(0.18f, 0.18f, 0.2f));
             Material ropeMat = decor.Unlit("NetRope", new Color(0.16f, 0.4f, 0.26f));
             Material edgeMat = decor.Unlit("NetEdgeRope", new Color(0.12f, 0.3f, 0.2f));
-            // 梁の下まで上がるワイヤー（動かない。鉤の上の滑車から）。
-            float cableTop = zone.Source.HasValue ? zone.LocalSource.y : netY + HookAbove + 6f;
+            // 梁の下のトロリー（動かない。足場の物体の子）と、そこから鉤のブロックへ伸びるワイヤー（CargoNetView が両端を合わせる）。
+            Transform anchorRoot = visual.parent;
+            var trolley = decor.Box("Trolley", anchorRoot, new Vector3(0f, beamBottom - spec.Center.y - 0.25f, 0f), new Vector3(1.2f, 0.5f, 1.4f), dark).transform;
             var cableLine = new GameObject("HoistCable").AddComponent<LineRenderer>();
-            cableLine.transform.SetParent(rigRoot, false);
+            cableLine.transform.SetParent(anchorRoot, false);
             cableLine.sharedMaterial = cable;
-            cableLine.useWorldSpace = false;
+            cableLine.useWorldSpace = true;
             cableLine.positionCount = 2;
-            cableLine.SetPosition(0, new Vector3(0f, netY + HookAbove + 0.9f, 0f));
-            cableLine.SetPosition(1, new Vector3(0f, cableTop, 0f));
+            cableLine.SetPosition(0, trolley.position + Vector3.down * 0.25f);
+            cableLine.SetPosition(1, hoist.position + Vector3.up * 0.9f);
             cableLine.startWidth = cableLine.endWidth = 0.07f;
             cableLine.shadowCastingMode = ShadowCastingMode.Off;
-            decor.Box("Trolley", rigRoot, new Vector3(0f, cableTop - 0.25f, 0f), new Vector3(1.2f, 0.5f, 1.4f), dark);
             // 滑車のついた鉤のブロックと、J の形の鉤。
             decor.Box("HookBlock", hoist, new Vector3(0f, 0.75f, 0f), new Vector3(0.6f, 0.7f, 0.42f), steel);
             decor.Cylinder("Sheave", hoist, new Vector3(0f, 0.9f, 0f), new Vector3(0.5f, 0.24f, 0.5f), dark).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
@@ -1679,8 +1686,7 @@ namespace Airerage.Editor.Stages
                 alongZ.Add(NetRope($"RopeZ{c + 1}", net, c == 0 || c == Columns - 1 ? edgeMat : ropeMat, 9, i => new Vector3(x, 0f, Mathf.Lerp(-half.y, half.y, i / 8f)),
                     c == 0 || c == Columns - 1 ? 0.06f : 0.035f));
             }
-            rigRoot.gameObject.AddComponent<CargoNetView>().Configure(root.GetComponent<StageZoneView>(), alongX.ToArray(), alongZ.ToArray(), half, 0f, hoist);
-            return rigRoot.gameObject;
+            visual.gameObject.AddComponent<CargoNetView>().Configure(alongX.ToArray(), alongZ.ToArray(), half, 0f, hoist, cableLine, trolley);
         }
 
         private static LineRenderer NetRope(string name, Transform parent, Material material, int count, Func<int, Vector3> point, float width)

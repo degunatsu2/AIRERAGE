@@ -120,12 +120,6 @@ namespace Airerage.Editor.Stages
                     new ZoneSpec("Sea", StageZoneKind.Water, new Vector2(0f, -8.5f), new Vector2(120f, 7f), Vector2.zero, 5f, 24f),
                     // ベルトコンベア（右の岸壁。クレーンの脚の方へ）。
                     ZoneSpec.OnFloor("Conveyor", StageZoneKind.SpeedLane, 27f, 35f, 1f, Vector2.left, 10f),
-                    // 荷役の網（バンパー）。2026-11-21 の方針: クレーンの梁からワイヤーと 4 本足の吊り具で吊った、鉄の枠に張った網。乗った所が
-                    // 沈んで跳ね返す（CargoNetView）。前は光る板だった。
-                    new ZoneSpec("NetWest", StageZoneKind.Bumper, new Vector2(-18f, 14f), new Vector2(3f, 1f), Vector2.up, 16f)
-                        .Styled(StageZoneView.ZoneLook.Net).From(new Vector3(-18f, BeamBottom, 0f)),
-                    new ZoneSpec("NetEast", StageZoneKind.Bumper, new Vector2(18f, 14f), new Vector2(3f, 1f), Vector2.up, 16f)
-                        .Styled(StageZoneView.ZoneLook.Net).From(new Vector3(18f, BeamBottom, 0f)),
                     // 岸壁のジャンプ台。
                     ZoneSpec.OnFloor("QuayPadWest", StageZoneKind.JumpPad, -24.5f, -22.5f, 1f, Vector2.up, 26f, 0.4f),
                     // 右は、クレーンの脚の横の動くボラードを避けて、少し左（ユーザーの要望、2026-10-26）。
@@ -136,6 +130,17 @@ namespace Airerage.Editor.Stages
                 },
                 Platforms = new[]
                 {
+                    // 荷役の網（2026-11-21 の要望）: クレーンの梁からワイヤーと 4 本足の吊り具で吊った、鉄の枠に張った網。重なった人を跳ね返し
+                    // （前の跳ね返す物と同じ 16 m/s）、真ん中にワイヤーがつながる。ぶら下がると吊り具が速く伸びて 4m 下がり（バンジーのように少し
+                    // 行きすぎて跳ね返る）、外すとゆっくり戻る（StagePlatformKind.Hoist・CargoNetView）。
+                    new PlatformSpec("NetWest", new Vector2(-18f, 14f), new Vector2(3f, 1f), true)
+                    {
+                        Visual = (decor, visual, spec) => StageSceneBuilder.BuildCargoNet(decor, visual, spec, BeamBottom),
+                    }.Hoist(4f, 16f, 1.8f),
+                    new PlatformSpec("NetEast", new Vector2(18f, 14f), new Vector2(3f, 1f), true)
+                    {
+                        Visual = (decor, visual, spec) => StageSceneBuilder.BuildCargoNet(decor, visual, spec, BeamBottom),
+                    }.Hoist(4f, 16f, 1.8f),
                     // クレーンのコンテナ（ユーザーの案）: 屋根と床の 2 枚が一緒に運ばれる（左右は開いていて、両側から入れる）。
                     ContainerPlate("ContainerRoof", spotA + new Vector2(0f, plateOffset), spotA, spotC, spotB, containerRed, roof: true),
                     ContainerPlate("ContainerFloor", spotA - new Vector2(0f, plateOffset), spotA, spotC, spotB, containerRed, roof: false),

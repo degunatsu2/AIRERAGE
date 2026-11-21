@@ -147,6 +147,9 @@ namespace Airerage.Core.Economy
 
         /// <summary>アイテムでの確定（移動。所持 → 確定。金庫の鍵のボーナスと、確定の印鑑）。</summary>
         ItemBank = 16,
+
+        /// <summary>鬼火の輪の贈り物（生成。→ くぐった人の所持。恐怖の館。StageTraps.StepWispRings）。</summary>
+        WispGift = 17,
     }
 
     /// <summary>

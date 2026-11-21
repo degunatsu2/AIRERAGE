@@ -91,6 +91,116 @@ namespace Airerage.PlayMode.Tests
         }
 
         /// <summary>
+        /// 恐怖の館の鬼火の輪と、埠頭の荷役の網（2026-11-21 の要望で作り直した）を撮る（Logs/Snapshots/Wisp_*・Net_*）。鬼火の輪: 飛び回る輪、
+        /// くぐった人の周りを回る鬼火、上空へ昇って消える鬼火。荷役の網: 吊られている網、ぶら下がって下がる途中、下がりきった後、外して戻る途中。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureWispRingAndCargoNet()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            Directory.CreateDirectory(Folder);
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Manor"));
+            while (flow.Current != GameFlow.FlowScreen.Training || flow.IsLoading || SceneManager.GetActiveScene().name != "Stage_Manor")
+            {
+                yield return null;
+            }
+            yield return Wait(1.5f);
+            Camera camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            ISimulationFeed feed = runner;
+            WispRingView wisp = Object.FindFirstObjectByType<WispRingView>();
+            Airerage.Core.Simulation.StageTrap trap = wisp.GetComponent<StageTrapAuthoring>().ToTrap();
+            Vector3 ring = wisp.ShownCenter;
+            Shoot(camera, new Vector3(ring.x, ring.y, -12f), "Wisp_1Flying");
+            float limit = Time.realtimeSinceStartup + 4f;
+            while (!wisp.Circling && Time.realtimeSinceStartup < limit)
+            {
+                System.Numerics.Vector2 next = trap.WispAt(feed.CurrentTick + 1, feed.Rules.Seed);
+                Airerage.Core.Simulation.CharacterState state = runner.PlayerState;
+                state.Position = new System.Numerics.Vector3(next.X, next.Y, 0f);
+                state.Velocity = System.Numerics.Vector3.Zero;
+                runner.SetPlayerState(state);
+                yield return null;
+            }
+            float start = Time.time;
+            while (Time.time - start < 0.5f)
+            {
+                yield return null;
+            }
+            Vector3 player = new Vector3(runner.PlayerState.Position.X, runner.PlayerState.Position.Y, 0f);
+            Shoot(camera, new Vector3(player.x, player.y, -9f), "Wisp_2Circling");
+            while (Time.time - start < WispRingView.CircleSeconds + 0.35f)
+            {
+                yield return null;
+            }
+            Shoot(camera, new Vector3(player.x, player.y + 4f, -14f), "Wisp_3Rising");
+
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Wharf"));
+            while (flow.Current != GameFlow.FlowScreen.Training || flow.IsLoading || SceneManager.GetActiveScene().name != "Stage_Wharf")
+            {
+                yield return null;
+            }
+            yield return Wait(1f);
+            camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            runner = Object.FindFirstObjectByType<SimulationRunner>();
+            feed = runner;
+            StagePlatformView net = Object.FindObjectsByType<StagePlatformView>(FindObjectsSortMode.None).Single(v => v.name == "NetWest");
+            Airerage.Core.Simulation.StagePlatform platform = net.GetComponent<StagePlatformAuthoring>().ToPlatform();
+            var focus = new Vector3(platform.Origin.X, platform.Origin.Y + 1f, -20f);
+            Shoot(camera, focus, "Net_1Hanging");
+            int index = feed.Platforms.ToList().FindIndex(p => p.SameAs(platform));
+            Airerage.Core.Simulation.CharacterState hanger = runner.PlayerState;
+            hanger.Position = new System.Numerics.Vector3(platform.Origin.X - 1f, platform.Origin.Y - 4f, 0f);
+            hanger.Velocity = new System.Numerics.Vector3(0f, -12f, 0f);
+            hanger.Wire.Phase = Airerage.Core.Wire.WirePhase.Attached;
+            hanger.Wire.Anchor = new System.Numerics.Vector3(platform.Origin.X, platform.Origin.Y, 0f);
+            hanger.Wire.AnchorBody = (byte)(index + 1);
+            hanger.Wire.RopeLength = 4.2f;
+            hanger.Wire.PhaseTicks = 0;
+            runner.SetPlayerState(hanger);
+            runner.InputOverride = new HoldWire();
+            try
+            {
+                int at = feed.CurrentTick;
+                while (feed.CurrentTick - at < 12)
+                {
+                    yield return null;
+                }
+                Shoot(camera, focus + new Vector3(0f, -2f, 0f), "Net_2Dropping");
+                while (feed.CurrentTick - at < 70)
+                {
+                    yield return null;
+                }
+                Shoot(camera, focus + new Vector3(0f, -3f, 0f), "Net_3Lowered");
+            }
+            finally
+            {
+                runner.InputOverride = null;
+            }
+            int released = feed.CurrentTick;
+            while (feed.CurrentTick - released < 90)
+            {
+                yield return null;
+            }
+            Shoot(camera, focus + new Vector3(0f, -2f, 0f), "Net_4Returning");
+        }
+
+        private sealed class HoldWire : ITickInputSource
+        {
+            public bool TryGetNext(out Airerage.Core.Input.PlayerInput input)
+            {
+                input = Airerage.Core.Input.PlayerInput.FromAxes(0f, 0f, Airerage.Core.Input.InputButtons.Wire).WithAim(System.Numerics.Vector2.UnitY);
+                return true;
+            }
+        }
+
+        /// <summary>
         /// ステージの仕掛け（2026-11-21 の第 4 弾）: 研究所の赤外線（全体・発射装置の近く・ミサイルと煙の帯）と、競技場のピッチャーマシン
         /// （全体・ボールを送り込むところ・打ち出したボール）を撮る（Logs/Snapshots/Trap_*）。赤外線は自分を光線の上に置いて撃たせる。
         /// </summary>

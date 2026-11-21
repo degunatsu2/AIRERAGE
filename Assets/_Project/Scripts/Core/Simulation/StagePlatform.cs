@@ -20,6 +20,14 @@ namespace Airerage.Core.Simulation
 
         /// <summary>扉のボタン（動かない。ワイヤーをつないでいる間、同じ Group の扉が開く。ユーザーの要望、2026-10-26）。</summary>
         Button = 2,
+
+        /// <summary>
+        /// クレーンに吊った荷役の網（埠頭。ユーザーの要望、2026-11-21）。箱は当たらない（通り抜ける）が、重なった人を跳ね返し
+        /// （BouncePower。バンパーと同じ決まり）、真ん中がアンカーポイント（ワイヤーがつながる）。だれかがワイヤーをつないでいる間は、
+        /// 吊り具がばねのように伸びて OpenHeight だけ下がり（バンジーのように少し行きすぎて跳ね返る。ぶら下がった人が落ちる勢いが強いほど
+        /// 大きく）、外すとゆっくり元の高さへ戻る。伸び具合と速さは状態（StageState。HoistScale で OpenHeight）。StagePlatforms.StepHoist。
+        /// </summary>
+        Hoist = 3,
     }
 
     /// <summary>動く足場の道のりの 1 点（周期の中のティックと、元の位置からのずれ）。</summary>
@@ -66,6 +74,9 @@ namespace Airerage.Core.Simulation
     {
         /// <summary>扉の開き具合の全体（DoorScale で全開）。</summary>
         public const int DoorScale = 1000;
+
+        /// <summary>荷役の網（Hoist）の伸び具合の全体（HoistScale で OpenHeight だけ下がる。細かく動くので扉より細かい）。</summary>
+        public const int HoistScale = 100000;
 
         private readonly PlatformKey[] _keys;
 
@@ -126,8 +137,18 @@ namespace Airerage.Core.Simulation
         public bool HasAnchor { get; private set; }
         public float AnchorRadius { get; private set; }
 
+        /// <summary>荷役の網（Hoist）が重なった人を跳ね返す速さ（m/s。0 なら跳ね返さない）。</summary>
+        public float BouncePower { get; private set; }
+
         public bool IsDoor => Kind == StagePlatformKind.Door;
         public bool IsButton => Kind == StagePlatformKind.Button;
+        public bool IsHoist => Kind == StagePlatformKind.Hoist;
+
+        /// <summary>位置が状態（StageState の開き具合・伸び具合）で決まるか（扉と荷役の網）。</summary>
+        public bool UsesState => IsDoor || IsHoist;
+
+        /// <summary>当たる（乗れる・ぶつかる）箱か（荷役の網は通り抜ける）。</summary>
+        public bool IsSolid => !IsHoist;
 
         /// <summary>道のりを動く足場を作る。keys は周期の中のティックの順（最初は 0）。</summary>
         public static StagePlatform Path(Vector2 origin, Vector2 halfSize, bool attachable, IReadOnlyList<PlatformKey> keys, int period,
@@ -201,6 +222,22 @@ namespace Airerage.Core.Simulation
                 0, 0, 0, false, 0f, 0, 0, group);
         }
 
+        /// <summary>
+        /// 荷役の網を作る（restCenter は吊り具が縮んでいるときの網の中心。drop は伸びきって下がる長さ、bouncePower は重なった人を跳ね返す速さ、
+        /// anchorRadius は真ん中のアンカーのエイムアシストの半径）。ワイヤーがつながる。
+        /// </summary>
+        public static StagePlatform Hoist(Vector2 restCenter, Vector2 halfSize, float drop, float bouncePower, float anchorRadius)
+        {
+            if (!(drop > 0f) || float.IsInfinity(drop) || !(bouncePower >= 0f) || float.IsInfinity(bouncePower))
+            {
+                throw new ArgumentException($"荷役の網の下がる長さか跳ね返す速さが不正です（長さ {drop}、速さ {bouncePower}）");
+            }
+            var hoist = new StagePlatform(StagePlatformKind.Hoist, restCenter, halfSize, true, new[] { new PlatformKey(0, Vector2.Zero) }, 1,
+                0, 0, 0, false, drop, 1, 1);
+            hoist.BouncePower = bouncePower;
+            return hoist.WithAnchor(anchorRadius);
+        }
+
         /// <summary>箱の中心をアンカーポイントにする（radius はエイムアシストの半径。0 ならふつうのアンカーと同じ）。この足場を返す。</summary>
         public StagePlatform WithAnchor(float radius = 0f)
         {
@@ -245,6 +282,12 @@ namespace Airerage.Core.Simulation
             if (Kind == StagePlatformKind.Button)
             {
                 center = Origin;
+                return true;
+            }
+            if (Kind == StagePlatformKind.Hoist)
+            {
+                // 伸び具合は行きすぎ（HoistScale より大きい）と跳ね返り（負）もそのまま使う。
+                center = Origin - new Vector2(0f, OpenHeight * open / HoistScale);
                 return true;
             }
             int t = (int)((((long)tick + PhaseTicks) % Period + Period) % Period);
@@ -345,7 +388,7 @@ namespace Airerage.Core.Simulation
             return other != null && CompareTo(other) == 0 && Attachable == other.Attachable && ActiveFrom == other.ActiveFrom
                 && ActiveTo == other.ActiveTo && Smooth == other.Smooth && OpenHeight.Equals(other.OpenHeight) && OpenTicks == other.OpenTicks
                 && CloseTicks == other.CloseTicks && Group == other.Group && OpenPeriod == other.OpenPeriod && OpenWindow == other.OpenWindow
-                && HasAnchor == other.HasAnchor && AnchorRadius.Equals(other.AnchorRadius);
+                && HasAnchor == other.HasAnchor && AnchorRadius.Equals(other.AnchorRadius) && BouncePower.Equals(other.BouncePower);
         }
 
         public override string ToString()
@@ -355,7 +398,8 @@ namespace Airerage.Core.Simulation
     }
 
     /// <summary>
-    /// ステージの状態のうち、キャラクター・コイン・物のどれでもないもの（扉の開き具合と、仕掛けの触れた時刻。ユーザーの要望、2026-10-26）。
+    /// ステージの状態のうち、キャラクター・コイン・物のどれでもないもの（扉の開き具合と荷役の網の伸び具合・速さ、仕掛けの触れた時刻と
+    /// 鬼火の輪をくぐった人。ユーザーの要望、2026-10-26・2026-11-21）。
     /// 巻き戻しとチェックサムに乗る（WorldSnapshot、StateCodec.WorldChecksum）。扉の番号は SimWorld.Platforms の番号（扉でない足場は 0 の
     /// まま）、仕掛けの番号は SimWorld.Traps の番号。前のティックの開き具合も持つ（扉につないだワイヤーの接続点を、開いた分だけ動かす）。
     /// </summary>
@@ -363,8 +407,10 @@ namespace Airerage.Core.Simulation
     {
         private int[] _open = new int[0];
         private int[] _previous = new int[0];
+        private int[] _speed = new int[0];
         private int[] _trapTicks = new int[0];
         private bool[] _trapSpent = new bool[0];
+        private int[] _trapOwner = new int[0];
 
         /// <summary>足場・扉の数。</summary>
         public int Count => _open.Length;
@@ -376,19 +422,31 @@ namespace Airerage.Core.Simulation
         public int OpenOf(int index) => index >= 0 && index < _open.Length ? _open[index] : 0;
         public int PreviousOf(int index) => index >= 0 && index < _previous.Length ? _previous[index] : 0;
 
+        /// <summary>荷役の網 index の伸びる速さ（1 ティックに伸びる HoistScale の単位。縮むときは負）。</summary>
+        public int SpeedOf(int index) => index >= 0 && index < _speed.Length ? _speed[index] : 0;
+
         /// <summary>
         /// 仕掛け index（赤外線）がレーダーに触れられたティック（0 なら待っている）と、撃ったミサイルがもう当たって消えたか。
         /// </summary>
         public int TrapTickOf(int index) => index >= 0 && index < _trapTicks.Length ? _trapTicks[index] : 0;
         public bool TrapSpentOf(int index) => index >= 0 && index < _trapSpent.Length && _trapSpent[index];
 
+        /// <summary>仕掛け index（鬼火の輪）をくぐった人の番号（いなければ -1）。</summary>
+        public int TrapOwnerOf(int index) => index >= 0 && index < _trapOwner.Length ? _trapOwner[index] : -1;
+
         /// <summary>数を count（足場・扉）と traps（仕掛け）にする（すべて閉じて、待っている）。</summary>
         public void Reset(int count, int traps = 0)
         {
             _open = new int[count];
             _previous = new int[count];
+            _speed = new int[count];
             _trapTicks = new int[traps];
             _trapSpent = new bool[traps];
+            _trapOwner = new int[traps];
+            for (int i = 0; i < traps; i++)
+            {
+                _trapOwner[i] = -1;
+            }
         }
 
         /// <summary>扉 index の開き具合を open にする（前のティックの開き具合は、今の値になる）。</summary>
@@ -398,11 +456,26 @@ namespace Airerage.Core.Simulation
             _open[index] = open;
         }
 
+        /// <summary>荷役の網 index の伸び具合を open、速さを speed にする（前のティックの伸び具合は、今の値になる）。</summary>
+        public void Advance(int index, int open, int speed)
+        {
+            Advance(index, open);
+            _speed[index] = speed;
+        }
+
         /// <summary>仕掛け index の触れたティックと、ミサイルが消えたかを決める。</summary>
         public void SetTrap(int index, int tick, bool spent)
         {
             _trapTicks[index] = tick;
             _trapSpent[index] = spent;
+        }
+
+        /// <summary>仕掛け index（鬼火の輪）のくぐられたティック（0 ならある）と、くぐった人（いなければ -1）を決める。</summary>
+        public void SetTrapOwner(int index, int tick, int owner)
+        {
+            _trapTicks[index] = tick;
+            _trapSpent[index] = false;
+            _trapOwner[index] = owner;
         }
 
         public void CopyFrom(StageState other)
@@ -417,8 +490,10 @@ namespace Airerage.Core.Simulation
             }
             Array.Copy(other._open, _open, _open.Length);
             Array.Copy(other._previous, _previous, _previous.Length);
+            Array.Copy(other._speed, _speed, _speed.Length);
             Array.Copy(other._trapTicks, _trapTicks, _trapTicks.Length);
             Array.Copy(other._trapSpent, _trapSpent, _trapSpent.Length);
+            Array.Copy(other._trapOwner, _trapOwner, _trapOwner.Length);
         }
 
         public bool SameAs(StageState other)
@@ -429,14 +504,14 @@ namespace Airerage.Core.Simulation
             }
             for (int i = 0; i < _open.Length; i++)
             {
-                if (_open[i] != other._open[i] || _previous[i] != other._previous[i])
+                if (_open[i] != other._open[i] || _previous[i] != other._previous[i] || _speed[i] != other._speed[i])
                 {
                     return false;
                 }
             }
             for (int i = 0; i < _trapTicks.Length; i++)
             {
-                if (_trapTicks[i] != other._trapTicks[i] || _trapSpent[i] != other._trapSpent[i])
+                if (_trapTicks[i] != other._trapTicks[i] || _trapSpent[i] != other._trapSpent[i] || _trapOwner[i] != other._trapOwner[i])
                 {
                     return false;
                 }

@@ -196,12 +196,12 @@ namespace Airerage.Core.Economy
         }
 
         /// <summary>
-        /// 報酬（生成。kind は DamageReward、KoReward、CoinBonus、Heist）。キャラクター character の所持コインに amount 枚を加える。
+        /// 報酬（生成。kind は DamageReward、KoReward、CoinBonus、Heist、WispGift）。キャラクター character の所持コインに amount 枚を加える。
         /// </summary>
         public bool Reward(CoinEventId id, List<CharacterState> states, int character, int amount)
         {
             if (id.Kind != CoinEventKind.DamageReward && id.Kind != CoinEventKind.KoReward && id.Kind != CoinEventKind.CoinBonus
-                && id.Kind != CoinEventKind.Heist)
+                && id.Kind != CoinEventKind.Heist && id.Kind != CoinEventKind.WispGift)
             {
                 return Reject(id, "報酬の種類ではない");
             }

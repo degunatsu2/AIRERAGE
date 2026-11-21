@@ -1035,31 +1035,49 @@ namespace Airerage.Runtime.Tests
             Assert.That(bucket.position.y, Is.LessThan(catapult.MaxY + 0.6f), "かごが地面から浮いている");
             Assert.That(CatapultView.AngleAt(CatapultView.SwingSeconds, -16f, 100f), Is.EqualTo(100f).Within(0.01f), "腕が横木まで振り上がらない");
             Assert.That(catapultView.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("Prop_pumpkin")), Is.True, "かごのかぼちゃ");
-            // 鬼火の輪: 鬼火が連なり、輪は漂う（判定も一緒に動く）。
-            foreach (StageZoneAuthoring ring in InScene<StageZoneAuthoring>(manor).Where(z => z.name.StartsWith("WispRing")))
+            // 鬼火の輪（2026-11-21 の要望で作り直した）: 加速リングはなくし、1 つの仕掛けが 6 地点を飛び回る（くぐった人に 30 枚）。
+            Assert.That(InScene<StageZoneAuthoring>(manor).Any(z => z.Kind == StageZoneKind.BoostRing), Is.False, "前の加速リングの鬼火の輪が残っている");
+            StageTrapAuthoring wispAuthoring = InScene<StageTrapAuthoring>(manor).Single(t => t.Kind == StageTrapKind.WispRing);
+            StageTrap wisp = wispAuthoring.ToTrap();
+            Assert.That(wisp.Waypoints.Count, Is.EqualTo(6), "鬼火の輪の地点が 6 つでない");
+            Assert.That(wisp.Reward, Is.EqualTo(30), "くぐったときのコインが 30 枚でない");
+            Assert.That(wisp.RespawnMinTicks, Is.EqualTo(20 * 60));
+            Assert.That(wisp.RespawnMaxTicks, Is.EqualTo(30 * 60));
+            WispRingView wispView = wispAuthoring.GetComponent<WispRingView>();
+            Assert.That(wispView, Is.Not.Null, "鬼火の輪の見た目");
+            Assert.That(wispView.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("Wisp") && t.GetComponent<Renderer>() != null),
+                Is.GreaterThanOrEqualTo(8), "輪に連なる鬼火");
+            // 6 地点はどれも地形に埋まらない（輪の大きさの箱が、動かない地形と重ならない）。
+            foreach (System.Numerics.Vector2 point in wisp.Waypoints)
             {
-                StageZone zone = ring.ToZone();
-                Assert.That(zone.Kind, Is.EqualTo(StageZoneKind.BoostRing));
-                Assert.That(zone.Moves, Is.True, "鬼火の輪が漂わない");
-                WispRingView view = ring.GetComponentInChildren<WispRingView>(true);
-                Assert.That(view, Is.Not.Null, "鬼火の輪の見た目");
-                Assert.That(view.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("Wisp") && t.GetComponent<Renderer>() != null),
-                    Is.GreaterThanOrEqualTo(8), "輪に連なる鬼火");
-                Assert.That(ring.GetComponentsInChildren<Transform>(true).Any(t => t.name == "RingFrame"), Is.False, "金属の枠の輪が残っている");
+                foreach (BoxCollider box in InScene<BoxCollider>(manor).Where(b => !b.isTrigger))
+                {
+                    Bounds b = box.bounds;
+                    bool overlaps = point.X + wisp.HalfSize.X > b.min.x && point.X - wisp.HalfSize.X < b.max.x
+                        && point.Y + wisp.HalfSize.Y > b.min.y && point.Y - wisp.HalfSize.Y < b.max.y;
+                    Assert.That(overlaps, Is.False, $"鬼火の輪の地点 {point} が {box.name} に埋まる");
+                }
             }
 
-            // 荷役の網: クレーンの梁から吊り、網の面は跳ね返す範囲の上の辺の近く。
+            // 荷役の網（2026-11-21 の要望で作り直した）: クレーンの梁から吊った、ワイヤーで下がる動く足場。跳ね返す物の板は残っていない。
             Scene wharf = Open("Assets/_Project/Scenes/Stages/Stage_Wharf.unity");
-            foreach (StageZoneAuthoring authoring in InScene<StageZoneAuthoring>(wharf).Where(z => z.name.StartsWith("Net")))
+            Assert.That(InScene<StageZoneAuthoring>(wharf).Any(z => z.Kind == StageZoneKind.Bumper), Is.False, "前の跳ね返す物の網が残っている");
+            StagePlatformAuthoring[] nets = InScene<StagePlatformAuthoring>(wharf).Where(p => p.Kind == StagePlatformKind.Hoist).ToArray();
+            Assert.That(nets.Length, Is.EqualTo(2), "荷役の網が 2 つない");
+            foreach (StagePlatformAuthoring authoring in nets)
             {
-                StageZone zone = authoring.ToZone();
+                StagePlatform platform = authoring.ToPlatform();
+                Assert.That(platform.HasAnchor, Is.True, "網の真ん中にワイヤーがつながらない");
+                Assert.That(platform.IsSolid, Is.False, "網が当たる箱になっている");
+                Assert.That(platform.BouncePower, Is.EqualTo(16f), "網が跳ね返さない");
+                Assert.That(platform.OpenHeight, Is.EqualTo(4f), "網の下がる長さ");
                 CargoNetView net = authoring.GetComponentInChildren<CargoNetView>(true);
                 Assert.That(net, Is.Not.Null, "荷役の網の見た目");
                 Transform netPlane = net.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Net");
-                Assert.That(netPlane.position.y, Is.InRange(zone.MaxY - 0.5f, zone.MaxY), "網の面が跳ね返す範囲の上の辺にない");
-                LineRenderer cable = net.GetComponentsInChildren<LineRenderer>(true).Single(l => l.name == "HoistCable");
-                Assert.That(cable.transform.TransformPoint(cable.GetPosition(1)).y, Is.EqualTo(24.5f).Within(0.01f), "ワイヤーがクレーンの梁まで届かない");
-                Assert.That(authoring.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Body"), Is.False, "光る板が残っている");
+                Assert.That(netPlane.position.y, Is.InRange(platform.Origin.Y, platform.Origin.Y + platform.HalfSize.Y), "網の面が跳ね返す箱の上の半分にない");
+                Transform trolley = authoring.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Trolley");
+                Assert.That(trolley.IsChildOf(net.transform), Is.False, "トロリーが網と一緒に動く（梁に残るはず）");
+                Assert.That(trolley.position.y, Is.EqualTo(24.5f - 0.25f).Within(0.01f), "トロリーがクレーンの梁の下にない");
             }
 
             // ピッチャーマシン: 2 つのタイヤ・送りのレール・ボールの筒。照明塔の柱に埋まらない。

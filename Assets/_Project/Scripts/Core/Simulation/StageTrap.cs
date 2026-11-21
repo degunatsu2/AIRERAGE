@@ -23,10 +23,18 @@ namespace Airerage.Core.Simulation
         /// ボールなら吹き飛ぶ（StageTraps）。
         /// </summary>
         Pitcher = 1,
+
+        /// <summary>
+        /// 鬼火の輪（恐怖の館。ユーザーの要望、2026-11-21）。決まった地点（Waypoints）の間を、試合の種で決まる順にランダムに飛び回る
+        /// （地点で HoverTicks だけ漂い、次の地点へ速さ Speed で飛ぶ。WispAt。道のりはティック数と種だけで決まる）。だれかが輪（HalfSize）に
+        /// 触れると、その人に Reward 枚のコインを渡して消え、RespawnMinTicks〜RespawnMaxTicks の後（種で決まる）に、その時の道のりの所に
+        /// また現れる。触れたティックと人は状態（StageState）。StageTraps.StepWispRings。
+        /// </summary>
+        WispRing = 2,
     }
 
     /// <summary>
-    /// ステージの仕掛け（赤外線とミサイル、ピッチャーマシン。ユーザーの要望、2026-10-26）。当たると、ステージの危険と同じように吹き飛び、
+    /// ステージの仕掛け（赤外線とミサイル、ピッチャーマシン。ユーザーの要望、2026-10-26。鬼火の輪は 2026-11-21）。当たると、ステージの危険と同じように吹き飛び、
     /// 威力（Power）の枚数のコインを落とす（StageZones.Strike）。決まりは StageTraps。値は作るときに検査する（不正なら ArgumentException）。
     /// </summary>
     public sealed class StageTrap
@@ -92,6 +100,18 @@ namespace Airerage.Core.Simulation
         public int BlinkTicks { get; private set; }
         public float MinHitSpeed { get; private set; }
 
+        /// <summary>鬼火の輪の地点・地点で漂う長さ（ティック）・渡すコインの枚数・また現れるまでの長さ（ティック）。速さは Speed、輪の大きさは HalfSize。</summary>
+        public IReadOnlyList<Vector2> Waypoints => _waypoints;
+        public int HoverTicks { get; private set; }
+        public int Reward { get; private set; }
+        public int RespawnMinTicks { get; private set; }
+        public int RespawnMaxTicks { get; private set; }
+
+        /// <summary>鬼火の輪の道のりの乱数の種の混ぜ物。</summary>
+        private const int WispSalt = 0x5717;
+
+        private Vector2[] _waypoints = new Vector2[0];
+
         /// <summary>ボールの道のり（打ち出してからのティックごとの位置。Prepare で求める）。</summary>
         public IReadOnlyList<Vector2> Path => _path;
 
@@ -148,6 +168,80 @@ namespace Airerage.Core.Simulation
                 MinHitSpeed = minHitSpeed,
                 BlinkTicks = blinkTicks,
             };
+        }
+
+        /// <summary>鬼火の輪を作る（地点は 2 つ以上。最初の地点を Muzzle にする〈並べ替えの順に使う〉）。</summary>
+        public static StageTrap WispRing(IReadOnlyList<Vector2> waypoints, float speed, int hoverTicks, Vector2 halfSize, int reward, int respawnMinTicks,
+            int respawnMaxTicks)
+        {
+            if (waypoints == null || waypoints.Count < 2 || !(speed > 0f) || float.IsInfinity(speed) || hoverTicks < 0 || !(halfSize.X > 0f)
+                || !(halfSize.Y > 0f) || reward <= 0 || respawnMinTicks <= 0 || respawnMaxTicks < respawnMinTicks)
+            {
+                throw new ArgumentException($"鬼火の輪の値が不正です（地点 {waypoints?.Count ?? 0}、速さ {speed}、漂う {hoverTicks}、大きさ {halfSize}、"
+                    + $"コイン {reward}、また現れる {respawnMinTicks}〜{respawnMaxTicks}）");
+            }
+            var copy = new Vector2[waypoints.Count];
+            for (int i = 0; i < copy.Length; i++)
+            {
+                if (!Finite(waypoints[i]))
+                {
+                    throw new ArgumentException($"鬼火の輪の {i} 番目の地点が不正です（{waypoints[i]}）");
+                }
+                copy[i] = waypoints[i];
+            }
+            return new StageTrap(StageTrapKind.WispRing)
+            {
+                _waypoints = copy,
+                Muzzle = copy[0],
+                Speed = speed,
+                HoverTicks = hoverTicks,
+                HalfSize = halfSize,
+                Reward = reward,
+                RespawnMinTicks = respawnMinTicks,
+                RespawnMaxTicks = respawnMaxTicks,
+            };
+        }
+
+        /// <summary>
+        /// 鬼火の輪の、ティック tick の中心（試合の種 seed で決まる道のり）。最初の地点は種で決まり、各地点で HoverTicks だけ漂ってから、
+        /// 今の地点と違う地点（種と何本目の道のりかで決まる）へ、ゆっくり動き出して止まるように飛ぶ（平均の速さ Speed）。
+        /// </summary>
+        public Vector2 WispAt(int tick, int seed)
+        {
+            int n = _waypoints.Length;
+            if (n == 0)
+            {
+                return Muzzle;
+            }
+            int current = (int)(StageRandom.Hash(seed, WispSalt, 0) % (uint)n);
+            int t = Math.Max(0, tick);
+            for (int leg = 0; ; leg++)
+            {
+                int next = (current + 1 + (int)(StageRandom.Hash(seed, WispSalt, leg + 1) % (uint)(n - 1))) % n;
+                Vector2 from = _waypoints[current];
+                if (t < HoverTicks)
+                {
+                    return from;
+                }
+                t -= HoverTicks;
+                Vector2 to = _waypoints[next];
+                int travel = Math.Max(1, (int)MathF.Ceiling(Vector2.Distance(from, to) / Speed * SimTime.TicksPerSecond));
+                if (t < travel)
+                {
+                    float f = (float)t / travel;
+                    f = f * f * (3f - 2f * f);
+                    return from + (to - from) * f;
+                }
+                t -= travel;
+                current = next;
+            }
+        }
+
+        /// <summary>ティック taken にくぐられた鬼火の輪が、また現れるティック（RespawnMinTicks〜RespawnMaxTicks の後。種で決まる）。</summary>
+        public int RespawnTickAfter(int taken, int seed)
+        {
+            int span = RespawnMaxTicks - RespawnMinTicks + 1;
+            return taken + RespawnMinTicks + (int)(StageRandom.Hash(seed, WispSalt + 1, taken) % (uint)span);
         }
 
         private static bool Finite(Vector2 v)
@@ -322,12 +416,30 @@ namespace Airerage.Core.Simulation
             return other != null && CompareTo(other) == 0 && BeamMax.Equals(other.BeamMax) && Direction.Equals(other.Direction)
                 && Speed.Equals(other.Speed) && Range.Equals(other.Range) && Power == other.Power && Knockback.Equals(other.Knockback)
                 && ArmTicks == other.ArmTicks && CooldownTicks == other.CooldownTicks && HalfSize.Equals(other.HalfSize) && Period == other.Period
-                && BlinkTicks == other.BlinkTicks && MinHitSpeed.Equals(other.MinHitSpeed);
+                && BlinkTicks == other.BlinkTicks && MinHitSpeed.Equals(other.MinHitSpeed) && SameWaypoints(other) && HoverTicks == other.HoverTicks
+                && Reward == other.Reward && RespawnMinTicks == other.RespawnMinTicks && RespawnMaxTicks == other.RespawnMaxTicks;
+        }
+
+        private bool SameWaypoints(StageTrap other)
+        {
+            if (_waypoints.Length != other._waypoints.Length)
+            {
+                return false;
+            }
+            for (int i = 0; i < _waypoints.Length; i++)
+            {
+                if (!_waypoints[i].Equals(other._waypoints[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         public override string ToString()
         {
-            return Kind == StageTrapKind.Tripwire ? $"Tripwire {BeamMin}〜{BeamMax} from {Muzzle} dir {Direction}" : $"Pitcher at {Muzzle} v {LaunchVelocity}";
+            return Kind == StageTrapKind.Tripwire ? $"Tripwire {BeamMin}〜{BeamMax} from {Muzzle} dir {Direction}"
+                : Kind == StageTrapKind.WispRing ? $"WispRing {_waypoints.Length} points from {Muzzle}" : $"Pitcher at {Muzzle} v {LaunchVelocity}";
         }
     }
 }

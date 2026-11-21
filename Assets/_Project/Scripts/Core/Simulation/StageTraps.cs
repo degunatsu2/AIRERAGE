@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Airerage.Core.Common;
+using Airerage.Core.Economy;
 
 namespace Airerage.Core.Simulation
 {
@@ -100,11 +101,81 @@ namespace Airerage.Core.Simulation
                 {
                     StepTripwire(trap, stage, i, states, configs, tick);
                 }
-                else
+                else if (trap.Kind == StageTrapKind.Pitcher)
                 {
                     StepPitcher(trap, states, configs, tick);
                 }
+                // 鬼火の輪はコインを渡すので、台帳のある StepWispRings で進める。
             }
+        }
+
+        /// <summary>
+        /// 鬼火の輪をティック tick（進めた後のティック）に進める: くぐられて消えている輪は、また現れるティックになったら戻す。ある輪は、
+        /// 試合中（active）なら、触れている人のうち輪の中心にいちばん近い人（同じなら番号の小さい人）に Reward 枚のコインを渡して消える
+        /// （台帳の CoinEventKind.WispGift。くぐったティックと人を StageState に）。復帰を待っている人・メーデーで吊られている人・抜けた人は除く。
+        /// </summary>
+        public static void StepWispRings(IReadOnlyList<StageTrap> traps, StageState stage, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
+            CoinLedger ledger, int tick, int seed, bool active)
+        {
+            if (traps == null)
+            {
+                return;
+            }
+            for (int i = 0; i < traps.Count; i++)
+            {
+                StageTrap trap = traps[i];
+                if (trap.Kind != StageTrapKind.WispRing)
+                {
+                    continue;
+                }
+                int taken = stage.TrapTickOf(i);
+                if (taken > 0)
+                {
+                    if (tick < trap.RespawnTickAfter(taken, seed))
+                    {
+                        continue;
+                    }
+                    stage.SetTrapOwner(i, 0, -1);
+                }
+                if (!active)
+                {
+                    continue;
+                }
+                Vector2 at = trap.WispAt(tick, seed);
+                int who = WispToucher(at, trap.HalfSize, states, configs);
+                if (who >= 0 && ledger.Reward(new CoinEventId(tick, CoinEventKind.WispGift, i), states, who, trap.Reward))
+                {
+                    stage.SetTrapOwner(i, tick, who);
+                }
+            }
+        }
+
+        // 輪（中心 at、半分の大きさ half）に触れている人のうち、中心にいちばん近い人（いなければ -1）。
+        private static int WispToucher(Vector2 at, Vector2 half, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs)
+        {
+            int best = -1;
+            float bestDistance = float.MaxValue;
+            for (int c = 0; c < states.Count; c++)
+            {
+                CharacterState state = states[c];
+                if (state.Combat.IsWaitingToRespawn || state.Combat.IsAway || state.Combat.HasLeft)
+                {
+                    continue;
+                }
+                float dx = state.Position.X - at.X;
+                float dy = state.Position.Y - at.Y;
+                if (MathF.Abs(dx) >= half.X + configs[c].Movement.HalfWidth || MathF.Abs(dy) >= half.Y + configs[c].Movement.HalfHeight)
+                {
+                    continue;
+                }
+                float distance = dx * dx + dy * dy;
+                if (distance < bestDistance)
+                {
+                    best = c;
+                    bestDistance = distance;
+                }
+            }
+            return best;
         }
 
         private static void StepTripwire(StageTrap trap, StageState stage, int index, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,

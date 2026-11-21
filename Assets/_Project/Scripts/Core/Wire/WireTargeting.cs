@@ -235,6 +235,23 @@ namespace Airerage.Core.Wire
             return false;
         }
 
+        /// <summary>
+        /// point にあるアンカーポイントが付いている物（動く足場なら番号 + 1。ほかと、point がアンカーでなければ 0）。箱のない足場のアンカー
+        /// （荷役の網。2026-11-21）に空中でつながるときに、どの足場かを覚えるのに使う。
+        /// </summary>
+        public static int AnchorBodyAt(ICollisionQuery collision, Vector3 point)
+        {
+            var anchors = collision.AnchorPoints;
+            for (int i = 0; i < anchors.Count; i++)
+            {
+                if (anchors[i].X == point.X && anchors[i].Y == point.Y)
+                {
+                    return AnchorBodyOf(collision, i);
+                }
+            }
+            return 0;
+        }
+
         // アンカーポイント index が付いている物（動く足場なら番号 + 1。ほかは 0）。
         private static int AnchorBodyOf(ICollisionQuery collision, int index)
         {

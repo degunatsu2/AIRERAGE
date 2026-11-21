@@ -58,11 +58,13 @@ namespace Airerage.Runtime.Simulation
         [Tooltip("道のりを動く足場: 箱の中心をアンカーポイントにするか（埠頭の動くボラード）と、エイムアシストの半径（m。0 ならふつう）")]
         [SerializeField] private bool _anchor;
         [SerializeField] private float _anchorRadius;
+        [Tooltip("荷役の網: 重なった人を跳ね返す速さ（m/s。下がる長さは _openHeight、アンカーの半径は _anchorRadius）")]
+        [SerializeField] private float _bouncePower;
 
         public StagePlatformKind Kind => _kind;
 
         /// <summary>箱の中心がアンカーポイントか（道のりを動く足場だけ）。</summary>
-        public bool HasAnchor => _anchor && _kind == StagePlatformKind.Path;
+        public bool HasAnchor => (_anchor && _kind == StagePlatformKind.Path) || _kind == StagePlatformKind.Hoist;
         public Vector2 Size => _size;
         public int Group => _group;
 
@@ -107,6 +109,21 @@ namespace Airerage.Runtime.Simulation
             _phaseSeconds = phaseSeconds;
         }
 
+        /// <summary>
+        /// 荷役の網にする（シーンのビルダー用。drop は吊り具が伸びきって下がる長さ、bouncePower は重なった人を跳ね返す速さ、anchorRadius は
+        /// 真ん中のアンカーのエイムアシストの半径）。
+        /// </summary>
+        public void ConfigureHoist(Vector2 size, float drop, float bouncePower, float anchorRadius)
+        {
+            _kind = StagePlatformKind.Hoist;
+            _size = size;
+            _attachable = true;
+            _openHeight = drop;
+            _bouncePower = bouncePower;
+            _anchor = true;
+            _anchorRadius = anchorRadius;
+        }
+
         /// <summary>扉のボタンにする（シーンのビルダー用。ワイヤーがつながる）。</summary>
         public void ConfigureButton(Vector2 size, int group)
         {
@@ -134,6 +151,10 @@ namespace Airerage.Runtime.Simulation
             if (_kind == StagePlatformKind.Button)
             {
                 return StagePlatform.Button(origin, half, _group);
+            }
+            if (_kind == StagePlatformKind.Hoist)
+            {
+                return StagePlatform.Hoist(origin, half, _openHeight, _bouncePower, _anchorRadius);
             }
             var keys = new PlatformKey[_keys.Length];
             for (int i = 0; i < keys.Length; i++)

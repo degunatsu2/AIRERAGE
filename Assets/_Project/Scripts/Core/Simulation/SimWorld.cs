@@ -412,8 +412,9 @@ namespace Airerage.Core.Simulation
             // THIEF の分身（移動とワイヤーだけ）。
             ThiefRules.StepClones(this, _clones, _cloneMinds, _cloneMotion, _states, _simulator, _configs, Bounds, Tick, Rules.Seed);
             Tick++;
-            // ステージの仕掛け（赤外線とミサイル、ピッチャーマシンのボール）。
+            // ステージの仕掛け（赤外線とミサイル、ピッチャーマシンのボール）と、荷役の網の跳ね返し。
             StageTraps.Step(_traps, _stage, _states, _tickConfigs, Tick);
+            StagePlatforms.Bounce(_platforms, _stage, _states, _tickConfigs, Tick);
             // ステージの危険に当たった人が、威力に応じてコインを落とす。
             CoinDropRules.DropOnHazards(Coins, _states, Rules, Tick);
             SkillRules.FireEffects(_objects, Coins, _states, _tickConfigs, Tick, _thief, _collision);
@@ -441,6 +442,8 @@ namespace Airerage.Core.Simulation
             FieldCoinRules.Step(Coins, _states, _tickConfigs, CoinSpawns, Rules, Tick, active);
             // ホットエリア（30 秒ごとのフルーツとコイン）。
             HotAreaRules.Step(Coins, ref _match, _states, _tickConfigs, CoinSpawns, Rules, _collision, Bounds, Tick, active);
+            // 鬼火の輪（恐怖の館。くぐった人にコイン）。
+            StageTraps.StepWispRings(_traps, _stage, _states, _tickConfigs, Coins, Tick, Rules.Seed, active);
             if (phase == MatchPhase.Overtime)
             {
                 MatchFlow.StepOvertime(ref _match, _states, _tickConfigs, BankSpots, Rules, Tick);

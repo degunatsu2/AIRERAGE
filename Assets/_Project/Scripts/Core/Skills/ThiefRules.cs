@@ -503,6 +503,11 @@ namespace Airerage.Core.Skills
             for (int i = 0; i < traps.Count; i++)
             {
                 StageTrap trap = traps[i];
+                // 鬼火の輪は奪えない（飛び回る贈り物で、置ける仕掛けではない）。
+                if (trap.Kind == StageTrapKind.WispRing)
+                {
+                    continue;
+                }
                 if (Vector2.Distance(point, trap.Muzzle) <= tuning.TrapBodyRadius)
                 {
                     return i;

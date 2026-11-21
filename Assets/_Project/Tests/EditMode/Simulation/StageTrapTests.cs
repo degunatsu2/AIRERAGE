@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Airerage.Core.Combat;
+using Airerage.Core.Economy;
 using Airerage.Core.Input;
 using Airerage.Core.Movement;
 using Airerage.Core.Physics;
@@ -268,5 +269,90 @@ namespace Airerage.Core.Tests.Simulation
             Assert.Throws<ArgumentException>(() => StageTrap.Pitcher(Vector2.Zero, Vector2.One, 0, 0, 0.3f, 1, 1f, 0f, 0));
             Assert.Throws<ArgumentException>(() => new StageZone(StageZoneKind.Grab, -1f, -1f, 1f, 1f, Vector2.UnitY, 1f, 0f, default, Vector2.Zero));
         }
-    }
+    
+        // 鬼火の輪（2026-11-21）: 4 つの地点の間を秒速 12m で飛び、地点で 0.5 秒漂う。くぐると 30 枚。20〜30 秒でまた現れる。
+        private static StageTrap Wisp()
+        {
+            return StageTrap.WispRing(new[] { new Vector2(-20f, 5f), new Vector2(0f, 12f), new Vector2(20f, 5f), new Vector2(0f, 2f) }, 12f, 30,
+                new Vector2(1.2f, 1.5f), 30, 1200, 1800);
+        }
+
+        [Test]
+        public void WispRing_FliesBetweenItsPoints_InAnOrderSetByTheSeed()
+        {
+            StageTrap wisp = Wisp();
+            var visits = new System.Collections.Generic.List<int>();
+            int last = -1;
+            float fastest = 0f;
+            bool seedMatters = false;
+            for (int t = 0; t < 3600; t++)
+            {
+                Vector2 at = wisp.WispAt(t, 7);
+                Assert.That(wisp.WispAt(t, 7), Is.EqualTo(at), "同じ種とティックで道のりが変わる");
+                seedMatters |= Vector2.Distance(at, wisp.WispAt(t, 8)) > 1f;
+                fastest = Math.Max(fastest, Vector2.Distance(at, wisp.WispAt(t + 1, 7)) * 60f);
+                for (int w = 0; w < wisp.Waypoints.Count; w++)
+                {
+                    if (Vector2.Distance(at, wisp.Waypoints[w]) < 1e-3f && w != last)
+                    {
+                        visits.Add(w);
+                        last = w;
+                    }
+                }
+            }
+            Assert.That(visits.Count, Is.GreaterThanOrEqualTo(8), "1 分で地点をあまり回らない");
+            Assert.That(new System.Collections.Generic.HashSet<int>(visits).Count, Is.EqualTo(4), "飛び回る地点が偏る");
+            Assert.That(fastest, Is.LessThanOrEqualTo(12f * 1.5f + 0.5f), "速すぎる");
+            Assert.That(fastest, Is.GreaterThan(12f), "動き出して止まる途中の速さが出ない");
+            Assert.That(seedMatters, Is.True, "試合の種で順番が変わらない");
+            Assert.Throws<ArgumentException>(() => StageTrap.WispRing(new[] { Vector2.Zero }, 12f, 30, Vector2.One, 30, 60, 120), "地点 1 つで作れた");
+        }
+
+        [Test]
+        public void WispRing_GivesCoinsToWhoPassesThroughIt_ThenComesBackAfter20To30Seconds()
+        {
+            var world = new SimWorld(Floor(), null, null, null, null, null, null, new[] { Wisp() });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-40f, Movement.HalfHeight, 0f), 1);
+            StageTrap wisp = world.Traps[0];
+            int seed = world.Rules.Seed;
+            // 輪の次のティックの位置に置く（重力の影響の前に触れる）。
+            void HoldAtTheRing()
+            {
+                Vector2 next = wisp.WispAt(world.Tick + 1, seed);
+                CharacterState state = world.GetState(0);
+                state.Position = new Vector3(next.X, next.Y, 0f);
+                state.Velocity = Vector3.Zero;
+                world.SetState(0, state);
+            }
+            HoldAtTheRing();
+            Step(world, 1);
+            int taken = world.Tick;
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(30), "くぐっても 30 枚もらえない");
+            Assert.That(world.Stage.TrapTickOf(0), Is.EqualTo(taken), "くぐったティックを覚えない");
+            Assert.That(world.Stage.TrapOwnerOf(0), Is.EqualTo(0), "くぐった人を覚えない");
+            Assert.That(world.Coins.Field.Generated, Is.EqualTo(30), "台帳の生成に入らない");
+            Assert.That(world.Coins.Totals(new System.Collections.Generic.List<CharacterState> { world.GetState(0) }).IsConserved, Is.True, "コインの総量が合わない");
+
+            // 消えている間は、輪の所にいてももらえない。
+            int back = wisp.RespawnTickAfter(taken, seed);
+            Assert.That(back - taken, Is.InRange(1200, 1800), "20〜30 秒でまた現れない");
+            while (world.Tick < back - 2)
+            {
+                HoldAtTheRing();
+                Step(world, 1);
+            }
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(30), "消えている間にもらえた");
+
+            // 巻き戻し: くぐった人も戻る。
+            var snapshot = new WorldSnapshot();
+            world.SaveTo(snapshot);
+            HoldAtTheRing();
+            Step(world, 3);
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(60), "また現れた輪をくぐってももらえない");
+            Assert.That(world.Stage.TrapOwnerOf(0), Is.EqualTo(0));
+            world.LoadFrom(snapshot);
+            Assert.That(world.Stage.TrapTickOf(0), Is.EqualTo(taken), "巻き戻しで、くぐったティックが戻らない");
+            Assert.That(world.Checksum(), Is.EqualTo(snapshot.Checksum()));
+        }
+}
 }

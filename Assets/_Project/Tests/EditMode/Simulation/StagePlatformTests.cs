@@ -278,5 +278,124 @@ namespace Airerage.Core.Tests.Simulation
             Assert.Throws<ArgumentException>(() => StagePlatform.TimedDoor(Vector2.Zero, Vector2.One, false, 1f, 10, 10, 100, 100));
             Assert.Throws<ArgumentException>(() => StagePlatform.Button(Vector2.Zero, Vector2.One, 0));
         }
-    }
+    
+        // 荷役の網（2026-11-21）: 床（上面 y = 0）の上の空中（中心 (0, 10)、幅 3m・厚さ 1m）。4m 下がり、重なった人を 16 m/s で跳ね返す。
+        private static StagePlatform Net()
+        {
+            return StagePlatform.Hoist(new Vector2(0f, 10f), new Vector2(1.5f, 0.5f), 4f, 16f, 1.8f);
+        }
+
+        [Test]
+        public void ANet_DropsWithABungeeBounce_WhileAWireHangsOnIt_AndRisesSlowlyAfter()
+        {
+            var world = new SimWorld(new BoxTerrain().AddBox(-30f, -2f, 30f, 0f), null, null, null, null, null, new[] { Net() });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-4f, Movement.HalfHeight, 0f), 1);
+            var toNet = Vector2.Normalize(new Vector2(4f, 10f - Movement.HalfHeight));
+            PlayerInput hold = PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(toNet);
+            for (int t = 0; t < 40 && world.GetState(0).Wire.Phase != WirePhase.Attached; t++)
+            {
+                Step(world, 1, hold);
+            }
+            Assert.That(world.GetState(0).Wire.Phase, Is.EqualTo(WirePhase.Attached), "網にワイヤーがつながらない");
+            Assert.That(world.GetState(0).Wire.AnchorBody, Is.EqualTo(1), "網の真ん中のアンカーにつながっていない");
+            int deepest = 0;
+            int full = -1;
+            for (int t = 0; t < 150; t++)
+            {
+                Step(world, 1, hold);
+                int open = world.Stage.OpenOf(0);
+                deepest = Math.Max(deepest, open);
+                if (full < 0 && open >= StagePlatform.HoistScale)
+                {
+                    full = t;
+                }
+            }
+            Assert.That(full, Is.InRange(0, 45), "吊り具が速く伸びない");
+            Assert.That(deepest, Is.GreaterThan(StagePlatform.HoistScale * 1.05f), "バンジーのように行きすぎて跳ね返らない");
+            Assert.That(deepest, Is.LessThan(StagePlatform.HoistScale * 1.5f), "行きすぎが大きすぎる（少し跳ね返るだけのはず）");
+            Assert.That(world.Stage.OpenOf(0), Is.EqualTo(StagePlatform.HoistScale).Within(StagePlatform.HoistScale * 0.03f), "伸びきった所に落ち着かない");
+            Assert.That(world.Platforms[0].TryGetCenter(world.Tick, world.Stage.OpenOf(0), out Vector2 low), Is.True);
+            Assert.That(low.Y, Is.EqualTo(6f).Within(0.15f), "網が 4m 下がらない");
+            Assert.That(world.GetState(0).Wire.Anchor.Y, Is.EqualTo(low.Y).Within(0.05f), "ワイヤーの接続点が網と一緒に下がらない");
+
+            // 外すと、行きすぎずにゆっくり戻る。
+            Step(world, 60);
+            Assert.That(world.GetState(0).Wire.Phase, Is.Not.EqualTo(WirePhase.Attached), "前提: ワイヤーを外した");
+            Assert.That(world.Stage.OpenOf(0), Is.GreaterThan(StagePlatform.HoistScale / 2), "外すとすぐ戻る（ゆっくりでない）");
+            int highest = int.MaxValue;
+            for (int t = 0; t < 480; t++)
+            {
+                Step(world, 1);
+                highest = Math.Min(highest, world.Stage.OpenOf(0));
+            }
+            Assert.That(world.Stage.OpenOf(0), Is.Zero, "外しても元の高さへ戻らない");
+            Assert.That(highest, Is.GreaterThanOrEqualTo(0), "戻るときに元の高さより上へ行きすぎた");
+        }
+
+        [Test]
+        public void ANet_PulledByAFastFall_BouncesFurther()
+        {
+            // 同じ網に、止まってぶら下がる人と、勢いよく落ちながらぶら下がる人。落ちる勢いが強いほど、大きく行きすぎて跳ね返る。
+            int Deepest(float fall)
+            {
+                StagePlatform net = Net();
+                var stage = new StageState();
+                stage.Reset(1);
+                var hanger = new CharacterState { Velocity = new Vector3(0f, -fall, 0f) };
+                hanger.Wire.Phase = WirePhase.Attached;
+                hanger.Wire.AnchorBody = 1;
+                var states = new[] { hanger };
+                int deepest = 0;
+                for (int t = 0; t < 120; t++)
+                {
+                    StagePlatforms.StepHoist(net, stage, 0, states, true);
+                    deepest = Math.Max(deepest, stage.OpenOf(0));
+                    // 落ちる勢いは、ロープに止められて少しずつ弱まる。
+                    states[0].Velocity.Y *= 0.9f;
+                }
+                return deepest;
+            }
+            int still = Deepest(0f);
+            int fast = Deepest(25f);
+            Assert.That(fast, Is.GreaterThan(still + StagePlatform.HoistScale / 20), "強く引っ張られても跳ね返りが大きくならない");
+        }
+
+        [Test]
+        public void ANet_IsNotSolid_ButBouncesWhoLandsOnIt_AndRollsBackWithTheWorld()
+        {
+            var world = new SimWorld(new BoxTerrain().AddBox(-30f, -2f, 30f, 0f), null, null, null, null, null, new[] { Net() });
+            world.AddCharacter(new CharacterConfig(), new Vector3(0.3f, 12f, 0f), 1);
+            var collision = (Airerage.Core.Objects.WorldCollision)world.Collision;
+            Step(world, 1);
+            Assert.That(collision.Raycast(new Vector3(0f, 9.2f, 0f), Vector3.UnitY, 3f, out _), Is.False, "網が当たる箱になっている（通り抜けるはず）");
+            Assert.That(collision.AnchorBodyOf(collision.AnchorPoints.Count - 1), Is.EqualTo(1), "網の真ん中がアンカーにならない");
+            CharacterState falling = world.GetState(0);
+            falling.Velocity = new Vector3(0f, -12f, 0f);
+            world.SetState(0, falling);
+            bool bounced = false;
+            for (int t = 0; t < 30 && !bounced; t++)
+            {
+                Step(world, 1);
+                bounced = world.GetState(0).Velocity.Y > 12f;
+            }
+            Assert.That(bounced, Is.True, "上から乗っても跳ね返さない");
+
+            // 巻き戻し: 下がっている途中の伸び具合と速さが戻る。
+            var stage = new StageState();
+            stage.Reset(1);
+            var hanger = new CharacterState();
+            hanger.Wire.Phase = WirePhase.Attached;
+            hanger.Wire.AnchorBody = 1;
+            for (int t = 0; t < 10; t++)
+            {
+                StagePlatforms.StepHoist(world.Platforms[0], stage, 0, new[] { hanger }, true);
+            }
+            var copy = new StageState();
+            copy.CopyFrom(stage);
+            Assert.That(copy.SameAs(stage), Is.True);
+            Assert.That(copy.SpeedOf(0), Is.EqualTo(stage.SpeedOf(0)).And.Not.Zero, "伸びる速さが写らない");
+            StagePlatforms.StepHoist(world.Platforms[0], stage, 0, new[] { hanger }, true);
+            Assert.That(copy.SameAs(stage), Is.False, "伸び具合の違いを見分けない");
+        }
+}
 }

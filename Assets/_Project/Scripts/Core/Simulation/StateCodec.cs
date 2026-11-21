@@ -87,16 +87,26 @@ namespace Airerage.Core.Simulation
             hash = Mix(hash, match.HotFruitTaken);
             if (stage != null)
             {
-                // 扉の開き具合と、仕掛けの触れた時刻（扉と仕掛けのないステージでは何も足さない）。
+                // 扉の開き具合・荷役の網の伸び具合と、仕掛けの触れた時刻（扉と仕掛けのないステージでは何も足さない）。
                 for (int i = 0; i < stage.Count; i++)
                 {
                     hash = Mix(hash, stage.OpenOf(i));
                     hash = Mix(hash, stage.PreviousOf(i));
+                    // 荷役の網の伸びる速さ（扉は 0 のまま。0 は足さないので、網のないステージの記録の値は変わらない）。
+                    if (stage.SpeedOf(i) != 0)
+                    {
+                        hash = Mix(hash, stage.SpeedOf(i));
+                    }
                 }
                 for (int i = 0; i < stage.TrapCount; i++)
                 {
                     hash = Mix(hash, stage.TrapTickOf(i));
                     hash = Mix(hash, stage.TrapSpentOf(i) ? 1 : 0);
+                    // 鬼火の輪をくぐった人（ほかの仕掛けは -1 のまま。足さない）。
+                    if (stage.TrapOwnerOf(i) >= 0)
+                    {
+                        hash = Mix(hash, stage.TrapOwnerOf(i));
+                    }
                 }
             }
             if (clones != null)

@@ -51,12 +51,23 @@ namespace Airerage.Runtime.Simulation
         [Tooltip("止まってから消えるまでの点滅（秒）")]
         [SerializeField] private float _blinkSeconds = 1.5f;
 
+        [Header("鬼火の輪")]
+        [Tooltip("飛び回る地点（ワールドの位置）")]
+        [SerializeField] private Vector2[] _waypoints = new Vector2[0];
+        [Tooltip("地点で漂う長さ（秒）・輪の大きさ（m）・渡すコインの枚数・また現れるまで（秒。最短と最長）。速さは _speed")]
+        [SerializeField] private float _hoverSeconds = 1f;
+        [SerializeField] private Vector2 _ringSize = new Vector2(2.4f, 3f);
+        [SerializeField] private int _reward = 30;
+        [SerializeField] private float _respawnMinSeconds = 20f;
+        [SerializeField] private float _respawnMaxSeconds = 30f;
+
         public StageTrapKind Kind => _kind;
         public Vector2 BeamSize => _beamSize;
         public Vector2 MuzzleOffset => _muzzleOffset;
         public Vector2 Direction => _direction;
         public float Radius => _radius;
         public Vector2 MissileSize => _missileSize;
+        public Vector2 RingSize => _ringSize;
 
         /// <summary>赤外線とミサイルにする（シーンのビルダー用）。</summary>
         public void ConfigureTripwire(Vector2 beamSize, Vector2 muzzleOffset, Vector2 direction, float speed, float range, int power, float knockback,
@@ -90,6 +101,20 @@ namespace Airerage.Runtime.Simulation
             _blinkSeconds = blinkSeconds;
         }
 
+        /// <summary>鬼火の輪にする（シーンのビルダー用。waypoints はワールドの位置）。</summary>
+        public void ConfigureWispRing(Vector2[] waypoints, float speed, float hoverSeconds, Vector2 ringSize, int reward, float respawnMinSeconds,
+            float respawnMaxSeconds)
+        {
+            _kind = StageTrapKind.WispRing;
+            _waypoints = waypoints;
+            _speed = speed;
+            _hoverSeconds = hoverSeconds;
+            _ringSize = ringSize;
+            _reward = reward;
+            _respawnMinSeconds = respawnMinSeconds;
+            _respawnMaxSeconds = respawnMaxSeconds;
+        }
+
         /// <summary>Core の仕掛けにする（秒はティックに丸める）。値が不正なら ArgumentException。</summary>
         public StageTrap ToTrap()
         {
@@ -101,6 +126,16 @@ namespace Airerage.Runtime.Simulation
                 return StageTrap.Tripwire(center - half, center + half, center + new NVector2(_muzzleOffset.x, _muzzleOffset.y),
                     new NVector2(_direction.x, _direction.y), _speed, _range, _power, _knockback, Ticks(_armSeconds), Ticks(_cooldownSeconds),
                     new NVector2(_missileSize.x * 0.5f, _missileSize.y * 0.5f));
+            }
+            if (_kind == StageTrapKind.WispRing)
+            {
+                var points = new NVector2[_waypoints.Length];
+                for (int i = 0; i < points.Length; i++)
+                {
+                    points[i] = new NVector2(_waypoints[i].x, _waypoints[i].y);
+                }
+                return StageTrap.WispRing(points, _speed, Ticks(_hoverSeconds), new NVector2(_ringSize.x * 0.5f, _ringSize.y * 0.5f), _reward,
+                    Ticks(_respawnMinSeconds), Ticks(_respawnMaxSeconds));
             }
             return StageTrap.Pitcher(center, new NVector2(_launchVelocity.x, _launchVelocity.y), Ticks(_periodSeconds), Ticks(_phaseSeconds), _radius,
                 _power, _knockback, _minHitSpeed, Ticks(_blinkSeconds));

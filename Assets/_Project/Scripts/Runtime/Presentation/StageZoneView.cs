@@ -91,17 +91,8 @@ namespace Airerage.Runtime.Presentation
             /// </summary>
             Catapult = 13,
 
-            /// <summary>
-            /// 加速リングを鬼火の輪にする（青白い鬼火が輪の形に回り、くぐる向きへ流れる。輪はゆっくり漂う。枠と印は出さない。
-            /// WispRingView。2026-11-21 の方針）。
-            /// </summary>
-            Wisp = 14,
-
-            /// <summary>
-            /// 跳ね返す物をクレーンに吊った荷役の網にする（4 本の吊り具と枠に張った網。乗った所が沈んで跳ね返す。枠は出さない。
-            /// CargoNetView。2026-11-21 の方針）。
-            /// </summary>
-            Net = 15,
+            // 14（鬼火の輪）と 15（荷役の網）は、ステージの仕掛け（StageTrapKind.WispRing）と動く足場（StagePlatformKind.Hoist）に
+            // 作り直した（2026-11-21 の要望）。番号は使わない。
         }
 
         private const int RingSegments = 40;
@@ -648,13 +639,6 @@ namespace Airerage.Runtime.Presentation
         // 脈打つ二重の枠。
         private void RenderBumper(Vector3 center, Vector2 half, float time)
         {
-            if (_look == ZoneLook.Net)
-            {
-                // 網は網そのもの（CargoNetView）で見せる。
-                SetColor(_ring, 0f);
-                SetColor(_inner, 0f);
-                return;
-            }
             float pulse = Mathf.Sin(time * Mathf.PI * 2f);
             Box(_ring, center, half, 1f + 0.06f * pulse, 1f);
             Box(_inner, center, half, 0.7f - 0.08f * pulse, 0.5f + 0.3f * pulse);
@@ -1292,16 +1276,6 @@ namespace Airerage.Runtime.Presentation
         // 輪（範囲に収まる楕円）と、中心から両方向へ流れる「<」「>」。輪は少し脈打つ。
         private void RenderRing(Vector3 center, Vector2 half, float time)
         {
-            if (_look == ZoneLook.Wisp)
-            {
-                // 鬼火の輪は鬼火そのもの（WispRingView）で見せる。
-                SetColor(_ring, 0f);
-                foreach (LineRenderer line in _marks)
-                {
-                    SetColor(line, 0f);
-                }
-                return;
-            }
             float pulse = 1f + 0.06f * Mathf.Sin(time * Mathf.PI * 2f);
             for (int i = 0; i < RingSegments; i++)
             {

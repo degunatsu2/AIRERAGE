@@ -265,7 +265,8 @@ namespace Airerage.Core.Wire
                     Miss(ref state, WireMissReason.OutOfRange);
                     return;
                 }
-                Attach(ref state, wire.TargetPoint, tuning);
+                // 箱のない足場のアンカー（荷役の網）なら、その足場と一緒に動くように覚える。
+                Attach(ref state, wire.TargetPoint, tuning, WireTargeting.AnchorBodyAt(_collision, wire.TargetPoint));
                 return;
             }
 

@@ -235,10 +235,11 @@ namespace Airerage.PlayMode.Tests
         }
 
         /// <summary>
-        /// 埠頭の荷役の網（2026-11-21）: 上から落ちてきた人を跳ね返し、網が受けた所で沈む（CargoNetView）。
+        /// 埠頭の荷役の網（2026-11-21 の要望）: 上から落ちてきた人を跳ね返して網目が沈み（CargoNetView）、ワイヤーをつないでぶら下がると
+        /// 網が下がってワイヤー（吊り具）が伸び、外すと戻り始める（動く足場 StagePlatformKind.Hoist）。
         /// </summary>
         [UnityTest]
-        public IEnumerator Wharf_CargoNet_SagsWhenItCatchesSomeone()
+        public IEnumerator Wharf_CargoNet_Bounces_AndLowersWhileAWireHangsOnIt()
         {
             SceneManager.LoadScene("App");
             yield return null;
@@ -247,26 +248,101 @@ namespace Airerage.PlayMode.Tests
             flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Wharf"));
             yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
             var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
-            StageZoneAuthoring authoring = UnityEngine.Object.FindObjectsByType<StageZoneAuthoring>(FindObjectsSortMode.None).Single(z => z.name == "NetWest");
-            StageZone zone = authoring.ToZone();
-            CargoNetView net = authoring.GetComponentInChildren<CargoNetView>();
+            StagePlatformView view = UnityEngine.Object.FindObjectsByType<StagePlatformView>(FindObjectsSortMode.None).Single(v => v.name == "NetWest");
+            StagePlatform platform = view.GetComponent<StagePlatformAuthoring>().ToPlatform();
+            CargoNetView net = view.GetComponentInChildren<CargoNetView>();
             yield return WaitSeconds(0.5f);
             CharacterState state = runner.PlayerState;
-            state.Position = new System.Numerics.Vector3(zone.Center.X + 0.6f, zone.MaxY + 2.5f, 0f);
+            state.Position = new System.Numerics.Vector3(platform.Origin.X + 0.6f, platform.Origin.Y + platform.HalfSize.Y + 2.5f, 0f);
             state.Velocity = new System.Numerics.Vector3(0f, -14f, 0f);
             state.Grounded = false;
             runner.SetPlayerState(state);
             yield return WaitFor(() => net.Catches > 0, 3f, $"網が受けない（{runner.PlayerState.Position}・{runner.PlayerState.Velocity}）");
             Assert.That(runner.PlayerState.Velocity.Y, Is.GreaterThan(5f), "網が跳ね返さない");
-            float deepest = 0f;
-            float until = Time.realtimeSinceStartup + 0.4f;
-            while (Time.realtimeSinceStartup < until)
+
+            // 網の真ん中のアンカーにワイヤーをつないだ状態にする（ぶら下がる）。網が下がり、ワイヤーが伸びる。
+            float restCable = net.CableLength;
+            int index = ((ISimulationFeed)runner).Platforms.ToList().FindIndex(p => p.SameAs(platform));
+            Assert.That(index, Is.GreaterThanOrEqualTo(0));
+            CharacterState hanger = runner.PlayerState;
+            hanger.Position = new System.Numerics.Vector3(platform.Origin.X, platform.Origin.Y - 5f, 0f);
+            hanger.Velocity = System.Numerics.Vector3.Zero;
+            hanger.Wire.Phase = Airerage.Core.Wire.WirePhase.Attached;
+            hanger.Wire.Anchor = new System.Numerics.Vector3(platform.Origin.X, platform.Origin.Y, 0f);
+            hanger.Wire.AnchorBody = (byte)(index + 1);
+            hanger.Wire.RopeLength = 5f;
+            hanger.Wire.PhaseTicks = 0;
+            runner.SetPlayerState(hanger);
+            // ワイヤーのボタンを押し続ける（離すと外れる）。
+            runner.InputOverride = new Repeat(Airerage.Core.Input.PlayerInput.FromAxes(0f, 0f, Airerage.Core.Input.InputButtons.Wire)
+                .WithAim(System.Numerics.Vector2.UnitY));
+            try
             {
-                deepest = Mathf.Max(deepest, net.Sag);
+                yield return WaitFor(() => ((ISimulationFeed)runner).Stage.OpenOf(index) >= StagePlatform.HoistScale, 3f,
+                    $"ぶら下がっても網が下がらない（{((ISimulationFeed)runner).Stage.OpenOf(index)}・{runner.PlayerState.Wire.Phase}）");
                 yield return null;
+                Assert.That(view.ShownCenter.y, Is.LessThan(platform.Origin.Y - platform.OpenHeight * 0.8f), "網の見た目が下がらない");
+                Assert.That(net.CableLength, Is.GreaterThan(restCable + platform.OpenHeight * 0.8f), "吊り具（ワイヤー）が伸びない");
             }
-            Assert.That(deepest, Is.GreaterThan(0.05f), "網が受けた所で沈まない");
-            Assert.That(net.Depth(0.6f, 0f), Is.GreaterThan(net.Depth(-1.4f, 0f)), "受けた所より縁が深く沈んでいる");
+            finally
+            {
+                runner.InputOverride = null;
+            }
+        }
+
+        private sealed class Repeat : ITickInputSource
+        {
+            private readonly Airerage.Core.Input.PlayerInput _input;
+
+            public Repeat(Airerage.Core.Input.PlayerInput input)
+            {
+                _input = input;
+            }
+
+            public bool TryGetNext(out Airerage.Core.Input.PlayerInput input)
+            {
+                input = _input;
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// 恐怖の館の鬼火の輪（2026-11-21 の要望）: 飛び回る輪をくぐると 30 枚のコインをもらい、鬼火がその人の周りを回る（WispRingView）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Manor_WispRing_GivesCoins_AndCirclesWhoPassesThroughIt()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Manor"));
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+            var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
+            ISimulationFeed feed = runner;
+            WispRingView view = UnityEngine.Object.FindFirstObjectByType<WispRingView>();
+            StageTrap wisp = view.GetComponent<StageTrapAuthoring>().ToTrap();
+            yield return WaitFor(() => feed.Rules.HasTimeLimit ? feed.CurrentTick > feed.Rules.CountdownTicks + 5 : feed.CurrentTick > 5, 10f, "試合が始まらない");
+            Assert.That(view.ShowsRing, Is.True, "輪が出ていない");
+            int before = runner.PlayerState.Coins.Held;
+            bool taken = false;
+            float limit = Time.realtimeSinceStartup + 3f;
+            while (!taken && Time.realtimeSinceStartup < limit)
+            {
+                // 輪の次のティックの位置に置き続ける。
+                System.Numerics.Vector2 next = wisp.WispAt(feed.CurrentTick + 1, feed.Rules.Seed);
+                CharacterState state = runner.PlayerState;
+                state.Position = new System.Numerics.Vector3(next.X, next.Y, 0f);
+                state.Velocity = System.Numerics.Vector3.Zero;
+                runner.SetPlayerState(state);
+                yield return null;
+                taken = runner.PlayerState.Coins.Held >= before + 30;
+            }
+            Assert.That(taken, Is.True, "輪をくぐっても 30 枚もらえない");
+            yield return null;
+            yield return null;
+            Assert.That(view.Circling, Is.True, "鬼火がくぐった人の周りを回らない");
+            Assert.That(view.ShowsRing, Is.False, "くぐった後も輪が出ている");
         }
 
         /// <summary>

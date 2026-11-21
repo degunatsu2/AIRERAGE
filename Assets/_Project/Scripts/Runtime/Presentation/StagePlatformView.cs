@@ -38,6 +38,15 @@ namespace Airerage.Runtime.Presentation
         /// <summary>ボタンのランプを点けているか（テスト用）。</summary>
         public bool LampOn { get; private set; }
 
+        /// <summary>表示する試合（見つかっていなければ null。メニューの背景など）。荷役の網が乗った人を見るのに使う。</summary>
+        public ISimulationFeed Feed => _feed != null && _feed.CharacterCount > 0 && !(_feed is MonoBehaviour gone && gone == null) ? _feed : null;
+
+        /// <summary>Core の足場（荷役の網の下がる長さなど）。</summary>
+        public StagePlatform Platform => _platform;
+
+        /// <summary>今の伸び具合・開き具合（状態で動く足場。表示する試合がなければ 0）。</summary>
+        public int ShownOpen { get; private set; }
+
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(Transform visual)
         {
@@ -78,7 +87,7 @@ namespace Airerage.Runtime.Presentation
             bool running = _feed != null && _feed.CharacterCount > 0 && _feed.Platforms != null;
             int tick = running ? _feed.CurrentTick : Mathf.FloorToInt(Time.time * SimTime.TicksPerSecond);
             int open = 0;
-            if (running && _platform.IsDoor)
+            if (running && _platform.UsesState)
             {
                 int index = IndexIn(_feed.Platforms);
                 open = index >= 0 && _feed.Stage != null ? _feed.Stage.OpenOf(index) : 0;
@@ -97,6 +106,7 @@ namespace Airerage.Runtime.Presentation
                     _lamp.sharedMaterial = pressed ? _lampOn : _lampOff;
                 }
             }
+            ShownOpen = open;
             bool active = _platform.TryGetCenter(tick, open, out System.Numerics.Vector2 center);
             if (_visual.gameObject.activeSelf != active)
             {

@@ -118,16 +118,17 @@ namespace Airerage.Editor.Stages
                     // （前は x 26〜28。左の端が農園の崖に掛からないように）。CatapultView。
                     ZoneSpec.OnFloor("PumpkinLauncher", StageZoneKind.Launcher, 26.5f, 28.5f, 0f, new Vector2(-0.5f, 1f), 32f)
                         .Every(3.6f, 0.25f, 0f, 0f, 1.2f).Styled(StageZoneView.ZoneLook.Catapult),
-                    // 鬼火の輪（加速リング）: 墓場と農園の上から館の屋根へ。
-                    // 2026-11-21 の方針: 青白い鬼火が輪に連なって回り、輪はゆっくり漂う（8 秒で 1 往復。判定も一緒に動く）。WispRingView。
-                    new ZoneSpec("WispRingWest", StageZoneKind.BoostRing, new Vector2(-24f, 22f), new Vector2(2.4f, 3f), new Vector2(1f, 0.2f), 18f)
-                        .Moving(new Vector2(1.2f, 1.8f), 8f).Styled(StageZoneView.ZoneLook.Wisp),
-                    new ZoneSpec("WispRingEast", StageZoneKind.BoostRing, new Vector2(24f, 22f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.2f), 18f)
-                        .Moving(new Vector2(-1.2f, 1.8f), 8f).Styled(StageZoneView.ZoneLook.Wisp),
                     // 館のポーチのジャンプ台と、納骨堂の屋根のジャンプ台（ユーザーの要望、2026-10-26）。
                     ZoneSpec.OnFloor("PorchPadWest", StageZoneKind.JumpPad, -11f, -9f, 2f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("PorchPadEast", StageZoneKind.JumpPad, 9f, 11f, 2f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("CryptPad", StageZoneKind.JumpPad, -32f, -30f, 5.6f, Vector2.up, 24f, 0.4f),
+                },
+                // 鬼火の輪（2026-11-21 の要望: 1 つだけ。左右の牢屋・館の屋根の頂点〈鐘楼の上〉・バルコニーの真ん中・左下の納骨堂の中・右下の
+                // トマト農園の真上の 6 地点を、試合の種で決まる順にランダムに速く〈秒速 12m〉飛び回り、地点で 1 秒漂う。くぐった人の周りを回って
+                // 30 枚のコインを渡し、上空へ消えて 20〜30 秒でまた現れる。前は 2 つの加速リングだった）。StageTraps.StepWispRings・WispRingView。
+                Traps = new[]
+                {
+                    TrapSpec.WispRing("WispRing", WispPoints, 12f, 1f, new Vector2(2.4f, 3f), 30, 20f, 30f),
                 },
                 Platforms = new[]
                 {
@@ -305,6 +306,15 @@ namespace Airerage.Editor.Stages
         private const string PropFolder = "Assets/_Project/Materials/Stages/Manor";
 
         // 背景の小物の色合い（夜の月明かりの中で明るすぎないように少し暗く）と、奥の森の松（黒い針葉樹に見えるように暗く）。
+        /// <summary>
+        /// 鬼火の輪が飛び回る 6 地点（輪の中心）: 左の牢屋の中、右の牢屋の中、館の屋根の頂点（鐘楼の上）、バルコニーの真ん中、左下の納骨堂の中、
+        /// 右下のトマト農園の真上（カカシの腕より上）。
+        /// </summary>
+        internal static readonly Vector2[] WispPoints =
+        {
+            new Vector2(-40f, 30.1f), new Vector2(40f, 30.1f), new Vector2(0f, 35.2f), new Vector2(0f, 12.6f), new Vector2(-31f, 2.5f), new Vector2(36f, 7.5f),
+        };
+
         private static readonly Color PropTint = new Color(0.62f, 0.58f, 0.68f);
         private static readonly Color ForestTint = new Color(0.16f, 0.14f, 0.2f);
 

@@ -265,6 +265,9 @@ namespace Airerage.Editor.Stages
         public bool AnchorPoint;
         public float AnchorRadius;
 
+        /// <summary>荷役の網（Kind が Hoist）: 重なった人を跳ね返す速さ（m/s。下がる長さは OpenHeight、アンカーの半径は AnchorRadius）。</summary>
+        public float BouncePower;
+
         /// <summary>箱の色（なければステージの地形の色）。</summary>
         public Color? Color;
 
@@ -277,6 +280,20 @@ namespace Airerage.Editor.Stages
             Center = center;
             Size = size;
             Attachable = attachable;
+        }
+
+        /// <summary>
+        /// 荷役の網にする（クレーンに吊った網。ワイヤーをつないでいる間は drop だけ下がり、重なった人を bouncePower で跳ね返す。真ん中は
+        /// アンカーポイント〈エイムアシストの半径 anchorRadius〉）。見た目は Visual で作る。
+        /// </summary>
+        public PlatformSpec Hoist(float drop, float bouncePower, float anchorRadius)
+        {
+            Kind = StagePlatformKind.Hoist;
+            OpenHeight = drop;
+            BouncePower = bouncePower;
+            AnchorPoint = true;
+            AnchorRadius = anchorRadius;
+            return this;
         }
 
         /// <summary>道のり（秒とずれの並び。最初は 0 秒・ずれ 0）を決める。</summary>
@@ -424,6 +441,14 @@ namespace Airerage.Editor.Stages
         /// <summary>マシンの向き（壁の左に付くなら 1、右なら -1。見た目だけ）。</summary>
         public float Facing = 1f;
 
+        // 鬼火の輪（速さは Speed）。
+        public Vector2[] Waypoints;
+        public float HoverSeconds;
+        public Vector2 RingSize;
+        public int Reward;
+        public float RespawnMinSeconds;
+        public float RespawnMaxSeconds;
+
         private TrapSpec(string name, StageTrapKind kind, Vector2 center)
         {
             Name = name;
@@ -451,6 +476,25 @@ namespace Airerage.Editor.Stages
                 Knockback = knockback,
                 ArmSeconds = armSeconds,
                 CooldownSeconds = cooldownSeconds,
+            };
+        }
+
+        /// <summary>
+        /// 鬼火の輪（waypoints の間を秒速 speed でランダムに飛び回り、地点で hover 秒漂う。くぐった人に reward 枚。respawnMin〜respawnMax 秒で
+        /// また現れる）。物体は最初の地点に置く。
+        /// </summary>
+        public static TrapSpec WispRing(string name, Vector2[] waypoints, float speed, float hover, Vector2 ringSize, int reward, float respawnMin,
+            float respawnMax)
+        {
+            return new TrapSpec(name, StageTrapKind.WispRing, waypoints[0])
+            {
+                Waypoints = waypoints,
+                Speed = speed,
+                HoverSeconds = hover,
+                RingSize = ringSize,
+                Reward = reward,
+                RespawnMinSeconds = respawnMin,
+                RespawnMaxSeconds = respawnMax,
             };
         }
 

@@ -126,9 +126,13 @@ namespace Airerage.Core.Objects
                 {
                     continue;
                 }
-                platforms[i].BoundsAt(center, out Vector2 min, out Vector2 max);
-                _platforms.AddBox(min.X, min.Y, max.X, max.Y, platforms[i].Attachable, i + 1);
-                _hasPlatforms = true;
+                // 通り抜ける足場（荷役の網）は当たりに入れず、真ん中のアンカーだけを入れる。
+                if (platforms[i].IsSolid)
+                {
+                    platforms[i].BoundsAt(center, out Vector2 min, out Vector2 max);
+                    _platforms.AddBox(min.X, min.Y, max.X, max.Y, platforms[i].Attachable, i + 1);
+                    _hasPlatforms = true;
+                }
                 if (platforms[i].HasAnchor)
                 {
                     _anchors.Add(new Vector3(center.X, center.Y, 0f));

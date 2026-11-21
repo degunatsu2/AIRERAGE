@@ -60,7 +60,8 @@ namespace Airerage.Runtime.Tests
             { "Stage_Kitchen", new[] { StageZoneKind.Hazard, StageZoneKind.Launcher, StageZoneKind.Water, StageZoneKind.Ice, StageZoneKind.SpeedLane, StageZoneKind.Gust } },
             { "Stage_Manor", new[] { StageZoneKind.Hazard, StageZoneKind.Grab, StageZoneKind.Launcher } },
             { "Stage_Stadium", new[] { StageZoneKind.SpeedLane, StageZoneKind.Launcher } },
-            { "Stage_Wharf", new[] { StageZoneKind.Water, StageZoneKind.SpeedLane, StageZoneKind.Bumper } },
+            // 2026-11-21: 埠頭の荷役の網（バンパー）は、ワイヤーで下がる動く足場（StagePlatformKind.Hoist）に。
+            { "Stage_Wharf", new[] { StageZoneKind.Water, StageZoneKind.SpeedLane } },
         };
 
         // ユーザーの要望で消したギミック（2026-10-26）。残っていたら失敗する。
@@ -70,7 +71,7 @@ namespace Airerage.Runtime.Tests
             { "Stage_Volcano", new[] { StageZoneKind.Bumper } },
             { "Stage_Manor", new[] { StageZoneKind.Warp, StageZoneKind.Water, StageZoneKind.LowGravity, StageZoneKind.Bumper, StageZoneKind.Gust } },
             { "Stage_Stadium", new[] { StageZoneKind.Gust, StageZoneKind.Bumper } },
-            { "Stage_Wharf", new[] { StageZoneKind.Gust } },
+            { "Stage_Wharf", new[] { StageZoneKind.Gust, StageZoneKind.Bumper } },
         };
 
         private static readonly NVector3 CharacterHalf = new NVector3(0.4f, 0.9f, 0.4f);
