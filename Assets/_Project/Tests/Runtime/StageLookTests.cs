@@ -998,6 +998,86 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
+        public void FourthGimmickBatch_HasItsLooks_AndMatchesTheHitboxes()
+        {
+            // 2026-11-21 の方針（実際の現象に寄せる。汎用のギミックは見た目に合わせて効果と配置も変える）の第 4 弾。
+            // 気送管: 丸いガラスの管・送風機・昇る筒（管の奥側を昇り、キャラクターを隠さない）。前の四角いガラスの箱はない。
+            Scene lab = Open("Assets/_Project/Scenes/Stages/Stage_Lab.unity");
+            PneumaticTubeView[] tubes = InScene<PneumaticTubeView>(lab).ToArray();
+            Assert.That(tubes.Length, Is.EqualTo(2), "気送管");
+            foreach (PneumaticTubeView tube in tubes)
+            {
+                Transform[] carriers = tube.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("Carrier")).ToArray();
+                Assert.That(carriers.Length, Is.EqualTo(3), "昇る筒");
+                Assert.That(carriers.All(c => c.localPosition.z > 0.5f), Is.True, "筒が遊ぶ面の手前を昇る（キャラクターを隠す）");
+                Assert.That(tube.transform.Find("Fan"), Is.Not.Null, "送風機の羽根");
+            }
+            Assert.That(InScene<Transform>(lab).Any(t => t.name == "TubeGlass"), Is.False, "前の四角いガラスの箱が残っている");
+            // 赤外線: 上下 2 本の細い光線と、両端の投光器・受光器、ミサイルの煙の帯。
+            foreach (StageTrapView trap in InScene<StageTrapView>(lab))
+            {
+                Assert.That(trap.transform.Find("Beam").GetComponent<LineRenderer>(), Is.Not.Null, "赤外線の光線が線でない");
+                Assert.That(trap.transform.Find("Beam2"), Is.Not.Null, "赤外線の 2 本目の光線");
+                Assert.That(trap.GetComponentsInChildren<Transform>(true).Count(t => t.name == "Sensor"), Is.EqualTo(2), "投光器と受光器");
+                Assert.That(trap.GetComponentsInChildren<ParticleSystem>(true).Any(p => p.name == "MissileSmoke"), Is.True, "ミサイルの煙の帯");
+                Assert.That(trap.GetComponentsInChildren<Transform>(true).Count(t => t.name == "Fin"), Is.EqualTo(4), "ミサイルの尾翼");
+            }
+
+            // 投石機: 周期のある発射台（予告の間に引き絞る）で、かごは範囲の所にあり、腕は左上へ振り上がる。
+            Scene manor = Open("Assets/_Project/Scenes/Stages/Stage_Manor.unity");
+            StageZone catapult = InScene<StageZoneAuthoring>(manor).Single(z => z.name == "PumpkinLauncher").ToZone();
+            Assert.That(catapult.Kind, Is.EqualTo(StageZoneKind.Launcher));
+            Assert.That(catapult.Period, Is.GreaterThan(0), "投石機が周期のある発射台でない（いつも効く）");
+            Assert.That(catapult.Timing.WarningTicks, Is.GreaterThan(0), "引き絞る予告がない");
+            CatapultView catapultView = InScene<CatapultView>(manor).Single();
+            Transform bucket = catapultView.GetComponentsInChildren<Transform>(true).First(t => t.name == "BucketBase");
+            Assert.That(bucket.position.x, Is.InRange(catapult.MinX, catapult.MaxX), "かごが発射台の範囲にない");
+            Assert.That(bucket.position.y, Is.LessThan(catapult.MaxY + 0.6f), "かごが地面から浮いている");
+            Assert.That(CatapultView.AngleAt(CatapultView.SwingSeconds, -16f, 100f), Is.EqualTo(100f).Within(0.01f), "腕が横木まで振り上がらない");
+            Assert.That(catapultView.GetComponentsInChildren<Transform>(true).Any(t => t.name.StartsWith("Prop_pumpkin")), Is.True, "かごのかぼちゃ");
+            // 鬼火の輪: 鬼火が連なり、輪は漂う（判定も一緒に動く）。
+            foreach (StageZoneAuthoring ring in InScene<StageZoneAuthoring>(manor).Where(z => z.name.StartsWith("WispRing")))
+            {
+                StageZone zone = ring.ToZone();
+                Assert.That(zone.Kind, Is.EqualTo(StageZoneKind.BoostRing));
+                Assert.That(zone.Moves, Is.True, "鬼火の輪が漂わない");
+                WispRingView view = ring.GetComponentInChildren<WispRingView>(true);
+                Assert.That(view, Is.Not.Null, "鬼火の輪の見た目");
+                Assert.That(view.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("Wisp") && t.GetComponent<Renderer>() != null),
+                    Is.GreaterThanOrEqualTo(8), "輪に連なる鬼火");
+                Assert.That(ring.GetComponentsInChildren<Transform>(true).Any(t => t.name == "RingFrame"), Is.False, "金属の枠の輪が残っている");
+            }
+
+            // 荷役の網: クレーンの梁から吊り、網の面は跳ね返す範囲の上の辺の近く。
+            Scene wharf = Open("Assets/_Project/Scenes/Stages/Stage_Wharf.unity");
+            foreach (StageZoneAuthoring authoring in InScene<StageZoneAuthoring>(wharf).Where(z => z.name.StartsWith("Net")))
+            {
+                StageZone zone = authoring.ToZone();
+                CargoNetView net = authoring.GetComponentInChildren<CargoNetView>(true);
+                Assert.That(net, Is.Not.Null, "荷役の網の見た目");
+                Transform netPlane = net.GetComponentsInChildren<Transform>(true).Single(t => t.name == "Net");
+                Assert.That(netPlane.position.y, Is.InRange(zone.MaxY - 0.5f, zone.MaxY), "網の面が跳ね返す範囲の上の辺にない");
+                LineRenderer cable = net.GetComponentsInChildren<LineRenderer>(true).Single(l => l.name == "HoistCable");
+                Assert.That(cable.transform.TransformPoint(cable.GetPosition(1)).y, Is.EqualTo(24.5f).Within(0.01f), "ワイヤーがクレーンの梁まで届かない");
+                Assert.That(authoring.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Body"), Is.False, "光る板が残っている");
+            }
+
+            // ピッチャーマシン: 2 つのタイヤ・送りのレール・ボールの筒。照明塔の柱に埋まらない。
+            Scene stadium = Open("Assets/_Project/Scenes/Stages/Stage_Stadium.unity");
+            foreach (StageTrapView pitcher in InScene<StageTrapView>(stadium))
+            {
+                Assert.That(pitcher.GetComponentsInChildren<Transform>(true).Count(t => t.name.StartsWith("Wheel")), Is.EqualTo(2), "2 つのタイヤ");
+                Assert.That(pitcher.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Magazine"), Is.True, "ボールの筒");
+                float poleFace = Mathf.Sign(pitcher.transform.position.x) * 32.4f;
+                foreach (Renderer part in pitcher.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Tire" || r.name == "Tube"))
+                {
+                    float inner = poleFace < 0f ? part.bounds.min.x : -part.bounds.max.x;
+                    Assert.That(inner, Is.GreaterThan(-Mathf.Abs(poleFace) - 0.2f), $"{pitcher.name} の {part.name} が照明塔の柱に埋まる");
+                }
+            }
+        }
+
+        [Test]
         public void DefaultPostProcessing_IsNeutral_SoStagesWithoutAVolumeLookTheSame()
         {
             // URP の設定のアセットの既定の Volume（テンプレートの Bloom・モーションブラーなど）は外した。ステージの Volume だけが効く。

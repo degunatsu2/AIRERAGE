@@ -279,29 +279,45 @@ namespace Airerage.Runtime.Tests
             Open(stage);
             foreach (StageZone zone in _zones.Where(z => z.Kind == StageZoneKind.Launcher && z.Period == 0))
             {
-                // 飛ぶ向きへ入れ続ける（プレイヤーがふつうにすること）。床に降りるか、床の上のジャンプ台に乗ったら（続けて飛ぶ）降りたとみなす。
-                // 危険（溶岩流など）は時刻とランダムな場所で当たるかが変わるので除き、飛ぶ道だけを見る。
-                SimWorld world = World(_zones.Where(z => z.Kind != StageZoneKind.Hazard).ToList(),
-                    new NVector3(zone.Center.X, zone.MinY + CharacterHalf.Y + 0.01f, 0f));
-                PlayerInput input = PlayerInput.FromAxes(zone.Direction.X > 0f ? 1f : -1f, 0f, InputButtons.None);
-                Step(world, 1, input);
-                Assert.That(world.GetState(0).Grounded, Is.False, $"前提: {zone} で飛んだ");
-                var path = new System.Text.StringBuilder();
-                for (int i = 0; i < 240 && !Landed(world.GetState(0)); i++)
-                {
-                    Step(world, 1, input);
-                    if (i % 10 == 0)
-                    {
-                        NVector3 p = world.GetState(0).Position;
-                        path.Append($" ({p.X:F1}, {p.Y:F1})");
-                    }
-                }
-                CharacterState state = world.GetState(0);
-                Assert.That(state.Combat.Falls, Is.EqualTo(0), $"{zone} で飛ぶと撃破される:{path}");
-                Assert.That(Landed(state), Is.True, $"{zone} で飛んだ先に降りる所がない:{path}");
-                Assert.That(NVector3.Distance(state.Position, new NVector3(zone.Center.X, zone.Center.Y, 0f)), Is.GreaterThan(6f),
-                    $"{zone} で飛んでも、ほとんど同じ所に戻る（{state.Position}）");
+                AssertLaunchLandsOnTheStage(zone);
             }
+        }
+
+        [Test]
+        public void Manor_Catapult_FlingsOntoTheStage_WhenItSwings()
+        {
+            // 投石機（2026-11-21。周期のある発射台にした）: 腕が跳ね上がる瞬間（試合の始まりのティック 0 から効く）にかごにいると放られ、
+            // ステージの上に降りる。
+            Open("Stage_Manor");
+            StageZone catapult = _zones.Single(z => z.Kind == StageZoneKind.Launcher && z.Period > 0 && z.Center.X > 20f);
+            Assert.That(catapult.IsActive(0) && catapult.IsActive(1), Is.True, "前提: 試合の始まりに腕が跳ね上がる");
+            AssertLaunchLandsOnTheStage(catapult);
+        }
+
+        // 飛ぶ向きへ入れ続ける（プレイヤーがふつうにすること）。床に降りるか、床の上のジャンプ台に乗ったら（続けて飛ぶ）降りたとみなす。
+        // 危険（溶岩流など）は時刻とランダムな場所で当たるかが変わるので除き、飛ぶ道だけを見る。試合の始まり（ティック 0）から飛ぶ。
+        private void AssertLaunchLandsOnTheStage(StageZone zone)
+        {
+            SimWorld world = World(_zones.Where(z => z.Kind != StageZoneKind.Hazard).ToList(),
+                new NVector3(zone.Center.X, zone.MinY + CharacterHalf.Y + 0.01f, 0f));
+            PlayerInput input = PlayerInput.FromAxes(zone.Direction.X > 0f ? 1f : -1f, 0f, InputButtons.None);
+            Step(world, 1, input);
+            Assert.That(world.GetState(0).Grounded, Is.False, $"前提: {zone} で飛んだ");
+            var path = new System.Text.StringBuilder();
+            for (int i = 0; i < 240 && !Landed(world.GetState(0)); i++)
+            {
+                Step(world, 1, input);
+                if (i % 10 == 0)
+                {
+                    NVector3 p = world.GetState(0).Position;
+                    path.Append($" ({p.X:F1}, {p.Y:F1})");
+                }
+            }
+            CharacterState state = world.GetState(0);
+            Assert.That(state.Combat.Falls, Is.EqualTo(0), $"{zone} で飛ぶと撃破される:{path}");
+            Assert.That(Landed(state), Is.True, $"{zone} で飛んだ先に降りる所がない:{path}");
+            Assert.That(NVector3.Distance(state.Position, new NVector3(zone.Center.X, zone.Center.Y, 0f)), Is.GreaterThan(6f),
+                $"{zone} で飛んでも、ほとんど同じ所に戻る（{state.Position}）");
         }
 
         [TestCaseSource(nameof(Stages))]

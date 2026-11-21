@@ -234,6 +234,69 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        /// <summary>
+        /// 埠頭の荷役の網（2026-11-21）: 上から落ちてきた人を跳ね返し、網が受けた所で沈む（CargoNetView）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Wharf_CargoNet_SagsWhenItCatchesSomeone()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Wharf"));
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+            var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
+            StageZoneAuthoring authoring = UnityEngine.Object.FindObjectsByType<StageZoneAuthoring>(FindObjectsSortMode.None).Single(z => z.name == "NetWest");
+            StageZone zone = authoring.ToZone();
+            CargoNetView net = authoring.GetComponentInChildren<CargoNetView>();
+            yield return WaitSeconds(0.5f);
+            CharacterState state = runner.PlayerState;
+            state.Position = new System.Numerics.Vector3(zone.Center.X + 0.6f, zone.MaxY + 2.5f, 0f);
+            state.Velocity = new System.Numerics.Vector3(0f, -14f, 0f);
+            state.Grounded = false;
+            runner.SetPlayerState(state);
+            yield return WaitFor(() => net.Catches > 0, 3f, $"網が受けない（{runner.PlayerState.Position}・{runner.PlayerState.Velocity}）");
+            Assert.That(runner.PlayerState.Velocity.Y, Is.GreaterThan(5f), "網が跳ね返さない");
+            float deepest = 0f;
+            float until = Time.realtimeSinceStartup + 0.4f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                deepest = Mathf.Max(deepest, net.Sag);
+                yield return null;
+            }
+            Assert.That(deepest, Is.GreaterThan(0.05f), "網が受けた所で沈まない");
+            Assert.That(net.Depth(0.6f, 0f), Is.GreaterThan(net.Depth(-1.4f, 0f)), "受けた所より縁が深く沈んでいる");
+        }
+
+        /// <summary>
+        /// 恐怖の館のかぼちゃの投石機（2026-11-21）: かごの中の人は、腕が跳ね上がる瞬間に放られ、腕は横木まで振り上がる（CatapultView）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Manor_Catapult_FlingsWhoIsInTheBucket_AsTheArmSwingsUp()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Manor"));
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+            var runner = UnityEngine.Object.FindFirstObjectByType<SimulationRunner>();
+            StageZoneView view = UnityEngine.Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.None).Single(v => v.name == "PumpkinLauncher");
+            StageZone zone = view.GetComponent<StageZoneAuthoring>().ToZone();
+            CatapultView catapult = UnityEngine.Object.FindFirstObjectByType<CatapultView>();
+            // 予告（引き絞り）の間にかごへ入れる。
+            yield return WaitFor(() => view.ShowsWarning, 6f, "投石機が引き絞らない");
+            CharacterState state = runner.PlayerState;
+            state.Position = new System.Numerics.Vector3(zone.Center.X, zone.MinY + 0.95f, 0f);
+            state.Velocity = System.Numerics.Vector3.Zero;
+            runner.SetPlayerState(state);
+            yield return WaitFor(() => runner.PlayerState.Velocity.Y > 20f, 3f, $"かごの中の人が放られない（{runner.PlayerState.Position}）");
+            Assert.That(runner.PlayerState.Velocity.X, Is.LessThan(-5f), "館の方（左上）へ放られない");
+            yield return WaitFor(() => catapult.ArmAngle > 90f, 1f, $"腕が横木まで振り上がらない（{catapult.ArmAngle}）");
+            Assert.That(catapult.Throwing, Is.True, "かごのかぼちゃが飛んでいかない");
+        }
+
         [UnityTest]
         public IEnumerator SpaceStation_EdgeGate_WrapsThePlayerToTheOtherSide()
         {

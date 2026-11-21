@@ -119,9 +119,12 @@ namespace Airerage.Editor.Stages
                 Theme = theme,
                 Zones = new[]
                 {
-                    // 気送管: 管の中だけ、強い上向きの風（上の棚へ）。
-                    new ZoneSpec("TubeWest", StageZoneKind.Gust, new Vector2(-47.3f, 15.25f), new Vector2(3.4f, 30.5f), Vector2.up, 75f, 22f),
-                    new ZoneSpec("TubeEast", StageZoneKind.Gust, new Vector2(47.3f, 15.25f), new Vector2(3.4f, 30.5f), Vector2.up, 75f, 22f),
+                    // 気送管: 管の中だけ、強い上向きの風（上の棚へ）。見た目は丸いガラスの管と送風機、空気に押されて昇る筒と紙くず
+                    // （2026-11-21 の方針。PneumaticTubeView）。
+                    new ZoneSpec("TubeWest", StageZoneKind.Gust, new Vector2(-47.3f, 15.25f), new Vector2(3.4f, 30.5f), Vector2.up, 75f, 22f)
+                        .Styled(StageZoneView.ZoneLook.Pneumatic),
+                    new ZoneSpec("TubeEast", StageZoneKind.Gust, new Vector2(47.3f, 15.25f), new Vector2(3.4f, 30.5f), Vector2.up, 75f, 22f)
+                        .Styled(StageZoneView.ZoneLook.Pneumatic),
                     // キャットウォークのジャンプ台。
                     ZoneSpec.OnFloor("CatwalkPadWest", StageZoneKind.JumpPad, -14.5f, -12.5f, 6.5f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("CatwalkPadEast", StageZoneKind.JumpPad, 12.5f, 14.5f, 6.5f, Vector2.up, 24f, 0.4f),
@@ -619,11 +622,7 @@ namespace Airerage.Editor.Stages
                 GameObject band = decor.Box("ShaftStripe", new Vector3(-3f + i * 1.2f, 21.7f, -2.1f), new Vector3(0.5f, 0.12f, 0.05f), warning);
                 band.transform.rotation = Quaternion.Euler(0f, 0f, 35f);
             }
-            // 気送管のガラス。
-            foreach (float x in new[] { -47.3f, 47.3f })
-            {
-                decor.Box("TubeGlass", new Vector3(x, 15f, 0f), new Vector3(3.4f, 30f, 3.6f), glass);
-            }
+            // 気送管のガラスは、ギミックの見た目（StageSceneBuilder.CreatePneumaticTube）の丸い管にした（2026-11-21）。
             // 天井の配管。
             for (int i = 0; i < 5; i++)
             {

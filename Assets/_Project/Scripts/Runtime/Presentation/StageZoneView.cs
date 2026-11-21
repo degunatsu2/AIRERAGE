@@ -78,6 +78,30 @@ namespace Airerage.Runtime.Presentation
 
             /// <summary>危険をレーザーの網にする（両端の装置の間の細い赤い光線と、光線できらめくちり。枠と印は出さない。LaserGridView）。</summary>
             Laser = 11,
+
+            /// <summary>
+            /// いつも吹く縦の風を気送管にする（丸いガラスの管・継ぎ目の金具・下の送風機と、空気に押されて昇る筒〈キャリア〉と紙くず。
+            /// 筋は出さない。PneumaticTubeView。2026-11-21 の方針）。
+            /// </summary>
+            Pneumatic = 12,
+
+            /// <summary>
+            /// 周期のある発射台を投石機にする（巻き上げで腕を引き絞り、効き始めに腕が跳ね上がって緩衝材の横木に当たり、かごの中の人と
+            /// かぼちゃを放る。枠と印は出さない。CatapultView。2026-11-21 の方針。前はいつも効く発射台だった）。
+            /// </summary>
+            Catapult = 13,
+
+            /// <summary>
+            /// 加速リングを鬼火の輪にする（青白い鬼火が輪の形に回り、くぐる向きへ流れる。輪はゆっくり漂う。枠と印は出さない。
+            /// WispRingView。2026-11-21 の方針）。
+            /// </summary>
+            Wisp = 14,
+
+            /// <summary>
+            /// 跳ね返す物をクレーンに吊った荷役の網にする（4 本の吊り具と枠に張った網。乗った所が沈んで跳ね返す。枠は出さない。
+            /// CargoNetView。2026-11-21 の方針）。
+            /// </summary>
+            Net = 15,
         }
 
         private const int RingSegments = 40;
@@ -240,6 +264,9 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>Core のギミック（表示が落ちてくる物の帯 FallBand などを読む）。</summary>
         public StageZone CoreZone => _core;
+
+        /// <summary>表示する試合（見つかっていなければ null。メニューの背景など）。網が乗った人を、鬼火の輪がくぐった人を見るのに使う。</summary>
+        public ISimulationFeed Feed => _feed != null && _feed.CharacterCount > 0 && !(_feed is MonoBehaviour gone && gone == null) ? _feed : null;
 
         private void Awake()
         {
@@ -593,8 +620,9 @@ namespace Airerage.Runtime.Presentation
             if (strength >= 1f && _core.Period > 0 && cycle != _soundedCycle)
             {
                 _soundedCycle = cycle;
-                // トースターはパンが跳ね上がる音（ばねのジャンプ台の音）。
-                PlayInMatch(_look == ZoneLook.Toaster ? SoundId.JumpPad : SoundId.Geyser, 0.7f);
+                // トースターはパンが跳ね上がる音（ばねのジャンプ台の音）、投石機は腕が横木に当たる重い音。
+                PlayInMatch(_look == ZoneLook.Toaster ? SoundId.JumpPad : _look == ZoneLook.Catapult ? SoundId.HeavyHit : SoundId.Geyser,
+                    _look == ZoneLook.Catapult ? 0.55f : 0.7f);
             }
             if (warning)
             {
@@ -602,7 +630,7 @@ namespace Airerage.Runtime.Presentation
             }
             ShowWarning(warning);
             // 蒸気の噴出（ZoneLook.Steam）は湯気の粒だけで見せる（枠と流れる印は出さない。予告の斜線と記号はそのまま。2026-11-20 の方針）。
-            float shown = _look == ZoneLook.Steam || _look == ZoneLook.Toaster ? 0f : 1f;
+            float shown = _look == ZoneLook.Steam || _look == ZoneLook.Toaster || _look == ZoneLook.Catapult ? 0f : 1f;
             float frameAlpha = (_core.Period <= 0 ? 1f : 0.25f + 0.75f * strength) * shown;
             Box(_ring, center, half, 1f + 0.05f * Mathf.Sin(time * Mathf.PI * 4f), frameAlpha);
             Vector2 side = new Vector2(_direction.y, -_direction.x);
@@ -620,6 +648,13 @@ namespace Airerage.Runtime.Presentation
         // 脈打つ二重の枠。
         private void RenderBumper(Vector3 center, Vector2 half, float time)
         {
+            if (_look == ZoneLook.Net)
+            {
+                // 網は網そのもの（CargoNetView）で見せる。
+                SetColor(_ring, 0f);
+                SetColor(_inner, 0f);
+                return;
+            }
             float pulse = Mathf.Sin(time * Mathf.PI * 2f);
             Box(_ring, center, half, 1f + 0.06f * pulse, 1f);
             Box(_inner, center, half, 0.7f - 0.08f * pulse, 0.5f + 0.3f * pulse);
@@ -640,9 +675,9 @@ namespace Airerage.Runtime.Presentation
                 RenderDraft(center, half, time);
                 return;
             }
-            if (_look == ZoneLook.Steam)
+            if (_look == ZoneLook.Steam || _look == ZoneLook.Pneumatic)
             {
-                // 湯気（やかん・噴気孔）は湯気の粒だけで見せる（筋と吹く向きの矢印は出さない。予告の斜線と記号はそのまま）。
+                // 湯気（やかん・噴気孔）は湯気の粒だけで、気送管は昇る筒と紙くずで見せる（筋と吹く向きの矢印は出さない。予告の斜線と記号はそのまま）。
                 foreach (LineRenderer line in _marks)
                 {
                     SetColor(line, 0f);
@@ -1217,7 +1252,7 @@ namespace Airerage.Runtime.Presentation
         // いつも吹いている縦の風（上昇気流と、上下向きの周期のない風）か。同じ見た目にする。
         private bool IsSteadyDraft => _zone.Kind == StageZoneKind.Updraft
             || (_zone.Kind == StageZoneKind.Gust && _core.Period <= 0 && _look != ZoneLook.Flow && _look != ZoneLook.Steam
-                && Mathf.Abs(_direction.y) > Mathf.Abs(_direction.x));
+                && _look != ZoneLook.Pneumatic && Mathf.Abs(_direction.y) > Mathf.Abs(_direction.x));
 
         // 縦の風の筋（幅 0.8m ごとの列、2〜8 列。1 列に 2 本）。
         private void CreateDraftStreaks()
@@ -1257,6 +1292,16 @@ namespace Airerage.Runtime.Presentation
         // 輪（範囲に収まる楕円）と、中心から両方向へ流れる「<」「>」。輪は少し脈打つ。
         private void RenderRing(Vector3 center, Vector2 half, float time)
         {
+            if (_look == ZoneLook.Wisp)
+            {
+                // 鬼火の輪は鬼火そのもの（WispRingView）で見せる。
+                SetColor(_ring, 0f);
+                foreach (LineRenderer line in _marks)
+                {
+                    SetColor(line, 0f);
+                }
+                return;
+            }
             float pulse = 1f + 0.06f * Mathf.Sin(time * Mathf.PI * 2f);
             for (int i = 0; i < RingSegments; i++)
             {

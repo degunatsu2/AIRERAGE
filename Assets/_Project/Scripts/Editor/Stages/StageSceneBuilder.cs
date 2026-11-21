@@ -66,7 +66,7 @@ namespace Airerage.Editor.Stages
             CreateBigAnchors(layout.BigAnchors, theme, decor);
             CreateZones(layout.Zones, theme, decor);
             CreatePlatforms(layout.Platforms, theme, decor);
-            CreateTraps(layout.Traps, decor);
+            CreateTraps(layout.Traps, layout.Terrain, decor);
             SandboxCombatSceneBuilder.CreateBounds(layout.BoundsMin, layout.BoundsMax);
             SandboxWireSceneBuilder.CreateCoinSpawns(layout.Coins, layout.Jackpots);
             SandboxWireSceneBuilder.CreateBankSpots(layout.Banks);
@@ -181,7 +181,7 @@ namespace Airerage.Editor.Stages
 
         // ステージの仕掛け（StageTrapAuthoring と見た目 StageTrapView）。赤外線: 半透明の赤い板、発射装置とランプ、ミサイル。
         // ピッチャーマシン: 壁の機械と、ボール（試合のときだけ出る）。
-        private static void CreateTraps(TrapSpec[] traps, StageDecor decor)
+        private static void CreateTraps(TrapSpec[] traps, SandboxWireSceneBuilder.TerrainBox[] terrain, StageDecor decor)
         {
             if (traps == null || traps.Length == 0)
             {
@@ -200,50 +200,263 @@ namespace Airerage.Editor.Stages
                 {
                     authoring.ConfigureTripwire(spec.BeamSize, spec.MuzzleOffset, spec.Direction, spec.Speed, spec.Range, spec.Power, spec.Knockback,
                         spec.ArmSeconds, spec.CooldownSeconds, spec.MissileSize);
-                    GameObject beam = decor.Quad("Beam", go.transform, new Vector3(0f, 0f, -0.3f), spec.BeamSize,
-                        decor.Transparent("Infrared", new Color(1f, 0.08f, 0.12f, 0.32f)));
-                    // 発射装置（発射口の後ろの箱）とランプ。
-                    Vector2 back = spec.MuzzleOffset - spec.Direction * 0.9f;
-                    GameObject launcher = decor.Box("Launcher", go.transform, new Vector3(back.x, back.y, 0f), new Vector3(1.8f, 1.2f, 2.4f),
-                        decor.Lit("MissileLauncher", new Color(0.3f, 0.32f, 0.36f)));
-                    launcher.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(spec.Direction.y, spec.Direction.x) * Mathf.Rad2Deg);
-                    GameObject lamp = decor.Sphere("Lamp", go.transform, new Vector3(back.x, back.y + 0.85f, -1.2f), new Vector3(0.4f, 0.4f, 0.2f),
-                        decor.Unlit("LauncherLamp", new Color(1f, 0.15f, 0.1f)));
-                    // ミサイル（右向きに作る。StageTrapView が向きに回す）。
-                    var missile = new GameObject("Missile").transform;
-                    missile.SetParent(go.transform, false);
-                    decor.Box("Body", missile, Vector3.zero, new Vector3(spec.MissileSize.x, spec.MissileSize.y * 0.8f, 0.6f),
-                        decor.Lit("MissileBody", new Color(0.85f, 0.87f, 0.9f)));
-                    decor.Sphere("Nose", missile, new Vector3(spec.MissileSize.x * 0.5f, 0f, 0f), new Vector3(0.5f, spec.MissileSize.y * 0.8f, 0.6f),
-                        decor.Lit("MissileNose", new Color(0.9f, 0.15f, 0.1f)));
-                    decor.Box("Flame", missile, new Vector3(-spec.MissileSize.x * 0.65f, 0f, 0f), new Vector3(0.6f, spec.MissileSize.y * 0.5f, 0.3f),
-                        decor.Unlit("MissileFlame", new Color(1f, 0.7f, 0.2f)));
-                    // 撃った後の待ちの円形のゲージ（発射装置の周り。ユーザーの要望、2026-10-26）。
-                    RingGaugeView reload = SandboxWireSceneBuilder.CreateRingGauge("ReloadGauge", go.transform, "RELOAD", 1.5f,
-                        new Color(1f, 0.3f, 0.25f, 0.85f), sceneCamera: false);
-                    view.Configure(beam.GetComponent<Renderer>(), missile, lamp.GetComponent<Renderer>(), lineMaterial, reload, launcher.transform);
+                    CreateTripwire(go.transform, spec, view, lineMaterial, terrain, decor);
                 }
                 else
                 {
                     authoring.ConfigurePitcher(spec.LaunchVelocity, spec.PeriodSeconds, spec.PhaseSeconds, spec.Radius, spec.Power, spec.Knockback,
                         spec.MinHitSpeed, spec.BlinkSeconds);
-                    // ピッチャーマシン（壁に付けた箱と、打ち出す筒）。
-                    Material machine = decor.Lit("PitchingMachine", new Color(0.2f, 0.45f, 0.85f));
-                    decor.Box("Machine", go.transform, new Vector3(-spec.Facing * 0.9f, -0.3f, 0f), new Vector3(1.8f, 1.6f, 1.8f), machine);
-                    float angle = Mathf.Atan2(spec.LaunchVelocity.y, spec.LaunchVelocity.x) * Mathf.Rad2Deg;
-                    GameObject barrel = decor.Cylinder("Barrel", go.transform, Vector3.zero, new Vector3(0.6f, 0.7f, 0.6f),
-                        decor.Lit("PitchingBarrel", new Color(0.85f, 0.85f, 0.88f)));
-                    barrel.transform.localRotation = Quaternion.Euler(0f, 0f, angle - 90f);
-                    decor.Cylinder("Wheel", go.transform, new Vector3(-spec.Facing * 0.9f, -1.1f, -0.95f), new Vector3(0.9f, 0.08f, 0.9f),
-                        decor.Lit("PitchingWheel", new Color(0.15f, 0.15f, 0.17f))).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    var ball = new GameObject("Ball").transform;
-                    ball.SetParent(go.transform, false);
-                    decor.Sphere("Leather", ball, Vector3.zero, Vector3.one * spec.Radius * 2f, decor.Lit("Baseball", new Color(0.97f, 0.96f, 0.92f)));
-                    decor.Box("Seam", ball, new Vector3(0f, 0f, -spec.Radius * 0.9f), new Vector3(spec.Radius * 1.6f, 0.05f, 0.05f),
-                        decor.Unlit("BaseballSeam", new Color(0.85f, 0.1f, 0.1f)));
-                    view.Configure(null, ball, null, lineMaterial);
+                    CreatePitchingMachine(go.transform, spec, view, lineMaterial, decor);
                 }
             }
+        }
+
+        // 地形のうち、x の真下（y より下）でいちばん高い上の面（なければ y - fallback）。
+        private static float FloorBelow(SandboxWireSceneBuilder.TerrainBox[] terrain, float x, float y, float fallback)
+        {
+            float best = float.NegativeInfinity;
+            if (terrain != null)
+            {
+                foreach (SandboxWireSceneBuilder.TerrainBox box in terrain)
+                {
+                    if (x >= box.Min.x && x <= box.Max.x && box.Max.y <= y + 0.01f && box.Max.y > best)
+                    {
+                        best = box.Max.y;
+                    }
+                }
+            }
+            return float.IsNegativeInfinity(best) ? y - fallback : best;
+        }
+
+        // 赤外線とミサイル（2026-11-21 の方針: 実際の現象に寄せる）。手本は防犯の赤外線センサー（向かい合った投光器と受光器の間に、目に
+        // 見えない近赤外の光を通し、光が遮られると警報。光は点滅させて周りの光と見分ける）。目に見えないので、ゲームの警報の光線のように
+        // 細い赤い 2 本の線（上下 2 段の光線のセンサー）で見せ、光線の上で塵がきらめく。両端に床から立てた投光器と受光器。ミサイルは
+        // 胴・尖った頭・4 枚の尾翼と尾の炎、飛ぶ間は白い煙の帯を残す。発射装置は 4 つの筒の箱。当たり（赤外線・ミサイル）は今までどおり。
+        private static void CreateTripwire(Transform trap, TrapSpec spec, StageTrapView view, Material lineMaterial, SandboxWireSceneBuilder.TerrainBox[] terrain,
+            StageDecor decor)
+        {
+            Material beamMaterial = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("InfraredBeam", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", 2.2f);
+                m.SetFloat("_Core", 1.4f);
+            }, decor.Folder);
+            var red = new Color(1f, 0.1f, 0.08f, 0.85f);
+            float halfX = spec.BeamSize.x * 0.5f;
+            float gap = Mathf.Min(0.08f, spec.BeamSize.y * 0.3f);
+            LineRenderer upper = Line("Beam", trap, beamMaterial, new Vector3(-halfX + 0.25f, gap, -0.1f), new Vector3(halfX - 0.25f, gap, -0.1f), red, 0.035f);
+            LineRenderer lower = Line("Beam2", trap, beamMaterial, new Vector3(-halfX + 0.25f, -gap, -0.1f), new Vector3(halfX - 0.25f, -gap, -0.1f), red, 0.035f);
+            // 投光器と受光器（床から立てた柱の上の白い箱と、赤みがかった窓、緑の表示灯）。
+            Material housing = decor.Lit("SensorHousing", new Color(0.82f, 0.84f, 0.86f));
+            Material pole = decor.Lit("SensorPole", new Color(0.3f, 0.32f, 0.35f));
+            pole.SetFloat("_Metallic", 0.6f);
+            Material window = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("SensorWindow", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(0.6f, 0.03f, 0.05f));
+                m.SetFloat("_Intensity", 0.9f);
+            }, decor.Folder);
+            Material led = decor.Unlit("SensorLed", new Color(0.3f, 1f, 0.4f));
+            Vector3 origin = trap.position;
+            foreach (float end in new[] { -1f, 1f })
+            {
+                float x = end * (halfX - 0.1f);
+                float floor = FloorBelow(terrain, origin.x + x, origin.y - 0.2f, 0.8f) - origin.y;
+                decor.Box("Sensor", trap, new Vector3(x, 0f, 0f), new Vector3(0.3f, 0.6f, 0.36f), housing);
+                decor.Box("SensorWindow", trap, new Vector3(x - end * 0.155f, 0f, 0f), new Vector3(0.02f, 0.4f, 0.26f), window);
+                decor.Sphere("SensorLed", trap, new Vector3(x, 0.22f, -0.19f), Vector3.one * 0.06f, led);
+                // 下の床が近ければ柱で立て、遠ければ（研究所の発射装置の側は 8m 下が床）後ろの金具で発射装置の箱に取り付ける。
+                float stand = -0.3f - floor;
+                if (stand > 0.02f && stand < 1.8f)
+                {
+                    decor.Box("SensorPole", trap, new Vector3(x, floor + stand * 0.5f, 0f), new Vector3(0.08f, stand, 0.08f), pole);
+                    decor.Box("SensorFoot", trap, new Vector3(x, floor + 0.03f, 0f), new Vector3(0.36f, 0.06f, 0.36f), pole);
+                }
+                else if (stand >= 1.8f)
+                {
+                    decor.Box("SensorBracket", trap, new Vector3(x - end * 0.25f, -0.22f, 0.12f), new Vector3(0.5f, 0.08f, 0.16f), pole);
+                }
+            }
+            // 発射装置（4 つの筒の箱。発射口の後ろ）とランプ。
+            Vector2 back = spec.MuzzleOffset - spec.Direction * 0.9f;
+            float angle = Mathf.Atan2(spec.Direction.y, spec.Direction.x) * Mathf.Rad2Deg;
+            var launcher = new GameObject("Launcher").transform;
+            launcher.SetParent(trap, false);
+            launcher.localPosition = new Vector3(back.x, back.y, 0f);
+            launcher.localRotation = Quaternion.Euler(0f, 0f, angle);
+            Material pod = decor.Lit("MissileLauncher", new Color(0.3f, 0.34f, 0.3f));
+            pod.SetFloat("_Smoothness", 0.35f);
+            Material bore = decor.Lit("MissileBore", new Color(0.03f, 0.03f, 0.035f));
+            decor.Box("Pod", launcher, Vector3.zero, new Vector3(1.8f, 1.2f, 1.6f), pod);
+            foreach (float y in new[] { -0.28f, 0.28f })
+            {
+                foreach (float z in new[] { -0.36f, 0.36f })
+                {
+                    decor.Cylinder("Tube", launcher, new Vector3(0.86f, y, z), new Vector3(0.42f, 0.06f, 0.42f), bore).transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                }
+            }
+            decor.Box("Mount", launcher, new Vector3(-0.1f, -0.72f, 0f), new Vector3(0.7f, 0.26f, 0.9f), pole);
+            GameObject lamp = decor.Sphere("Lamp", trap, new Vector3(back.x, back.y + 0.78f, 0f), new Vector3(0.36f, 0.36f, 0.36f),
+                decor.Unlit("LauncherLamp", new Color(1f, 0.15f, 0.1f)));
+            // ミサイル（右向きに作る。StageTrapView が向きに回す）: 胴・尖った頭・4 枚の尾翼・尾の炎。
+            var missile = new GameObject("Missile").transform;
+            missile.SetParent(trap, false);
+            float length = spec.MissileSize.x;
+            float radius = spec.MissileSize.y * 0.36f;
+            Material body = decor.Lit("MissileBody", new Color(0.86f, 0.88f, 0.9f));
+            body.SetFloat("_Smoothness", 0.6f);
+            Material nose = decor.Lit("MissileNose", new Color(0.85f, 0.14f, 0.1f));
+            decor.Cylinder("Body", missile, Vector3.zero, new Vector3(radius * 2f, length * 0.34f, radius * 2f), body).transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            ProceduralMesh.Place("Nose", missile, ProceduralMesh.Lathe("Gimmicks", "MissileNose", new[]
+            {
+                new Vector2(1f, 0f), new Vector2(0.92f, 0.3f), new Vector2(0.7f, 0.6f), new Vector2(0.38f, 0.85f), new Vector2(0f, 1f),
+            }, 16), new Vector3(length * 0.34f, 0f, 0f), Quaternion.Euler(0f, 0f, -90f), new Vector3(radius, length * 0.26f, radius), nose);
+            for (int k = 0; k < 4; k++)
+            {
+                var fin = new GameObject("Fin").transform;
+                fin.SetParent(missile, false);
+                fin.localPosition = new Vector3(-length * 0.26f, 0f, 0f);
+                fin.localRotation = Quaternion.Euler(45f + k * 90f, 0f, 0f);
+                decor.Box("Blade", fin, new Vector3(0f, radius * 1.25f, 0f), new Vector3(length * 0.22f, radius * 1.1f, 0.03f), nose);
+            }
+            Material flameMaterial = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("MissileFlame", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(1f, 0.62f, 0.2f));
+                m.SetFloat("_Intensity", 4f);
+            }, decor.Folder);
+            ProceduralMesh.Place("Flame", missile, ProceduralMesh.Lathe("Gimmicks", "MissileFlame", new[]
+            {
+                new Vector2(0f, 0f), new Vector2(0.75f, 0.12f), new Vector2(0.55f, 0.5f), new Vector2(0f, 1f),
+            }, 12), new Vector3(-length * 0.34f, 0f, 0f), Quaternion.Euler(0f, 0f, 90f), new Vector3(radius, length * 0.42f, radius), flameMaterial);
+            var tail = new GameObject("Tail").transform;
+            tail.SetParent(missile, false);
+            tail.localPosition = new Vector3(-length * 0.55f, 0f, 0f);
+            // 飛ぶ間の煙の帯（尾から出し、ワールドに残って広がりながら薄れる）と、光線の上できらめく塵。
+            ParticleSystem trail = new ParticleFx
+            {
+                Name = "MissileSmoke", LifetimeMin = 0.9f, LifetimeMax = 1.6f, SpeedMin = 0f, SpeedMax = 0.4f, SizeMin = 0.3f, SizeMax = 0.5f,
+                GrowFrom = 0.6f, GrowTo = 2.4f, Softness = 0.7f, EdgeNoise = 0.4f, Turbulence = 0.6f, Rate = 70f, MaxParticles = 220,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.95f, 0.93f, 0.9f), 0f), (new Color(0.6f, 0.6f, 0.62f), 1f) }, new[] { (0f, 0f), (0.7f, 0.08f), (0.35f, 0.6f), (0f, 1f) }),
+            }.Build(trap, Vector3.zero, Quaternion.identity, decor.Folder);
+            ParticleSystem.MainModule trailMain = trail.main;
+            trailMain.prewarm = false;
+            ParticleSystem.EmissionModule trailEmission = trail.emission;
+            trailEmission.enabled = false;
+            ParticleSystem motes = new ParticleFx
+            {
+                Name = "InfraredMotes", LifetimeMin = 0.3f, LifetimeMax = 0.7f, SpeedMin = 0f, SpeedMax = 0.15f, SizeMin = 0.04f, SizeMax = 0.08f,
+                BoxSize = new Vector3(Mathf.Max(0.5f, spec.BeamSize.x - 0.6f), gap * 2.6f, 0.2f), Additive = true, Intensity = 2.5f, Rate = 14f, MaxParticles = 60,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.45f, 0.35f), 0f), (new Color(1f, 0.15f, 0.1f), 1f) }, new[] { (0f, 0f), (1f, 0.3f), (0f, 1f) }),
+            }.Build(trap, new Vector3(0f, 0f, -0.1f), Quaternion.identity, decor.Folder);
+            // 撃った後の待ちの円形のゲージ（発射装置の周り。ユーザーの要望、2026-10-26）。
+            RingGaugeView reload = SandboxWireSceneBuilder.CreateRingGauge("ReloadGauge", trap, "RELOAD", 1.5f, new Color(1f, 0.3f, 0.25f, 0.85f), sceneCamera: false);
+            view.Configure(upper, missile, lamp.GetComponent<Renderer>(), lineMaterial, reload, launcher);
+            view.ConfigureTripwireDetail(new Renderer[] { lower }, motes, trail, tail);
+        }
+
+        // ピッチャーマシン（2026-11-21 の方針: 実際の現象に寄せる）。手本は 2 つのタイヤのピッチングマシン（上下に並んだタイヤが逆向きに
+        // 高速で回り、間に送り込んだボールを挟んで打ち出す。上下の回る速さの差で回転がかかる。ボールは筒からタイヤの間へ送る）。
+        // 頭（タイヤ 2 つ・モーター・枠）を打ち出す向きに傾け、後ろの上にボールの入った縦の筒（マガジン）と、タイヤの間へ下る送りのレール。
+        // 照明塔の柱から腕で支える（柱は発射口から横に 3m。StadiumStage）。左へ打ち出すマシンは打ち出す向きの軸で裏返す（上のタイヤが上）。
+        // ボールは大きい（半径 spec.Radius）ので、マシンも大きく作る。当たり（ボール）は今までどおり。
+        private static void CreatePitchingMachine(Transform trap, TrapSpec spec, StageTrapView view, Material lineMaterial, StageDecor decor)
+        {
+            const float PoleOffset = 3f;
+            float facing = spec.Facing;
+            float angle = Mathf.Atan2(spec.LaunchVelocity.y, spec.LaunchVelocity.x) * Mathf.Rad2Deg;
+            var head = new GameObject("Head").transform;
+            head.SetParent(trap, false);
+            head.localRotation = Quaternion.Euler(0f, 0f, angle);
+            head.localScale = new Vector3(1f, facing, 1f);
+            Material rubber = decor.Lit("PitchingTire", new Color(0.06f, 0.06f, 0.07f));
+            rubber.SetFloat("_Smoothness", 0.2f);
+            Material hub = decor.Lit("PitchingHub", new Color(0.78f, 0.8f, 0.84f));
+            hub.SetFloat("_Metallic", 0.85f);
+            hub.SetFloat("_Smoothness", 0.75f);
+            Material casing = decor.Lit("PitchingMachine", new Color(0.2f, 0.45f, 0.85f));
+            casing.SetFloat("_Smoothness", 0.55f);
+            Material mark = decor.Unlit("PitchingTireMark", new Color(0.9f, 0.9f, 0.9f));
+            Material rail = decor.Lit("PitchingRail", new Color(0.6f, 0.62f, 0.66f));
+            rail.SetFloat("_Metallic", 0.8f);
+            Material leather = decor.Lit("Baseball", new Color(0.97f, 0.96f, 0.92f));
+            Material seam = decor.Unlit("BaseballSeam", new Color(0.85f, 0.1f, 0.1f));
+            Material clear = decor.Transparent("PitchingMagazine", new Color(0.8f, 0.9f, 1f, 0.18f));
+            const float WheelRadius = 0.62f;
+            float offset = spec.Radius + WheelRadius - 0.12f;
+            var wheels = new Transform[2];
+            for (int i = 0; i < 2; i++)
+            {
+                float s = i == 0 ? 1f : -1f;
+                var wheel = new GameObject(i == 0 ? "WheelUpper" : "WheelLower").transform;
+                wheel.SetParent(head, false);
+                wheel.localPosition = new Vector3(0f, s * offset, 0f);
+                decor.Cylinder("Tire", wheel, Vector3.zero, new Vector3(WheelRadius * 2f, 0.22f, WheelRadius * 2f), rubber).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                decor.Cylinder("Hub", wheel, new Vector3(0f, 0f, -0.01f), new Vector3(0.55f, 0.24f, 0.55f), hub).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                for (int k = 0; k < 3; k++)
+                {
+                    float a = k * Mathf.PI * 2f / 3f;
+                    decor.Box("Mark", wheel, new Vector3(Mathf.Cos(a) * 0.42f, Mathf.Sin(a) * 0.42f, -0.23f), new Vector3(0.16f, 0.05f, 0.01f), mark)
+                        .transform.localRotation = Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg);
+                }
+                wheels[i] = wheel;
+                // タイヤの後ろのモーター（回さない）。
+                decor.Box("Motor", head, new Vector3(0f, s * offset, 0.42f), new Vector3(0.5f, 0.5f, 0.44f), casing);
+            }
+            // 頭の枠（タイヤの後ろの板と、上下の覆い）。
+            decor.Box("Frame", head, new Vector3(-0.1f, 0f, 0.3f), new Vector3(1.1f, offset * 2f + 0.9f, 0.08f), casing);
+            foreach (float s in new[] { -1f, 1f })
+            {
+                decor.Box("Guard", head, new Vector3(-0.1f, s * (offset + WheelRadius + 0.08f), 0.05f), new Vector3(1.5f, 0.1f, 0.6f), casing);
+            }
+            // 送りのレール（頭の後ろの上から、タイヤの間へ下る 2 本の棒）と、ボールの入った縦の筒（ワールドで縦）。
+            var chute = new[] { new Vector3(-1.55f, 1.55f, 0f), new Vector3(-1.2f, 0.9f, 0f), new Vector3(-0.85f, 0.35f, 0f), new Vector3(-0.55f, 0.04f, 0f) };
+            foreach (float z in new[] { -0.55f, 0.55f })
+            {
+                var path = new Vector3[chute.Length];
+                for (int i = 0; i < chute.Length; i++)
+                {
+                    path[i] = chute[i] + new Vector3(0f, -spec.Radius * 0.7f, z);
+                }
+                ProceduralMesh.Place("FeedRail", head, ProceduralMesh.Tube("Gimmicks", "PitchingFeedRail", path, new[] { 0.05f, 0.05f, 0.05f, 0.05f }, 6),
+                    Vector3.zero, Quaternion.identity, Vector3.one, rail);
+            }
+            Vector3 magazineFoot = trap.InverseTransformPoint(head.TransformPoint(chute[0]));
+            var magazine = new GameObject("Magazine").transform;
+            magazine.SetParent(trap, false);
+            magazine.localPosition = magazineFoot + new Vector3(0f, spec.Radius * 2.1f, 0f);
+            decor.Cylinder("Tube", magazine, Vector3.zero, new Vector3(spec.Radius * 2.3f, spec.Radius * 2.1f, spec.Radius * 2.3f), clear);
+            decor.Cylinder("Cap", magazine, new Vector3(0f, spec.Radius * 2.15f, 0f), new Vector3(spec.Radius * 2.45f, 0.1f, spec.Radius * 2.45f), casing);
+            CreateBaseball(decor, "WaitingBall", magazine, new Vector3(0f, -spec.Radius * 0.05f, 0.05f), spec.Radius, leather, seam);
+            CreateBaseball(decor, "WaitingBall", magazine, new Vector3(0f, spec.Radius * 1.55f, 0.05f), spec.Radius, leather, seam);
+            Transform feedBall = CreateBaseball(decor, "FeedBall", head, chute[0], spec.Radius, leather, seam);
+            // 照明塔の柱からの腕と筋交い（柱の面から頭の後ろへ）。
+            Vector3 headBack = trap.InverseTransformPoint(head.TransformPoint(new Vector3(-0.6f, 0f, 0.3f)));
+            var poleFace = new Vector3(-facing * PoleOffset, headBack.y - 0.2f, 0.3f);
+            Material arm = decor.Lit("PitchingArm", new Color(0.32f, 0.34f, 0.37f));
+            arm.SetFloat("_Metallic", 0.6f);
+            Strut(decor, "MountArm", trap, poleFace, headBack, 0.22f, arm);
+            Strut(decor, "MountBrace", trap, poleFace + new Vector3(0f, -1.6f, 0f), Vector3.Lerp(poleFace, headBack, 0.75f), 0.14f, arm);
+            decor.Box("MountPlate", trap, poleFace + new Vector3(facing * 0.06f, -0.6f, 0f), new Vector3(0.12f, 2.2f, 0.7f), arm);
+            // 打ち出すボール（StageTrapView が道のりの位置へ動かす）。
+            Transform ball = CreateBaseball(decor, "Ball", trap, Vector3.zero, spec.Radius, leather, seam);
+            view.Configure(null, ball, null, lineMaterial);
+            view.ConfigurePitcherDetail(wheels, feedBall, chute);
+        }
+
+        // 野球のボール（白い革と、交わる 2 本の赤い縫い目）。
+        private static Transform CreateBaseball(StageDecor decor, string name, Transform parent, Vector3 localPosition, float radius, Material leather, Material seam)
+        {
+            var ball = new GameObject(name).transform;
+            ball.SetParent(parent, false);
+            ball.localPosition = localPosition;
+            decor.Sphere("Leather", ball, Vector3.zero, Vector3.one * radius * 2f, leather);
+            var seamA = new GameObject("SeamA").transform;
+            seamA.SetParent(ball, false);
+            seamA.localRotation = Quaternion.Euler(62f, 0f, 20f);
+            Band("Seam", seamA, Vector3.zero, radius * 0.985f, radius * 1.02f, radius * 0.06f, seam);
+            var seamB = new GameObject("SeamB").transform;
+            seamB.SetParent(ball, false);
+            seamB.localRotation = Quaternion.Euler(-62f, 90f, 20f);
+            Band("Seam", seamB, Vector3.zero, radius * 0.985f, radius * 1.02f, radius * 0.06f, seam);
+            return ball;
         }
 
         // ワイヤーが刺さる動く足場の正面の縁を、オレンジに光らせる（動かない地形の AttachableGlow と同じ色。足場と一緒に動く）。
@@ -356,6 +569,14 @@ namespace Airerage.Editor.Stages
                         decor.Lit(kind, Color.Lerp(color, Color.black, 0.75f)));
                 case StageZoneKind.Launcher when zone.Look == StageZoneView.ZoneLook.Toaster:
                     return CreateToaster(parent, root, zone, decor);
+                case StageZoneKind.Launcher when zone.Look == StageZoneView.ZoneLook.Catapult:
+                    return CreateCatapult(parent, root, zone, decor);
+                case StageZoneKind.Bumper when zone.Look == StageZoneView.ZoneLook.Net:
+                    return CreateCargoNet(parent, root, zone, decor);
+                case StageZoneKind.BoostRing when zone.Look == StageZoneView.ZoneLook.Wisp:
+                    return CreateWispRing(parent, root, zone, decor);
+                case StageZoneKind.Gust when zone.Look == StageZoneView.ZoneLook.Pneumatic:
+                    return CreatePneumaticTube(parent, root, zone, decor);
                 case StageZoneKind.Launcher:
                     if (zone.PeriodSeconds > 0f)
                     {
@@ -1079,6 +1300,406 @@ namespace Airerage.Editor.Stages
             return beams;
         }
 
+        // 部品の棒（from から to まで。太さ thickness の四角い棒）。
+        private static GameObject Strut(StageDecor decor, string name, Transform parent, Vector3 from, Vector3 to, float thickness, Material material)
+        {
+            Vector3 along = to - from;
+            GameObject bar = decor.Box(name, parent, (from + to) * 0.5f, new Vector3(thickness, along.magnitude, thickness), material);
+            bar.transform.localRotation = Quaternion.FromToRotation(Vector3.up, along.normalized);
+            return bar;
+        }
+
+        // 輪の形の金具（縦の軸の周りの帯。内の半径 inner、外の半径 outer、高さ height。真ん中は抜けている）。
+        private static void Band(string name, Transform parent, Vector3 center, float inner, float outer, float height, Material material)
+        {
+            Mesh mesh = ProceduralMesh.Lathe("Gimmicks", $"Band_{Mathf.RoundToInt(inner * 100f)}_{Mathf.RoundToInt(outer * 100f)}_{Mathf.RoundToInt(height * 100f)}", new[]
+            {
+                new Vector2(inner, -height * 0.5f), new Vector2(outer, -height * 0.5f), new Vector2(outer, height * 0.5f), new Vector2(inner, height * 0.5f),
+                new Vector2(inner, -height * 0.5f),
+            }, 32, caps: false);
+            ProceduralMesh.Place(name, parent, mesh, center, Quaternion.identity, Vector3.one, material);
+        }
+
+        // 気送管（いつも吹く上向きの風 + ZoneLook.Pneumatic。2026-11-21 の方針: 実際の現象に寄せる。手本は病院・工場の気送管〈エアシューター〉:
+        // 送風機が管の中の空気を押し、筒〈キャリア〉が管を勢いよく進み、受け口の手前で逆向きの空気でゆっくりになる〈気送管の特許の説明〉）。
+        // 丸いガラスの管と継ぎ目の金具、下の口（入口）の床の送風機の羽根と格子、上の受け口のラッパ形の口、管の後ろの送風機の箱とダクト。
+        // 管を昇る筒は遊ぶ面より奥（キャラクターを隠さない）。空気に乗って昇る塵と紙。当たり（風）は管の中（範囲のまま）。
+        // 前は LabStage の飾りの四角いガラスの箱だった。
+        private static GameObject CreatePneumaticTube(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 size = zone.Size;
+            float radius = size.x * 0.5f;
+            float bottom = -size.y * 0.5f;
+            float top = size.y * 0.5f;
+            // 下の入口の高さ（LabStage の管の内側の壁の下の端。人はここから管に入る）。
+            const float Intake = 2.6f;
+            var tube = new GameObject("PneumaticTube").transform;
+            tube.SetParent(parent, false);
+            Material glass = decor.Transparent("TubeGlassRound", new Color(0.7f, 0.86f, 1f, 0.12f));
+            Material metal = decor.Lit("TubeMetal", new Color(0.55f, 0.58f, 0.62f));
+            metal.SetFloat("_Metallic", 0.8f);
+            metal.SetFloat("_Smoothness", 0.7f);
+            Material dark = decor.Lit("TubeDark", new Color(0.08f, 0.09f, 0.1f));
+            dark.SetFloat("_Metallic", 0.5f);
+            dark.SetFloat("_Smoothness", 0.5f);
+            Material capColor = decor.Lit("CarrierCap", new Color(0.12f, 0.36f, 0.85f));
+            Material felt = decor.Lit("CarrierFelt", new Color(0.22f, 0.22f, 0.24f));
+            Material shell = decor.Transparent("CarrierShell", new Color(0.85f, 0.95f, 1f, 0.32f));
+            Material paper = decor.Lit("CarrierPaper", new Color(0.92f, 0.9f, 0.84f));
+            float glassBottom = bottom + Intake;
+            float glassTop = top - 0.9f;
+            decor.Cylinder("Glass", tube, new Vector3(0f, (glassBottom + glassTop) * 0.5f, 0f), new Vector3(radius * 2f, (glassTop - glassBottom) * 0.5f, radius * 2f), glass);
+            // 継ぎ目の金具（5m ごと）と、入口の上の太い金具。
+            for (float y = glassBottom + 5f; y < glassTop - 1f; y += 5f)
+            {
+                Band("Flange", tube, new Vector3(0f, y, 0f), radius - 0.02f, radius + 0.14f, 0.16f, metal);
+            }
+            Band("IntakeCollar", tube, new Vector3(0f, glassBottom, 0f), radius - 0.05f, radius + 0.2f, 0.32f, metal);
+            // 上の受け口（ラッパ形に開いた口。厚みのある殻で、内側も見える。真ん中は抜けている）。
+            ProceduralMesh.Place("BellMouth", tube, ProceduralMesh.Lathe("Gimmicks", "TubeBellMouth", new[]
+            {
+                new Vector2(radius - 0.04f, 0f), new Vector2(radius + 0.1f, 0f), new Vector2(radius + 0.16f, 0.35f), new Vector2(radius + 0.3f, 0.64f),
+                new Vector2(radius + 0.48f, 0.88f), new Vector2(radius + 0.38f, 0.9f), new Vector2(radius + 0.2f, 0.68f), new Vector2(radius + 0.06f, 0.38f),
+                new Vector2(radius - 0.04f, 0f),
+            }, 32, caps: false), new Vector3(0f, glassTop, 0f), Quaternion.identity, Vector3.one, metal);
+            // 床の送風機: ダクトの輪、回る羽根（PneumaticTubeView）、上の格子。
+            Band("FanDuct", tube, new Vector3(0f, bottom + 0.09f, 0f), radius - 0.4f, radius - 0.15f, 0.18f, dark);
+            var fan = new GameObject("Fan").transform;
+            fan.SetParent(tube, false);
+            fan.localPosition = new Vector3(0f, bottom + 0.1f, 0f);
+            decor.Cylinder("Hub", fan, Vector3.zero, new Vector3(0.42f, 0.06f, 0.42f), metal);
+            for (int i = 0; i < 5; i++)
+            {
+                var blade = new GameObject("Blade").transform;
+                blade.SetParent(fan, false);
+                blade.localRotation = Quaternion.Euler(0f, i * 72f, 0f);
+                decor.Box("Vane", blade, new Vector3((radius - 0.45f) * 0.5f + 0.2f, 0f, 0f), new Vector3(radius - 0.6f, 0.03f, 0.34f), metal)
+                    .transform.localRotation = Quaternion.Euler(28f, 0f, 0f);
+            }
+            for (int i = -3; i <= 3; i++)
+            {
+                float x = i * 0.42f;
+                float half = Mathf.Sqrt(Mathf.Max(0.01f, (radius - 0.2f) * (radius - 0.2f) - x * x));
+                decor.Box("Grille", tube, new Vector3(x, bottom + 0.2f, 0f), new Vector3(0.04f, 0.04f, half * 2f), dark);
+            }
+            // 管の後ろの送風機の箱と、床へのダクト（遊ぶ面より奥）。
+            decor.Box("Blower", tube, new Vector3(0f, bottom + 1.1f, radius + 1.3f), new Vector3(2.4f, 2.2f, 1.6f), dark);
+            decor.Box("BlowerVent", tube, new Vector3(0f, bottom + 1.4f, radius + 0.48f), new Vector3(1.6f, 0.9f, 0.04f), metal);
+            decor.Cylinder("BlowerDuct", tube, new Vector3(0f, bottom + 0.35f, radius + 0.25f), new Vector3(1.1f, 0.6f, 1.1f), metal)
+                .transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            // 昇る筒（キャリア）: 透明の胴、両端の青いふたとフェルトの帯、中に丸めた書類。管の奥側を昇る。
+            var carriers = new Transform[3];
+            for (int i = 0; i < carriers.Length; i++)
+            {
+                var carrier = new GameObject($"Carrier{i + 1}").transform;
+                carrier.SetParent(tube, false);
+                carrier.localPosition = new Vector3(0f, glassBottom, 0.85f);
+                decor.Cylinder("Shell", carrier, Vector3.zero, new Vector3(0.84f, 0.6f, 0.84f), shell);
+                decor.Cylinder("Papers", carrier, Vector3.zero, new Vector3(0.5f, 0.48f, 0.5f), paper);
+                foreach (float end in new[] { -1f, 1f })
+                {
+                    decor.Cylinder("Cap", carrier, new Vector3(0f, end * 0.62f, 0f), new Vector3(0.88f, 0.07f, 0.88f), capColor);
+                    decor.Cylinder("Felt", carrier, new Vector3(0f, end * 0.44f, 0f), new Vector3(0.9f, 0.04f, 0.9f), felt);
+                }
+                carriers[i] = carrier;
+                carrier.gameObject.SetActive(false);
+            }
+            // 空気に乗って昇る塵と、ひらひら昇る紙。
+            float span = glassTop - glassBottom;
+            new ParticleFx
+            {
+                Name = "TubeDust", LifetimeMin = 0.6f, LifetimeMax = 1.2f, SizeMin = 0.04f, SizeMax = 0.1f, Stretch = 0.6f,
+                BoxSize = new Vector3(radius * 1.4f, span * 0.95f, 1.6f), WorldVelocity = new Vector3(0f, 17f, 0f), VelocityJitter = 0.35f,
+                Rate = 30f, MaxParticles = 120, Turbulence = 0.4f,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.95f, 0.97f, 1f), 0f), (new Color(0.85f, 0.9f, 1f), 1f) }, new[] { (0f, 0f), (0.55f, 0.2f), (0.35f, 0.8f), (0f, 1f) }),
+            }.Build(tube, new Vector3(0f, (glassBottom + glassTop) * 0.5f, 0.3f), Quaternion.identity, decor.Folder);
+            new ParticleFx
+            {
+                Name = "TubePaper", LifetimeMin = 2.4f, LifetimeMax = 3.2f, SizeMin = 0.18f, SizeMax = 0.3f, Spin = 420f, Softness = 0.08f,
+                BoxSize = new Vector3(radius * 1.2f, 1.5f, 1.2f), WorldVelocity = new Vector3(0f, 11f, 0f), VelocityJitter = 0.3f,
+                Rate = 1.6f, MaxParticles = 12, Turbulence = 1.4f,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.95f, 0.94f, 0.9f), 0f), (new Color(0.9f, 0.9f, 0.86f), 1f) }, new[] { (0f, 0f), (1f, 0.08f), (1f, 0.85f), (0f, 1f) }),
+            }.Build(tube, new Vector3(0f, bottom + 1.8f, 0.5f), Quaternion.identity, decor.Folder);
+            tube.gameObject.AddComponent<PneumaticTubeView>().Configure(root.GetComponent<StageZoneView>(), carriers, fan, glassBottom - 0.3f, glassTop - 0.7f);
+            return tube.gameObject;
+        }
+
+        // かぼちゃの投石機（周期のある発射台 + ZoneLook.Catapult。2026-11-21 の方針: 汎用の発射台の見た目を変えるので、効果と配置も
+        // 見た目に合わせる。前はいつも効く発射台〈台だけ〉だった）。手本はマンゴネル: ねじった綱の束（トーション）を巻いた軸、腕と先のかご、
+        // 腕が当たって止まる緩衝材つきの横木〈横木の位置で放つ角度が決まる〉、腕を引き下ろす巻き上げ機と歯止め。動きは CatapultView。
+        // 当たり（発射台）はかごの所（範囲のまま）。予告の間に引き絞り、効き始めに腕が跳ね上がる（StageZone の周期）。
+        // 放る向き（範囲の向き）が左上なので、かごは軸の右、腕は左回りに振り上がる。右上へ放つ投石機は全体を左右に裏返す。
+        private static GameObject CreateCatapult(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            var release = new GameObject("CatapultRelease");
+            release.transform.SetParent(parent, false);
+            var frame = new GameObject("Catapult").transform;
+            frame.SetParent(parent, false);
+            float side = zone.Direction.x <= 0f ? 1f : -1f;
+            frame.localScale = new Vector3(side, 1f, 1f);
+            float floor = -zone.Size.y * 0.5f;
+            Material wood = decor.Lit("CatapultWood", new Color(0.32f, 0.21f, 0.13f));
+            Material woodDark = decor.Lit("CatapultWoodDark", new Color(0.2f, 0.13f, 0.09f));
+            Material iron = decor.Lit("CatapultIron", new Color(0.12f, 0.12f, 0.13f));
+            iron.SetFloat("_Metallic", 0.7f);
+            iron.SetFloat("_Smoothness", 0.45f);
+            Material rope = decor.Lit("CatapultRope", new Color(0.5f, 0.42f, 0.3f));
+            Material pad = decor.Lit("CatapultPad", new Color(0.3f, 0.2f, 0.26f));
+            const float Depth = 0.95f;
+            var pivot = new Vector3(-2.25f, floor + 0.85f, 0f);
+            var toBucket = new Vector2(2.25f, -0.7f);
+            float armLength = toBucket.magnitude;
+            float rest = Mathf.Atan2(toBucket.y, toBucket.x) * Mathf.Rad2Deg;
+            const float Stop = 100f;
+            var stopDirection = new Vector3(Mathf.Cos(Stop * Mathf.Deg2Rad), Mathf.Sin(Stop * Mathf.Deg2Rad), 0f);
+            var swing = new Vector3(-stopDirection.y, stopDirection.x, 0f);
+            Vector3 crossbar = pivot + stopDirection * 1.6f + swing * 0.26f;
+            var drumAt = new Vector3(1.05f, floor + 0.55f, 0f);
+            foreach (float z in new[] { -Depth, Depth })
+            {
+                var at = new Vector3(0f, 0f, z);
+                decor.Box("Skid", frame, new Vector3(-1.2f, floor + 0.11f, z), new Vector3(5f, 0.22f, 0.24f), woodDark);
+                // 軸を支える A の形の柱、横木を支える柱と筋交い、巻き上げ機の柱。
+                Strut(decor, "Upright", frame, new Vector3(-3.1f, floor + 0.2f, z), pivot + new Vector3(0f, 0.14f, z), 0.2f, wood);
+                Strut(decor, "Upright", frame, new Vector3(-1.4f, floor + 0.2f, z), pivot + new Vector3(0f, 0.14f, z), 0.2f, wood);
+                Strut(decor, "Post", frame, new Vector3(-3.55f, floor + 0.2f, z), crossbar + at, 0.18f, wood);
+                Strut(decor, "Brace", frame, pivot + new Vector3(-0.15f, 0.1f, z), crossbar + at + new Vector3(0.05f, -0.25f, 0f), 0.12f, woodDark);
+                decor.Box("WinchPost", frame, new Vector3(drumAt.x, floor + 0.38f, z), new Vector3(0.18f, 0.52f, 0.18f), wood);
+                // 継ぎ目の鉄の帯。
+                decor.Box("Strap", frame, pivot + new Vector3(0f, 0.02f, z), new Vector3(0.34f, 0.34f, 0.26f), iron);
+            }
+            foreach (float x in new[] { -3.45f, -1.45f, 1.05f })
+            {
+                decor.Box("Tie", frame, new Vector3(x, floor + 0.13f, 0f), new Vector3(0.2f, 0.2f, Depth * 2f + 0.24f), woodDark);
+            }
+            // 軸と、ねじった綱の束（トーション）。
+            decor.Cylinder("Axle", frame, pivot, new Vector3(0.2f, Depth + 0.16f, 0.2f), iron).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            foreach (float z in new[] { -0.5f, 0.5f })
+            {
+                decor.Cylinder("Skein", frame, pivot + new Vector3(0f, 0f, z), new Vector3(0.56f, 0.2f, 0.56f), rope).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                decor.Box("SkeinLever", frame, pivot + new Vector3(0f, 0f, z * 1.55f), new Vector3(0.9f, 0.1f, 0.1f), iron).transform.localRotation = Quaternion.Euler(0f, 0f, 35f);
+            }
+            // 横木と、真ん中の緩衝材（布の袋）。
+            decor.Cylinder("Crossbar", frame, crossbar, new Vector3(0.24f, Depth + 0.1f, 0.24f), wood).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            decor.Cylinder("Cushion", frame, crossbar, new Vector3(0.44f, 0.36f, 0.44f), pad).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            // 腕とかご（CatapultView が軸の周りに回す）。
+            var arm = new GameObject("Arm").transform;
+            arm.SetParent(frame, false);
+            arm.localPosition = pivot;
+            arm.localRotation = Quaternion.Euler(0f, 0f, rest);
+            decor.Box("Beam", arm, new Vector3((armLength - 0.6f) * 0.5f, 0f, 0f), new Vector3(armLength + 0.1f, 0.2f, 0.26f), wood);
+            foreach (float x in new[] { 0.45f, armLength * 0.62f })
+            {
+                decor.Box("Band", arm, new Vector3(x, 0f, 0f), new Vector3(0.08f, 0.24f, 0.3f), iron);
+            }
+            var bucket = new Vector3(armLength, 0.12f, 0f);
+            decor.Box("BucketBase", arm, bucket, new Vector3(1.1f, 0.1f, 0.9f), woodDark);
+            foreach (float z in new[] { -0.45f, 0.45f })
+            {
+                decor.Box("BucketSide", arm, bucket + new Vector3(0f, 0.2f, z), new Vector3(1.1f, 0.42f, 0.06f), wood);
+            }
+            foreach (float x in new[] { -0.55f, 0.55f })
+            {
+                decor.Box("BucketEnd", arm, bucket + new Vector3(x, 0.2f, 0f), new Vector3(0.06f, 0.42f, 0.9f), wood);
+            }
+            var hook = new GameObject("RopeHook").transform;
+            hook.SetParent(arm, false);
+            hook.localPosition = new Vector3(armLength - 0.4f, -0.12f, 0f);
+            // かごのかぼちゃ（腕の子）と、放ったかぼちゃ（CatapultView がワールドで飛ばす）。
+            var payload = new GameObject("Payload").transform;
+            payload.SetParent(arm, false);
+            payload.localPosition = bucket + new Vector3(0f, 0.08f, 0f);
+            var thrown = new GameObject("ThrownPumpkin").transform;
+            thrown.SetParent(frame, false);
+            foreach (Transform holder in new[] { payload, thrown })
+            {
+                GameObject pumpkin = ThirdPartyProps.Place(decor, ThirdPartyProps.Halloween, "pumpkin_orange_small", holder.position, 1.15f, 30f,
+                    new Color(0.85f, 0.8f, 0.8f), decor.Folder);
+                if (pumpkin != null)
+                {
+                    pumpkin.transform.SetParent(holder, true);
+                    pumpkin.transform.localPosition = Vector3.zero;
+                }
+            }
+            // 巻き上げ機（胴・綱の巻き・手回しの輪の輻）と、腕へ掛けた綱。
+            var drum = new GameObject("Drum").transform;
+            drum.SetParent(frame, false);
+            drum.localPosition = drumAt;
+            decor.Cylinder("DrumCore", drum, Vector3.zero, new Vector3(0.36f, Depth, 0.36f), wood).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            decor.Cylinder("RopeWrap", drum, Vector3.zero, new Vector3(0.44f, 0.34f, 0.44f), rope).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            foreach (float z in new[] { -Depth - 0.08f, Depth + 0.08f })
+            {
+                for (int k = 0; k < 4; k++)
+                {
+                    decor.Box("Spoke", drum, new Vector3(0f, 0f, z), new Vector3(0.95f, 0.06f, 0.06f), wood).transform.localRotation = Quaternion.Euler(0f, 0f, k * 45f);
+                }
+                decor.Cylinder("Ratchet", drum, new Vector3(0f, 0f, z * 0.92f), new Vector3(0.5f, 0.03f, 0.5f), iron).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            }
+            var ropeLine = new GameObject("WinchRope").AddComponent<LineRenderer>();
+            ropeLine.transform.SetParent(frame, false);
+            ropeLine.sharedMaterial = decor.Unlit("CatapultRopeLine", new Color(0.36f, 0.3f, 0.22f));
+            ropeLine.useWorldSpace = true;
+            ropeLine.positionCount = 8;
+            ropeLine.startWidth = ropeLine.endWidth = 0.05f;
+            ropeLine.shadowCastingMode = ShadowCastingMode.Off;
+            ropeLine.receiveShadows = false;
+            for (int i = 0; i < 8; i++)
+            {
+                ropeLine.SetPosition(i, Vector3.Lerp(drum.position, hook.position, i / 7f));
+            }
+            frame.gameObject.AddComponent<CatapultView>().Configure(root.GetComponent<StageZoneView>(), arm, rest, Stop, drum, payload, thrown,
+                new Vector3(-5f * side, 21f, 15f), ropeLine, hook);
+            return release;
+        }
+
+        // 鬼火の輪（加速リング + ZoneLook.Wisp。2026-11-21 の方針: 汎用の加速リングの見た目を変えるので、配置も見た目に合わせて輪を漂わせる
+        // 〈ZoneSpec.Moving〉。鬼火は墓地や沼の地面から数メートルの所に浮かぶ小さな青白い火の玉で、煙を出さず、ゆらゆら漂う〈記録と伝承の
+        // まとめ〉）。青白い鬼火が輪に連なって回り（WispRingView）、輪の中から加速する向きへ鬼火の粒がこぼれて流れる。くぐると散る。
+        // 当たり（加速）は輪の中（範囲のまま。動く）。前は金属の枠の輪だった。
+        private static GameObject CreateWispRing(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            var ring = new GameObject("WispRing").transform;
+            ring.SetParent(parent, false);
+            Mesh card = ProceduralMesh.GlowCard("Gimmicks", "GlowCard");
+            Material flame = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WispRingFlame", "Airerage/Wisp", m =>
+            {
+                m.SetColor("_Color", new Color(0.9f, 1.7f, 1.4f));
+                m.SetFloat("_Core", 7f);
+            }, decor.Folder);
+            var radii = new Vector2(zone.Size.x * 0.5f + 0.15f, zone.Size.y * 0.5f + 0.15f);
+            const int Count = 9;
+            var wisps = new Transform[Count];
+            for (int i = 0; i < Count; i++)
+            {
+                float angle = i * Mathf.PI * 2f / Count;
+                GameObject wisp = ProceduralMesh.Place($"Wisp{i + 1}", ring, card, new Vector3(Mathf.Cos(angle) * radii.x, Mathf.Sin(angle) * radii.y, 0f),
+                    Quaternion.identity, Vector3.one * (0.62f + 0.18f * Mathf.Sin(i * 2.7f)), flame);
+                wisp.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+                wisp.GetComponent<Renderer>().receiveShadows = false;
+                wisps[i] = wisp.transform;
+            }
+            Vector2 direction = zone.Direction.normalized;
+            Gradient pale = ParticleFx.Ramp(new[] { (new Color(0.6f, 1f, 0.95f), 0f), (new Color(0.45f, 0.75f, 1f), 1f) }, new[] { (0f, 0f), (0.8f, 0.25f), (0f, 1f) });
+            new ParticleFx
+            {
+                Name = "WispFlow", LifetimeMin = 1.2f, LifetimeMax = 2f, SizeMin = 0.1f, SizeMax = 0.26f, Additive = true, Intensity = 2.4f,
+                BoxSize = new Vector3(radii.x * 1.1f, radii.y * 1.3f, 0.4f), WorldVelocity = new Vector3(direction.x, direction.y, 0f) * 2.4f, VelocityJitter = 0.4f,
+                Rate = 7f, MaxParticles = 40, Turbulence = 0.5f, Colors = pale,
+            }.Build(ring, new Vector3(0f, 0f, -0.1f), Quaternion.identity, decor.Folder);
+            ParticleSystem burst = new ParticleFx
+            {
+                Name = "WispBurst", LifetimeMin = 0.5f, LifetimeMax = 0.9f, SpeedMin = 0f, SpeedMax = 0f, SizeMin = 0.14f, SizeMax = 0.34f, Additive = true,
+                Intensity = 3f, BoxSize = new Vector3(0.6f, 0.6f, 0.1f), Radial = -6f, MaxParticles = 60, Turbulence = 0.8f, Colors = pale,
+            }.Build(root, new Vector3(0f, 0f, -0.2f), Quaternion.identity, decor.Folder);
+            ring.gameObject.AddComponent<WispRingView>().Configure(root.GetComponent<StageZoneView>(), wisps, radii, burst);
+            return ring.gameObject;
+        }
+
+        // 荷役の網（跳ね返す物 + ZoneLook.Net。2026-11-21 の方針: 実際の現象に寄せる。手本は港の荷役の網〈カーゴネット〉: 四隅の輪を
+        // 4 本足の吊り具でクレーンの鉤に掛け、吊り具の下に枠〈スプレッダー〉を入れると網が張ったまま広がる。落ちてきた物を受けた網は
+        // 深く沈んでから跳ね返す）。上のクレーンの梁の吊る所（ZoneSpec.From の出どころ）からワイヤーで吊った鉤、4 本足の吊り具、鉄の枠、
+        // 縦横の綱の網目（CargoNetView が乗った所を沈める）。当たり（跳ね返す）は網の所（範囲のまま）。前は光る看板の板だった。
+        private static GameObject CreateCargoNet(Transform parent, Transform root, ZoneSpec zone, StageDecor decor)
+        {
+            var rigRoot = new GameObject("CargoNet").transform;
+            rigRoot.SetParent(parent, false);
+            var half = new Vector2(zone.Size.x * 0.5f + 0.1f, 1.1f);
+            float netY = zone.Size.y * 0.5f - 0.15f;
+            const float HookAbove = 3.9f;
+            // 揺らす吊り具（鉤の所が軸）。
+            var hoist = new GameObject("Hoist").transform;
+            hoist.SetParent(rigRoot, false);
+            hoist.localPosition = new Vector3(0f, netY + HookAbove, 0f);
+            Material steel = decor.Lit("NetSteel", new Color(0.86f, 0.62f, 0.12f));
+            steel.SetFloat("_Metallic", 0.6f);
+            steel.SetFloat("_Smoothness", 0.5f);
+            Material dark = decor.Lit("NetHookDark", new Color(0.12f, 0.12f, 0.13f));
+            dark.SetFloat("_Metallic", 0.7f);
+            Material cable = decor.Unlit("NetCable", new Color(0.18f, 0.18f, 0.2f));
+            Material ropeMat = decor.Unlit("NetRope", new Color(0.16f, 0.4f, 0.26f));
+            Material edgeMat = decor.Unlit("NetEdgeRope", new Color(0.12f, 0.3f, 0.2f));
+            // 梁の下まで上がるワイヤー（動かない。鉤の上の滑車から）。
+            float cableTop = zone.Source.HasValue ? zone.LocalSource.y : netY + HookAbove + 6f;
+            var cableLine = new GameObject("HoistCable").AddComponent<LineRenderer>();
+            cableLine.transform.SetParent(rigRoot, false);
+            cableLine.sharedMaterial = cable;
+            cableLine.useWorldSpace = false;
+            cableLine.positionCount = 2;
+            cableLine.SetPosition(0, new Vector3(0f, netY + HookAbove + 0.9f, 0f));
+            cableLine.SetPosition(1, new Vector3(0f, cableTop, 0f));
+            cableLine.startWidth = cableLine.endWidth = 0.07f;
+            cableLine.shadowCastingMode = ShadowCastingMode.Off;
+            decor.Box("Trolley", rigRoot, new Vector3(0f, cableTop - 0.25f, 0f), new Vector3(1.2f, 0.5f, 1.4f), dark);
+            // 滑車のついた鉤のブロックと、J の形の鉤。
+            decor.Box("HookBlock", hoist, new Vector3(0f, 0.75f, 0f), new Vector3(0.6f, 0.7f, 0.42f), steel);
+            decor.Cylinder("Sheave", hoist, new Vector3(0f, 0.9f, 0f), new Vector3(0.5f, 0.24f, 0.5f), dark).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            Mesh hookMesh = ProceduralMesh.Tube("Gimmicks", "CraneHook", new[]
+            {
+                new Vector3(0f, 0.4f, 0f), new Vector3(0f, 0.1f, 0f), new Vector3(0.05f, -0.12f, 0f), new Vector3(0.22f, -0.2f, 0f), new Vector3(0.3f, -0.05f, 0f),
+            }, new[] { 0.08f, 0.09f, 0.085f, 0.07f, 0.05f }, 8);
+            ProceduralMesh.Place("Hook", hoist, hookMesh, Vector3.zero, Quaternion.identity, Vector3.one, dark);
+            decor.Sphere("MasterLink", hoist, new Vector3(0.05f, -0.15f, 0f), new Vector3(0.22f, 0.3f, 0.08f), dark);
+            // 鉄の枠（網の縁）と、四隅から鉤への 4 本足の吊り具。
+            float frameY = -HookAbove;
+            var corners = new[] { new Vector3(-half.x, frameY, -half.y), new Vector3(half.x, frameY, -half.y), new Vector3(half.x, frameY, half.y), new Vector3(-half.x, frameY, half.y) };
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 a = corners[i];
+                Vector3 b = corners[(i + 1) % 4];
+                Strut(decor, "Spreader", hoist, a, b, 0.1f, steel);
+                decor.Sphere("Shackle", hoist, a + new Vector3(0f, 0.08f, 0f), Vector3.one * 0.16f, dark);
+                var leg = new GameObject("SlingLeg").AddComponent<LineRenderer>();
+                leg.transform.SetParent(hoist, false);
+                leg.sharedMaterial = cable;
+                leg.useWorldSpace = false;
+                leg.positionCount = 2;
+                leg.SetPosition(0, a + new Vector3(0f, 0.1f, 0f));
+                leg.SetPosition(1, new Vector3(0.05f, -0.2f, 0f));
+                leg.startWidth = leg.endWidth = 0.045f;
+                leg.shadowCastingMode = ShadowCastingMode.Off;
+            }
+            // 網目（縦横の綱。CargoNetView が点を沈める）。網の面は枠と同じ高さ。
+            var net = new GameObject("Net").transform;
+            net.SetParent(hoist, false);
+            net.localPosition = new Vector3(0f, frameY, 0f);
+            var alongX = new List<LineRenderer>();
+            var alongZ = new List<LineRenderer>();
+            const int Rows = 7;
+            const int Columns = 11;
+            for (int r = 0; r < Rows; r++)
+            {
+                float z = Mathf.Lerp(-half.y, half.y, r / (float)(Rows - 1));
+                alongX.Add(NetRope($"RopeX{r + 1}", net, r == 0 || r == Rows - 1 ? edgeMat : ropeMat, 16, i => new Vector3(Mathf.Lerp(-half.x, half.x, i / 15f), 0f, z),
+                    r == 0 || r == Rows - 1 ? 0.06f : 0.035f));
+            }
+            for (int c = 0; c < Columns; c++)
+            {
+                float x = Mathf.Lerp(-half.x, half.x, c / (float)(Columns - 1));
+                alongZ.Add(NetRope($"RopeZ{c + 1}", net, c == 0 || c == Columns - 1 ? edgeMat : ropeMat, 9, i => new Vector3(x, 0f, Mathf.Lerp(-half.y, half.y, i / 8f)),
+                    c == 0 || c == Columns - 1 ? 0.06f : 0.035f));
+            }
+            rigRoot.gameObject.AddComponent<CargoNetView>().Configure(root.GetComponent<StageZoneView>(), alongX.ToArray(), alongZ.ToArray(), half, 0f, hoist);
+            return rigRoot.gameObject;
+        }
+
+        private static LineRenderer NetRope(string name, Transform parent, Material material, int count, Func<int, Vector3> point, float width)
+        {
+            var line = new GameObject(name).AddComponent<LineRenderer>();
+            line.transform.SetParent(parent, false);
+            line.sharedMaterial = material;
+            line.useWorldSpace = false;
+            line.positionCount = count;
+            for (int i = 0; i < count; i++)
+            {
+                line.SetPosition(i, point(i));
+            }
+            line.startWidth = line.endWidth = width;
+            line.alignment = LineAlignment.View;
+            line.shadowCastingMode = ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            return line;
+        }
+
         private static LineRenderer Line(string name, Transform parent, Material material, Vector3 from, Vector3 to, Color color, float width)
         {
             var go = new GameObject(name);
@@ -1434,7 +2055,8 @@ namespace Airerage.Editor.Stages
         private static bool IsSteadyDraft(ZoneSpec zone)
         {
             return zone.Kind == StageZoneKind.Gust && zone.PeriodSeconds <= 0f && zone.Look != StageZoneView.ZoneLook.Flow
-                && zone.Look != StageZoneView.ZoneLook.Steam && Mathf.Abs(zone.Direction.y) > Mathf.Abs(zone.Direction.x);
+                && zone.Look != StageZoneView.ZoneLook.Steam && zone.Look != StageZoneView.ZoneLook.Pneumatic
+                && Mathf.Abs(zone.Direction.y) > Mathf.Abs(zone.Direction.x);
         }
 
         private static Color DefaultColor(StageZoneKind kind)

@@ -15,6 +15,10 @@ namespace Airerage.Runtime.Presentation
     ///   （ユーザーの要望、2026-10-26）。
     /// - ピッチャーマシン: ボール（_projectile）を道のりの位置へ動かし、止まったら点滅させ、消えたら隠す。打ち出した瞬間に音。
     /// 表示する試合がなければ（メニューの背景）、赤外線とマシンだけを出す。
+    /// 2026-11-21 の方針（実際の現象に寄せる）: 赤外線は向かい合った投光器と受光器の間の細い 2 本の光線（_beams。本物の赤外線は目に
+    /// 見えないので、ゲームの警報の光線のように細い赤い線で見せ、光線の上で塵がきらめく _motes）。ミサイルは尾に炎と、後ろに残る
+    /// 白い煙の帯（_trail）。ピッチャーマシンは上下 2 つのタイヤが逆向きに回り続け（_wheels）、打ち出す少し前に、かごのボールが
+    /// 送りの筒を転がってタイヤの間へ入る（_feedBall・_chute）。
     /// </summary>
     [RequireComponent(typeof(StageTrapAuthoring))]
     public sealed class StageTrapView : MonoBehaviour
@@ -32,6 +36,19 @@ namespace Airerage.Runtime.Presentation
         [Tooltip("撃った後の待ちの円形のゲージ（発射装置の周り）と、その中心（発射装置）")]
         [SerializeField] private RingGaugeView _reload;
         [SerializeField] private Transform _launcher;
+        [Tooltip("赤外線の光線（2 本目以降。1 本目は _beam）と、光線できらめく塵、ミサイルの煙の帯")]
+        [SerializeField] private Renderer[] _beams = new Renderer[0];
+        [SerializeField] private ParticleSystem _motes;
+        [SerializeField] private ParticleSystem _trail;
+        [Tooltip("ミサイルの尾（煙を出す所。ミサイルの子）")]
+        [SerializeField] private Transform _tail;
+        [Tooltip("ピッチャーマシンのタイヤ（Z の軸で回す。上と下は逆向き）と、送るボール、送りの筒の道（仕掛けからの位置）")]
+        [SerializeField] private Transform[] _wheels = new Transform[0];
+        [SerializeField] private Transform _feedBall;
+        [SerializeField] private Vector3[] _chute = new Vector3[0];
+
+        /// <summary>送りの筒をボールが転がる長さ（ティック）。</summary>
+        public const int FeedTicks = 40;
 
         private StageTrapAuthoring _authoring;
         private StageTrap _trap;
@@ -61,6 +78,29 @@ namespace Airerage.Runtime.Presentation
 
         /// <summary>赤外線を見せているか（明滅で消えている瞬間も含む。待ちの間は false。テスト用）。</summary>
         public bool ShowsBeam => _beam != null && !Reloading;
+
+        /// <summary>送りの筒を転がっているか（テスト用）。</summary>
+        public bool Feeding { get; private set; }
+
+        /// <summary>ミサイルの煙の帯を出しているか（テスト用）。</summary>
+        public bool Trailing => _trail != null && _trail.emission.enabled;
+
+        /// <summary>赤外線の細部（2 本目以降の光線・塵・煙の帯と尾）を設定する（シーンのビルダー用）。</summary>
+        public void ConfigureTripwireDetail(Renderer[] beams, ParticleSystem motes, ParticleSystem trail, Transform tail)
+        {
+            _beams = beams;
+            _motes = motes;
+            _trail = trail;
+            _tail = tail;
+        }
+
+        /// <summary>ピッチャーマシンの細部（タイヤ・送るボール・送りの筒の道）を設定する（シーンのビルダー用）。</summary>
+        public void ConfigurePitcherDetail(Transform[] wheels, Transform feedBall, Vector3[] chute)
+        {
+            _wheels = wheels;
+            _feedBall = feedBall;
+            _chute = chute;
+        }
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
         public void Configure(Renderer beam, Transform projectile, Renderer lamp, Material lineMaterial, RingGaugeView reload = null,
@@ -185,13 +225,39 @@ namespace Airerage.Runtime.Presentation
             {
                 // 赤外線は待ちの間だけ消し、ほかはゆっくり明滅（触れられたら速く）。
                 float speed = arming ? 8f : 1.2f;
-                _beam.enabled = !reloading && Mathf.Repeat(Time.time * speed, 1f) < (arming ? 0.5f : 0.92f);
+                bool on = !reloading && Mathf.Repeat(Time.time * speed, 1f) < (arming ? 0.5f : 0.92f);
+                _beam.enabled = on;
+                foreach (Renderer beam in _beams)
+                {
+                    if (beam != null)
+                    {
+                        beam.enabled = on;
+                    }
+                }
+            }
+            if (_motes != null)
+            {
+                ParticleSystem.EmissionModule motes = _motes.emission;
+                motes.enabled = !reloading;
             }
             SetProjectile(flying, position);
             if (flying && _projectile != null)
             {
                 Vector2 direction = _authoring.Direction.normalized;
                 _projectile.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+            }
+            if (_trail != null)
+            {
+                // 煙の帯: 飛んでいる間は尾から出し続け、当たったら出すのをやめる（出た煙は残って薄れる）。
+                ParticleSystem.EmissionModule trail = _trail.emission;
+                if (flying && _tail != null)
+                {
+                    _trail.transform.position = _tail.position;
+                }
+                if (trail.enabled != flying)
+                {
+                    trail.enabled = flying;
+                }
             }
         }
 
@@ -221,6 +287,43 @@ namespace Airerage.Runtime.Presentation
                 // 転がる・飛ぶ向きに回す（見た目だけ）。
                 _projectile.Rotate(0f, 0f, -Time.deltaTime * 720f, Space.Self);
             }
+            // タイヤ: 上と下が逆向きに回り続ける（ボールを挟んで送り出す向き）。
+            for (int i = 0; i < _wheels.Length; i++)
+            {
+                if (_wheels[i] != null)
+                {
+                    _wheels[i].Rotate(0f, 0f, (i % 2 == 0 ? -1f : 1f) * 1800f * Time.deltaTime, Space.Self);
+                }
+            }
+            RenderFeed(trap);
+        }
+
+        // 送るボール: 打ち出す FeedTicks 前から、かごの出口から送りの筒を転がってタイヤの間へ入る。それまではかごの出口で待つ。
+        private void RenderFeed(StageTrap trap)
+        {
+            Feeding = false;
+            if (_feedBall == null || _chute.Length == 0)
+            {
+                return;
+            }
+            float u = 0f;
+            if (trap != null && trap.Period > 0)
+            {
+                long shifted = (long)_feed.CurrentTick + trap.PhaseTicks;
+                int age = shifted >= 0 ? (int)(shifted % trap.Period) : (int)(((shifted % trap.Period) + trap.Period) % trap.Period);
+                int until = trap.Period - age;
+                if (until <= FeedTicks)
+                {
+                    u = 1f - until / (float)FeedTicks;
+                    Feeding = true;
+                }
+            }
+            // 筒の中では重さで速くなる（転がり始めはゆっくり）。
+            float along = u * u * (_chute.Length - 1);
+            int segment = Mathf.Min(_chute.Length - 2, Mathf.FloorToInt(along));
+            Vector3 local = _chute.Length == 1 ? _chute[0] : Vector3.Lerp(_chute[Mathf.Max(0, segment)], _chute[Mathf.Max(0, segment) + 1], along - Mathf.Max(0, segment));
+            _feedBall.localPosition = local;
+            _feedBall.Rotate(0f, 0f, -Time.deltaTime * (Feeding ? 900f : 0f), Space.Self);
         }
 
         private void SetProjectile(bool shown, Vector2 position)

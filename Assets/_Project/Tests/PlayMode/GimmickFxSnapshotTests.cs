@@ -52,7 +52,8 @@ namespace Airerage.PlayMode.Tests
                     foreach (StageZoneView view in Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.InstanceID))
                     {
                         if (view.GetComponentInChildren<ParticleSystem>(true) == null && view.GetComponentInChildren<LightningStrikeView>(true) == null
-                            && view.GetComponentInChildren<PlasmaGlobeView>(true) == null)
+                            && view.GetComponentInChildren<PlasmaGlobeView>(true) == null && view.GetComponentInChildren<CatapultView>(true) == null
+                            && view.GetComponentInChildren<CargoNetView>(true) == null)
                         {
                             continue;
                         }
@@ -80,6 +81,83 @@ namespace Airerage.PlayMode.Tests
                             continue;
                         }
                         yield return CaptureOne(camera, $"Fx_{scene}_{view.name}", view);
+                    }
+                }
+            }
+            finally
+            {
+                Time.timeScale = 1f;
+            }
+        }
+
+        /// <summary>
+        /// ステージの仕掛け（2026-11-21 の第 4 弾）: 研究所の赤外線（全体・発射装置の近く・ミサイルと煙の帯）と、競技場のピッチャーマシン
+        /// （全体・ボールを送り込むところ・打ち出したボール）を撮る（Logs/Snapshots/Trap_*）。赤外線は自分を光線の上に置いて撃たせる。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureTrapsInAction()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            Directory.CreateDirectory(Folder);
+            try
+            {
+                foreach (string scene in new[] { "Stage_Lab", "Stage_Stadium" })
+                {
+                    flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == scene));
+                    while (flow.Current != GameFlow.FlowScreen.Training || flow.IsLoading || SceneManager.GetActiveScene().name != scene)
+                    {
+                        yield return null;
+                    }
+                    yield return Wait(1f);
+                    Camera camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+                    var runner = Object.FindFirstObjectByType<SimulationRunner>();
+                    foreach (StageTrapView trap in Object.FindObjectsByType<StageTrapView>(FindObjectsSortMode.InstanceID).OrderBy(t => t.transform.position.x).Take(2))
+                    {
+                        Vector3 at = trap.transform.position;
+                        string name = $"Trap_{scene}_{trap.name}";
+                        Transform launcher = trap.transform.Find("Launcher");
+                        if (launcher != null)
+                        {
+                            Shoot(camera, new Vector3(at.x, at.y + 1f, -22f), $"{name}_Whole");
+                            Shoot(camera, new Vector3(launcher.position.x + 1.5f, launcher.position.y + 0.3f, -6.5f), $"{name}_Launcher");
+                            // 自分を光線の上に置いて、ミサイルを撃たせる。
+                            Airerage.Core.Simulation.CharacterState player = runner.PlayerState;
+                            player.Position = new System.Numerics.Vector3(at.x, at.y - 0.4f, 0f);
+                            player.Velocity = System.Numerics.Vector3.Zero;
+                            runner.SetPlayerState(player);
+                            float limit = Time.realtimeSinceStartup + 8f;
+                            while (!trap.ShowsProjectile && Time.realtimeSinceStartup < limit)
+                            {
+                                yield return null;
+                            }
+                            yield return Wait(0.35f);
+                            Transform missile = trap.transform.Find("Missile");
+                            Shoot(camera, new Vector3(missile.position.x - 1.5f, missile.position.y + 0.5f, -9f), $"{name}_Missile");
+                            continue;
+                        }
+                        Shoot(camera, new Vector3(at.x, at.y - 1f, -16f), $"{name}_Whole");
+                        Time.timeScale = 4f;
+                        float wait = Time.realtimeSinceStartup + 40f;
+                        while (!trap.Feeding && Time.realtimeSinceStartup < wait)
+                        {
+                            yield return null;
+                        }
+                        Time.timeScale = 1f;
+                        yield return Wait(0.3f);
+                        Shoot(camera, new Vector3(at.x - Mathf.Sign(at.x) * 0.5f, at.y + 0.5f, -10f), $"{name}_Feeding");
+                        wait = Time.realtimeSinceStartup + 4f;
+                        while (!trap.ShowsProjectile && Time.realtimeSinceStartup < wait)
+                        {
+                            yield return null;
+                        }
+                        yield return Wait(0.15f);
+                        Shoot(camera, new Vector3(at.x + Mathf.Sign(-at.x) * 3f, at.y + 1.5f, -14f), $"{name}_Pitch");
                     }
                 }
             }

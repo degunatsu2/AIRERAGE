@@ -129,8 +129,10 @@ namespace Airerage.Editor.Stages
                 // 吹き飛んで威力 10 の枚数のコインを落とす【仮】。
                 Traps = new[]
                 {
-                    TrapSpec.Pitcher("PitcherWest", new Vector2(-31.4f, 16f), new Vector2(26f, 18f), 20f, 5f, 0.8f, 10, 24f, 7f, 1.5f),
-                    TrapSpec.Pitcher("PitcherEast", new Vector2(31.4f, 16f), new Vector2(-26f, 18f), 20f, 15f, 0.8f, 10, 24f, 7f, 1.5f),
+                    // 2026-11-21 の方針: 2 つのタイヤのピッチングマシンにした（タイヤ・送りのレール・ボールの筒。照明塔の柱から腕で支える）。
+                    // 機械が柱に埋まらないように、発射口を打ち出す向きへ 2.4m 先にした（前は (±31.4, 16)）。
+                    TrapSpec.Pitcher("PitcherWest", new Vector2(-29.4f, 17.4f), new Vector2(26f, 18f), 20f, 5f, 0.8f, 10, 24f, 7f, 1.5f),
+                    TrapSpec.Pitcher("PitcherEast", new Vector2(29.4f, 17.4f), new Vector2(-26f, 18f), 20f, 15f, 0.8f, 10, 24f, 7f, 1.5f),
                 },
                 Coins = new (Vector2, int)[]
                 {

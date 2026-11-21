@@ -113,10 +113,17 @@ namespace Airerage.Editor.Stages
                     new ZoneSpec("DemonHandEast", StageZoneKind.Grab, new Vector2(45f, 1.2f), new Vector2(2.6f, 2.4f), Vector2.up, 1.2f)
                         .To(prisonEast).Moving(new Vector2(-19f, 0f), 19f, 1.5f),
                     // カボチャの発射台: 農園から館の東のバルコニーへ。
-                    ZoneSpec.OnFloor("PumpkinLauncher", StageZoneKind.Launcher, 26f, 28f, 0f, new Vector2(-0.5f, 1f), 32f),
+                    // かぼちゃの投石機（2026-11-21 の方針: 見た目に合わせて効果と配置も変える。前はいつも効く発射台だった）: かごに入ると、
+                    // 3.6 秒ごとに 1.2 秒かけて腕を引き絞り（予告）、腕が跳ね上がる 0.25 秒の間に館の屋根へ放る。軸と横木の分だけ右へ寄せた
+                    // （前は x 26〜28。左の端が農園の崖に掛からないように）。CatapultView。
+                    ZoneSpec.OnFloor("PumpkinLauncher", StageZoneKind.Launcher, 26.5f, 28.5f, 0f, new Vector2(-0.5f, 1f), 32f)
+                        .Every(3.6f, 0.25f, 0f, 0f, 1.2f).Styled(StageZoneView.ZoneLook.Catapult),
                     // 鬼火の輪（加速リング）: 墓場と農園の上から館の屋根へ。
-                    new ZoneSpec("WispRingWest", StageZoneKind.BoostRing, new Vector2(-24f, 22f), new Vector2(2.4f, 3f), new Vector2(1f, 0.2f), 18f),
-                    new ZoneSpec("WispRingEast", StageZoneKind.BoostRing, new Vector2(24f, 22f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.2f), 18f),
+                    // 2026-11-21 の方針: 青白い鬼火が輪に連なって回り、輪はゆっくり漂う（8 秒で 1 往復。判定も一緒に動く）。WispRingView。
+                    new ZoneSpec("WispRingWest", StageZoneKind.BoostRing, new Vector2(-24f, 22f), new Vector2(2.4f, 3f), new Vector2(1f, 0.2f), 18f)
+                        .Moving(new Vector2(1.2f, 1.8f), 8f).Styled(StageZoneView.ZoneLook.Wisp),
+                    new ZoneSpec("WispRingEast", StageZoneKind.BoostRing, new Vector2(24f, 22f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.2f), 18f)
+                        .Moving(new Vector2(-1.2f, 1.8f), 8f).Styled(StageZoneView.ZoneLook.Wisp),
                     // 館のポーチのジャンプ台と、納骨堂の屋根のジャンプ台（ユーザーの要望、2026-10-26）。
                     ZoneSpec.OnFloor("PorchPadWest", StageZoneKind.JumpPad, -11f, -9f, 2f, Vector2.up, 24f, 0.4f),
                     ZoneSpec.OnFloor("PorchPadEast", StageZoneKind.JumpPad, 9f, 11f, 2f, Vector2.up, 24f, 0.4f),

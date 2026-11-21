@@ -15,10 +15,10 @@ namespace Airerage.Editor.Stages
         private const string MeshRoot = "Assets/_Project/Meshes/Stages";
 
         /// <summary>
-        /// 回転体。profile は下から上への (半径, 高さ) の並び。segments は周りの分割の数。上下の端の半径が 0 でなければ蓋をする。
-        /// UV は u が周り、v が輪郭に沿った長さの割合。
+        /// 回転体。profile は下から上への (半径, 高さ) の並び。segments は周りの分割の数。上下の端の半径が 0 でなければ蓋をする
+        /// （caps が false なら蓋をしない。輪の金具・筒の口など、真ん中が抜けている物）。UV は u が周り、v が輪郭に沿った長さの割合。
         /// </summary>
-        public static Mesh Lathe(string stage, string name, Vector2[] profile, int segments)
+        public static Mesh Lathe(string stage, string name, Vector2[] profile, int segments, bool caps = true)
         {
             var vertices = new List<Vector3>();
             var normals = new List<Vector3>();
@@ -65,8 +65,11 @@ namespace Airerage.Editor.Stages
                     triangles.Add(p + 3);
                 }
             }
-            Cap(vertices, normals, uvs, triangles, profile[0], segments, false);
-            Cap(vertices, normals, uvs, triangles, profile[profile.Length - 1], segments, true);
+            if (caps)
+            {
+                Cap(vertices, normals, uvs, triangles, profile[0], segments, false);
+                Cap(vertices, normals, uvs, triangles, profile[profile.Length - 1], segments, true);
+            }
             return Save(stage, name, vertices, normals, uvs, triangles);
         }
 
@@ -230,6 +233,22 @@ namespace Airerage.Editor.Stages
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = material;
             return go;
+        }
+
+        /// <summary>
+        /// 光の板（XY の面の 1×1。表は -Z、カメラ向き）。頂点の色は白（頂点の色を掛けるパーティクル用のシェーダー〈Airerage/Wisp など〉を、
+        /// 粒でない板に使う。Unity の Quad には頂点の色がない）。
+        /// </summary>
+        public static Mesh GlowCard(string stage, string name)
+        {
+            var vertices = new List<Vector3> { new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f), new Vector3(0.5f, 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f) };
+            var normals = new List<Vector3> { Vector3.back, Vector3.back, Vector3.back, Vector3.back };
+            var uvs = new List<Vector2> { new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f) };
+            var triangles = new List<int> { 0, 3, 2, 0, 2, 1 };
+            Mesh mesh = Save(stage, name, vertices, normals, uvs, triangles);
+            mesh.SetColors(new List<Color> { Color.white, Color.white, Color.white, Color.white });
+            EditorUtility.SetDirty(mesh);
+            return mesh;
         }
 
         private static Mesh Save(string stage, string name, List<Vector3> vertices, List<Vector3> normals, List<Vector2> uvs, List<int> triangles)
