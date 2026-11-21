@@ -2161,6 +2161,12 @@ C スコープ・D フックの影）を出し、ユーザーが選んだ組み�
     PlayMode の `SpaceStation_EdgeWormholes_Wrap_CoilsFire_AndTheCabinDrifts`（端の口で反対側へ移り、両方の口に波紋／コイルで 17 m/s
     以上に加速し 3 回以上通電／宇宙船の中を通ると漂う物が押される）。
   - 撮影は `GimmickFxSnapshotTests.CaptureSpaceStationGimmicks`（`Logs/Snapshots/Space_*`）。
+  - EditMode と PlayMode のテストは全部通った（2026-11-21）。
+- **ついでに直した不具合**:
+  - ステージを作るとき、主の光（太陽・月）を `FindFirstObjectByType<Light>()` で探していたので、船内の照明（点の光）を取り違えて
+    主の光の設定を上書きしていた（`StageSceneBuilder.MainLight` で平行光源だけから探すようにした）。
+  - PlayMode の `Lab_LaserBeams_RunOnlyBetweenTheEmitters` が、4 倍速で待つ間に重いフレーム 1 つで 1.2 秒の効いている間を
+    飛び越えて失敗することがあった（効き始める少し前まで速め、そこからは等速で待つようにした）。
 - **次に作るギミック**: キッチンのドーナツの輪（加速リング。ドーナツで加速する現象が思いつかないので、効果ごと変える案を 62 章で聞く）、
   ジャンプ台・発射台・スピードレーン（汎用。ステージごとに合う物へ）。
 - **出典**: https://arxiv.org/abs/1502.03809 、https://www.dneg.com/interstellar-wormhole/ 、https://godotshaders.com/shader/black-hole/ 、

@@ -203,15 +203,17 @@ namespace Airerage.PlayMode.Tests
             yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
             StageZoneView view = UnityEngine.Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.None).Single(v => v.name == "LaserGrid");
             StageZone zone = view.GetComponent<StageZoneAuthoring>().ToZone();
+            // 速めるのは効き始める少し前まで（4 倍だと重いフレーム 1 つで 1.2 秒の効いている間を飛び越えることがある）。
             Time.timeScale = 4f;
             try
             {
-                yield return WaitFor(() => view.ShowsActive && view.ActiveElapsedTicks >= 0, 30f, "レーザーの網が効き始めない");
+                yield return WaitFor(() => !view.ShowsActive && view.TicksUntilActive > 0 && view.TicksUntilActive < 90, 30f, "レーザーの網が効き始める前にならない");
             }
             finally
             {
                 Time.timeScale = 1f;
             }
+            yield return WaitFor(() => view.ShowsActive && view.ActiveElapsedTicks >= 0 && view.ActiveElapsedTicks < 40, 5f, "レーザーの網が効き始めない");
             yield return null;
             LineRenderer[] beams = view.GetComponentsInChildren<LineRenderer>().Where(l => l.name.StartsWith("Beam") && l.enabled).ToArray();
             Assert.That(beams.Length, Is.EqualTo(3), "効いている間の光線が 3 本ない");
