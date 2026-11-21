@@ -26,7 +26,7 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private Transform _rig;
 
         /// <summary>自分の重さのたるみ（m）、ばねの強さと減衰。</summary>
-        public const float RestSag = 0.1f;
+        public const float RestSag = 0.28f;
         public const float Stiffness = 150f;
         public const float Damping = 7f;
 

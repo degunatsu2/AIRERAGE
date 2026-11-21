@@ -1438,13 +1438,14 @@ namespace Airerage.Editor.Stages
             float side = zone.Direction.x <= 0f ? 1f : -1f;
             frame.localScale = new Vector3(side, 1f, 1f);
             float floor = -zone.Size.y * 0.5f;
-            Material wood = decor.Lit("CatapultWood", new Color(0.32f, 0.21f, 0.13f));
-            Material woodDark = decor.Lit("CatapultWoodDark", new Color(0.2f, 0.13f, 0.09f));
-            Material iron = decor.Lit("CatapultIron", new Color(0.12f, 0.12f, 0.13f));
+            // 夜の霧の中でも形が読めるように、明るめの木と鉄（2026-11-21 の撮影で暗く沈んでいた）。
+            Material wood = decor.Lit("CatapultWood", new Color(0.62f, 0.42f, 0.25f));
+            Material woodDark = decor.Lit("CatapultWoodDark", new Color(0.42f, 0.28f, 0.17f));
+            Material iron = decor.Lit("CatapultIron", new Color(0.32f, 0.32f, 0.35f));
             iron.SetFloat("_Metallic", 0.7f);
             iron.SetFloat("_Smoothness", 0.45f);
-            Material rope = decor.Lit("CatapultRope", new Color(0.5f, 0.42f, 0.3f));
-            Material pad = decor.Lit("CatapultPad", new Color(0.3f, 0.2f, 0.26f));
+            Material rope = decor.Lit("CatapultRope", new Color(0.72f, 0.62f, 0.44f));
+            Material pad = decor.Lit("CatapultPad", new Color(0.5f, 0.3f, 0.42f));
             const float Depth = 0.95f;
             var pivot = new Vector3(-2.25f, floor + 0.85f, 0f);
             var toBucket = new Vector2(2.25f, -0.7f);
@@ -1513,8 +1514,8 @@ namespace Airerage.Editor.Stages
             thrown.SetParent(frame, false);
             foreach (Transform holder in new[] { payload, thrown })
             {
-                GameObject pumpkin = ThirdPartyProps.Place(decor, ThirdPartyProps.Halloween, "pumpkin_orange_small", holder.position, 1.15f, 30f,
-                    new Color(0.85f, 0.8f, 0.8f), decor.Folder);
+                GameObject pumpkin = ThirdPartyProps.Place(decor, ThirdPartyProps.Halloween, "pumpkin_orange_small", holder.position, 1.3f, 30f,
+                    Color.white, decor.Folder);
                 if (pumpkin != null)
                 {
                     pumpkin.transform.SetParent(holder, true);
@@ -1537,7 +1538,7 @@ namespace Airerage.Editor.Stages
             }
             var ropeLine = new GameObject("WinchRope").AddComponent<LineRenderer>();
             ropeLine.transform.SetParent(frame, false);
-            ropeLine.sharedMaterial = decor.Unlit("CatapultRopeLine", new Color(0.36f, 0.3f, 0.22f));
+            ropeLine.sharedMaterial = decor.Unlit("CatapultRopeLine", new Color(0.55f, 0.46f, 0.32f));
             ropeLine.useWorldSpace = true;
             ropeLine.positionCount = 8;
             ropeLine.startWidth = ropeLine.endWidth = 0.05f;
