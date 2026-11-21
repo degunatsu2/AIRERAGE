@@ -188,6 +188,52 @@ namespace Airerage.PlayMode.Tests
             }
         }
 
+        /// <summary>
+        /// 研究所のレーザーの網（2026-11-21 の指摘）: 効いている間の光線は、両端の発光装置の間（判定の範囲）だけに出る
+        /// （柱の幅への引き伸ばしで、ステージの端から端まで伸びていた）。光線は細いまま。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Lab_LaserBeams_RunOnlyBetweenTheEmitters()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = UnityEngine.Object.FindFirstObjectByType<GameFlow>();
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Menu && !flow.IsLoading, 10f, "メニューにならない");
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Lab"));
+            yield return WaitFor(() => flow.Current == GameFlow.FlowScreen.Training && !flow.IsLoading, 10f, "トレーニングにならない");
+            StageZoneView view = UnityEngine.Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.None).Single(v => v.name == "LaserGrid");
+            StageZone zone = view.GetComponent<StageZoneAuthoring>().ToZone();
+            Time.timeScale = 4f;
+            try
+            {
+                yield return WaitFor(() => view.ShowsActive && view.ActiveElapsedTicks >= 0, 30f, "レーザーの網が効き始めない");
+            }
+            finally
+            {
+                Time.timeScale = 1f;
+            }
+            yield return null;
+            LineRenderer[] beams = view.GetComponentsInChildren<LineRenderer>().Where(l => l.name.StartsWith("Beam") && l.enabled).ToArray();
+            Assert.That(beams.Length, Is.EqualTo(3), "効いている間の光線が 3 本ない");
+            Camera camera = Camera.main != null ? Camera.main : UnityEngine.Object.FindFirstObjectByType<Camera>();
+            Assert.That(camera, Is.Not.Null, "カメラがない");
+            foreach (LineRenderer beam in beams)
+            {
+                Vector3 from = beam.transform.TransformPoint(beam.GetPosition(0));
+                Vector3 to = beam.transform.TransformPoint(beam.GetPosition(1));
+                Assert.That(Mathf.Min(from.x, to.x), Is.EqualTo(zone.MinX).Within(0.05f), $"{beam.name} の左の端が発光装置の所にない（{from} → {to}）");
+                Assert.That(Mathf.Max(from.x, to.x), Is.EqualTo(zone.MaxX).Within(0.05f), $"{beam.name} の右の端が発光装置の所にない（{from} → {to}）");
+                // 描かれる形（線の網をワールドの座標で作る。画面を描かないバッチモードでは Renderer.bounds が当てにならない）。
+                var mesh = new Mesh();
+                beam.BakeMesh(mesh, camera, true);
+                Bounds bounds = mesh.bounds;
+                UnityEngine.Object.Destroy(mesh);
+                Assert.That(bounds.min.x, Is.GreaterThan(zone.MinX - 0.5f), $"{beam.name} の描かれる所が範囲の左へはみ出る（{bounds}）");
+                Assert.That(bounds.max.x, Is.LessThan(zone.MaxX + 0.5f), $"{beam.name} の描かれる所が範囲の右へはみ出る（{bounds}）");
+                Assert.That(bounds.size.y, Is.LessThan(0.5f), $"{beam.name} が太くなっている（{bounds}）");
+            }
+        }
+
         [UnityTest]
         public IEnumerator SpaceStation_EdgeGate_WrapsThePlayerToTheOtherSide()
         {

@@ -1027,6 +1027,8 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_Intensity", 4f);
                 m.SetFloat("_Core", 1.6f);
             }, decor.Folder);
+            // 効いている間の見た目は、StageZoneView が柱の幅に横へ引き伸ばす（PlaceOnColumn）ので、光線は幅 1（−0.5〜0.5）で作る
+            // （範囲の幅で作ると、さらに幅の倍だけ伸びてステージの端から端まで出ていた。2026-11-21 の指摘）。
             var beams = new GameObject("LaserBeams");
             beams.transform.SetParent(parent, false);
             var lines = new LineRenderer[3];
@@ -1034,7 +1036,7 @@ namespace Airerage.Editor.Stages
             for (int i = 0; i < lines.Length; i++)
             {
                 float y = (i - 1) * half.y * 0.6f;
-                lines[i] = Line($"Beam{i + 1}", beams.transform, beam, new Vector3(-half.x, y, -0.2f), new Vector3(half.x, y, -0.2f), red, 0.08f);
+                lines[i] = Line($"Beam{i + 1}", beams.transform, beam, new Vector3(-0.5f, y, -0.2f), new Vector3(0.5f, y, -0.2f), red, 0.08f);
             }
             var rig = new GameObject("LaserRig").transform;
             rig.SetParent(root, false);
