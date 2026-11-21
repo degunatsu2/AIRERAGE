@@ -521,6 +521,58 @@ namespace Airerage.Core.Tests.Simulation
             Assert.That(state.Grounded, Is.False);
         }
 
+        // 丸いワープゲート（ワームホールの口。StageZone.Round。2026-11-21）: 範囲の箱に内接する円の中だけが当たる。
+        private static StageZone RoundGate()
+        {
+            return new StageZone(StageZoneKind.Warp, 0f, 0f, 6f, 6f, Vector2.Zero, 1f, 0f, default, new Vector2(-20f, 5f), round: true);
+        }
+
+        [Test]
+        public void RoundGate_OverlapsOnlyTheCircle_NotTheCornersOfItsBox()
+        {
+            StageZone gate = RoundGate();
+            var half = new Vector2(0.4f, 0.9f);
+            Assert.That(gate.Round, Is.True);
+            Assert.That(gate.Contains(new Vector3(3f, 3f, 0f)), Is.True);
+            Assert.That(gate.Contains(new Vector3(5.8f, 5.8f, 0f)), Is.False, "箱の隅（円の外）を中とみなした");
+            Assert.That(gate.Overlaps(new Vector3(6.2f, 6.6f, 0f), half), Is.False, "箱の隅だけに触れた人に当たった");
+            Assert.That(gate.Overlaps(new Vector3(3f, 6.6f, 0f), half), Is.True, "円の上の端に触れた人に当たらない");
+            Assert.That(gate.Overlaps(new Vector3(6.3f, 3f, 0f), half), Is.True, "円の右の端に触れた人に当たらない");
+            // 四角いゲートなら箱の隅でも当たる。
+            var square = new StageZone(StageZoneKind.Warp, 0f, 0f, 6f, 6f, Vector2.Zero, 1f, 0f, default, new Vector2(-20f, 5f));
+            Assert.That(square.Overlaps(new Vector3(6.2f, 6.6f, 0f), half), Is.True);
+        }
+
+        [Test]
+        public void RoundGate_Sweep_CatchesAPassThroughTheCircle_ButNotAPastTheCorner()
+        {
+            StageZone gate = RoundGate();
+            var half = new Vector2(0.4f, 0.9f);
+            // 真ん中を 1 ティックで横切る（速くても見つける）。
+            Assert.That(gate.Swept(new Vector3(-2f, 3f, 0f), new Vector3(8f, 3f, 0f), half), Is.True);
+            // 箱の右上の隅をかすめる斜めの通り道（四角なら当たるが、円には届かない）。
+            var from = new Vector3(7.5f, 4.5f, 0f);
+            var to = new Vector3(4.5f, 7.5f, 0f);
+            Assert.That(gate.Swept(from, to, half), Is.False, "円の外の隅を通っただけで当たった");
+            var square = new StageZone(StageZoneKind.Warp, 0f, 0f, 6f, 6f, Vector2.Zero, 1f, 0f, default, new Vector2(-20f, 5f));
+            Assert.That(square.Swept(from, to, half), Is.True);
+            // 同じ向きでも、円にかかる所を通れば当たる。
+            Assert.That(gate.Swept(new Vector3(6.5f, 3.5f, 0f), new Vector3(3.5f, 6.5f, 0f), half), Is.True);
+        }
+
+        [Test]
+        public void Round_IsOnlyForWarpGates_AndKeptWhenMoved()
+        {
+            var pad = new StageZone(StageZoneKind.JumpPad, 0f, 0f, 2f, 2f, Vector2.UnitY, 20f, 0f, default, Vector2.Zero, round: true);
+            Assert.That(pad.Round, Is.False, "ワープゲートでないギミックが丸くなった");
+            var moving = new StageZone(StageZoneKind.Warp, 0f, 0f, 4f, 4f, Vector2.Zero, 1f, 0f, default, new Vector2(-20f, 5f),
+                travel: new Vector2(10f, 0f), travelPeriod: 600, round: true);
+            StageZone moved = moving.At(150);
+            Assert.That(moved.Round, Is.True, "動いたゲートが四角に戻った");
+            Assert.That(moved.Equals(moving), Is.False);
+            Assert.That(RoundGate().Equals(RoundGate()), Is.True);
+        }
+
         [Test]
         public void Warp_DoesNotMove_ACharacterAlreadyInsideTheGate_OrJustWarped()
         {

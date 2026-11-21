@@ -191,6 +191,75 @@ namespace Airerage.PlayMode.Tests
             Shoot(camera, focus + new Vector3(0f, -2f, 0f), "Net_4Returning");
         }
 
+        /// <summary>
+        /// 宇宙ステーション（2026-11-21 の第 5 弾）: 端のワームホールの口、救出のゲートと出口の口、くぐった直後の波紋、電磁コイルの加速器を
+        /// 通るところ、宇宙船の中の漂う物と水の玉を撮る（Logs/Snapshots/Space_*）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureSpaceStationGimmicks()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            Directory.CreateDirectory(Folder);
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_SpaceStation"));
+            while (flow.Current != GameFlow.FlowScreen.Training || flow.IsLoading || SceneManager.GetActiveScene().name != "Stage_SpaceStation")
+            {
+                yield return null;
+            }
+            yield return Wait(1.5f);
+            Camera camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            StageZoneView View(string name)
+            {
+                return Object.FindObjectsByType<StageZoneView>(FindObjectsSortMode.None).Single(v => v.name == name);
+            }
+            Shoot(camera, new Vector3(-54f, 4f, -18f), "Space_1Wormhole");
+            Shoot(camera, new Vector3(-55f, 4f, -9f), "Space_1WormholeClose");
+            StageZoneView rescue = View("RescueGate");
+            Shoot(camera, new Vector3(rescue.ShownCenter.x, rescue.ShownCenter.y + 1f, -14f), "Space_2Rescue");
+            Shoot(camera, new Vector3(0f, 29f, -12f), "Space_3Exit");
+            // 西の口へ飛び込み、東の口から出たところ。
+            Airerage.Core.Simulation.CharacterState state = runner.PlayerState;
+            state.Position = new System.Numerics.Vector3(-51f, 4f, 0f);
+            state.Velocity = new System.Numerics.Vector3(-14f, 2f, 0f);
+            runner.SetPlayerState(state);
+            float limit = Time.realtimeSinceStartup + 3f;
+            while (runner.PlayerState.Combat.WarpCount == 0 && Time.realtimeSinceStartup < limit)
+            {
+                yield return null;
+            }
+            yield return Wait(0.12f);
+            Shoot(camera, new Vector3(54f, 4f, -16f), "Space_4Warped");
+            // 電磁コイルの加速器を通るところ。
+            StageZoneView coil = View("CoreRing");
+            Shoot(camera, new Vector3(coil.ShownCenter.x, coil.ShownCenter.y, -9f), "Space_5Coil");
+            state = runner.PlayerState;
+            state.Position = new System.Numerics.Vector3(coil.ShownCenter.x - 4.4f, coil.ShownCenter.y, 0f);
+            state.Velocity = new System.Numerics.Vector3(10f, 1f, 0f);
+            runner.SetPlayerState(state);
+            limit = Time.realtimeSinceStartup + 2f;
+            while (runner.PlayerState.Position.X < coil.ShownCenter.x - 0.6f && Time.realtimeSinceStartup < limit)
+            {
+                yield return null;
+            }
+            Shoot(camera, new Vector3(coil.ShownCenter.x, coil.ShownCenter.y, -9f), "Space_6CoilFiring");
+            // 宇宙船の中（漂う物と水の玉）と、人が通って押されたところ。
+            StageZoneView cabin = View("ZeroGravityWest");
+            Shoot(camera, new Vector3(cabin.ShownCenter.x, cabin.ShownCenter.y, -13f), "Space_7Cabin");
+            Shoot(camera, new Vector3(cabin.ShownCenter.x - 3f, cabin.ShownCenter.y, -5f), "Space_7CabinClose");
+            state = runner.PlayerState;
+            state.Position = new System.Numerics.Vector3(cabin.ShownCenter.x - 6.5f, cabin.ShownCenter.y, 0f);
+            state.Velocity = new System.Numerics.Vector3(8f, 0f, 0f);
+            runner.SetPlayerState(state);
+            yield return Wait(1.2f);
+            Shoot(camera, new Vector3(cabin.ShownCenter.x, cabin.ShownCenter.y, -13f), "Space_8CabinPushed");
+        }
+
         private sealed class HoldWire : ITickInputSource
         {
             public bool TryGetNext(out Airerage.Core.Input.PlayerInput input)

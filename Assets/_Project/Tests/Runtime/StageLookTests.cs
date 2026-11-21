@@ -1096,6 +1096,65 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
+        public void FifthGimmickBatch_SpaceStation_HasItsLooks_AndMatchesTheHitboxes()
+        {
+            // 2026-11-21 の方針の第 5 弾（宇宙ステーション）。
+            Scene space = Open("Assets/_Project/Scenes/Stages/Stage_SpaceStation.unity");
+            // ワープゲート: 球のワームホールの口（重力レンズの板）。判定も円。端の口は対で、救出のゲートの出口に小さな口。前の平たい球はない。
+            WormholeView[] mouths = InScene<WormholeView>(space).ToArray();
+            Assert.That(mouths.Length, Is.EqualTo(3), "ワームホールの口");
+            foreach (WormholeView mouth in mouths)
+            {
+                StageZone zone = mouth.GetComponentInParent<StageZoneAuthoring>().ToZone();
+                Assert.That(zone.Round, Is.True, $"{zone}: 判定が丸くない");
+                Assert.That(zone.MaxX - zone.MinX, Is.EqualTo(zone.MaxY - zone.MinY).Within(0.001f), "口の範囲が正方形でない");
+                Assert.That(mouth.Radius, Is.EqualTo((zone.MaxX - zone.MinX) * 0.5f).Within(0.001f), "見た目の口の半径が判定と違う");
+                Assert.That(mouth.Mouth.sharedMaterial.shader.name, Is.EqualTo("Airerage/Wormhole"));
+                Assert.That(mouth.Mouth.transform.localPosition.z, Is.GreaterThan(0.3f), "口の板がキャラクターの手前にある");
+                Assert.That(mouth.Other, Is.Not.Null, "口の中に映す向こう側がない");
+            }
+            WormholeView rescue = mouths.Single(m => m.GetComponentInParent<StageZoneView>().name == "RescueGate");
+            Vector2 target = rescue.GetComponentInParent<StageZoneAuthoring>().Target;
+            Assert.That(rescue.ExitMouth, Is.Not.Null, "救出のゲートの出口に口がない");
+            Assert.That(Vector2.Distance(rescue.ExitMouth.transform.position, target), Is.LessThan(0.01f), "出口の口が出口にない");
+            Assert.That(InScene<Transform>(space).Any(t => t.name == "Gate" || t.name == "Exit"), Is.False, "前の平たい球のゲートが残っている");
+            // 無重力: 宇宙船の中の漂う物と水の玉（Airerage/WaterDrop）と手すり。前の紫の板はない。漂う物は遊ぶ面より奥。
+            MicrogravityView[] cabins = InScene<MicrogravityView>(space).ToArray();
+            Assert.That(cabins.Length, Is.EqualTo(2), "宇宙船の中");
+            foreach (MicrogravityView cabin in cabins)
+            {
+                Renderer[] drops = cabin.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "WaterDrop").ToArray();
+                Assert.That(drops.Length, Is.EqualTo(3), "水の玉");
+                Assert.That(drops.All(d => d.sharedMaterial.shader.name == "Airerage/WaterDrop"), Is.True, "水の玉の材質");
+                Assert.That(cabin.GetComponentsInChildren<Transform>(true).Count(t => t.name == "Handrail"), Is.EqualTo(2), "床と天井の手すり");
+                foreach (Transform child in cabin.transform)
+                {
+                    if (child.name != "Handrail" && child.name != "HandrailPost" && child.name != "CabinLight")
+                    {
+                        Assert.That(child.localPosition.z, Is.GreaterThan(0.5f), $"{child.name} が遊ぶ面の手前に漂う（キャラクターを隠す）");
+                    }
+                }
+            }
+            Assert.That(InScene<Transform>(space).Any(t => t.name == "Field" || t.name == "FieldFront"), Is.False, "前の紫の板が残っている");
+            // 加速リング: 電磁コイルの加速器（コイル 3 つの光る輪。内径が範囲の高さ）。前の金属の輪の枠はない。
+            CoilAcceleratorView[] coils = InScene<CoilAcceleratorView>(space).ToArray();
+            Assert.That(coils.Length, Is.EqualTo(3), "電磁コイルの加速器");
+            foreach (CoilAcceleratorView coil in coils)
+            {
+                StageZone zone = coil.GetComponentInParent<StageZoneAuthoring>().ToZone();
+                Renderer[] liners = coil.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Liner").ToArray();
+                Assert.That(liners.Length, Is.EqualTo(3), "コイルの光る輪");
+                Assert.That(liners.All(l => l.sharedMaterial.shader.name == "Airerage/Emissive"), Is.True);
+                Assert.That(coil.GetComponentsInChildren<ParticleSystem>(true).Length, Is.EqualTo(3), "コイルの火花");
+                Assert.That(coil.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Piece"), Is.False, "前の輪の枠が残っている");
+                // コイルの並ぶ長さが範囲の幅に収まる。
+                Transform first = coil.transform.Find("Coil1");
+                Transform last = coil.transform.Find("Coil3");
+                Assert.That(Vector3.Distance(first.position, last.position), Is.LessThan(zone.MaxX - zone.MinX), "コイルが範囲からはみ出す");
+            }
+        }
+
+        [Test]
         public void DefaultPostProcessing_IsNeutral_SoStagesWithoutAVolumeLookTheSame()
         {
             // URP の設定のアセットの既定の Volume（テンプレートの Bloom・モーションブラーなど）は外した。ステージの Volume だけが効く。

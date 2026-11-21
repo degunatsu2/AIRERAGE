@@ -93,6 +93,24 @@ namespace Airerage.Runtime.Presentation
 
             // 14（鬼火の輪）と 15（荷役の網）は、ステージの仕掛け（StageTrapKind.WispRing）と動く足場（StagePlatformKind.Hoist）に
             // 作り直した（2026-11-21 の要望）。番号は使わない。
+
+            /// <summary>
+            /// ワープゲートをワームホールの口にする（球に見える口の周りで後ろの景色が重力レンズでゆがみ、口の中に向こう側の景色が映る。
+            /// 線の輪は出さない。Airerage/Wormhole・WormholeView。2026-11-21 の方針。判定も丸い〈StageZone.Round〉）。
+            /// </summary>
+            Wormhole = 16,
+
+            /// <summary>
+            /// 無重力を宇宙船の中の無重力にする（漂う工具・袋・水の玉と手すり。枠は出さず、光を受けて漂う塵だけ。MicrogravityView。
+            /// 2026-11-21 の方針）。
+            /// </summary>
+            Microgravity = 17,
+
+            /// <summary>
+            /// 加速リングを電磁コイルの加速器にする（コイル 3 つが通る人の位置に合わせて順に光る。線の輪と矢印は出さない。
+            /// CoilAcceleratorView。2026-11-21 の方針）。
+            /// </summary>
+            Coil = 18,
         }
 
         private const int RingSegments = 40;
@@ -290,6 +308,18 @@ namespace Airerage.Runtime.Presentation
                     break;
                 case StageZoneKind.Gust when !_windLines:
                     break;
+                case StageZoneKind.BoostRing when _look == ZoneLook.Coil:
+                case StageZoneKind.Warp when _look == ZoneLook.Wormhole:
+                    // 見た目の物体（CoilAcceleratorView・WormholeView）で見せる。線は作らない。
+                    break;
+                case StageZoneKind.LowGravity when _look == ZoneLook.Microgravity:
+                    // 枠は出さず、漂う塵だけ（漂う物は MicrogravityView）。
+                    int dust = Mathf.Clamp(Mathf.RoundToInt(_zone.Size.x * _zone.Size.y / 8f), 8, 32);
+                    for (int i = 0; i < dust; i++)
+                    {
+                        _marks.Add(CreateLine($"Dust{i + 1}", 2, 0.05f));
+                    }
+                    break;
                 case StageZoneKind.BoostRing:
                     _ring = CreateLine("Ring", RingSegments, 0.16f);
                     _ring.loop = true;
@@ -485,7 +515,10 @@ namespace Airerage.Runtime.Presentation
                     RenderUpdraft(center, half, time);
                     break;
                 case StageZoneKind.BoostRing:
-                    RenderRing(center, half, time);
+                    if (_look != ZoneLook.Coil)
+                    {
+                        RenderRing(center, half, time);
+                    }
                     break;
                 case StageZoneKind.SpeedLane:
                     RenderLane(center, half, time);
@@ -503,10 +536,20 @@ namespace Airerage.Runtime.Presentation
                     RenderIce(center, half, time);
                     break;
                 case StageZoneKind.LowGravity:
-                    RenderLowGravity(center, half, time);
+                    if (_look == ZoneLook.Microgravity)
+                    {
+                        RenderCabinDust(center, half);
+                    }
+                    else
+                    {
+                        RenderLowGravity(center, half, time);
+                    }
                     break;
                 case StageZoneKind.Warp:
-                    RenderWarp(center, half, time);
+                    if (_look != ZoneLook.Wormhole)
+                    {
+                        RenderWarp(center, half, time);
+                    }
                     break;
                 case StageZoneKind.Hazard:
                     RenderHazard(center, half, time, tick);
@@ -1163,6 +1206,24 @@ namespace Airerage.Runtime.Presentation
                 _marks[i].SetPosition(0, new Vector3(x, y, 0f));
                 _marks[i].SetPosition(1, new Vector3(x, y + 0.14f, 0f));
                 SetColor(_marks[i], Fade(phase));
+            }
+        }
+
+        // 宇宙船の中で光を受けて漂う塵（重さがないので昇りも落ちもせず、換気の流れでゆっくり揺れる。2026-11-21 の方針）。
+        private void RenderCabinDust(Vector3 center, Vector2 half)
+        {
+            float time = Time.time;
+            for (int i = 0; i < _marks.Count; i++)
+            {
+                float u = Mathf.Repeat(i * 0.618f, 1f);
+                float v = Mathf.Repeat(i * 0.377f + 0.21f, 1f);
+                float x = center.x + (u * 2f - 1f) * half.x * 0.92f + Mathf.Sin(time * 0.21f + i * 1.7f) * 0.6f;
+                float y = center.y + (v * 2f - 1f) * half.y * 0.85f + Mathf.Sin(time * 0.17f + i * 2.3f) * 0.4f;
+                var p = new Vector3(x, y, 0.4f);
+                _marks[i].SetPosition(0, p);
+                _marks[i].SetPosition(1, p + new Vector3(0.05f, 0.02f, 0f));
+                float twinkle = 0.5f + 0.5f * Mathf.Sin(time * (0.8f + u) + i);
+                SetColor(_marks[i], 0.12f + 0.18f * twinkle);
             }
         }
 

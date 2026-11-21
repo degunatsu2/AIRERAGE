@@ -374,7 +374,7 @@ namespace Airerage.PlayMode.Tests
         }
 
         [UnityTest]
-        public IEnumerator SpaceStation_EdgeGate_WrapsThePlayerToTheOtherSide()
+        public IEnumerator SpaceStation_EdgeWormholes_Wrap_CoilsFire_AndTheCabinDrifts()
         {
             SceneManager.LoadScene("App");
             yield return null;
@@ -398,6 +398,44 @@ namespace Airerage.PlayMode.Tests
             Assert.That(after.Position.X, Is.GreaterThan(35f), "反対の端へ移らない");
             Assert.That(after.Velocity.X, Is.LessThan(0f), "向きを保たない");
             Assert.That(after.Combat.Falls, Is.EqualTo(0));
+
+            // ワームホールの口（2026-11-21 の第 5 弾）: 端の口は対になっていて、くぐると入った口と出た口に波紋が出る。
+            WormholeView[] mouths = UnityEngine.Object.FindObjectsByType<WormholeView>(FindObjectsSortMode.None);
+            WormholeView west = mouths.Single(m => m.GetComponentInParent<StageZoneView>().name == "WarpGateWest");
+            WormholeView east = mouths.Single(m => m.GetComponentInParent<StageZoneView>().name == "WarpGateEast");
+            WormholeView rescue = mouths.Single(m => m.GetComponentInParent<StageZoneView>().name == "RescueGate");
+            Assert.That(west.Other, Is.EqualTo(east.Mouth.transform), "西の口の中に東の口の向こうが映らない");
+            Assert.That(east.Other, Is.EqualTo(west.Mouth.transform), "東の口の中に西の口の向こうが映らない");
+            Assert.That(rescue.ExitMouth, Is.Not.Null, "救出のゲートの出口に口がない");
+            yield return WaitFor(() => west.Pulses > 0 && east.Pulses > 0, 1f, $"くぐった口に波紋が出ない（西 {west.Pulses}・東 {east.Pulses}）");
+
+            // 電磁コイルの加速器: 通ると加速し、手前のコイルから順に通電して光る。
+            yield return WaitSeconds(0.6f);
+            CoilAcceleratorView coil = UnityEngine.Object.FindObjectsByType<CoilAcceleratorView>(FindObjectsSortMode.None)
+                .Single(c => c.GetComponentInParent<StageZoneView>().name == "CoreRing");
+            StageZone ring = coil.GetComponentInParent<StageZoneAuthoring>().ToZone();
+            CharacterState runnerIn = runner.PlayerState;
+            runnerIn.Position = new System.Numerics.Vector3(ring.MinX - 2.5f, ring.Center.Y, 0f);
+            runnerIn.Velocity = new System.Numerics.Vector3(10f, 1f, 0f);
+            runner.SetPlayerState(runnerIn);
+            yield return WaitFor(() => runner.PlayerState.Position.X > ring.MaxX + 0.5f, 2f, "コイルを通り抜けない");
+            Assert.That(runner.PlayerState.Velocity.X, Is.GreaterThanOrEqualTo(17f), "コイルで加速しない");
+            Assert.That(coil.Firings, Is.GreaterThanOrEqualTo(3), $"コイルが順に通電しない（{coil.Firings} 回）");
+
+            // 宇宙船の中: 人が通ると、漂う物が押される。
+            MicrogravityView cabin = UnityEngine.Object.FindObjectsByType<MicrogravityView>(FindObjectsSortMode.None)
+                .Single(c => c.GetComponentInParent<StageZoneView>().name == "ZeroGravityWest");
+            Assert.That(cabin.Count, Is.GreaterThanOrEqualTo(8), "漂う物が少ない");
+            StageZone zeroG = cabin.GetComponentInParent<StageZoneAuthoring>().ToZone();
+            for (int pass = 0; pass < 3 && cabin.Pushes == 0; pass++)
+            {
+                CharacterState drifter = runner.PlayerState;
+                drifter.Position = new System.Numerics.Vector3(zeroG.MinX + 0.8f, zeroG.MinY + 1.6f + pass * 2f, 0f);
+                drifter.Velocity = new System.Numerics.Vector3(9f, 0f, 0f);
+                runner.SetPlayerState(drifter);
+                yield return WaitSeconds(1.4f);
+            }
+            Assert.That(cabin.Pushes, Is.GreaterThan(0), "宇宙船の中を通っても、漂う物が押されない");
         }
 
         private static IEnumerator WaitFor(Func<bool> condition, float seconds, string message)

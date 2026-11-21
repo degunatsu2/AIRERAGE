@@ -201,6 +201,12 @@ namespace Airerage.Core.Simulation
         /// </summary>
         public readonly int OwnerTeam;
 
+        /// <summary>
+        /// 範囲が丸いか（範囲の箱に内接する円・楕円の中だけが当たる。ワープゲートだけ）。宇宙ステーションのワームホールの口は球に見えるので、
+        /// 判定も円にする（2026-11-21 の方針: 判定を見た目に合わせる）。Overlaps・Swept・Contains が使う。
+        /// </summary>
+        public readonly bool Round;
+
         public int Period => Timing.Period;
         public int ActiveTicks => Timing.ActiveTicks;
         public int PhaseTicks => Timing.PhaseTicks;
@@ -230,9 +236,10 @@ namespace Airerage.Core.Simulation
         /// <param name="capHeight">危険の柱の上の丸みの高さ（m。0 なら四角）。</param>
         /// <param name="fallLength">危険の柱が落ちてくる物のとき、その長さ（m。0 ならふつうの柱）。</param>
         /// <param name="electric">危険が電気を帯びているか（中のアンカーポイントにつないだワイヤーが電気を帯びる）。</param>
+        /// <param name="round">範囲が丸いか（箱に内接する円・楕円。ワープゲートだけ）。</param>
         public StageZone(StageZoneKind kind, float minX, float minY, float maxX, float maxY, Vector2 direction, float power, float limit,
             StageZoneTiming timing, Vector2 target, float width = 0f, Vector2 travel = default, int travelPeriod = 0, int travelDwell = 0,
-            float capHeight = 0f, float fallLength = 0f, bool electric = false)
+            float capHeight = 0f, float fallLength = 0f, bool electric = false, bool round = false)
         {
             if (!(minX < maxX) || !(minY < maxY))
             {
@@ -346,6 +353,7 @@ namespace Airerage.Core.Simulation
             FallLength = fallLength;
             Electric = electric;
             OwnerTeam = 0;
+            Round = round && kind == StageZoneKind.Warp;
         }
 
         // 検査を済ませた値から、範囲だけを動かしたものを作る（At）。
@@ -369,6 +377,7 @@ namespace Airerage.Core.Simulation
             FallLength = source.FallLength;
             Electric = source.Electric;
             OwnerTeam = source.OwnerTeam;
+            Round = source.Round;
         }
 
         // 検査を済ませた値から、置いた人のチームだけを変えたものを作る（WithOwnerTeam）。
@@ -392,6 +401,7 @@ namespace Airerage.Core.Simulation
             FallLength = source.FallLength;
             Electric = source.Electric;
             OwnerTeam = ownerTeam;
+            Round = source.Round;
         }
 
         /// <summary>置いた人のチーム team（0〜4）を持たせたもの。</summary>
@@ -648,14 +658,36 @@ namespace Airerage.Core.Simulation
         /// <summary>点 point が範囲の中か（辺の上も中とみなす）。</summary>
         public bool Contains(Vector3 point)
         {
-            return point.X >= MinX && point.X <= MaxX && point.Y >= MinY && point.Y <= MaxY;
+            if (!Round)
+            {
+                return point.X >= MinX && point.X <= MaxX && point.Y >= MinY && point.Y <= MaxY;
+            }
+            float x = (point.X - (MinX + MaxX) * 0.5f) / RadiusX;
+            float y = (point.Y - (MinY + MaxY) * 0.5f) / RadiusY;
+            return x * x + y * y <= 1f;
         }
+
+        // 丸い範囲の横と縦の半径。
+        private float RadiusX => (MaxX - MinX) * 0.5f;
+        private float RadiusY => (MaxY - MinY) * 0.5f;
 
         /// <summary>中心 position、半分の大きさ halfExtents の箱が範囲と重なるか（辺が触れているだけでも重なるとみなす）。</summary>
         public bool Overlaps(Vector3 position, Vector2 halfExtents)
         {
-            return position.X + halfExtents.X >= MinX && position.X - halfExtents.X <= MaxX
+            bool box = position.X + halfExtents.X >= MinX && position.X - halfExtents.X <= MaxX
                 && position.Y + halfExtents.Y >= MinY && position.Y - halfExtents.Y <= MaxY;
+            if (!box || !Round)
+            {
+                return box;
+            }
+            // 丸い範囲: 楕円が単位円になるように縮めると、箱は箱のまま。箱のいちばん近い点が単位円の中か。
+            float x = (position.X - (MinX + MaxX) * 0.5f) / RadiusX;
+            float y = (position.Y - (MinY + MaxY) * 0.5f) / RadiusY;
+            float hx = halfExtents.X / RadiusX;
+            float hy = halfExtents.Y / RadiusY;
+            float nearX = Math.Max(x - hx, Math.Min(0f, x + hx));
+            float nearY = Math.Max(y - hy, Math.Min(0f, y + hy));
+            return nearX * nearX + nearY * nearY <= 1f;
         }
 
         /// <summary>
@@ -666,8 +698,46 @@ namespace Airerage.Core.Simulation
         {
             float t0 = 0f;
             float t1 = 1f;
-            return Clip(from.X, to.X - from.X, MinX - halfExtents.X, MaxX + halfExtents.X, ref t0, ref t1)
+            bool box = Clip(from.X, to.X - from.X, MinX - halfExtents.X, MaxX + halfExtents.X, ref t0, ref t1)
                 && Clip(from.Y, to.Y - from.Y, MinY - halfExtents.Y, MaxY + halfExtents.Y, ref t0, ref t1);
+            if (!box || !Round)
+            {
+                return box;
+            }
+            // 丸い範囲: 楕円が単位円になるように縮め、箱の中心の通り道（線分）が「箱を半径 1 だけ丸く太らせた形」に入るかを調べる
+            // （箱を横と縦に 1 ずつ広げた 2 つの箱と、四隅の半径 1 の円）。
+            float cx = (MinX + MaxX) * 0.5f;
+            float cy = (MinY + MaxY) * 0.5f;
+            float ax = (from.X - cx) / RadiusX;
+            float ay = (from.Y - cy) / RadiusY;
+            float dx = (to.X - cx) / RadiusX - ax;
+            float dy = (to.Y - cy) / RadiusY - ay;
+            float hx = halfExtents.X / RadiusX;
+            float hy = halfExtents.Y / RadiusY;
+            if (SegmentInBox(ax, ay, dx, dy, hx + 1f, hy) || SegmentInBox(ax, ay, dx, dy, hx, hy + 1f))
+            {
+                return true;
+            }
+            return SegmentNear(ax, ay, dx, dy, hx, hy) || SegmentNear(ax, ay, dx, dy, -hx, hy) || SegmentNear(ax, ay, dx, dy, hx, -hy)
+                || SegmentNear(ax, ay, dx, dy, -hx, -hy);
+        }
+
+        // 点 (ax, ay) から (ax + dx, ay + dy) への線分が、原点を中心にした半分の大きさ (hx, hy) の箱に入るか。
+        private static bool SegmentInBox(float ax, float ay, float dx, float dy, float hx, float hy)
+        {
+            float t0 = 0f;
+            float t1 = 1f;
+            return Clip(ax, dx, -hx, hx, ref t0, ref t1) && Clip(ay, dy, -hy, hy, ref t0, ref t1);
+        }
+
+        // 線分が、点 (px, py) から距離 1 以内を通るか。
+        private static bool SegmentNear(float ax, float ay, float dx, float dy, float px, float py)
+        {
+            float length = dx * dx + dy * dy;
+            float t = length > 0f ? Math.Max(0f, Math.Min(1f, ((px - ax) * dx + (py - ay) * dy) / length)) : 0f;
+            float ex = ax + dx * t - px;
+            float ey = ay + dy * t - py;
+            return ex * ex + ey * ey <= 1f;
         }
 
         private static bool Clip(float start, float delta, float min, float max, ref float t0, ref float t1)
@@ -781,7 +851,11 @@ namespace Airerage.Core.Simulation
             {
                 c = FallLength.CompareTo(other.FallLength);
             }
-            return c != 0 ? c : Electric.CompareTo(other.Electric);
+            if (c == 0)
+            {
+                c = Electric.CompareTo(other.Electric);
+            }
+            return c != 0 ? c : Round.CompareTo(other.Round);
         }
 
         public bool Equals(StageZone other)
@@ -791,7 +865,7 @@ namespace Airerage.Core.Simulation
                 && Timing.Equals(other.Timing) && Target.Equals(other.Target) && Width.Equals(other.Width) && Travel.Equals(other.Travel)
                 && TravelPeriod == other.TravelPeriod && TravelDwell == other.TravelDwell && CapHeight.Equals(other.CapHeight)
                 && FallLength.Equals(other.FallLength) && Electric == other.Electric
-                && OwnerTeam == other.OwnerTeam;
+                && OwnerTeam == other.OwnerTeam && Round == other.Round;
         }
 
         public override bool Equals(object obj)
@@ -802,12 +876,12 @@ namespace Airerage.Core.Simulation
         public override int GetHashCode()
         {
             return HashCode.Combine(HashCode.Combine(Kind, MinX, MinY, MaxX, MaxY, Direction, Power, Limit), Timing, Target, Width, Travel, TravelPeriod,
-                HashCode.Combine(TravelDwell, CapHeight, FallLength, Electric, OwnerTeam));
+                HashCode.Combine(TravelDwell, CapHeight, FallLength, Electric, OwnerTeam, Round));
         }
 
         public override string ToString()
         {
-            return $"{Kind} x {MinX}〜{MaxX}, y {MinY}〜{MaxY}, dir {Direction}, power {Power}";
+            return $"{Kind}{(Round ? " (round)" : "")} x {MinX}〜{MaxX}, y {MinY}〜{MaxY}, dir {Direction}, power {Power}";
         }
     }
 

@@ -106,6 +106,12 @@ namespace Airerage.Editor.Stages
         /// <summary>見た目の種類（雷・水の流れ）。</summary>
         public StageZoneView.ZoneLook Look = StageZoneView.ZoneLook.Default;
 
+        /// <summary>範囲が丸いか（箱に内接する円。ワープゲートのワームホールの口）。</summary>
+        public bool Round;
+
+        /// <summary>ワームホールの出口に小さな口を置くか（出口が対の口の近くでないとき。救出のゲート）。</summary>
+        public bool ExitMouth;
+
         /// <summary>線と台の色（なければステージの種類ごとの色）。</summary>
         public Color? Color;
 
@@ -149,6 +155,18 @@ namespace Airerage.Editor.Stages
         public ZoneSpec Styled(StageZoneView.ZoneLook look)
         {
             Look = look;
+            return this;
+        }
+
+        /// <summary>
+        /// ワープゲートを球のワームホールの口にする（ZoneLook.Wormhole。判定も円 StageZone.Round。2026-11-21 の方針）。範囲は正方形にする。
+        /// exitMouth なら出口に小さな口を置く（出口が対の口の近くでないとき）。
+        /// </summary>
+        public ZoneSpec Wormhole(bool exitMouth)
+        {
+            Look = StageZoneView.ZoneLook.Wormhole;
+            Round = true;
+            ExitMouth = exitMouth;
             return this;
         }
 

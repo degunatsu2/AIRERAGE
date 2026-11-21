@@ -525,6 +525,7 @@ namespace Airerage.Editor.Stages
         {
             var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             var root = new GameObject("Gimmicks").transform;
+            var wormholes = new List<(ZoneSpec Spec, WormholeView View)>();
             foreach (ZoneSpec zone in zones)
             {
                 var go = new GameObject(zone.Name);
@@ -535,6 +536,7 @@ namespace Airerage.Editor.Stages
                 authoring.ConfigureTiming(zone.PeriodSeconds, zone.ActiveSeconds, zone.PhaseSeconds, zone.JitterSeconds, zone.WarningSeconds);
                 authoring.ConfigureTarget(zone.Target);
                 authoring.ConfigureElectric(zone.Electric);
+                authoring.ConfigureRound(zone.Round);
                 authoring.ConfigureShape(zone.Width, zone.Travel, zone.TravelSeconds, zone.DwellSeconds, zone.CapHeight, zone.FallLength);
                 Color color = zone.Color ?? (theme.ZoneColors.TryGetValue(zone.Kind, out Color themed) ? themed : DefaultColor(zone.Kind));
                 var view = go.AddComponent<StageZoneView>();
@@ -555,6 +557,10 @@ namespace Airerage.Editor.Stages
                     view.ConfigureMoving(propParent);
                 }
                 GameObject active = CreateProp(propParent, go.transform, zone, color, decor);
+                if (active != null && active.TryGetComponent(out WormholeView wormhole))
+                {
+                    wormholes.Add((zone, wormhole));
+                }
                 // いつも効いている危険（周期と効く長さが同じ。プラズマ球）は、いつも出しておく。
                 bool periodic = zone.PeriodSeconds > 0f && zone.ActiveSeconds < zone.PeriodSeconds;
                 if (zone.Kind == StageZoneKind.Gust || zone.Kind == StageZoneKind.Hazard || zone.Kind == StageZoneKind.Blizzard
@@ -565,6 +571,7 @@ namespace Airerage.Editor.Stages
                     active.SetActive(!periodic);
                 }
             }
+            PairWormholes(wormholes);
         }
 
         // ギミックの台・柱などの見た目（当たりはない）。風の柱・間欠泉の噴き出し・危険の柱・吹雪の幕は、効いている間だけ出す（StageZoneView）。
@@ -586,6 +593,12 @@ namespace Airerage.Editor.Stages
                     return CreateCatapult(parent, root, zone, decor);
                 case StageZoneKind.Gust when zone.Look == StageZoneView.ZoneLook.Pneumatic:
                     return CreatePneumaticTube(parent, root, zone, decor);
+                case StageZoneKind.Warp when zone.Look == StageZoneView.ZoneLook.Wormhole:
+                    return CreateWormhole(parent, root, zone, color, decor);
+                case StageZoneKind.LowGravity when zone.Look == StageZoneView.ZoneLook.Microgravity:
+                    return CreateMicrogravity(parent, zone, decor);
+                case StageZoneKind.BoostRing when zone.Look == StageZoneView.ZoneLook.Coil:
+                    return CreateCoilAccelerator(parent, zone, color, decor);
                 case StageZoneKind.Launcher:
                     if (zone.PeriodSeconds > 0f)
                     {
@@ -679,6 +692,254 @@ namespace Airerage.Editor.Stages
                 default:
                     return null;
             }
+        }
+
+        // ワームホールの口（ワープゲート + ZoneLook.Wormhole。2026-11-21 のギミックの精巧化 第 5 弾）: 手本は映画『インターステラー』の
+        // ワームホール（どの向きからも球に見え、中に向こう側の景色、周りに重力レンズ）。面の質感はなく、Airerage/Wormhole の板が後ろの景色を
+        // ゆがめて描く。板はキャラクターの少し奥（z +0.6）。当たりは口の円（StageZone.Round）。出口が対の口の近くでなければ、出口に小さな口
+        // （向こうから見た出口）を置く。対の口は CreateZones が WormholeView.Configure の後に結ぶ（PairWormholes）。
+        private static GameObject CreateWormhole(Transform parent, Transform root, ZoneSpec zone, Color color, StageDecor decor)
+        {
+            float radius = Mathf.Min(zone.Size.x, zone.Size.y) * 0.5f;
+            var mouth = new GameObject("Wormhole").transform;
+            mouth.SetParent(parent, false);
+            GameObject plate = decor.Quad("Mouth", mouth, new Vector3(0f, 0f, WormholeDepth), Vector2.one * radius * 2f * WormholeHalo,
+                WormholeMaterial(radius, color, decor));
+            Renderer exit = null;
+            const float exitRadius = 1.1f;
+            if (zone.ExitMouth)
+            {
+                Vector3 local = new Vector3(zone.Target.x - zone.Center.x, zone.Target.y - zone.Center.y, WormholeDepth);
+                exit = decor.Quad("ExitMouth", root, local, Vector2.one * exitRadius * 2f * WormholeHalo, WormholeMaterial(exitRadius, color, decor))
+                    .GetComponent<Renderer>();
+            }
+            mouth.gameObject.AddComponent<WormholeView>().Configure(plate.GetComponent<Renderer>(), radius, exit != null ? exit.transform : null,
+                exit, exitRadius);
+            return mouth.gameObject;
+        }
+
+        // ワームホールの板の奥行き（キャラクターより奥）と、重力レンズの広さ（口の半径の倍）。
+        private const float WormholeDepth = 0.6f;
+        private const float WormholeHalo = 2.4f;
+
+        private static Material WormholeMaterial(float radius, Color color, StageDecor decor)
+        {
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial($"Wormhole{Mathf.RoundToInt(radius * 100f)}", "Airerage/Wormhole", m =>
+            {
+                m.SetFloat("_Radius", radius);
+                m.SetFloat("_Halo", WormholeHalo);
+                m.SetFloat("_Einstein", 1.3f);
+                m.SetColor("_Color", new Color(color.r * 1.6f, color.g * 1.6f, color.b * 2.2f, 1f));
+                m.SetColor("_OtherTint", color);
+            }, decor.Folder);
+        }
+
+        // 対になったワームホールの口を結ぶ: 出口が別のワープゲートの口の近く（口の半径 + 3m 以内）なら、その口を向こう側にする。
+        private static void PairWormholes(List<(ZoneSpec Spec, WormholeView View)> mouths)
+        {
+            foreach ((ZoneSpec spec, WormholeView view) in mouths)
+            {
+                if (view.Other != null)
+                {
+                    continue;
+                }
+                foreach ((ZoneSpec otherSpec, WormholeView otherView) in mouths)
+                {
+                    if (otherView == view)
+                    {
+                        continue;
+                    }
+                    if (Vector2.Distance(spec.Target, otherSpec.Center) <= otherView.Radius + 3f)
+                    {
+                        view.Configure(view.Mouth, view.Radius, otherView.Mouth.transform, null, 0f);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 宇宙船の中の無重力（無重力 + ZoneLook.Microgravity。2026-11-21 のギミックの精巧化 第 5 弾）: 手本は ISS と天宮の船内の映像。
+        // 床と天井の手すり（支柱で壁から浮かせた管）、天井の照明の帯、漂う物（白い荷物の袋・工具・ペン・手順書・食品の袋・束ねた
+        // ケーブル）と水の玉（Airerage/WaterDrop。後ろの景色を逆さに映す）。漂う物の動きは MicrogravityView（表示だけ）。
+        // 物は遊ぶ面より奥（z 0.7〜1.4。奥の壁の手前）に置き、キャラクターの手前を隠さない。
+        private static GameObject CreateMicrogravity(Transform parent, ZoneSpec zone, StageDecor decor)
+        {
+            Vector2 half = zone.Size * 0.5f;
+            var cabin = new GameObject("Microgravity").transform;
+            cabin.SetParent(parent, false);
+            const string meshes = "SpaceStation";
+            // 手すり（床と天井の近く。支柱で奥の壁から少し浮かせる）と照明の帯。
+            Material rail = decor.Lit("CabinHandrail", new Color(0.78f, 0.78f, 0.74f));
+            rail.SetFloat("_Smoothness", 0.55f);
+            Material light = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("CabinLight", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(0.85f, 0.92f, 1f));
+                m.SetFloat("_Intensity", 1.6f);
+            }, decor.Folder);
+            float railLength = zone.Size.x - 2.4f;
+            foreach (float y in new[] { -half.y + 0.45f, half.y - 0.45f })
+            {
+                decor.Cylinder("Handrail", cabin, new Vector3(0f, y, 1.42f), new Vector3(0.07f, railLength * 0.5f, 0.07f), rail)
+                    .transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                for (float x = -railLength * 0.5f + 0.3f; x <= railLength * 0.5f - 0.29f; x += 2f)
+                {
+                    decor.Box("HandrailPost", cabin, new Vector3(x, y, 1.55f), new Vector3(0.06f, 0.06f, 0.26f), rail);
+                }
+            }
+            for (float x = -half.x + 2f; x <= half.x - 1.99f; x += 3f)
+            {
+                decor.Box("CabinLight", cabin, new Vector3(x, half.y - 0.08f, 0.9f), new Vector3(1.6f, 0.06f, 0.5f), light);
+            }
+            // 漂う物（ISS の映像でよく見る物）。
+            Material bag = decor.Lit("CargoBag", new Color(0.88f, 0.87f, 0.82f));
+            Material strap = decor.Lit("CargoStrap", new Color(0.18f, 0.24f, 0.4f));
+            Material tool = decor.Lit("ToolSteel", new Color(0.62f, 0.64f, 0.68f));
+            tool.SetFloat("_Metallic", 0.85f);
+            tool.SetFloat("_Smoothness", 0.7f);
+            Material foil = decor.Lit("FoodFoil", new Color(0.8f, 0.8f, 0.84f));
+            foil.SetFloat("_Metallic", 0.9f);
+            foil.SetFloat("_Smoothness", 0.8f);
+            Material paper = decor.Lit("Checklist", new Color(0.95f, 0.95f, 0.92f));
+            Material ink = decor.Lit("ChecklistInk", new Color(0.12f, 0.14f, 0.2f));
+            Material pen = decor.Lit("Pen", new Color(0.1f, 0.2f, 0.65f));
+            Material cable = decor.Lit("Cable", new Color(0.06f, 0.06f, 0.07f));
+            var items = new List<Transform>();
+            Transform Item(string name)
+            {
+                var item = new GameObject(name).transform;
+                item.SetParent(cabin, false);
+                item.localPosition = new Vector3(decor.Range(-half.x + 1.2f, half.x - 1.2f), decor.Range(-half.y + 1f, half.y - 1f), decor.Range(0.75f, 1.3f));
+                item.localRotation = Quaternion.Euler(decor.Range(0f, 360f), decor.Range(0f, 360f), decor.Range(0f, 360f));
+                items.Add(item);
+                return item;
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                Transform cargo = Item("CargoBag");
+                decor.Box("Bag", cargo, Vector3.zero, new Vector3(0.62f, 0.4f, 0.36f), bag);
+                decor.Box("Strap", cargo, Vector3.zero, new Vector3(0.64f, 0.06f, 0.38f), strap);
+                decor.Box("Handle", cargo, new Vector3(0f, 0.22f, 0f), new Vector3(0.24f, 0.04f, 0.06f), strap);
+            }
+            Transform wrench = Item("Wrench");
+            decor.Box("Handle", wrench, Vector3.zero, new Vector3(0.42f, 0.05f, 0.02f), tool);
+            ProceduralMesh.Place("Head", wrench, Torus(meshes, "WrenchHead", 0.055f, 0.018f), new Vector3(0.23f, 0f, 0f), Quaternion.Euler(90f, 0f, 0f),
+                Vector3.one, tool);
+            Transform penItem = Item("Pen");
+            decor.Cylinder("Body", penItem, Vector3.zero, new Vector3(0.022f, 0.08f, 0.022f), pen);
+            Transform checklist = Item("Checklist");
+            decor.Box("Sheet", checklist, Vector3.zero, new Vector3(0.3f, 0.4f, 0.008f), paper);
+            for (int line = 0; line < 4; line++)
+            {
+                decor.Box("Line", checklist, new Vector3(-0.02f, 0.12f - line * 0.07f, -0.006f), new Vector3(0.22f, 0.012f, 0.002f), ink);
+            }
+            Transform food = Item("FoodPacket");
+            decor.Box("Packet", food, Vector3.zero, new Vector3(0.16f, 0.22f, 0.04f), foil);
+            Transform loop = Item("CableBundle");
+            ProceduralMesh.Place("Loop", loop, Torus(meshes, "CableLoop", 0.16f, 0.018f), Vector3.zero, Quaternion.identity, Vector3.one, cable);
+            ProceduralMesh.Place("Loop", loop, Torus(meshes, "CableLoop", 0.16f, 0.018f), new Vector3(0.03f, 0f, 0.02f),
+                Quaternion.Euler(0f, 25f, 0f), Vector3.one, cable);
+            // 水の玉（大中小。後ろの景色を逆さに映す）。
+            Material water = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WaterDrop", "Airerage/WaterDrop", m =>
+            {
+                m.SetFloat("_Invert", 1.6f);
+            }, decor.Folder);
+            var drops = new List<Transform>();
+            foreach (float size in new[] { 0.62f, 0.4f, 0.22f })
+            {
+                Transform drop = decor.Sphere("WaterDrop", cabin, new Vector3(decor.Range(-half.x + 1.5f, half.x - 1.5f), decor.Range(-half.y + 1.2f, half.y - 1.2f),
+                    decor.Range(0.75f, 1.2f)), Vector3.one * size, water).transform;
+                drops.Add(drop);
+            }
+            cabin.gameObject.AddComponent<MicrogravityView>().Configure(items.ToArray(), drops.ToArray(), half - new Vector2(0.15f, 0.25f),
+                new Vector2(0.7f, 1.35f));
+            return cabin.gameObject;
+        }
+
+        // 輪（ドーナツ形。半径 radius、管の太さ tube。軸は Y）。
+        private static Mesh Torus(string stage, string name, float radius, float tube)
+        {
+            const int steps = 16;
+            var profile = new Vector2[steps + 1];
+            for (int i = 0; i <= steps; i++)
+            {
+                float angle = -Mathf.PI * 0.5f + i * Mathf.PI * 2f / steps;
+                profile[i] = new Vector2(radius + Mathf.Cos(angle) * tube, Mathf.Sin(angle) * tube);
+            }
+            return ProceduralMesh.Lathe(stage, name, profile, 32, caps: false);
+        }
+
+        // 電磁コイルの加速器（加速リング + ZoneLook.Coil。2026-11-21 のギミックの精巧化 第 5 弾）: 手本は多段のコイルガン（電磁石の
+        // コイルを順に通電して、通る物を引き寄せて加速するリニアモーター）。銅の巻き線のコイル 3 つ（内側の光る輪）を加速の向きに並べ、
+        // 上下と奥のレールでつなぎ、上のレールにコンデンサーの列とケーブル。コイルの内径が範囲の高さ（通れる所）。光り方と火花は
+        // CoilAcceleratorView（通る人の位置に合わせて、手前のコイルから順に通電する）。
+        private static GameObject CreateCoilAccelerator(Transform parent, ZoneSpec zone, Color color, StageDecor decor)
+        {
+            const string meshes = "SpaceStation";
+            Vector2 axis = zone.Direction.sqrMagnitude > 0f ? zone.Direction.normalized : Vector2.right;
+            float bore = zone.Size.y * 0.5f;
+            const float tube = 0.2f;
+            float length = zone.Size.x;
+            var rig = new GameObject("CoilAccelerator").transform;
+            rig.SetParent(parent, false);
+            rig.localRotation = Quaternion.FromToRotation(Vector3.right, new Vector3(axis.x, axis.y, 0f));
+            Material copper = decor.Lit("CoilCopper", new Color(0.72f, 0.42f, 0.22f));
+            copper.SetFloat("_Metallic", 0.9f);
+            copper.SetFloat("_Smoothness", 0.6f);
+            Material frame = decor.Lit("CoilFrame", new Color(0.22f, 0.24f, 0.28f));
+            frame.SetFloat("_Metallic", 0.7f);
+            frame.SetFloat("_Smoothness", 0.5f);
+            Material capacitor = decor.Lit("CoilCapacitor", new Color(0.12f, 0.2f, 0.42f));
+            capacitor.SetFloat("_Smoothness", 0.6f);
+            Material cable = decor.Lit("CoilCable", new Color(0.05f, 0.05f, 0.06f));
+            Quaternion ring = Quaternion.Euler(0f, 0f, 90f);
+            float[] stations = { -length * 0.5f + 0.45f, 0f, length * 0.5f - 0.45f };
+            var liners = new Renderer[stations.Length];
+            var sparks = new ParticleSystem[stations.Length];
+            for (int i = 0; i < stations.Length; i++)
+            {
+                var coil = new GameObject($"Coil{i + 1}").transform;
+                coil.SetParent(rig, false);
+                coil.localPosition = new Vector3(stations[i], 0f, 0f);
+                // 巻き線（太い輪）と、両側の押さえの輪、内側の光る輪。
+                ProceduralMesh.Place("Winding", coil, Torus(meshes, "CoilWinding", bore + tube, tube), Vector3.zero, ring, new Vector3(1f, 1.6f, 1f), copper);
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    ProceduralMesh.Place("Flange", coil, Torus(meshes, "CoilFlange", bore + tube, tube * 0.55f), new Vector3(side * tube * 1.5f, 0f, 0f), ring,
+                        Vector3.one, frame);
+                }
+                Material liner = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("CoilLiner", "Airerage/Emissive", m =>
+                {
+                    m.SetColor("_BaseColor", new Color(0.35f, 0.85f, 1f));
+                    m.SetFloat("_Intensity", 0.4f);
+                }, decor.Folder);
+                liners[i] = ProceduralMesh.Place("Liner", coil, Torus(meshes, "CoilLiner", bore + 0.02f, 0.035f), Vector3.zero, ring, Vector3.one, liner)
+                    .GetComponent<Renderer>();
+                sparks[i] = new ParticleFx
+                {
+                    Name = "Sparks", LifetimeMin = 0.15f, LifetimeMax = 0.4f, SpeedMin = 4f, SpeedMax = 9f, SizeMin = 0.03f, SizeMax = 0.07f, ConeAngle = 80f,
+                    ConeRadius = bore, Additive = true, Intensity = 4f, Stretch = 0.08f, MaxParticles = 80,
+                    Colors = ParticleFx.Ramp(new[] { (new Color(0.75f, 0.95f, 1f), 0f), (new Color(0.3f, 0.6f, 1f), 1f) }, new[] { (1f, 0f), (0f, 1f) }),
+                }.Build(coil, Vector3.zero, Quaternion.LookRotation(Vector3.right), decor.Folder);
+            }
+            // 上下と奥のレール（コイルの外側でつなぐ。手前には置かない）。
+            float outer = bore + tube * 2.2f;
+            foreach (Vector3 at in new[] { new Vector3(0f, outer, 0f), new Vector3(0f, -outer, 0f), new Vector3(0f, 0f, outer) })
+            {
+                decor.Box("Rail", rig, at, new Vector3(length + 0.5f, 0.16f, 0.16f), frame);
+            }
+            // コンデンサーの列（上のレールの上）と、コイルへのケーブル。
+            for (int i = 0; i < stations.Length; i++)
+            {
+                float x = stations[i] + 0.35f;
+                decor.Cylinder("Capacitor", rig, new Vector3(x, outer + 0.32f, 0.25f), new Vector3(0.26f, 0.22f, 0.26f), capacitor);
+                decor.Cylinder("CapacitorTop", rig, new Vector3(x, outer + 0.55f, 0.25f), new Vector3(0.2f, 0.02f, 0.2f), frame);
+                ProceduralMesh.Place("Cable", rig, ProceduralMesh.Tube(meshes, $"CoilCable{i}", new[]
+                {
+                    new Vector3(x, outer + 0.1f, 0.25f), new Vector3(x - 0.15f, outer + 0.02f, 0.3f), new Vector3(stations[i] + 0.05f, bore + tube * 1.8f, 0.2f),
+                }, new[] { 0.025f, 0.025f, 0.025f }, 6), Vector3.zero, Quaternion.identity, Vector3.one, cable);
+            }
+            rig.gameObject.AddComponent<CoilAcceleratorView>().Configure(liners, sparks, stations, bore, axis, new Color(0.35f, 0.85f, 1f));
+            return rig.gameObject;
         }
 
         // 悪魔の手（2026-11-20 の要望で精巧に）: 地面の紫に光る裂け目から生えた、骨ばった黒い手。前腕・手のひら・拳の節・

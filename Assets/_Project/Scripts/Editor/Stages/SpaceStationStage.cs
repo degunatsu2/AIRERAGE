@@ -1,4 +1,5 @@
 using Airerage.Core.Simulation;
+using Airerage.Runtime.Presentation;
 using UnityEngine;
 using TerrainBox = Airerage.Editor.SandboxWireSceneBuilder.TerrainBox;
 
@@ -81,15 +82,21 @@ namespace Airerage.Editor.Stages
                 Theme = theme,
                 Zones = new[]
                 {
-                    // 無重力: 宇宙船の中だけ（重力 0.12 倍、落ちる速さは 3 m/s まで）。
-                    new ZoneSpec("ZeroGravityWest", StageZoneKind.LowGravity, new Vector2(-29f, 27.5f), new Vector2(15f, 7f), Vector2.up, 0.12f, 3f),
-                    new ZoneSpec("ZeroGravityEast", StageZoneKind.LowGravity, new Vector2(29f, 27.5f), new Vector2(15f, 7f), Vector2.up, 0.12f, 3f),
-                    // 左右の端のワープゲート（反対の端の内側へ。速度はそのまま）。
-                    new ZoneSpec("WarpGateWest", StageZoneKind.Warp, new Vector2(-57f, 4f), new Vector2(2f, 6f), Vector2.up, 1f).To(new Vector2(54.5f, 4f)),
-                    new ZoneSpec("WarpGateEast", StageZoneKind.Warp, new Vector2(57f, 4f), new Vector2(2f, 6f), Vector2.up, 1f).To(new Vector2(-54.5f, 4f)),
-                    // いちばん下の小さなゲート: 端から端まで 12 秒で 1 往復する。通った人をトラスの上へ戻す。
-                    new ZoneSpec("RescueGate", StageZoneKind.Warp, new Vector2(-40f, -17.5f), new Vector2(5f, 2.5f), Vector2.up, 1f).To(new Vector2(0f, 30f))
-                        .Moving(new Vector2(80f, 0f), 12f),
+                    // 無重力: 宇宙船の中だけ（重力 0.12 倍、落ちる速さは 3 m/s まで）。見た目は ISS の船内のように、漂う物と水の玉と手すり
+                    // （2026-11-21 のギミックの精巧化 第 5 弾。docs/15 6.67）。
+                    new ZoneSpec("ZeroGravityWest", StageZoneKind.LowGravity, new Vector2(-29f, 27.5f), new Vector2(15f, 7f), Vector2.up, 0.12f, 3f)
+                        .Styled(StageZoneView.ZoneLook.Microgravity),
+                    new ZoneSpec("ZeroGravityEast", StageZoneKind.LowGravity, new Vector2(29f, 27.5f), new Vector2(15f, 7f), Vector2.up, 0.12f, 3f)
+                        .Styled(StageZoneView.ZoneLook.Microgravity),
+                    // 左右の端のワープゲート: 対になったワームホールの口（直径 6m の球。判定も円。2026-11-21 の方針）。入った口と反対の口の外側
+                    // （入った向きの先）へ出る。速度はそのまま。
+                    new ZoneSpec("WarpGateWest", StageZoneKind.Warp, new Vector2(-57f, 4f), new Vector2(6f, 6f), Vector2.up, 1f).To(new Vector2(53f, 4f))
+                        .Wormhole(exitMouth: false),
+                    new ZoneSpec("WarpGateEast", StageZoneKind.Warp, new Vector2(57f, 4f), new Vector2(6f, 6f), Vector2.up, 1f).To(new Vector2(-53f, 4f))
+                        .Wormhole(exitMouth: false),
+                    // いちばん下の小さなゲート: 端から端まで 12 秒で 1 往復する。通った人をトラスの上へ戻す（直径 4.5m の口。出口に小さな口）。
+                    new ZoneSpec("RescueGate", StageZoneKind.Warp, new Vector2(-40f, -17.5f), new Vector2(4.5f, 4.5f), Vector2.up, 1f).To(new Vector2(0f, 30f))
+                        .Moving(new Vector2(80f, 0f), 12f).Wormhole(exitMouth: true),
                     // マスドライバー。
                     ZoneSpec.OnFloor("MassDriverWest", StageZoneKind.Launcher, -8f, -6.4f, 0f, driverWest, driverPower),
                     ZoneSpec.OnFloor("MassDriverEast", StageZoneKind.Launcher, 6.4f, 8f, 0f, driverEast, driverPower),
@@ -99,10 +106,13 @@ namespace Airerage.Editor.Stages
                     ZoneSpec.OnFloor("DockPadWest", StageZoneKind.JumpPad, -41f, -39f, 13f, Vector2.up, 18f, 0.4f),
                     ZoneSpec.OnFloor("DockPadEast", StageZoneKind.JumpPad, 39f, 41f, 13f, Vector2.up, 18f, 0.4f),
                     ZoneSpec.OnFloor("CorePad", StageZoneKind.JumpPad, -1f, 1f, 0f, Vector2.up, 20f, 0.4f),
-                    // 加速リング。
-                    new ZoneSpec("CoreRing", StageZoneKind.BoostRing, new Vector2(0f, 12f), new Vector2(2.4f, 3f), Vector2.right, 18f),
-                    new ZoneSpec("OrbitRingWest", StageZoneKind.BoostRing, new Vector2(-34f, 18f), new Vector2(2.4f, 3f), new Vector2(1f, 0.2f), 16f),
-                    new ZoneSpec("OrbitRingEast", StageZoneKind.BoostRing, new Vector2(34f, 18f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.2f), 16f),
+                    // 加速リング: 電磁コイルの加速器（コイル 3 つを加速の向きに並べた長さ 3.8m・内径 2.6m。通る所が範囲。2026-11-21 の方針）。
+                    new ZoneSpec("CoreRing", StageZoneKind.BoostRing, new Vector2(0f, 12f), new Vector2(3.8f, 2.6f), Vector2.right, 18f)
+                        .Styled(StageZoneView.ZoneLook.Coil),
+                    new ZoneSpec("OrbitRingWest", StageZoneKind.BoostRing, new Vector2(-34f, 18f), new Vector2(3.8f, 2.6f), new Vector2(1f, 0.2f), 16f)
+                        .Styled(StageZoneView.ZoneLook.Coil),
+                    new ZoneSpec("OrbitRingEast", StageZoneKind.BoostRing, new Vector2(34f, 18f), new Vector2(3.8f, 2.6f), new Vector2(-1f, 0.2f), 16f)
+                        .Styled(StageZoneView.ZoneLook.Coil),
                 },
                 Coins = new (Vector2, int)[]
                 {

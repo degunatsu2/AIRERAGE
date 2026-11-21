@@ -564,7 +564,9 @@ namespace Airerage.Runtime.Tests
                 }
             }
             Assert.That(_zones.Any(z => z.Kind == StageZoneKind.JumpPad), Is.True, "ジャンプ台がない");
-            Assert.That(_zones.Any(z => z.Kind == StageZoneKind.BoostRing), Is.True, "加速リングがない");
+            // 恐怖の館は、加速リングを鬼火の輪の仕掛け（くぐるとコイン。StageTrapKind.WispRing）に作り直した（2026-11-21 の要望）。
+            Assert.That(_zones.Any(z => z.Kind == StageZoneKind.BoostRing) || _traps.Any(t => t.Kind == StageTrapKind.WispRing), Is.True,
+                "加速リング（か鬼火の輪）がない");
             Assert.That(Object.FindObjectsByType<Airerage.Runtime.Presentation.StageZoneView>(FindObjectsSortMode.None).Length, Is.EqualTo(_zones.Count),
                 "見た目のないギミックがある");
         }
@@ -923,7 +925,8 @@ namespace Airerage.Runtime.Tests
             Open("Stage_Wharf");
             // 右のクレーンの脚（右の外と真ん中の仕切り）の両側に、岸壁の上から脚の上まで動く、アンカー付きのボラード（ユーザーの要望、2026-10-26）。
             BoxTerrain.Box leg = _terrain.Boxes.Where(b => b.Min.X > 20f && b.Min.X < 30f && b.Max.Y - b.Min.Y > 20f).Single();
-            StagePlatform[] bollards = _platforms.Where(p => p.HasAnchor).ToArray();
+            // 荷役の網（StagePlatformKind.Hoist）も真ん中にアンカーがあるので除く。
+            StagePlatform[] bollards = _platforms.Where(p => p.HasAnchor && !p.IsHoist).ToArray();
             Assert.That(bollards.Length, Is.EqualTo(2), "動くボラードが 2 つない");
             Assert.That(bollards.Count(b => b.Origin.X < leg.Min.X), Is.EqualTo(1), "脚の内側にボラードがない");
             Assert.That(bollards.Count(b => b.Origin.X > leg.Max.X), Is.EqualTo(1), "脚の外側にボラードがない");
