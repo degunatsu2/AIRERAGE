@@ -16,8 +16,14 @@ namespace Airerage.Runtime.Presentation
     {
         [Tooltip("ドーナツの見た目（番号ごと。数は StageTrap.DonutSlots 以上）と、油の泡・しずく（なくてもよい）")]
         [SerializeField] private Transform[] _donuts = new Transform[0];
+        [Tooltip("次に出るドーナツがシュートを滑ってくる見た目と、シュートの上の端（この仕掛けからの位置。出口は原点）")]
+        [SerializeField] private Transform _onChute;
+        [SerializeField] private Vector3 _chuteStart = new Vector3(-2.3f, 0.7f, 0f);
         [SerializeField] private ParticleSystem _bubbles;
         [SerializeField] private ParticleSystem _drips;
+
+        /// <summary>出る前に、シュートを滑ってくる長さ（ティック）。</summary>
+        public const int ChuteTicks = 30;
 
         /// <summary>着地でつぶれる強さと、戻るまでの長さ（ティック）。</summary>
         public const float SquashAmount = 0.22f;
@@ -35,13 +41,18 @@ namespace Airerage.Runtime.Presentation
         /// <summary>今見せているドーナツの数（テスト用）。</summary>
         public int Shown { get; private set; }
 
+        /// <summary>次のドーナツがシュートを滑っているか（テスト用）。</summary>
+        public bool OnChute => _onChute != null && _onChute.gameObject.activeSelf;
+
         /// <summary>ドーナツが出た回数（テスト用）。</summary>
         public int Launches { get; private set; }
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(Transform[] donuts, ParticleSystem bubbles, ParticleSystem drips)
+        public void Configure(Transform[] donuts, Transform onChute, Vector3 chuteStart, ParticleSystem bubbles, ParticleSystem drips)
         {
             _donuts = donuts;
+            _onChute = onChute;
+            _chuteStart = chuteStart;
             _bubbles = bubbles;
             _drips = drips;
         }
@@ -119,14 +130,37 @@ namespace Airerage.Runtime.Presentation
                 shown++;
             }
             Shown = shown;
+            long shifted = (long)tick + _trap.PhaseTicks;
+            int untilNext = shifted < 0 ? int.MaxValue : _trap.Period - (int)(shifted % _trap.Period);
             if (_bubbles != null)
             {
                 // ドーナツが出る少し前（周期の最後の 1 秒）は、油が強く泡立つ。
-                long shifted = (long)tick + _trap.PhaseTicks;
-                int untilNext = _trap.Period - (int)(shifted % _trap.Period);
                 ParticleSystem.EmissionModule emission = _bubbles.emission;
                 emission.rateOverTime = untilNext < SimTime.TicksPerSecond ? 40f : 8f;
             }
+            RenderChute(untilNext, between, radius);
+        }
+
+        // 出る前の ChuteTicks の間、次のドーナツが油槽の上からシュートを滑って出口へ来る（だんだん速く。転がる）。出た瞬間に本物と入れ替わる。
+        private void RenderChute(int untilNext, float between, float radius)
+        {
+            if (_onChute == null)
+            {
+                return;
+            }
+            bool sliding = untilNext <= ChuteTicks && untilNext > 0;
+            _onChute.gameObject.SetActive(sliding);
+            if (!sliding)
+            {
+                return;
+            }
+            float k = Mathf.Clamp01((ChuteTicks - untilNext + between) / ChuteTicks);
+            float eased = k * k;
+            Vector3 local = Vector3.Lerp(_chuteStart, Vector3.zero, eased);
+            _onChute.position = transform.TransformPoint(local);
+            float rolled = Vector3.Distance(_chuteStart, local) / Mathf.Max(0.01f, radius) * Mathf.Rad2Deg;
+            _onChute.localRotation = Quaternion.Euler(0f, 0f, -rolled);
+            _onChute.localScale = Vector3.one;
         }
 
         // 着地の後の SquashTicks の間のつぶれ（着地の瞬間がいちばん強い）。

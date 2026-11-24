@@ -901,6 +901,7 @@ namespace Airerage.Editor.Stages
             Quaternion ring = Quaternion.Euler(0f, 0f, 90f);
             float[] stations = { -length * 0.5f + 0.45f, 0f, length * 0.5f - 0.45f };
             var liners = new Renderer[stations.Length];
+            var bands = new Renderer[stations.Length];
             var sparks = new ParticleSystem[stations.Length];
             for (int i = 0; i < stations.Length; i++)
             {
@@ -920,6 +921,9 @@ namespace Airerage.Editor.Stages
                     m.SetFloat("_Intensity", 0.4f);
                 }, decor.Folder);
                 liners[i] = ProceduralMesh.Place("Liner", coil, Torus(meshes, "CoilLiner", bore + 0.02f, 0.035f), Vector3.zero, ring, Vector3.one, liner)
+                    .GetComponent<Renderer>();
+                // 巻き線の外側の真ん中を一周する光る帯（2026-11-24: 砲身が横を向くと内側の輪が見えにくいので、ため具合を外からも見せる）。
+                bands[i] = ProceduralMesh.Place("ChargeBand", coil, Torus(meshes, "CoilChargeBand", bore + tube * 2f, 0.055f), Vector3.zero, ring, Vector3.one, liner)
                     .GetComponent<Renderer>();
                 sparks[i] = new ParticleFx
                 {
@@ -965,7 +969,7 @@ namespace Airerage.Editor.Stages
             trajectory.shadowCastingMode = ShadowCastingMode.Off;
             trajectory.receiveShadows = false;
             trajectory.enabled = false;
-            rig.gameObject.AddComponent<CoilAcceleratorView>().Configure(liners, sparks, muzzle, trajectory, length * 0.5f, axis, zone.Power,
+            rig.gameObject.AddComponent<CoilAcceleratorView>().Configure(liners, bands, sparks, muzzle, trajectory, length * 0.5f, axis, zone.Power,
                 new Color(0.35f, 0.85f, 1f));
             return rig.gameObject;
         }
@@ -1892,14 +1896,47 @@ namespace Airerage.Editor.Stages
             {
                 new Vector2(0.18f, 0f), new Vector2(0.75f, 0.9f), new Vector2(0.78f, 1.25f), new Vector2(0f, 1.25f),
             }, 24), new Vector3(-0.9f, 2.5f, 0f), Quaternion.identity, Vector3.one, steel);
-            decor.Box("Panel", fryer, new Vector3(0f, 1.1f, -1.22f), new Vector3(2.4f, 0.9f, 0.06f), dark);
+            // 前の面: 左に油槽の中が見える窓（揚がっているドーナツが油に半分浮かぶ）、右に操作盤のランプ。
+            Material glass = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("FryerGlass", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(0.12f, 0.08f, 0.05f));
+                m.SetFloat("_Intensity", 0.6f);
+            }, decor.Folder);
+            decor.Box("WindowFrame", fryer, new Vector3(-0.55f, 1.5f, -1.22f), new Vector3(2.7f, 1.05f, 0.06f), dark);
+            decor.Box("WindowGlass", fryer, new Vector3(-0.55f, 1.56f, -1.25f), new Vector3(2.45f, 0.8f, 0.03f), glass);
+            decor.Box("WindowOil", fryer, new Vector3(-0.55f, 1.33f, -1.27f), new Vector3(2.45f, 0.34f, 0.03f), oil);
+            Material fried = decor.Lit("DonutFried", new Color(0.72f, 0.42f, 0.18f));
+            Mesh small = Torus(meshes, "DonutSmall", 0.19f, 0.12f);
             for (int i = 0; i < 3; i++)
             {
-                decor.Box("Lamp", fryer, new Vector3(-0.7f + i * 0.7f, 1.15f, -1.27f), new Vector3(0.22f, 0.22f, 0.04f), lamp);
+                ProceduralMesh.Place("Frying", fryer, small, new Vector3(-1.3f + i * 0.75f, 1.52f, -1.3f), Quaternion.Euler(90f, 0f, 0f), Vector3.one, fried);
             }
-            // シュート（油槽の右の縁から、出口へ下りながら手前へ）。
-            GameObject chute = decor.Box("Chute", trap, new Vector3(-0.9f, -0.15f, 1.3f), new Vector3(2.6f, 0.1f, 2.4f), steel);
-            chute.transform.localRotation = Quaternion.Euler(-25f, 0f, -12f);
+            decor.Box("Panel", fryer, new Vector3(1.5f, 1.1f, -1.22f), new Vector3(1.1f, 0.9f, 0.06f), dark);
+            for (int i = 0; i < 3; i++)
+            {
+                decor.Box("Lamp", fryer, new Vector3(1.18f + i * 0.32f, 1.2f, -1.27f), new Vector3(0.18f, 0.18f, 0.04f), lamp);
+            }
+            // シュート（出口のコンベヤーの代わりの樋）: 油槽の上から、出口へ下りる。底の板・両側の手すり・脚・油槽へつなぐ覆い。
+            // ドーナツ（穴をカメラへ向けて立てて転がる）が樋の中を滑って、出口（この仕掛けの原点）から跳び出す。
+            Vector2 chuteTop = new Vector2(-2.3f, -0.2f);
+            Vector2 chuteEnd = new Vector2(0.25f, -0.97f);
+            Vector2 along = chuteEnd - chuteTop;
+            float slope = Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg;
+            Vector2 mid = (chuteTop + chuteEnd) * 0.5f;
+            Vector2 down = new Vector2(Mathf.Sin(slope * Mathf.Deg2Rad), -Mathf.Cos(slope * Mathf.Deg2Rad));
+            GameObject chute = decor.Box("Chute", trap, new Vector3(mid.x + down.x * 0.05f, mid.y + down.y * 0.05f, 0f), new Vector3(along.magnitude, 0.1f, 1.1f), steel);
+            chute.transform.localRotation = Quaternion.Euler(0f, 0f, slope);
+            foreach (float side in new[] { -0.58f, 0.58f })
+            {
+                GameObject rail = decor.Box("ChuteRail", trap, new Vector3(mid.x - down.x * 0.17f, mid.y - down.y * 0.17f, side), new Vector3(along.magnitude, 0.38f, 0.06f), steel);
+                rail.transform.localRotation = Quaternion.Euler(0f, 0f, slope);
+            }
+            foreach (float x in new[] { -0.4f, chuteEnd.x - 0.15f })
+            {
+                float top = Mathf.Lerp(chuteTop.y, chuteEnd.y, Mathf.InverseLerp(chuteTop.x, chuteEnd.x, x)) - 0.1f;
+                decor.Box("ChuteLeg", trap, new Vector3(x, (top - 2.2f) * 0.5f, 0f), new Vector3(0.12f, top + 2.2f, 0.12f), dark);
+            }
+            decor.Box("ChuteHood", trap, new Vector3(chuteTop.x + 0.2f, chuteTop.y + 0.25f, 0.95f), new Vector3(0.9f, 0.5f, 0.9f), steel);
             // 油の泡と、シュートから飛ぶ油のしずく、立ちのぼる湯気。
             ParticleSystem bubbles = new ParticleFx
             {
@@ -1929,10 +1966,11 @@ namespace Airerage.Editor.Stages
             doughMaterial.SetFloat("_Smoothness", 0.35f);
             Color[] glazes = { new Color(1f, 0.55f, 0.75f), new Color(0.36f, 0.19f, 0.1f), new Color(0.98f, 0.95f, 0.9f), new Color(0.56f, 0.76f, 0.36f) };
             Color[] sprinkleColors = { new Color(1f, 0.85f, 0.2f), new Color(0.3f, 0.75f, 1f), new Color(1f, 0.35f, 0.4f), new Color(0.6f, 1f, 0.5f), Color.white };
-            var donuts = new Transform[core.DonutSlots];
+            var donuts = new Transform[core.DonutSlots + 1];
             for (int i = 0; i < donuts.Length; i++)
             {
-                var donut = new GameObject($"Donut{i + 1}").transform;
+                // いちばん最後は、次に出るドーナツがシュートを滑ってくる見た目（DonutFryerView の onChute）。
+                var donut = new GameObject(i < core.DonutSlots ? $"Donut{i + 1}" : "DonutOnChute").transform;
                 donut.SetParent(trap, false);
                 Quaternion faceCamera = Quaternion.Euler(90f, 0f, 0f);
                 ProceduralMesh.Place("Dough", donut, dough, Vector3.zero, faceCamera, Vector3.one, doughMaterial);
@@ -1954,7 +1992,9 @@ namespace Airerage.Editor.Stages
                 donut.gameObject.SetActive(false);
                 donuts[i] = donut;
             }
-            trap.gameObject.AddComponent<DonutFryerView>().Configure(donuts, bubbles, drips);
+            var slots = new Transform[core.DonutSlots];
+            Array.Copy(donuts, slots, slots.Length);
+            trap.gameObject.AddComponent<DonutFryerView>().Configure(slots, donuts[core.DonutSlots], new Vector3(chuteTop.x, chuteTop.y + radius, 0f), bubbles, drips);
         }
 
         // 鬼火の輪（ステージの仕掛け StageTrapKind.WispRing。2026-11-21 の要望: 1 つだけ、6 地点の間を速く飛び回り、くぐった人の周りを

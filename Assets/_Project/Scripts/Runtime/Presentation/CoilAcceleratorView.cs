@@ -17,8 +17,9 @@ namespace Airerage.Runtime.Presentation
     /// </summary>
     public sealed class CoilAcceleratorView : MonoBehaviour
     {
-        [Tooltip("コイルの内側の光る輪（後ろから砲口への順）と、火花（コイルごと）")]
+        [Tooltip("コイルの内側の光る輪と、巻き線の外側の光る帯（どちらも後ろから砲口への順）と、火花（コイルごと）")]
         [SerializeField] private Renderer[] _liners = new Renderer[0];
+        [SerializeField] private Renderer[] _bands = new Renderer[0];
         [SerializeField] private ParticleSystem[] _sparks = new ParticleSystem[0];
         [Tooltip("砲口の火花（撃ち出した瞬間）と、撃ち出す先の軌道の点線")]
         [SerializeField] private ParticleSystem _muzzle;
@@ -62,6 +63,9 @@ namespace Airerage.Runtime.Presentation
         /// <summary>コイルが満ちた回数（コイルごとの合計。テスト用）。</summary>
         public int Firings { get; private set; }
 
+        /// <summary>巻き線の外側の光る帯の数（テスト用）。</summary>
+        public int BandCount => _bands.Length;
+
         /// <summary>i 番目のコイルの今の光の強さ（0〜1。テスト用）。</summary>
         public float GlowOf(int i)
         {
@@ -72,10 +76,11 @@ namespace Airerage.Runtime.Presentation
         public bool ShowsTrajectory => _trajectory != null && _trajectory.enabled;
 
         /// <summary>設定する（シーンのビルダー用）。</summary>
-        public void Configure(Renderer[] liners, ParticleSystem[] sparks, ParticleSystem muzzle, LineRenderer trajectory, float muzzleDistance, Vector2 axis,
-            float power, Color color)
+        public void Configure(Renderer[] liners, Renderer[] bands, ParticleSystem[] sparks, ParticleSystem muzzle, LineRenderer trajectory, float muzzleDistance,
+            Vector2 axis, float power, Color color)
         {
             _liners = liners;
+            _bands = bands;
             _sparks = sparks;
             _muzzle = muzzle;
             _trajectory = trajectory;
@@ -224,15 +229,23 @@ namespace Airerage.Runtime.Presentation
                     target = 0.12f + 0.18f * Mathf.Pow(Mathf.Max(0f, Mathf.Sin(time * 3.9f - i * 1.1f)), 6f);
                 }
                 _glow[i] = target > _glow[i] ? Mathf.MoveTowards(_glow[i], target, dt * 8f) : Mathf.MoveTowards(_glow[i], target, dt * 2.5f);
-                if (i < _liners.Length && _liners[i] != null)
-                {
-                    _liners[i].GetPropertyBlock(_block);
-                    Color c = Color.Lerp(_color, Color.white, Mathf.Clamp01(_glow[i] - 0.8f) * 2f);
-                    _block.SetColor(ColorId, c);
-                    _block.SetFloat(IntensityId, 0.2f + 3.6f * _glow[i]);
-                    _liners[i].SetPropertyBlock(_block);
-                }
+                Color c = Color.Lerp(_color, Color.white, Mathf.Clamp01(_glow[i] - 0.8f) * 2f);
+                Light(i < _liners.Length ? _liners[i] : null, c, 0.2f + 3.6f * _glow[i]);
+                // 外側の帯は、待機の間はほとんど光らず、ためた分だけはっきり光る（外から見たため具合）。
+                Light(i < _bands.Length ? _bands[i] : null, c, 0.05f + 4.5f * Mathf.Max(0f, _glow[i] - 0.12f));
             }
+        }
+
+        private void Light(Renderer target, Color color, float intensity)
+        {
+            if (target == null)
+            {
+                return;
+            }
+            target.GetPropertyBlock(_block);
+            _block.SetColor(ColorId, color);
+            _block.SetFloat(IntensityId, intensity);
+            target.SetPropertyBlock(_block);
         }
 
         // 撃ち出す先の軌道（砲口から、照準の向きに速さ Power で出た物の重力の放物線）を点線で。ためるほど濃く、遠くまで。

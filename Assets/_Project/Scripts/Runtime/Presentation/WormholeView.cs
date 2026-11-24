@@ -49,6 +49,8 @@ namespace Airerage.Runtime.Presentation
         private readonly List<LineRenderer> _swirls = new List<LineRenderer>();
         private LineRenderer _exitRing;
         private Vector3 _lastPosition;
+        private float _sinceMove;
+        private Vector2 _moveVelocity;
         private bool _hasLast;
         private Vector2 _bend;
         private Vector2 _bendVelocity;
@@ -198,16 +200,29 @@ namespace Airerage.Runtime.Presentation
         // 動く速さから、撓みの目標（動く向きの反対）を決め、ばねで追わせる（向きが変わる端で行きすぎて揺れ戻る）。
         private void UpdateBend(float dt)
         {
+            // ゲートはシミュレーションのティックごと（60Hz）に動くので、描くフレームが速いと、フレームごとの差は 0 と大きな跳びを
+            // 繰り返す（バッチモードのテストでは撓みが 0 のままだった）。位置が変わったときに、前に変わってからの時間で速さを測る。
             Vector3 position = transform.position;
-            Vector2 velocity = _hasLast ? (Vector2)(position - _lastPosition) / dt : Vector2.zero;
-            _lastPosition = position;
-            _hasLast = true;
-            // 瞬間移動（シーンの読み込みなど）は無視する。
-            if (velocity.sqrMagnitude > 60f * 60f)
+            _sinceMove += Time.deltaTime;
+            if (!_hasLast)
             {
-                velocity = Vector2.zero;
+                _lastPosition = position;
+                _hasLast = true;
+                _sinceMove = 0f;
             }
-            Vector2 target = -Vector2.ClampMagnitude(velocity / BendSpeed, 1f);
+            else if ((position - _lastPosition).sqrMagnitude > 1e-8f)
+            {
+                Vector2 measured = (Vector2)(position - _lastPosition) / Mathf.Max(_sinceMove, 1f / 240f);
+                // 瞬間移動（シーンの読み込みなど）は無視する。
+                _moveVelocity = measured.sqrMagnitude > 60f * 60f ? Vector2.zero : measured;
+                _lastPosition = position;
+                _sinceMove = 0f;
+            }
+            else if (_sinceMove > 0.1f)
+            {
+                _moveVelocity = Vector2.zero;
+            }
+            Vector2 target = -Vector2.ClampMagnitude(_moveVelocity / BendSpeed, 1f);
             _bendVelocity += (BendStiffness * (target - _bend) - BendDamping * _bendVelocity) * dt;
             _bend += _bendVelocity * dt;
             _bend = Vector2.ClampMagnitude(_bend, 1.6f);

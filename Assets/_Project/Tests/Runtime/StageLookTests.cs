@@ -1146,6 +1146,7 @@ namespace Airerage.Runtime.Tests
                 StageZone zone = coil.GetComponentInParent<StageZoneAuthoring>().ToZone();
                 Assert.That(zone.Kind, Is.EqualTo(StageZoneKind.CoilGun), "コイルが撃ち出すギミックでない");
                 Assert.That(coil.transform.parent.GetComponentsInChildren<LineRenderer>(true).Any(l => l.name == "Trajectory"), Is.True, "軌道の線がない");
+                Assert.That(coil.BandCount, Is.EqualTo(3), "ため具合を外から見せる光る帯がない");
                 Renderer[] liners = coil.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Liner").ToArray();
                 Assert.That(liners.Length, Is.EqualTo(3), "コイルの光る輪");
                 Assert.That(liners.All(l => l.sharedMaterial.shader.name == "Airerage/Emissive"), Is.True);

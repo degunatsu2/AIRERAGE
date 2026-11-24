@@ -86,9 +86,10 @@ Shader "Airerage/Wormhole"
                 float angle = input.uv.x * 6.2831853;
                 float r = saturate(input.uv.y);
                 float speed = _Spin * (1.0 + 0.6 * _Bend);
-                // 対数らせんの腕: 内へ行くほど速く回る（吸い込む渦）。出口は逆に外へ流れる。
+                // 対数らせんの腕を、らせんごと回す（回すと腕が内へ流れて見える。出口はらせんの巻きを逆にして外へ流れる）。
+                // 回る速さを中心からの距離で変えると、時間がたつほど巻きが強くなり、細かい同心の縞になった（2026-11-24 の撮影）。
                 float logR = log(max(r, 0.02));
-                float swirl = angle * _Arms + logR * _Twist * _Inward + time * speed * 2.5 * _Inward / max(r, 0.25);
+                float swirl = angle * _Arms + logR * _Twist * _Inward + time * speed * 2.5;
                 float arms = 0.5 + 0.5 * sin(swirl);
                 arms = pow(arms, 3.0);
                 // 腕に沿って流れる光の粒（角度と距離の格子。時間で中心へ寄る）。
