@@ -438,8 +438,9 @@ namespace Airerage.PlayMode.Tests
             }, 2f, "1 秒たっても撃ち出されない");
             runner.InputOverride = null;
             Assert.That(Vector2.Dot(launched, aim), Is.GreaterThan(18f), $"照準の向きへ撃ち出されない（{launched}）");
-            Assert.That(coil.Firings, Is.GreaterThanOrEqualTo(3), $"コイルが順に満ちない（{coil.Firings} 回）");
+            // 表示は LateUpdate で撃ち出しを見つけるので、砲口がはじけてから数える（いちばん前のコイルは撃ち出す瞬間に通電する）。
             yield return WaitFor(() => coil.Shots > 0, 0.5f, "砲口がはじけない");
+            Assert.That(coil.Firings, Is.GreaterThanOrEqualTo(3), $"コイルが順に満ちない（{coil.Firings} 回）");
 
             // 宇宙船の中: 人が通ると、漂う物が押される。
             MicrogravityView cabin = UnityEngine.Object.FindObjectsByType<MicrogravityView>(FindObjectsSortMode.None)
