@@ -2257,7 +2257,11 @@ C スコープ・D フックの影）を出し、ユーザーが選んだ組み�
     `SpaceStation_EdgeWormholes_Wrap_TheCoilGunShootsWhereYouAim_AndTheCabinDrifts`（くぐると口と出口に波紋／動くゲートが撓む／コイルに
     収まって軌道の線が出て、砲身が照準へ回り、照準の向きへ撃ち出される）。
   - 撮影は `GimmickFxSnapshotTests.CaptureSpaceStationGimmicks`（`Space_2RescueBending`・`Space_6CoilCharging`・`Space_6CoilFiring` を
-    足した）と `CaptureKitchenDonuts`（`Logs/Snapshots/Kitchen_*`）。
+    足した）と `CaptureKitchenDonuts`（`Kitchen_1FryerChute` など。`Logs/Snapshots/Kitchen_*`）。
+  - EditMode は全部通った（1216）。PlayMode は全体で 1 つ（コイルの通電の数え方）を残して通り、直した後に `StageGimmickTests` の
+    8 つが全部通った（2026-11-24）。
+  - テストで分かって直したこと: 撃ち出すティックにため具合が 0 に戻るので、いちばん前のコイルは満ちきる前に撃っていた（表示のため具合は
+    59/60 まで）。まだ満ちていないコイルは撃ち出す瞬間に通電する（物が出ていくときに最後の段が引く）。
 - **演出の案**: ワイヤーキャンセル・技の発動の星型のエフェクト（S1〜S15）、JACKPOT（J1〜J12）、FATAL（F1〜F12）の 39 の案を、動く見本の
   ページ（Artifact「AIRERAGE 演出の案」）で示した（D-101。ユーザーが選ぶ）。商業ゲームの手法（層の重ね方、白い閃光は短く、決め手は
   寄りと少しのスロー、持ち主の色、価値の段階、数え上げ）を取り出し、絵や文字の形は写していない。
