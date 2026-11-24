@@ -396,16 +396,16 @@ namespace Airerage.PlayMode.Tests
             yield return Wait(1f);
             Camera camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
             DonutFryerView fryer = Object.FindFirstObjectByType<DonutFryerView>();
-            Shoot(camera, new Vector3(-50f, 5f, -14f), "Kitchen_1Fryer");
-            Shoot(camera, new Vector3(-50f, 4f, -7f), "Kitchen_1FryerClose");
-            // 次のドーナツがシュートを滑ってくるところ。
-            float limit = Time.realtimeSinceStartup + 8f;
+            Shoot(camera, new Vector3(-60f, 4f, -16f), "Kitchen_1Fryer");
+            Shoot(camera, new Vector3(-61.5f, 3.5f, -8f), "Kitchen_1FryerClose");
+            // 次のドーナツがシュートを滑ってくるところ（間隔が 10 秒なので、最初のドーナツまで待つ）。
+            float limit = Time.realtimeSinceStartup + 14f;
             while (!fryer.OnChute && Time.realtimeSinceStartup < limit)
             {
                 yield return null;
             }
             yield return Wait(0.25f);
-            Shoot(camera, new Vector3(-52f, 3.5f, -8f), "Kitchen_1FryerChute");
+            Shoot(camera, new Vector3(-60.5f, 3.5f, -9f), "Kitchen_1FryerChute");
             limit = Time.realtimeSinceStartup + 8f;
             while (fryer.Shown < 3 && Time.realtimeSinceStartup < limit)
             {
