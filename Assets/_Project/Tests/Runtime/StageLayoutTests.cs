@@ -1004,14 +1004,17 @@ namespace Airerage.Runtime.Tests
                     $"{i} 番目の着地点 {at} の下に足場がない");
             }
             // 道のりのどこでも、ドーナツが地形に埋まらない。
+            NVector2 last = fryer.Muzzle;
             for (int age = 0; ; age++)
             {
                 if (!fryer.TryGetDonut(fryer.Period + age, slot, out int shownAge, out NVector2 at, out _) || shownAge != age)
                 {
+                    // 消えたときの位置は、最後に出ていた位置（消えた後の TryGetDonut の位置は出口を返す）。
                     Assert.That(age, Is.GreaterThan(300), "ドーナツがすぐ消える");
-                    Assert.That(_bounds.Contains(new NVector3(at.X, at.Y, 0f)), Is.False, "ドーナツがステージの中で消える（右の外へ消えるはず）");
+                    Assert.That(_bounds.Contains(new NVector3(last.X, last.Y, 0f)), Is.False, $"ドーナツがステージの中で消える（{last}。右の外へ消えるはず）");
                     break;
                 }
+                last = at;
                 Assert.That(_terrain.IsOverlapping(new NVector3(at.X, at.Y, 0f), new NVector3(radius * 0.7f, radius * 0.7f, 0.1f)), Is.False,
                     $"ドーナツが {age} ティック目に地形に埋まる（{at}）");
             }

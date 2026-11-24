@@ -190,6 +190,16 @@ namespace Airerage.Runtime.Presentation
             }
             for (int i = 0; i < _glow.Length; i++)
             {
+                // 撃ち出すティックにため具合が 0 に戻るので、いちばん前のコイルは満ちきる前に撃つ（表示のため具合は 59/60 まで）。
+                // まだ満ちていないコイルは、撃ち出す瞬間に通電する（物が出ていくときに最後の段が引く）。
+                if (!_full[i])
+                {
+                    Firings++;
+                    if (i < _sparks.Length && _sparks[i] != null)
+                    {
+                        _sparks[i].Emit(16 + i * 6);
+                    }
+                }
                 _glow[i] = 1.4f;
                 _full[i] = false;
             }
