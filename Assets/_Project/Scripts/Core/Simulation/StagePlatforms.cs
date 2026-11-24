@@ -123,8 +123,9 @@ namespace Airerage.Core.Simulation
         // 足場・扉につないだワイヤーの接続点を、足場の動いた分だけ動かす（足場がなくなったら外す）。
         private static bool MoveAnchor(IReadOnlyList<StagePlatform> platforms, StageState stage, ref CharacterState state, WireTuning wire, int tick)
         {
-            if (state.Wire.Phase != WirePhase.Attached || state.Wire.AnchorBody == 0)
+            if (state.Wire.Phase != WirePhase.Attached || state.Wire.AnchorBody == 0 || state.Wire.AnchorBody >= StageTraps.DonutBodyBase)
             {
+                // ドーナツにつないだワイヤーは StageTraps.CarryWires が運ぶ。
                 return false;
             }
             int index = state.Wire.AnchorBody - 1;

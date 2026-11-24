@@ -51,6 +51,10 @@ namespace Airerage.Runtime.Simulation
         [Tooltip("止まってから消えるまでの点滅（秒）")]
         [SerializeField] private float _blinkSeconds = 1.5f;
 
+        [Header("ドーナツフライヤー（着地点は _waypoints、周期とずれは _periodSeconds・_phaseSeconds、半径は _radius）")]
+        [Tooltip("跳ねの高さ（m）")]
+        [SerializeField] private float _hopHeight = 3f;
+
         [Header("鬼火の輪")]
         [Tooltip("飛び回る地点（ワールドの位置）")]
         [SerializeField] private Vector2[] _waypoints = new Vector2[0];
@@ -116,6 +120,17 @@ namespace Airerage.Runtime.Simulation
         }
 
         /// <summary>Core の仕掛けにする（秒はティックに丸める）。値が不正なら ArgumentException。</summary>
+        /// <summary>ドーナツフライヤーにする（シーンのビルダー用）。物体の位置が出口。</summary>
+        public void ConfigureDonutFryer(Vector2[] landings, float periodSeconds, float phaseSeconds, float radius, float hopHeight)
+        {
+            _kind = StageTrapKind.DonutFryer;
+            _waypoints = landings;
+            _periodSeconds = periodSeconds;
+            _phaseSeconds = phaseSeconds;
+            _radius = radius;
+            _hopHeight = hopHeight;
+        }
+
         public StageTrap ToTrap()
         {
             Vector3 p = transform.position;
@@ -126,6 +141,15 @@ namespace Airerage.Runtime.Simulation
                 return StageTrap.Tripwire(center - half, center + half, center + new NVector2(_muzzleOffset.x, _muzzleOffset.y),
                     new NVector2(_direction.x, _direction.y), _speed, _range, _power, _knockback, Ticks(_armSeconds), Ticks(_cooldownSeconds),
                     new NVector2(_missileSize.x * 0.5f, _missileSize.y * 0.5f));
+            }
+            if (_kind == StageTrapKind.DonutFryer)
+            {
+                var landings = new NVector2[_waypoints.Length];
+                for (int i = 0; i < landings.Length; i++)
+                {
+                    landings[i] = new NVector2(_waypoints[i].x, _waypoints[i].y);
+                }
+                return StageTrap.DonutFryer(center, landings, Ticks(_periodSeconds), Ticks(_phaseSeconds), _radius, _hopHeight);
             }
             if (_kind == StageTrapKind.WispRing)
             {

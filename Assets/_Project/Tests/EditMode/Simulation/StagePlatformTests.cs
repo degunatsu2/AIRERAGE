@@ -333,6 +333,43 @@ namespace Airerage.Core.Tests.Simulation
         }
 
         [Test]
+        public void ANet_RisingBack_CanStillBeHooked_AndIsPulledDownAgain()
+        {
+            // 2026-11-24 の要望: 戻っていく途中の網にもワイヤーがつながり、つなぐとまた下へ引ける。
+            var world = new SimWorld(new BoxTerrain().AddBox(-30f, -2f, 30f, 0f), null, null, null, null, null, new[] { Net() });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-4f, Movement.HalfHeight, 0f), 1);
+            var toNet = Vector2.Normalize(new Vector2(4f, 10f - Movement.HalfHeight));
+            PlayerInput hold = PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(toNet);
+            for (int t = 0; t < 40 && world.GetState(0).Wire.Phase != WirePhase.Attached; t++)
+            {
+                Step(world, 1, hold);
+            }
+            Step(world, 90, hold);
+            Assert.That(world.Stage.OpenOf(0), Is.GreaterThan(StagePlatform.HoistScale * 0.9f), "前提: 網が下がった");
+            // 外して、戻り始めるまで待つ。
+            Step(world, 70);
+            int rising = world.Stage.OpenOf(0);
+            Assert.That(rising, Is.InRange(StagePlatform.HoistScale / 10, StagePlatform.HoistScale * 95 / 100), "前提: 網が戻っている途中");
+            Assert.That(world.GetState(0).Wire.Phase, Is.Not.EqualTo(WirePhase.Attached), "前提: ワイヤーを外した");
+            // 戻っている網の真ん中を狙って撃つ。
+            Assert.That(world.Platforms[0].TryGetCenter(world.Tick, world.Stage.OpenOf(0), out Vector2 net), Is.True);
+            CharacterState shooter = world.GetState(0);
+            var aim = Vector2.Normalize(new Vector2(net.X - shooter.Position.X, net.Y - shooter.Position.Y));
+            PlayerInput again = PlayerInput.FromAxes(0f, 0f, InputButtons.Wire).WithAim(aim);
+            bool attached = false;
+            for (int t = 0; t < 40 && !attached; t++)
+            {
+                Step(world, 1, again);
+                attached = world.GetState(0).Wire.Phase == WirePhase.Attached;
+            }
+            Assert.That(attached, Is.True, $"戻っている途中の網にワイヤーがつながらない（{world.GetState(0).Wire.LastMissReason}）");
+            Assert.That(world.GetState(0).Wire.AnchorBody, Is.EqualTo(1), "網のアンカーにつながっていない");
+            int before = world.Stage.OpenOf(0);
+            Step(world, 40, again);
+            Assert.That(world.Stage.OpenOf(0), Is.GreaterThan(before), "つないでも、また下へ引けない");
+        }
+
+        [Test]
         public void ANet_PulledByAFastFall_BouncesFurther()
         {
             // 同じ網に、止まってぶら下がる人と、勢いよく落ちながらぶら下がる人。落ちる勢いが強いほど、大きく行きすぎて跳ね返る。

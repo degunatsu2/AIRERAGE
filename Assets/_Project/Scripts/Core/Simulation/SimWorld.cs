@@ -379,7 +379,10 @@ namespace Airerage.Core.Simulation
             _collision.Refresh(_objects);
             // 動く足場と扉: このティックの位置の当たりを作り、動いた分だけ乗っている人とつないだワイヤーを運ぶ。
             _collision.SetPlatforms(_platforms, _stage, Tick);
+            // ドーナツ（キッチンのドーナツフライヤー）の真ん中もアンカーにし、つないだワイヤーを運ぶ（2026-11-24）。
+            StageTraps.AddAnchors(_collision, _traps, Tick);
             StagePlatforms.Carry(_platforms, _stage, _states, _tickConfigs, Tick);
+            StageTraps.CarryWires(_traps, _states, _tickConfigs, Tick, Bounds);
             for (int i = 0; i < _states.Count; i++)
             {
                 CharacterState state = _states[i];

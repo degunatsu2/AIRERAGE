@@ -376,7 +376,7 @@ namespace Airerage.PlayMode.Tests
         }
 
         [UnityTest]
-        public IEnumerator SpaceStation_EdgeWormholes_Wrap_CoilsFire_AndTheCabinDrifts()
+        public IEnumerator SpaceStation_EdgeWormholes_Wrap_TheCoilGunShootsWhereYouAim_AndTheCabinDrifts()
         {
             SceneManager.LoadScene("App");
             yield return null;
@@ -401,28 +401,45 @@ namespace Airerage.PlayMode.Tests
             Assert.That(after.Velocity.X, Is.LessThan(0f), "向きを保たない");
             Assert.That(after.Combat.Falls, Is.EqualTo(0));
 
-            // ワームホールの口（2026-11-21 の第 5 弾）: 端の口は対になっていて、くぐると入った口と出た口に波紋が出る。
+            // ワームホールの渦（2026-11-24: 前の紫の楕円の見た目を精巧に）: くぐると入った口と出口の渦に波紋が出る。
             WormholeView[] mouths = UnityEngine.Object.FindObjectsByType<WormholeView>(FindObjectsSortMode.None);
             WormholeView west = mouths.Single(m => m.GetComponentInParent<StageZoneView>().name == "WarpGateWest");
-            WormholeView east = mouths.Single(m => m.GetComponentInParent<StageZoneView>().name == "WarpGateEast");
             WormholeView rescue = mouths.Single(m => m.GetComponentInParent<StageZoneView>().name == "RescueGate");
-            Assert.That(west.Other, Is.EqualTo(east.Mouth.transform), "西の口の中に東の口の向こうが映らない");
-            Assert.That(east.Other, Is.EqualTo(west.Mouth.transform), "東の口の中に西の口の向こうが映らない");
-            Assert.That(rescue.ExitMouth, Is.Not.Null, "救出のゲートの出口に口がない");
-            yield return WaitFor(() => west.Pulses > 0 && east.Pulses > 0, 1f, $"くぐった口に波紋が出ない（西 {west.Pulses}・東 {east.Pulses}）");
+            Assert.That(rescue.ExitMouth, Is.Not.Null, "救出のゲートの出口に渦がない");
+            yield return WaitFor(() => west.Pulses > 0 && west.ExitPulses > 0, 1f, $"くぐった口と出口に波紋が出ない（口 {west.Pulses}・出口 {west.ExitPulses}）");
+            // 動く救出のゲートは、動く向きと逆へ撓む（前の見た目でユーザーが気に入っていたところ）。
+            float bent = 0f;
+            yield return WaitFor(() => (bent = Mathf.Max(bent, rescue.Bend.magnitude)) > 0.3f, 6f, $"動くゲートが撓まない（{rescue.Bend}）");
 
-            // 電磁コイルの加速器: 通ると加速し、手前のコイルから順に通電して光る。
+            // コイルガン（2026-11-24）: 触れると中に収まって 1 秒ため、ためている間は照準で向きを変えられ、たまったらその向きへ撃ち出す。
             yield return WaitSeconds(0.6f);
             CoilAcceleratorView coil = UnityEngine.Object.FindObjectsByType<CoilAcceleratorView>(FindObjectsSortMode.None)
-                .Single(c => c.GetComponentInParent<StageZoneView>().name == "CoreRing");
-            StageZone ring = coil.GetComponentInParent<StageZoneAuthoring>().ToZone();
-            CharacterState runnerIn = runner.PlayerState;
-            runnerIn.Position = new System.Numerics.Vector3(ring.MinX - 2.5f, ring.Center.Y, 0f);
-            runnerIn.Velocity = new System.Numerics.Vector3(10f, 1f, 0f);
-            runner.SetPlayerState(runnerIn);
-            yield return WaitFor(() => runner.PlayerState.Position.X > ring.MaxX + 0.5f, 2f, "コイルを通り抜けない");
-            Assert.That(runner.PlayerState.Velocity.X, Is.GreaterThanOrEqualTo(17f), "コイルで加速しない");
-            Assert.That(coil.Firings, Is.GreaterThanOrEqualTo(3), $"コイルが順に通電しない（{coil.Firings} 回）");
+                .Single(c => c.GetComponentInParent<StageZoneView>().name == "CoilGunCore");
+            StageZone gun = coil.GetComponentInParent<StageZoneAuthoring>().ToZone();
+            var aim = new Vector2(-0.6f, 0.8f);
+            runner.InputOverride = new HoldAim(aim);
+            CharacterState into = runner.PlayerState;
+            into.Position = new System.Numerics.Vector3(gun.MinX - 0.6f, gun.Center.Y, 0f);
+            into.Velocity = new System.Numerics.Vector3(4f, 0f, 0f);
+            runner.SetPlayerState(into);
+            yield return WaitFor(() => runner.PlayerState.Combat.CaptureTicks > 0, 2f, "コイルに収まらない");
+            yield return WaitFor(() => coil.ShowsTrajectory && coil.Charge > 0.3f, 1f, "ためている間に軌道の線が出ない");
+            Assert.That(Mathf.DeltaAngle(coil.Angle, Mathf.Atan2(aim.y, aim.x) * Mathf.Rad2Deg), Is.InRange(-15f, 15f), $"砲身が照準へ回らない（{coil.Angle}）");
+            Vector2 launched = Vector2.zero;
+            yield return WaitFor(() =>
+            {
+                CharacterState now = runner.PlayerState;
+                if (now.Combat.CaptureTicks > 0)
+                {
+                    return false;
+                }
+                launched = new Vector2(now.Velocity.X, now.Velocity.Y);
+                return true;
+            }, 2f, "1 秒たっても撃ち出されない");
+            runner.InputOverride = null;
+            Assert.That(Vector2.Dot(launched, aim), Is.GreaterThan(18f), $"照準の向きへ撃ち出されない（{launched}）");
+            Assert.That(coil.Firings, Is.GreaterThanOrEqualTo(3), $"コイルが順に満ちない（{coil.Firings} 回）");
+            yield return WaitFor(() => coil.Shots > 0, 0.5f, "砲口がはじけない");
 
             // 宇宙船の中: 人が通ると、漂う物が押される。
             MicrogravityView cabin = UnityEngine.Object.FindObjectsByType<MicrogravityView>(FindObjectsSortMode.None)
@@ -438,6 +455,25 @@ namespace Airerage.PlayMode.Tests
                 yield return WaitSeconds(1.4f);
             }
             Assert.That(cabin.Pushes, Is.GreaterThan(0), "宇宙船の中を通っても、漂う物が押されない");
+        }
+
+        // 照準を同じ向きに入れ続ける（コイルガンの向きを決める）。
+        private sealed class HoldAim : ITickInputSource
+        {
+            private readonly sbyte _x;
+            private readonly sbyte _y;
+
+            public HoldAim(Vector2 aim)
+            {
+                _x = (sbyte)Mathf.RoundToInt(aim.x * Airerage.Core.Input.PlayerInput.AxisMax);
+                _y = (sbyte)Mathf.RoundToInt(aim.y * Airerage.Core.Input.PlayerInput.AxisMax);
+            }
+
+            public bool TryGetNext(out Airerage.Core.Input.PlayerInput input)
+            {
+                input = new Airerage.Core.Input.PlayerInput(0, 0, Airerage.Core.Input.InputButtons.None, _x, _y);
+                return true;
+            }
         }
 
         private static IEnumerator WaitFor(Func<bool> condition, float seconds, string message)

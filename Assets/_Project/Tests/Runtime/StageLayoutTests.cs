@@ -986,6 +986,53 @@ namespace Airerage.Runtime.Tests
             }
         }
 
+        [Test]
+        public void Kitchen_Donuts_BounceOnTheCounters_WithoutGoingThroughAnything_AndLeaveOnTheRight()
+        {
+            // 2026-11-24 の要望: 左の冷蔵庫の上のフライヤーから出て、地面を弾みながら右のステージの外へ消える。
+            Open("Stage_Kitchen");
+            StageTrap fryer = _traps.Single(t => t.Kind == StageTrapKind.DonutFryer);
+            float radius = fryer.HalfSize.X;
+            Assert.That(fryer.Muzzle.X, Is.LessThan(-50f), "フライヤーが左の冷蔵庫の上にない");
+            int slot = Enumerable.Range(0, fryer.DonutSlots).First(s => fryer.TryGetDonut(fryer.Period, s, out int age, out _, out _) && age == 0);
+            // 最後の点のほかは、着地点の真下に足場がある（足場の上で弾む）。
+            for (int i = 0; i < fryer.LandingTicks.Count - 1; i++)
+            {
+                Assert.That(fryer.TryGetDonut(fryer.Period + fryer.LandingTicks[i], slot, out _, out NVector2 at, out _), Is.True);
+                Assert.That(_terrain.Raycast(new NVector3(at.X, at.Y, 0f), -NVector3.UnitY, radius + 0.3f, out _), Is.True,
+                    $"{i} 番目の着地点 {at} の下に足場がない");
+            }
+            // 道のりのどこでも、ドーナツが地形に埋まらない。
+            for (int age = 0; ; age++)
+            {
+                if (!fryer.TryGetDonut(fryer.Period + age, slot, out int shownAge, out NVector2 at, out _) || shownAge != age)
+                {
+                    Assert.That(age, Is.GreaterThan(300), "ドーナツがすぐ消える");
+                    Assert.That(_bounds.Contains(new NVector3(at.X, at.Y, 0f)), Is.False, "ドーナツがステージの中で消える（右の外へ消えるはず）");
+                    break;
+                }
+                Assert.That(_terrain.IsOverlapping(new NVector3(at.X, at.Y, 0f), new NVector3(radius * 0.7f, radius * 0.7f, 0.1f)), Is.False,
+                    $"ドーナツが {age} ティック目に地形に埋まる（{at}）");
+            }
+        }
+
+        [Test]
+        public void Kitchen_MixerWhirl_CarriesYouAsHighAsItsDustRises()
+        {
+            // 2026-11-24 の指摘: 見た目（昇る塵の柱）のわりに飛ぶ高さが低い → 高く運ぶ。棚の上から 20m ほど上まで飛ぶ。
+            Open("Stage_Kitchen");
+            StageZone whirl = _zones.Single(z => z.Kind == StageZoneKind.Updraft);
+            SimWorld world = World(new NVector3(-42f, 14.6f + CharacterHalf.Y, 0f));
+            float highest = 0f;
+            for (int t = 0; t < 240; t++)
+            {
+                Step(world, 1, default);
+                highest = Mathf.Max(highest, world.GetState(0).Position.Y);
+            }
+            Assert.That(highest, Is.GreaterThan(whirl.MaxY + 3f), "渦の上の端から飛び出さない");
+            Assert.That(highest - 14.6f, Is.InRange(17f, 24f), $"棚から 20m ほど上まで飛ばない（{highest}）");
+        }
+
         private SimWorld World(params NVector3[] positions)
         {
             return World(_zones, positions);

@@ -28,6 +28,15 @@ namespace Airerage.Core.Simulation
         /// <summary>ボールに触れたときに弾き返す速さ（m/s。バンパーと同じ決まり。StageZones.BumpAlong）【仮】。</summary>
         public const float BallBumpPower = 20f;
 
+        /// <summary>ドーナツに触れたときに弾き返す速さ（m/s。バンパーと同じ決まり）【仮】。</summary>
+        public const float DonutBumpPower = 18f;
+
+        /// <summary>
+        /// ドーナツのアンカーの、接続先の番号（WireState.AnchorBody）の始まり。動く足場は 1〜127、ドーナツは
+        /// DonutBodyBase + 仕掛けの番号 × StageTrap.MaxDonuts + ドーナツの番号。
+        /// </summary>
+        public const int DonutBodyBase = 128;
+
         /// <summary>ミサイルに当たったときの、上向きに足す速さ（吹き飛びの速さに対する割合）【仮】。</summary>
         public const float MissileLiftRatio = 0.35f;
 
@@ -104,6 +113,10 @@ namespace Airerage.Core.Simulation
                 else if (trap.Kind == StageTrapKind.Pitcher)
                 {
                     StepPitcher(trap, states, configs, tick);
+                }
+                else if (trap.Kind == StageTrapKind.DonutFryer)
+                {
+                    StepDonuts(trap, states, configs, tick);
                 }
                 // 鬼火の輪はコインを渡すので、台帳のある StepWispRings で進める。
             }
@@ -237,6 +250,117 @@ namespace Airerage.Core.Simulation
             StageZones.Strike(ref hit, velocity, trap.Power, StrikeImmunityTicks, configs[victim].Wire);
             states[victim] = hit;
             stage.SetTrap(index, tripped, true);
+        }
+
+        // ドーナツに触れた人を、ドーナツの中心から外向きに弾き返す（バンパーと同じ。ドーナツは丸いので、円に重なった人だけ）。
+        private static void StepDonuts(StageTrap trap, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick)
+        {
+            float radius = trap.HalfSize.X;
+            for (int slot = 0; slot < trap.DonutSlots; slot++)
+            {
+                if (!trap.TryGetDonut(tick, slot, out _, out Vector2 donut, out _))
+                {
+                    continue;
+                }
+                for (int c = 0; c < states.Count; c++)
+                {
+                    CharacterState state = states[c];
+                    if (!StageZones.CanBeHitByStage(state) || state.Combat.IsUntouchable)
+                    {
+                        continue;
+                    }
+                    Vector2 half = Half(configs[c]);
+                    // 箱のいちばん近い点が、ドーナツの円の中か。
+                    float nearX = MathF.Max(state.Position.X - half.X, MathF.Min(donut.X, state.Position.X + half.X));
+                    float nearY = MathF.Max(state.Position.Y - half.Y, MathF.Min(donut.Y, state.Position.Y + half.Y));
+                    float dx = nearX - donut.X;
+                    float dy = nearY - donut.Y;
+                    if (dx * dx + dy * dy > radius * radius)
+                    {
+                        continue;
+                    }
+                    var away = new Vector2(state.Position.X - donut.X, state.Position.Y - donut.Y);
+                    float distance = away.Length();
+                    Vector2 normal = distance > 1e-4f ? away / distance : Vector2.UnitY;
+                    if (StageZones.BumpAlong(ref state, normal, DonutBumpPower))
+                    {
+                        states[c] = state;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// ティック tick の初めに、出ているドーナツの真ん中をアンカーポイントにする（動く足場のアンカーの後に足す。次のティックの
+        /// SetPlatforms で消える）。ワイヤーの接続先の番号は DonutBodyBase から。
+        /// </summary>
+        public static void AddAnchors(Objects.WorldCollision collision, IReadOnlyList<StageTrap> traps, int tick)
+        {
+            if (traps == null || collision == null)
+            {
+                return;
+            }
+            for (int i = 0; i < traps.Count; i++)
+            {
+                StageTrap trap = traps[i];
+                if (trap.Kind != StageTrapKind.DonutFryer)
+                {
+                    continue;
+                }
+                for (int slot = 0; slot < trap.DonutSlots; slot++)
+                {
+                    if (trap.TryGetDonut(tick, slot, out _, out Vector2 donut, out _))
+                    {
+                        collision.AddMovingAnchor(new Vector3(donut.X, donut.Y, 0f), trap.HalfSize.X, DonutBody(i, slot));
+                    }
+                }
+            }
+        }
+
+        /// <summary>仕掛け trapIndex の番号 slot のドーナツの、ワイヤーの接続先の番号。</summary>
+        public static int DonutBody(int trapIndex, int slot)
+        {
+            return DonutBodyBase + trapIndex * StageTrap.MaxDonuts + slot;
+        }
+
+        /// <summary>
+        /// ティック tick の初めに、ドーナツにつないだワイヤーの接続点を、ドーナツの動いた分だけ動かす。ドーナツが消えた・ステージの外
+        /// （bounds）へ出たら、ワイヤーを外す（つないだまま外へ引きずり出されない）。
+        /// </summary>
+        public static void CarryWires(IReadOnlyList<StageTrap> traps, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick,
+            StageBounds? bounds)
+        {
+            if (traps == null)
+            {
+                return;
+            }
+            for (int c = 0; c < states.Count; c++)
+            {
+                CharacterState state = states[c];
+                if (state.Wire.Phase != Wire.WirePhase.Attached || state.Wire.AnchorBody < DonutBodyBase)
+                {
+                    continue;
+                }
+                int body = state.Wire.AnchorBody - DonutBodyBase;
+                int index = body / StageTrap.MaxDonuts;
+                int slot = body % StageTrap.MaxDonuts;
+                Vector2 now = Vector2.Zero;
+                int age = 0;
+                bool alive = index < traps.Count && traps[index].Kind == StageTrapKind.DonutFryer
+                    && traps[index].TryGetDonut(tick, slot, out age, out now, out _);
+                alive = alive && age > 0 && (!bounds.HasValue || bounds.Value.Contains(new Vector3(now.X, now.Y, 0f)));
+                if (!alive)
+                {
+                    Wire.WireController.Release(ref state, Wire.WireReleaseReason.AnchorGone, configs[c].Wire);
+                    states[c] = state;
+                    continue;
+                }
+                traps[index].TryGetDonut(tick - 1, slot, out _, out Vector2 before, out _);
+                var move = new Vector3(now.X - before.X, now.Y - before.Y, 0f);
+                state.Wire.Anchor += move;
+                state.Wire.HookPosition += move;
+                states[c] = state;
+            }
         }
 
         private static void StepPitcher(StageTrap trap, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick)

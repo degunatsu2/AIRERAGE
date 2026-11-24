@@ -25,6 +25,21 @@ namespace Airerage.Editor.Stages
 
         // トースター（左の調理台の上。2026-11-20 の方針: 判定を見た目に合わせる。前は通り抜けられる飾りの箱だったので、乗れる地形にした）:
         // 本体の範囲と奥行き。上の 2 本の溝からパンが跳ね上がる（ToasterPop の発射台は溝の上）。
+        /// <summary>ドーナツの半径（m）と、フライヤーのシュートの出口（左の冷蔵庫の上）。</summary>
+        internal const float DonutRadius = 0.9f;
+        internal static readonly Vector2 DonutChuteExit = new Vector2(-52.5f, 3.3f);
+
+        /// <summary>
+        /// ドーナツの着地点（中心。足場の上の面 ＋ 半径）: 左の調理台・トースターの上・左の調理台・まな板のゼリー・コンロ・コンロ・ボウルのゼリー・
+        /// 右の調理台（カップケーキのベルトコンベア）・排水溝のふたの上、最後はステージの右の外（ここで消える）。
+        /// </summary>
+        internal static readonly Vector2[] DonutLandings =
+        {
+            new Vector2(-44f, 2f + DonutRadius), new Vector2(-35.5f, ToasterTop + DonutRadius), new Vector2(-28f, 2f + DonutRadius),
+            new Vector2(-18f, 6.5f + DonutRadius), new Vector2(-5f, DonutRadius), new Vector2(5f, DonutRadius), new Vector2(18f, 6.5f + DonutRadius),
+            new Vector2(30f, 2f + DonutRadius), new Vector2(46.4f, 18.2f + DonutRadius), new Vector2(66f, 4f),
+        };
+
         internal const float ToasterMinX = -37.1f;
         internal const float ToasterMaxX = -33.9f;
         internal const float ToasterTop = 4.4f;
@@ -76,8 +91,8 @@ namespace Airerage.Editor.Stages
                 Id = "Kitchen",
                 Music = "Kitchen",
                 DisplayName = "SWEET KITCHEN",
-                Description = "The oven blasts fire every 40 seconds. Ride the roll cakes across the sky, and dive into the sink drain to be flushed up to the shelf.",
-                DescriptionJa = "40秒ごとにオーブンから火柱が噴き出す。空を渡るロールケーキに乗り、シンクの排水溝に飛び込めば棚の上まで流される。",
+                Description = "The oven blasts fire every 40 seconds. Ride the roll cakes across the sky, dive into the sink drain to be flushed up to the shelf, and hook the bouncing donuts.",
+                DescriptionJa = "40秒ごとにオーブンから火柱が噴き出す。空を渡るロールケーキに乗り、シンクの排水溝に飛び込めば棚の上まで流される。跳ねてくるドーナツにもワイヤーがつながる。",
                 Color = new Color(1f, 0.6f, 0.75f),
                 Terrain = new[]
                 {
@@ -148,10 +163,18 @@ namespace Airerage.Editor.Stages
                     // ドーナツの輪（加速リング）: 調理台の上の空から真ん中へ。
                     new ZoneSpec("DonutWest", StageZoneKind.BoostRing, new Vector2(-26f, 15f), new Vector2(2.4f, 3f), new Vector2(1f, 0.3f), 19f),
                     new ZoneSpec("DonutEast", StageZoneKind.BoostRing, new Vector2(26f, 15f), new Vector2(2.4f, 3f), new Vector2(-1f, 0.3f), 19f),
-                    // ミキサーの渦（左の棚の上から上へ）。
-                    new ZoneSpec("MixerWhirl", StageZoneKind.Updraft, new Vector2(-42f, 19f), new Vector2(4f, 9f), Vector2.up, 45f, 12f)
+                    // ミキサーの渦（左の棚の上から上へ）。見た目の渦の柱の高さに合わせて、高く運ぶ（2026-11-24 の指摘: 見た目のわりに低い。
+                    // 範囲を 9m → 16m、上向きの速さの上限を 12 → 16 m/s【仮】。棚から約 20m 上まで飛ぶ）。
+                    new ZoneSpec("MixerWhirl", StageZoneKind.Updraft, new Vector2(-42f, 22.5f), new Vector2(4f, 16f), Vector2.up, 45f, 16f)
                         // 2026-11-20 の方針: 小麦粉と砂糖が回りながら舞い上がる渦（つむじ風と同じ回る粒。色は粉の色。明るい壁の上で見えるように少し濃く）。
                         .Styled(StageZoneView.ZoneLook.DustDevil).Tinted(new Color(0.8f, 0.76f, 0.68f)),
+                },
+                // ドーナツフライヤー（ユーザーの案、2026-11-24）: 左の冷蔵庫の上のフライヤーから、揚げたドーナツが 5 秒【仮】ごとに飛び出し、
+                // 調理台・トースターの上・まな板のゼリー・コンロ・ボウル・右の調理台・排水溝のふたの上を弾んで、右のステージの外へ消える。
+                // 触れると弾かれ、真ん中にワイヤーがつながる（一緒に運ばれる。ステージの外へ出たら外れる）。
+                Traps = new[]
+                {
+                    TrapSpec.DonutFryer("DonutFryer", DonutChuteExit, DonutLandings, 5f, 0f, DonutRadius, 3f),
                 },
                 Platforms = new[]
                 {
@@ -182,7 +205,7 @@ namespace Airerage.Editor.Stages
                     (new Vector2(-20.5f, 8.5f), 1), (new Vector2(-15.5f, 8.5f), 1), (new Vector2(15.5f, 8.5f), 1), (new Vector2(20.5f, 8.5f), 1),
                     (new Vector2(-18f, 14.5f), 1), (new Vector2(18f, 14.5f), 1), (new Vector2(-22.5f, 11f), 1), (new Vector2(22.5f, 11f), 1),
                     // 棚の上とミキサーの渦。
-                    (new Vector2(-45f, 16.5f), 1), (new Vector2(-39f, 16.5f), 1), (new Vector2(-42f, 26f), 3), (new Vector2(-42f, 28.5f), 20),
+                    (new Vector2(-45f, 16.5f), 1), (new Vector2(-39f, 16.5f), 1), (new Vector2(-42f, 26f), 3), (new Vector2(-42f, 35.5f), 20),
                     (new Vector2(45f, 16.5f), 1), (new Vector2(39f, 16.5f), 1), (new Vector2(42f, 19.5f), 3),
                     // ケーキスタンドの上と、その上の空。
                     (new Vector2(-4.5f, 22.5f), 1), (new Vector2(4.5f, 22.5f), 1), (new Vector2(-6f, 27f), 3),

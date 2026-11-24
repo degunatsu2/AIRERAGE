@@ -503,8 +503,8 @@ namespace Airerage.Core.Skills
             for (int i = 0; i < traps.Count; i++)
             {
                 StageTrap trap = traps[i];
-                // 鬼火の輪は奪えない（飛び回る贈り物で、置ける仕掛けではない）。
-                if (trap.Kind == StageTrapKind.WispRing)
+                // 鬼火の輪とドーナツフライヤーは奪えない（飛び回る物・ステージの外の装置で、置ける仕掛けではない）。
+                if (trap.Kind == StageTrapKind.WispRing || trap.Kind == StageTrapKind.DonutFryer)
                 {
                     continue;
                 }

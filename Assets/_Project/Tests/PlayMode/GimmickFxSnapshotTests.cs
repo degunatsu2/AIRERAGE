@@ -235,19 +235,37 @@ namespace Airerage.PlayMode.Tests
             }
             yield return Wait(0.12f);
             Shoot(camera, new Vector3(54f, 4f, -16f), "Space_4Warped");
-            // 電磁コイルの加速器を通るところ。
-            StageZoneView coil = View("CoreRing");
-            Shoot(camera, new Vector3(coil.ShownCenter.x, coil.ShownCenter.y, -9f), "Space_5Coil");
-            state = runner.PlayerState;
-            state.Position = new System.Numerics.Vector3(coil.ShownCenter.x - 4.4f, coil.ShownCenter.y, 0f);
-            state.Velocity = new System.Numerics.Vector3(10f, 1f, 0f);
-            runner.SetPlayerState(state);
-            limit = Time.realtimeSinceStartup + 2f;
-            while (runner.PlayerState.Position.X < coil.ShownCenter.x - 0.6f && Time.realtimeSinceStartup < limit)
+            // 救出のゲートが動いて撓んでいるところ（動く向きと逆へ帆のようにふくらむ）。
+            limit = Time.realtimeSinceStartup + 6f;
+            WormholeView rescueMouth = rescue.GetComponentInChildren<WormholeView>();
+            while (rescueMouth.Bend.magnitude < 0.6f && Time.realtimeSinceStartup < limit)
             {
                 yield return null;
             }
-            Shoot(camera, new Vector3(coil.ShownCenter.x, coil.ShownCenter.y, -9f), "Space_6CoilFiring");
+            Shoot(camera, new Vector3(rescue.ShownCenter.x, rescue.ShownCenter.y + 1f, -12f), "Space_2RescueBending");
+            // コイルガン: 収まってためているところ（照準を左上へ）と、撃ち出した瞬間。
+            StageZoneView coil = View("CoilGunCore");
+            Shoot(camera, new Vector3(coil.ShownCenter.x, coil.ShownCenter.y, -10f), "Space_5Coil");
+            runner.InputOverride = new HoldAimAt(new System.Numerics.Vector2(-0.6f, 0.8f));
+            state = runner.PlayerState;
+            state.Position = new System.Numerics.Vector3(coil.ShownCenter.x - 2.4f, coil.ShownCenter.y, 0f);
+            state.Velocity = new System.Numerics.Vector3(4f, 0f, 0f);
+            runner.SetPlayerState(state);
+            limit = Time.realtimeSinceStartup + 2f;
+            while (runner.PlayerState.Combat.CaptureTicks < 36 && Time.realtimeSinceStartup < limit)
+            {
+                yield return null;
+            }
+            Shoot(camera, new Vector3(coil.ShownCenter.x, coil.ShownCenter.y + 1.5f, -12f), "Space_6CoilCharging");
+            limit = Time.realtimeSinceStartup + 2f;
+            while (runner.PlayerState.Combat.CaptureTicks > 0 && Time.realtimeSinceStartup < limit)
+            {
+                yield return null;
+            }
+            yield return Wait(0.05f);
+            Shoot(camera, new Vector3(coil.ShownCenter.x - 1f, coil.ShownCenter.y + 2f, -12f), "Space_6CoilFiring");
+            runner.InputOverride = null;
+            yield return Wait(1.5f);
             // 宇宙船の中（漂う物と水の玉）と、人が通って押されたところ。
             StageZoneView cabin = View("ZeroGravityWest");
             Shoot(camera, new Vector3(cabin.ShownCenter.x, cabin.ShownCenter.y, -13f), "Space_7Cabin");
@@ -258,6 +276,61 @@ namespace Airerage.PlayMode.Tests
             runner.SetPlayerState(state);
             yield return Wait(1.2f);
             Shoot(camera, new Vector3(cabin.ShownCenter.x, cabin.ShownCenter.y, -13f), "Space_8CabinPushed");
+        }
+
+        private sealed class HoldAimAt : ITickInputSource
+        {
+            private readonly System.Numerics.Vector2 _aim;
+
+            public HoldAimAt(System.Numerics.Vector2 aim)
+            {
+                _aim = aim;
+            }
+
+            public bool TryGetNext(out Airerage.Core.Input.PlayerInput input)
+            {
+                input = Airerage.Core.Input.PlayerInput.FromAxes(0f, 0f, Airerage.Core.Input.InputButtons.None).WithAim(_aim);
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// キッチンのドーナツフライヤー（2026-11-24 の要望）: 左の棚のフライヤー、弾んで転がるドーナツ、着地でつぶれたところ、
+        /// 右の端から出ていくところを撮る（Logs/Snapshots/Kitchen_*）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureKitchenDonuts()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            Directory.CreateDirectory(Folder);
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Kitchen"));
+            while (flow.Current != GameFlow.FlowScreen.Training || flow.IsLoading || SceneManager.GetActiveScene().name != "Stage_Kitchen")
+            {
+                yield return null;
+            }
+            yield return Wait(1f);
+            Camera camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            DonutFryerView fryer = Object.FindFirstObjectByType<DonutFryerView>();
+            Shoot(camera, new Vector3(-50f, 5f, -14f), "Kitchen_1Fryer");
+            Shoot(camera, new Vector3(-50f, 4f, -7f), "Kitchen_1FryerClose");
+            float limit = Time.realtimeSinceStartup + 8f;
+            while (fryer.Shown < 3 && Time.realtimeSinceStartup < limit)
+            {
+                yield return null;
+            }
+            Shoot(camera, new Vector3(-20f, 8f, -40f), "Kitchen_2DonutsLeft");
+            Shoot(camera, new Vector3(-36f, 5f, -12f), "Kitchen_3DonutToaster");
+            yield return Wait(4f);
+            Shoot(camera, new Vector3(20f, 8f, -40f), "Kitchen_4DonutsRight");
+            Shoot(camera, new Vector3(0f, 4f, -10f), "Kitchen_5DonutCenter");
+            // 左上のつむじ風（ミキサーの粉の渦）: 見た目の高さと、飛ぶ高さ（頂点の高さ）が合っているか。
+            Shoot(camera, new Vector3(-42f, 24f, -34f), "Kitchen_6MixerWhirl");
         }
 
         private sealed class HoldWire : ITickInputSource

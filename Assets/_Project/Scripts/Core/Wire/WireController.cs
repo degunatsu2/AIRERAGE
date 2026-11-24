@@ -232,6 +232,20 @@ namespace Airerage.Core.Wire
                 step = remaining;
             }
 
+            if (wire.HasTargetPoint && !WireTargeting.IsAnchorPoint(_collision, wire.TargetPoint)
+                && WireTargeting.TryTrackAnchor(_collision, wire.TargetPoint, out Vector3 moved))
+            {
+                // 狙ったアンカーが動く物に付いていて動いた: 今の位置へ向け直して追いかける（2026-11-24 の要望: 戻っていく途中の荷役の網）。
+                wire.TargetPoint = moved;
+                Vector3 toMoved = moved - wire.HookPosition;
+                toMoved.Z = 0f;
+                float movedDistance = toMoved.Length();
+                if (movedDistance > SimMath.Epsilon)
+                {
+                    wire.HookDirection = toMoved / movedDistance;
+                }
+            }
+
             float targetDistance = float.MaxValue;
             if (wire.HasTargetPoint)
             {
@@ -258,7 +272,7 @@ namespace Airerage.Core.Wire
 
             if (wire.HasTargetPoint && targetDistance <= step)
             {
-                // 狙ったアンカーが動いた・なくなった（動く足場のアンカー、置かれた物）なら、何もない所にはつながらない。
+                // 狙ったアンカーがなくなった（置かれた物）・追いかけられないほど離れたなら、何もない所にはつながらない。
                 if (!WireTargeting.IsAnchorPoint(_collision, wire.TargetPoint))
                 {
                     wire.HookPosition = wire.TargetPoint;

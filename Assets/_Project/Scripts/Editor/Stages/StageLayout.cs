@@ -109,7 +109,7 @@ namespace Airerage.Editor.Stages
         /// <summary>範囲が丸いか（箱に内接する円。ワープゲートのワームホールの口）。</summary>
         public bool Round;
 
-        /// <summary>ワームホールの出口に小さな口を置くか（出口が対の口の近くでないとき。救出のゲート）。</summary>
+        /// <summary>ワープゲートの出口に小さな渦を置くか。</summary>
         public bool ExitMouth;
 
         /// <summary>線と台の色（なければステージの種類ごとの色）。</summary>
@@ -159,8 +159,8 @@ namespace Airerage.Editor.Stages
         }
 
         /// <summary>
-        /// ワープゲートを球のワームホールの口にする（ZoneLook.Wormhole。判定も円 StageZone.Round。2026-11-21 の方針）。範囲は正方形にする。
-        /// exitMouth なら出口に小さな口を置く（出口が対の口の近くでないとき）。
+        /// ワープゲートを紫の渦にする（ZoneLook.Wormhole。2026-11-24: 前の楕円の見た目を精巧に）。判定も渦と同じ楕円（StageZone.Round）。
+        /// exitMouth なら出口に小さな逆回りの渦を置く。
         /// </summary>
         public ZoneSpec Wormhole(bool exitMouth)
         {
@@ -467,6 +467,9 @@ namespace Airerage.Editor.Stages
         public float RespawnMinSeconds;
         public float RespawnMaxSeconds;
 
+        // ドーナツフライヤー（着地点は Waypoints、周期とずれは PeriodSeconds・PhaseSeconds、半径は Radius）。
+        public float HopHeight;
+
         private TrapSpec(string name, StageTrapKind kind, Vector2 center)
         {
             Name = name;
@@ -513,6 +516,22 @@ namespace Airerage.Editor.Stages
                 Reward = reward,
                 RespawnMinSeconds = respawnMin,
                 RespawnMaxSeconds = respawnMax,
+            };
+        }
+
+        /// <summary>
+        /// ドーナツフライヤー（出口 muzzle から period 秒ごとにドーナツを出し、landings の着地点を順に弾んで、最後の点で消える。ずれ phase 秒。
+        /// 半径 radius・跳ねの高さ hop）。物体は出口に置く。
+        /// </summary>
+        public static TrapSpec DonutFryer(string name, Vector2 muzzle, Vector2[] landings, float period, float phase, float radius, float hop)
+        {
+            return new TrapSpec(name, StageTrapKind.DonutFryer, muzzle)
+            {
+                Waypoints = landings,
+                PeriodSeconds = period,
+                PhaseSeconds = phase,
+                Radius = radius,
+                HopHeight = hop,
             };
         }
 

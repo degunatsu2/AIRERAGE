@@ -200,6 +200,13 @@ namespace Airerage.Editor.Stages
                 go.transform.SetParent(root, false);
                 go.transform.position = new Vector3(spec.Center.x, spec.Center.y, 0f);
                 var authoring = go.AddComponent<StageTrapAuthoring>();
+                if (spec.Kind == StageTrapKind.DonutFryer)
+                {
+                    // ドーナツは決まった道のりを弾むので、見た目は DonutFryerView が動かす（StageTrapView は使わない）。
+                    authoring.ConfigureDonutFryer(spec.Waypoints, spec.PeriodSeconds, spec.PhaseSeconds, spec.Radius, spec.HopHeight);
+                    CreateDonutFryer(go.transform, authoring, spec, decor);
+                    continue;
+                }
                 if (spec.Kind == StageTrapKind.WispRing)
                 {
                     // 鬼火の輪は飛び回るので、見た目は WispRingView が動かす（StageTrapView は使わない）。
@@ -541,7 +548,6 @@ namespace Airerage.Editor.Stages
         {
             var lineMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             var root = new GameObject("Gimmicks").transform;
-            var wormholes = new List<(ZoneSpec Spec, WormholeView View)>();
             foreach (ZoneSpec zone in zones)
             {
                 var go = new GameObject(zone.Name);
@@ -573,10 +579,6 @@ namespace Airerage.Editor.Stages
                     view.ConfigureMoving(propParent);
                 }
                 GameObject active = CreateProp(propParent, go.transform, zone, color, decor);
-                if (active != null && active.TryGetComponent(out WormholeView wormhole))
-                {
-                    wormholes.Add((zone, wormhole));
-                }
                 // いつも効いている危険（周期と効く長さが同じ。プラズマ球）は、いつも出しておく。
                 bool periodic = zone.PeriodSeconds > 0f && zone.ActiveSeconds < zone.PeriodSeconds;
                 if (zone.Kind == StageZoneKind.Gust || zone.Kind == StageZoneKind.Hazard || zone.Kind == StageZoneKind.Blizzard
@@ -587,7 +589,6 @@ namespace Airerage.Editor.Stages
                     active.SetActive(!periodic);
                 }
             }
-            PairWormholes(wormholes);
         }
 
         // ギミックの台・柱などの見た目（当たりはない）。風の柱・間欠泉の噴き出し・危険の柱・吹雪の幕は、効いている間だけ出す（StageZoneView）。
@@ -613,7 +614,7 @@ namespace Airerage.Editor.Stages
                     return CreateWormhole(parent, root, zone, color, decor);
                 case StageZoneKind.LowGravity when zone.Look == StageZoneView.ZoneLook.Microgravity:
                     return CreateMicrogravity(parent, zone, decor);
-                case StageZoneKind.BoostRing when zone.Look == StageZoneView.ZoneLook.Coil:
+                case StageZoneKind.CoilGun:
                     return CreateCoilAccelerator(parent, zone, color, decor);
                 case StageZoneKind.Launcher:
                     if (zone.PeriodSeconds > 0f)
@@ -710,68 +711,46 @@ namespace Airerage.Editor.Stages
             }
         }
 
-        // ワームホールの口（ワープゲート + ZoneLook.Wormhole。2026-11-21 のギミックの精巧化 第 5 弾）: 手本は映画『インターステラー』の
-        // ワームホール（どの向きからも球に見え、中に向こう側の景色、周りに重力レンズ）。面の質感はなく、Airerage/Wormhole の板が後ろの景色を
-        // ゆがめて描く。板はキャラクターの少し奥（z +0.6）。当たりは口の円（StageZone.Round）。出口が対の口の近くでなければ、出口に小さな口
-        // （向こうから見た出口）を置く。対の口は CreateZones が WormholeView.Configure の後に結ぶ（PairWormholes）。
+        // ワープゲートの渦（ワープゲート + ZoneLook.Wormhole。2026-11-24 の要望: 前の紫の楕円の見た目を精巧に）: 楕円の渦の面
+        // （Airerage/Wormhole。半径 1 の円盤をゲートの大きさに拡大。キャラクターの少し奥）と、出口の小さな渦（逆回り。動かない）。
+        // 回りながら揺れる輪と吸い込まれる輪、動く向きへの撓み、ワープの波紋は WormholeView。当たりは渦と同じ楕円（StageZone.Round）。
         private static GameObject CreateWormhole(Transform parent, Transform root, ZoneSpec zone, Color color, StageDecor decor)
         {
-            float radius = Mathf.Min(zone.Size.x, zone.Size.y) * 0.5f;
             var mouth = new GameObject("Wormhole").transform;
             mouth.SetParent(parent, false);
-            GameObject plate = decor.Quad("Mouth", mouth, new Vector3(0f, 0f, WormholeDepth), Vector2.one * radius * 2f * WormholeHalo,
-                WormholeMaterial(radius, color, decor));
-            Renderer exit = null;
-            const float exitRadius = 1.1f;
+            Mesh disc = ProceduralMesh.Disc("SpaceStation", "WarpDisc", 10, 64);
+            Material portal = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WarpPortal", "Airerage/Wormhole", m =>
+            {
+                m.SetColor("_Color", new Color(color.r * 1.7f, color.g * 1.5f, color.b * 2.4f, 1f));
+                m.SetColor("_Mid", color);
+                m.SetFloat("_Inward", 1f);
+            }, decor.Folder);
+            GameObject face = ProceduralMesh.Place("Portal", mouth, disc, new Vector3(0f, 0f, 0.3f), Quaternion.identity,
+                new Vector3(zone.Size.x * 0.5f, zone.Size.y * 0.5f, 1f), portal);
+            face.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            MeshFilter exit = null;
+            const float exitRadius = 0.7f;
             if (zone.ExitMouth)
             {
-                Vector3 local = new Vector3(zone.Target.x - zone.Center.x, zone.Target.y - zone.Center.y, WormholeDepth);
-                exit = decor.Quad("ExitMouth", root, local, Vector2.one * exitRadius * 2f * WormholeHalo, WormholeMaterial(exitRadius, color, decor))
-                    .GetComponent<Renderer>();
+                Material outflow = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WarpExit", "Airerage/Wormhole", m =>
+                {
+                    m.SetColor("_Color", new Color(color.r * 1.7f, color.g * 1.6f, color.b * 2.4f, 1f));
+                    m.SetColor("_Mid", Color.Lerp(color, Color.white, 0.25f));
+                    m.SetFloat("_Inward", -1f);
+                    m.SetFloat("_Opacity", 0.6f);
+                }, decor.Folder);
+                // 出口は動かない（動くゲートでも、ギミックの物体の子にする）。
+                Vector3 local = new Vector3(zone.Target.x - zone.Center.x, zone.Target.y - zone.Center.y, 0.3f);
+                GameObject exitFace = ProceduralMesh.Place("ExitMouth", root, disc, local, Quaternion.identity, Vector3.one * exitRadius, outflow);
+                exitFace.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+                exit = exitFace.GetComponent<MeshFilter>();
             }
-            mouth.gameObject.AddComponent<WormholeView>().Configure(plate.GetComponent<Renderer>(), radius, exit != null ? exit.transform : null,
-                exit, exitRadius);
-            return mouth.gameObject;
-        }
-
-        // ワームホールの板の奥行き（キャラクターより奥）と、重力レンズの広さ（口の半径の倍）。
-        private const float WormholeDepth = 0.6f;
-        private const float WormholeHalo = 2.4f;
-
-        private static Material WormholeMaterial(float radius, Color color, StageDecor decor)
-        {
-            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial($"Wormhole{Mathf.RoundToInt(radius * 100f)}", "Airerage/Wormhole", m =>
+            Material line = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WarpRing", "Airerage/GlowLine", m =>
             {
-                m.SetFloat("_Radius", radius);
-                m.SetFloat("_Halo", WormholeHalo);
-                m.SetFloat("_Einstein", 1.3f);
-                m.SetColor("_Color", new Color(color.r * 1.6f, color.g * 1.6f, color.b * 2.2f, 1f));
-                m.SetColor("_OtherTint", color);
+                m.SetFloat("_Intensity", 2.4f);
             }, decor.Folder);
-        }
-
-        // 対になったワームホールの口を結ぶ: 出口が別のワープゲートの口の近く（口の半径 + 3m 以内）なら、その口を向こう側にする。
-        private static void PairWormholes(List<(ZoneSpec Spec, WormholeView View)> mouths)
-        {
-            foreach ((ZoneSpec spec, WormholeView view) in mouths)
-            {
-                if (view.Other != null)
-                {
-                    continue;
-                }
-                foreach ((ZoneSpec otherSpec, WormholeView otherView) in mouths)
-                {
-                    if (otherView == view)
-                    {
-                        continue;
-                    }
-                    if (Vector2.Distance(spec.Target, otherSpec.Center) <= otherView.Radius + 3f)
-                    {
-                        view.Configure(view.Mouth, view.Radius, otherView.Mouth.transform, null, 0f);
-                        break;
-                    }
-                }
-            }
+            mouth.gameObject.AddComponent<WormholeView>().Configure(face.GetComponent<MeshFilter>(), exit, line, color, zone.Size * 0.5f, exitRadius);
+            return mouth.gameObject;
         }
 
         // 宇宙船の中の無重力（無重力 + ZoneLook.Microgravity。2026-11-21 のギミックの精巧化 第 5 弾）: 手本は ISS と天宮の船内の映像。
@@ -896,10 +875,10 @@ namespace Airerage.Editor.Stages
             return ProceduralMesh.Lathe(stage, name, profile, 32, caps: false);
         }
 
-        // 電磁コイルの加速器（加速リング + ZoneLook.Coil。2026-11-21 のギミックの精巧化 第 5 弾）: 手本は多段のコイルガン（電磁石の
-        // コイルを順に通電して、通る物を引き寄せて加速するリニアモーター）。銅の巻き線のコイル 3 つ（内側の光る輪）を加速の向きに並べ、
-        // 上下と奥のレールでつなぎ、上のレールにコンデンサーの列とケーブル。コイルの内径が範囲の高さ（通れる所）。光り方と火花は
-        // CoilAcceleratorView（通る人の位置に合わせて、手前のコイルから順に通電する）。
+        // コイルガン（StageZoneKind.CoilGun。2026-11-24 の要望。前は 2026-11-21 の電磁コイルの加速器）: 手本は多段のコイルガン（電磁石の
+        // コイルを順に通電して、中の物を撃ち出すリニアモーター）。銅の巻き線のコイル 3 つ（内側の光る輪）を砲身の向きに並べ、
+        // 上下と奥のレールでつなぎ、上のレールにコンデンサーの列とケーブル。コイルの内径が範囲の高さ。砲身ごと照準の向きへ回り、
+        // ため具合でコイルが順に光り、撃ち出す先の軌道を線で見せる（CoilAcceleratorView）。
         private static GameObject CreateCoilAccelerator(Transform parent, ZoneSpec zone, Color color, StageDecor decor)
         {
             const string meshes = "SpaceStation";
@@ -909,7 +888,7 @@ namespace Airerage.Editor.Stages
             float length = zone.Size.x;
             var rig = new GameObject("CoilAccelerator").transform;
             rig.SetParent(parent, false);
-            rig.localRotation = Quaternion.FromToRotation(Vector3.right, new Vector3(axis.x, axis.y, 0f));
+            rig.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(axis.y, axis.x) * Mathf.Rad2Deg);
             Material copper = decor.Lit("CoilCopper", new Color(0.72f, 0.42f, 0.22f));
             copper.SetFloat("_Metallic", 0.9f);
             copper.SetFloat("_Smoothness", 0.6f);
@@ -966,7 +945,28 @@ namespace Airerage.Editor.Stages
                     new Vector3(x, outer + 0.1f, 0.25f), new Vector3(x - 0.15f, outer + 0.02f, 0.3f), new Vector3(stations[i] + 0.05f, bore + tube * 1.8f, 0.2f),
                 }, new[] { 0.025f, 0.025f, 0.025f }, 6), Vector3.zero, Quaternion.identity, Vector3.one, cable);
             }
-            rig.gameObject.AddComponent<CoilAcceleratorView>().Configure(liners, sparks, stations, bore, axis, new Color(0.35f, 0.85f, 1f));
+            // 砲口の火花（撃ち出した瞬間。砲身の向きへ）と、撃ち出す先の軌道の線。
+            ParticleSystem muzzle = new ParticleFx
+            {
+                Name = "MuzzleBurst", LifetimeMin = 0.2f, LifetimeMax = 0.5f, SpeedMin = 8f, SpeedMax = 18f, SizeMin = 0.04f, SizeMax = 0.1f, ConeAngle = 25f,
+                ConeRadius = bore * 0.6f, Additive = true, Intensity = 5f, Stretch = 0.1f, MaxParticles = 120,
+                Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (new Color(0.35f, 0.85f, 1f), 0.4f), (new Color(0.2f, 0.4f, 1f), 1f) },
+                    new[] { (1f, 0f), (0f, 1f) }),
+            }.Build(rig, new Vector3(length * 0.5f, 0f, 0f), Quaternion.LookRotation(Vector3.right), decor.Folder);
+            var trajectory = new GameObject("Trajectory").AddComponent<LineRenderer>();
+            trajectory.transform.SetParent(parent, false);
+            trajectory.useWorldSpace = true;
+            trajectory.sharedMaterial = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("CoilTrajectory", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", 2f);
+            }, decor.Folder);
+            trajectory.widthMultiplier = 0.14f;
+            trajectory.numCapVertices = 2;
+            trajectory.shadowCastingMode = ShadowCastingMode.Off;
+            trajectory.receiveShadows = false;
+            trajectory.enabled = false;
+            rig.gameObject.AddComponent<CoilAcceleratorView>().Configure(liners, sparks, muzzle, trajectory, length * 0.5f, axis, zone.Power,
+                new Color(0.35f, 0.85f, 1f));
             return rig.gameObject;
         }
 
@@ -1244,9 +1244,15 @@ namespace Airerage.Editor.Stages
             visual.SetParent(parent, false);
             Quaternion up = Quaternion.Euler(-90f, 0f, 0f);
             var ground = new Vector3(0f, -size.y * 0.5f + 0.2f, 0.3f);
+            // 塵が昇る高さを、運ばれる人が届く高さ（範囲の上の端 ＋ 上向きの速さの上限で飛び出す分）に合わせる（2026-11-24 の指摘: 見た目の
+            // わりに飛ぶ高さが低い）。重力はキャラクターと同じ 30 m/s²。
+            float reach = size.y + zone.Limit * zone.Limit / (2f * 30f);
+            const float riseSpeed = 7f;
+            float life = Mathf.Clamp(reach / riseSpeed, 1.2f, 4f);
             new ParticleFx
             {
-                Name = "DustCore", Rate = 40f, LifetimeMin = 2.4f, LifetimeMax = 3.4f, SpeedMin = 5f, SpeedMax = 8f, SizeMin = 0.7f, SizeMax = 1.3f,
+                Name = "DustCore", Rate = 40f, LifetimeMin = life * 0.85f, LifetimeMax = life * 1.1f, SpeedMin = riseSpeed * 0.85f, SpeedMax = riseSpeed * 1.15f,
+                SizeMin = 0.7f, SizeMax = 1.3f,
                 GrowFrom = 0.8f, GrowTo = 2.4f, ConeAngle = 6f, ConeRadius = 0.9f, Orbit = 260f, Radial = -0.15f, EdgeNoise = 0.6f, Softness = 0.85f,
                 Turbulence = 0.4f, Spin = 60f, MaxParticles = 220,
                 Colors = ParticleFx.Ramp(new[] { (dust, 0f), (light, 1f) },
@@ -1262,7 +1268,8 @@ namespace Airerage.Editor.Stages
             }.Build(visual, ground, up, decor.Folder);
             new ParticleFx
             {
-                Name = "Debris", Rate = 10f, LifetimeMin = 2f, LifetimeMax = 3.2f, SpeedMin = 4f, SpeedMax = 8f, SizeMin = 0.06f, SizeMax = 0.16f,
+                Name = "Debris", Rate = 10f, LifetimeMin = life * 0.7f, LifetimeMax = life * 1.05f, SpeedMin = riseSpeed * 0.7f, SpeedMax = riseSpeed * 1.2f,
+                SizeMin = 0.06f, SizeMax = 0.16f,
                 ConeAngle = 10f, ConeRadius = 1f, Orbit = 340f, Spin = 400f, Softness = 0.2f, EdgeNoise = 0.5f, MaxParticles = 60,
                 Colors = ParticleFx.Ramp(new[] { (dark, 0f), (Color.Lerp(dark, dust, 0.4f), 1f) },
                     new[] { (1f, 0f), (1f, 0.8f), (0f, 1f) }),
@@ -1849,6 +1856,105 @@ namespace Airerage.Editor.Stages
             frame.gameObject.AddComponent<CatapultView>().Configure(root.GetComponent<StageZoneView>(), arm, rest, Stop, drum, payload, thrown,
                 new Vector3(-5f * side, 21f, 15f), ropeLine, hook);
             return release;
+        }
+
+        // ドーナツフライヤー（StageTrapKind.DonutFryer。2026-11-24 の要望）: 左の冷蔵庫の上に置いた業務用のフライヤー（ステンレスの油槽・
+        // 揚げ油・生地を落とすホッパー・操作盤・ドーナツが滑り出るシュート）。手本は、生地を輪の形に押し出して油に落とし、揚がったら
+        // シュートへ送り出すドーナツフライヤー。出ているドーナツ（揚げ色の生地・アイシング・トッピング）は DonutFryerView が道のりに
+        // 沿って動かす（転がる・着地でつぶれる）。物体の位置がシュートの出口。
+        private static void CreateDonutFryer(Transform trap, StageTrapAuthoring authoring, TrapSpec spec, StageDecor decor)
+        {
+            const string meshes = "Kitchen";
+            Material steel = decor.Lit("FryerSteel", new Color(0.78f, 0.8f, 0.84f));
+            steel.SetFloat("_Metallic", 0.85f);
+            steel.SetFloat("_Smoothness", 0.72f);
+            Material dark = decor.Lit("FryerDark", new Color(0.18f, 0.19f, 0.22f));
+            Material oil = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("FryerOil", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(0.95f, 0.66f, 0.18f));
+                m.SetFloat("_Intensity", 0.9f);
+            }, decor.Folder);
+            Material lamp = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("FryerLamp", "Airerage/Emissive", m =>
+            {
+                m.SetColor("_BaseColor", new Color(1f, 0.35f, 0.2f));
+                m.SetFloat("_Intensity", 2.2f);
+            }, decor.Folder);
+            // 冷蔵庫の上（上の面 y ≈ 1.1、手前の面 z ≈ 1.3）に、シュートの出口から見て左奥に置く。
+            var fryer = new GameObject("Fryer").transform;
+            fryer.SetParent(trap, false);
+            fryer.localPosition = new Vector3(-3.2f, -2.2f, 2.6f);
+            decor.Box("Body", fryer, new Vector3(0f, 1.05f, 0f), new Vector3(4.4f, 2.1f, 2.4f), steel);
+            decor.Box("Base", fryer, new Vector3(0f, 0.08f, 0f), new Vector3(4.6f, 0.16f, 2.6f), dark);
+            decor.Box("Rim", fryer, new Vector3(0f, 2.14f, 0f), new Vector3(4.5f, 0.1f, 2.5f), steel);
+            decor.Box("Oil", fryer, new Vector3(0f, 2.06f, 0f), new Vector3(4.1f, 0.06f, 2.1f), oil);
+            // 生地を落とすホッパー（逆さの円錐）と、操作盤のランプ。
+            ProceduralMesh.Place("Hopper", fryer, ProceduralMesh.Lathe(meshes, "FryerHopper", new[]
+            {
+                new Vector2(0.18f, 0f), new Vector2(0.75f, 0.9f), new Vector2(0.78f, 1.25f), new Vector2(0f, 1.25f),
+            }, 24), new Vector3(-0.9f, 2.5f, 0f), Quaternion.identity, Vector3.one, steel);
+            decor.Box("Panel", fryer, new Vector3(0f, 1.1f, -1.22f), new Vector3(2.4f, 0.9f, 0.06f), dark);
+            for (int i = 0; i < 3; i++)
+            {
+                decor.Box("Lamp", fryer, new Vector3(-0.7f + i * 0.7f, 1.15f, -1.27f), new Vector3(0.22f, 0.22f, 0.04f), lamp);
+            }
+            // シュート（油槽の右の縁から、出口へ下りながら手前へ）。
+            GameObject chute = decor.Box("Chute", trap, new Vector3(-0.9f, -0.15f, 1.3f), new Vector3(2.6f, 0.1f, 2.4f), steel);
+            chute.transform.localRotation = Quaternion.Euler(-25f, 0f, -12f);
+            // 油の泡と、シュートから飛ぶ油のしずく、立ちのぼる湯気。
+            ParticleSystem bubbles = new ParticleFx
+            {
+                Name = "OilBubbles", Rate = 8f, LifetimeMin = 0.3f, LifetimeMax = 0.6f, SpeedMin = 0.2f, SpeedMax = 0.6f, SizeMin = 0.06f, SizeMax = 0.16f,
+                BoxSize = new Vector3(3.8f, 0.05f, 1.8f), GrowFrom = 0.4f, GrowTo = 1.2f, Softness = 0.2f, MaxParticles = 80,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.9f, 0.6f), 0f), (new Color(1f, 0.95f, 0.8f), 1f) }, new[] { (0.8f, 0f), (0f, 1f) }),
+            }.Build(fryer, new Vector3(0f, 2.1f, 0f), Quaternion.Euler(-90f, 0f, 0f), decor.Folder);
+            new ParticleFx
+            {
+                Name = "FryerSteam", Rate = 5f, LifetimeMin = 1.6f, LifetimeMax = 2.4f, SpeedMin = 0.6f, SpeedMax = 1.2f, SizeMin = 0.6f, SizeMax = 1f,
+                GrowFrom = 0.6f, GrowTo = 2.2f, ConeAngle = 12f, ConeRadius = 1.4f, EdgeNoise = 0.6f, Softness = 0.95f, Turbulence = 0.4f, MaxParticles = 30,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 1f, 1f), 0f), (new Color(0.95f, 0.95f, 0.97f), 1f) },
+                    new[] { (0f, 0f), (0.22f, 0.25f), (0f, 1f) }),
+            }.Build(fryer, new Vector3(0.4f, 2.2f, 0f), Quaternion.Euler(-90f, 0f, 0f), decor.Folder);
+            ParticleSystem drips = new ParticleFx
+            {
+                Name = "OilDrips", LifetimeMin = 0.4f, LifetimeMax = 0.8f, SpeedMin = 2f, SpeedMax = 4f, SizeMin = 0.06f, SizeMax = 0.12f, Gravity = 1f,
+                ConeAngle = 35f, ConeRadius = 0.4f, Softness = 0.3f, MaxParticles = 40,
+                Colors = ParticleFx.Ramp(new[] { (new Color(1f, 0.8f, 0.3f), 0f), (new Color(0.95f, 0.65f, 0.15f), 1f) }, new[] { (1f, 0f), (0f, 1f) }),
+            }.Build(trap, Vector3.zero, Quaternion.Euler(-60f, 90f, 0f), decor.Folder);
+            // ドーナツ（番号ごと。揚げ色の生地の輪・前の面のアイシング・トッピング）。穴をカメラへ向けて転がる。
+            StageTrap core = authoring.ToTrap();
+            float radius = spec.Radius;
+            Mesh dough = Torus(meshes, "DonutDough", radius * 0.62f, radius * 0.38f);
+            Mesh icing = Torus(meshes, "DonutIcing", radius * 0.62f, radius * 0.385f);
+            Material doughMaterial = decor.Lit("DonutDough", new Color(0.82f, 0.52f, 0.24f));
+            doughMaterial.SetFloat("_Smoothness", 0.35f);
+            Color[] glazes = { new Color(1f, 0.55f, 0.75f), new Color(0.36f, 0.19f, 0.1f), new Color(0.98f, 0.95f, 0.9f), new Color(0.56f, 0.76f, 0.36f) };
+            Color[] sprinkleColors = { new Color(1f, 0.85f, 0.2f), new Color(0.3f, 0.75f, 1f), new Color(1f, 0.35f, 0.4f), new Color(0.6f, 1f, 0.5f), Color.white };
+            var donuts = new Transform[core.DonutSlots];
+            for (int i = 0; i < donuts.Length; i++)
+            {
+                var donut = new GameObject($"Donut{i + 1}").transform;
+                donut.SetParent(trap, false);
+                Quaternion faceCamera = Quaternion.Euler(90f, 0f, 0f);
+                ProceduralMesh.Place("Dough", donut, dough, Vector3.zero, faceCamera, Vector3.one, doughMaterial);
+                Material glaze = decor.Lit($"DonutGlaze{i % glazes.Length}", glazes[i % glazes.Length]);
+                glaze.SetFloat("_Smoothness", 0.8f);
+                // アイシングは前の面だけ（奥行きを薄くして手前へずらす）。
+                ProceduralMesh.Place("Icing", donut, icing, new Vector3(0f, 0f, -radius * 0.12f), faceCamera, new Vector3(1f, 0.55f, 1f), glaze);
+                if (i % glazes.Length != 1)
+                {
+                    for (int k = 0; k < 14; k++)
+                    {
+                        float angle = k * Mathf.PI * 2f / 14f + decor.Range(-0.15f, 0.15f);
+                        float at = radius * decor.Range(0.42f, 0.82f);
+                        GameObject sprinkle = decor.Box("Sprinkle", donut, new Vector3(Mathf.Cos(angle) * at, Mathf.Sin(angle) * at, -radius * 0.38f),
+                            new Vector3(radius * 0.16f, radius * 0.05f, radius * 0.05f), decor.Lit($"Sprinkle{k % sprinkleColors.Length}", sprinkleColors[k % sprinkleColors.Length]));
+                        sprinkle.transform.localRotation = Quaternion.Euler(0f, 0f, decor.Range(0f, 180f));
+                    }
+                }
+                donut.gameObject.SetActive(false);
+                donuts[i] = donut;
+            }
+            trap.gameObject.AddComponent<DonutFryerView>().Configure(donuts, bubbles, drips);
         }
 
         // 鬼火の輪（ステージの仕掛け StageTrapKind.WispRing。2026-11-21 の要望: 1 つだけ、6 地点の間を速く飛び回り、くぐった人の周りを

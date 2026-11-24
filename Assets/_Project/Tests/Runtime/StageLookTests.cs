@@ -1098,26 +1098,25 @@ namespace Airerage.Runtime.Tests
         [Test]
         public void FifthGimmickBatch_SpaceStation_HasItsLooks_AndMatchesTheHitboxes()
         {
-            // 2026-11-21 の方針の第 5 弾（宇宙ステーション）。
+            // 2026-11-21 の方針の第 5 弾（宇宙ステーション）と、2026-11-24 の要望（ワープゲートは前の紫の楕円の見た目を精巧に、コイルはコイルガンに）。
             Scene space = Open("Assets/_Project/Scenes/Stages/Stage_SpaceStation.unity");
-            // ワープゲート: 球のワームホールの口（重力レンズの板）。判定も円。端の口は対で、救出のゲートの出口に小さな口。前の平たい球はない。
+            // ワープゲート: 楕円の渦の面（Airerage/Wormhole）と出口の逆回りの渦。判定も渦と同じ楕円。前の平たい球はない。
             WormholeView[] mouths = InScene<WormholeView>(space).ToArray();
-            Assert.That(mouths.Length, Is.EqualTo(3), "ワームホールの口");
+            Assert.That(mouths.Length, Is.EqualTo(3), "ワープゲートの渦");
             foreach (WormholeView mouth in mouths)
             {
                 StageZone zone = mouth.GetComponentInParent<StageZoneAuthoring>().ToZone();
-                Assert.That(zone.Round, Is.True, $"{zone}: 判定が丸くない");
-                Assert.That(zone.MaxX - zone.MinX, Is.EqualTo(zone.MaxY - zone.MinY).Within(0.001f), "口の範囲が正方形でない");
-                Assert.That(mouth.Radius, Is.EqualTo((zone.MaxX - zone.MinX) * 0.5f).Within(0.001f), "見た目の口の半径が判定と違う");
+                Assert.That(zone.Round, Is.True, $"{zone}: 判定が楕円でない");
+                Assert.That(mouth.Half.x, Is.EqualTo((zone.MaxX - zone.MinX) * 0.5f).Within(0.001f), "見た目の渦の大きさが判定と違う");
+                Assert.That(mouth.Half.y, Is.EqualTo((zone.MaxY - zone.MinY) * 0.5f).Within(0.001f), "見た目の渦の大きさが判定と違う");
                 Assert.That(mouth.Mouth.sharedMaterial.shader.name, Is.EqualTo("Airerage/Wormhole"));
-                Assert.That(mouth.Mouth.transform.localPosition.z, Is.GreaterThan(0.3f), "口の板がキャラクターの手前にある");
-                Assert.That(mouth.Other, Is.Not.Null, "口の中に映す向こう側がない");
+                Assert.That(mouth.Mouth.transform.localPosition.z, Is.GreaterThan(0.1f), "渦の面がキャラクターの手前にある");
+                Vector2 target = mouth.GetComponentInParent<StageZoneAuthoring>().Target;
+                Assert.That(mouth.ExitMouth, Is.Not.Null, "出口の渦がない");
+                Assert.That(Vector2.Distance(mouth.ExitMouth.transform.position, target), Is.LessThan(0.01f), "出口の渦が出口にない");
             }
-            WormholeView rescue = mouths.Single(m => m.GetComponentInParent<StageZoneView>().name == "RescueGate");
-            Vector2 target = rescue.GetComponentInParent<StageZoneAuthoring>().Target;
-            Assert.That(rescue.ExitMouth, Is.Not.Null, "救出のゲートの出口に口がない");
-            Assert.That(Vector2.Distance(rescue.ExitMouth.transform.position, target), Is.LessThan(0.01f), "出口の口が出口にない");
-            Assert.That(InScene<Transform>(space).Any(t => t.name == "Gate" || t.name == "Exit"), Is.False, "前の平たい球のゲートが残っている");
+            Assert.That(InScene<Transform>(space).Any(t => t.name == "Gate" || t.name == "Exit" || t.name == "Mouth"), Is.False,
+                "前の平たい球のゲート・レンズの板が残っている");
             // 無重力: 宇宙船の中の漂う物と水の玉（Airerage/WaterDrop）と手すり。前の紫の板はない。漂う物は遊ぶ面より奥。
             MicrogravityView[] cabins = InScene<MicrogravityView>(space).ToArray();
             Assert.That(cabins.Length, Is.EqualTo(2), "宇宙船の中");
@@ -1138,16 +1137,19 @@ namespace Airerage.Runtime.Tests
                 }
             }
             Assert.That(InScene<Transform>(space).Any(t => t.name == "Field" || t.name == "FieldFront"), Is.False, "前の紫の板が残っている");
-            // 加速リング: 電磁コイルの加速器（コイル 3 つの光る輪。内径が範囲の高さ）。前の金属の輪の枠はない。
+            // コイルガン（2026-11-24）: コイル 3 つの光る輪と火花・砲口の火花・軌道の線。前の金属の輪の枠はない。
             CoilAcceleratorView[] coils = InScene<CoilAcceleratorView>(space).ToArray();
-            Assert.That(coils.Length, Is.EqualTo(3), "電磁コイルの加速器");
+            Assert.That(coils.Length, Is.EqualTo(3), "コイルガン");
+            Assert.That(InScene<StageZoneAuthoring>(space).Any(z => z.Kind == StageZoneKind.BoostRing), Is.False, "宇宙ステーションに加速リングが残っている");
             foreach (CoilAcceleratorView coil in coils)
             {
                 StageZone zone = coil.GetComponentInParent<StageZoneAuthoring>().ToZone();
+                Assert.That(zone.Kind, Is.EqualTo(StageZoneKind.CoilGun), "コイルが撃ち出すギミックでない");
+                Assert.That(coil.transform.parent.GetComponentsInChildren<LineRenderer>(true).Any(l => l.name == "Trajectory"), Is.True, "軌道の線がない");
                 Renderer[] liners = coil.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Liner").ToArray();
                 Assert.That(liners.Length, Is.EqualTo(3), "コイルの光る輪");
                 Assert.That(liners.All(l => l.sharedMaterial.shader.name == "Airerage/Emissive"), Is.True);
-                Assert.That(coil.GetComponentsInChildren<ParticleSystem>(true).Length, Is.EqualTo(3), "コイルの火花");
+                Assert.That(coil.GetComponentsInChildren<ParticleSystem>(true).Length, Is.EqualTo(4), "コイルの火花と砲口の火花");
                 Assert.That(coil.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Piece"), Is.False, "前の輪の枠が残っている");
                 // コイルの並ぶ長さが範囲の幅に収まる。
                 Transform first = coil.transform.Find("Coil1");

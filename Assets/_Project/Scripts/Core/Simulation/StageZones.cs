@@ -66,6 +66,15 @@ namespace Airerage.Core.Simulation
         /// <summary>悪魔の手で牢屋へ移った後、また握られないティック数【仮】。</summary>
         public const int GrabImmunityTicks = 120;
 
+        /// <summary>コイルガンが電気をためる長さ（ティック。1 秒。ユーザーの要望、2026-11-24）。</summary>
+        public const int CoilChargeTicks = 60;
+
+        /// <summary>コイルガンで撃ち出した後、またコイルに収まらない（ほかの危険にも当たらない）ティック数【仮】。</summary>
+        public const int CoilImmunityTicks = 40;
+
+        /// <summary>コイルガンの照準の、向きとみなす最小の長さ（これより短い照準の入力では、前の向きのまま）。</summary>
+        public const float CoilAimDeadzone = 0.2f;
+
         /// <summary>悪魔の手に握られている人の中心の、手の上の辺からの高さ（m。体の下が指の間に入る）【仮】。</summary>
         public const float GrabHoldHeight = 0.4f;
 
@@ -399,6 +408,17 @@ namespace Airerage.Core.Simulation
                             return;
                         }
                         break;
+                    case StageZoneKind.CoilGun:
+                        if (CanBeHitByStage(state) && !state.Combat.IsUntouchable && state.Combat.HazardImmunityTicks <= 0
+                            && zone.Overlaps(state.Position, halfExtents))
+                        {
+                            // コイルの中に収まる（悪魔の手と同じ握られ方）。コイルの向きの初めはギミックの向き。
+                            Capture(ref state, i, config.Wire);
+                            state.Combat.SkillAim = zone.Direction;
+                            state.Position = new Vector3(zone.Center.X, zone.Center.Y, 0f);
+                            return;
+                        }
+                        break;
                     default:
                         throw new InvalidOperationException($"知らないギミックの種類です: {zone.Kind}");
                 }
@@ -430,9 +450,14 @@ namespace Airerage.Core.Simulation
         /// 悪魔の手に握られている人を 1 ティック進める（CharacterSimulator が、ほかの処理の代わりに呼ぶ）: 手の上に握られたまま手と
         /// 一緒に動き、握られてから手の Power 秒で、手の Target（牢屋）へ移る（止まった状態。GrabImmunityTicks の間は、また握られない）。
         /// </summary>
-        public static void HoldCapture(ref CharacterState state, IReadOnlyList<StageZone> zones, int tick)
+        public static void HoldCapture(ref CharacterState state, IReadOnlyList<StageZone> zones, int tick, Vector2 aim = default)
         {
             int index = state.Combat.CaptureZone;
+            if (zones != null && index >= 0 && index < zones.Count && zones[index].Kind == StageZoneKind.CoilGun)
+            {
+                HoldInCoil(ref state, zones[index].At(tick), aim);
+                return;
+            }
             if (zones == null || index < 0 || index >= zones.Count || zones[index].Kind != StageZoneKind.Grab)
             {
                 // 手がない（ありえないが、状態を壊さないように放す）。
@@ -452,6 +477,58 @@ namespace Airerage.Core.Simulation
                 return;
             }
             state.Position = new Vector3((hand.MinX + hand.MaxX) * 0.5f, hand.MaxY + GrabHoldHeight, 0f);
+        }
+
+        /// <summary>
+        /// コイルガンの中の人を 1 ティック進める: コイルの中心に収まったまま、照準 aim（CoilAimDeadzone 以上の長さのとき）を
+        /// コイルの向き（CombatState.SkillAim）として覚え、収まってから CoilChargeTicks たったら、その向きへ速さ Power で撃ち出す
+        /// （空中ジャンプが戻る。CoilImmunityTicks の間は、また収まらない）。2026-11-24 の要望。
+        /// </summary>
+        private static void HoldInCoil(ref CharacterState state, StageZone coil, Vector2 aim)
+        {
+            if (aim.LengthSquared() >= CoilAimDeadzone * CoilAimDeadzone)
+            {
+                state.Combat.SkillAim = aim;
+            }
+            state.Combat.CaptureTicks++;
+            state.Velocity = Vector3.Zero;
+            state.Position = new Vector3(coil.Center.X, coil.Center.Y, 0f);
+            if (state.Combat.CaptureTicks <= CoilChargeTicks)
+            {
+                return;
+            }
+            Vector2 direction = CoilDirection(state.Combat.SkillAim, coil.Direction);
+            state.Velocity = new Vector3(direction.X * coil.Power, direction.Y * coil.Power, 0f);
+            state.Combat.CaptureTicks = 0;
+            state.Combat.HazardImmunityTicks = CoilImmunityTicks;
+            TakeOff(ref state);
+        }
+
+        /// <summary>コイルガンの向き（照準 aim が短ければ、ギミックの向き fallback）。表示も同じ向きを使う。</summary>
+        public static Vector2 CoilDirection(Vector2 aim, Vector2 fallback)
+        {
+            float length = aim.Length();
+            return length >= CoilAimDeadzone && length > SimMath.Epsilon ? aim / length : fallback;
+        }
+
+        /// <summary>state がコイルガンの中にいるか（握られている先が zones のコイルガン）。表示と音の区別に使う。</summary>
+        public static bool IsInCoil(in CharacterState state, IReadOnlyList<StageZone> zones)
+        {
+            int index = state.Combat.CaptureZone;
+            return state.Combat.CaptureTicks > 0 && zones != null && index >= 0 && index < zones.Count && zones[index].Kind == StageZoneKind.CoilGun;
+        }
+
+        /// <summary>state が握られていた先（CaptureZone）が、zones のコイルガンか（放された直後の区別に使う）。</summary>
+        public static bool WasCoil(in CharacterState state, IReadOnlyList<StageZone> zones)
+        {
+            int index = state.Combat.CaptureZone;
+            return zones != null && index >= 0 && index < zones.Count && zones[index].Kind == StageZoneKind.CoilGun;
+        }
+
+        /// <summary>コイルガンの中で、撃ち出すまでのため具合（0〜1。中にいなければ 0）。</summary>
+        public static float CoilCharge(in CharacterState state)
+        {
+            return state.Combat.CaptureTicks <= 0 ? 0f : Math.Min(1f, state.Combat.CaptureTicks / (float)CoilChargeTicks);
         }
 
         // 外から入ったかを調べる範囲: 動くギミックは 1 つ前のティックの範囲（ゲートのほうが動いてきて重なったときも、入ったとみなす）。

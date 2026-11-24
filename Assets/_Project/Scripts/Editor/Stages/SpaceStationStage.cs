@@ -13,6 +13,9 @@ namespace Airerage.Editor.Stages
     /// </summary>
     internal static class SpaceStationStage
     {
+        /// <summary>コイルガンが撃ち出す速さ（m/s）【仮】。</summary>
+        internal const float CoilGunPower = 26f;
+
         public static StageLayout Create()
         {
             var theme = new StageTheme
@@ -36,6 +39,7 @@ namespace Airerage.Editor.Stages
             theme.ZoneColors[StageZoneKind.LowGravity] = new Color(0.55f, 0.45f, 1f);
             theme.ZoneColors[StageZoneKind.Warp] = new Color(0.75f, 0.4f, 1f);
             theme.ZoneColors[StageZoneKind.Launcher] = new Color(0.3f, 1f, 0.85f);
+            theme.ZoneColors[StageZoneKind.CoilGun] = new Color(0.35f, 0.85f, 1f);
             theme.ZoneColors[StageZoneKind.Updraft] = new Color(0.5f, 1f, 0.75f);
 
             // マスドライバー: コアの端から、上へ 19 m/s・横へ 15 m/s（低重力の高さに入らずに、隣のモジュールの上に降りる）。
@@ -88,14 +92,14 @@ namespace Airerage.Editor.Stages
                         .Styled(StageZoneView.ZoneLook.Microgravity),
                     new ZoneSpec("ZeroGravityEast", StageZoneKind.LowGravity, new Vector2(29f, 27.5f), new Vector2(15f, 7f), Vector2.up, 0.12f, 3f)
                         .Styled(StageZoneView.ZoneLook.Microgravity),
-                    // 左右の端のワープゲート: 対になったワームホールの口（直径 6m の球。判定も円。2026-11-21 の方針）。入った口と反対の口の外側
-                    // （入った向きの先）へ出る。速度はそのまま。
-                    new ZoneSpec("WarpGateWest", StageZoneKind.Warp, new Vector2(-57f, 4f), new Vector2(6f, 6f), Vector2.up, 1f).To(new Vector2(53f, 4f))
-                        .Wormhole(exitMouth: false),
-                    new ZoneSpec("WarpGateEast", StageZoneKind.Warp, new Vector2(57f, 4f), new Vector2(6f, 6f), Vector2.up, 1f).To(new Vector2(-53f, 4f))
-                        .Wormhole(exitMouth: false),
-                    // いちばん下の小さなゲート: 端から端まで 12 秒で 1 往復する。通った人をトラスの上へ戻す（直径 4.5m の口。出口に小さな口）。
-                    new ZoneSpec("RescueGate", StageZoneKind.Warp, new Vector2(-40f, -17.5f), new Vector2(4.5f, 4.5f), Vector2.up, 1f).To(new Vector2(0f, 30f))
+                    // 左右の端のワープゲート（反対の端の内側へ。速度はそのまま）。見た目は前の紫の楕円の渦を精巧にしたもの（2026-11-24 の要望）。
+                    // 判定は楕円（見た目と同じ形。StageZone.Round）。
+                    new ZoneSpec("WarpGateWest", StageZoneKind.Warp, new Vector2(-57f, 4f), new Vector2(2f, 6f), Vector2.up, 1f).To(new Vector2(54.5f, 4f))
+                        .Wormhole(exitMouth: true),
+                    new ZoneSpec("WarpGateEast", StageZoneKind.Warp, new Vector2(57f, 4f), new Vector2(2f, 6f), Vector2.up, 1f).To(new Vector2(-54.5f, 4f))
+                        .Wormhole(exitMouth: true),
+                    // いちばん下の小さなゲート: 端から端まで 12 秒で 1 往復する。通った人をトラスの上へ戻す。動く向きに撓む（2026-11-24 の要望）。
+                    new ZoneSpec("RescueGate", StageZoneKind.Warp, new Vector2(-40f, -17.5f), new Vector2(5f, 2.5f), Vector2.up, 1f).To(new Vector2(0f, 30f))
                         .Moving(new Vector2(80f, 0f), 12f).Wormhole(exitMouth: true),
                     // マスドライバー。
                     ZoneSpec.OnFloor("MassDriverWest", StageZoneKind.Launcher, -8f, -6.4f, 0f, driverWest, driverPower),
@@ -106,12 +110,13 @@ namespace Airerage.Editor.Stages
                     ZoneSpec.OnFloor("DockPadWest", StageZoneKind.JumpPad, -41f, -39f, 13f, Vector2.up, 18f, 0.4f),
                     ZoneSpec.OnFloor("DockPadEast", StageZoneKind.JumpPad, 39f, 41f, 13f, Vector2.up, 18f, 0.4f),
                     ZoneSpec.OnFloor("CorePad", StageZoneKind.JumpPad, -1f, 1f, 0f, Vector2.up, 20f, 0.4f),
-                    // 加速リング: 電磁コイルの加速器（コイル 3 つを加速の向きに並べた長さ 3.8m・内径 2.6m。通る所が範囲。2026-11-21 の方針）。
-                    new ZoneSpec("CoreRing", StageZoneKind.BoostRing, new Vector2(0f, 12f), new Vector2(3.8f, 2.6f), Vector2.right, 18f)
+                    // コイルガン（2026-11-24 の要望）: 触れると中に収まって 1 秒ためる。ためている間は照準でコイルの向きを変えられ、たまったら
+                    // その向きへ撃ち出す（26 m/s【仮】）。範囲はコイルの並ぶ長さ 3.8m × 内径 2.6m。向きを入れなければ、コイルの向き。
+                    new ZoneSpec("CoilGunCore", StageZoneKind.CoilGun, new Vector2(0f, 12f), new Vector2(3.8f, 2.6f), Vector2.right, CoilGunPower)
                         .Styled(StageZoneView.ZoneLook.Coil),
-                    new ZoneSpec("OrbitRingWest", StageZoneKind.BoostRing, new Vector2(-34f, 18f), new Vector2(3.8f, 2.6f), new Vector2(1f, 0.2f), 16f)
+                    new ZoneSpec("CoilGunWest", StageZoneKind.CoilGun, new Vector2(-34f, 18f), new Vector2(3.8f, 2.6f), new Vector2(1f, 0.2f), CoilGunPower)
                         .Styled(StageZoneView.ZoneLook.Coil),
-                    new ZoneSpec("OrbitRingEast", StageZoneKind.BoostRing, new Vector2(34f, 18f), new Vector2(3.8f, 2.6f), new Vector2(-1f, 0.2f), 16f)
+                    new ZoneSpec("CoilGunEast", StageZoneKind.CoilGun, new Vector2(34f, 18f), new Vector2(3.8f, 2.6f), new Vector2(-1f, 0.2f), CoilGunPower)
                         .Styled(StageZoneView.ZoneLook.Coil),
                 },
                 Coins = new (Vector2, int)[]

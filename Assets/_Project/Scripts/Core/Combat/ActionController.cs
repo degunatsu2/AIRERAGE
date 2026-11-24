@@ -819,7 +819,9 @@ namespace Airerage.Core.Combat
         /// </summary>
         public static bool TracksAimNow(in CharacterState state, CombatTuning combat)
         {
-            return (state.Action.Kind == ActionKind.Attack && combat.Get(state.Action.Attack).TracksAim) || JuggernautRules.TracksAim(state);
+            // 握られている間（コイルガンの中で照準を向ける。悪魔の手でも送るが、結果は変わらない。2026-11-24）も照準を送る。
+            return (state.Action.Kind == ActionKind.Attack && combat.Get(state.Action.Attack).TracksAim) || JuggernautRules.TracksAim(state)
+                || state.Combat.CaptureTicks > 0;
         }
 
         private static void BufferAttack(ref CharacterState state, in InputFrame input, CombatTuning combat, float deadzone, AttackSlot slot)

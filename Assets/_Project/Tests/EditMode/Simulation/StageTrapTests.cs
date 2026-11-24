@@ -6,6 +6,7 @@ using Airerage.Core.Input;
 using Airerage.Core.Movement;
 using Airerage.Core.Physics;
 using Airerage.Core.Simulation;
+using Airerage.Core.Wire;
 using NUnit.Framework;
 
 namespace Airerage.Core.Tests.Simulation
@@ -66,6 +67,197 @@ namespace Airerage.Core.Tests.Simulation
             Assert.That(jailed.Combat.IsCaptured, Is.False, "1.2 秒たっても放されない");
             Assert.That(jailed.Position.Y, Is.GreaterThan(15f), "牢屋へ移らない");
             Assert.That(jailed.Combat.HazardImmunityTicks, Is.GreaterThan(0), "移った後に、また握られる");
+        }
+
+        // 宙に浮いたコイルガン（中心 (0, 6)、長さ 4m・内径 2.6m。右向きに 26 m/s で撃ち出す。2026-11-24）。
+        private static StageZone Coil()
+        {
+            return new StageZone(StageZoneKind.CoilGun, -2f, 4.7f, 2f, 7.3f, Vector2.UnitX, 26f);
+        }
+
+        private static void StepWith(SimWorld world, int ticks, PlayerInput input)
+        {
+            var inputs = new PlayerInput[world.CharacterCount];
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                inputs[i] = input;
+            }
+            for (int t = 0; t < ticks; t++)
+            {
+                world.Step(inputs);
+            }
+        }
+
+        [Test]
+        public void TheCoilGun_HoldsYouInside_ChargesForASecond_ThenShootsYouWhereYouAim()
+        {
+            var world = new SimWorld(Floor(), null, new[] { Coil() });
+            // 下から跳んで、コイルの中へ入る。
+            world.AddCharacter(new CharacterConfig(), new Vector3(0f, 2f, 0f), 1);
+            CharacterState jumper = world.GetState(0);
+            jumper.Velocity = new Vector3(0f, 12f, 0f);
+            jumper.Grounded = false;
+            world.SetState(0, jumper);
+            int capturedAt = -1;
+            for (int t = 0; t < 40 && capturedAt < 0; t++)
+            {
+                Step(world, 1);
+                if (world.GetState(0).Combat.IsCaptured)
+                {
+                    capturedAt = world.Tick;
+                }
+            }
+            Assert.That(capturedAt, Is.GreaterThan(0), "コイルに触れても収まらない");
+            CharacterState held = world.GetState(0);
+            Assert.That(held.Position.X, Is.EqualTo(0f).Within(1e-4f), "コイルの中心に収まらない");
+            Assert.That(held.Position.Y, Is.EqualTo(6f).Within(1e-4f));
+            Assert.That(held.Combat.IsUntouchable, Is.True, "コイルの中で触れられる");
+            Assert.That(ActionController.TracksAimNow(held, new CombatTuning()), Is.True, "コイルの中で照準を送らない（オンラインで向きが変わらない）");
+            Assert.That(StageZones.IsInCoil(held, world.Zones), Is.True);
+            // ためている間に左上へ照準を向ける。動けない。
+            var aim = Vector2.Normalize(new Vector2(-1f, 1f));
+            PlayerInput aiming = PlayerInput.FromAxes(1f, 0f, InputButtons.Jump).WithAim(aim);
+            StepWith(world, StageZones.CoilChargeTicks - 5, aiming);
+            CharacterState charging = world.GetState(0);
+            Assert.That(charging.Combat.IsCaptured, Is.True, "1 秒たつ前に出てしまう");
+            Assert.That(charging.Position.X, Is.EqualTo(0f).Within(1e-4f), "ためている間に動ける");
+            Assert.That(StageZones.CoilCharge(charging), Is.InRange(0.85f, 1f));
+            StepWith(world, 10, aiming);
+            CharacterState shot = world.GetState(0);
+            Assert.That(shot.Combat.IsCaptured, Is.False, "1 秒たっても撃ち出されない");
+            Vector2 velocity = new Vector2(shot.Velocity.X, shot.Velocity.Y);
+            Assert.That(velocity.X, Is.LessThan(-12f), "照準の向き（左上）へ撃ち出されない");
+            Assert.That(velocity.Y, Is.GreaterThan(8f), "照準の向き（左上）へ撃ち出されない");
+            Assert.That(shot.Combat.HazardImmunityTicks, Is.GreaterThan(0), "撃ち出した直後に、また収まる");
+            Assert.That(shot.AirJumpsUsed, Is.EqualTo(0), "撃ち出されて空中ジャンプが戻らない");
+        }
+
+        [Test]
+        public void TheCoilGun_ShootsAlongItsOwnDirection_WhenYouDoNotAim()
+        {
+            var world = new SimWorld(Floor(), null, new[] { Coil() });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-1f, 6f, 0f), 1);
+            Step(world, 1);
+            Assert.That(world.GetState(0).Combat.IsCaptured, Is.True, "前提: 収まった");
+            Step(world, StageZones.CoilChargeTicks + 1);
+            CharacterState shot = world.GetState(0);
+            Assert.That(shot.Combat.IsCaptured, Is.False);
+            Assert.That(shot.Velocity.X, Is.GreaterThan(24f), "照準を入れなければ、コイルの向き（右）へ撃ち出されない");
+            Assert.That(MathF.Abs(shot.Velocity.Y), Is.LessThan(1f));
+        }
+
+        // 左の出口 (-20, 3) から、床（y = 0）の上を右へ 4 回弾んで、ステージの外 (40, 1) へ消えるドーナツ（半径 0.9m・跳ね 2m。3 秒ごと）。
+        private static StageTrap Donuts(int period = 180)
+        {
+            return StageTrap.DonutFryer(new Vector2(-20f, 3f), new[] { new Vector2(-14f, 0.9f), new Vector2(-6f, 0.9f), new Vector2(2f, 0.9f),
+                new Vector2(10f, 0.9f), new Vector2(40f, 1f) }, period, 0, 0.9f, 2f);
+        }
+
+        [Test]
+        public void Donuts_BounceThroughEachLandingPoint_AndComeOutOneByOne()
+        {
+            StageTrap fryer = Donuts();
+            Assert.That(fryer.DonutSlots, Is.InRange(2, StageTrap.MaxDonuts));
+            // 1 つ目は 180 ティック（Period）に出る（試合の始まりより前のドーナツはない）。
+            Assert.That(fryer.TryGetDonut(100, 0, out _, out _, out _) || fryer.TryGetDonut(100, 1, out _, out _, out _), Is.False);
+            int slot = -1;
+            for (int s = 0; s < fryer.DonutSlots; s++)
+            {
+                if (fryer.TryGetDonut(181, s, out int age, out _, out _) && age == 1)
+                {
+                    slot = s;
+                }
+            }
+            Assert.That(slot, Is.GreaterThanOrEqualTo(0), "周期のティックにドーナツが出ない");
+            // 着地点を順に通り、跳ねるたびに上がる（どの着地点でも、そのティックの位置が着地点）。
+            for (int i = 0; i < fryer.LandingTicks.Count; i++)
+            {
+                Assert.That(fryer.TryGetDonut(180 + fryer.LandingTicks[i], slot, out _, out Vector2 at, out _), Is.True, $"{i} 番目の着地点の前に消える");
+                Vector2 landing = new[] { new Vector2(-14f, 0.9f), new Vector2(-6f, 0.9f), new Vector2(2f, 0.9f), new Vector2(10f, 0.9f), new Vector2(40f, 1f) }[i];
+                Assert.That(Vector2.Distance(at, landing), Is.LessThan(0.6f), $"{i} 番目の着地点を通らない（{at}）");
+            }
+            Assert.That(fryer.TryGetDonut(180 + fryer.LandingTicks[1] - 10, slot, out _, out Vector2 mid, out _), Is.True);
+            Assert.That(mid.Y, Is.GreaterThan(1.5f), "着地点の間で跳ねない");
+            // 次のドーナツは 3 秒後に、別の番号で出る（前のドーナツもまだ出ている）。
+            bool second = false;
+            for (int s = 0; s < fryer.DonutSlots; s++)
+            {
+                second |= s != slot && fryer.TryGetDonut(361, s, out int age, out _, out _) && age == 1;
+            }
+            Assert.That(second, Is.True, "次のドーナツが別の番号で出ない");
+            Assert.That(fryer.TryGetDonut(361, slot, out _, out _, out _), Is.True, "前のドーナツが消えた");
+        }
+
+        [Test]
+        public void TouchingADonut_BouncesYouAway_WithoutDroppingCoins()
+        {
+            StageTrap fryer = Donuts();
+            var world = new SimWorld(Floor(), null, null, null, null, null, null, new[] { fryer });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-6f, Movement.HalfHeight, 0f), 1);
+            CharacterState start = world.GetState(0);
+            start.Coins.Held = 50;
+            world.SetState(0, start);
+            bool bounced = false;
+            for (int t = 0; t < 600 && !bounced; t++)
+            {
+                Step(world, 1);
+                bounced = world.GetState(0).Velocity.Length() > 10f;
+            }
+            Assert.That(bounced, Is.True, "ドーナツに触れても弾かれない");
+            Assert.That(world.GetState(0).Coins.Held, Is.EqualTo(50), "ドーナツに触れてコインを落とした（弾くだけのはず）");
+        }
+
+        [Test]
+        public void AWireOnADonut_RidesWithIt_AndLetsGoWhenItLeavesTheStage()
+        {
+            StageTrap fryer = Donuts();
+            var bounds = new StageBounds(-30f, -10f, 30f, 30f);
+            var world = new SimWorld(Floor(), bounds, null, null, null, null, null, new[] { fryer });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-2f, Movement.HalfHeight, 0f), 1);
+            // 1 つ目のドーナツが出てくるまで待って、ドーナツを狙って撃ち続ける。
+            var collision = (Airerage.Core.Objects.WorldCollision)world.Collision;
+            int attachedAt = -1;
+            for (int t = 0; t < 600 && attachedAt < 0; t++)
+            {
+                Vector2 aim = Vector2.UnitY;
+                for (int i = 0; i < collision.AnchorPoints.Count; i++)
+                {
+                    if (collision.AnchorBodyOf(i) >= StageTraps.DonutBodyBase)
+                    {
+                        Vector3 p = collision.AnchorPoints[i];
+                        CharacterState me = world.GetState(0);
+                        aim = Vector2.Normalize(new Vector2(p.X - me.Position.X, p.Y - me.Position.Y));
+                    }
+                }
+                // 外れたら、押し直して撃ち直す（ドーナツが出ていない間は押さない）。
+                bool shoot = aim != Vector2.UnitY && world.GetState(0).Wire.Phase == WirePhase.Ready && t % 2 == 0;
+                var inputs = new[] { PlayerInput.FromAxes(0f, 0f, shoot || world.GetState(0).Wire.Phase != WirePhase.Ready ? InputButtons.Wire : InputButtons.None).WithAim(aim) };
+                world.Step(inputs);
+                if (world.GetState(0).Wire.Phase == WirePhase.Attached)
+                {
+                    attachedAt = world.Tick;
+                }
+            }
+            Assert.That(attachedAt, Is.GreaterThan(0), "ドーナツにワイヤーがつながらない");
+            CharacterState attached = world.GetState(0);
+            Assert.That(attached.Wire.AnchorBody, Is.GreaterThanOrEqualTo(StageTraps.DonutBodyBase), "ドーナツのアンカーにつながっていない");
+            float anchorX = attached.Wire.Anchor.X;
+            var holding = new[] { PlayerInput.FromAxes(0f, 0f, InputButtons.Wire) };
+            for (int t = 0; t < 20; t++)
+            {
+                world.Step(holding);
+            }
+            CharacterState carried = world.GetState(0);
+            Assert.That(carried.Wire.Phase, Is.EqualTo(WirePhase.Attached), "運ばれる間にワイヤーが外れた");
+            Assert.That(carried.Wire.Anchor.X, Is.GreaterThan(anchorX + 1f), "接続点がドーナツと一緒に動かない");
+            // ドーナツがステージの外へ出たら、ワイヤーが外れる。
+            for (int t = 0; t < 600 && world.GetState(0).Wire.Phase == WirePhase.Attached; t++)
+            {
+                world.Step(holding);
+            }
+            CharacterState released = world.GetState(0);
+            Assert.That(released.Wire.Phase, Is.Not.EqualTo(WirePhase.Attached), "ドーナツが外へ出てもワイヤーが外れない");
+            Assert.That(released.Wire.LastReleaseReason, Is.EqualTo(WireReleaseReason.AnchorGone));
         }
 
         // 床の上の高さ 1m を横切る赤外線（x = -10〜10）と、左の端の発射口から右へ撃つミサイル。

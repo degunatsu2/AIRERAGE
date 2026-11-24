@@ -251,6 +251,45 @@ namespace Airerage.Editor.Stages
             return mesh;
         }
 
+        /// <summary>
+        /// 半径 1 の円盤（XY の面。表は -Z、カメラ向き）を、中心からの輪 rings 本 × 周り segments に分けたもの。UV は u が周りの角度
+        /// （0〜1）、v が中心からの距離（0〜1）。ワープゲートの渦（WormholeView が頂点を撓ませる）に使う。
+        /// </summary>
+        public static Mesh Disc(string stage, string name, int rings, int segments)
+        {
+            var vertices = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var triangles = new List<int>();
+            for (int r = 0; r <= rings; r++)
+            {
+                float radius = r / (float)rings;
+                for (int s = 0; s <= segments; s++)
+                {
+                    float angle = s * Mathf.PI * 2f / segments;
+                    vertices.Add(new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, 0f));
+                    normals.Add(Vector3.back);
+                    uvs.Add(new Vector2(s / (float)segments, radius));
+                }
+            }
+            int row = segments + 1;
+            for (int r = 0; r < rings; r++)
+            {
+                for (int s = 0; s < segments; s++)
+                {
+                    int a = r * row + s;
+                    int b = a + row;
+                    triangles.Add(a);
+                    triangles.Add(b);
+                    triangles.Add(b + 1);
+                    triangles.Add(a);
+                    triangles.Add(b + 1);
+                    triangles.Add(a + 1);
+                }
+            }
+            return Save(stage, name, vertices, normals, uvs, triangles);
+        }
+
         private static Mesh Save(string stage, string name, List<Vector3> vertices, List<Vector3> normals, List<Vector2> uvs, List<int> triangles)
         {
             string folder = $"{MeshRoot}/{stage}";

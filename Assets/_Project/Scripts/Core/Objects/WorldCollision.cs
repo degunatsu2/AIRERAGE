@@ -142,6 +142,17 @@ namespace Airerage.Core.Objects
             }
         }
 
+        /// <summary>
+        /// 動く物のアンカーポイントを足す（ステージの仕掛けのドーナツ。SetPlatforms の後に呼ぶ。次の SetPlatforms で消える）。
+        /// body はワイヤーの接続先の番号（StageTraps.DonutBodyBase から）。
+        /// </summary>
+        public void AddMovingAnchor(Vector3 point, float radius, int body)
+        {
+            _anchors.Add(new Vector3(point.X, point.Y, 0f));
+            _anchorRadii.Add(radius);
+            _anchorBodies.Add(body);
+        }
+
         /// <summary>空中に置いたベルトコンベア item の足場の箱（ベルトの見た目どおり、範囲の下の端から FootingThickness の厚さ）。</summary>
         public static void FootingBox(in WorldObject item, out Vector2 min, out Vector2 max)
         {

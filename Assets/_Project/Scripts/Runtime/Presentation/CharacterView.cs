@@ -523,6 +523,13 @@ namespace Airerage.Runtime.Presentation
         private void RenderCapture(in CharacterState state)
         {
             CombatState c = state.Combat;
+            if (c.IsCaptured && InCoil(state))
+            {
+                // コイルガンの中（2026-11-24）: 吸い込まれない。コイルの中に収まって見える（光と向きは CoilAcceleratorView）。
+                HiddenForCapture = false;
+                _shownCaptured = false;
+                return;
+            }
             if (c.IsCaptured)
             {
                 float grip = Mathf.Clamp01(c.CaptureTicks / (float)CaptureGripTicks);
@@ -551,6 +558,31 @@ namespace Airerage.Runtime.Presentation
                     }
                 }
             }
+        }
+
+        private ISimulationFeed _zoneFeed;
+        private float _nextZoneFeedSearch;
+
+        // state がコイルガンの中か（握られている先のギミックの種類は、表示する試合のギミックの一覧で見る）。
+        private bool InCoil(in CharacterState state)
+        {
+            if (_zoneFeed is MonoBehaviour gone && gone == null)
+            {
+                _zoneFeed = null;
+            }
+            if (_zoneFeed == null && Time.unscaledTime >= _nextZoneFeedSearch)
+            {
+                _nextZoneFeedSearch = Time.unscaledTime + 1f;
+                foreach (MonoBehaviour behaviour in FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
+                {
+                    if (behaviour is ISimulationFeed feed)
+                    {
+                        _zoneFeed = feed;
+                        break;
+                    }
+                }
+            }
+            return _zoneFeed != null && StageZones.IsInCoil(state, _zoneFeed.Zones);
         }
 
         // 状態の変化（受けた時刻、FATAL を受けた数、ワイヤーキャンセルのクールタイムの始まり）から、一瞬の光を出す。

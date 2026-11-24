@@ -1,30 +1,23 @@
-// ワームホールの口（宇宙ステーションのワープゲート。2026-11-21 のギミックの精巧化 第 5 弾。docs/15 6.67）。
-// 手本は映画『インターステラー』のワームホール（James, von Tunzelmann, Franklin, Thorne「Visualizing Interstellar's Wormhole」）:
-// 口はどの向きから見ても球に見え、球の中には向こう側の景色が縮んで映り、球の周りでは後ろの景色が重力レンズでゆがむ（星の像が
-// 外へ押し出され、口のすぐ外には後ろの景色が裏返った像とアインシュタインリングができる）。面の質感はなく、光の像だけでできている。
-// 描き方（カメラの不透明の絵 _CameraOpaqueTexture と深さを使う。URP の設定で Opaque Texture と Depth Texture を使う）:
-// - 口の外（半径 _Radius から _Halo 倍まで）: 点の重力レンズの式 β = θ (1 − θE² / θ²) で、後ろの景色を引く所をずらす（θE は
-//   _Einstein 倍の半径）。外へ行くほどずらしを弱めて、板の端で元の景色につなぐ。引いた所が口より手前の物（キャラクターや足場）なら、
-//   ずらさない（手前の物の像をゆがめて写さない）。カメラの不透明の絵には半透明の背景（星や星雲の板・光の格子）が入らないので、
-//   口の外は縁から外へ向かって不透明さを下げてもとの背景を残し、引いた所の星（絵を使わない星）を足す（ずらした所から引くので、
-//   口の近くでは星が弧に伸びて輪〈アインシュタインリング〉になる）。
-// - 口の中: 向こう側の口（_OtherCenter）のまわりの景色を魚眼のように縮めて写す（真ん中が向こうの口のすぐ後ろ、縁ほど遠く）。
-//   向こうの口が画面の外なら、向こう側の星空（絵を使わない星）で代わりにする。
-// - 縁: 薄く光る輪（光子の球の名残り。見分けやすさのために少し強め）と、ワープしたときの波紋（_Pulse）。
-// 板は口の中心に置いた XY 面（キャラクターの少し奥）。大きさは半径 × _Halo × 2。
+// ワープゲートの渦（宇宙ステーション。2026-11-24 の要望: 前の紫の楕円の見た目を精巧に）。半径 1 の円盤（ProceduralMesh.Disc。UV の
+// u が周りの角度 0〜1、v が中心からの距離 0〜1）に描く。網の頂点は WormholeView が撓ませる（UV は頂点についていくので、渦も一緒に撓む）。
+// - 奥へ続くトンネル: 真ん中ほど暗い紫、いちばん奥に小さな明るい光（向こう側の光）。
+// - 内へ巻き込む渦の腕（対数らせん。_Inward が -1 なら外へ吐き出す出口の渦）と、腕に沿って吸い込まれていく光の粒。
+// - 明るい縁（紫から白へ）と、縁の外へ少しにじむ光。半透明で、後ろが少し透ける（前の見た目の半透明の紫）。
+// - _Pulse: ワープしたときの波紋（明るく、縁から内へ走る輪）。_Bend: 撓んでいる強さ（渦を少し明るく速く）。
 Shader "Airerage/Wormhole"
 {
     Properties
     {
-        [HDR] _Color ("Rim color", Color) = (1.4, 0.8, 2.6, 1)
-        _Radius ("Mouth radius (world m)", Float) = 3
-        _Halo ("Lensing halo (x radius)", Float) = 2.4
-        _Einstein ("Einstein radius (x radius)", Float) = 1.3
-        _OtherCenter ("Other mouth (world)", Vector) = (0, 0, 0, 0)
-        _OtherTint ("Other side tint", Color) = (0.55, 0.35, 1, 1)
-        _Fisheye ("Other side squeeze", Float) = 1.4
-        _Swirl ("Swirl inside (rad/s)", Float) = 0.25
-        _Pulse ("Warp ripple (0-1)", Range(0, 1)) = 0
+        [HDR] _Color ("Rim color", Color) = (1.5, 0.8, 2.6, 1)
+        _Deep ("Deep color", Color) = (0.08, 0.02, 0.18, 1)
+        _Mid ("Swirl color", Color) = (0.55, 0.25, 1, 1)
+        _Arms ("Spiral arms", Float) = 3
+        _Twist ("Spiral twist", Float) = 5
+        _Spin ("Spin speed", Float) = 1.2
+        _Inward ("Inward (1) or outward (-1)", Float) = 1
+        _Opacity ("Opacity", Range(0, 1)) = 0.78
+        _Pulse ("Warp pulse (0-1)", Range(0, 1)) = 0
+        _Bend ("Bend (0-1)", Range(0, 2)) = 0
     }
 
     SubShader
@@ -42,54 +35,42 @@ Shader "Airerage/Wormhole"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _Color;
-                float _Radius;
-                float _Halo;
-                float _Einstein;
-                float4 _OtherCenter;
-                half4 _OtherTint;
-                float _Fisheye;
-                float _Swirl;
+                half4 _Deep;
+                half4 _Mid;
+                float _Arms;
+                float _Twist;
+                float _Spin;
+                float _Inward;
+                half _Opacity;
                 half _Pulse;
+                half _Bend;
             CBUFFER_END
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
             };
 
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
-                float3 positionWS : TEXCOORD0;
-                float3 centerWS : TEXCOORD1;
-                float4 screenPos : TEXCOORD2;
+                float2 uv : TEXCOORD0;
+                float fog : TEXCOORD1;
             };
 
             Varyings Vert(Attributes input)
             {
                 Varyings output;
-                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
-                output.centerWS = TransformObjectToWorld(float3(0, 0, 0));
-                output.positionCS = TransformWorldToHClip(output.positionWS);
-                output.screenPos = ComputeScreenPos(output.positionCS);
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.uv = input.uv;
+                output.fog = ComputeFogFactor(output.positionCS.z);
                 return output;
-            }
-
-            // ワールドの点を画面の位置（0〜1）へ。画面の外か、カメラの後ろなら onScreen が 0。
-            float2 ToScreen(float3 world, out float onScreen)
-            {
-                float4 clip = TransformWorldToHClip(world);
-                float4 screen = ComputeScreenPos(clip);
-                float2 uv = screen.xy / max(screen.w, 1e-5);
-                float2 edge = min(uv, 1.0 - uv);
-                onScreen = clip.w > 0 ? saturate(min(edge.x, edge.y) * 20.0) : 0.0;
-                return saturate(uv);
             }
 
             float Hash(float2 p)
@@ -99,120 +80,42 @@ Shader "Airerage/Wormhole"
                 return frac(p.x * p.y);
             }
 
-            // 星（絵を使わない。p は口の半径を 1 とした位置。2 層）。
-            half3 Stars(float2 p, float time, float density)
-            {
-                half3 sum = 0;
-                for (int layer = 0; layer < 2; layer++)
-                {
-                    float scale = layer == 0 ? 2.6 : 5.5;
-                    float2 g = p * scale + layer * 31.0;
-                    float2 cell = floor(g);
-                    float h = Hash(cell + 11.0);
-                    float2 star = cell + 0.5 + (float2(Hash(cell + 5.3), Hash(cell + 9.1)) - 0.5) * 0.7;
-                    float dist = length(g - star);
-                    float bright = step(1.0 - density, h) * exp(-dist * dist * (layer == 0 ? 90.0 : 200.0));
-                    float twinkle = 0.8 + 0.2 * sin(time * (1.5 + h * 3.0) + h * 50.0);
-                    sum += bright * twinkle * lerp(half3(0.85, 0.9, 1.0), half3(1.0, 0.85, 0.95), h);
-                }
-                return sum;
-            }
-
-            // 向こう側の星空（絵を使わない。2 層の星と、向こう側の色のもや）。
-            half3 OtherSky(float2 d, float time)
-            {
-                half3 sky = _OtherTint.rgb * 0.05;
-                for (int layer = 0; layer < 2; layer++)
-                {
-                    float scale = layer == 0 ? 9.0 : 21.0;
-                    float2 g = d * scale + layer * 17.0;
-                    float2 cell = floor(g);
-                    float h = Hash(cell);
-                    float2 star = cell + 0.5 + (float2(Hash(cell + 3.1), Hash(cell + 7.7)) - 0.5) * 0.7;
-                    float dist = length(g - star);
-                    float bright = step(0.82, h) * exp(-dist * dist * (layer == 0 ? 60.0 : 140.0));
-                    float twinkle = 0.75 + 0.25 * sin(time * (2.0 + h * 3.0) + h * 40.0);
-                    sky += bright * twinkle * lerp(half3(0.8, 0.85, 1.0), half3(1.0, 0.8, 0.95), h);
-                }
-                float haze = saturate(1.0 - length(d) * 0.35);
-                sky += _OtherTint.rgb * haze * haze * 0.18;
-                return sky;
-            }
-
-            // 後ろの景色を、引く所 world から取る。そこが口の板より手前の物なら、ずらさない所 fallbackUV の色にする。
-            half3 Background(float3 world, float2 fallbackUV, float planeDepth)
-            {
-                float onScreen;
-                float2 uv = ToScreen(world, onScreen);
-                float sceneDepth = LinearEyeDepth(SampleSceneDepth(uv), _ZBufferParams);
-                float useLensed = step(planeDepth - 0.05, sceneDepth) * onScreen;
-                half3 lensed = SampleSceneColor(uv);
-                half3 straight = SampleSceneColor(fallbackUV);
-                return lerp(straight, lensed, useLensed);
-            }
-
             half4 Frag(Varyings input) : SV_Target
             {
                 float time = _Time.y;
-                float2 screenUV = input.screenPos.xy / input.screenPos.w;
-                float planeDepth = input.screenPos.w;
-                float2 p = (input.positionWS.xy - input.centerWS.xy) / _Radius;
-                float r = length(p);
-                float2 dir = r > 1e-4 ? p / r : float2(1, 0);
-                float halo = max(_Halo, 1.05);
-                if (r > halo)
-                {
-                    discard;
-                }
-
-                // ワープしたときの波紋（口の縁から外へ広がる）。
-                float rippleFront = 1.0 + (1.0 - _Pulse) * (halo - 1.0);
-                float rippleOffset = (r - rippleFront) * 4.0;
-                float ripple = _Pulse * exp(-rippleOffset * rippleOffset);
-
-                half3 color;
-                if (r >= 1.0)
-                {
-                    // 重力レンズ: β = θ (1 − θE²/θ²)。外へ行くほど弱めて、板の端で元の景色につなぐ。
-                    float fade = 1.0 - smoothstep(halo * 0.55, halo, r);
-                    float einstein = _Einstein * (1.0 + 0.15 * _Pulse);
-                    float bend = (einstein * einstein) / (r * r) * fade;
-                    float2 source = p * (1.0 - bend) + dir * ripple * 0.08;
-                    float3 world = float3(input.centerWS.xy + source * _Radius, input.centerWS.z);
-                    color = Background(world, screenUV, planeDepth);
-                    // 口のすぐ外は光が回り込んで暗く縮んだ像になる（縁の近くを少しだけ暗く）。
-                    color *= lerp(0.7, 1.0, smoothstep(1.0, 1.25, r));
-                    // ずらした所の星（半透明の星の板は不透明の絵に入らないので、ここで足す。口の近くで弧に伸びる）。
-                    color += Stars(source, time, 0.22) * fade * 1.2;
-                }
-                else
-                {
-                    // 口の中: 向こう側を魚眼で。真ん中が向こうの口のすぐ後ろ、縁ほど遠く（縁で無限遠へ縮む）。
-                    float angle = _Swirl * time * (1.0 - r * 0.6);
-                    float s = sin(angle);
-                    float c = cos(angle);
-                    float2 swirled = float2(dir.x * c - dir.y * s, dir.x * s + dir.y * c);
-                    float reach = _Fisheye * r / max(1.0 - 0.86 * r * r, 0.08);
-                    float3 otherWorld = float3(_OtherCenter.xy + swirled * reach * _Radius, _OtherCenter.z);
-                    float otherOnScreen;
-                    float2 otherUV = ToScreen(otherWorld, otherOnScreen);
-                    half3 other = SampleSceneColor(otherUV);
-                    half3 sky = OtherSky(swirled * reach, time);
-                    color = lerp(sky, other, otherOnScreen * 0.9);
-                    color = lerp(color, color * _OtherTint.rgb * 1.6 + _OtherTint.rgb * 0.04, 0.22);
-                    // 縁へ向かって像が縮んで明るくなる（光の環）。
-                    color += _Color.rgb * pow(saturate(r), 10.0) * 0.35;
-                }
-
-                // 縁の薄い光の輪と、波紋。
+                float angle = input.uv.x * 6.2831853;
+                float r = saturate(input.uv.y);
+                float speed = _Spin * (1.0 + 0.6 * _Bend);
+                // 対数らせんの腕: 内へ行くほど速く回る（吸い込む渦）。出口は逆に外へ流れる。
+                float logR = log(max(r, 0.02));
+                float swirl = angle * _Arms + logR * _Twist * _Inward + time * speed * 2.5 * _Inward / max(r, 0.25);
+                float arms = 0.5 + 0.5 * sin(swirl);
+                arms = pow(arms, 3.0);
+                // 腕に沿って流れる光の粒（角度と距離の格子。時間で中心へ寄る）。
+                float flow = frac(r * 3.0 + time * 0.45 * _Inward);
+                float2 cell = float2(floor(input.uv.x * 40.0 + floor(r * 3.0 + time * 0.45 * _Inward) * 7.0), floor(r * 3.0 + time * 0.45 * _Inward));
+                float h = Hash(cell);
                 // pow は負の数で NaN になるので、2 乗は掛け算で。
-                float rimOffset = (r - 1.0) / 0.035;
-                float rim = exp(-rimOffset * rimOffset);
-                color += _Color.rgb * (rim * (0.9 + 0.6 * _Pulse) + ripple * 0.8);
-                // 口の中は不透明。外は縁から外へ不透明さを下げて、もとの背景（半透明の層を含む）を残す。
-                float alpha = r < 1.0 ? 1.0 : pow(saturate(1.0 - (r - 1.0) / (halo - 1.0)), 0.8) * 0.9;
-                alpha = max(alpha, rim);
-                return half4(color, saturate(alpha));
+                float along = (flow - 0.5) * 9.0;
+                float side = (frac(input.uv.x * 40.0) - 0.5) * 3.0;
+                float mote = step(0.86, h) * exp(-along * along) * exp(-side * side);
+                // トンネル: 真ん中ほど暗く、いちばん奥に向こう側の小さな光。
+                half3 color = lerp(_Deep.rgb, _Mid.rgb, smoothstep(0.0, 0.95, r));
+                color += _Mid.rgb * arms * (0.25 + 0.6 * r);
+                float core = exp(-r * r * 60.0);
+                color += half3(1.0, 0.85, 1.0) * core * 0.9;
+                color += half3(1.0, 0.9, 1.0) * mote * (0.6 + 0.8 * r);
+                // 明るい縁（紫から白へ）と、波紋（縁から内へ走る輪）。
+                float rim = smoothstep(0.78, 1.0, r);
+                color += _Color.rgb * rim * rim * (0.8 + 0.5 * _Pulse);
+                float waveOffset = (r - _Pulse) * 7.0;
+                float wave = _Pulse * exp(-waveOffset * waveOffset);
+                color += _Color.rgb * wave * 1.5;
+                half alpha = saturate(_Opacity * (0.55 + 0.45 * r) + rim * 0.25 + wave * 0.3 + core * 0.2);
+                // 縁の外側をやわらかく。
+                alpha *= 1.0 - smoothstep(0.97, 1.0, r);
+                color = MixFog(color, input.fog);
+                return half4(color, alpha);
             }
             ENDHLSL
         }

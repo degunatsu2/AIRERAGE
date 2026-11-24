@@ -80,6 +80,15 @@ namespace Airerage.Core.Simulation
         /// StageZones.GrabImmunityTicks の間は、また握られない。StageZones.HoldCapture。
         /// </summary>
         Grab = 13,
+
+        /// <summary>
+        /// コイルガン（宇宙ステーションの電磁コイル。ユーザーの要望、2026-11-24）。触れた人をコイルの中（範囲の中心）に収めて動けなくし、
+        /// StageZones.CoilChargeTicks（1 秒）だけ電気をためる。ためている間は照準（マウスポインター・右スティック）でコイルの向きを変えられ
+        /// （CombatState.SkillAim に覚える）、たまったら、その向きへ速さ Power で撃ち出す（空中ジャンプが戻る）。向きを入れていなければ
+        /// Direction の向き。中にいる間は何にも触れない。撃ち出した後の StageZones.CoilImmunityTicks の間は、また収まらない。
+        /// 悪魔の手と同じ「握られる」仕組み（CombatState.CaptureTicks・CaptureZone。StageZones.HoldCapture）。
+        /// </summary>
+        CoilGun = 14,
     }
 
     /// <summary>ギミックの周期（ティック）。Period が 0 ならいつも効く。</summary>
@@ -454,6 +463,7 @@ namespace Airerage.Core.Simulation
         {
             return kind != StageZoneKind.Bumper && kind != StageZoneKind.Ice && kind != StageZoneKind.LowGravity && kind != StageZoneKind.Warp
                 && kind != StageZoneKind.Water && kind != StageZoneKind.Grab;
+            // コイルガンは向き（撃ち出す向きの初め）を使う。
         }
 
         /// <summary>範囲の中心。</summary>

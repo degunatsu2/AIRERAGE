@@ -235,6 +235,41 @@ namespace Airerage.Core.Wire
             return false;
         }
 
+        /// <summary>動くアンカーを追いかける距離の最小（m。アンカーの判定の半径がこれより小さいときに使う）。</summary>
+        public const float TrackRadius = 0.8f;
+
+        /// <summary>
+        /// 動く物のアンカー（荷役の網・ドーナツ・アンカー付きの動く足場）を追いかける: 狙った点 target のそばに、動く物のアンカーがあれば
+        /// （そのアンカーの判定の半径〈TrackRadius 以上〉の中でいちばん近いもの）、その今の位置 current を返す。フックが飛んでいる間に毎ティック
+        /// 呼ぶので、アンカーが動き続けても追える（戻っていく途中の荷役の網にもつながる。2026-11-24 の要望）。
+        /// </summary>
+        public static bool TryTrackAnchor(ICollisionQuery collision, Vector3 target, out Vector3 current)
+        {
+            current = target;
+            var anchors = collision.AnchorPoints;
+            var radii = collision.AnchorRadii;
+            float best = float.MaxValue;
+            bool found = false;
+            for (int i = 0; i < anchors.Count; i++)
+            {
+                if (AnchorBodyOf(collision, i) == 0)
+                {
+                    continue;
+                }
+                float radius = i < radii.Count ? MathF.Max(TrackRadius, radii[i]) : TrackRadius;
+                float dx = anchors[i].X - target.X;
+                float dy = anchors[i].Y - target.Y;
+                float distance = dx * dx + dy * dy;
+                if (distance <= radius * radius && distance < best)
+                {
+                    best = distance;
+                    current = anchors[i];
+                    found = true;
+                }
+            }
+            return found;
+        }
+
         /// <summary>
         /// point にあるアンカーポイントが付いている物（動く足場なら番号 + 1。ほかと、point がアンカーでなければ 0）。箱のない足場のアンカー
         /// （荷役の網。2026-11-21）に空中でつながるときに、どの足場かを覚えるのに使う。

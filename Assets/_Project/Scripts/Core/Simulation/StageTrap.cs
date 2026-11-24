@@ -31,6 +31,15 @@ namespace Airerage.Core.Simulation
         /// また現れる。触れたティックと人は状態（StageState）。StageTraps.StepWispRings。
         /// </summary>
         WispRing = 2,
+
+        /// <summary>
+        /// ドーナツフライヤー（キッチン。ユーザーの要望、2026-11-24）。周期 Period ごとに、揚げたドーナツを 1 つ出す。ドーナツは出口
+        /// （Muzzle）から決まった着地点（Waypoints）へ順に弾みながら進み（重力 DonutGravity の放物線。どの跳ねも、高いほうの点より
+        /// HopHeight 上まで上がる）、最後の点（ステージの外）で消える。道のりはティック数だけで決まる（状態を持たない。TryGetDonut）。
+        /// 触れた人はバンパーのように弾き返され（StageTraps.DonutBumpPower）、ドーナツの真ん中はアンカー（ワイヤーがつながり、一緒に動く。
+        /// StageTraps.AddAnchors・CarryWires）。
+        /// </summary>
+        DonutFryer = 3,
     }
 
     /// <summary>
@@ -55,6 +64,12 @@ namespace Airerage.Core.Simulation
 
         /// <summary>ボールが飛んでいられる長さの上限（ティック。止まらなくても、ここで点滅を始める。点滅の間も動き続ける）【仮】。</summary>
         public const int BallMaxFlightTicks = 900;
+
+        /// <summary>ドーナツの重力（m/s²。キャラクターと同じ）。</summary>
+        public const float DonutGravity = 30f;
+
+        /// <summary>1 つのドーナツフライヤーから同時に出ていられるドーナツの数の上限（ワイヤーの接続先の番号を分けるため）。</summary>
+        public const int MaxDonuts = 8;
 
         private Vector2[] _path = new Vector2[0];
 
@@ -117,6 +132,17 @@ namespace Airerage.Core.Simulation
 
         /// <summary>ボールが止まった（点滅を始めた）、打ち出してからのティック。</summary>
         public int StopTick { get; private set; }
+
+        /// <summary>ドーナツの跳ねの高さ（m。跳ねるたびに、前と次の着地点の高いほうからこれだけ上がる）。</summary>
+        public float HopHeight { get; private set; }
+
+        /// <summary>同時に出ていられるドーナツの数（周期と道のりの長さで決まる。番号 0〜DonutSlots-1 を順に使い回す）。</summary>
+        public int DonutSlots { get; private set; }
+
+        /// <summary>ドーナツが出てから、それぞれの着地点に着くティック（表示の弾む形に使う）。</summary>
+        public IReadOnlyList<int> LandingTicks => _landingTicks;
+
+        private int[] _landingTicks = new int[0];
 
         /// <summary>赤外線レーダーとミサイル発射装置を作る。</summary>
         public static StageTrap Tripwire(Vector2 beamMin, Vector2 beamMax, Vector2 muzzle, Vector2 direction, float speed, float range, int power,
@@ -200,6 +226,117 @@ namespace Airerage.Core.Simulation
                 RespawnMinTicks = respawnMinTicks,
                 RespawnMaxTicks = respawnMaxTicks,
             };
+        }
+
+        /// <summary>
+        /// ドーナツフライヤーを作る。muzzle は出口、landings は着地点（1 つ以上。最後はステージの外で消える所）。周期 period ごとに
+        /// 1 つ出す（ずれ phaseTicks。試合が始まる前に出たことになるドーナツはない）。radius はドーナツの半径、hopHeight は跳ねの高さ。
+        /// 道のりは作るときに求める（重力 DonutGravity の放物線をつなぐ）。
+        /// </summary>
+        public static StageTrap DonutFryer(Vector2 muzzle, IReadOnlyList<Vector2> landings, int period, int phaseTicks, float radius, float hopHeight)
+        {
+            if (!Finite(muzzle) || landings == null || landings.Count < 1 || period <= 0 || phaseTicks < 0 || !(radius > 0f) || float.IsInfinity(radius)
+                || !(hopHeight > 0f) || float.IsInfinity(hopHeight))
+            {
+                throw new ArgumentException($"ドーナツフライヤーの値が不正です（出口 {muzzle}、着地点 {landings?.Count ?? 0}、周期 {period}、ずれ {phaseTicks}、"
+                    + $"半径 {radius}、跳ね {hopHeight}）");
+            }
+            var copy = new Vector2[landings.Count];
+            for (int i = 0; i < copy.Length; i++)
+            {
+                if (!Finite(landings[i]))
+                {
+                    throw new ArgumentException($"ドーナツフライヤーの {i} 番目の着地点が不正です（{landings[i]}）");
+                }
+                copy[i] = landings[i];
+            }
+            var trap = new StageTrap(StageTrapKind.DonutFryer)
+            {
+                _waypoints = copy,
+                Muzzle = muzzle,
+                Period = period,
+                PhaseTicks = phaseTicks % period,
+                HalfSize = new Vector2(radius, radius),
+                HopHeight = hopHeight,
+            };
+            trap.BuildDonutPath();
+            trap.DonutSlots = trap._path.Length / period + 2;
+            if (trap.DonutSlots > MaxDonuts)
+            {
+                throw new ArgumentException($"ドーナツフライヤーの周期 {period} が短すぎます（道のり {trap._path.Length} ティックの間に {MaxDonuts} 個より多く出る）");
+            }
+            return trap;
+        }
+
+        // ドーナツの道のり（出てからのティックごとの位置）: 出口から着地点へ順に、高いほうの点より HopHeight 上まで上がる放物線でつなぐ。
+        private void BuildDonutPath()
+        {
+            var path = new List<Vector2>();
+            var landingTicks = new int[_waypoints.Length];
+            float dt = SimTime.DeltaTime;
+            float g = DonutGravity;
+            float time = 0f;
+            float segmentStart = 0f;
+            Vector2 from = Muzzle;
+            for (int i = 0; i < _waypoints.Length; i++)
+            {
+                Vector2 to = _waypoints[i];
+                float apex = MathF.Max(from.Y, to.Y) + HopHeight;
+                float up = MathF.Sqrt(2f * (apex - from.Y) / g);
+                float down = MathF.Sqrt(2f * (apex - to.Y) / g);
+                float duration = up + down;
+                float vx = (to.X - from.X) / duration;
+                float vy = g * up;
+                float end = segmentStart + duration;
+                while (time < end)
+                {
+                    float t = time - segmentStart;
+                    path.Add(new Vector2(from.X + vx * t, from.Y + vy * t - 0.5f * g * t * t));
+                    time = path.Count * dt;
+                }
+                landingTicks[i] = path.Count;
+                segmentStart = end;
+                from = to;
+            }
+            path.Add(from);
+            _path = path.ToArray();
+            _landingTicks = landingTicks;
+        }
+
+        /// <summary>
+        /// ドーナツフライヤーの、番号 slot のドーナツのティック tick の様子（出てからのティック age・位置・速度）。その番号のドーナツが
+        /// なければ false。番号は出た順に 0〜DonutSlots-1 を使い回す（同じ番号のドーナツは同時に 2 つ出ていない）。
+        /// </summary>
+        public bool TryGetDonut(int tick, int slot, out int age, out Vector2 position, out Vector2 velocity)
+        {
+            age = 0;
+            position = Muzzle;
+            velocity = Vector2.Zero;
+            if (Kind != StageTrapKind.DonutFryer || _path.Length == 0 || slot < 0 || slot >= DonutSlots)
+            {
+                return false;
+            }
+            long shifted = (long)tick + PhaseTicks;
+            if (shifted < 0)
+            {
+                return false;
+            }
+            long latest = shifted / Period;
+            long n = latest - (((latest - slot) % DonutSlots) + DonutSlots) % DonutSlots;
+            // 1 つ目のドーナツは、ティック Period - PhaseTicks に出る（0 番目は出さない）。
+            if (n < 1)
+            {
+                return false;
+            }
+            long elapsed = shifted - n * Period;
+            if (elapsed >= _path.Length || tick - elapsed < 0)
+            {
+                return false;
+            }
+            age = (int)elapsed;
+            position = _path[age];
+            velocity = age > 0 ? (_path[age] - _path[age - 1]) * SimTime.TicksPerSecond : (_path.Length > 1 ? (_path[1] - _path[0]) * SimTime.TicksPerSecond : Vector2.Zero);
+            return true;
         }
 
         /// <summary>
@@ -417,7 +554,8 @@ namespace Airerage.Core.Simulation
                 && Speed.Equals(other.Speed) && Range.Equals(other.Range) && Power == other.Power && Knockback.Equals(other.Knockback)
                 && ArmTicks == other.ArmTicks && CooldownTicks == other.CooldownTicks && HalfSize.Equals(other.HalfSize) && Period == other.Period
                 && BlinkTicks == other.BlinkTicks && MinHitSpeed.Equals(other.MinHitSpeed) && SameWaypoints(other) && HoverTicks == other.HoverTicks
-                && Reward == other.Reward && RespawnMinTicks == other.RespawnMinTicks && RespawnMaxTicks == other.RespawnMaxTicks;
+                && Reward == other.Reward && RespawnMinTicks == other.RespawnMinTicks && RespawnMaxTicks == other.RespawnMaxTicks
+                && HopHeight.Equals(other.HopHeight);
         }
 
         private bool SameWaypoints(StageTrap other)
@@ -439,7 +577,9 @@ namespace Airerage.Core.Simulation
         public override string ToString()
         {
             return Kind == StageTrapKind.Tripwire ? $"Tripwire {BeamMin}〜{BeamMax} from {Muzzle} dir {Direction}"
-                : Kind == StageTrapKind.WispRing ? $"WispRing {_waypoints.Length} points from {Muzzle}" : $"Pitcher at {Muzzle} v {LaunchVelocity}";
+                : Kind == StageTrapKind.WispRing ? $"WispRing {_waypoints.Length} points from {Muzzle}"
+                : Kind == StageTrapKind.DonutFryer ? $"DonutFryer {_waypoints.Length} landings from {Muzzle} every {Period}"
+                : $"Pitcher at {Muzzle} v {LaunchVelocity}";
         }
     }
 }

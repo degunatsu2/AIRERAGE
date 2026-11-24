@@ -132,15 +132,16 @@ namespace Airerage.Runtime.Audio
                 // 溺れた。
                 _audio.Play(SoundId.Drown, 0.9f, 0.03f);
             }
+            bool coil = StageZones.WasCoil(now, _feed.Zones);
             if (n.CaptureCount > b.CaptureCount)
             {
-                // 悪魔の手に握られた。
-                _audio.Play(SoundId.Grab, 1f, 0.04f);
+                // 悪魔の手に握られた・コイルガンに収まった（ためる音。2026-11-24）。
+                _audio.Play(coil ? SoundId.ChargeUp : SoundId.Grab, 1f, 0.04f);
             }
             if (n.CaptureTicks == 0 && b.CaptureTicks > 0)
             {
-                // 時空に吸い込まれて、牢屋に現れた。
-                _audio.Play(SoundId.Vortex, 0.8f, 0.04f);
+                // 時空に吸い込まれて、牢屋に現れた・コイルガンから撃ち出された。
+                _audio.Play(StageZones.WasCoil(before, _feed.Zones) ? SoundId.Cannon : SoundId.Vortex, 0.8f, 0.04f);
             }
             if (n.FreezeCount > b.FreezeCount)
             {
@@ -207,7 +208,8 @@ namespace Airerage.Runtime.Audio
                 _audio.Play(SoundId.GuardUp, 0.8f);
             }
 
-            bool pad = now.JumpPadCount > before.JumpPadCount;
+            // コイルガンから撃ち出されたときは、撃ち出す音（Cannon）だけにする。
+            bool pad = now.JumpPadCount > before.JumpPadCount && !(before.Combat.CaptureTicks > 0 && StageZones.WasCoil(before, _feed.Zones));
             if (pad)
             {
                 _audio.Play(SoundId.JumpPad, 0.9f, 0.05f);

@@ -61,7 +61,9 @@ namespace Airerage.Core.Simulation
             if (state.Combat.CaptureTicks > 0)
             {
                 // 悪魔の手に握られている間は動けず、手と一緒に動き、時間が来たら牢屋へ移る（ユーザーの要望、2026-10-26）。
-                StageZones.HoldCapture(ref state, _zones, tick);
+                // コイルガンの中も同じく動けず、ためてから撃ち出される（2026-11-24）。
+                // コイルガンの中なら、照準でコイルの向きを変える（2026-11-24）。
+                StageZones.HoldCapture(ref state, _zones, tick, input.Aim);
                 CountDownInvincibility(ref state);
                 state.PreviousButtons = input.Buttons;
                 return;
