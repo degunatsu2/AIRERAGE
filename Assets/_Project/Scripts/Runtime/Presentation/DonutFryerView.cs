@@ -85,7 +85,10 @@ namespace Airerage.Runtime.Presentation
                 {
                     continue;
                 }
-                bool alive = slot < _trap.DonutSlots && _trap.TryGetDonut(tick, slot, out int age, out System.Numerics.Vector2 now, out System.Numerics.Vector2 velocity);
+                int age = 0;
+                System.Numerics.Vector2 now = default;
+                System.Numerics.Vector2 velocity = default;
+                bool alive = slot < _trap.DonutSlots && _trap.TryGetDonut(tick, slot, out age, out now, out velocity);
                 if (!alive)
                 {
                     donut.gameObject.SetActive(false);

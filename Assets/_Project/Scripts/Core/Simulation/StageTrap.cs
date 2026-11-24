@@ -269,14 +269,14 @@ namespace Airerage.Core.Simulation
         }
 
         // ドーナツの道のり（出てからのティックごとの位置）: 出口から着地点へ順に、高いほうの点より HopHeight 上まで上がる放物線でつなぐ。
+        // 1 本の弧の長さはティックの整数に丸め、その長さでちょうど着地点に着くように上向きの速さを決める（着地のティックの位置が
+        // ちょうど着地点になる。丸めないと、着地のティックには次の弧を少し上がっていて、足場から最大 0.35m 浮いて見えた）。
         private void BuildDonutPath()
         {
             var path = new List<Vector2>();
             var landingTicks = new int[_waypoints.Length];
             float dt = SimTime.DeltaTime;
             float g = DonutGravity;
-            float time = 0f;
-            float segmentStart = 0f;
             Vector2 from = Muzzle;
             for (int i = 0; i < _waypoints.Length; i++)
             {
@@ -284,18 +284,16 @@ namespace Airerage.Core.Simulation
                 float apex = MathF.Max(from.Y, to.Y) + HopHeight;
                 float up = MathF.Sqrt(2f * (apex - from.Y) / g);
                 float down = MathF.Sqrt(2f * (apex - to.Y) / g);
-                float duration = up + down;
+                int ticks = Math.Max(1, (int)MathF.Round((up + down) / dt));
+                float duration = ticks * dt;
                 float vx = (to.X - from.X) / duration;
-                float vy = g * up;
-                float end = segmentStart + duration;
-                while (time < end)
+                float vy = (to.Y - from.Y + 0.5f * g * duration * duration) / duration;
+                for (int k = 0; k < ticks; k++)
                 {
-                    float t = time - segmentStart;
+                    float t = k * dt;
                     path.Add(new Vector2(from.X + vx * t, from.Y + vy * t - 0.5f * g * t * t));
-                    time = path.Count * dt;
                 }
                 landingTicks[i] = path.Count;
-                segmentStart = end;
                 from = to;
             }
             path.Add(from);

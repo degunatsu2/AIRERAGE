@@ -565,8 +565,9 @@ namespace Airerage.Runtime.Tests
             }
             Assert.That(_zones.Any(z => z.Kind == StageZoneKind.JumpPad), Is.True, "ジャンプ台がない");
             // 恐怖の館は、加速リングを鬼火の輪の仕掛け（くぐるとコイン。StageTrapKind.WispRing）に作り直した（2026-11-21 の要望）。
-            Assert.That(_zones.Any(z => z.Kind == StageZoneKind.BoostRing) || _traps.Any(t => t.Kind == StageTrapKind.WispRing), Is.True,
-                "加速リング（か鬼火の輪）がない");
+            // 宇宙ステーションは、加速リングをコイルガン（StageZoneKind.CoilGun。2026-11-24 の要望）に作り直した。
+            Assert.That(_zones.Any(z => z.Kind == StageZoneKind.BoostRing || z.Kind == StageZoneKind.CoilGun)
+                || _traps.Any(t => t.Kind == StageTrapKind.WispRing), Is.True, "加速リング（か鬼火の輪・コイルガン）がない");
             Assert.That(Object.FindObjectsByType<Airerage.Runtime.Presentation.StageZoneView>(FindObjectsSortMode.None).Length, Is.EqualTo(_zones.Count),
                 "見た目のないギミックがある");
         }
