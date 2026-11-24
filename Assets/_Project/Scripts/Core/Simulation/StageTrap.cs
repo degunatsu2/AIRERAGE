@@ -34,8 +34,10 @@ namespace Airerage.Core.Simulation
 
         /// <summary>
         /// ドーナツフライヤー（キッチン。ユーザーの要望、2026-11-24）。周期 Period ごとに、揚げたドーナツを 1 つ出す。ドーナツは出口
-        /// （Muzzle）から決まった着地点（Waypoints）へ順に弾みながら進み（重力 DonutGravity の放物線。どの跳ねも、高いほうの点より
-        /// HopHeight 上まで上がる）、最後の点（ステージの外）で消える。道のりはティック数だけで決まる（状態を持たない。TryGetDonut）。
+        /// （Muzzle）から、跳ね方（コース。DonutCourse）の着地点へ順に弾みながら進み（重力 DonutGravity の放物線。どの跳ねも、高いほうの
+        /// 点よりコースの跳ねの高さだけ上がる）、最後の点（ステージの外や穴の中）で消える。どのコースを跳ねるかは、出るたびに試合の種と
+        /// 何番目に出たかで決まる（2026-11-24 の要望: 5 つの跳ね方から毎回ランダムに）。道のりはティック数と種だけで決まる（状態を持たない。
+        /// TryGetDonut）。
         /// 触れた人はバンパーのように弾き返され（StageTraps.DonutBumpPower）、ドーナツの真ん中はアンカー（ワイヤーがつながり、一緒に動く。
         /// StageTraps.AddAnchors・CarryWires）。
         /// </summary>
@@ -133,16 +135,53 @@ namespace Airerage.Core.Simulation
         /// <summary>ボールが止まった（点滅を始めた）、打ち出してからのティック。</summary>
         public int StopTick { get; private set; }
 
-        /// <summary>ドーナツの跳ねの高さ（m。跳ねるたびに、前と次の着地点の高いほうからこれだけ上がる）。</summary>
-        public float HopHeight { get; private set; }
+        /// <summary>ドーナツの跳ね方（コース）の数。</summary>
+        public int CourseCount => _courseHops.Length;
 
-        /// <summary>同時に出ていられるドーナツの数（周期と道のりの長さで決まる。番号 0〜DonutSlots-1 を順に使い回す）。</summary>
+        /// <summary>同時に出ていられるドーナツの数（周期といちばん長いコースの長さで決まる。番号 0〜DonutSlots-1 を順に使い回す）。</summary>
         public int DonutSlots { get; private set; }
 
-        /// <summary>ドーナツが出てから、それぞれの着地点に着くティック（表示の弾む形に使う）。</summary>
-        public IReadOnlyList<int> LandingTicks => _landingTicks;
+        /// <summary>コース course の着地点（最後は消える所）。</summary>
+        public IReadOnlyList<Vector2> CourseLandings(int course)
+        {
+            int start = _courseStarts[course];
+            int end = course + 1 < _courseStarts.Length ? _courseStarts[course + 1] : _waypoints.Length;
+            var landings = new Vector2[end - start];
+            Array.Copy(_waypoints, start, landings, 0, landings.Length);
+            return landings;
+        }
 
-        private int[] _landingTicks = new int[0];
+        /// <summary>コース course の跳ねの高さ（m。跳ねるたびに、前と次の着地点の高いほうからこれだけ上がる）。</summary>
+        public float CourseHop(int course)
+        {
+            return _courseHops[course];
+        }
+
+        /// <summary>コース course で、ドーナツが出てから、それぞれの着地点に着くティック（表示の弾む形に使う）。</summary>
+        public IReadOnlyList<int> LandingTicks(int course)
+        {
+            return _courseLandingTicks[course];
+        }
+
+        /// <summary>コース course で、ドーナツが出てから消えるまでのティック数。</summary>
+        public int CourseLength(int course)
+        {
+            return _coursePaths[course].Length;
+        }
+
+        /// <summary>コース course の道のり（出てからのティックごとの中心の位置。最後の点の次のティックで消える）。</summary>
+        public IReadOnlyList<Vector2> CoursePath(int course)
+        {
+            return _coursePaths[course];
+        }
+
+        /// <summary>ドーナツのコースを選ぶ乱数の種の混ぜ物。</summary>
+        private const int DonutSalt = 0xD047;
+
+        private int[] _courseStarts = new int[0];
+        private float[] _courseHops = new float[0];
+        private Vector2[][] _coursePaths = new Vector2[0][];
+        private int[][] _courseLandingTicks = new int[0][];
 
         /// <summary>赤外線レーダーとミサイル発射装置を作る。</summary>
         public static StageTrap Tripwire(Vector2 beamMin, Vector2 beamMax, Vector2 muzzle, Vector2 direction, float speed, float range, int power,
@@ -229,59 +268,90 @@ namespace Airerage.Core.Simulation
         }
 
         /// <summary>
-        /// ドーナツフライヤーを作る。muzzle は出口、landings は着地点（1 つ以上。最後はステージの外で消える所）。周期 period ごとに
-        /// 1 つ出す（ずれ phaseTicks。試合が始まる前に出たことになるドーナツはない）。radius はドーナツの半径、hopHeight は跳ねの高さ。
-        /// 道のりは作るときに求める（重力 DonutGravity の放物線をつなぐ）。
+        /// ドーナツフライヤーを作る（跳ね方は 1 つだけ）。muzzle は出口、landings は着地点（1 つ以上。最後はステージの外で消える所）。
+        /// 周期 period ごとに 1 つ出す（ずれ phaseTicks。試合が始まる前に出たことになるドーナツはない）。radius はドーナツの半径、
+        /// hopHeight は跳ねの高さ。
         /// </summary>
         public static StageTrap DonutFryer(Vector2 muzzle, IReadOnlyList<Vector2> landings, int period, int phaseTicks, float radius, float hopHeight)
         {
-            if (!Finite(muzzle) || landings == null || landings.Count < 1 || period <= 0 || phaseTicks < 0 || !(radius > 0f) || float.IsInfinity(radius)
-                || !(hopHeight > 0f) || float.IsInfinity(hopHeight))
+            return DonutFryer(muzzle, new[] { new DonutCourse(landings, hopHeight) }, period, phaseTicks, radius);
+        }
+
+        /// <summary>
+        /// ドーナツフライヤーを作る。muzzle は出口、courses は跳ね方（1 つ以上。それぞれ着地点と跳ねの高さ。最後の点はステージの外や
+        /// 穴の中など、消える所）。周期 period ごとに 1 つ出し、出るたびに試合の種と何番目かでコースを選ぶ（CourseOf）。ずれ phaseTicks。
+        /// radius はドーナツの半径。道のりは作るときに求める（重力 DonutGravity の放物線をつなぐ）。
+        /// </summary>
+        public static StageTrap DonutFryer(Vector2 muzzle, IReadOnlyList<DonutCourse> courses, int period, int phaseTicks, float radius)
+        {
+            if (!Finite(muzzle) || courses == null || courses.Count < 1 || period <= 0 || phaseTicks < 0 || !(radius > 0f) || float.IsInfinity(radius))
             {
-                throw new ArgumentException($"ドーナツフライヤーの値が不正です（出口 {muzzle}、着地点 {landings?.Count ?? 0}、周期 {period}、ずれ {phaseTicks}、"
-                    + $"半径 {radius}、跳ね {hopHeight}）");
+                throw new ArgumentException($"ドーナツフライヤーの値が不正です（出口 {muzzle}、コース {courses?.Count ?? 0}、周期 {period}、ずれ {phaseTicks}、"
+                    + $"半径 {radius}）");
             }
-            var copy = new Vector2[landings.Count];
-            for (int i = 0; i < copy.Length; i++)
+            var points = new List<Vector2>();
+            var starts = new int[courses.Count];
+            var hops = new float[courses.Count];
+            for (int c = 0; c < courses.Count; c++)
             {
-                if (!Finite(landings[i]))
+                DonutCourse course = courses[c];
+                if (course.Landings == null || course.Landings.Count < 1 || !(course.Hop > 0f) || float.IsInfinity(course.Hop))
                 {
-                    throw new ArgumentException($"ドーナツフライヤーの {i} 番目の着地点が不正です（{landings[i]}）");
+                    throw new ArgumentException($"ドーナツフライヤーの {c} 番目のコースが不正です（着地点 {course.Landings?.Count ?? 0}、跳ね {course.Hop}）");
                 }
-                copy[i] = landings[i];
+                starts[c] = points.Count;
+                hops[c] = course.Hop;
+                for (int i = 0; i < course.Landings.Count; i++)
+                {
+                    if (!Finite(course.Landings[i]))
+                    {
+                        throw new ArgumentException($"ドーナツフライヤーの {c} 番目のコースの {i} 番目の着地点が不正です（{course.Landings[i]}）");
+                    }
+                    points.Add(course.Landings[i]);
+                }
             }
             var trap = new StageTrap(StageTrapKind.DonutFryer)
             {
-                _waypoints = copy,
+                _waypoints = points.ToArray(),
+                _courseStarts = starts,
+                _courseHops = hops,
                 Muzzle = muzzle,
                 Period = period,
                 PhaseTicks = phaseTicks % period,
                 HalfSize = new Vector2(radius, radius),
-                HopHeight = hopHeight,
             };
-            trap.BuildDonutPath();
-            trap.DonutSlots = trap._path.Length / period + 2;
+            trap._coursePaths = new Vector2[courses.Count][];
+            trap._courseLandingTicks = new int[courses.Count][];
+            int longest = 0;
+            for (int c = 0; c < courses.Count; c++)
+            {
+                trap.BuildDonutPath(c);
+                longest = Math.Max(longest, trap._coursePaths[c].Length);
+            }
+            trap.DonutSlots = longest / period + 2;
             if (trap.DonutSlots > MaxDonuts)
             {
-                throw new ArgumentException($"ドーナツフライヤーの周期 {period} が短すぎます（道のり {trap._path.Length} ティックの間に {MaxDonuts} 個より多く出る）");
+                throw new ArgumentException($"ドーナツフライヤーの周期 {period} が短すぎます（道のり {longest} ティックの間に {MaxDonuts} 個より多く出る）");
             }
             return trap;
         }
 
-        // ドーナツの道のり（出てからのティックごとの位置）: 出口から着地点へ順に、高いほうの点より HopHeight 上まで上がる放物線でつなぐ。
+        // コース course の道のり（出てからのティックごとの位置）: 出口から着地点へ順に、高いほうの点より跳ねの高さだけ上がる放物線でつなぐ。
         // 1 本の弧の長さはティックの整数に丸め、その長さでちょうど着地点に着くように上向きの速さを決める（着地のティックの位置が
         // ちょうど着地点になる。丸めないと、着地のティックには次の弧を少し上がっていて、足場から最大 0.35m 浮いて見えた）。
-        private void BuildDonutPath()
+        private void BuildDonutPath(int course)
         {
+            IReadOnlyList<Vector2> landings = CourseLandings(course);
+            float hop = _courseHops[course];
             var path = new List<Vector2>();
-            var landingTicks = new int[_waypoints.Length];
+            var landingTicks = new int[landings.Count];
             float dt = SimTime.DeltaTime;
             float g = DonutGravity;
             Vector2 from = Muzzle;
-            for (int i = 0; i < _waypoints.Length; i++)
+            for (int i = 0; i < landings.Count; i++)
             {
-                Vector2 to = _waypoints[i];
-                float apex = MathF.Max(from.Y, to.Y) + HopHeight;
+                Vector2 to = landings[i];
+                float apex = MathF.Max(from.Y, to.Y) + hop;
                 float up = MathF.Sqrt(2f * (apex - from.Y) / g);
                 float down = MathF.Sqrt(2f * (apex - to.Y) / g);
                 int ticks = Math.Max(1, (int)MathF.Round((up + down) / dt));
@@ -297,20 +367,29 @@ namespace Airerage.Core.Simulation
                 from = to;
             }
             path.Add(from);
-            _path = path.ToArray();
-            _landingTicks = landingTicks;
+            _coursePaths[course] = path.ToArray();
+            _courseLandingTicks[course] = landingTicks;
+        }
+
+        /// <summary>n 番目に出るドーナツのコース（試合の種 seed と n だけで決まる。どの PC でも同じ）。</summary>
+        public int CourseOf(long launch, int seed)
+        {
+            int count = CourseCount;
+            return count <= 1 ? 0 : (int)(StageRandom.Hash(seed, DonutSalt, (int)launch) % (uint)count);
         }
 
         /// <summary>
-        /// ドーナツフライヤーの、番号 slot のドーナツのティック tick の様子（出てからのティック age・位置・速度）。その番号のドーナツが
-        /// なければ false。番号は出た順に 0〜DonutSlots-1 を使い回す（同じ番号のドーナツは同時に 2 つ出ていない）。
+        /// ドーナツフライヤーの、番号 slot のドーナツのティック tick の様子（出てからのティック age・コース course・位置・速度）。その番号の
+        /// ドーナツがなければ false。番号は出た順に 0〜DonutSlots-1 を使い回す（同じ番号のドーナツは同時に 2 つ出ていない）。コースは
+        /// 試合の種 seed と、何番目に出たかで決まる。
         /// </summary>
-        public bool TryGetDonut(int tick, int slot, out int age, out Vector2 position, out Vector2 velocity)
+        public bool TryGetDonut(int tick, int seed, int slot, out int age, out int course, out Vector2 position, out Vector2 velocity)
         {
             age = 0;
+            course = 0;
             position = Muzzle;
             velocity = Vector2.Zero;
-            if (Kind != StageTrapKind.DonutFryer || _path.Length == 0 || slot < 0 || slot >= DonutSlots)
+            if (Kind != StageTrapKind.DonutFryer || _coursePaths.Length == 0 || slot < 0 || slot >= DonutSlots)
             {
                 return false;
             }
@@ -327,14 +406,23 @@ namespace Airerage.Core.Simulation
                 return false;
             }
             long elapsed = shifted - n * Period;
-            if (elapsed >= _path.Length || tick - elapsed < 0)
+            int chosen = CourseOf(n, seed);
+            Vector2[] path = _coursePaths[chosen];
+            if (elapsed >= path.Length || tick - elapsed < 0)
             {
                 return false;
             }
             age = (int)elapsed;
-            position = _path[age];
-            velocity = age > 0 ? (_path[age] - _path[age - 1]) * SimTime.TicksPerSecond : (_path.Length > 1 ? (_path[1] - _path[0]) * SimTime.TicksPerSecond : Vector2.Zero);
+            course = chosen;
+            position = path[age];
+            velocity = age > 0 ? (path[age] - path[age - 1]) * SimTime.TicksPerSecond : (path.Length > 1 ? (path[1] - path[0]) * SimTime.TicksPerSecond : Vector2.Zero);
             return true;
+        }
+
+        /// <summary>TryGetDonut（コースは要らないとき）。</summary>
+        public bool TryGetDonut(int tick, int seed, int slot, out int age, out Vector2 position, out Vector2 velocity)
+        {
+            return TryGetDonut(tick, seed, slot, out age, out _, out position, out velocity);
         }
 
         /// <summary>
@@ -553,7 +641,23 @@ namespace Airerage.Core.Simulation
                 && ArmTicks == other.ArmTicks && CooldownTicks == other.CooldownTicks && HalfSize.Equals(other.HalfSize) && Period == other.Period
                 && BlinkTicks == other.BlinkTicks && MinHitSpeed.Equals(other.MinHitSpeed) && SameWaypoints(other) && HoverTicks == other.HoverTicks
                 && Reward == other.Reward && RespawnMinTicks == other.RespawnMinTicks && RespawnMaxTicks == other.RespawnMaxTicks
-                && HopHeight.Equals(other.HopHeight);
+                && SameCourses(other);
+        }
+
+        private bool SameCourses(StageTrap other)
+        {
+            if (_courseHops.Length != other._courseHops.Length)
+            {
+                return false;
+            }
+            for (int i = 0; i < _courseHops.Length; i++)
+            {
+                if (_courseStarts[i] != other._courseStarts[i] || !_courseHops[i].Equals(other._courseHops[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private bool SameWaypoints(StageTrap other)
@@ -576,8 +680,22 @@ namespace Airerage.Core.Simulation
         {
             return Kind == StageTrapKind.Tripwire ? $"Tripwire {BeamMin}〜{BeamMax} from {Muzzle} dir {Direction}"
                 : Kind == StageTrapKind.WispRing ? $"WispRing {_waypoints.Length} points from {Muzzle}"
-                : Kind == StageTrapKind.DonutFryer ? $"DonutFryer {_waypoints.Length} landings from {Muzzle} every {Period}"
+                : Kind == StageTrapKind.DonutFryer ? $"DonutFryer {CourseCount} courses ({_waypoints.Length} landings) from {Muzzle} every {Period}"
                 : $"Pitcher at {Muzzle} v {LaunchVelocity}";
         }
+    }
+
+    /// <summary>ドーナツの跳ね方（1 つのコース）: 着地点（最後は消える所）と、跳ねの高さ（m）。</summary>
+    public readonly struct DonutCourse
+    {
+        public DonutCourse(IReadOnlyList<Vector2> landings, float hop)
+        {
+            Landings = landings;
+            Hop = hop;
+        }
+
+        public IReadOnlyList<Vector2> Landings { get; }
+
+        public float Hop { get; }
     }
 }

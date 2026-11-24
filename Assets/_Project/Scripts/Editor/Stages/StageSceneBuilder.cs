@@ -203,7 +203,16 @@ namespace Airerage.Editor.Stages
                 if (spec.Kind == StageTrapKind.DonutFryer)
                 {
                     // ドーナツは決まった道のりを弾むので、見た目は DonutFryerView が動かす（StageTrapView は使わない）。
-                    authoring.ConfigureDonutFryer(spec.Waypoints, spec.PeriodSeconds, spec.PhaseSeconds, spec.Radius, spec.HopHeight);
+                    var landings = new List<Vector2>();
+                    var lengths = new int[spec.DonutCourses.Length];
+                    var hops = new float[spec.DonutCourses.Length];
+                    for (int c = 0; c < lengths.Length; c++)
+                    {
+                        landings.AddRange(spec.DonutCourses[c].Landings);
+                        lengths[c] = spec.DonutCourses[c].Landings.Length;
+                        hops[c] = spec.DonutCourses[c].Hop;
+                    }
+                    authoring.ConfigureDonutFryer(landings.ToArray(), lengths, hops, spec.PeriodSeconds, spec.PhaseSeconds, spec.Radius);
                     CreateDonutFryer(go.transform, authoring, spec, decor);
                     continue;
                 }
@@ -950,10 +959,11 @@ namespace Airerage.Editor.Stages
                 }, new[] { 0.025f, 0.025f, 0.025f }, 6), Vector3.zero, Quaternion.identity, Vector3.one, cable);
             }
             // 砲口の火花（撃ち出した瞬間。砲身の向きへ）と、撃ち出す先の軌道の線。
+            // 2026-11-24 の要望: 発射の火花をもっと派手に（数・速さ・長さを増やし、広く散らす）。
             ParticleSystem muzzle = new ParticleFx
             {
-                Name = "MuzzleBurst", LifetimeMin = 0.2f, LifetimeMax = 0.5f, SpeedMin = 8f, SpeedMax = 18f, SizeMin = 0.04f, SizeMax = 0.1f, ConeAngle = 25f,
-                ConeRadius = bore * 0.6f, Additive = true, Intensity = 5f, Stretch = 0.1f, MaxParticles = 120,
+                Name = "MuzzleBurst", LifetimeMin = 0.25f, LifetimeMax = 0.75f, SpeedMin = 10f, SpeedMax = 30f, SizeMin = 0.05f, SizeMax = 0.16f, ConeAngle = 35f,
+                ConeRadius = bore * 0.6f, Additive = true, Intensity = 7f, Stretch = 0.14f, MaxParticles = 320,
                 Colors = ParticleFx.Ramp(new[] { (Color.white, 0f), (new Color(0.35f, 0.85f, 1f), 0.4f), (new Color(0.2f, 0.4f, 1f), 1f) },
                     new[] { (1f, 0f), (0f, 1f) }),
             }.Build(rig, new Vector3(length * 0.5f, 0f, 0f), Quaternion.LookRotation(Vector3.right), decor.Folder);
@@ -969,9 +979,85 @@ namespace Airerage.Editor.Stages
             trajectory.shadowCastingMode = ShadowCastingMode.Off;
             trajectory.receiveShadows = false;
             trajectory.enabled = false;
-            rig.gameObject.AddComponent<CoilAcceleratorView>().Configure(liners, bands, sparks, muzzle, trajectory, length * 0.5f, axis, zone.Power,
-                new Color(0.35f, 0.85f, 1f));
+            var gun = rig.gameObject.AddComponent<CoilAcceleratorView>();
+            gun.Configure(liners, bands, sparks, muzzle, trajectory, length * 0.5f, axis, zone.Power, new Color(0.35f, 0.85f, 1f));
+            CreateCoilDischarge(parent, rig, gun, liners, bore + tube * 2f, outer, length * 0.5f, decor);
             return rig.gameObject;
+        }
+
+        // コイルガンのためと発射の演出（2026-11-24 の要望: いつ撃つか分かるように光を派手に、ためている間に放電、発射の火花を派手に）:
+        // 電気の弧 7 本・砲口の光の玉と閃光（Airerage/GlowStar）・衝撃の輪と光の筋（Airerage/GlowLine）・砲口へ吸い込まれる光の粒。
+        private static void CreateCoilDischarge(Transform parent, Transform rig, CoilAcceleratorView gun, Renderer[] liners, float coilRadius, float railOffset,
+            float muzzleDistance, StageDecor decor)
+        {
+            var color = new Color(0.35f, 0.85f, 1f);
+            Material arcMaterial = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("CoilArc", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", 3.4f);
+                m.SetFloat("_Core", 1.2f);
+            }, decor.Folder);
+            LineRenderer Line(string name, Material material, float width)
+            {
+                var line = new GameObject(name).AddComponent<LineRenderer>();
+                line.transform.SetParent(parent, false);
+                line.useWorldSpace = true;
+                line.sharedMaterial = material;
+                line.widthMultiplier = width;
+                line.numCapVertices = 2;
+                line.numCornerVertices = 1;
+                line.shadowCastingMode = ShadowCastingMode.Off;
+                line.receiveShadows = false;
+                line.enabled = false;
+                return line;
+            }
+            var arcs = new LineRenderer[7];
+            for (int i = 0; i < arcs.Length; i++)
+            {
+                arcs[i] = Line($"CoilArc{i + 1}", arcMaterial, 0.07f);
+            }
+            MeshRenderer Glow(string name, float points, float inner, float sharp, float halo, float intensity)
+            {
+                Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/GlowStar", m =>
+                {
+                    m.SetFloat("_Points", points);
+                    m.SetFloat("_Inner", inner);
+                    m.SetFloat("_Sharp", sharp);
+                    m.SetFloat("_Halo", halo);
+                    m.SetFloat("_Core", 1.1f);
+                    m.SetFloat("_Intensity", intensity);
+                }, decor.Folder);
+                GameObject quad = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, name, material, Vector3.one);
+                quad.transform.SetParent(parent, false);
+                var renderer = quad.GetComponent<MeshRenderer>();
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+                renderer.enabled = false;
+                return renderer;
+            }
+            MeshRenderer orb = Glow("CoilOrb", 0f, 1f, 1f, 1.2f, 2.6f);
+            MeshRenderer flash = Glow("CoilFlash", 8f, 0.1f, 3.2f, 0.9f, 3.4f);
+            Material shockMaterial = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("CoilShock", "Airerage/GlowLine", m =>
+            {
+                m.SetFloat("_Intensity", 2.6f);
+                m.SetFloat("_Core", 0.9f);
+            }, decor.Folder);
+            LineRenderer shock = Line("CoilShock", shockMaterial, 0.2f);
+            LineRenderer streak = Line("CoilStreak", shockMaterial, 0.8f);
+            streak.widthCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0.15f));
+            // 砲口へ吸い込まれる光の粒（円盤の上から生まれて、中心へ寄る。ため具合で数を増やす）。
+            ParticleSystem gather = new ParticleFx
+            {
+                Name = "CoilGather", Rate = 0f, LifetimeMin = 0.28f, LifetimeMax = 0.4f, SpeedMin = 0f, SpeedMax = 0.1f, SizeMin = 0.05f, SizeMax = 0.12f,
+                ConeAngle = 0f, ConeRadius = 2.6f, Radial = -7.5f, Additive = true, Intensity = 4f, Stretch = 0.1f, MaxParticles = 160,
+                Colors = ParticleFx.Ramp(new[] { (new Color(0.55f, 0.9f, 1f), 0f), (Color.white, 1f) }, new[] { (0f, 0f), (1f, 0.3f), (1f, 1f) }),
+            }.Build(parent, Vector3.zero, Quaternion.identity, decor.Folder);
+            var coils = new Transform[liners.Length];
+            for (int i = 0; i < liners.Length; i++)
+            {
+                coils[i] = liners[i].transform.parent;
+            }
+            rig.gameObject.AddComponent<CoilDischargeView>().Configure(gun, coils, coilRadius, railOffset, arcs, orb, flash, shock, streak, gather,
+                muzzleDistance, color);
         }
 
         // 悪魔の手（2026-11-20 の要望で精巧に）: 地面の紫に光る裂け目から生えた、骨ばった黒い手。前腕・手のひら・拳の節・
@@ -1883,7 +1969,8 @@ namespace Airerage.Editor.Stages
                 m.SetColor("_BaseColor", new Color(1f, 0.35f, 0.2f));
                 m.SetFloat("_Intensity", 2.2f);
             }, decor.Folder);
-            // 冷蔵庫の上（上の面 y ≈ 1.1、手前の面 z ≈ 1.3）に、シュートの出口から見て左奥に置く。
+            // 左の外の大きな冷蔵庫（白い棚。上の面 y ≈ 1.08、x −72.5〜−60、奥行き z 1.3〜11）の上の、ステージの側の端に置く
+            // （シュートの出口から見て左奥。KitchenStage.DonutChuteExit）。
             var fryer = new GameObject("Fryer").transform;
             fryer.SetParent(trap, false);
             fryer.localPosition = new Vector3(-3.2f, -2.2f, 2.6f);
@@ -1931,11 +2018,14 @@ namespace Airerage.Editor.Stages
                 GameObject rail = decor.Box("ChuteRail", trap, new Vector3(mid.x - down.x * 0.17f, mid.y - down.y * 0.17f, side), new Vector3(along.magnitude, 0.38f, 0.06f), steel);
                 rail.transform.localRotation = Quaternion.Euler(0f, 0f, slope);
             }
-            foreach (float x in new[] { -0.4f, chuteEnd.x - 0.15f })
-            {
-                float top = Mathf.Lerp(chuteTop.y, chuteEnd.y, Mathf.InverseLerp(chuteTop.x, chuteEnd.x, x)) - 0.1f;
-                decor.Box("ChuteLeg", trap, new Vector3(x, (top - 2.2f) * 0.5f, 0f), new Vector3(0.12f, top + 2.2f, 0.12f), dark);
-            }
+            // 樋は冷蔵庫の前の面（遊ぶ面より奥）より手前に出るので、脚は立てず、フライヤーの前の面から片持ちで支える（2026-11-24: 棚に乗せる）:
+            // 樋の奥の側に沿った背板（フライヤーの前の面まで）と、フライヤーの前の面の下から樋の真ん中の下へ斜めの支え。
+            GameObject back = decor.Box("ChuteBack", trap, new Vector3(mid.x - down.x * 0.25f, mid.y - down.y * 0.25f, 1f), new Vector3(along.magnitude, 0.7f, 0.8f), steel);
+            back.transform.localRotation = Quaternion.Euler(0f, 0f, slope);
+            Vector3 braceFrom = new Vector3(-1.4f, -1.9f, 1.38f);
+            Vector3 braceTo = new Vector3(mid.x + down.x * 0.15f, mid.y + down.y * 0.15f, 0.4f);
+            GameObject brace = decor.Box("ChuteBrace", trap, (braceFrom + braceTo) * 0.5f, new Vector3(0.12f, 0.12f, Vector3.Distance(braceFrom, braceTo)), dark);
+            brace.transform.localRotation = Quaternion.LookRotation(braceTo - braceFrom);
             decor.Box("ChuteHood", trap, new Vector3(chuteTop.x + 0.2f, chuteTop.y + 0.25f, 0.95f), new Vector3(0.9f, 0.5f, 0.9f), steel);
             // 油の泡と、シュートから飛ぶ油のしずく、立ちのぼる湯気。
             ParticleSystem bubbles = new ParticleFx

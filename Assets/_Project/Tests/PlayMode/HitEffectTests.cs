@@ -69,6 +69,9 @@ namespace Airerage.PlayMode.Tests
             var audio = Object.FindFirstObjectByType<GameAudio>();
             CharacterView dummyView = DummyView(runner);
             Assert.That(dummyView.FatalBurst.Label, Is.EqualTo("FATAL!"));
+            // 2026-11-24 の決定（D-101 の F6）: 輪と光の筋は描かず、背景をゆがませる空気の塊（画面の衝撃波）を出す。
+            Assert.That(dummyView.FatalBurst.DrawsRings, Is.False, "FATAL に前の虹色の輪が残っている");
+            Assert.That(dummyView.FatalBurst.MakesShockwave, Is.True, "FATAL が衝撃波を出さない");
             yield return WaitSeconds(0.5f);
 
             // ダミーの左上を右へ 14 m/s で飛んでいる状態にして、撃破技（下＋攻撃）を出す。チャージの後にちょうどダミーに当たる。
@@ -93,15 +96,18 @@ namespace Airerage.PlayMode.Tests
             {
                 yield return null;
             }
+            bool sawShockwave = false;
             for (int i = 0; i < 5; i++)
             {
                 sawFatal |= dummyView.FatalBurst.IsPlaying;
+                sawShockwave |= ScreenShockwaves.SubmittedCount > 0;
                 yield return null;
             }
             runner.InputOverride = null;
 
             Assert.That(runner.GetDummyState(0).Combat.FatalHitCount, Is.EqualTo(1), "FATAL にならなかった");
             Assert.That(sawFatal, Is.True, "FATAL の光が出ない");
+            Assert.That(sawShockwave, Is.True, "FATAL の衝撃波が画面の処理に渡らない");
             Assert.That(audio.History.Contains(SoundId.Fatal), Is.True, "重い打撃音が鳴らない");
         }
 
@@ -121,15 +127,21 @@ namespace Airerage.PlayMode.Tests
             inputs.Add(SimInput.FromAxes(0f, 1f, InputButtons.Wire));
             runner.InputOverride = new Script(inputs);
             bool sawBurst = false;
+            bool starBehind = false;
             float start = Time.time;
+            BurstEffectView burst = runner.PlayerView.WireCancelBurst;
+            Assert.That(burst.HasSpinningStar, Is.True, "ワイヤーキャンセルが回る星（S5）になっていない");
             while (Time.time - start < 1f)
             {
-                sawBurst |= runner.PlayerView.WireCancelBurst.IsPlaying;
+                sawBurst |= burst.IsPlaying;
+                // 回る星はキャラクターより奥に描く（2026-11-24 の要望）。
+                starBehind |= burst.MainStar.enabled && burst.MainStar.transform.position.z > runner.PlayerState.Position.Z + 0.3f;
                 yield return null;
             }
 
             Assert.That(runner.PlayerState.Combat.WireCancelCooldownTicksLeft, Is.GreaterThan(0), "前提: ワイヤーでキャンセルした");
             Assert.That(sawBurst, Is.True, "ワイヤーキャンセルの光が出ない");
+            Assert.That(starBehind, Is.True, "回る星がキャラクターより奥に出ない");
         }
 
         private static CharacterView DummyView(SimulationRunner runner)

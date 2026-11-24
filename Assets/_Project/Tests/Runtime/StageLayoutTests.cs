@@ -990,34 +990,50 @@ namespace Airerage.Runtime.Tests
         [Test]
         public void Kitchen_Donuts_BounceOnTheCounters_WithoutGoingThroughAnything_AndLeaveOnTheRight()
         {
-            // 2026-11-24 の要望: 左の冷蔵庫の上のフライヤーから出て、地面を弾みながら右のステージの外へ消える。
+            // 2026-11-24 の要望: 左の冷蔵庫の上のフライヤーから出て、地面を弾みながら右のステージの外へ消える。5 つの跳ね方から毎回選ぶ
+            // （穴に落ちてもよい: 右の外へ出るか、ステージの下へ落ちるか、シンクの水の中で消える）。
             Open("Stage_Kitchen");
             StageTrap fryer = _traps.Single(t => t.Kind == StageTrapKind.DonutFryer);
             float radius = fryer.HalfSize.X;
-            Assert.That(fryer.Muzzle.X, Is.LessThan(-50f), "フライヤーが左の冷蔵庫の上にない");
-            int slot = Enumerable.Range(0, fryer.DonutSlots).First(s => fryer.TryGetDonut(fryer.Period, s, out int age, out _, out _) && age == 0);
-            // 最後の点のほかは、着地点の真下に足場がある（足場の上で弾む）。
-            for (int i = 0; i < fryer.LandingTicks.Count - 1; i++)
+            Assert.That(fryer.Muzzle.X, Is.LessThan(-58f), "フライヤーの出口が左の冷蔵庫の上（ステージの左の端）にない");
+            Assert.That(fryer.CourseCount, Is.EqualTo(5), "跳ね方が 5 つない");
+            Assert.That(fryer.Period, Is.EqualTo(10 * SimTime.TicksPerSecond), "間隔が 10 秒でない");
+            StageZone sink = _zones.Single(z => z.Kind == StageZoneKind.Water);
+            var ends = new HashSet<string>();
+            for (int course = 0; course < fryer.CourseCount; course++)
             {
-                Assert.That(fryer.TryGetDonut(fryer.Period + fryer.LandingTicks[i], slot, out _, out NVector2 at, out _), Is.True);
-                Assert.That(_terrain.Raycast(new NVector3(at.X, at.Y, 0f), -NVector3.UnitY, radius + 0.3f, out _), Is.True,
-                    $"{i} 番目の着地点 {at} の下に足場がない");
-            }
-            // 道のりのどこでも、ドーナツが地形に埋まらない。
-            NVector2 last = fryer.Muzzle;
-            for (int age = 0; ; age++)
-            {
-                if (!fryer.TryGetDonut(fryer.Period + age, slot, out int shownAge, out NVector2 at, out _) || shownAge != age)
+                IReadOnlyList<NVector2> path = fryer.CoursePath(course);
+                IReadOnlyList<int> landings = fryer.LandingTicks(course);
+                // 最後の点のほかは、着地点の真下に足場がある（足場の上で弾む）。
+                for (int i = 0; i < landings.Count - 1; i++)
                 {
-                    // 消えたときの位置は、最後に出ていた位置（消えた後の TryGetDonut の位置は出口を返す）。
-                    Assert.That(age, Is.GreaterThan(300), "ドーナツがすぐ消える");
-                    Assert.That(_bounds.Contains(new NVector3(last.X, last.Y, 0f)), Is.False, $"ドーナツがステージの中で消える（{last}。右の外へ消えるはず）");
-                    break;
+                    NVector2 at = path[landings[i]];
+                    Assert.That(_terrain.Raycast(new NVector3(at.X, at.Y, 0f), -NVector3.UnitY, radius + 0.3f, out _), Is.True,
+                        $"コース {course} の {i} 番目の着地点 {at} の下に足場がない");
                 }
-                last = at;
-                Assert.That(_terrain.IsOverlapping(new NVector3(at.X, at.Y, 0f), new NVector3(radius * 0.7f, radius * 0.7f, 0.1f)), Is.False,
-                    $"ドーナツが {age} ティック目に地形に埋まる（{at}）");
+                // 道のりのどこでも、ドーナツが地形に埋まらない。
+                for (int age = 0; age < path.Count; age++)
+                {
+                    NVector2 at = path[age];
+                    Assert.That(_terrain.IsOverlapping(new NVector3(at.X, at.Y, 0f), new NVector3(radius * 0.7f, radius * 0.7f, 0.1f)), Is.False,
+                        $"コース {course} のドーナツが {age} ティック目に地形に埋まる（{at}）");
+                }
+                Assert.That(path.Count, Is.GreaterThan(240), $"コース {course} のドーナツがすぐ消える");
+                // 消える所: ステージの外（右の外・下）か、シンクの水の中。
+                NVector2 last = path[path.Count - 1];
+                bool outside = !_bounds.Contains(new NVector3(last.X, last.Y, 0f));
+                bool inWater = sink.Contains(new NVector3(last.X, last.Y, 0f));
+                Assert.That(outside || inWater, Is.True, $"コース {course} のドーナツがステージの中で消える（{last}）");
+                ends.Add(inWater ? "sink" : last.Y < _bounds.MinY ? "fall" : "right");
             }
+            Assert.That(ends, Is.EquivalentTo(new[] { "right", "fall", "sink" }), "右の外へ出る・すき間に落ちる・シンクに落ちるコースがそろっていない");
+            // 出るたびに選ぶコースは、試合の種で変わり、どのコースも選ばれる。
+            var chosen = new HashSet<int>();
+            for (int n = 1; n <= 40; n++)
+            {
+                chosen.Add(fryer.CourseOf(n, 4242));
+            }
+            Assert.That(chosen.Count, Is.EqualTo(5), "選ばれないコースがある");
         }
 
         [Test]

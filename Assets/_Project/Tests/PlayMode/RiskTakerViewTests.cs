@@ -142,6 +142,8 @@ namespace Airerage.PlayMode.Tests
             while (Time.time - start < 0.5f)
             {
                 sawBurst |= runner.PlayerView.JackpotBurst.IsPlaying;
+                // 2026-11-24 の決定（D-101 の J7）: 色が重なって虹色に流れる文字。
+                Assert.That(runner.PlayerView.JackpotBurst.Look, Is.EqualTo(BurstEffectView.LabelLook.Prism));
                 yield return null;
             }
             Assert.That(sawBurst, Is.True, "JACKPOT! の光が出ない");

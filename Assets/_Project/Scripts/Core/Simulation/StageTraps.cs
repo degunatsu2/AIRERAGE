@@ -95,9 +95,9 @@ namespace Airerage.Core.Simulation
             return trap.Muzzle + trap.Direction * distance;
         }
 
-        /// <summary>仕掛けをティック tick（進めた後のティック）に進める。</summary>
+        /// <summary>仕掛けをティック tick（進めた後のティック）に進める。seed は試合の種（ドーナツのコースを選ぶ）。</summary>
         public static void Step(IReadOnlyList<StageTrap> traps, StageState stage, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs,
-            int tick)
+            int tick, int seed)
         {
             if (traps == null)
             {
@@ -116,7 +116,7 @@ namespace Airerage.Core.Simulation
                 }
                 else if (trap.Kind == StageTrapKind.DonutFryer)
                 {
-                    StepDonuts(trap, states, configs, tick);
+                    StepDonuts(trap, states, configs, tick, seed);
                 }
                 // 鬼火の輪はコインを渡すので、台帳のある StepWispRings で進める。
             }
@@ -253,12 +253,12 @@ namespace Airerage.Core.Simulation
         }
 
         // ドーナツに触れた人を、ドーナツの中心から外向きに弾き返す（バンパーと同じ。ドーナツは丸いので、円に重なった人だけ）。
-        private static void StepDonuts(StageTrap trap, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick)
+        private static void StepDonuts(StageTrap trap, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick, int seed)
         {
             float radius = trap.HalfSize.X;
             for (int slot = 0; slot < trap.DonutSlots; slot++)
             {
-                if (!trap.TryGetDonut(tick, slot, out _, out Vector2 donut, out _))
+                if (!trap.TryGetDonut(tick, seed, slot, out _, out Vector2 donut, out _))
                 {
                     continue;
                 }
@@ -294,7 +294,7 @@ namespace Airerage.Core.Simulation
         /// ティック tick の初めに、出ているドーナツの真ん中をアンカーポイントにする（動く足場のアンカーの後に足す。次のティックの
         /// SetPlatforms で消える）。ワイヤーの接続先の番号は DonutBodyBase から。
         /// </summary>
-        public static void AddAnchors(Objects.WorldCollision collision, IReadOnlyList<StageTrap> traps, int tick)
+        public static void AddAnchors(Objects.WorldCollision collision, IReadOnlyList<StageTrap> traps, int tick, int seed)
         {
             if (traps == null || collision == null)
             {
@@ -309,7 +309,7 @@ namespace Airerage.Core.Simulation
                 }
                 for (int slot = 0; slot < trap.DonutSlots; slot++)
                 {
-                    if (trap.TryGetDonut(tick, slot, out _, out Vector2 donut, out _))
+                    if (trap.TryGetDonut(tick, seed, slot, out _, out Vector2 donut, out _))
                     {
                         collision.AddMovingAnchor(new Vector3(donut.X, donut.Y, 0f), trap.HalfSize.X, DonutBody(i, slot));
                     }
@@ -328,7 +328,7 @@ namespace Airerage.Core.Simulation
         /// （bounds）へ出たら、ワイヤーを外す（つないだまま外へ引きずり出されない）。
         /// </summary>
         public static void CarryWires(IReadOnlyList<StageTrap> traps, List<CharacterState> states, IReadOnlyList<CharacterConfig> configs, int tick,
-            StageBounds? bounds)
+            int seed, StageBounds? bounds)
         {
             if (traps == null)
             {
@@ -347,7 +347,7 @@ namespace Airerage.Core.Simulation
                 Vector2 now = Vector2.Zero;
                 int age = 0;
                 bool alive = index < traps.Count && traps[index].Kind == StageTrapKind.DonutFryer
-                    && traps[index].TryGetDonut(tick, slot, out age, out now, out _);
+                    && traps[index].TryGetDonut(tick, seed, slot, out age, out now, out _);
                 alive = alive && age > 0 && (!bounds.HasValue || bounds.Value.Contains(new Vector3(now.X, now.Y, 0f)));
                 if (!alive)
                 {
@@ -355,7 +355,7 @@ namespace Airerage.Core.Simulation
                     states[c] = state;
                     continue;
                 }
-                traps[index].TryGetDonut(tick - 1, slot, out _, out Vector2 before, out _);
+                traps[index].TryGetDonut(tick - 1, seed, slot, out _, out Vector2 before, out _);
                 var move = new Vector3(now.X - before.X, now.Y - before.Y, 0f);
                 state.Wire.Anchor += move;
                 state.Wire.HookPosition += move;

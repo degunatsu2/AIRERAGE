@@ -467,8 +467,8 @@ namespace Airerage.Editor.Stages
         public float RespawnMinSeconds;
         public float RespawnMaxSeconds;
 
-        // ドーナツフライヤー（着地点は Waypoints、周期とずれは PeriodSeconds・PhaseSeconds、半径は Radius）。
-        public float HopHeight;
+        // ドーナツフライヤー（跳ね方のコース。周期とずれは PeriodSeconds・PhaseSeconds、半径は Radius）。
+        public DonutCourseSpec[] DonutCourses;
 
         private TrapSpec(string name, StageTrapKind kind, Vector2 center)
         {
@@ -523,15 +523,14 @@ namespace Airerage.Editor.Stages
         /// ドーナツフライヤー（出口 muzzle から period 秒ごとにドーナツを出し、landings の着地点を順に弾んで、最後の点で消える。ずれ phase 秒。
         /// 半径 radius・跳ねの高さ hop）。物体は出口に置く。
         /// </summary>
-        public static TrapSpec DonutFryer(string name, Vector2 muzzle, Vector2[] landings, float period, float phase, float radius, float hop)
+        public static TrapSpec DonutFryer(string name, Vector2 muzzle, DonutCourseSpec[] courses, float period, float phase, float radius)
         {
             return new TrapSpec(name, StageTrapKind.DonutFryer, muzzle)
             {
-                Waypoints = landings,
+                DonutCourses = courses,
                 PeriodSeconds = period,
                 PhaseSeconds = phase,
                 Radius = radius,
-                HopHeight = hop,
             };
         }
 
@@ -584,5 +583,22 @@ namespace Airerage.Editor.Stages
 
         /// <summary>ギミックの線と台の色（なければ StageSceneBuilder の標準の色）。</summary>
         public readonly Dictionary<StageZoneKind, Color> ZoneColors = new Dictionary<StageZoneKind, Color>();
+    }
+
+    /// <summary>ドーナツの跳ね方（1 つのコース）: 名前（設計書とテスト用）、着地点（中心。最後は消える所）、跳ねの高さ（m）。</summary>
+    internal readonly struct DonutCourseSpec
+    {
+        public DonutCourseSpec(string name, float hop, params Vector2[] landings)
+        {
+            Name = name;
+            Hop = hop;
+            Landings = landings;
+        }
+
+        public string Name { get; }
+
+        public float Hop { get; }
+
+        public Vector2[] Landings { get; }
     }
 }

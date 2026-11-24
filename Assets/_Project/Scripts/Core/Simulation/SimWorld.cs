@@ -380,9 +380,9 @@ namespace Airerage.Core.Simulation
             // 動く足場と扉: このティックの位置の当たりを作り、動いた分だけ乗っている人とつないだワイヤーを運ぶ。
             _collision.SetPlatforms(_platforms, _stage, Tick);
             // ドーナツ（キッチンのドーナツフライヤー）の真ん中もアンカーにし、つないだワイヤーを運ぶ（2026-11-24）。
-            StageTraps.AddAnchors(_collision, _traps, Tick);
+            StageTraps.AddAnchors(_collision, _traps, Tick, Rules.Seed);
             StagePlatforms.Carry(_platforms, _stage, _states, _tickConfigs, Tick);
-            StageTraps.CarryWires(_traps, _states, _tickConfigs, Tick, Bounds);
+            StageTraps.CarryWires(_traps, _states, _tickConfigs, Tick, Rules.Seed, Bounds);
             for (int i = 0; i < _states.Count; i++)
             {
                 CharacterState state = _states[i];
@@ -416,7 +416,7 @@ namespace Airerage.Core.Simulation
             ThiefRules.StepClones(this, _clones, _cloneMinds, _cloneMotion, _states, _simulator, _configs, Bounds, Tick, Rules.Seed);
             Tick++;
             // ステージの仕掛け（赤外線とミサイル、ピッチャーマシンのボール）と、荷役の網の跳ね返し。
-            StageTraps.Step(_traps, _stage, _states, _tickConfigs, Tick);
+            StageTraps.Step(_traps, _stage, _states, _tickConfigs, Tick, Rules.Seed);
             StagePlatforms.Bounce(_platforms, _stage, _states, _tickConfigs, Tick);
             // ステージの危険に当たった人が、威力に応じてコインを落とす。
             CoinDropRules.DropOnHazards(Coins, _states, Rules, Tick);

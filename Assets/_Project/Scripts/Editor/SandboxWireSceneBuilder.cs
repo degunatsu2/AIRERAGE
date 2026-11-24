@@ -429,13 +429,17 @@ namespace Airerage.Editor
             BurstEffectView spark = CreateBurst(name + "HitSpark", parent);
             spark.Configure(new Color(1f, 0.95f, 0.6f, 1f), false, 0.2f, 0.2f, 1.1f, 6, 0.9f, 0.1f, string.Empty, 0, 0f);
             SetReference(view, "_hitSpark", spark);
-            // FATAL（虹色の大きな光、「FATAL!」、画面の閃光。ユーザーの要望、2026-10-13）。
+            // FATAL（「FATAL!」。ユーザーの要望、2026-10-13）: 2026-11-24 の決定（D-101 の F6）で、虹色の輪と光の筋・画面の閃光をやめ、
+            // 当たった所から背景をゆがませる透明な空気の塊（衝撃波）と、輪の内側の虹色の色収差（ScreenShockwaves）にした。
             BurstEffectView fatal = CreateBurst(name + "FatalBurst", parent);
-            fatal.Configure(Color.white, true, 1.1f, 0.4f, 5f, 14, 3.2f, 0.28f, "FATAL!", 64, 0.45f);
+            fatal.Configure(Color.white, true, 1.1f, 0.4f, 5f, 0, 0f, 0.28f, "FATAL!", 64, 0f);
+            fatal.ConfigureRings(false);
+            fatal.ConfigureShockwave(true, 1f);
             SetReference(view, "_fatalBurst", fatal);
-            // ワイヤーキャンセル（紫。クールタイムのゲージと同じ色）。
+            // ワイヤーキャンセル（紫。クールタイムのゲージと同じ色）: 2026-11-24 の決定（D-101 の S5）で、回る星と残像に（キャラクターより奥）。
             BurstEffectView wireCancel = CreateBurst(name + "WireCancelBurst", parent);
-            wireCancel.Configure(new Color(0.75f, 0.45f, 1f, 1f), false, 0.35f, 0.4f, 1.9f, 10, 1.2f, 0.12f, string.Empty, 0, 0f);
+            wireCancel.Configure(new Color(0.75f, 0.45f, 1f, 1f), false, 0.7f, 0.4f, 1.9f, 0, 0f, 0.12f, string.Empty, 0, 0f);
+            wireCancel.ConfigureSpinningStar(CreateStarQuads(wireCancel.transform), SpinningStarRadius);
             SetReference(view, "_wireCancelBurst", wireCancel);
             // のけぞり中に地形で跳ね返った（白っぽい水色。土ぼこりのような短い光）。
             BurstEffectView bounce = CreateBurst(name + "BounceBurst", parent);
@@ -446,16 +450,22 @@ namespace Airerage.Editor
             gimmick.Configure(new Color(0.55f, 1f, 0.6f, 1f), false, 0.3f, 0.4f, 1.6f, 8, 0.7f, 0.1f, string.Empty, 0, 0f);
             SetReference(view, "_gimmickBurst", gimmick);
             // 特殊攻撃を出した（プレイヤーの色の、鋭い光。docs/13 T5-4）。
+            // 2026-11-24 の決定（D-101 の S5）で、回る星と残像に（プレイヤーの色。キャラクターより奥）。
             BurstEffectView special = CreateBurst(name + "SpecialBurst", parent);
-            special.Configure(Color.Lerp(playerColor, Color.white, 0.35f), false, 0.3f, 0.3f, 2.2f, 12, 1.4f, 0.13f, string.Empty, 0, 0f);
+            special.Configure(Color.Lerp(playerColor, Color.white, 0.35f), false, 0.7f, 0.3f, 2.2f, 0, 0f, 0.13f, string.Empty, 0, 0f);
+            special.ConfigureSpinningStar(CreateStarQuads(special.transform), SpinningStarRadius);
             SetReference(view, "_specialBurst", special);
-            // 必殺技を出した（虹色の大きな光と「SUPER!」。画面の暗転は SuperFlashHud）。
+            // 必殺技を出した（虹色の回る星（S5。ひと回り大きく）と「SUPER!」。画面の暗転は SuperFlashHud）。
             BurstEffectView super = CreateBurst(name + "SuperBurst", parent);
-            super.Configure(Color.white, true, 0.8f, 0.5f, 4.5f, 16, 2.6f, 0.22f, "SUPER!", 56, 0f);
+            super.Configure(Color.white, true, 0.85f, 0.5f, 4.5f, 0, 0f, 0.22f, "SUPER!", 56, 0f);
+            super.ConfigureSpinningStar(CreateStarQuads(super.transform), SpinningStarRadius * 1.3f);
             SetReference(view, "_superBurst", super);
-            // ルーレットの最大（JACKPOT。RISK TAKER の撃破技）を受けた（虹色の光と「JACKPOT!」）。
+            // ルーレットの最大・ALL IN の虹（JACKPOT。RISK TAKER）を受けた: 2026-11-24 の決定（D-101 の J7）で、赤・緑・青の 3 枚が重なって
+            // 虹色に流れる「JACKPOT!」と、虹色に光るにじみの影（J9 の発光）。輪と光の筋・光の帯は出さない。
             BurstEffectView jackpot = CreateBurst(name + "JackpotBurst", parent);
-            jackpot.Configure(Color.white, true, 1f, 0.4f, 4.5f, 12, 3f, 0.24f, "JACKPOT!", 60, 0.3f);
+            jackpot.Configure(Color.white, true, 1.8f, 0.4f, 4.5f, 0, 0f, 0.24f, "JACKPOT!", 64, 0f);
+            jackpot.ConfigureRings(false);
+            jackpot.ConfigureLabel(BurstEffectView.LabelLook.Prism, 1.8f);
             SetReference(view, "_jackpotBurst", jackpot);
             // コインの効率が上がっている残り（フィーバータイム。金色）。
             SetReference(view, "_feverGauge", CreateRingGauge(name + "FeverGauge", parent, "FEVER", 1.9f, new Color(1f, 0.8f, 0.2f, 0.75f)));
@@ -489,6 +499,37 @@ namespace Airerage.Editor
         }
 
         /// <summary>一瞬の光（輪 2 つと光の筋。文字はシーンのカメラで画面に写す）。値は呼んだ側が Configure で決める。</summary>
+        /// <summary>回る星（S5。ワイヤーキャンセル・技の発動）の半径（m）。案の見本より少し大きく（2026-11-24 の要望）。</summary>
+        internal const float SpinningStarRadius = 2.2f;
+
+        /// <summary>
+        /// 回る星の板（S5）: 本体 1 枚と残像 3 枚（Airerage/GlowStar の 4 点の星。影を落とさない）。表示は BurstEffectView が動かす。
+        /// </summary>
+        internal static MeshRenderer[] CreateStarQuads(Transform parent)
+        {
+            Material material = LoadOrCreateShaderMaterial("SpinningStar", "Airerage/GlowStar", m =>
+            {
+                m.SetFloat("_Points", 4f);
+                m.SetFloat("_Inner", 0.16f);
+                m.SetFloat("_Sharp", 2.4f);
+                m.SetFloat("_Halo", 0.55f);
+                m.SetFloat("_Core", 0.9f);
+                m.SetFloat("_Intensity", 2.2f);
+            });
+            var stars = new MeshRenderer[4];
+            for (int i = 0; i < stars.Length; i++)
+            {
+                GameObject quad = CreateVisual(PrimitiveType.Quad, i == 0 ? "Star" : $"StarGhost{i}", material, Vector3.one);
+                quad.transform.SetParent(parent, false);
+                var renderer = quad.GetComponent<MeshRenderer>();
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+                renderer.enabled = false;
+                stars[i] = renderer;
+            }
+            return stars;
+        }
+
         internal static BurstEffectView CreateBurst(string name, Transform parent)
         {
             var material = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");

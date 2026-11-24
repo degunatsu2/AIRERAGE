@@ -1096,6 +1096,28 @@ namespace Airerage.Runtime.Tests
         }
 
         [Test]
+        public void Kitchen_DonutFryer_SitsOnTheFridge()
+        {
+            // 2026-11-24 の指摘: フライヤーが左の外の白い棚（大きな冷蔵庫）の上に乗っていない。冷蔵庫の上の面に乗り、はみ出さない。
+            Scene kitchen = Open("Assets/_Project/Scenes/Stages/Stage_Kitchen.unity");
+            Transform fryer = InScene<Transform>(kitchen).Single(t => t.name == "Fryer");
+            Bounds body = fryer.Find("Body").GetComponent<Renderer>().bounds;
+            Transform fridge = InScene<Transform>(kitchen).Where(t => t.name == "Prop_kitchenFridgeLarge").OrderBy(t => t.position.x).First();
+            Renderer[] parts = fridge.GetComponentsInChildren<Renderer>();
+            Bounds top = parts[0].bounds;
+            foreach (Renderer part in parts)
+            {
+                top.Encapsulate(part.bounds);
+            }
+            string where = $"フライヤー {body.min}〜{body.max}、冷蔵庫 {top.min}〜{top.max}";
+            Assert.That(body.min.y, Is.EqualTo(top.max.y).Within(0.15f), $"フライヤーが冷蔵庫の上の面に乗っていない（{where}）");
+            Assert.That(body.min.x, Is.GreaterThanOrEqualTo(top.min.x - 0.05f), $"フライヤーが冷蔵庫からはみ出す（{where}）");
+            Assert.That(body.max.x, Is.LessThanOrEqualTo(top.max.x + 0.05f), $"フライヤーが冷蔵庫からはみ出す（{where}）");
+            Assert.That(body.min.z, Is.GreaterThanOrEqualTo(top.min.z - 0.05f), $"フライヤーが冷蔵庫の手前へはみ出す（{where}）");
+            Assert.That(InScene<Transform>(kitchen).Any(t => t.name == "ChuteLeg"), Is.False, "宙に浮く樋の脚が残っている");
+        }
+
+        [Test]
         public void FifthGimmickBatch_SpaceStation_HasItsLooks_AndMatchesTheHitboxes()
         {
             // 2026-11-21 の方針の第 5 弾（宇宙ステーション）と、2026-11-24 の要望（ワープゲートは前の紫の楕円の見た目を精巧に、コイルはコイルガンに）。
@@ -1147,6 +1169,7 @@ namespace Airerage.Runtime.Tests
                 Assert.That(zone.Kind, Is.EqualTo(StageZoneKind.CoilGun), "コイルが撃ち出すギミックでない");
                 Assert.That(coil.transform.parent.GetComponentsInChildren<LineRenderer>(true).Any(l => l.name == "Trajectory"), Is.True, "軌道の線がない");
                 Assert.That(coil.BandCount, Is.EqualTo(3), "ため具合を外から見せる光る帯がない");
+                Assert.That(coil.GetComponent<CoilDischargeView>(), Is.Not.Null, "ためと発射の演出（放電・光の玉・閃光）がない");
                 Renderer[] liners = coil.GetComponentsInChildren<Renderer>(true).Where(r => r.name == "Liner").ToArray();
                 Assert.That(liners.Length, Is.EqualTo(3), "コイルの光る輪");
                 Assert.That(liners.All(l => l.sharedMaterial.shader.name == "Airerage/Emissive"), Is.True);

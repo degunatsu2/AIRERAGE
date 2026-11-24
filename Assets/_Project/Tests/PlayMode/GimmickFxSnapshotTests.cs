@@ -258,6 +258,12 @@ namespace Airerage.PlayMode.Tests
             }
             Shoot(camera, new Vector3(coil.ShownCenter.x, coil.ShownCenter.y + 1.5f, -12f), "Space_6CoilCharging");
             limit = Time.realtimeSinceStartup + 2f;
+            while (runner.PlayerState.Combat.CaptureTicks < 54 && runner.PlayerState.Combat.CaptureTicks > 0 && Time.realtimeSinceStartup < limit)
+            {
+                yield return null;
+            }
+            Shoot(camera, new Vector3(coil.ShownCenter.x, coil.ShownCenter.y + 1.5f, -12f), "Space_6CoilReady");
+            limit = Time.realtimeSinceStartup + 2f;
             while (runner.PlayerState.Combat.CaptureTicks > 0 && Time.realtimeSinceStartup < limit)
             {
                 yield return null;
@@ -276,6 +282,79 @@ namespace Airerage.PlayMode.Tests
             runner.SetPlayerState(state);
             yield return Wait(1.2f);
             Shoot(camera, new Vector3(cabin.ShownCenter.x, cabin.ShownCenter.y, -13f), "Space_8CabinPushed");
+        }
+
+        /// <summary>
+        /// 戦いの演出（2026-11-24 の決定 D-101）: ワイヤーキャンセル・技・必殺技の回る星（S5。キャラクターより奥）と、FATAL の空気の塊の
+        /// 衝撃波（F6。背景がゆがむ）を撮る（Logs/Snapshots/Fx_*）。演出はそれぞれの光を直接始めて撮る（JACKPOT の文字は画面に OnGUI で
+        /// 描くので、カメラの絵には写らない）。
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureCombatEffects()
+        {
+            SceneManager.LoadScene("App");
+            yield return null;
+            var flow = Object.FindFirstObjectByType<GameFlow>();
+            while (flow.Current != GameFlow.FlowScreen.Menu || flow.IsLoading)
+            {
+                yield return null;
+            }
+            Directory.CreateDirectory(Folder);
+            flow.StartTraining(flow.Stages.Stages.First(s => s.SceneName == "Stage_Athletic"));
+            while (flow.Current != GameFlow.FlowScreen.Training || flow.IsLoading || SceneManager.GetActiveScene().name != "Stage_Athletic")
+            {
+                yield return null;
+            }
+            yield return Wait(2f);
+            Camera camera = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            var runner = Object.FindFirstObjectByType<SimulationRunner>();
+            CharacterView view = runner.PlayerView;
+            System.Numerics.Vector3 at = runner.PlayerState.Position;
+            var center = new Vector3(at.X, at.Y + 0.9f, at.Z);
+            var shot = new Vector3(center.x, center.y + 0.5f, -10f);
+            Shoot(camera, shot, "Fx_0Before");
+            view.WireCancelBurst.Play(center);
+            yield return Wait(0.07f);
+            Shoot(camera, shot, "Fx_1WireCancelStar");
+            yield return Wait(0.2f);
+            Shoot(camera, shot, "Fx_1WireCancelStarLate");
+            yield return Wait(0.6f);
+            view.SpecialBurst.Play(center);
+            yield return Wait(0.1f);
+            Shoot(camera, shot, "Fx_2SpecialStar");
+            yield return Wait(0.8f);
+            view.SuperBurst.Play(center);
+            yield return Wait(0.12f);
+            Shoot(camera, shot, "Fx_2SuperStar");
+            yield return Wait(1f);
+            view.FatalBurst.Play(center);
+            yield return Wait(0.1f);
+            ShootWithShockwaves(camera, new Vector3(center.x, center.y + 1f, -14f), "Fx_3FatalShock");
+            yield return Wait(0.15f);
+            ShootWithShockwaves(camera, new Vector3(center.x, center.y + 1f, -14f), "Fx_3FatalShockLate");
+        }
+
+        // 画面の衝撃波の値を、撮るカメラ（位置と絵の大きさ）で入れ直してから撮る。
+        private static void ShootWithShockwaves(Camera camera, Vector3 position, string name)
+        {
+            Vector3 previousPosition = camera.transform.position;
+            Quaternion previousRotation = camera.transform.rotation;
+            camera.transform.SetPositionAndRotation(position, Quaternion.identity);
+            var texture = new RenderTexture(1920, 1080, 24);
+            RenderTexture previous = camera.targetTexture;
+            camera.targetTexture = texture;
+            ScreenShockwaves.Submit(camera);
+            camera.Render();
+            RenderTexture.active = texture;
+            var image = new Texture2D(1920, 1080, TextureFormat.RGB24, false);
+            image.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0);
+            image.Apply();
+            File.WriteAllBytes($"{Folder}/{name}.png", image.EncodeToPNG());
+            camera.targetTexture = previous;
+            RenderTexture.active = null;
+            camera.transform.SetPositionAndRotation(previousPosition, previousRotation);
+            Object.Destroy(texture);
+            Object.Destroy(image);
         }
 
         private sealed class HoldAimAt : ITickInputSource

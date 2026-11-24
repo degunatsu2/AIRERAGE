@@ -25,19 +25,40 @@ namespace Airerage.Editor.Stages
 
         // トースター（左の調理台の上。2026-11-20 の方針: 判定を見た目に合わせる。前は通り抜けられる飾りの箱だったので、乗れる地形にした）:
         // 本体の範囲と奥行き。上の 2 本の溝からパンが跳ね上がる（ToasterPop の発射台は溝の上）。
-        /// <summary>ドーナツの半径（m）と、フライヤーのシュートの出口（左の冷蔵庫の上）。</summary>
+        /// <summary>
+        /// ドーナツの半径（m）と、フライヤーのシュートの出口。フライヤーは左のステージの外の大きな冷蔵庫（白い棚。Kenney の
+        /// kitchenFridgeLarge。上の面 y ≈ 1.08、x −72.5〜−60）の上の、ステージの側の端に乗せる（2026-11-24 の指摘: 棚に乗っていない）。
+        /// </summary>
         internal const float DonutRadius = 0.9f;
-        internal static readonly Vector2 DonutChuteExit = new Vector2(-52.5f, 3.3f);
+        internal static readonly Vector2 DonutChuteExit = new Vector2(-59.4f, 3.3f);
+
+        /// <summary>ドーナツが出る間隔（秒）【仮】（2026-11-24 の要望: 5 → 10 秒）。</summary>
+        internal const float DonutPeriod = 10f;
 
         /// <summary>
-        /// ドーナツの着地点（中心。足場の上の面 ＋ 半径）: 左の調理台・トースターの上・左の調理台・まな板のゼリー・コンロ・コンロ・ボウルのゼリー・
-        /// 右の調理台（カップケーキのベルトコンベア）・排水溝のふたの上、最後はステージの右の外（ここで消える）。
+        /// ドーナツの跳ね方（2026-11-24 の要望: いろいろな跳ね方を 5 つ作り、出るたびにランダムに選ぶ。穴に落ちてもよい）。着地点は
+        /// 中心（足場の上の面 ＋ 半径）。どれも、着地点の下に足場があり、道のりのどこでも地形に埋まらない（StageLayoutTests）。
+        /// どのコースかは試合の種と何番目に出たかで決まる（StageTrap.CourseOf。ネットワーク対戦でもずれない）。
         /// </summary>
-        internal static readonly Vector2[] DonutLandings =
+        internal static readonly DonutCourseSpec[] DonutCourses =
         {
-            new Vector2(-44f, 2f + DonutRadius), new Vector2(-35.5f, ToasterTop + DonutRadius), new Vector2(-28f, 2f + DonutRadius),
-            new Vector2(-18f, 6.5f + DonutRadius), new Vector2(-5f, DonutRadius), new Vector2(5f, DonutRadius), new Vector2(18f, 6.5f + DonutRadius),
-            new Vector2(30f, 2f + DonutRadius), new Vector2(46.4f, 18.2f + DonutRadius), new Vector2(66f, 4f),
+            // 1. ひと巡り: 調理台・トースターの上・調理台・まな板・コンロ 2 回・ボウル・右の調理台・排水溝のふたの上を弾んで、右の外へ。
+            new DonutCourseSpec("Tour", 3f, new Vector2(-44f, 2f + DonutRadius), new Vector2(-35.5f, ToasterTop + DonutRadius), new Vector2(-28f, 2f + DonutRadius),
+                new Vector2(-18f, 6.5f + DonutRadius), new Vector2(-5f, DonutRadius), new Vector2(5f, DonutRadius), new Vector2(18f, 6.5f + DonutRadius),
+                new Vector2(30f, 2f + DonutRadius), new Vector2(46.4f, 18.2f + DonutRadius), new Vector2(66f, 4f)),
+            // 2. 小刻み: 左の調理台の上を低く速く 5 回跳ねて、端からコンロとの間のすき間へ落ちる（穴）。
+            new DonutCourseSpec("Skimmer", 1.3f, new Vector2(-46f, 2f + DonutRadius), new Vector2(-41f, 2f + DonutRadius), new Vector2(-35.5f, ToasterTop + DonutRadius),
+                new Vector2(-30.5f, 2f + DonutRadius), new Vector2(-27.2f, 2f + DonutRadius), new Vector2(-19f, -15f)),
+            // 3. 大跳ね: 高く 6m 跳ねて、まな板からコンロの上を一気に越えてボウルへ、右の調理台から排水溝のふたへ、右の外へ。
+            new DonutCourseSpec("Bouncer", 6f, new Vector2(-40f, 2f + DonutRadius), new Vector2(-18f, 6.5f + DonutRadius), new Vector2(18f, 6.5f + DonutRadius),
+                new Vector2(31f, 2f + DonutRadius), new Vector2(47f, 18.2f + DonutRadius), new Vector2(68f, 3f)),
+            // 4. シンク落ち: ひと巡りと同じように弾んで、右の調理台からシンクの水の中へ落ちる（穴）。
+            new DonutCourseSpec("SinkDive", 2.5f, new Vector2(-44f, 2f + DonutRadius), new Vector2(-35.5f, ToasterTop + DonutRadius), new Vector2(-28f, 2f + DonutRadius),
+                new Vector2(-18f, 6.5f + DonutRadius), new Vector2(-4f, DonutRadius), new Vector2(6f, DonutRadius), new Vector2(18f, 6.5f + DonutRadius),
+                new Vector2(30f, 2f + DonutRadius), new Vector2(38f, -4f)),
+            // 5. 棚渡り: 出口から左の棚へ跳び上がり、ケーキスタンドのてっぺん、右の棚、排水溝のふたを渡って、右の外へ。
+            new DonutCourseSpec("Shelves", 4.5f, new Vector2(-44.5f, 14.6f + DonutRadius), new Vector2(-40.5f, 14.6f + DonutRadius), new Vector2(0f, 25.5f + DonutRadius),
+                new Vector2(39.5f, 14.6f + DonutRadius), new Vector2(47.5f, 18.2f + DonutRadius), new Vector2(68f, 3f)),
         };
 
         internal const float ToasterMinX = -37.1f;
@@ -169,12 +190,12 @@ namespace Airerage.Editor.Stages
                         // 2026-11-20 の方針: 小麦粉と砂糖が回りながら舞い上がる渦（つむじ風と同じ回る粒。色は粉の色。明るい壁の上で見えるように少し濃く）。
                         .Styled(StageZoneView.ZoneLook.DustDevil).Tinted(new Color(0.8f, 0.76f, 0.68f)),
                 },
-                // ドーナツフライヤー（ユーザーの案、2026-11-24）: 左の冷蔵庫の上のフライヤーから、揚げたドーナツが 5 秒【仮】ごとに飛び出し、
-                // 調理台・トースターの上・まな板のゼリー・コンロ・ボウル・右の調理台・排水溝のふたの上を弾んで、右のステージの外へ消える。
+                // ドーナツフライヤー（ユーザーの案、2026-11-24）: 左の冷蔵庫の上のフライヤーから、揚げたドーナツが 10 秒【仮】ごとに飛び出し、
+                // 5 つの跳ね方（DonutCourses）のどれかで台所を弾んで、右のステージの外へ消えるか、穴（すき間・シンク）に落ちる。
                 // 触れると弾かれ、真ん中にワイヤーがつながる（一緒に運ばれる。ステージの外へ出たら外れる）。
                 Traps = new[]
                 {
-                    TrapSpec.DonutFryer("DonutFryer", DonutChuteExit, DonutLandings, 5f, 0f, DonutRadius, 3f),
+                    TrapSpec.DonutFryer("DonutFryer", DonutChuteExit, DonutCourses, DonutPeriod, 0f, DonutRadius),
                 },
                 Platforms = new[]
                 {

@@ -79,7 +79,10 @@ namespace Airerage.Runtime.Presentation
                 return;
             }
             FindFeed();
-            int tick = _feed != null && _feed.CharacterCount > 0 ? _feed.CurrentTick : Mathf.FloorToInt(Time.time * SimTime.TicksPerSecond);
+            bool running = _feed != null && _feed.CharacterCount > 0;
+            int tick = running ? _feed.CurrentTick : Mathf.FloorToInt(Time.time * SimTime.TicksPerSecond);
+            // どの跳ね方（コース）かは、試合の種と何番目に出たかで決まる（Core と同じ。表示もずれない）。
+            int seed = running && _feed.Rules != null ? _feed.Rules.Seed : 0;
             if (tick != _lastTick)
             {
                 _lastTick = tick;
@@ -97,9 +100,10 @@ namespace Airerage.Runtime.Presentation
                     continue;
                 }
                 int age = 0;
+                int course = 0;
                 System.Numerics.Vector2 now = default;
                 System.Numerics.Vector2 velocity = default;
-                bool alive = slot < _trap.DonutSlots && _trap.TryGetDonut(tick, slot, out age, out now, out velocity);
+                bool alive = slot < _trap.DonutSlots && _trap.TryGetDonut(tick, seed, slot, out age, out course, out now, out velocity);
                 if (!alive)
                 {
                     donut.gameObject.SetActive(false);
@@ -116,7 +120,7 @@ namespace Airerage.Runtime.Presentation
                 }
                 _lastAge[slot] = age;
                 Vector3 position = new Vector3(now.X, now.Y, 0f);
-                if (_trap.TryGetDonut(tick + 1, slot, out int nextAge, out System.Numerics.Vector2 next, out _) && nextAge == age + 1)
+                if (_trap.TryGetDonut(tick + 1, seed, slot, out int nextAge, out System.Numerics.Vector2 next, out _) && nextAge == age + 1)
                 {
                     position = Vector3.Lerp(position, new Vector3(next.X, next.Y, 0f), between);
                 }
@@ -124,7 +128,7 @@ namespace Airerage.Runtime.Presentation
                 donut.position = position;
                 // 転がる: 横の速さ ÷ 半径（度/秒）。
                 _spin[slot] -= velocity.X / radius * Mathf.Rad2Deg * Time.deltaTime;
-                float squash = Squash(age);
+                float squash = Squash(age, course);
                 donut.localRotation = Quaternion.Euler(0f, 0f, _spin[slot]);
                 donut.localScale = new Vector3(1f + squash, 1f - squash, 1f + squash * 0.5f);
                 shown++;
@@ -164,9 +168,9 @@ namespace Airerage.Runtime.Presentation
         }
 
         // 着地の後の SquashTicks の間のつぶれ（着地の瞬間がいちばん強い）。
-        private float Squash(int age)
+        private float Squash(int age, int course)
         {
-            var landings = _trap.LandingTicks;
+            var landings = _trap.LandingTicks(course);
             for (int i = 0; i < landings.Count; i++)
             {
                 int since = age - landings[i];

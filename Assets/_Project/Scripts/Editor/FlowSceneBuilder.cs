@@ -84,6 +84,8 @@ namespace Airerage.Editor
         /// <summary>シーンとステージの設定を作り直して保存し、ビルドの設定の順を整える。</summary>
         public static void Build()
         {
+            // 画面全体の処理（FATAL の衝撃波）を描き方の設定に足す（2026-11-24）。
+            ScreenEffectsSetup.EnsureShockwavePass();
             BuildAthleticStage();
             StageSceneBuilder.BuildAll();
             BuildTraining();

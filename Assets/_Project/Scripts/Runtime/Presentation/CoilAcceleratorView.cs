@@ -32,6 +32,9 @@ namespace Airerage.Runtime.Presentation
         [Tooltip("光の色（Airerage/Emissive の _BaseColor。強さは光り方で変える）")]
         [SerializeField] private Color _color = new Color(0.35f, 0.85f, 1f);
 
+        /// <summary>この ため具合から、満ちるほど速く明滅する（もうすぐ撃つ合図）。</summary>
+        public const float StrobeFrom = 0.7f;
+
         /// <summary>砲身が照準の向きへ回る速さ（度/秒）。</summary>
         public const float TurnDegreesPerSecond = 900f;
 
@@ -182,11 +185,11 @@ namespace Airerage.Runtime.Presentation
         private void Fire()
         {
             Shots++;
-            _recoil = 1f;
+            _recoil = 1.6f;
             if (_muzzle != null)
             {
                 _muzzle.transform.localPosition = new Vector3(_muzzleDistance, 0f, 0f);
-                _muzzle.Emit(60);
+                _muzzle.Emit(160);
             }
             for (int i = 0; i < _glow.Length; i++)
             {
@@ -227,10 +230,12 @@ namespace Airerage.Runtime.Presentation
                             _sparks[i].Emit(16 + i * 6);
                         }
                     }
-                    // 満ちきる直前（最後の 15%）は、全部が白く速く明滅する。
-                    if (charge > 0.85f)
+                    // 70% を過ぎたら、満ちるほど速く明滅する（8 → 30 回/秒。もうすぐ撃つ合図。2026-11-24 の要望: いつ撃つか分かりにくい）。
+                    if (charge > StrobeFrom)
                     {
-                        target += 0.35f * Mathf.Abs(Mathf.Sin(time * 38f));
+                        float hurry = Mathf.Clamp01((charge - StrobeFrom) / (1f - StrobeFrom));
+                        float rate = Mathf.Lerp(8f, 30f, hurry);
+                        target += (0.25f + 0.45f * hurry) * (Mathf.Repeat(time * rate, 1f) < 0.5f ? 1f : 0f);
                     }
                 }
                 else
@@ -240,9 +245,9 @@ namespace Airerage.Runtime.Presentation
                 }
                 _glow[i] = target > _glow[i] ? Mathf.MoveTowards(_glow[i], target, dt * 8f) : Mathf.MoveTowards(_glow[i], target, dt * 2.5f);
                 Color c = Color.Lerp(_color, Color.white, Mathf.Clamp01(_glow[i] - 0.8f) * 2f);
-                Light(i < _liners.Length ? _liners[i] : null, c, 0.2f + 3.6f * _glow[i]);
-                // 外側の帯は、待機の間はほとんど光らず、ためた分だけはっきり光る（外から見たため具合）。
-                Light(i < _bands.Length ? _bands[i] : null, c, 0.05f + 4.5f * Mathf.Max(0f, _glow[i] - 0.12f));
+                Light(i < _liners.Length ? _liners[i] : null, c, 0.3f + 6f * _glow[i]);
+                // 外側の帯は、待機の間はほとんど光らず、ためた分だけはっきり光る（外から見たため具合。2026-11-24 の要望でもっと派手に）。
+                Light(i < _bands.Length ? _bands[i] : null, c, 0.05f + 9f * Mathf.Max(0f, _glow[i] - 0.12f));
             }
         }
 

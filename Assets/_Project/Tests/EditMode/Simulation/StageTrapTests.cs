@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Airerage.Core.Combat;
 using Airerage.Core.Economy;
@@ -159,33 +160,79 @@ namespace Airerage.Core.Tests.Simulation
             StageTrap fryer = Donuts();
             Assert.That(fryer.DonutSlots, Is.InRange(2, StageTrap.MaxDonuts));
             // 1 つ目は 180 ティック（Period）に出る（試合の始まりより前のドーナツはない）。
-            Assert.That(fryer.TryGetDonut(100, 0, out _, out _, out _) || fryer.TryGetDonut(100, 1, out _, out _, out _), Is.False);
+            Assert.That(fryer.TryGetDonut(100, 0, 0, out _, out _, out _) || fryer.TryGetDonut(100, 0, 1, out _, out _, out _), Is.False);
             int slot = -1;
             for (int s = 0; s < fryer.DonutSlots; s++)
             {
-                if (fryer.TryGetDonut(181, s, out int age, out _, out _) && age == 1)
+                if (fryer.TryGetDonut(181, 0, s, out int age, out _, out _) && age == 1)
                 {
                     slot = s;
                 }
             }
             Assert.That(slot, Is.GreaterThanOrEqualTo(0), "周期のティックにドーナツが出ない");
             // 着地点を順に通り、跳ねるたびに上がる（どの着地点でも、そのティックの位置が着地点）。
-            for (int i = 0; i < fryer.LandingTicks.Count; i++)
+            for (int i = 0; i < fryer.LandingTicks(0).Count; i++)
             {
-                Assert.That(fryer.TryGetDonut(180 + fryer.LandingTicks[i], slot, out _, out Vector2 at, out _), Is.True, $"{i} 番目の着地点の前に消える");
+                Assert.That(fryer.TryGetDonut(180 + fryer.LandingTicks(0)[i], 0, slot, out _, out Vector2 at, out _), Is.True, $"{i} 番目の着地点の前に消える");
                 Vector2 landing = new[] { new Vector2(-14f, 0.9f), new Vector2(-6f, 0.9f), new Vector2(2f, 0.9f), new Vector2(10f, 0.9f), new Vector2(40f, 1f) }[i];
                 Assert.That(Vector2.Distance(at, landing), Is.LessThan(0.6f), $"{i} 番目の着地点を通らない（{at}）");
             }
-            Assert.That(fryer.TryGetDonut(180 + fryer.LandingTicks[1] - 10, slot, out _, out Vector2 mid, out _), Is.True);
+            Assert.That(fryer.TryGetDonut(180 + fryer.LandingTicks(0)[1] - 10, 0, slot, out _, out Vector2 mid, out _), Is.True);
             Assert.That(mid.Y, Is.GreaterThan(1.5f), "着地点の間で跳ねない");
             // 次のドーナツは 3 秒後に、別の番号で出る（前のドーナツもまだ出ている）。
             bool second = false;
             for (int s = 0; s < fryer.DonutSlots; s++)
             {
-                second |= s != slot && fryer.TryGetDonut(361, s, out int age, out _, out _) && age == 1;
+                second |= s != slot && fryer.TryGetDonut(361, 0, s, out int age, out _, out _) && age == 1;
             }
             Assert.That(second, Is.True, "次のドーナツが別の番号で出ない");
-            Assert.That(fryer.TryGetDonut(361, slot, out _, out _, out _), Is.True, "前のドーナツが消えた");
+            Assert.That(fryer.TryGetDonut(361, 0, slot, out _, out _, out _), Is.True, "前のドーナツが消えた");
+        }
+
+        [Test]
+        public void Donuts_PickOneOfTheCourses_EachLaunch_FromTheMatchSeed()
+        {
+            // 2026-11-24 の要望: いろいろな跳ね方（コース）から、出るたびにランダムに選ぶ。どの PC でも同じ（試合の種と何番目かだけで決まる）。
+            var courses = new[]
+            {
+                new DonutCourse(new[] { new Vector2(-14f, 0.9f), new Vector2(40f, 1f) }, 2f),
+                new DonutCourse(new[] { new Vector2(-10f, 0.9f), new Vector2(0f, 0.9f), new Vector2(40f, 1f) }, 4f),
+                new DonutCourse(new[] { new Vector2(-6f, 0.9f), new Vector2(0f, -20f) }, 1f),
+            };
+            StageTrap fryer = StageTrap.DonutFryer(new Vector2(-20f, 3f), courses, 180, 0, 0.9f);
+            Assert.That(fryer.CourseCount, Is.EqualTo(3));
+            var seen = new HashSet<int>();
+            for (int n = 1; n <= 60; n++)
+            {
+                int course = fryer.CourseOf(n, 1234);
+                Assert.That(course, Is.EqualTo(fryer.CourseOf(n, 1234)), "同じ種と番号でコースが変わる");
+                seen.Add(course);
+            }
+            Assert.That(seen.Count, Is.EqualTo(3), "どのコースも選ばれる");
+            bool differs = false;
+            for (int n = 1; n <= 20; n++)
+            {
+                differs |= fryer.CourseOf(n, 1234) != fryer.CourseOf(n, 99);
+            }
+            Assert.That(differs, Is.True, "試合の種が違っても同じ順番になる");
+            // 出たドーナツは、選ばれたコースの着地点を通る（コースごとに長さも違う。穴に落ちるコースは早く消える）。
+            for (int n = 1; n <= 6; n++)
+            {
+                int tick = 180 * n;
+                int course = fryer.CourseOf(n, 7);
+                bool found = false;
+                for (int s = 0; s < fryer.DonutSlots; s++)
+                {
+                    if (fryer.TryGetDonut(tick + fryer.LandingTicks(course)[0], 7, s, out int age, out int shown, out Vector2 at, out _)
+                        && age == fryer.LandingTicks(course)[0])
+                    {
+                        found = true;
+                        Assert.That(shown, Is.EqualTo(course));
+                        Assert.That(Vector2.Distance(at, fryer.CourseLandings(course)[0]), Is.LessThan(0.01f), $"{n} 番目のドーナツが選ばれたコースを通らない");
+                    }
+                }
+                Assert.That(found, Is.True, $"{n} 番目のドーナツが見つからない");
+            }
         }
 
         [Test]

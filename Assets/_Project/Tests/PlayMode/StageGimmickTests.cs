@@ -422,8 +422,13 @@ namespace Airerage.PlayMode.Tests
             into.Position = new System.Numerics.Vector3(gun.MinX - 0.6f, gun.Center.Y, 0f);
             into.Velocity = new System.Numerics.Vector3(4f, 0f, 0f);
             runner.SetPlayerState(into);
+            CoilDischargeView discharge = coil.GetComponent<CoilDischargeView>();
+            Assert.That(discharge, Is.Not.Null, "コイルガンのためと発射の演出がない");
             yield return WaitFor(() => runner.PlayerState.Combat.CaptureTicks > 0, 2f, "コイルに収まらない");
             yield return WaitFor(() => coil.ShowsTrajectory && coil.Charge > 0.3f, 1f, "ためている間に軌道の線が出ない");
+            // ためている間は放電し、砲口に光の玉が育つ。満ちる直前は合図を出す（2026-11-24 の要望）。
+            yield return WaitFor(() => discharge.ActiveArcs > 0 && discharge.OrbSize > 0.5f, 1f, $"ためている間に放電しない（弧 {discharge.ActiveArcs}・玉 {discharge.OrbSize}）");
+            yield return WaitFor(() => discharge.Ready, 1f, "満ちる直前の合図が出ない");
             Assert.That(Mathf.DeltaAngle(coil.Angle, Mathf.Atan2(aim.y, aim.x) * Mathf.Rad2Deg), Is.InRange(-15f, 15f), $"砲身が照準へ回らない（{coil.Angle}）");
             Vector2 launched = Vector2.zero;
             yield return WaitFor(() =>
@@ -440,6 +445,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(Vector2.Dot(launched, aim), Is.GreaterThan(18f), $"照準の向きへ撃ち出されない（{launched}）");
             // 表示は LateUpdate で撃ち出しを見つけるので、砲口がはじけてから数える（いちばん前のコイルは撃ち出す瞬間に通電する）。
             yield return WaitFor(() => coil.Shots > 0, 0.5f, "砲口がはじけない");
+            yield return WaitFor(() => discharge.Flashes > 0, 0.5f, "砲口の閃光が出ない");
             Assert.That(coil.Firings, Is.GreaterThanOrEqualTo(3), $"コイルが順に満ちない（{coil.Firings} 回）");
 
             // 宇宙船の中: 人が通ると、漂う物が押される。

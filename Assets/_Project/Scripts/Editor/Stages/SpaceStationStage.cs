@@ -14,7 +14,7 @@ namespace Airerage.Editor.Stages
     internal static class SpaceStationStage
     {
         /// <summary>コイルガンが撃ち出す速さ（m/s）【仮】。</summary>
-        internal const float CoilGunPower = 26f;
+        internal const float CoilGunPower = 40f;
 
         public static StageLayout Create()
         {
@@ -111,7 +111,7 @@ namespace Airerage.Editor.Stages
                     ZoneSpec.OnFloor("DockPadEast", StageZoneKind.JumpPad, 39f, 41f, 13f, Vector2.up, 18f, 0.4f),
                     ZoneSpec.OnFloor("CorePad", StageZoneKind.JumpPad, -1f, 1f, 0f, Vector2.up, 20f, 0.4f),
                     // コイルガン（2026-11-24 の要望）: 触れると中に収まって 1 秒ためる。ためている間は照準でコイルの向きを変えられ、たまったら
-                    // その向きへ撃ち出す（26 m/s【仮】）。範囲はコイルの並ぶ長さ 3.8m × 内径 2.6m。向きを入れなければ、コイルの向き。
+                    // その向きへ撃ち出す（40 m/s【仮】。2026-11-24 の要望で 26 → 40）。範囲はコイルの並ぶ長さ 3.8m × 内径 2.6m。向きを入れなければ、コイルの向き。
                     new ZoneSpec("CoilGunCore", StageZoneKind.CoilGun, new Vector2(0f, 12f), new Vector2(3.8f, 2.6f), Vector2.right, CoilGunPower)
                         .Styled(StageZoneView.ZoneLook.Coil),
                     new ZoneSpec("CoilGunWest", StageZoneKind.CoilGun, new Vector2(-34f, 18f), new Vector2(3.8f, 2.6f), new Vector2(1f, 0.2f), CoilGunPower)

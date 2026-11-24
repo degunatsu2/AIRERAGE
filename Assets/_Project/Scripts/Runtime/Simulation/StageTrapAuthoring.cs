@@ -51,9 +51,10 @@ namespace Airerage.Runtime.Simulation
         [Tooltip("止まってから消えるまでの点滅（秒）")]
         [SerializeField] private float _blinkSeconds = 1.5f;
 
-        [Header("ドーナツフライヤー（着地点は _waypoints、周期とずれは _periodSeconds・_phaseSeconds、半径は _radius）")]
-        [Tooltip("跳ねの高さ（m）")]
-        [SerializeField] private float _hopHeight = 3f;
+        [Header("ドーナツフライヤー（着地点は _waypoints にコースの順に並べる。周期とずれは _periodSeconds・_phaseSeconds、半径は _radius）")]
+        [Tooltip("コースごとの着地点の数（_waypoints の前から順に）と、跳ねの高さ（m）")]
+        [SerializeField] private int[] _courseLengths = new int[0];
+        [SerializeField] private float[] _courseHops = new float[0];
 
         [Header("鬼火の輪")]
         [Tooltip("飛び回る地点（ワールドの位置）")]
@@ -119,17 +120,22 @@ namespace Airerage.Runtime.Simulation
             _respawnMaxSeconds = respawnMaxSeconds;
         }
 
-        /// <summary>Core の仕掛けにする（秒はティックに丸める）。値が不正なら ArgumentException。</summary>
-        /// <summary>ドーナツフライヤーにする（シーンのビルダー用）。物体の位置が出口。</summary>
-        public void ConfigureDonutFryer(Vector2[] landings, float periodSeconds, float phaseSeconds, float radius, float hopHeight)
+        /// <summary>
+        /// ドーナツフライヤーにする（シーンのビルダー用）。物体の位置が出口。landings はコースの着地点をコースの順に並べたもの、
+        /// courseLengths はコースごとの着地点の数、courseHops はコースごとの跳ねの高さ。
+        /// </summary>
+        public void ConfigureDonutFryer(Vector2[] landings, int[] courseLengths, float[] courseHops, float periodSeconds, float phaseSeconds, float radius)
         {
             _kind = StageTrapKind.DonutFryer;
             _waypoints = landings;
+            _courseLengths = courseLengths;
+            _courseHops = courseHops;
             _periodSeconds = periodSeconds;
             _phaseSeconds = phaseSeconds;
             _radius = radius;
-            _hopHeight = hopHeight;
         }
+
+        /// <summary>Core の仕掛けにする（秒はティックに丸める）。値が不正なら ArgumentException。</summary>
 
         public StageTrap ToTrap()
         {
@@ -144,12 +150,27 @@ namespace Airerage.Runtime.Simulation
             }
             if (_kind == StageTrapKind.DonutFryer)
             {
-                var landings = new NVector2[_waypoints.Length];
-                for (int i = 0; i < landings.Length; i++)
+                if (_courseLengths.Length == 0 || _courseLengths.Length != _courseHops.Length)
                 {
-                    landings[i] = new NVector2(_waypoints[i].x, _waypoints[i].y);
+                    throw new ArgumentException($"ドーナツフライヤー {name} のコースの数が合わない（着地点の数 {_courseLengths.Length}、跳ね {_courseHops.Length}）");
                 }
-                return StageTrap.DonutFryer(center, landings, Ticks(_periodSeconds), Ticks(_phaseSeconds), _radius, _hopHeight);
+                var courses = new DonutCourse[_courseLengths.Length];
+                int next = 0;
+                for (int c = 0; c < courses.Length; c++)
+                {
+                    if (_courseLengths[c] < 1 || next + _courseLengths[c] > _waypoints.Length)
+                    {
+                        throw new ArgumentException($"ドーナツフライヤー {name} の {c} 番目のコースの着地点が足りない");
+                    }
+                    var landings = new NVector2[_courseLengths[c]];
+                    for (int i = 0; i < landings.Length; i++)
+                    {
+                        landings[i] = new NVector2(_waypoints[next + i].x, _waypoints[next + i].y);
+                    }
+                    next += landings.Length;
+                    courses[c] = new DonutCourse(landings, _courseHops[c]);
+                }
+                return StageTrap.DonutFryer(center, courses, Ticks(_periodSeconds), Ticks(_phaseSeconds), _radius);
             }
             if (_kind == StageTrapKind.WispRing)
             {
