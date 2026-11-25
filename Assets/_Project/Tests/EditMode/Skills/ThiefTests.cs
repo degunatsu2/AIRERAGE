@@ -239,6 +239,68 @@ namespace Airerage.Core.Tests.Skills
         }
 
         [Test]
+        public void PlacedHazard_AtAnyPosition_BuildsAValidZone()
+        {
+            // 2026-11-25 の指摘（研究所のプラズマ球を写すとフリーズ）: 危険の柱の幅を置いた範囲の幅にそのまま当てると、位置によっては
+            // 浮動小数の丸めで範囲の幅を超えて、ギミックを作れずに試合が止まっていた。どの位置に置いても作れる。
+            var sources = new[]
+            {
+                // プラズマ球（周期・幅・上の丸み）、つらら（落ちてくる長さ）、溶岩の噴泉（広い範囲の柱）。
+                new StageZone(StageZoneKind.Hazard, 15.45f, 27.73f, 17.15f, 29.43f, Vector2.UnitY, 8f, 12f, new StageZoneTiming(30, 30, 0), Vector2.Zero,
+                    17.15f - 15.45f, default, 0, 0, 0.85f, 0f, electric: true),
+                new StageZone(StageZoneKind.Hazard, -8.3f, 4.1f, -6.7f, 12.9f, -Vector2.UnitY, 15f, 0f, new StageZoneTiming(600, 90, 0), Vector2.Zero,
+                    -6.7f - -8.3f, default, 0, 0, 0f, 3.2f),
+                new StageZone(StageZoneKind.Hazard, -30f, -12f, 30f, 6f, Vector2.UnitY, 30f, 40f, new StageZoneTiming(1500, 180, 0), Vector2.Zero, 6f),
+            };
+            ThiefTuning tuning = Thief.Skills.Thief;
+            foreach (StageZone source in sources)
+            {
+                Vector2 half = ThiefRules.PlacedHalfSize(source, tuning);
+                for (int i = 0; i < 4000; i++)
+                {
+                    var position = new Vector2(-61.3f + i * 0.03071f, -17.9f + i * 0.01937f);
+                    var item = new WorldObject { Kind = WorldObjectKind.PlacedZone, Position = position, End = half, SpawnTick = i * 7 };
+                    StageZone placed = default;
+                    Assert.DoesNotThrow(() => placed = ThiefRules.PlacedZone(source, item), $"{position} に置いた危険を作れない");
+                    Assert.That(placed.Width, Is.LessThanOrEqualTo(placed.MaxX - placed.MinX));
+                }
+            }
+        }
+
+        [Test]
+        public void StolenCoilGun_CanBePlaced_AndShootsPeopleOut()
+        {
+            // 2026-11-25 の要望: THIEF の Q でコイルガンも奪える。置いたコイルガンも、触れると中に収まり、ためてから撃ち出す。
+            var coil = new StageZone(StageZoneKind.CoilGun, -21.9f, 8.7f, -18.1f, 11.3f, Vector2.UnitX, 40f);
+            Assert.That(ThiefRules.IsStealable(coil), Is.True, "コイルガンを奪えない");
+            var world = World(new SimWorld(TestArenas.Ground(), zones: new[] { coil }), new Vector3(0f, GroundY, 0f), new Vector3(-12f, GroundY, 0f));
+            Step(world, 2);
+            Edit(world, 0, s =>
+            {
+                s.Combat.StealKind = StealKind.Zone;
+                s.Combat.StealSource = 0;
+                s.Combat.StealUses = 1;
+                return s;
+            });
+            Step(world, 1, Aimed(InputButtons.Special1, Vector2.UnitX));
+            Step(world, 20);
+            WorldObject placed = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.PlacedZone && !o.Ended);
+            Assert.That(placed.Position.X, Is.GreaterThan(1f), "照準の方向（右）に置いていない");
+            Assert.That(world.ActiveZones.Count(z => z.Kind == StageZoneKind.CoilGun), Is.EqualTo(2), "置いたコイルガンが効く一覧に入っていない");
+            Edit(world, 1, s => { s.Position = new Vector3(placed.Position.X, placed.Position.Y, 0f); s.Velocity = Vector3.Zero; return s; });
+            Step(world, 2);
+            Assert.That(world.GetState(1).Combat.CaptureTicks, Is.GreaterThan(0), "置いたコイルガンに収まらない");
+            Assert.That(world.GetState(1).Combat.CaptureZone, Is.EqualTo(1), "収まった先が置いたコイルガンでない");
+            float speed = 0f;
+            for (int t = 0; t < 90; t++)
+            {
+                Step(world, 1);
+                speed = System.Math.Max(speed, world.GetState(1).Velocity.Length());
+            }
+            Assert.That(speed, Is.GreaterThan(30f), "置いたコイルガンが撃ち出さない");
+        }
+
+        [Test]
         public void PlacedJumpPad_LaunchesPeople()
         {
             var pad = new StageZone(StageZoneKind.JumpPad, 5f, 0f, 7f, 0.5f, Vector2.UnitY, 20f);

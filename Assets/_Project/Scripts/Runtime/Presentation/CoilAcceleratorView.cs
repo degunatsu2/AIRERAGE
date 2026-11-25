@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Airerage.Core.Simulation;
+using Airerage.Core.Skills;
 using Airerage.Runtime.Simulation;
 using UnityEngine;
 
@@ -149,7 +150,12 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
-            if (_zoneIndex < 0 || _zoneIndex >= feed.Zones.Count || !feed.Zones[_zoneIndex].Equals(_zone.CoreZone))
+            if (_zone.IsCopy)
+            {
+                // THIEF が奪って置いたコイルガン（2026-11-25）: 効かせるギミックの一覧で、ステージのギミックの後ろに並ぶ番号。
+                _zoneIndex = ThiefRules.PlacedZoneIndex(feed.Zones, feed.Objects, _zone.CoreZone);
+            }
+            else if (_zoneIndex < 0 || _zoneIndex >= feed.Zones.Count || !feed.Zones[_zoneIndex].Equals(_zone.CoreZone))
             {
                 _zoneIndex = -1;
                 for (int i = 0; i < feed.Zones.Count; i++)

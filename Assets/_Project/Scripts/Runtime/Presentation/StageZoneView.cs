@@ -274,6 +274,9 @@ namespace Airerage.Runtime.Presentation
         /// <summary>Core のギミック（表示が落ちてくる物の帯 FallBand などを読む）。</summary>
         public StageZone CoreZone => _core;
 
+        /// <summary>THIEF が奪って置いたギミックの写しか（StageZoneAuthoring.IsCopy）。</summary>
+        public bool IsCopy => _zone != null && _zone.IsCopy;
+
         /// <summary>表示する試合（見つかっていなければ null。メニューの背景など）。網が乗った人を、鬼火の輪がくぐった人を見るのに使う。</summary>
         public ISimulationFeed Feed => _feed != null && _feed.CharacterCount > 0 && !(_feed is MonoBehaviour gone && gone == null) ? _feed : null;
 

@@ -451,11 +451,15 @@ namespace Airerage.Core.Skills
             states[shot.Owner] = owner;
         }
 
-        /// <summary>奪えるステージのギミックの種類か（広い所を覆う物と、動く足場・扉は奪えない。ユーザーの回答、2026-10-28）。</summary>
+        /// <summary>
+        /// 奪えるステージのギミックの種類か（広い所を覆う物と、動く足場・扉は奪えない。ユーザーの回答、2026-10-28）。コイルガンも奪える
+        /// （2026-11-25 の要望。置いたコイルガンも触れると中に収まって撃ち出す）。
+        /// </summary>
         public static bool IsStealable(in StageZone zone)
         {
             switch (zone.Kind)
             {
+                case StageZoneKind.CoilGun:
                 case StageZoneKind.JumpPad:
                 case StageZoneKind.Updraft:
                 case StageZoneKind.BoostRing:
@@ -628,13 +632,18 @@ namespace Airerage.Core.Skills
                 int phase = ((timing.Period - item.SpawnTick % timing.Period) % timing.Period + timing.Period) % timing.Period;
                 timing = new StageZoneTiming(timing.Period, timing.ActiveTicks, phase, 0, Math.Min(timing.WarningTicks, timing.Period - timing.ActiveTicks));
             }
-            float width = source.Kind == StageZoneKind.Hazard ? half.X * 2f : 0f;
-            // 危険の上の丸みは、置いた大きさに収まる分だけ写す。
-            float cap = source.Kind == StageZoneKind.Hazard ? MathF.Min(source.CapHeight, half.Y * 2f) : 0f;
-            float fall = source.Kind == StageZoneKind.Hazard ? MathF.Min(source.FallLength, half.Y * 2f) : 0f;
+            float minX = item.Position.X - half.X;
+            float maxX = item.Position.X + half.X;
+            float minY = item.Position.Y - half.Y;
+            float maxY = item.Position.Y + half.Y;
+            // 危険の柱の幅・上の丸み・落ちてくる物の長さは、置いた範囲（の端の差）に収める。half.X * 2 をそのまま使うと、位置によっては
+            // 浮動小数の丸めで範囲の幅をわずかに超え、ギミックを作れずに試合が止まっていた（2026-11-25 の指摘: 研究所のプラズマ球・雪原の
+            // つららなどを置くとフリーズ）。
+            float width = source.Kind == StageZoneKind.Hazard ? maxX - minX : 0f;
+            float cap = source.Kind == StageZoneKind.Hazard ? MathF.Min(source.CapHeight, maxY - minY) : 0f;
+            float fall = source.Kind == StageZoneKind.Hazard ? MathF.Min(source.FallLength, maxY - minY) : 0f;
             // 電気を帯びた危険（プラズマ球）は、触れると当たる危険として写す（置いた所にアンカーポイントはないので、ワイヤーの電気は写さない）。
-            return new StageZone(source.Kind, item.Position.X - half.X, item.Position.Y - half.Y, item.Position.X + half.X, item.Position.Y + half.Y,
-                direction, source.Power, source.Limit, timing, source.Target, width, default, 0, 0, cap, fall);
+            return new StageZone(source.Kind, minX, minY, maxX, maxY, direction, source.Power, source.Limit, timing, source.Target, width, default, 0, 0, cap, fall);
         }
 
         /// <summary>
@@ -660,6 +669,34 @@ namespace Airerage.Core.Skills
                     active.Add(team != 0 ? placed.WithOwnerTeam(team) : placed);
                 }
             }
+        }
+
+        /// <summary>
+        /// 置いたギミック zone（PlacedZone の値）の、効かせるギミックの一覧（RefreshZones。ステージのギミックの後に置いたギミックが番号の順に
+        /// 並ぶ）での番号（なければ -1）。表示が、置いたコイルガンに収まっている人を探すのに使う（CombatState.CaptureZone はこの番号）。
+        /// </summary>
+        public static int PlacedZoneIndex(IReadOnlyList<StageZone> stageZones, WorldObjects objects, in StageZone zone)
+        {
+            if (stageZones == null || objects == null)
+            {
+                return -1;
+            }
+            int keep = stageZones.Count;
+            int index = keep;
+            for (int o = 0; o < objects.Count; o++)
+            {
+                WorldObject item = objects[o];
+                if (item.Kind != WorldObjectKind.PlacedZone || item.Ended || item.Stored < 0 || item.Stored >= keep)
+                {
+                    continue;
+                }
+                if (PlacedZone(stageZones[item.Stored], item).Equals(zone))
+                {
+                    return index;
+                }
+                index++;
+            }
+            return -1;
         }
 
         /// <summary>置いた仕掛けの、向き（長さ 1。赤外線のミサイル）か打ち出す速度（ピッチャーマシン）。左右の反転を当てる。</summary>
