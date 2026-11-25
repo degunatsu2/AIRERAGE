@@ -90,12 +90,10 @@ namespace Airerage.Runtime.Presentation
         private float[] _fellAt = new float[0];
         private float[] _backAt = new float[0];
         private float[] _jackpotAt = new float[0];
-        private int[] _coinsTotal = new int[0];
+        private readonly JackpotPickupWatch _jackpotWatch = new JackpotPickupWatch();
         private bool[] _wanted = new bool[0];
         private float[] _wantedAt = new float[0];
         private float[] _unwantedAt = new float[0];
-        private bool _jackpotWasPresent;
-        private int _lastTick = -1;
 
         /// <summary>100 枚のコインを取って虹色に光った回数（テスト用）。</summary>
         public int JackpotCelebrations { get; private set; }
@@ -335,46 +333,30 @@ namespace Airerage.Runtime.Presentation
         /// <summary>BANK が増えて「+増えた数」を浮かべた回数（テスト用）。</summary>
         public int BankGains { get; private set; }
 
-        // 100 枚のコインを取った人を探す: 100 枚のコインが前のフレームにあった（またはこの間に出た）のに今はなく、
-        // 確定＋所持が 100 枚以上増えた人。
+        // 100 枚のコインを取った人（JackpotPickupWatch。取った人の JACKPOT の演出と同じ見つけ方）。
         private void TrackJackpot(CharacterState[] states)
         {
-            int tick = _feed.CurrentTick;
-            int spawn = _feed.Rules != null ? FieldCoinRules.JackpotSpawnTick(_feed.Rules) : -1;
-            bool appeared = _jackpotWasPresent || (spawn >= 0 && _lastTick >= 0 && _lastTick <= spawn && tick > spawn);
-            _lastTick = tick;
-            bool present = false;
-            if (_feed.Coins != null)
+            if (_jackpotAt.Length != states.Length)
             {
-                foreach (FieldCoin coin in _feed.Coins.Coins)
-                {
-                    present |= CoinView.LookOf(coin.Value) == CoinLook.Rainbow;
-                }
-            }
-            if (_coinsTotal.Length != states.Length)
-            {
-                _coinsTotal = new int[states.Length];
                 _jackpotAt = new float[states.Length];
                 for (int i = 0; i < states.Length; i++)
                 {
                     _jackpotAt[i] = float.NegativeInfinity;
                 }
             }
-            for (int i = 0; i < states.Length; i++)
+            foreach (int picker in _jackpotWatch.Observe(_feed))
             {
-                int total = states[i].Coins.Held + states[i].Coins.Banked;
-                if (appeared && !present && total - _coinsTotal[i] >= CoinView.RainbowValue)
+                if (picker >= _jackpotAt.Length)
                 {
-                    _jackpotAt[i] = Time.time;
-                    JackpotCelebrations++;
-                    if (_audio != null)
-                    {
-                        _audio.Play(SoundId.JackpotGet);
-                    }
+                    continue;
                 }
-                _coinsTotal[i] = total;
+                _jackpotAt[picker] = Time.time;
+                JackpotCelebrations++;
+                if (_audio != null)
+                {
+                    _audio.Play(SoundId.JackpotGet);
+                }
             }
-            _jackpotWasPresent = present;
         }
 
         // 撃破された瞬間（復帰を待ち始めた）と、復帰した瞬間を覚える（人数が変わったら、今の様子から数え直す）。

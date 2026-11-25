@@ -1,6 +1,6 @@
 // 光る星と光の玉（2026-11-24 の要望）: 板（Quad。UV 0〜1）の真ん中を中心に、_Points 本のとがった光の星（_Points が 0 なら丸い光の玉）を
 // 描く。星の芯は白く、縁は色、その外へやわらかいにじみ（_Halo）。色と濃さは _Color（MaterialPropertyBlock で 1 枚ずつ塗る）× _Intensity。
-// 使う所: ワイヤーキャンセルと技の発動の回る星（S5。BurstEffectView）、コイルガンのため玉と砲口の閃光（CoilAcceleratorView）。
+// 使う所: ワイヤーキャンセルと技の発動の芯の閃光と星の先のきらめき（BurstEffectView）、コイルガンのため玉と砲口の閃光（CoilAcceleratorView）。
 // 明るい空の上でも色が抜けないよう、GlowLine と同じ乗算済みの半透明で重ねる。
 Shader "Airerage/GlowStar"
 {

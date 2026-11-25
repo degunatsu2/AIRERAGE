@@ -458,14 +458,20 @@ namespace Airerage.PlayMode.Tests
             var board = root.AddComponent<ScoreboardHud>();
             typeof(ScoreboardHud).GetField("_source", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(board, feed);
             root.SetActive(true);
+            // 取った人の JACKPOT の演出（2026-11-25）も同じ見つけ方（JackpotPickupWatch）を使う。
+            var watch = new JackpotPickupWatch();
+            var pickers = new List<int>();
             try
             {
                 while (world.Tick < 120)
                 {
+                    pickers.AddRange(watch.Observe(feed));
                     yield return null;
                 }
                 yield return null;
+                pickers.AddRange(watch.Observe(feed));
                 Assert.That(world.GetState(0).Coins.Held, Is.GreaterThanOrEqualTo(100), "前提: キャラクター 0 が 100 枚のコインを拾った");
+                Assert.That(pickers, Is.EqualTo(new[] { 0 }), "取った人（キャラクター 0）を 1 回だけ見つけない");
                 Assert.That(board.JackpotCelebrations, Is.EqualTo(1), "取ったことを見つけない");
                 Assert.That(board.IsCelebrating(0), Is.True, "取った人の札が光らない");
                 Assert.That(board.IsCelebrating(1), Is.False, "取っていない人の札が光った");

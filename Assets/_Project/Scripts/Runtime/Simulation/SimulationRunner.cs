@@ -57,6 +57,8 @@ namespace Airerage.Runtime.Simulation
 
         private SimInput[] _inputs = new SimInput[1];
         private CharacterState[] _previousDummies = new CharacterState[0];
+        // 100 枚のコインを取った人に JACKPOT の演出を出す（2026-11-25 の要望）。
+        private readonly JackpotPickupWatch _jackpotWatch = new JackpotPickupWatch();
         private Vector3 _playerSpawn;
         private Vector3[] _dummySpawnPositions = new Vector3[0];
         private SimWorld _world;
@@ -417,6 +419,15 @@ namespace Airerage.Runtime.Simulation
                 _dummyViews[i].Render(_previousDummies[i], dummy, alpha, _character.Config.Movement.HalfExtents.ToUnity());
                 _dummyViews[i].RenderAction(dummy, _character.Config.Combat, _world.Rules.RespawnDelayTicks, _character.Config.Movement);
                 _dummyViews[i].SetCostume(_character);
+            }
+            foreach (int picker in _jackpotWatch.Observe(this))
+            {
+                CharacterView picked = picker == _player ? _characterView
+                    : picker - _player - 1 >= 0 && picker - _player - 1 < _dummyViews.Length ? _dummyViews[picker - _player - 1] : null;
+                if (picked != null)
+                {
+                    picked.PlayJackpotPickup();
+                }
             }
             if (_wireView != null)
             {

@@ -86,6 +86,8 @@ namespace Airerage.Net
             ("RTT 150", 75, 8),
         };
         private static readonly int[] DropPresets = { 0, 2, 5 };
+        // 100 枚のコインを取った人に JACKPOT の演出を出す（2026-11-25 の要望）。
+        private readonly JackpotPickupWatch _jackpotWatch = new JackpotPickupWatch();
         private static readonly string[] DelayLabels = Array.ConvertAll(DelayPresets, preset => preset.Label);
         private static readonly string[] DropLabels = Array.ConvertAll(DropPresets, percent => $"Loss {percent}%");
 
@@ -669,6 +671,14 @@ namespace Airerage.Net
                 _wireViews[p].Render(previous, current, alpha, wire, StageZones.IsWireCharged(current, _session.World.Zones));
                 bool cloned = SimWorldFeed.TryGetClone(_session.World, p, out CharacterState clone);
                 _characterViews[p].RenderClone(cloned, clone, halfExtents, _session.World.Tick, _wireViews[p]);
+            }
+
+            foreach (int picker in _jackpotWatch.Observe(this))
+            {
+                if (picker < count && _characterViews[picker] != null)
+                {
+                    _characterViews[picker].PlayJackpotPickup();
+                }
             }
 
             Transform local = _characterViews[viewed].transform;

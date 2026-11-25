@@ -231,7 +231,7 @@ namespace Airerage.Editor.Stages
         }
 
         // 写真の絵を読む（法線の絵は法線として読み込み直す）。なければ例外（黙って白い地面にしない）。
-        private static Texture2D PhotoTexture(string id, bool normal)
+        internal static Texture2D PhotoTexture(string id, bool normal)
         {
             string path = $"{PhotoRoot}/{id}/{id}_{(normal ? "nor_gl" : "diff")}_1k.jpg";
             if (AssetImporter.GetAtPath(path) is TextureImporter importer)

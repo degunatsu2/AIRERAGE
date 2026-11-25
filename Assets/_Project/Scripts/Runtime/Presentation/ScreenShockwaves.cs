@@ -7,6 +7,8 @@ namespace Airerage.Runtime.Presentation
     /// 影響しない）。Play でワールドの位置から広がる波を足し（同時に 4 つまで。あふれたらいちばん古い波と入れ替える）、毎フレーム、
     /// カメラで画面の位置と大きさに直して、全画面の処理のシェーダー（Airerage/Shockwave。PC_Renderer の全画面の処理）の値に入れる。
     /// 波の広がり: 半径は StartRadius → EndRadius（m）へ素早く広がって遅くなり（4 乗のイーズアウト）、押す強さと色収差は弱まっていく。
+    /// 2026-11-25 の要望（波が見えにくい。もっと大きく揺らす・色収差を強く）で、押す強さ 2.5 倍・輪の幅 1.5 倍・長さ 1.2 倍、色収差
+    /// 2.7 倍、縁の明暗（CrestLight）と、当たった瞬間の画面の小さな揺れ（Jitter・JitterSeconds。_ShockJitter）を足した。【仮】
     /// </summary>
     public static class ScreenShockwaves
     {
@@ -14,16 +16,24 @@ namespace Airerage.Runtime.Presentation
         public const int MaxWaves = 4;
 
         /// <summary>波の長さ（秒）・半径（m）・輪の幅（m）・押す強さと色収差（画面の高さに対する割合）。</summary>
-        public const float Duration = 0.75f;
+        public const float Duration = 0.9f;
         public const float StartRadius = 0.4f;
-        public const float EndRadius = 11f;
-        public const float RingWidth = 1.6f;
-        public const float Push = 0.022f;
-        public const float Chroma = 0.006f;
+        public const float EndRadius = 14f;
+        public const float RingWidth = 2.4f;
+        public const float Push = 0.055f;
+        public const float Chroma = 0.016f;
+
+        /// <summary>輪の縁の明暗の強さ（明るさの割合）。</summary>
+        public const float CrestLight = 0.22f;
+
+        /// <summary>当たった瞬間の画面の揺れの大きさ（画面の高さに対する割合）と長さ（秒）。</summary>
+        public const float Jitter = 0.006f;
+        public const float JitterSeconds = 0.28f;
 
         private static readonly int WavesId = Shader.PropertyToID("_ShockWaves");
         private static readonly int ShapeId = Shader.PropertyToID("_ShockShape");
         private static readonly int CountId = Shader.PropertyToID("_ShockWaveCount");
+        private static readonly int JitterId = Shader.PropertyToID("_ShockJitter");
 
         private struct Wave
         {
@@ -48,8 +58,10 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        /// <summary>シェーダーに入れた波の数（テスト用。最後に毎フレームの更新をしたとき）。</summary>
+        /// <summary>シェーダーに入れた波の数と、画面の揺れの大きさ（テスト用。最後に毎フレームの更新をしたとき）。</summary>
         public static int SubmittedCount { get; private set; }
+
+        public static float SubmittedJitter { get; private set; }
 
         /// <summary>center から波を広げる（scale は大きさと強さの倍率）。</summary>
         public static void Play(Vector3 center, float scale = 1f)
@@ -94,12 +106,20 @@ namespace Airerage.Runtime.Presentation
             float now = Time.unscaledTime;
             Prune(now);
             int shown = 0;
+            Vector2 jitter = Vector2.zero;
             if (camera != null && camera.pixelHeight > 0)
             {
                 for (int i = 0; i < _count; i++)
                 {
                     Wave wave = _waves[i];
-                    float k = Mathf.Clamp01((now - wave.StartedAt) / Duration);
+                    float age = now - wave.StartedAt;
+                    float k = Mathf.Clamp01(age / Duration);
+                    if (age < JitterSeconds)
+                    {
+                        // 揺れ: 速く向きを変えながら小さくなる（波ごとに位相をずらす）。
+                        float shake = Jitter * wave.Scale * (1f - age / JitterSeconds) * (1f - age / JitterSeconds);
+                        jitter += new Vector2(Mathf.Sin(age * 97f + i * 1.3f), Mathf.Cos(age * 83f + i * 2.1f)) * shake;
+                    }
                     float ease = 1f - Mathf.Pow(1f - k, 4f);
                     float radius = Mathf.Lerp(StartRadius, EndRadius, ease) * wave.Scale;
                     Vector3 screen = camera.WorldToScreenPoint(wave.Center);
@@ -113,9 +133,9 @@ namespace Airerage.Runtime.Presentation
                     float height = camera.pixelHeight;
                     float screenRadius = Vector2.Distance(screen, side) / height;
                     float screenWidth = Mathf.Max(0.004f, Vector2.Distance(screen, widthEdge) / height);
-                    float fade = (1f - k) * (1f - k);
+                    float fade = Mathf.Pow(1f - k, 1.6f);
                     _wavesBuffer[shown] = new Vector4(screen.x / camera.pixelWidth, screen.y / height, screenRadius, Push * wave.Scale * fade);
-                    _shapeBuffer[shown] = new Vector4(screenWidth, Chroma * wave.Scale * Mathf.Clamp01(1f - k * 1.4f), 0f, 0f);
+                    _shapeBuffer[shown] = new Vector4(screenWidth, Chroma * wave.Scale * Mathf.Clamp01(1f - k * 1.1f), CrestLight * fade, 0f);
                     shown++;
                 }
             }
@@ -127,7 +147,9 @@ namespace Airerage.Runtime.Presentation
             Shader.SetGlobalVectorArray(WavesId, _wavesBuffer);
             Shader.SetGlobalVectorArray(ShapeId, _shapeBuffer);
             Shader.SetGlobalFloat(CountId, shown);
+            Shader.SetGlobalVector(JitterId, jitter);
             SubmittedCount = shown;
+            SubmittedJitter = jitter.magnitude;
         }
 
         // 毎フレームの更新をする隠れた物（最初の波を出したときに作る。シーンをまたいで残る）。
@@ -150,7 +172,9 @@ namespace Airerage.Runtime.Presentation
         {
             _count = 0;
             Shader.SetGlobalFloat(CountId, 0f);
+            Shader.SetGlobalVector(JitterId, Vector4.zero);
             SubmittedCount = 0;
+            SubmittedJitter = 0f;
         }
     }
 }

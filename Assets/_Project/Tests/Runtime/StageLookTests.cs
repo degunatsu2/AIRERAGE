@@ -405,6 +405,37 @@ namespace Airerage.Runtime.Tests
         // StageDressing.BackgroundShadowDepth と同じ（m）。
         private const float BackgroundShadowDepth = 1f;
 
+        [TestCase("Stage_CityDay")]
+        [TestCase("Stage_CityNight")]
+        public void CityAvenue_HasRoadSidewalksHalfTheLampsAndTraffic(string stage)
+        {
+            // 手前の大通り（2026-11-25 の要望: 電灯を半分にして置き直し、アセットで歩道と車道、人影と車。docs/15 6.70）。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            GameObject[] roots = scene.GetRootGameObjects();
+            Transform[] all = roots.SelectMany(r => r.GetComponentsInChildren<Transform>(true)).ToArray();
+            Transform avenue = all.Single(t => t.name == "Avenue" && t.Find("Roadway") != null);
+            Material road = avenue.Find("Roadway").GetComponent<Renderer>().sharedMaterial;
+            Texture asphalt = road.HasProperty("_BaseMap") ? road.GetTexture("_BaseMap") : road.GetTexture("_MainTex");
+            Assert.That(asphalt != null && asphalt.name.Contains("asphalt"), Is.True, "車道に舗装（アスファルト）の写真の絵がない");
+            Assert.That(all.Count(t => t.name == "Sidewalk"), Is.EqualTo(2), "両側の歩道がない");
+            Assert.That(all.Count(t => t.name == "Curb"), Is.EqualTo(2), "縁石がない");
+            Assert.That(avenue.Find("Markings").GetComponent<MeshFilter>().sharedMesh.vertexCount, Is.GreaterThan(400), "道路の標示がない");
+            // 道路照明は前の半分（20 → 10）、左右交互（千鳥）。前の Kenney の街灯は置かない。
+            Transform[] lamps = all.Where(t => t.name == "AvenueLamp").ToArray();
+            Assert.That(lamps.Length, Is.EqualTo(10), "道路照明が前の半分の数でない");
+            Assert.That(lamps.Count(t => t.position.x < 0f), Is.EqualTo(5), "道路照明が左右交互でない");
+            Assert.That(all.Any(t => t.name == "Prop_light-curved"), Is.False, "前の街灯が残っている");
+            Assert.That(all.Count(t => t.name.StartsWith("Prop_CommonTree")), Is.GreaterThan(20), "街路樹がない");
+            StreetTrafficView traffic = all.Select(t => t.GetComponent<StreetTrafficView>()).Single(v => v != null);
+            Assert.That(traffic.IsNight, Is.EqualTo(stage == "Stage_CityNight"));
+            // 大通りの上に建物を置かない（歩道の外の端 13 m まで）。
+            foreach (Transform block in all.Where(t => t.name == "Block"))
+            {
+                Bounds bounds = block.GetComponent<Renderer>().bounds;
+                Assert.That(bounds.min.x > 13f || bounds.max.x < -13f, Is.True, $"{block.name}: 大通りの上に建物がある（x {bounds.min.x:0.0}〜{bounds.max.x:0.0}）");
+            }
+        }
+
         [TestCase("Stage_Athletic")]
         [TestCase("Stage_CityDay")]
         [TestCase("Stage_CityNight")]
@@ -626,7 +657,7 @@ namespace Airerage.Runtime.Tests
         [TestCase("Stage_SnowSea", "Prop_tree-snow-a", "Prop_rocks-large", "Prop_boat-sail-a")]
         [TestCase("Stage_Volcano", "Prop_DeadTree_1", "Prop_DeadTree_2", "Prop_rock_")]
         [TestCase("Stage_Kitchen", "Prop_kitchenFridgeLarge", "Prop_kitchenMicrowave", "Prop_pottedPlant")]
-        [TestCase("Stage_CityNight", "Prop_light-curved", "Prop_traffic-light", "Prop_building-")]
+        [TestCase("Stage_CityNight", "Prop_CommonTree_1", "Prop_traffic-light", "Prop_building-")]
         public void NewAssetPacks_ArePlacedBehindThePlayPlane(string stage, string a, string b, string c)
         {
             // 2026-11-19 にユーザーが追加したアセット（Kenney の Racing・Industrial・Watercraft・Holiday・Nature・Furniture・Roads、

@@ -127,21 +127,26 @@ namespace Airerage.PlayMode.Tests
             inputs.Add(SimInput.FromAxes(0f, 1f, InputButtons.Wire));
             runner.InputOverride = new Script(inputs);
             bool sawBurst = false;
-            bool starBehind = false;
+            bool coreBehind = false;
+            int sparkles = 0;
             float start = Time.time;
             BurstEffectView burst = runner.PlayerView.WireCancelBurst;
-            Assert.That(burst.HasSpinningStar, Is.True, "ワイヤーキャンセルが回る星（S5）になっていない");
+            // 2026-11-25 の要望: 回る星（S5）をやめ、元の輪と星形の筋に細部を足した。
+            Assert.That(burst.DrawsRings, Is.True, "ワイヤーキャンセルが元の輪と星形の筋に戻っていない");
+            Assert.That(burst.HasDetail, Is.True, "ワイヤーキャンセルの光に細部（芯の閃光・きらめき）がない");
             while (Time.time - start < 1f)
             {
                 sawBurst |= burst.IsPlaying;
-                // 回る星はキャラクターより奥に描く（2026-11-24 の要望）。
-                starBehind |= burst.MainStar.enabled && burst.MainStar.transform.position.z > runner.PlayerState.Position.Z + 0.3f;
+                // 芯の閃光はキャラクターより奥に描く（キャラクターを隠さない）。
+                coreBehind |= burst.Core.enabled && burst.Core.transform.position.z > runner.PlayerState.Position.Z + 0.3f;
+                sparkles = Mathf.Max(sparkles, burst.VisibleSparkles);
                 yield return null;
             }
 
             Assert.That(runner.PlayerState.Combat.WireCancelCooldownTicksLeft, Is.GreaterThan(0), "前提: ワイヤーでキャンセルした");
             Assert.That(sawBurst, Is.True, "ワイヤーキャンセルの光が出ない");
-            Assert.That(starBehind, Is.True, "回る星がキャラクターより奥に出ない");
+            Assert.That(coreBehind, Is.True, "芯の閃光がキャラクターより奥に出ない");
+            Assert.That(sparkles, Is.EqualTo(10), "星の先のきらめきが筋の数（10）だけ出ない");
         }
 
         private static CharacterView DummyView(SimulationRunner runner)

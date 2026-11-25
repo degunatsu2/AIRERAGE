@@ -9,7 +9,8 @@
   - `CityIndustrial/`（City Kit Industrial 2.0）: 埠頭の湾の向こうの工業港（倉庫・工場・煙突・タンク・給水塔・コンテナ）。
   - `Watercraft/`（Watercraft Pack）: 埠頭と雪原の海の船とブイ。
   - `Holiday/`（Holiday Kit）: 雪原の雪の木と岩。
-  - `CityRoads/`（City Kit Roads）: ビル街の谷の底の街灯と信号。
+  - `CityRoads/`（City Kit Roads）: ビル街の手前の大通りの信号（2026-11-25 から街灯は使わない。柱が太すぎたので、日本の道路照明灯に
+    寄せた網を `Editor/Stages/CityStreet` が作る）。
   - `Racing/`（Racing Kit）: 陸上競技場の旗・旗の塔・テント・看板・縁石。
   - `Nature/`（Nature Kit）: 火山の溶岩の湖の縁の岩。
   - `Furniture/`（Furniture Kit）: キッチンの冷蔵庫・電子レンジ・コーヒーメーカー・観葉植物。

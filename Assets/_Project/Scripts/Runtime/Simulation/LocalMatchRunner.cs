@@ -70,6 +70,8 @@ namespace Airerage.Runtime.Simulation
         private SimInput[] _tickInputs = new SimInput[0];
         private CpuPlayer[] _cpus = new CpuPlayer[0];
         private CharacterState[] _previous = new CharacterState[0];
+        // 100 枚のコインを取った人に JACKPOT の演出を出す（2026-11-25 の要望）。
+        private readonly JackpotPickupWatch _jackpotWatch = new JackpotPickupWatch();
         private GameFlow _flow;
         private bool _timed = true;
         private float _accumulator;
@@ -473,6 +475,13 @@ namespace Airerage.Runtime.Simulation
 
         private void Render(float alpha)
         {
+            foreach (int picker in _jackpotWatch.Observe(this))
+            {
+                if (picker < _characterViews.Length && _characterViews[picker] != null)
+                {
+                    _characterViews[picker].PlayJackpotPickup();
+                }
+            }
             for (int p = 0; p < _previous.Length; p++)
             {
                 CharacterState current = _world.GetState(p);

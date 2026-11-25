@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: SpinningStar
+  m_Name: BurstSparkle
   m_Shader: {fileID: 4800000, guid: a247755dd4b742bf899c035fd2961090, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -25,12 +25,12 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Core: 0.9
-    - _Halo: 0.55
-    - _Inner: 0.16
+    - _Core: 1
+    - _Halo: 0.5
+    - _Inner: 0.12
     - _Intensity: 2.2
     - _Points: 4
-    - _Sharp: 2.4
+    - _Sharp: 2.8
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []

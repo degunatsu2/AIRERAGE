@@ -6,12 +6,14 @@ namespace Airerage.Runtime.Presentation
     /// 一瞬の光（広がる輪 2 つと光の筋。文字と画面の閃光は任意）。docs/11_combat_plan.md T3-7。
     /// 命中の火花、FATAL の虹色の光と「FATAL!」（ユーザーの要望、2026-10-13）、ワイヤーキャンセルの光に使う。
     /// Play で始め、_duration 秒で消える。見た目の動きは表示の時間で決める（シミュレーションには影響しない）。
-    /// 2026-11-24 の決定（D-101）で、次の 3 つの見せ方を足した:
-    /// - 回る星（S5。_stars があるとき）: 4 点の光の星が 90° 回りながら縮み、少し遅れた残像が 3 枚ついていく。細い輪が 1 本広がる。
-    ///   光はすべてキャラクターより奥に描く（ワイヤーキャンセル・技の発動）。輪と光の筋は描かない。
+    /// 2026-11-24 の決定（D-101）で、次の見せ方を足した:
     /// - 色が重なって光る文字（J7。_labelLook が Prism）: 赤・緑・青に分かれた 3 枚の文字が左右から寄って 1 枚に重なり、白く光ってから
     ///   虹色のグラデーションが流れる。後ろに虹色に光るにじみ（J9 のネオンの発光）を影として落とす。光の帯は通さない（JACKPOT）。
     /// - 空気の塊の衝撃波（F6。_shockwave）: 中心から背景をゆがませる透明な輪（ScreenShockwaves）と、輪の内側の色収差（FATAL）。
+    /// 2026-11-25 の要望（ワイヤーキャンセル・技・必殺技は回る星 S5 より元の演出が好み。元の演出を精巧に）で、回る星をやめて元の
+    /// 輪 2 つと星形の筋に戻し、細部（HasDetail。_core があるとき）を足した: 線は芯が白く縁がやわらかい光の線（Airerage/GlowLine）、
+    /// 星形の筋は先ほど細くとがる。半拍遅れて追いかける細い輪、逆向きに回る小さな星形（大きな星の先の間を向く）、星の先のきらめき
+    /// （4 点の光が瞬きながら消える）、出始めの芯の閃光（キャラクターより奥）。
     /// </summary>
     public sealed class BurstEffectView : MonoBehaviour
     {
@@ -28,12 +30,15 @@ namespace Airerage.Runtime.Presentation
         private const int CirclePoints = 48;
         private const float Z = -0.8f;
 
-        /// <summary>回る星と、その輪を描く奥行き（キャラクターより奥。m）。</summary>
+        /// <summary>芯の閃光を描く奥行き（キャラクターより奥。m）。</summary>
         public const float BehindZ = 0.7f;
 
-        /// <summary>回る星の残像の遅れ（秒）と、星が回る角度（度）。</summary>
-        public const float GhostLag = 0.035f;
-        public const float StarSpinDegrees = 90f;
+        /// <summary>追いかける輪の遅れ（_duration に対する割合）と、芯の閃光の長さ（同じ）。</summary>
+        public const float EchoLag = 0.18f;
+        public const float CoreLife = 0.45f;
+
+        /// <summary>細部のある光の線の太さの倍率（光の線は縁がやわらかいので、元の線と同じに見えるよう太めに）。</summary>
+        public const float DetailWidthScale = 1.5f;
 
         /// <summary>色が重なって光る文字が 1 枚に重なるまで（秒）。</summary>
         public const float PrismMergeSeconds = 0.3f;
@@ -57,11 +62,17 @@ namespace Airerage.Runtime.Presentation
         [SerializeField] private float _rayLength = 1.6f;
         [SerializeField] private float _width = 0.12f;
         [SerializeField] private int _fontSize = 48;
-        [Tooltip("広がる輪と光の筋を描く（回る星・文字だけの見せ方では描かない）")]
+        [Tooltip("広がる輪と光の筋を描く（文字だけの見せ方では描かない）")]
         [SerializeField] private bool _drawRings = true;
-        [Tooltip("回る星（S5。0 番目が本体、残りが残像。Airerage/GlowStar の板）と、星の半径（m）")]
-        [SerializeField] private MeshRenderer[] _stars = new MeshRenderer[0];
-        [SerializeField] private float _starRadius = 2.2f;
+        [Header("細部（2026-11-25。なければ元の輪と筋だけ）")]
+        [Tooltip("半拍遅れて追いかける細い輪")]
+        [SerializeField] private LineRenderer _echoRing;
+        [Tooltip("逆向きに回る小さな星形の筋")]
+        [SerializeField] private LineRenderer _counterRays;
+        [Tooltip("出始めの芯の閃光（Airerage/GlowStar の丸い光の板。キャラクターより奥）")]
+        [SerializeField] private MeshRenderer _core;
+        [Tooltip("星の先のきらめき（Airerage/GlowStar の 4 点の光の板。筋の数まで使う）")]
+        [SerializeField] private MeshRenderer[] _sparkles = new MeshRenderer[0];
         [Tooltip("文字の見せ方と、文字を出す長さ（秒。0 なら _duration）")]
         [SerializeField] private LabelLook _labelLook = LabelLook.Pop;
         [SerializeField] private float _labelSeconds;
@@ -75,16 +86,34 @@ namespace Airerage.Runtime.Presentation
         private GUIStyle _style;
         private Gradient _gradient;
         private MaterialPropertyBlock _block;
+        private AnimationCurve _taper;
+        private int _taperRays;
 
         /// <summary>今光っているか。</summary>
         public bool IsPlaying => Time.time - _startedAt < Mathf.Max(_duration, LabelDuration);
 
         public string Label => _label;
 
-        /// <summary>回る星の見せ方か（テスト用）と、その本体の板。</summary>
-        public bool HasSpinningStar => _stars.Length > 0;
+        /// <summary>細部（芯の閃光・きらめきなど）があるか（テスト用）と、芯の閃光の板・今出ているきらめきの数。</summary>
+        public bool HasDetail => _core != null;
 
-        public MeshRenderer MainStar => _stars.Length > 0 ? _stars[0] : null;
+        public MeshRenderer Core => _core;
+
+        public int VisibleSparkles
+        {
+            get
+            {
+                int count = 0;
+                foreach (MeshRenderer sparkle in _sparkles)
+                {
+                    if (sparkle != null && sparkle.enabled)
+                    {
+                        count++;
+                    }
+                }
+                return count;
+            }
+        }
 
         /// <summary>文字の見せ方・衝撃波を出すか（テスト用）。</summary>
         public LabelLook Look => _labelLook;
@@ -111,14 +140,6 @@ namespace Airerage.Runtime.Presentation
             _label = label ?? string.Empty;
             _fontSize = fontSize;
             _screenFlash = screenFlash;
-        }
-
-        /// <summary>回る星の見せ方にする（S5。シーンのビルダー用。stars は 0 番目が本体、残りが残像）。輪と光の筋は描かない。</summary>
-        public void ConfigureSpinningStar(MeshRenderer[] stars, float radius)
-        {
-            _stars = stars ?? new MeshRenderer[0];
-            _starRadius = radius;
-            _drawRings = false;
         }
 
         /// <summary>文字の見せ方を決める（シーンのビルダー用）。seconds が 0 なら _duration の間。</summary>
@@ -174,11 +195,6 @@ namespace Airerage.Runtime.Presentation
                 SetEnabled(false);
                 return;
             }
-            if (_stars.Length > 0)
-            {
-                RenderSpinningStar(age);
-                return;
-            }
             if (!_drawRings)
             {
                 SetEnabled(false);
@@ -187,80 +203,166 @@ namespace Airerage.Runtime.Presentation
             float ease = 1f - (1f - progress) * (1f - progress);
             float alpha = 1f - progress;
             float hueShift = Time.time * 1.5f;
+            // 光の線（細部あり）は縁がやわらかく細く見えるので、元の線と同じ太さに見えるよう太めに描く。
+            float width = HasDetail ? _width * DetailWidthScale : _width;
 
-            DrawCircle(_ring, Mathf.Lerp(_startRadius, _endRadius, ease), Mathf.Lerp(_width * 2f, _width * 0.3f, progress), alpha, hueShift, Z);
-            DrawCircle(_innerRing, Mathf.Lerp(_startRadius * 0.5f, _endRadius * 0.65f, ease), _width * 0.8f, alpha * 0.8f, hueShift + 0.5f, Z);
+            DrawCircle(_ring, Mathf.Lerp(_startRadius, _endRadius, ease), Mathf.Lerp(width * 2f, width * 0.3f, progress), alpha, hueShift, Z);
+            DrawCircle(_innerRing, Mathf.Lerp(_startRadius * 0.5f, _endRadius * 0.65f, ease), width * 0.8f, alpha * 0.8f, hueShift + 0.5f, Z);
+            float inner = Mathf.Lerp(_startRadius, _endRadius * 0.5f, ease);
+            float outer = inner + _rayLength * (1f - 0.5f * progress);
+            float rotation = Time.time * 1.2f;
             if (_rays != null && _rayCount > 0)
             {
-                float inner = Mathf.Lerp(_startRadius, _endRadius * 0.5f, ease);
-                float outer = inner + _rayLength * (1f - 0.5f * progress);
-                float rotation = Time.time * 1.2f;
-                _rays.positionCount = _rayCount * 2;
-                _rays.loop = true;
-                for (int i = 0; i < _rayCount * 2; i++)
-                {
-                    float angle = rotation + Mathf.PI * i / _rayCount;
-                    float radius = i % 2 == 0 ? outer : inner;
-                    _rays.SetPosition(i, _center + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, Z));
-                }
-                _rays.widthMultiplier = Mathf.Lerp(_width * 1.2f, _width * 0.2f, progress);
-                Paint(_rays, alpha, hueShift + 0.25f);
-                _rays.enabled = true;
+                DrawStar(_rays, rotation, inner, outer, Mathf.Lerp(width * 1.2f, width * 0.2f, progress), alpha, hueShift + 0.25f, 0f);
+            }
+            if (HasDetail)
+            {
+                RenderDetail(age, progress, alpha, hueShift, rotation, inner, outer);
             }
         }
 
-        // S5: 4 点の星が 90° 回りながら縮み（出始めは少し行きすぎて広がる）、少し遅れた残像が 3 枚ついていく。細い輪が 1 本広がって消える。
-        // 星も輪もキャラクターより奥（BehindZ）に描く。
-        private void RenderSpinningStar(float age)
+        // 星形の筋（先と谷を交互に結んだ輪）。細部があるときは先ほど細くとがる（幅の曲線）。whiten は白へ寄せる割合。
+        private void DrawStar(LineRenderer line, float rotation, float inner, float outer, float width, float alpha, float hueShift, float whiten)
+        {
+            int points = _rayCount * 2;
+            line.positionCount = points;
+            line.loop = true;
+            for (int i = 0; i < points; i++)
+            {
+                float angle = rotation + Mathf.PI * i / _rayCount;
+                float radius = i % 2 == 0 ? outer : inner;
+                line.SetPosition(i, _center + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, Z));
+            }
+            if (HasDetail)
+            {
+                line.widthCurve = TaperCurve();
+            }
+            line.widthMultiplier = width;
+            Paint(line, alpha, hueShift, whiten);
+            line.enabled = true;
+        }
+
+        // 細部: 追いかける輪・逆に回る小さな星形・星の先のきらめき・芯の閃光。
+        private void RenderDetail(float age, float progress, float alpha, float hueShift, float rotation, float inner, float outer)
         {
             _block = _block ?? new MaterialPropertyBlock();
-            float life = _duration * 0.72f;
-            Color baseColor = _rainbow ? Color.HSVToRGB(Mathf.Repeat(Time.time * 1.2f, 1f), 0.75f, 1f) : _color;
-            for (int i = 0; i < _stars.Length; i++)
+            // 半拍遅れて追いかける細い輪（白っぽく、外の輪の少し内側を広がる）。
+            float echo = Mathf.Clamp01((age - _duration * EchoLag) / (_duration * (1f - EchoLag)));
+            if (_echoRing != null)
             {
-                MeshRenderer star = _stars[i];
-                if (star == null)
+                if (echo > 0f)
+                {
+                    float echoEase = 1f - (1f - echo) * (1f - echo);
+                    DrawCircle(_echoRing, Mathf.Lerp(_startRadius, _endRadius * 0.86f, echoEase), _width * 0.35f, (1f - echo) * 0.6f, hueShift + 0.75f, Z, 0.45f);
+                }
+                else
+                {
+                    _echoRing.enabled = false;
+                }
+            }
+            // 逆向きに回る小さな星形（先は大きな星の先の間を向く）。
+            if (_counterRays != null && _rayCount > 0)
+            {
+                float smallInner = inner * 0.55f;
+                float smallOuter = smallInner + _rayLength * 0.55f * (1f - 0.6f * progress);
+                DrawStar(_counterRays, -Time.time * 1.8f + Mathf.PI / _rayCount, smallInner, smallOuter,
+                    Mathf.Lerp(_width * 0.7f, _width * 0.15f, progress), alpha * 0.75f, hueShift + 0.5f, 0.45f);
+            }
+            // 星の先のきらめき（先の向きにそろえた 4 点の光。1 つずつずらして瞬き、外へ少し流れて消える）。
+            float sparkleSize = 0.18f + 0.08f * _rayLength;
+            for (int i = 0; i < _sparkles.Length; i++)
+            {
+                MeshRenderer sparkle = _sparkles[i];
+                if (sparkle == null)
                 {
                     continue;
                 }
-                float t = age - i * GhostLag;
-                if (t < 0f)
+                if (i >= _rayCount || progress < 0.04f)
                 {
-                    star.enabled = false;
+                    sparkle.enabled = false;
                     continue;
                 }
-                float k = Mathf.Clamp01(t / life);
-                float pop = OutBack(Mathf.Clamp01(t / 0.12f));
-                float size = (1f - k * k * k) * pop;
+                float angle = rotation + Mathf.PI * 2f * i / _rayCount;
+                float twinkle = 0.55f + 0.45f * Mathf.Sin(age * 40f + i * 1.7f);
+                float size = sparkleSize * Mathf.Pow(1f - progress, 0.6f) * twinkle * OutBack(Mathf.Clamp01((progress - 0.04f) / 0.12f));
                 if (size <= 0.001f)
                 {
-                    star.enabled = false;
+                    sparkle.enabled = false;
                     continue;
                 }
-                float spin = (1f - Mathf.Pow(1f - k, 3f)) * StarSpinDegrees;
-                Transform tr = star.transform;
-                tr.position = new Vector3(_center.x, _center.y, _center.z + BehindZ + i * 0.02f);
-                tr.rotation = Quaternion.Euler(0f, 0f, spin);
-                tr.localScale = Vector3.one * (_starRadius * 2f * size);
-                Color color = i == 0 ? Color.Lerp(baseColor, Color.white, 0.55f) : baseColor;
-                color.a = i == 0 ? 1f - 0.3f * k : Mathf.Max(0f, 0.45f - 0.1f * i) * (1f - k * 0.5f);
-                star.GetPropertyBlock(_block);
-                _block.SetColor(ColorId, color);
-                star.SetPropertyBlock(_block);
-                star.enabled = true;
+                float reach = outer * 1.04f + 0.25f * progress;
+                Transform tr = sparkle.transform;
+                tr.position = _center + new Vector3(Mathf.Cos(angle) * reach, Mathf.Sin(angle) * reach, Z - 0.02f);
+                tr.rotation = Quaternion.Euler(0f, 0f, angle * Mathf.Rad2Deg);
+                tr.localScale = Vector3.one * size;
+                Color color = _rainbow ? Color.HSVToRGB(Mathf.Repeat(hueShift + i / (float)_rayCount, 1f), 0.6f, 1f) : Color.Lerp(_color, Color.white, 0.5f);
+                color.a = alpha;
+                SetQuadColor(sparkle, color);
             }
-            float ringK = Mathf.Clamp01(age / (_duration * 0.65f));
-            float ringEase = 1f - Mathf.Pow(1f - ringK, 3f);
-            float ringScale = _starRadius / 2.2f;
-            DrawCircle(_ring, Mathf.Lerp(0.9f, 2.6f, ringEase) * ringScale, 0.02f + 0.07f * (1f - ringK), 1f - ringK, Time.time * 1.5f, _center.z + BehindZ - _center.z);
-            if (_innerRing != null)
+            // 出始めの芯の閃光（丸い光が一瞬ふくらんで消える。キャラクターより奥）。
+            float coreK = age / (_duration * CoreLife);
+            if (coreK < 1f)
             {
-                _innerRing.enabled = false;
+                float coreSize = Mathf.Max(1.2f, _endRadius * 0.8f) * Mathf.Lerp(0.6f, 1.25f, 1f - (1f - coreK) * (1f - coreK));
+                Transform tr = _core.transform;
+                tr.position = new Vector3(_center.x, _center.y, _center.z + BehindZ);
+                tr.rotation = Quaternion.identity;
+                tr.localScale = Vector3.one * coreSize;
+                Color color = _rainbow ? Color.HSVToRGB(Mathf.Repeat(hueShift, 1f), 0.35f, 1f) : Color.Lerp(_color, Color.white, 0.6f);
+                color.a = (1f - coreK) * (1f - coreK);
+                SetQuadColor(_core, color);
             }
-            if (_rays != null)
+            else
             {
-                _rays.enabled = false;
+                _core.enabled = false;
             }
+        }
+
+        private void SetQuadColor(MeshRenderer quad, Color color)
+        {
+            quad.GetPropertyBlock(_block);
+            _block.SetColor(ColorId, color);
+            quad.SetPropertyBlock(_block);
+            quad.enabled = true;
+        }
+
+        // 星形の筋の幅の曲線: 先（偶数の点）で細く、谷で太い。筋の数が変わったときだけ作り直す。
+        private AnimationCurve TaperCurve()
+        {
+            if (_taper != null && _taperRays == _rayCount)
+            {
+                return _taper;
+            }
+            int points = _rayCount * 2;
+            var keys = new Keyframe[points + 1];
+            for (int i = 0; i <= points; i++)
+            {
+                keys[i] = new Keyframe(i / (float)points, i % 2 == 0 ? 0.3f : 1f);
+            }
+            _taper = new AnimationCurve(keys);
+            for (int i = 0; i < keys.Length; i++)
+            {
+                SetLinearTangents(_taper, i);
+            }
+            _taperRays = _rayCount;
+            return _taper;
+        }
+
+        // キーの間を直線でつなぐ（エディタの AnimationUtility を使わずに、前後のキーへの傾きを入れる）。
+        private static void SetLinearTangents(AnimationCurve curve, int index)
+        {
+            Keyframe key = curve[index];
+            if (index > 0)
+            {
+                Keyframe previous = curve[index - 1];
+                key.inTangent = (key.value - previous.value) / (key.time - previous.time);
+            }
+            if (index < curve.length - 1)
+            {
+                Keyframe next = curve[index + 1];
+                key.outTangent = (next.value - key.value) / (next.time - key.time);
+            }
+            curve.MoveKey(index, key);
         }
 
         private static float OutBack(float k)
@@ -271,7 +373,7 @@ namespace Airerage.Runtime.Presentation
             return 1f + c3 * m * m * m + c * m * m;
         }
 
-        private void DrawCircle(LineRenderer line, float radius, float width, float alpha, float hueShift, float z)
+        private void DrawCircle(LineRenderer line, float radius, float width, float alpha, float hueShift, float z, float whiten = 0f)
         {
             if (line == null)
             {
@@ -285,17 +387,17 @@ namespace Airerage.Runtime.Presentation
                 line.SetPosition(i, _center + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, z));
             }
             line.widthMultiplier = width;
-            Paint(line, alpha, hueShift);
+            Paint(line, alpha, hueShift, whiten);
             line.enabled = true;
         }
 
         // 虹色なら、線に沿って色相を一周させる（時間で回す）。そうでなければ単色。
-        private void Paint(LineRenderer line, float alpha, float hueShift)
+        private void Paint(LineRenderer line, float alpha, float hueShift, float whiten = 0f)
         {
             _gradient = _gradient ?? new Gradient();
             if (!_rainbow)
             {
-                Color color = _color;
+                Color color = Color.Lerp(_color, Color.white, whiten);
                 color.a *= alpha;
                 _gradient.SetKeys(new[] { new GradientColorKey(color, 0f), new GradientColorKey(color, 1f) },
                     new[] { new GradientAlphaKey(color.a, 0f), new GradientAlphaKey(color.a, 1f) });
@@ -306,7 +408,7 @@ namespace Airerage.Runtime.Presentation
             for (int i = 0; i < colors.Length; i++)
             {
                 float t = i / (colors.Length - 1f);
-                colors[i] = new GradientColorKey(Color.HSVToRGB(Mathf.Repeat(t + hueShift, 1f), 0.85f, 1f), t);
+                colors[i] = new GradientColorKey(Color.HSVToRGB(Mathf.Repeat(t + hueShift, 1f), 0.85f * (1f - whiten), 1f), t);
             }
             _gradient.SetKeys(colors, new[] { new GradientAlphaKey(alpha, 0f), new GradientAlphaKey(alpha, 1f) });
             line.colorGradient = _gradient;
@@ -326,11 +428,23 @@ namespace Airerage.Runtime.Presentation
             {
                 _rays.enabled = enabled;
             }
-            foreach (MeshRenderer star in _stars)
+            if (_echoRing != null)
             {
-                if (star != null)
+                _echoRing.enabled = enabled;
+            }
+            if (_counterRays != null)
+            {
+                _counterRays.enabled = enabled;
+            }
+            if (_core != null)
+            {
+                _core.enabled = enabled;
+            }
+            foreach (MeshRenderer sparkle in _sparkles)
+            {
+                if (sparkle != null)
                 {
-                    star.enabled = enabled;
+                    sparkle.enabled = enabled;
                 }
             }
         }
@@ -428,17 +542,36 @@ namespace Airerage.Runtime.Presentation
                     });
                 }
             }
+            // 文字のすぐ周りの発光（2026-11-25 の要望: 文字をもう少しだけ発光させる）: 文字と同じ色相の淡い色を、文字の周りに 2 重の輪で
+            // 薄く重ねる（外ほど薄い）。暗い縁取りより外へにじむ。
+            float breathe = 0.85f + 0.15f * Mathf.Sin(Time.time * 9f);
+            for (int ring = 0; ring < 2; ring++)
+            {
+                float radius = (ring == 0 ? 0.011f : 0.0055f) * height;
+                const int Taps = 12;
+                for (int tap = 0; tap < Taps; tap++)
+                {
+                    float angle = (tap + ring * 0.5f) * Mathf.PI * 2f / Taps;
+                    var offset = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+                    DrawWord(center + offset, i =>
+                    {
+                        Color glow = Color.HSVToRGB(Mathf.Repeat(flow - i * 0.08f, 1f), 0.45f, 1f);
+                        glow.a = (ring == 0 ? 0.07f : 0.12f) * fade * breathe;
+                        return glow;
+                    });
+                }
+            }
             // 暗い縁取り（読みやすさ）。
             for (int tap = 0; tap < 8; tap++)
             {
                 float angle = tap * Mathf.PI * 0.25f;
                 var offset = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * 3f;
-                DrawWord(center + offset, i => new Color(0.1f, 0.06f, 0.18f, 0.9f * fade));
+                DrawWord(center + offset, i => new Color(0.1f, 0.06f, 0.18f, 0.8f * fade));
             }
             // 本体: 重なった瞬間は白く光り、虹色へ。文字ごとに色相をずらして流す。
             DrawWord(center, i =>
             {
-                Color rainbow = Color.HSVToRGB(Mathf.Repeat(flow - i * 0.08f, 1f), 0.7f, 1f);
+                Color rainbow = Color.HSVToRGB(Mathf.Repeat(flow - i * 0.08f, 1f), 0.62f, 1f);
                 Color shown = TextFlash.Apply(rainbow, since);
                 shown.a = fade;
                 return shown;

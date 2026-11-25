@@ -285,7 +285,7 @@ namespace Airerage.PlayMode.Tests
         }
 
         /// <summary>
-        /// 戦いの演出（2026-11-24 の決定 D-101）: ワイヤーキャンセル・技・必殺技の回る星（S5。キャラクターより奥）と、FATAL の空気の塊の
+        /// 戦いの演出: ワイヤーキャンセル・技・必殺技の輪と星形の筋（2026-11-25 の要望で元の演出を精巧にした）と、FATAL の空気の塊の
         /// 衝撃波（F6。背景がゆがむ）を撮る（Logs/Snapshots/Fx_*）。演出はそれぞれの光を直接始めて撮る（JACKPOT の文字は画面に OnGUI で
         /// 描くので、カメラの絵には写らない）。
         /// </summary>
@@ -315,20 +315,22 @@ namespace Airerage.PlayMode.Tests
             Shoot(camera, shot, "Fx_0Before");
             view.WireCancelBurst.Play(center);
             yield return Wait(0.07f);
-            Shoot(camera, shot, "Fx_1WireCancelStar");
-            yield return Wait(0.2f);
-            Shoot(camera, shot, "Fx_1WireCancelStarLate");
+            Shoot(camera, shot, "Fx_1WireCancel");
+            yield return Wait(0.12f);
+            Shoot(camera, shot, "Fx_1WireCancelLate");
             yield return Wait(0.6f);
             view.SpecialBurst.Play(center);
             yield return Wait(0.1f);
-            Shoot(camera, shot, "Fx_2SpecialStar");
+            Shoot(camera, shot, "Fx_2Special");
             yield return Wait(0.8f);
             view.SuperBurst.Play(center);
             yield return Wait(0.12f);
-            Shoot(camera, shot, "Fx_2SuperStar");
+            Shoot(camera, shot, "Fx_2Super");
             yield return Wait(1f);
             view.FatalBurst.Play(center);
-            yield return Wait(0.1f);
+            yield return Wait(0.05f);
+            ShootWithShockwaves(camera, new Vector3(center.x, center.y + 1f, -14f), "Fx_3FatalShockEarly");
+            yield return Wait(0.07f);
             ShootWithShockwaves(camera, new Vector3(center.x, center.y + 1f, -14f), "Fx_3FatalShock");
             yield return Wait(0.15f);
             ShootWithShockwaves(camera, new Vector3(center.x, center.y + 1f, -14f), "Fx_3FatalShockLate");

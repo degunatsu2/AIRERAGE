@@ -130,6 +130,7 @@ namespace Airerage.Runtime.Presentation
         private int _shownSpecial2Cooldown;
         private int _shownGauge;
         private int _shownJackpots;
+        private bool _burstsShown = true;
         private int _shownHeistPayouts;
         private int _feverTicks;
         private int _waveTicks;
@@ -179,6 +180,23 @@ namespace Airerage.Runtime.Presentation
         public BurstEffectView SpecialBurst => _specialBurst;
         public BurstEffectView SuperBurst => _superBurst;
         public BurstEffectView JackpotBurst => _jackpotBurst;
+
+        /// <summary>100 枚のコインを取って JACKPOT の演出を出した回数（テスト用）。</summary>
+        public int JackpotPickupsShown { get; private set; }
+
+        /// <summary>
+        /// 100 枚のコインを取った（2026-11-25 の要望: 取ったときにも JACKPOT の演出を出す）。試合を進める部品が JackpotPickupWatch で
+        /// 見つけて呼ぶ。透明の間は出さない（居場所が分かるため）。
+        /// </summary>
+        public void PlayJackpotPickup()
+        {
+            if (_jackpotBurst == null || !_burstsShown)
+            {
+                return;
+            }
+            _jackpotBurst.Play(transform.position);
+            JackpotPickupsShown++;
+        }
         public RingGaugeView FeverGauge => _feverGauge;
 
         /// <summary>復帰までの残りのゲージ（なければ null）。</summary>
@@ -592,6 +610,7 @@ namespace Airerage.Runtime.Presentation
             Vector3 center = transform.position;
             // 透明の間は、居場所が分かる光を出さない（透明になった瞬間の技の光だけは出す）。
             bool shown = c.InvisibleTicksLeft <= 0;
+            _burstsShown = shown;
             if (c.FatalHitCount > _shownFatalHits && shown && _fatalBurst != null)
             {
                 _fatalBurst.Play(center);

@@ -382,33 +382,19 @@ namespace Airerage.Editor.Stages
             decor.Box("Street", new Vector3(0f, -24f, 6f), new Vector3(110f, 0.5f, 30f), street);
             // 大通りは西新宿の道路の地面（CityStreetsFront から奥。StageDressing）の手前まで。
             decor.Box("Avenue", new Vector3(0f, -24.25f, (20f + CityStreetsFront) * 0.5f), new Vector3(1600f, 0.5f, CityStreetsFront - 20f), street);
-            // 谷の底の道路と大通りの街灯・信号（Kenney の City Kit Roads。CC0。2026-11-19 にユーザーが追加）。夜は灯りの所を光らせる。
-            Material lampGlow = night ? decor.Unlit("StreetLamp", Glow(new Color(1f, 0.86f, 0.6f), 3f)) : null;
-            for (float z = 14f; z < 260f; z += 26f)
-            {
-                foreach (float side in new[] { -1f, 1f })
-                {
-                    float x = side * 13f;
-                    ThirdPartyProps.Place(decor, ThirdPartyProps.CityRoads, "light-curved", new Vector3(x, -24f, z), 11f, side < 0f ? -90f : 90f,
-                        night ? new Color(0.45f, 0.46f, 0.55f) : Color.white, decor.Folder);
-                    if (night)
-                    {
-                        decor.Sphere("StreetLampGlow", new Vector3(x - side * 1.9f, -24f + 7.2f, z), new Vector3(0.7f, 0.35f, 0.7f), lampGlow);
-                    }
-                }
-            }
-            ThirdPartyProps.Place(decor, ThirdPartyProps.CityRoads, "traffic-light", new Vector3(-12f, -24f, 40f), 11f, 90f,
-                night ? new Color(0.45f, 0.46f, 0.55f) : Color.white, decor.Folder);
-            ThirdPartyProps.Place(decor, ThirdPartyProps.CityRoads, "traffic-light", new Vector3(12f, -24f, 40f), 11f, -90f,
-                night ? new Color(0.45f, 0.46f, 0.55f) : Color.white, decor.Folder);
+            // 大通りの車道・歩道・植樹帯・道路照明・横断歩道と信号、行き交う車と人影（2026-11-25 の要望: 電灯を半分にして置き直し、
+            // アセットで歩道と車道、歩道に人影、車道にまばらな車。実際の街並みを参考に。CityStreet。docs/15 6.70）。
+            CityStreet.Build(decor, night);
             // 大通りの両側の低い街並み（見通しの奥を空っぽに見せない。高層ビルを隠さない低さ）。
-            for (float z = 110f; z < 300f; z += decor.Range(40f, 60f))
+            // 2026-11-25: 大通りの手前（z 30 から）にも並べて、通りの両側を建物が縁取る実際の街並みに（低いので遊ぶ画面からの見通しは隠さない）。
+            for (float z = 30f; z < 300f; z += decor.Range(40f, 60f))
             {
                 for (float x = -280f; x < 280f;)
                 {
                     float width = decor.Range(8f, 20f);
                     float middle = x + width * 0.5f;
-                    if (Mathf.Abs(middle) > 14f)
+                    // 大通り（歩道の外の端まで）に掛からない所だけ（前は中心だけを見ていて、幅の広い建物が車道に掛かることがあった）。
+                    if (Mathf.Abs(middle) - width * 0.5f > CityStreet.SidewalkOuter + 0.5f)
                     {
                         float height = decor.Range(4f, 14f) + Mathf.Abs(middle) / 280f * 12f;
                         float depth = decor.Range(10f, 22f);
@@ -456,6 +442,12 @@ namespace Airerage.Editor.Stages
                     float width = (turned ? model.SizeZ : model.SizeX) * scale;
                     float depth = (turned ? model.SizeX : model.SizeZ) * scale;
                     float centerX = x + width * 0.5f;
+                    if (Mathf.Abs(centerX) - width * 0.5f < CityStreet.SidewalkOuter + 0.5f && z - depth * 0.5f < CityStreet.FarZ)
+                    {
+                        // 大通り（車道と歩道）の上には建てない（2026-11-25。通りを見通せるように）。
+                        x += width + decor.Range(1f, 5f);
+                        continue;
+                    }
                     if (vista && Mathf.Abs(centerX) >= CityVistaHalfWidth && row > 0)
                     {
                         x += width + decor.Range(1f, 5f);

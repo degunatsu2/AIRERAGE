@@ -13,6 +13,8 @@ Poly Haven の API（api.polyhaven.com・dl.polyhaven.org）で取得した。
 | `leafy_grass/` | 陸上競技場の芝生 |
 | `forest_ground_04/` | 恐怖の館の森の地面と墓場・農園の土 |
 | `concrete_floor_02/` | 埠頭の岸壁の奥行き |
+| `clean_asphalt/` | ビル街の手前の大通りの車道（2026-11-25。`Editor/Stages/CityStreet`） |
+| `concrete_pavers/` | ビル街の手前の大通りの歩道（インターロッキングブロック。2026-11-25） |
 
 貼り方は `Editor/Stages/TerrainSculpt`（`ApplyPhotos`・`GroundMaterial`）とシェーダー `Airerage/TerrainRock`（世界の位置から三方向に
 投影し、色は台本のまま絵の明暗と凹凸だけを足す）。
