@@ -18,6 +18,9 @@ namespace Airerage.PlayMode.Tests
     {
         private const string Folder = "Logs/Snapshots";
 
+        // 地上の大通りの高さ（Editor/Stages/CityStreet.Ground と同じ。遊ぶ屋上の約 110m 下）。
+        private const float CityStreetHeight = -110f;
+
         [UnityTest]
         public IEnumerator CityAvenue_CarsKeepLeft_AndPeopleWalkBothWays([Values("Stage_CityDay", "Stage_CityNight")] string stage)
         {
@@ -57,11 +60,14 @@ namespace Airerage.PlayMode.Tests
                 string tag = stage.Replace("Stage_", "");
                 Shoot(camera, camera.transform.position, camera.transform.rotation, camera.fieldOfView, $"Avenue_{tag}_0Game");
                 Shoot(camera, new Vector3(0f, 12f, -70f), Quaternion.Euler(6f, 0f, 0f), 40f, $"Avenue_{tag}_1Overview");
-                Shoot(camera, new Vector3(0f, -10f, 30f), Quaternion.Euler(14f, 0f, 0f), 50f, $"Avenue_{tag}_2Street");
-                Shoot(camera, new Vector3(-6f, -21.5f, 40f), Quaternion.Euler(4f, 8f, 0f), 55f, $"Avenue_{tag}_3EyeLevel");
-                Shoot(camera, new Vector3(-24f, -17f, 140f), Quaternion.Euler(18f, 70f, 0f), 45f, $"Avenue_{tag}_4Side");
+                // 空撮のように高い所から見下ろす（雲海と、雲の切れ間から遥か下の大通り）。
+                Shoot(camera, new Vector3(0f, 45f, -60f), Quaternion.Euler(28f, 0f, 0f), 45f, $"Avenue_{tag}_2Aerial");
+                Shoot(camera, new Vector3(-40f, 8f, -45f), Quaternion.Euler(4f, 20f, 0f), 45f, $"Avenue_{tag}_3Side");
+                // 雲の切れ間の中から大通りを見る（車と人影）。
+                Shoot(camera, new Vector3(0f, CityStreetHeight + 14f, 150f), Quaternion.Euler(16f, 0f, 0f), 50f, $"Avenue_{tag}_4Street");
+                Shoot(camera, new Vector3(-6f, CityStreetHeight + 2.5f, 160f), Quaternion.Euler(4f, 8f, 0f), 55f, $"Avenue_{tag}_5EyeLevel");
                 yield return Wait(4f);
-                Shoot(camera, new Vector3(0f, -10f, 30f), Quaternion.Euler(14f, 0f, 0f), 50f, $"Avenue_{tag}_5StreetLater");
+                Shoot(camera, new Vector3(0f, CityStreetHeight + 14f, 150f), Quaternion.Euler(16f, 0f, 0f), 50f, $"Avenue_{tag}_6StreetLater");
             }
         }
 

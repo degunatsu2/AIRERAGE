@@ -21,8 +21,11 @@ namespace Airerage.Editor.Stages
     /// </summary>
     internal static class CityStreet
     {
-        /// <summary>道の高さ（谷の底の大通りの面。ワールドの y）と、縁石の高さ（m）。</summary>
-        public const float Ground = -24f;
+        /// <summary>
+        /// 道の高さ（地上の大通りの面。ワールドの y）と、縁石の高さ（m）。2026-11-25 の要望（ステージは非常に高い高層ビルの上）で、遊ぶ屋上
+        /// （y 0〜15）から約 110〜125 m 下に下げた（間は雲海。CityClouds）。
+        /// </summary>
+        public const float Ground = -110f;
         public const float CurbHeight = 0.15f;
 
         /// <summary>手前の端（横断歩道）と奥の端（西新宿の道路の地面の手前。ワールドの z）。</summary>

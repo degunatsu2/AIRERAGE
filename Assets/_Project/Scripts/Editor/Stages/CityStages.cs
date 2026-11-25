@@ -352,10 +352,11 @@ namespace Airerage.Editor.Stages
             foreach (var building in buildings)
             {
                 float width = building.MaxX - building.MinX;
-                float height = building.Top + 30f;
+                // 超高層ビル（2026-11-25 の要望）: 地上の大通り（CityStreet.Ground）まで伸ばす（根元は雲海に隠れる）。
+                float height = building.Top - CityStreet.Ground;
                 decor.Box("Volume", new Vector3((building.MinX + building.MaxX) * 0.5f, building.Top - height * 0.5f, 7f),
                     new Vector3(width, height, 10f), building.Top > 10f ? glass : facade);
-                for (float y = building.Top - 2f; y > -21f; y -= 2.6f)
+                for (float y = building.Top - 2f; y > -40f; y -= 2.6f)
                 {
                     if (building.MinX < 0f && building.MaxX > 0f && y > -11f && y < -3f)
                     {
@@ -378,10 +379,12 @@ namespace Airerage.Editor.Stages
             {
                 decor.Box("HollowLight", new Vector3(x, -4.15f, 0f), new Vector3(2f, 0.15f, 1.2f), decor.Unlit("HollowLamp", new Color(1f, 0.92f, 0.7f)));
             }
-            // 谷の底の道路（撃破の範囲の下）と、その先へまっすぐ延びる大通り（霧で薄れて、遠くの西新宿の高層ビルの足もとへ続く）。
-            decor.Box("Street", new Vector3(0f, -24f, 6f), new Vector3(110f, 0.5f, 30f), street);
-            // 大通りは西新宿の道路の地面（CityStreetsFront から奥。StageDressing）の手前まで。
-            decor.Box("Avenue", new Vector3(0f, -24.25f, (20f + CityStreetsFront) * 0.5f), new Vector3(1600f, 0.5f, CityStreetsFront - 20f), street);
+            // 地上（遊ぶ屋上の約 110m 下。間は雲海）: ビルの足もとの道路と、その先へまっすぐ延びる大通り（霧で薄れて、遠くの西新宿の
+            // 高層ビルの足もとへ続く）。大通りは西新宿の道路の地面（CityStreetsFront から奥。StageDressing）の手前まで。
+            decor.Box("Street", new Vector3(0f, CityStreet.Ground, 6f), new Vector3(110f, 0.5f, 30f), street);
+            decor.Box("Avenue", new Vector3(0f, CityStreet.Ground - 0.25f, (20f + CityStreetsFront) * 0.5f), new Vector3(1600f, 0.5f, CityStreetsFront - 20f), street);
+            // 足場のビルの根元を隠す雲海と、大通りの上の雲の切れ間（2026-11-25 の要望。CityClouds）。
+            CityClouds.Build(decor, night);
             // 大通りの車道・歩道・植樹帯・道路照明・横断歩道と信号、行き交う車と人影（2026-11-25 の要望: 電灯を半分にして置き直し、
             // アセットで歩道と車道、歩道に人影、車道にまばらな車。実際の街並みを参考に。CityStreet。docs/15 6.70）。
             CityStreet.Build(decor, night);
@@ -398,12 +401,12 @@ namespace Airerage.Editor.Stages
                     {
                         float height = decor.Range(4f, 14f) + Mathf.Abs(middle) / 280f * 12f;
                         float depth = decor.Range(10f, 22f);
-                        decor.Box("Block", new Vector3(middle, -24f + height * 0.5f, z), new Vector3(width, height, depth),
+                        decor.Box("Block", new Vector3(middle, CityStreet.Ground + height * 0.5f, z), new Vector3(width, height, depth),
                             decor.Random.NextDouble() < 0.5 ? facade : glass);
                         if (night && decor.Random.NextDouble() < 0.6)
                         {
                             // 夜は正面にまばらな窓の明かり（灰色の塊に見えないように）。
-                            decor.Quad("BlockLights", new Vector3(middle, -24f + height * decor.Range(0.35f, 0.8f), z - depth * 0.5f - 0.05f),
+                            decor.Quad("BlockLights", new Vector3(middle, CityStreet.Ground + height * decor.Range(0.35f, 0.8f), z - depth * 0.5f - 0.05f),
                                 new Vector2(width * decor.Range(0.3f, 0.75f), 0.8f), SkyLight(decor, skyLights));
                         }
                     }
@@ -553,11 +556,13 @@ namespace Airerage.Editor.Stages
         // 西新宿（PLATEAU）の地面の高さ: 谷の底の道路（-24）より下に沈め、大通りの地平の上に高層ビルの上の方だけが並んで見える高さ。
         // 2026-11-18 の要望（背景の下側で建物がぶつ切り）で、道路の地面（谷の底の大通りと同じ高さ）に立たせた。大きさは少し小さく、
         // 少し奥へ（道路に立つと高層ビルの頭が画面の上からはみ出さないように）。地面は大通りの奥の端 CityStreetsFront から。
-        private const float CityPlateauGround = -24f;
+        // 2026-11-25: 地上を遊ぶ屋上の約 110m 下へ下げたのに合わせて、西新宿も同じ地上に立たせ、大きさを実物に近づけた（高層ビルの頭が
+        // 雲海の上に突き出し、遊ぶ屋上と同じくらいの高さに並ぶ）。
+        private const float CityPlateauGround = CityStreet.Ground;
 
         // 夜の濡れた道路のネオンの照り返しの強さ（大通りと西新宿の道路の地面で同じ）。
         private const float CityWetReflect = 1.1f;
-        private const float CityPlateauScale = 0.62f;
+        private const float CityPlateauScale = 0.9f;
         private const float CityPlateauPush = 80f;
         private const float CityStreetsFront = 380f;
         // 手前の霧の濃い大通り（霧の割合 1）から、西新宿の霧の割合へなじませる範囲（ワールドの z）。
@@ -573,6 +578,10 @@ namespace Airerage.Editor.Stages
             PlaceTokyo(look);
             // 谷のもや（霧 60〜170m）のままだと、450m 先の西新宿は霧の色の影になる（2026-11-18 の指摘: ほぼシルエット）。
             look.CityFogAmount = CityDayPlateauFog;
+            // 2026-11-25: 遊ぶ屋上の下は雲海になり、谷の底のもやは要らない。遥か下の大通りと雲の切れ間が霞に消えすぎないように、霧を遠くへ
+            // （高い所から見下ろす空気遠近法は残す）。
+            look.FogStart = 140f;
+            look.FogEnd = 800f;
             return look;
         }
 

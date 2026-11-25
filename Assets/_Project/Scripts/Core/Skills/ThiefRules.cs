@@ -618,6 +618,9 @@ namespace Airerage.Core.Skills
             return new Vector2(MathF.Min(width, tuning.PlaceMaxSize) * 0.5f, MathF.Min(height, tuning.PlaceMaxSize) * 0.5f);
         }
 
+        /// <summary>置いた危険の柱の幅・丸み・落ちてくる長さを、置いた範囲より小さくする余り（m。浮動小数の丸めで範囲を超えないように）。</summary>
+        private const float PlacedFit = 1e-3f;
+
         /// <summary>
         /// 置いたギミック item（PlacedZone）の、ステージのギミックとしての値。元のギミック source の種類・強さ・周期で、置いた位置と大きさ、
         /// 左右の反転にする。周期のあるものは、置いたティックに効き始める（ばらつきはなくす）。動かない。
@@ -636,12 +639,13 @@ namespace Airerage.Core.Skills
             float maxX = item.Position.X + half.X;
             float minY = item.Position.Y - half.Y;
             float maxY = item.Position.Y + half.Y;
-            // 危険の柱の幅・上の丸み・落ちてくる物の長さは、置いた範囲（の端の差）に収める。half.X * 2 をそのまま使うと、位置によっては
+            // 危険の柱の幅・上の丸み・落ちてくる物の長さは、置いた範囲より PlacedFit だけ小さくする。half.X * 2 をそのまま使うと、位置によっては
             // 浮動小数の丸めで範囲の幅をわずかに超え、ギミックを作れずに試合が止まっていた（2026-11-25 の指摘: 研究所のプラズマ球・雪原の
-            // つららなどを置くとフリーズ）。
-            float width = source.Kind == StageZoneKind.Hazard ? maxX - minX : 0f;
-            float cap = source.Kind == StageZoneKind.Hazard ? MathF.Min(source.CapHeight, maxY - minY) : 0f;
-            float fall = source.Kind == StageZoneKind.Hazard ? MathF.Min(source.FallLength, maxY - minY) : 0f;
+            // つららなどを置くとフリーズ）。範囲の端の差と同じ値にしても、Unity（Mono）では引き算の精度が違って超えることがあるので、少し余らせる。
+            bool hazard = source.Kind == StageZoneKind.Hazard;
+            float width = hazard ? MathF.Max(PlacedFit, maxX - minX - PlacedFit) : 0f;
+            float cap = hazard ? MathF.Max(0f, MathF.Min(source.CapHeight, maxY - minY - PlacedFit)) : 0f;
+            float fall = hazard ? MathF.Max(0f, MathF.Min(source.FallLength, maxY - minY - PlacedFit)) : 0f;
             // 電気を帯びた危険（プラズマ球）は、触れると当たる危険として写す（置いた所にアンカーポイントはないので、ワイヤーの電気は写さない）。
             return new StageZone(source.Kind, minX, minY, maxX, maxY, direction, source.Power, source.Limit, timing, source.Target, width, default, 0, 0, cap, fall);
         }
