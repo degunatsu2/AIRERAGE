@@ -49,11 +49,14 @@ namespace Airerage.Editor.Stages
         // 雲の土手: 名前・奥行き z・中心の x・幅・上の縁の高さ・こぶの高さ・うねり（上の縁が大きく下がる深さ）・下の端・不透明さ・抜け。
         // 手前と真後ろの土手は、遊ぶ画面で足場のビルの根元を隠す（うねりは小さく）。奥の 2 枚はつなげて、大きくうねらせる。
         // 2026-11-26: 大通りへの見通しを遮る真後ろ（z 17）と奥（z 66）の土手を少し透かし、抜けを作った（前は不透明さ 0.97・抜けなし）。
+        // 見下ろすと手前の土手（z −7）が平らな白い壁になって大通りを隠していたので、手前の土手にも抜けを作り、真後ろと奥の抜けを強めた
+        // （抜けは風で流れていくので、隙間から時々遥か下がのぞく。手前の土手はいちばん厚いまま。
+        // 足場のビルは根元の柱 TowerFoot が地上まで続くので、透けても浮いて見えない）。
         private static readonly (string Name, float Z, float X, float Width, float Top, float Billow, float Dip, float Bottom, float Opacity, float Holes)[] Banks =
         {
-            ("CloudBankFront", -7f, 0f, 300f, -25f, 7f, 0f, -95f, 0.97f, 0f),
-            ("CloudBankBehind", 17f, 0f, 380f, -22f, 9f, 10f, -95f, 0.86f, 0.55f),
-            ("CloudBankRow", 66f, 0f, 560f, -19f, 12f, 38f, -100f, 0.88f, 0.6f),
+            ("CloudBankFront", -7f, 0f, 300f, -25f, 7f, 0f, -95f, 0.94f, 0.55f),
+            ("CloudBankBehind", 17f, 0f, 380f, -22f, 9f, 10f, -95f, 0.84f, 0.75f),
+            ("CloudBankRow", 66f, 0f, 560f, -19f, 12f, 38f, -100f, 0.88f, 0.72f),
             ("CloudBankFar", 150f, 0f, 820f, -21f, 14f, 42f, -100f, 0.97f, 0f),
         };
 

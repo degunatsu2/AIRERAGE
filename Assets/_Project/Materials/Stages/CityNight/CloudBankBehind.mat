@@ -27,7 +27,7 @@ Material:
     m_Floats:
     - _BankBillow: 9
     - _BankDip: 10
-    - _BankHoles: 0.55
+    - _BankHoles: 0.75
     - _BankTop: -22
     - _Coverage: 0.46
     - _Mode: 1
@@ -35,7 +35,7 @@ Material:
     - _NearThin: 0
     - _NearThinEnd: 1
     - _NearThinStart: 0
-    - _Opacity: 0.86
+    - _Opacity: 0.84
     - _PatchScale: 0.22
     - _Patchiness: 0.25
     - _Scale: 0.03

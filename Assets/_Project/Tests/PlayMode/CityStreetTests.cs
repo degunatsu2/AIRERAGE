@@ -69,6 +69,9 @@ namespace Airerage.PlayMode.Tests
                 // 遊ぶ画面の高さから地平線を見る（雲海から頭を出す遠くの超高層ビル群）。
                 Shoot(camera, new Vector3(0f, 6f, -40f), Quaternion.Euler(3f, 0f, 0f), 50f, $"Avenue_{tag}_7Horizon");
                 Shoot(camera, new Vector3(-60f, 10f, -40f), Quaternion.Euler(3f, -30f, 0f), 50f, $"Avenue_{tag}_8HorizonLeft");
+                // 撃破の線の近くまで落ちたときの高さと、遊ぶ画面から少し見下ろしたとき（手前の雲の切れ間から遥か下の大通りがのぞくか）。
+                Shoot(camera, new Vector3(0f, -12f, -35f), Quaternion.Euler(8f, 0f, 0f), 50f, $"Avenue_{tag}_9Falling");
+                Shoot(camera, new Vector3(12f, 14f, -40f), Quaternion.Euler(24f, -6f, 0f), 50f, $"Avenue_{tag}_10LookDown");
                 yield return Wait(4f);
                 Shoot(camera, new Vector3(0f, CityStreetHeight + 14f, 150f), Quaternion.Euler(16f, 0f, 0f), 50f, $"Avenue_{tag}_6StreetLater");
             }

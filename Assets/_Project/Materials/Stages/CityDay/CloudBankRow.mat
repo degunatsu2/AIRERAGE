@@ -27,7 +27,7 @@ Material:
     m_Floats:
     - _BankBillow: 12
     - _BankDip: 38
-    - _BankHoles: 0.6
+    - _BankHoles: 0.72
     - _BankTop: -19
     - _Coverage: 0.46
     - _Mode: 1

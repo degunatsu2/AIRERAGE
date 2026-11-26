@@ -18,6 +18,17 @@
   --center -12196.9 -34315.7 --half 1200 --size 2048`。元のデータは同じデータセットの CityGML。
 - `Tokyo_LOD1.obj`: その周り（14 区画、LOD1〈高さの箱〉、25m 以上の約 1000 棟）。作り方: `tools/assets/plateau_skyline.py`（面のつながりで
   建物に分け、高い建物だけ残す。LOD1 にテクスチャはない）。
+- ほかの地区（ビル街の昼夜の遠景。2026-11-26 の要望: 西新宿の後ろと手前の空いた所にも実在のビル群を、遠くに感じる加工と夜のネオンで）:
+  `Ikebukuro`（池袋）・`Otemachi`（大手町と丸の内）・`Shiodome`（汐留）・`Shibuya`（渋谷）・`Shinagawa`（品川）の `_LOD2.obj`・
+  `_LOD2_Atlas.jpg`・`_LOD2_AtlasNight.jpg`。西新宿と同じ加工（外壁の写真のアトラス・夜の窓のネオン・根元をそろえる）で、遠いので外壁は
+  1 画素 1m・2048 四方。中心はいちばん高い建物、そこから半径で切り取る（`--radius`。渋谷は高すぎる 1 棟を外す `--max-height`）。
+  共通の引数は `--atlas 2048 --texel 1.0 --night --snap-ground`、地区ごとに:
+  - 池袋: `--mesh 53394577 53394576 53394587 --min-height 60 --radius 450`
+  - 大手町と丸の内: `--mesh 53394621 53394611 53394622 --min-height 70 --radius 600`
+  - 汐留: `--mesh 53393690 53393680 53393691 --min-height 70 --radius 450`
+  - 渋谷: `--mesh 53393596 53393586 --min-height 55 --max-height 240 --radius 380`
+  - 品川: `--mesh 53393559 53393549 --min-height 55 --radius 450`
+  置き方と遠くに感じる加工（霧・もやの色）は `StageDressing.CreatePlateauDistricts`（`docs/15` 6.73）。
 - 元のデータは G空間情報センターの「3D都市モデル（Project PLATEAU）東京都23区（2020年度）」の OBJ。
 
 ## 出典（ライセンス）
