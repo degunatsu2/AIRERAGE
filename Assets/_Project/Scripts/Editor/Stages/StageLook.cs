@@ -177,12 +177,14 @@ namespace Airerage.Editor.Stages
         public bool PlateauStreets;
 
         /// <summary>
-        /// 地平線まで、雲海・もやから頭を出す遠くの超高層ビルを並べるか（ビル街の昼夜。2026-11-25 の指摘: 背景の奥に建物がなくて不自然）。
-        /// 実在の西新宿（PLATEAU）の奥と左右に、霧で薄れた影として並べる（StageDressing.DistantTowers）。
+        /// 西新宿のほかの実在の地区（PLATEAU の池袋・大手町と丸の内・汐留を西新宿の後ろ、渋谷・品川を西新宿の手前の空いた所）を置くか
+        /// （ビル街の昼夜。2026-11-26 の要望。StageDressing.CreatePlateauDistricts）。
         /// </summary>
-        public bool DistantTowers;
-        /// <summary>遠くの超高層ビルに掛ける霧の割合（1 で空の色に消える。少し残して、遠くのビル群の影に見せる）。</summary>
-        public float DistantFogAmount = 0.45f;
+        public bool PlateauDistricts;
+        /// <summary>奥の帯の地区に掛ける霧の割合（西新宿の CityFogAmount より強くして、遠くに見せる）。</summary>
+        public float DistrictFarFog = 0.72f;
+        /// <summary>奥の帯の地区の写真を、もやの色へ寄せる割合（0 でそのまま）。</summary>
+        public float DistrictFarTint = 0.3f;
         public float PlateauStreetsFront = 380f;
         /// <summary>実在の街の霧の割合を、手前の霧の濃い所（1）から CityFogAmount へなじませる範囲（ワールドの z）。</summary>
         public float CityFogFadeStart = -100000f;

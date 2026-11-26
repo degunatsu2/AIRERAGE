@@ -254,6 +254,12 @@ namespace Airerage.Runtime.Audio
 
         /// <summary>メニューで前の画面へ戻った（後ろへ遠ざかる風。音声ファイル。2026-11-07。docs/18 4.19）。</summary>
         UiWhooshBack,
+
+        /// <summary>
+        /// 恐怖の館の鬼火の輪をくぐった（精霊・妖精を思わせる澄んだ音: ガラスの鈴のような上がる 4 音と、細かいきらめき、小さなこだま。
+        /// コインの音の代わり。2026-11-26 の要望）。
+        /// </summary>
+        WispChime,
     }
 
     /// <summary>
@@ -975,6 +981,33 @@ namespace Airerage.Runtime.Audio
                     b = new float[Samples(0.16f, r)];
                     AddTone(b, r, 0f, 0.12f, 2600f, 900f, Wave.Saw, 0.12f, 0.002f, 0.08f);
                     AddTone(b, r, 0f, 0.1f, 1300f, 500f, Wave.Triangle, 0.16f, 0.002f, 0.06f);
+                    break;
+                case SoundId.WispChime:
+                    // 澄んだ鈴: E6・G#6・B6・E7 を上へ（正弦波に、鈴の響きの 2.76 倍の倍音と、3Hz ずらした音を重ねて揺らぎ）。
+                    // そのあと高いきらめき（ペンタトニックの短い音を不規則に）と、0.24 秒遅れの小さなこだま、空気の「さらっ」。
+                    b = new float[Samples(1.6f, r)];
+                    int[] chime = { 88, 92, 95, 100 };
+                    for (int echo = 0; echo < 2; echo++)
+                    {
+                        float delay = echo * 0.24f;
+                        float level = echo == 0 ? 1f : 0.3f;
+                        for (int i = 0; i < chime.Length; i++)
+                        {
+                            float f = NoteFrequency(chime[i]);
+                            float start = delay + i * 0.065f;
+                            AddTone(b, r, start, 0.95f, f, f, Wave.Sine, 0.2f * level, 0.003f, 0.55f);
+                            AddTone(b, r, start, 0.95f, f + 3f, f + 3f, Wave.Sine, 0.12f * level, 0.003f, 0.5f);
+                            AddTone(b, r, start, 0.35f, f * 2.76f, f * 2.76f, Wave.Sine, 0.05f * level, 0.001f, 0.12f);
+                        }
+                    }
+                    int[] sparkle = { 100, 103, 105, 107, 110, 112 };
+                    for (int i = 0; i < 14; i++)
+                    {
+                        float f = NoteFrequency(sparkle[rng.Next(sparkle.Length)]);
+                        float start = 0.22f + (float)rng.NextDouble() * 0.9f;
+                        AddTone(b, r, start, 0.18f, f, f, Wave.Sine, 0.035f + 0.03f * (float)rng.NextDouble(), 0.001f, 0.08f);
+                    }
+                    AddNoise(b, r, rng, 0f, 0.6f, 0.05f, 0.04f, 0.3f, 12000f, 9000f, 5000f);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "合成の仕方がない効果音");

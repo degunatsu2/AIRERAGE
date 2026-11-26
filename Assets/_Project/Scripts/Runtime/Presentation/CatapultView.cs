@@ -199,7 +199,10 @@ namespace Airerage.Runtime.Presentation
                 _thrown.gameObject.SetActive(false);
                 return;
             }
-            _thrown.position = _throwFrom + _throwVelocity * t + 0.5f * _throwGravity * t * t * Vector3.down;
+            // 放る向き: 投石機の枠の左右の向き（裏返した枠は右へ。THIEF が左右を反転して置いた写しも）に合わせる。
+            Vector3 velocity = _throwVelocity;
+            velocity.x = -Mathf.Abs(velocity.x) * Mathf.Sign(transform.lossyScale.x);
+            _thrown.position = _throwFrom + velocity * t + 0.5f * _throwGravity * t * t * Vector3.down;
             _thrown.Rotate(260f * Time.deltaTime, 0f, 140f * Time.deltaTime, Space.Self);
         }
     }

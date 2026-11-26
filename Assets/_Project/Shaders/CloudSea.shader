@@ -9,6 +9,11 @@
 // - _Mode 1（雲の土手）: カメラに向いた縦の板。上の縁の高さを x のノイズで上下させて、もくもくしたこぶの並びにする（縁の近くほど
 //   明るく、下ほど暗く）。足場のビルの根元の手前と間に置いて隠す。_BankDip > 0 なら、上の縁を大きな周期でさらに深く下げる
 //   （うねる雲の連なり。下がった所から奥がのぞく）。
+// - 手前を薄く（_NearThin。ワールドの z が _NearThinStart〜_NearThinEnd より手前ほど雲を減らす。2026-11-26 の要望: 手前の雲が厚すぎて
+//   遥か下の大通りが全く見えない）。
+// - 厚みの層（_ShellLift > 0）: 同じ模様の層を少し上に重ね、厚い所だけを描く（積み重ねた板で体積に見せる。こぶの頂が盛り上がる）。
+//   奥（_ShellNear〜_ShellFar より奥）だけに出す（2026-11-26 の要望: 奥の雲海が板のように薄く見える）。
+// - 土手の抜け（_BankHoles）: 土手の中に、大きな周期の雲の薄い所を作り、奥がのぞく。
 // _GlowColor は下から照らす街の明かり（夜。影の面と下ほど強く）。遠くは霧の色に溶ける。
 Shader "Airerage/CloudSea"
 {
@@ -25,6 +30,13 @@ Shader "Airerage/CloudSea"
         _Drift ("Drift (m/s, xz or xy)", Vector) = (1.5, 0.4, 0, 0)
         _LightDir ("Light offset (xz)", Vector) = (-0.6, 0.5, 0, 0)
         _Patchiness ("Large-scale coverage variation (layer)", Range(0, 1)) = 0.25
+        _NearThin ("Thinner near (coverage added)", Range(0, 0.5)) = 0
+        _NearThinStart ("Near thinning full until z", Float) = 0
+        _NearThinEnd ("Near thinning gone at z", Float) = 1
+        _ShellLift ("Shell: extra coverage (0 = base layer)", Range(0, 0.5)) = 0
+        _ShellNear ("Shell: hidden before z", Float) = 0
+        _ShellFar ("Shell: full after z", Float) = 1
+        _BankHoles ("Bank thin patches", Range(0, 1)) = 0
         _PatchScale ("Large-scale variation scale (x noise scale)", Float) = 0.22
         _BankTop ("Bank top (world y)", Float) = -24
         _BankBillow ("Bank billow height (m)", Float) = 8
@@ -63,6 +75,13 @@ Shader "Airerage/CloudSea"
                 float4 _Drift;
                 float4 _LightDir;
                 half _Patchiness;
+                half _NearThin;
+                float _NearThinStart;
+                float _NearThinEnd;
+                half _ShellLift;
+                float _ShellNear;
+                float _ShellFar;
+                half _BankHoles;
                 float _PatchScale;
                 float _BankTop;
                 float _BankBillow;
@@ -149,12 +168,23 @@ Shader "Airerage/CloudSea"
                     float thick = Thickness(p, drift);
                     // 大きな周期で雲の多い所と少ない所を作る（かたまりと切れ間。所々から遥か下の地上がのぞく）。
                     float coverage = _Coverage + (Fbm(p * _PatchScale + seed * 0.1) - 0.5) * _Patchiness;
+                    // 手前ほど薄く。
+                    coverage += _NearThin * (1.0 - smoothstep(_NearThinStart, _NearThinEnd, world.z));
+                    // 厚みの層: 厚い所だけ（下の層より高い閾値）。奥だけに出す。
+                    coverage += _ShellLift;
                     float density = thick - coverage;
                     alpha = smoothstep(0.0, _Softness, density) * _Opacity;
+                    if (_ShellLift > 0.0)
+                    {
+                        alpha *= smoothstep(_ShellNear, _ShellFar, world.z);
+                    }
                     // 光の向きへずらした厚さとの差: 光の側が厚い所は影、薄い所は日なた（こぶの立体感）。
                     float toward = Thickness(p + _LightDir.xy * 0.06, drift);
                     lit = saturate(0.55 + (thick - toward) * 5.0 + density * 1.2);
                     low = saturate(1.0 - density * 3.0);
+                    // 厚みの層（こぶの上のほう）ほど日が当たって明るい。
+                    lit = saturate(lit + _ShellLift * 1.6);
+                    low *= saturate(1.0 - _ShellLift * 4.0);
                 }
                 else
                 {
@@ -169,6 +199,9 @@ Shader "Airerage/CloudSea"
                     alpha = smoothstep(0.0, _Softness * 2.0, density) * _Opacity;
                     lit = saturate(1.0 - depth / max(_BankBillow * 2.5, 0.01) + (puff - 0.5) * 0.6);
                     low = saturate(depth / max(_BankBillow * 4.0, 0.01));
+                    // 土手の抜け: 大きな周期で薄い所を作る（奥がのぞく。ふちは柔らかく）。
+                    float thin = Fbm(float2(world.x, world.y) * _Scale * 0.7 + seed * 1.7 + float2(drift.x * 0.6, 0.0));
+                    alpha *= lerp(1.0, smoothstep(0.36, 0.56, thin), _BankHoles);
                     // 板の左右の端は柔らかく消す。
                     alpha *= smoothstep(0.0, 0.08, input.uv.x) * smoothstep(0.0, 0.08, 1.0 - input.uv.x);
                 }

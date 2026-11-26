@@ -17,8 +17,11 @@
   ごとの色（暖かい白・ネオンのマゼンタ・シアン・紫・橙）で光らせた絵を、同じ並びのアトラスに書く（2026-11-18 の要望: 夜の明かりを
   窓と同期させ、ネオン風に光らせる）。シェーダーが縦の面にだけ足す（屋根は光らない）。
 
+- 高さの上限（--max-height）と、中心から水平の半径（--radius。--center がなければ、残る建物のうちいちばん高い建物の位置を中心にする）で
+  建物を絞れる（2026-11-26: ビル街の遠景に、西新宿のほかの地区〈池袋・大手町・汐留・渋谷・品川〉を同じ加工で足す。docs/15 6.73）。
+
 使い方: python3 -I tools/assets/plateau_textured.py 出力の名前 --cache フォルダ --mesh 53394525 53394526 ... \
-            [--min-height 50] [--center E N] [--ground G] [--texel 0.6] [--atlas 4096] [--night]
+            [--min-height 50] [--max-height 200] [--radius 300] [--center E N] [--ground G] [--texel 0.6] [--atlas 4096] [--night]
   出力: 出力の名前.obj と 出力の名前_Atlas.jpg（--night なら 出力の名前_AtlasNight.jpg も）
 出典: 国土交通省 Project PLATEAU（3D 都市モデル。東京都 23 区 2020 年度）。加工して作成。
 """
@@ -195,6 +198,8 @@ def main():
     ap.add_argument('--cache', required=True)
     ap.add_argument('--mesh', nargs='+', required=True)
     ap.add_argument('--min-height', type=float, default=50.0)
+    ap.add_argument('--max-height', type=float, help='これより高い建物は除く（m）')
+    ap.add_argument('--radius', type=float, help='中心から水平にこの距離（m）より内の建物だけ（--center がなければ、いちばん高い建物の位置）')
     ap.add_argument('--center', type=float, nargs=2, metavar=('E', 'N'))
     ap.add_argument('--ground', type=float)
     ap.add_argument('--texel', type=float, default=0.6, help='外壁の 1 画素の大きさ（m）の目安')
@@ -228,10 +233,27 @@ def main():
         textures = parse_mtl(mtl)
         for group in buildings(verts, faces):
             zs = [verts[c[0]][2] for f in group for c in f[:3]]
-            if max(zs) - min(zs) >= args.min_height:
+            height = max(zs) - min(zs)
+            if height >= args.min_height and (args.max_height is None or height <= args.max_height):
                 kept.append((mesh, verts, uvs, group, textures, min(zs)))
     if not kept:
         sys.exit('残る建物がない')
+    if args.radius is not None:
+        def foot(item):
+            _, verts, _, group, _, _ = item
+            es = [verts[c[0]][0] for f in group for c in f[:3]]
+            ns = [verts[c[0]][1] for f in group for c in f[:3]]
+            return (sum(es) / len(es), sum(ns) / len(ns))
+
+        def top(item):
+            _, verts, _, group, _, _ = item
+            return max(verts[c[0]][2] for f in group for c in f[:3]) - item[5]
+
+        if args.center is None:
+            args.center = list(foot(max(kept, key=top)))
+        cx0, cy0 = args.center
+        kept = [k for k in kept if math.hypot(foot(k)[0] - cx0, foot(k)[1] - cy0) <= args.radius]
+        print(f'中心 {cx0:.1f} {cy0:.1f} から {args.radius}m の内', file=sys.stderr)
 
     # 材質ごとの、外壁の広さ・UV の広さと範囲（残す建物の面だけ）。
     usage = {}

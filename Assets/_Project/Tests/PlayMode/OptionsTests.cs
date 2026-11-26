@@ -197,17 +197,9 @@ namespace Airerage.PlayMode.Tests
             StageSelectScreen stages = menu.StageSelect;
             yield return OpenRandomStages(options);
             Assert.That(stages.Highlighted, Is.Not.Null, "前提: ステージにカーソルがある");
-            Assert.That(stages.ShownDescription, Is.EqualTo(stages.Highlighted.DescriptionJa), "ステージの説明が日本語でない");
-            // 説明は専用の白い札の上に黒の文字（縁はステージのイメージカラー。高さは文に合わせる。2026-11-08）。
-            SlantedPlate descriptionPlate = stages.DescriptionPlate;
-            Assert.That(descriptionPlate, Is.Not.Null, "説明の札がない");
-            Assert.That(descriptionPlate.color.r + descriptionPlate.color.g + descriptionPlate.color.b, Is.GreaterThan(2.7f), "説明の札が白地でない");
-            Color stageColor = stages.Highlighted.Color;
-            Assert.That(new Vector3(descriptionPlate.BorderColor.r, descriptionPlate.BorderColor.g, descriptionPlate.BorderColor.b),
-                Is.EqualTo(new Vector3(stageColor.r, stageColor.g, stageColor.b)), "説明の札の縁がステージの色でない");
-            UnityEngine.UI.Text descriptionText = descriptionPlate.GetComponentInChildren<UnityEngine.UI.Text>();
-            Assert.That(descriptionText.color.r + descriptionText.color.g + descriptionText.color.b, Is.InRange(0.3f, 0.75f), "説明の文字が墨色でない（D-92 の T1）");
-            Assert.That(descriptionPlate.rectTransform.rect.height, Is.GreaterThanOrEqualTo(descriptionText.preferredHeight), "説明の札に文が収まらない");
+            // ステージの説明は出さない（2026-11-26 の要望: 右はステージの名前だけ）。
+            Assert.That(stages.ShownDescription, Is.Empty, "ステージの説明が出ている");
+            Assert.That(stages.DescriptionPlate, Is.Null, "ステージの説明の札が残っている");
             // 札の左の縁は見出しの 1 文字目の線（画面の左から 91。2026-11-08）。チェックの箱も画面の中。
             var firstPlate = (RectTransform)stages.Option(0).transform;
             Vector3[] corners = new Vector3[4];
@@ -223,7 +215,7 @@ namespace Airerage.PlayMode.Tests
             Assert.That(options.GeneralValue(OptionsScreen.Row.Language), Is.EqualTo(OptionsScreen.EnglishLabel));
             Assert.That(GameSettings.LoadLanguage(), Is.EqualTo(GameLanguage.English), "言語が保存されない");
             yield return OpenRandomStages(options);
-            Assert.That(stages.ShownDescription, Is.EqualTo(stages.Highlighted.Description), "ステージの説明が英語にならない");
+            Assert.That(stages.ShownDescription, Is.Empty, "ステージの説明が出ている");
             stages.Option(0).OnCancel(null);
             yield return null;
 

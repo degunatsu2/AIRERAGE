@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Numerics;
 using Airerage.Core.Combat;
@@ -99,6 +100,41 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(rider.Grounded, Is.True, "足場に乗れない");
             Assert.That(rider.Position.Y - world.GetConfig(1).Movement.HalfHeight, Is.EqualTo(max.Y).Within(0.05f), "足場の上に立っていない");
             Assert.That(rider.Velocity.X, Is.GreaterThan(5f), "ベルトコンベアで運ばれない");
+        }
+
+        [Test]
+        public void PlacedLauncher_InMidair_HasFootingInTheBucket_AndStillLaunches()
+        {
+            // 2026-11-26 の要望: THIEF の Q で奪ったかぼちゃの投石機（周期のある発射台）を空中に置くと、かごに乗れず使いにくい。
+            // 空中に置いた発射台には、下の端に足場を持たせる（乗って待つと、効き始めに放たれる）。
+            var catapult = new StageZone(StageZoneKind.Launcher, 26.5f, 0f, 28.5f, 1.4f, Vector2.Normalize(new Vector2(-0.5f, 1f)), 32f, 0f,
+                new StageZoneTiming(216, 15, 0, 0, 72), Vector2.Zero);
+            var world = new SimWorld(TestArenas.Ground(), zones: new[] { catapult });
+            world.AddCharacter(CharacterPresets.Thief(), new Vector3(0f, GroundY, 0f));
+            world.AddCharacter(new CharacterConfig(), new Vector3(-20f, GroundY, 0f));
+            Step(world, 2);
+            Place(world, Vector2.Normalize(new Vector2(1f, 1.4f)));
+            WorldObject placed = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.PlacedZone);
+            Assert.That(placed.ChargeMilli, Is.EqualTo(1), "空中に置いた発射台（投石機のかご）に足場がない");
+            WorldCollision.FootingBox(placed, out Vector2 min, out Vector2 max);
+            Assert.That(min.Y, Is.GreaterThan(0.5f), "前提: 床から浮いた所に置いていない");
+            // 置いた瞬間に効き始めるので、その効いている間が過ぎてから乗せる。
+            Step(world, 20);
+            CharacterState rider = world.GetState(1);
+            rider.Position = new Vector3(placed.Position.X, max.Y + 1.5f, 0f);
+            rider.Velocity = Vector3.Zero;
+            world.SetState(1, rider);
+            float highest = 0f;
+            bool stood = false;
+            for (int t = 0; t < 260; t++)
+            {
+                Step(world, 1);
+                rider = world.GetState(1);
+                stood |= rider.Grounded && Math.Abs(rider.Position.Y - world.GetConfig(1).Movement.HalfHeight - max.Y) < 0.05f;
+                highest = Math.Max(highest, rider.Velocity.Y);
+            }
+            Assert.That(stood, Is.True, "かごの足場に乗れない");
+            Assert.That(highest, Is.GreaterThan(20f), "かごに乗って待っても放たれない");
         }
 
         [Test]

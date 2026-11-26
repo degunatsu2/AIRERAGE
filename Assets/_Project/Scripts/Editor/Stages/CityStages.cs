@@ -613,8 +613,8 @@ namespace Airerage.Editor.Stages
         // 西新宿を道路の地面の上に、少し小さく奥へ置く（昼夜共通）。
         private static void PlaceTokyo(StageLook look)
         {
-            // 地平線まで、雲海から頭を出す遠くの超高層ビル（2026-11-25 の指摘: 背景の奥に建物がなくて不自然。StageDressing.DistantTowers）。
-            look.DistantTowers = true;
+            // 西新宿の後ろ（奥の帯）と、西新宿の手前の空いた所（手前の帯）に、ほかの実在の地区（2026-11-26 の要望。前は奥に作った箱のビル）。
+            look.PlateauDistricts = true;
             look.PlateauGround = CityPlateauGround;
             look.PlateauScale = CityPlateauScale;
             look.PlateauPush = CityPlateauPush;

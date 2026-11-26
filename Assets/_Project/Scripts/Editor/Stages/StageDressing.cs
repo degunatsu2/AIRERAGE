@@ -635,12 +635,9 @@ namespace Airerage.Editor.Stages
                 CreateCityGlow(Child(root, "CityGlow"), look, folder);
             }
             Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f, city ? PlateauHalfWidth : 0f);
-            if (look.DistantTowers)
+            if (city && look.PlateauDistricts)
             {
-                Material distant = BackdropMaterial("BackdropDistant", look.FarColor, look, folder, hazeTop, 0f, true);
-                distant.SetFloat("_FogAmount", look.DistantFogAmount);
-                EditorUtility.SetDirty(distant);
-                DistantTowers(Child(root, "Distant"), distant, beacon, new Random(look.Seed + 7));
+                CreatePlateauDistricts(Child(root, "Districts"), look, folder, hazeTop, beacon);
             }
             Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f, city ? PlateauMidKeepOut : 0f);
 
@@ -754,14 +751,23 @@ namespace Airerage.Editor.Stages
         // 西新宿の外壁の写真の材質（遠景の材質に、写真・主の光の向きの陰影・夜は暗くして窓の明かり）。写真がなければ null。
         private static Material PlateauMaterial(StageLook look, string folder, float hazeTop)
         {
-            Texture2D atlas = LoadAtlas(PlateauAtlasPath);
+            return PlateauMaterial("BackdropCity", PlateauAtlasPath, PlateauNightPath, 4096, look, folder, hazeTop, look.CityFogAmount,
+                look.CityFogFadeStart, look.CityFogFadeEnd, look.CityTexTint);
+        }
+
+        // 実在の街（PLATEAU）の材質: 外壁の写真のアトラス（atlasPath）と夜の窓の明かりの絵（nightPath）、霧の掛かり方（fogAmount。ワールドの z の
+        // fadeStart〜fadeEnd で 1 からなじませる）、写真の色（tint）。
+        private static Material PlateauMaterial(string name, string atlasPath, string nightPath, int size, StageLook look, string folder, float hazeTop,
+            float fogAmount, float fadeStart, float fadeEnd, Color tint)
+        {
+            Texture2D atlas = LoadAtlas(atlasPath, size);
             if (atlas == null)
             {
-                Debug.LogWarning($"PLATEAU の外壁の写真がない（{PlateauAtlasPath}）。色だけで塗る");
+                Debug.LogWarning($"PLATEAU の外壁の写真がない（{atlasPath}）。色だけで塗る");
                 return null;
             }
-            Texture2D nightLights = look.CityNightGlow > 0f ? LoadAtlas(PlateauNightPath) : null;
-            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("BackdropCity", "Airerage/StageBackdrop", m =>
+            Texture2D nightLights = look.CityNightGlow > 0f ? LoadAtlas(nightPath, size) : null;
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, "Airerage/StageBackdrop", m =>
             {
                 m.SetColor("_BaseColor", look.MidColor);
                 m.SetColor("_HazeColor", look.HazeColor);
@@ -775,11 +781,11 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_BandFill", 0f);
                 m.SetTexture("_MainTex", atlas);
                 m.SetFloat("_TexBlend", 1f);
-                m.SetColor("_TexTint", look.CityTexTint);
+                m.SetColor("_TexTint", tint);
                 m.SetFloat("_LightShade", 0.6f);
-                m.SetFloat("_FogAmount", look.CityFogAmount);
-                m.SetFloat("_FogFadeStart", look.CityFogFadeStart);
-                m.SetFloat("_FogFadeEnd", look.CityFogFadeEnd);
+                m.SetFloat("_FogAmount", fogAmount);
+                m.SetFloat("_FogFadeStart", fadeStart);
+                m.SetFloat("_FogFadeEnd", fadeEnd);
                 // 夜は、写真の窓に合わせて作った明かりの絵を、縦の面だけ光らせる（窓と同期。ネオン風。2026-11-18 の要望）。
                 m.SetTexture("_NightTex", nightLights);
                 m.SetFloat("_NightStrength", nightLights != null ? look.CityNightGlow : 0f);
@@ -987,8 +993,16 @@ namespace Airerage.Editor.Stages
             Transform hero = PlaceMesh(root, "Shinjuku", shinjuku, mid, new Vector3(0f, ground, ShinjukuZ + look.PlateauPush), scale);
             PlaceMesh(root, "Surroundings", tokyo, far, new Vector3(0f, ground, TokyoZ + look.PlateauPush), scale);
             // 航空障害灯: 25m の升目ごとのいちばん高い所のうち、上から 14 か所（150m より高く、互いに 60m 以上離す）。
+            AddBeacons(Child(root, "Beacons"), hero, shinjuku, beacon, 14, 150f, 2.4f);
+            return true;
+        }
+
+        // 実在の街 mesh（置いた所 placed）の高い屋上に、航空障害灯を count か所まで付ける（25m の升目ごとのいちばん高い所のうち、minHeight m
+        // より高く、互いに 60m 以上離す）。
+        private static void AddBeacons(Transform lights, Transform placed, Mesh mesh, Material beacon, int count, float minHeight, float size)
+        {
             var tops = new Dictionary<Vector2Int, Vector3>();
-            foreach (Vector3 v in shinjuku.vertices)
+            foreach (Vector3 v in mesh.vertices)
             {
                 var cell = new Vector2Int(Mathf.FloorToInt(v.x / 25f), Mathf.FloorToInt(v.z / 25f));
                 if (!tops.TryGetValue(cell, out Vector3 top) || v.y > top.y)
@@ -997,9 +1011,9 @@ namespace Airerage.Editor.Stages
                 }
             }
             var chosen = new List<Vector3>();
-            foreach (Vector3 top in tops.Values.Where(t => t.y > 150f).OrderByDescending(t => t.y))
+            foreach (Vector3 top in tops.Values.Where(t => t.y > minHeight).OrderByDescending(t => t.y))
             {
-                if (chosen.Count >= 14)
+                if (chosen.Count >= count)
                 {
                     break;
                 }
@@ -1008,13 +1022,53 @@ namespace Airerage.Editor.Stages
                     chosen.Add(top);
                 }
             }
-            Transform lights = Child(root, "Beacons");
             foreach (Vector3 top in chosen)
             {
-                GameObject light = Box(lights, "Beacon", beacon, Vector3.zero, new Vector3(2.4f, 2.4f, 2.4f));
-                light.transform.position = hero.TransformPoint(top) + Vector3.up * 1.6f;
+                GameObject light = Box(lights, "Beacon", beacon, Vector3.zero, new Vector3(size, size, size));
+                light.transform.position = placed.TransformPoint(top) + Vector3.up * (size * 0.67f);
             }
-            return true;
+        }
+
+        // 西新宿のほかの実在の地区（PLATEAU。2026-11-26 の要望: ビル街の背景の奥と、西新宿の手前の地面しかない寂しい所にビル群。西新宿と同じ
+        // 加工〈外壁の写真・夜の窓のネオン・tools/assets/plateau_textured.py と plateau_cleanup.py〉）。名前・置く所（ワールドの x・z）・
+        // 大きさ・奥の帯か。奥の帯（西新宿の後ろ）は、霧を強め、写真を空気の色に寄せて遠くに見せる（空気遠近法）。手前の帯は少し小さく
+        // して西新宿より目立たないようにし、真ん中（大通りの見通し）を空ける。
+        private static readonly (string Name, float X, float Z, float Scale, bool Far)[] Districts =
+        {
+            ("Ikebukuro", -400f, 790f, 0.9f, true),
+            ("Otemachi", 240f, 850f, 0.9f, true),
+            ("Shiodome", 560f, 740f, 0.9f, true),
+            ("Shibuya", -255f, 300f, 0.72f, false),
+            ("Shinagawa", 215f, 330f, 0.72f, false),
+        };
+
+        private static void CreatePlateauDistricts(Transform root, StageLook look, string folder, float hazeTop, Material beacon)
+        {
+            float ground = look.PlateauGround;
+            Transform lights = Child(root, "Beacons");
+            // 奥の帯の写真は、空気の色（もや）へ少し寄せて、明るさも少し落とす（霧の割合を上げるのと合わせて、遠くに見える）。
+            Color farTint = Color.Lerp(look.CityTexTint, look.HazeColor * look.CityTexTint.maxColorComponent, look.DistrictFarTint);
+            foreach (var district in Districts)
+            {
+                string path = $"{PlateauFolder}/{district.Name}_LOD2";
+                Mesh mesh = LoadObjMesh($"{path}.obj");
+                if (mesh == null)
+                {
+                    Debug.LogWarning($"PLATEAU の地区のモデルがない（{path}.obj）。置かない");
+                    continue;
+                }
+                // 奥の帯は西新宿より霧を強く（夜は西新宿も霧がいっぱいなので同じ。窓の明かりは霧の後に足すので見える）。
+                float fog = district.Far ? Mathf.Max(look.CityFogAmount, look.DistrictFarFog) : look.CityFogAmount;
+                Material material = PlateauMaterial($"BackdropCity{district.Name}", $"{path}_Atlas.jpg", $"{path}_AtlasNight.jpg", 2048, look, folder,
+                    hazeTop, fog, -100000f, -99999f, district.Far ? farTint : look.CityTexTint);
+                if (material == null)
+                {
+                    continue;
+                }
+                var scale = new Vector3(district.Scale, district.Scale, PlateauDepthScale);
+                Transform placed = PlaceMesh(root, district.Name, mesh, material, new Vector3(district.X, ground, district.Z), scale);
+                AddBeacons(lights, placed, mesh, beacon, district.Far ? 4 : 3, 120f, district.Far ? 3f : 2.4f);
+            }
         }
 
         // OBJ のモデルからメッシュを読む（材質は作らず、法線は計算し、頂点を読めるように読み込みの設定を合わせる）。
@@ -1049,36 +1103,6 @@ namespace Airerage.Editor.Stages
             go.AddComponent<MeshRenderer>().sharedMaterial = material;
             NoShadows(go);
             return go.transform;
-        }
-
-        // 遠くの超高層ビル群（2026-11-25 の指摘: ビル街の背景の奥に建物がなくて不自然）: 実在の西新宿の奥（z 640〜900。試合のカメラの
-        // 描画の距離 1000m に収まる所）に、地平線の端から
-        // 端まで、雲海（上の面 y −27）から頭を出す高いビルを、かたまりとすき間をつけて並べる。実際の雲海・霧の上に突き出す都市の写真の
-        // ように、手前ほど高く大きく、遠いほど低く霧に薄れる。根元は雲海の下まで（y −160）伸ばす。航空障害灯も付ける。
-        private static void DistantTowers(Transform parent, Material body, Material beacon, Random random)
-        {
-            float cursor = -1300f;
-            while (cursor < 1300f)
-            {
-                int cluster = random.Next(3, 8);
-                float clusterZ = Range(random, 680f, 860f);
-                for (int i = 0; i < cluster && cursor < 1300f; i++)
-                {
-                    float width = Range(random, 22f, 58f);
-                    float x = cursor + width * 0.5f;
-                    float z = clusterZ + Range(random, -40f, 40f);
-                    // 手前（z が小さい）ほど高い。ときどき飛び抜けて高い超高層ビル。
-                    float near = Mathf.InverseLerp(900f, 640f, z);
-                    float top = Range(random, -14f, 18f) + near * Range(random, 8f, 40f);
-                    if (random.NextDouble() < 0.18)
-                    {
-                        top += Range(random, 45f, 110f);
-                    }
-                    Building(parent, body, beacon, new Vector3(x, top, z), width, top + 160f, random, 0.45f);
-                    cursor += width + Range(random, 3f, 14f);
-                }
-                cursor += Range(random, 40f, 140f);
-            }
         }
 
         // ビルの列: かたまりで置き、かたまりの間をあける（等間隔に並べると単調になる）。真ん中ほど低く、外ほど高く、ときどき高いビル。

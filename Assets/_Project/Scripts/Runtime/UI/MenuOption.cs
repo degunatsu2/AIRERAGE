@@ -701,7 +701,8 @@ namespace Airerage.Runtime.UI
 
             AnimateText(now);
 
-            // B9: マウスを乗せている間、マウスの方へわずかに傾き、光の反射が付いてくる。
+            // B9: マウスを乗せている間、光の反射が付いてくる（札を傾けるのはやめた。2026-11-26 の要望: カーソルを重ねた所で札が傾く演出は
+            // 消し、薄く光る演出は残す。_lean は光を薄れさせる速さにだけ使う）。
             if (_plate != null)
             {
                 Vector2 target = Vector2.zero;
@@ -720,7 +721,7 @@ namespace Airerage.Runtime.UI
                     _lean = Vector2.zero;
                 }
                 // 光の反射は、マウスが離れたら傾きと一緒に薄れる。
-                _plate.SetLean(_lean, _sheenX, sheen > 0f ? 1f : Mathf.Clamp01(_lean.magnitude * 3f));
+                _plate.SetLean(Vector2.zero, _sheenX, sheen > 0f ? 1f : Mathf.Clamp01(_lean.magnitude * 3f));
             }
         }
 

@@ -238,6 +238,16 @@ namespace Airerage.Runtime.Presentation
         // その子に当てる。
         private static void Fit(Transform child, float sx, float sy, bool mirrored)
         {
+            if (child.GetComponent<CatapultView>() != null)
+            {
+                // かぼちゃの投石機は、腕を毎フレーム自分の向きで回すので、部品ごとに反転すると腕とかごが反対の側へ振れ、予告の表示と
+                // 当たり（かご）からずれていた（2026-11-26 の指摘: 右に置くとずれる）。全体を鏡に映す（ステージの右向きの投石機と同じ作り方）。
+                Vector3 at = child.localPosition;
+                child.localPosition = new Vector3(at.x * sx * (mirrored ? -1f : 1f), at.y * sy, at.z);
+                Vector3 size = child.localScale;
+                child.localScale = new Vector3(size.x * sx * (mirrored ? -1f : 1f), size.y * sy, size.z);
+                return;
+            }
             if (child.GetComponent<Renderer>() == null && child.childCount > 0 && child.localPosition == Vector3.zero && child.localScale == Vector3.one)
             {
                 foreach (Transform inner in Children(child))

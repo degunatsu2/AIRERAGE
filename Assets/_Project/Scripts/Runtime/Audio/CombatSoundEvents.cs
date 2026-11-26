@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Airerage.Core.Combat;
 using Airerage.Core.Simulation;
 using Airerage.Core.Wire;
@@ -67,12 +68,36 @@ namespace Airerage.Runtime.Audio
             {
                 CharacterState current = _feed.GetState(i);
                 CharacterConfig config = _feed.GetConfig(i);
-                Compare(_previous[i], current, config.Movement.JumpSpeed, config.Combat);
+                Compare(_previous[i], current, config.Movement.JumpSpeed, config.Combat, WispGifted(i));
                 _previous[i] = current;
             }
         }
 
-        private void Compare(in CharacterState before, in CharacterState now, float jumpSpeed, CombatTuning combat)
+        // キャラクター index が、このあいだに恐怖の館の鬼火の輪をくぐってコインをもらったか（鬼火の専用の音は WispRingView が鳴らすので、
+        // コインの音は鳴らさない。2026-11-26 の要望）。
+        private bool WispGifted(int index)
+        {
+            IReadOnlyList<StageTrap> traps = _feed.Traps;
+            StageState stage = _feed.Stage;
+            if (traps == null || stage == null)
+            {
+                return false;
+            }
+            int tick = _feed.CurrentTick;
+            for (int t = 0; t < traps.Count && t < stage.TrapCount; t++)
+            {
+                if (traps[t].Kind == StageTrapKind.WispRing && stage.TrapOwnerOf(t) == index && tick - stage.TrapTickOf(t) <= WispGiftWindowTicks)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 鬼火の輪からもらったとみなすティック数（1 回の通知で何ティックか進むことがあるので、少し余裕を持つ）。
+        private const int WispGiftWindowTicks = 6;
+
+        private void Compare(in CharacterState before, in CharacterState now, float jumpSpeed, CombatTuning combat, bool wispGift = false)
         {
             CombatState b = before.Combat;
             CombatState n = now.Combat;
@@ -90,7 +115,7 @@ namespace Airerage.Runtime.Audio
             {
                 _audio.Play(SoundId.Bank);
             }
-            else if (now.Coins.Held > before.Coins.Held)
+            else if (now.Coins.Held > before.Coins.Held && !wispGift)
             {
                 _audio.Play(SoundId.CoinPickup, 0.8f, 0.04f);
             }

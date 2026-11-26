@@ -16,7 +16,7 @@ namespace Airerage.Core.Objects
     /// 同じように調べる（当たった物は CastHit.Body。足場の番号 + 1）。ロープの巻き付きの角は、動かない地形だけ。
     /// アンカーのある足場（StagePlatform.HasAnchor。埠頭の動くボラード）は、その位置の中心をアンカーポイントの最後に加える
     /// （AnchorBodyOf がその足場の番号 + 1。ほかのアンカーは 0）。
-    /// THIEF が空中に置いたベルトコンベア（PlacedZone の ChargeMilli = 1。ユーザーの要望、2026-10-29）は、ベルトの見た目どおりの足場の箱を
+    /// THIEF が空中に置いたベルトコンベアと発射台（PlacedZone の ChargeMilli = 1。ユーザーの要望、2026-10-29・2026-11-26）は、見た目どおりの足場の箱を
     /// 動く足場と一緒に入れる（動かない地形と同じ扱い。CastHit.Body は 0、ワイヤーはつながらない。FootingBox）。
     /// </summary>
     public sealed class WorldCollision : ICollisionQuery

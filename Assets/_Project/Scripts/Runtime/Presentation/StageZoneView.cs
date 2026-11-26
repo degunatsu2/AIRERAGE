@@ -657,9 +657,11 @@ namespace Airerage.Runtime.Presentation
             if (strength >= 1f && _core.Period > 0 && cycle != _soundedCycle)
             {
                 _soundedCycle = cycle;
-                // トースターはパンが跳ね上がる音（ばねのジャンプ台の音）、投石機は腕が横木に当たる重い音。
-                PlayInMatch(_look == ZoneLook.Toaster ? SoundId.JumpPad : _look == ZoneLook.Catapult ? SoundId.HeavyHit : SoundId.Geyser,
-                    _look == ZoneLook.Catapult ? 0.55f : 0.7f);
+                // トースターはパンが跳ね上がる音（ばねのジャンプ台の音）。投石機は音を出さない（3.6 秒ごとに鳴ってうるさい。2026-11-26 の要望）。
+                if (_look != ZoneLook.Catapult)
+                {
+                    PlayInMatch(_look == ZoneLook.Toaster ? SoundId.JumpPad : SoundId.Geyser, 0.7f);
+                }
             }
             if (warning)
             {

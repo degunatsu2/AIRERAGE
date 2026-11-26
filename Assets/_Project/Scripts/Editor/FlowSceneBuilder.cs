@@ -564,15 +564,10 @@ namespace Airerage.Editor
             MenuOption done = CreateStagePlate(panel, "Done", "DONE");
             // 札の左端（見出しの 1 文字目の線。StageSelectScreen の札の並びと同じ）にそろえる（2026-11-08）。
             ((RectTransform)done.transform).anchoredPosition = new Vector2(scrollPosition.x + StageSelectScreen.PlateLeft, scrollPosition.y - scrollSize.y - 16f);
-            // 名前は右の見出しの札（白地に黒の文字、縁と裏の札はステージのイメージカラー。帯はやめた。2026-11-08）、説明はその下に、右の
-            // 端から置く（左の札とスクロールバーに重ならないように。説明は折り返す）。
+            // 名前は右の見出しの札（白地に黒の文字、縁と裏の札はステージのイメージカラー。帯はやめた。2026-11-08）。説明は出さない
+            // （2026-11-26 の要望: 右の説明を消してステージの名前だけに）。
             HeadingPlate heading = MenuUiBuilder.CreateHeadingPlate(panel, "Heading", new Vector2(1f, 0.65f), new Vector2(1f, 0.5f),
                 new Vector2(-80f, 0f), 112f, 64, 840f, 44f);
-            // 説明は専用の白い札の上に黒の文字（縁と裏の札はステージのイメージカラー。高さは文に合わせる。幅は前の説明の枠と同じ 820 で、
-            // 左のスクロールバーに重ならない。ユーザーの要望、2026-11-08）。
-            DescriptionPlate descriptionPlate = MenuUiBuilder.CreateDescriptionPlate(panel, "DescriptionPlate", new Vector2(1f, 0.5f),
-                new Vector2(-80f, 68f), 820f, 28);
-            UnityEngine.UI.Text description = descriptionPlate.Text;
             // 案内は、見出しとスクロールの上の端の間（アイテムを選ぶ画面と同じ。2026-11-06）。
             UnityEngine.UI.Text note = AccentTint.MarkOnWhite(MenuUiBuilder.CreateText(panel, "Note", string.Empty, 24, FontStyle.BoldAndItalic,
                 TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(110f, -131f), new Vector2(1000f, 38f), MenuUiBuilder.Accent));
@@ -583,8 +578,6 @@ namespace Airerage.Editor
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_options", options);
             SandboxWireSceneBuilder.SetReferenceArray(screen, "_stages", stages);
             SandboxWireSceneBuilder.SetReference(screen, "_heading", heading);
-            SandboxWireSceneBuilder.SetReference(screen, "_description", description);
-            SandboxWireSceneBuilder.SetReference(screen, "_descriptionPlate", descriptionPlate);
             SandboxWireSceneBuilder.SetReference(screen, "_panel", side);
             SandboxWireSceneBuilder.SetReference(screen, "_note", note);
             SandboxWireSceneBuilder.SetReference(screen, "_random", random);

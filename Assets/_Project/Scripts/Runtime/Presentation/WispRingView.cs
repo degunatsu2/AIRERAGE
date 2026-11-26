@@ -248,7 +248,7 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        // くぐられた瞬間: くぐった人の所で鬼火の粒が散り、コインの音。
+        // くぐられた瞬間: くぐった人の所で鬼火の粒が散り、精霊のような澄んだ音（2026-11-26 の要望。前はコインの音）。
         private void OnTaken(int owner)
         {
             if (owner < 0 || _feed == null || owner >= _feed.CharacterCount)
@@ -267,7 +267,7 @@ namespace Airerage.Runtime.Presentation
             }
             if (_audio != null)
             {
-                _audio.Play(SoundId.CoinPickup, 1f, 0.05f);
+                _audio.Play(SoundId.WispChime, 0.9f, 0.02f);
             }
         }
 

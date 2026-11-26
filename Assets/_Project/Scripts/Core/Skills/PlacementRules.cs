@@ -16,8 +16,9 @@ namespace Airerage.Core.Skills
     /// 対象は照準の方向に置く物に限らない: ミラーボール・セーフティボックス（RISK TAKER）、ワープポータル（SPACE TRAVELER）、わたがしの足場
     /// （PASTRY CHEF）、THIEF が置いたギミックと仕掛け。風の帯（STORM RUNNER の SKY ROCKET）は、置いた人から伸びる風の範囲なので直さない
     /// （ステージの風と同じく、地形と重なってよい）。
-    /// THIEF が空中に置いたベルトコンベア（SpeedLane）には、見た目どおりの足場を持たせる（ChargeMilli = 1。WorldCollision.FootingBox が
-    /// 当たりにする）。
+    /// THIEF が空中に置いたベルトコンベア（SpeedLane）と発射台（Launcher。恐怖の館のかぼちゃの投石機のかご・間欠泉・トースター）には、
+    /// 見た目どおりの足場を持たせる（ChargeMilli = 1。WorldCollision.FootingBox が当たりにする。発射台は 2026-11-26 の要望: 空中に置くと
+    /// 投石機のかごに乗れず使いにくい）。
     /// SkillRules.FireEffects が、物を置いたその場で呼ぶ（置いた瞬間の効果より前）。値と地形だけで決まるので、PC が違っても同じ。
     /// </summary>
     public static class PlacementRules
@@ -51,7 +52,7 @@ namespace Airerage.Core.Skills
                     continue;
                 }
                 item.Position = FreePosition(collision, item.Position, half, ownerPosition);
-                if (item.Kind == WorldObjectKind.PlacedZone && IsConveyor(item, thief) && !IsSupported(collision, item.Position, half))
+                if (item.Kind == WorldObjectKind.PlacedZone && NeedsFooting(item, thief) && !IsSupported(collision, item.Position, half))
                 {
                     item.ChargeMilli = 1;
                 }
@@ -163,10 +164,15 @@ namespace Airerage.Core.Skills
             return collision.ComputePenetration(new Vector3(center.X, center.Y, 0f), new Vector3(half.X, half.Y, half.X), out _);
         }
 
-        /// <summary>置いたギミック item が、ベルトコンベア（SpeedLane）の写しか。</summary>
-        public static bool IsConveyor(in WorldObject item, ThiefContext thief)
+        /// <summary>置いたギミック item が、空中に置いたら下の端に足場を持たせる物（ベルトコンベア・発射台）の写しか。</summary>
+        public static bool NeedsFooting(in WorldObject item, ThiefContext thief)
         {
-            return thief != null && item.Stored >= 0 && item.Stored < thief.Zones.Count && thief.Zones[item.Stored].Kind == StageZoneKind.SpeedLane;
+            if (thief == null || item.Stored < 0 || item.Stored >= thief.Zones.Count)
+            {
+                return false;
+            }
+            StageZoneKind kind = thief.Zones[item.Stored].Kind;
+            return kind == StageZoneKind.SpeedLane || kind == StageZoneKind.Launcher;
         }
 
         // 範囲（中心 center・半分の大きさ half）の下の端の、左右の端と真ん中のすぐ下に、どれも地形があるか（床に置いた）。

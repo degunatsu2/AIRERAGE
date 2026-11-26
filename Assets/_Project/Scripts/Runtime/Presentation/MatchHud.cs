@@ -574,8 +574,12 @@ namespace Airerage.Runtime.Presentation
             }
         }
 
-        // ラウンドコール（ON YOUR MARKS → GET READY…… → ROLL!。2026-11-18 の要望）。画面の真ん中に大きく、ステージの色の縁取り（ROLL! は橙）。
-        // 呼び出しが替わるたびに弾んで出て、ROLL! は大きく出て縮みながら消える。長い文字は画面の幅に収める。文字の下に、始まりまでのゲージ。
+        // ラウンドコール（ON YOUR MARKS → GET READY…… → ROLL!。2026-11-18 の要望）。画面の真ん中に大きく。
+        // 2026-11-26 の要望（全体に色が暗い・縁をぼかして発光させる・ほかのゲームの戦闘開始の演出を参考に文字の出方を）: 前は白い文字を
+        // ステージの色の太く濃い縁で 16 重に囲んでいて、暗い色のステージでは全体が沈んでいた。文字の芯は純白のまま、縁はステージの色を
+        // 明るくした柔らかい発光（ぼかした 3 重の輪。ROLL! は橙）に。格闘ゲームの開始の文字のように、1 文字ずつ大きく右から打ち付けて入り
+        // （着いた瞬間に白く光る）、入るときに横一文字の光の筋が走る。ROLL! は大きく出て縮みながら消える。長い文字は画面の幅に収める。
+        // 文字の下に、始まりまでのゲージ。
         private void DrawRoundCall()
         {
             EnsureIntroStyles();
@@ -585,7 +589,6 @@ namespace Airerage.Runtime.Presentation
                 ? _rules.CountdownTicks / (MatchIntroTimeline.DesignSeconds * Airerage.Core.Common.SimTime.TicksPerSecond) : 1f;
             float callStart = RoundCall == MatchIntroTimeline.CallSet ? MatchIntroTimeline.SetStart : MatchIntroTimeline.ReadyStart;
             float since = go ? Time.time - _goAt : (_introTime - callStart) * realPerDesign;
-            float pop = go ? Mathf.Lerp(1.5f, 1f, Ease(since / 0.18f)) : UiEase.OutBack(Mathf.Clamp01(since / 0.25f));
             float alpha = go ? 1f - Mathf.Clamp01((since - MatchIntroTimeline.GoSeconds * 0.6f) / (MatchIntroTimeline.GoSeconds * 0.4f)) : 1f;
             if (alpha <= 0f)
             {
@@ -594,53 +597,161 @@ namespace Airerage.Runtime.Presentation
             float width = _call.CalcSize(new GUIContent(RoundCall)).x;
             float fit = Mathf.Min(1f, Screen.width * 0.86f / Mathf.Max(1f, width));
             var center = new Vector2(Screen.width * 0.5f, Screen.height * 0.44f);
+            float pop = go ? Mathf.Lerp(1.5f, 1f, Ease(since / 0.18f)) : 1f;
             float scale = pop * fit;
+            Color glow = go ? new Color(1f, 0.62f, 0.2f) : Glowing(_stageColor);
+            DrawCallStreak(center, since, alpha, glow, fit);
             if (scale > 0.01f)
             {
                 GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), center);
-                var rect = new Rect(center.x - Screen.width, center.y - Screen.height * 0.1f, Screen.width * 2f, Screen.height * 0.2f);
-                Color outline = go ? new Color(1f, 0.55f, 0.15f, alpha) : new Color(_stageColor.r, _stageColor.g, _stageColor.b, alpha);
-                float thick = Mathf.Max(3f, Screen.height * 0.005f);
-                GUI.color = outline;
-                for (int i = 0; i < 16; i++)
-                {
-                    float a = i * Mathf.PI * 2f / 16f;
-                    GUI.Label(new Rect(rect.x + Mathf.Cos(a) * thick, rect.y + Mathf.Sin(a) * thick, rect.width, rect.height), RoundCall, _call);
-                }
-                GUI.color = new Color(1f, 1f, 1f, alpha);
-                GUI.Label(rect, RoundCall, _call);
+                DrawCallLetters(center, since, alpha, glow, go);
                 GUI.matrix = baseMatrix;
             }
-            DrawStartGauge(center.y + _call.fontSize * 0.55f * fit + Screen.height * 0.025f, alpha, go);
+            DrawStartGauge(center.y + _call.fontSize * 0.55f * fit + Screen.height * 0.025f, alpha, go, glow);
+        }
+
+        /// <summary>1 文字が打ち付けて入るまでの時間（秒）と、次の文字までの間（秒）。</summary>
+        public const float CallLetterSeconds = 0.16f;
+        public const float CallLetterStagger = 0.028f;
+
+        /// <summary>縁を光らせる色: ステージの色を明るく鮮やかに（暗い色のステージでも沈まないように。テスト用に公開）。</summary>
+        public static Color Glowing(Color stage)
+        {
+            Color.RGBToHSV(stage, out float h, out float s, out float v);
+            Color bright = Color.HSVToRGB(h, Mathf.Clamp01(s * 0.9f + 0.1f), Mathf.Max(v, 0.95f));
+            return Color.Lerp(bright, Color.white, 0.18f);
+        }
+
+        // 文字を 1 文字ずつ: 大きく右から打ち付けて入り、着いた瞬間に白く光る。縁はぼかした光（3 重の輪）。ROLL! は 1 度に出す。
+        private void DrawCallLetters(Vector2 center, float since, float alpha, Color glow, bool go)
+        {
+            string text = RoundCall;
+            float total = _call.CalcSize(new GUIContent(text)).x;
+            float x = center.x - total * 0.5f;
+            float height = Screen.height * 0.2f;
+            float thick = Mathf.Max(3f, Screen.height * 0.0055f);
+            for (int i = 0; i < text.Length; i++)
+            {
+                string letter = text[i].ToString();
+                float w = _call.CalcSize(new GUIContent(letter)).x;
+                float local = go ? since : since - i * CallLetterStagger;
+                float u = Mathf.Clamp01(local / CallLetterSeconds);
+                if (text[i] == ' ' || u <= 0f)
+                {
+                    x += w;
+                    continue;
+                }
+                float eased = Ease(u);
+                float letterScale = go ? 1f : Mathf.Lerp(2.1f, 1f, eased);
+                float slide = go ? 0f : (1f - eased) * Screen.height * 0.09f;
+                float a = alpha * Mathf.Clamp01(u * 2.2f);
+                // 着いた瞬間の白い光（0.12 秒で引く）。
+                float flash = go ? Mathf.Clamp01(1f - since / 0.2f) : u >= 1f ? Mathf.Clamp01(1f - (local - CallLetterSeconds) / 0.12f) : 0f;
+                var rect = new Rect(x + slide, center.y - height * 0.5f, w, height);
+                var pivot = new Vector2(rect.center.x, rect.center.y);
+                Matrix4x4 saved = GUI.matrix;
+                GUIUtility.ScaleAroundPivot(new Vector2(letterScale, letterScale), pivot);
+                // ぼかした発光の縁: 外ほど薄い 3 重の輪（芯の白を囲む柔らかい光）。
+                for (int ring = 0; ring < 3; ring++)
+                {
+                    float radius = thick * (0.7f + ring * 0.85f);
+                    float ringAlpha = (ring == 0 ? 0.42f : ring == 1 ? 0.2f : 0.09f) * a;
+                    GUI.color = new Color(glow.r, glow.g, glow.b, ringAlpha);
+                    for (int k = 0; k < 12; k++)
+                    {
+                        float angle = (k + ring * 0.5f) * Mathf.PI * 2f / 12f;
+                        GUI.Label(new Rect(rect.x + Mathf.Cos(angle) * radius, rect.y + Mathf.Sin(angle) * radius, rect.width, rect.height),
+                            letter, _call);
+                    }
+                }
+                // 芯: 本来の白。
+                GUI.color = new Color(1f, 1f, 1f, a);
+                GUI.Label(rect, letter, _call);
+                if (flash > 0f)
+                {
+                    GUI.color = new Color(1f, 1f, 1f, flash * 0.55f * a);
+                    for (int k = 0; k < 8; k++)
+                    {
+                        float angle = k * Mathf.PI * 2f / 8f;
+                        GUI.Label(new Rect(rect.x + Mathf.Cos(angle) * thick * 0.6f, rect.y + Mathf.Sin(angle) * thick * 0.6f, rect.width, rect.height),
+                            letter, _call);
+                    }
+                }
+                GUI.matrix = saved;
+                x += w;
+            }
+        }
+
+        // 文字が入るときに走る、横一文字の光の筋（細い白い芯と、縁の色の柔らかい広がり）。
+        private void DrawCallStreak(Vector2 center, float since, float alpha, Color glow, float fit)
+        {
+            const float Life = 0.45f;
+            if (since < 0f || since > Life)
+            {
+                return;
+            }
+            float u = since / Life;
+            float fade = (1f - u) * alpha;
+            float reach = Screen.width * Mathf.Lerp(0.25f, 0.62f, Ease(Mathf.Clamp01(u * 2.5f)));
+            float y = center.y + _call.fontSize * 0.08f * fit;
+            for (int layer = 3; layer >= 0; layer--)
+            {
+                float h = Mathf.Max(1.5f, Screen.height * (0.002f + layer * 0.006f));
+                float a = fade * (layer == 0 ? 0.9f : 0.32f / layer);
+                GUI.color = layer == 0 ? new Color(1f, 1f, 1f, a) : new Color(glow.r, glow.g, glow.b, a);
+                GUI.DrawTexture(new Rect(center.x - reach, y - h * 0.5f, reach * 2f, h), Texture2D.whiteTexture);
+            }
         }
 
         // 始まりまでのゲージ（左が緑、真ん中が黄、右が赤のグラデーション。ON YOUR MARKS で空、試合の始まりで満ちる。2026-11-18 の要望）。
-        // 暗い溝に白い縁、満ちている所の先に白い光、GET READY に替わる所に小さな区切り。ROLL! で白く光る。
-        private void DrawStartGauge(float y, float alpha, bool go)
+        // 2026-11-26 の要望（暗い・縁をぼかして発光させる）: 溝は 6 割の黒から、縁の色を少し含んだ半透明の暗い色に。縁は硬い白い線をやめ、
+        // 外ほど薄い光の重ね（ぼかした発光）に。満ちている所の上下に同じ色のにじみと上の照り、先に白い光、GET READY に替わる所に小さな
+        // 区切り。ROLL! で白く光る。
+        private void DrawStartGauge(float y, float alpha, bool go, Color glow)
         {
             float width = Mathf.Min(Screen.width * 0.5f, Screen.height * 0.85f);
             float height = Mathf.Max(10f, Screen.height * 0.014f);
             var track = new Rect(Screen.width * 0.5f - width * 0.5f, y, width, height);
             float border = Mathf.Max(2f, height * 0.18f);
-            GUI.color = new Color(0f, 0f, 0f, 0.6f * alpha);
-            GUI.DrawTexture(new Rect(track.x - border, track.y - border, track.width + border * 2f, track.height + border * 2f), Texture2D.whiteTexture);
+            // ぼかした発光の縁（外ほど薄い 4 重）。
+            for (int ring = 3; ring >= 0; ring--)
+            {
+                float grow = border * (0.6f + ring * 0.9f);
+                GUI.color = new Color(glow.r, glow.g, glow.b, (ring == 0 ? 0.5f : 0.22f / ring) * alpha);
+                GUI.DrawTexture(new Rect(track.x - grow, track.y - grow, track.width + grow * 2f, track.height + grow * 2f), Texture2D.whiteTexture);
+            }
+            // 溝（縁の色を少し含んだ半透明の暗い色）。
+            Color groove = Color.Lerp(new Color(0.05f, 0.06f, 0.1f), glow, 0.18f);
+            GUI.color = new Color(groove.r, groove.g, groove.b, 0.72f * alpha);
+            GUI.DrawTexture(track, Texture2D.whiteTexture);
             float fill = Mathf.Clamp01(StartGauge);
-            GUI.color = new Color(1f, 1f, 1f, alpha);
-            GUI.DrawTextureWithTexCoords(new Rect(track.x, track.y, track.width * fill, track.height), GaugeGradient(), new Rect(0f, 0f, fill, 1f));
+            if (fill > 0f)
+            {
+                // 満ちている所のにじみ（上下に柔らかく）と、本体のグラデーションと、上の縁の照り。
+                var filled = new Rect(track.x, track.y, track.width * fill, track.height);
+                GUI.color = new Color(1f, 1f, 1f, 0.28f * alpha);
+                GUI.DrawTextureWithTexCoords(new Rect(filled.x, filled.y - height * 0.45f, filled.width, filled.height + height * 0.9f), GaugeGradient(),
+                    new Rect(0f, 0f, fill, 1f));
+                GUI.color = new Color(1f, 1f, 1f, alpha);
+                GUI.DrawTextureWithTexCoords(filled, GaugeGradient(), new Rect(0f, 0f, fill, 1f));
+                GUI.color = new Color(1f, 1f, 1f, 0.35f * alpha);
+                GUI.DrawTexture(new Rect(filled.x, filled.y, filled.width, Mathf.Max(1.5f, height * 0.22f)), Texture2D.whiteTexture);
+            }
             float split = (MatchIntroTimeline.SetStart - MatchIntroTimeline.ReadyStart) / (MatchIntroTimeline.DesignSeconds - MatchIntroTimeline.ReadyStart);
-            GUI.color = new Color(1f, 1f, 1f, 0.55f * alpha);
+            GUI.color = new Color(1f, 1f, 1f, 0.6f * alpha);
             GUI.DrawTexture(new Rect(track.x + track.width * split - 1f, track.y, 2f, track.height), Texture2D.whiteTexture);
             if (fill > 0f && fill < 1f)
             {
-                GUI.color = new Color(1f, 1f, 1f, 0.95f * alpha);
-                GUI.DrawTexture(new Rect(track.x + track.width * fill - 2f, track.y - border, 4f, track.height + border * 2f), Texture2D.whiteTexture);
+                // 先の白い光（芯と、柔らかい光の輪）。
+                float tip = track.x + track.width * fill;
+                for (int ring = 2; ring >= 0; ring--)
+                {
+                    float grow = border * (0.5f + ring * 1.2f);
+                    GUI.color = new Color(1f, 1f, 1f, (ring == 0 ? 0.95f : 0.3f / ring) * alpha);
+                    GUI.DrawTexture(new Rect(tip - 2f - grow, track.y - border - grow, 4f + grow * 2f, track.height + (border + grow) * 2f),
+                        Texture2D.whiteTexture);
+                }
             }
-            // 白い縁（上下と左右）。
-            GUI.color = new Color(1f, 1f, 1f, 0.85f * alpha);
-            GUI.DrawTexture(new Rect(track.x - border, track.y - border, track.width + border * 2f, 1.5f), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(track.x - border, track.yMax + border - 1.5f, track.width + border * 2f, 1.5f), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(track.x - border, track.y - border, 1.5f, track.height + border * 2f), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(track.xMax + border - 1.5f, track.y - border, 1.5f, track.height + border * 2f), Texture2D.whiteTexture);
             if (go)
             {
                 float flash = 1f - Mathf.Clamp01((Time.time - _goAt) / 0.35f);
