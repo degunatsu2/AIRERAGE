@@ -37,7 +37,7 @@ Material:
     - _BandSpacing: 4.5
     - _BandStrength: 0.55
     - _Blink: 0
-    - _FogAmount: 0.62
+    - _FogAmount: 0.45
     - _FogFadeEnd: -99999
     - _FogFadeStart: -100000
     - _HazeBottom: -180
