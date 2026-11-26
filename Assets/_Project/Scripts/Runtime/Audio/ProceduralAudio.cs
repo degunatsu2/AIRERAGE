@@ -1000,10 +1000,10 @@ namespace Airerage.Runtime.Audio
                             AddTone(b, r, start, 0.35f, f * 2.76f, f * 2.76f, Wave.Sine, 0.05f * level, 0.001f, 0.12f);
                         }
                     }
-                    int[] sparkle = { 100, 103, 105, 107, 110, 112 };
+                    int[] twinkle = { 100, 103, 105, 107, 110, 112 };
                     for (int i = 0; i < 14; i++)
                     {
-                        float f = NoteFrequency(sparkle[rng.Next(sparkle.Length)]);
+                        float f = NoteFrequency(twinkle[rng.Next(twinkle.Length)]);
                         float start = 0.22f + (float)rng.NextDouble() * 0.9f;
                         AddTone(b, r, start, 0.18f, f, f, Wave.Sine, 0.035f + 0.03f * (float)rng.NextDouble(), 0.001f, 0.08f);
                     }
