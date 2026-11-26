@@ -21,6 +21,10 @@ namespace Airerage.PlayMode.Tests
         // 地上の大通りの高さ（Editor/Stages/CityStreet.Ground と同じ。遊ぶ屋上の約 110m 下）。
         private const float CityStreetHeight = -110f;
 
+        // 使い回す車と人影の数（Editor の CityStreet.CarPool・PersonPool と同じ。テストは Editor のアセンブリを参照しないので値を写す）。
+        private const int CityStreetCarPool = 32;
+        private const int CityStreetPersonPool = 40;
+
         [UnityTest]
         public IEnumerator CityAvenue_CarsKeepLeft_AndPeopleWalkBothWays([Values("Stage_CityDay", "Stage_CityNight")] string stage)
         {
@@ -41,8 +45,8 @@ namespace Airerage.PlayMode.Tests
                 bothWays |= traffic.PeopleWalkBothWays;
                 yield return null;
             }
-            Assert.That(maxCars, Is.InRange(2, 14), "車がまばらに走っていない");
-            Assert.That(maxPeople, Is.InRange(3, 18), "歩道に人影が歩いていない");
+            Assert.That(maxCars, Is.InRange(2, CityStreetCarPool), "車がまばらに走っていない");
+            Assert.That(maxPeople, Is.InRange(3, CityStreetPersonPool), "歩道に人影が歩いていない");
             Assert.That(keptLeft, Is.True, "左側通行になっていない車がある");
             Assert.That(bothWays, Is.True, "奥へ・手前へのどちらかにしか歩いていない");
         }

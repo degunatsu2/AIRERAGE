@@ -186,6 +186,13 @@ namespace Airerage.Editor.Stages
         /// <summary>奥の帯の地区の写真を、もやの色へ寄せる割合（0 でそのまま）。</summary>
         public float DistrictFarTint = 0.3f;
         public float PlateauStreetsFront = 380f;
+
+        /// <summary>
+        /// 大通りの谷間の半分の幅（ワールドの x の絶対値。0 なら分けない）。実在の街（PLATEAU）の建物を、大通りの延長線を境にビルごとに
+        /// 左右へ分けて離し、大通りが奥まで通る谷間を空ける（ビル街の昼夜。2026-11-26 の要望: 背景奥のビル群の位置を調整して、大通りを
+        /// もっと奥まで伸ばす。StageDressing.SplitForCorridor）。道路の地図の地面も左右に分けて建物に合わせる。
+        /// </summary>
+        public float AvenueCorridor;
         /// <summary>実在の街の霧の割合を、手前の霧の濃い所（1）から CityFogAmount へなじませる範囲（ワールドの z）。</summary>
         public float CityFogFadeStart = -100000f;
         public float CityFogFadeEnd = -99999f;

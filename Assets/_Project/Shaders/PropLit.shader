@@ -4,6 +4,11 @@
 // 絵がない所は既定の絵（色は白、法線は平ら、発光は黒）になるので、使わない絵は空のままでよい。
 // _Cutoff が 0 より大きいと、色の絵の不透明度がそれより小さい所を描かない（デカール・葉の切り抜き）。_Cull 0 で裏も描く（葉の板）。
 // 光は主の光と環境光（と追加の光）。影を受け、影を落とす。霧に溶ける。
+// _WindowGrid が 1 のときは、発光の絵を「窓のある所」の印として使い、そこを 1 枚ずつの窓に分けてネオンの色で光らせる（夜のビル街の背景の
+// ビル。2026-11-26 の要望: ビルに張り付いたネオンの四角を消し、代わりに窓をネオン発光）。窓は縦の面だけ、ワールドの大きさの格子
+// （_WindowCell: 幅・階の高さ・横と縦の枠の割合）で、窓ごとに点いている・消えている・明るさが違う。色はビルごと（モデルの位置で選ぶ
+// ネオンの 6 色）で、ところどころ暖かい白。遠くで窓が細かくなったら平均の明るさにする（ちらつかない）。_WindowMaskAll が 1 なら
+// 発光の絵を見ずに全部の縦の面を窓にする（箱のビル）。
 Shader "Airerage/PropLit"
 {
     Properties
@@ -17,6 +22,10 @@ Shader "Airerage/PropLit"
         _Smoothness ("Smoothness", Range(0, 1)) = 0.3
         _Metallic ("Metallic", Range(0, 1)) = 0
         _Cutoff ("Alpha cutoff (0 = off)", Range(0, 1)) = 0
+        _WindowGrid ("Neon windows (0 = off)", Float) = 0
+        _WindowCell ("Window cell (width, height, frame x, frame y)", Vector) = (2.4, 3.4, 0.12, 0.16)
+        _WindowBoost ("Window brightness", Float) = 2.2
+        _WindowMaskAll ("Windows on all vertical faces", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
 
@@ -35,6 +44,10 @@ Shader "Airerage/PropLit"
             half _Smoothness;
             half _Metallic;
             half _Cutoff;
+            half _WindowGrid;
+            float4 _WindowCell;
+            half _WindowBoost;
+            half _WindowMaskAll;
         CBUFFER_END
 
         TEXTURE2D(_BaseMap);
@@ -92,6 +105,52 @@ Shader "Airerage/PropLit"
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
+            float WindowHash(float2 v)
+            {
+                return frac(sin(dot(v, float2(127.1, 311.7))) * 43758.5453);
+            }
+
+            // ビルごとのネオンの色（背景の夜の明かりと同じ 6 色）。
+            half3 NeonPalette(float pick)
+            {
+                if (pick < 0.22) return half3(1.0, 0.8, 0.48);
+                if (pick < 0.36) return half3(0.72, 0.88, 1.0);
+                if (pick < 0.54) return half3(1.0, 0.28, 0.86);
+                if (pick < 0.72) return half3(0.22, 0.95, 1.0);
+                if (pick < 0.88) return half3(0.66, 0.36, 1.0);
+                return half3(1.0, 0.58, 0.16);
+            }
+
+            // 窓のある所（mask）を、1 枚ずつの窓に分けて光らせる。
+            half3 NeonWindows(float3 positionWS, float3 normalWS, half mask)
+            {
+                if (mask <= 0.002 || abs(normalWS.y) > 0.6)
+                {
+                    return 0;
+                }
+                float3 origin = UNITY_MATRIX_M._m03_m13_m23;
+                float building = WindowHash(origin.xz * 0.173 + 3.1);
+                bool sideX = abs(normalWS.x) > abs(normalWS.z);
+                float along = sideX ? positionWS.z - origin.z : positionWS.x - origin.x;
+                float face = sideX ? (normalWS.x > 0 ? 1.0 : 2.0) : (normalWS.z > 0 ? 3.0 : 4.0);
+                // 原点の高さを格子の真ん中にする（細長い板の窓の列を、1 つの格子に収める）。
+                float2 p = float2(along, positionWS.y - origin.y) / _WindowCell.xy + 0.5;
+                float2 cell = floor(p);
+                float2 f = frac(p);
+                float h = WindowHash(cell + face * 17.31 + building * 91.7);
+                float lit = h < 0.66 ? lerp(0.55, 1.15, WindowHash(cell.yx * 1.31 + building * 13.1)) : 0.012;
+                float2 w = fwidth(p);
+                float2 inside = smoothstep(_WindowCell.zw - w, _WindowCell.zw + w, f) * smoothstep(_WindowCell.zw - w, _WindowCell.zw + w, 1.0 - f);
+                float frame = inside.x * inside.y;
+                // 遠くで窓が画面の数ピクセルより小さくなったら、平均の明るさに寄せる。
+                float far = saturate(max(w.x, w.y) * 2.0 - 0.5);
+                float average = 0.66 * 0.85 * (1.0 - 2.0 * _WindowCell.z) * (1.0 - 2.0 * _WindowCell.w);
+                float value = lerp(lit * frame, average, far);
+                half3 neon = NeonPalette(building);
+                half3 color = WindowHash(cell * 1.7 + building * 5.3 + face) < 0.22 ? half3(1.0, 0.84, 0.6) : neon;
+                return color * value * mask * _WindowBoost;
+            }
+
             Varyings Vert(Attributes input)
             {
                 Varyings output = (Varyings)0;
@@ -121,7 +180,13 @@ Shader "Airerage/PropLit"
                 surface.metallic = _Metallic;
                 surface.smoothness = _Smoothness;
                 surface.normalTS = normalTS;
-                surface.emission = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, input.uv).rgb * _EmissionColor.rgb;
+                half3 emissionSample = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, input.uv).rgb;
+                surface.emission = emissionSample * _EmissionColor.rgb;
+                if (_WindowGrid > 0.0)
+                {
+                    half mask = _WindowMaskAll > 0.0 ? 1.0 : saturate(max(emissionSample.r, max(emissionSample.g, emissionSample.b)) * 2.0 - 0.2);
+                    surface.emission = NeonWindows(input.positionWS, normalize(input.normalWS), mask);
+                }
                 surface.occlusion = 1.0;
                 surface.alpha = 1.0;
 

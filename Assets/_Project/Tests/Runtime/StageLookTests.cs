@@ -190,7 +190,7 @@ namespace Airerage.Runtime.Tests
             }
             foreach (Renderer renderer in backdrop.GetComponentsInChildren<Renderer>())
             {
-                if (renderer.name == "Streets")
+                if (renderer.name.StartsWith("Streets"))
                 {
                     // はるか下の西新宿の道路の地面は、ステージの真下から奥へ敷く（2026-11-18 の要望: 奥の背景の根元までを地面に）。
                     Assert.That(renderer.bounds.max.y, Is.LessThan(-100f), "下の道路の地面が遊ぶ所の近くにある");
@@ -405,6 +405,9 @@ namespace Airerage.Runtime.Tests
         // StageDressing.BackgroundShadowDepth と同じ（m）。
         private const float BackgroundShadowDepth = 1f;
 
+        // CityStreet.Ground と同じ（ビル街の地上の高さ。m）。
+        private const float CityStreetGround = -110f;
+
         [TestCase("Stage_CityDay")]
         [TestCase("Stage_CityNight")]
         public void CityAvenue_HasRoadSidewalksHalfTheLampsAndTraffic(string stage)
@@ -420,10 +423,12 @@ namespace Airerage.Runtime.Tests
             Assert.That(all.Count(t => t.name == "Sidewalk"), Is.EqualTo(2), "両側の歩道がない");
             Assert.That(all.Count(t => t.name == "Curb"), Is.EqualTo(2), "縁石がない");
             Assert.That(avenue.Find("Markings").GetComponent<MeshFilter>().sharedMesh.vertexCount, Is.GreaterThan(400), "道路の標示がない");
-            // 道路照明は前の半分（20 → 10）、左右交互（千鳥）。前の Kenney の街灯は置かない。
+            // 道路照明は片側 52 m ごとの千鳥（左右交互）で、谷間を抜けた奥の端まで（2026-11-26 に大通りを伸ばして 10 → 35 本）。
+            // 前の Kenney の街灯は置かない。
             Transform[] lamps = all.Where(t => t.name == "AvenueLamp").ToArray();
-            Assert.That(lamps.Length, Is.EqualTo(10), "道路照明が前の半分の数でない");
-            Assert.That(lamps.Count(t => t.position.x < 0f), Is.EqualTo(5), "道路照明が左右交互でない");
+            Assert.That(lamps.Length, Is.EqualTo(35), "道路照明が奥の端までない");
+            Assert.That(lamps.Count(t => t.position.x < 0f), Is.EqualTo(18), "道路照明が左右交互でない");
+            Assert.That(lamps.Max(t => t.position.z), Is.GreaterThan(900f), "大通りが奥まで伸びていない");
             Assert.That(all.Any(t => t.name == "Prop_light-curved"), Is.False, "前の街灯が残っている");
             Assert.That(all.Count(t => t.name.StartsWith("Prop_CommonTree")), Is.GreaterThan(20), "街路樹がない");
             StreetTrafficView traffic = all.Select(t => t.GetComponent<StreetTrafficView>()).Single(v => v != null);
@@ -458,12 +463,36 @@ namespace Airerage.Runtime.Tests
             Material shinjuku = tokyo.Find("Shinjuku").GetComponent<Renderer>().sharedMaterial;
             if (stage != "Stage_Athletic")
             {
-                // ビル街は、道路の地図を貼った地面の上に建物が立つ（根元を切らない。2026-11-18 の要望）。
-                Transform streets = tokyo.Find("Streets");
-                Assert.That(streets, Is.Not.Null, "道路の地面がない");
-                Assert.That(streets.GetComponent<Renderer>().sharedMaterial.GetTexture("_MainTex"), Is.Not.Null, "道路の地図がない");
-                float bottom = tokyo.Find("Shinjuku").GetComponent<Renderer>().bounds.min.y;
-                Assert.That(bottom, Is.EqualTo(streets.position.y).Within(2f), "建物の根元が道路の地面にない");
+                // ビル街は、道路の地図を貼った地面の上に建物が立つ（根元を切らない。2026-11-18 の要望）。大通りの谷間を空けて
+                // 左右に分かれている（2026-11-26 の要望: 大通りを奥まで。docs/15 6.74）。
+                foreach (string side in new[] { "StreetsLeft", "StreetsRight" })
+                {
+                    Transform streets = tokyo.Find(side);
+                    Assert.That(streets, Is.Not.Null, $"道路の地面がない: {side}");
+                    Assert.That(streets.GetComponent<Renderer>().sharedMaterial.GetTexture("_MainTex"), Is.Not.Null, "道路の地図がない");
+                    float bottom = tokyo.Find("Shinjuku").GetComponent<Renderer>().bounds.min.y;
+                    Assert.That(bottom, Is.EqualTo(streets.position.y).Within(2f), "建物の根元が道路の地面にない");
+                    Bounds ground = streets.GetComponent<Renderer>().bounds;
+                    Assert.That(ground.min.x >= 12.9f || ground.max.x <= -12.9f, Is.True, $"{side} が大通りの谷間に掛かっている");
+                }
+                // 西新宿・周りの街のビルは、大通りの谷間（歩道の外の端 13 m の内側）に掛からない。
+                foreach (string name in new[] { "Shinjuku", "Surroundings" })
+                {
+                    MeshFilter filter = tokyo.Find(name).GetComponent<MeshFilter>();
+                    Vector3[] vertices = filter.sharedMesh.vertices;
+                    int[] triangles = filter.sharedMesh.triangles;
+                    Transform placed = filter.transform;
+                    int inside = 0;
+                    for (int t = 0; t < triangles.Length; t++)
+                    {
+                        Vector3 v = placed.TransformPoint(vertices[triangles[t]]);
+                        if (Mathf.Abs(v.x) < 12.9f && v.y > CityStreetGround + 1f)
+                        {
+                            inside++;
+                        }
+                    }
+                    Assert.That(inside, Is.EqualTo(0), $"{name}: 大通りの谷間にビルがある");
+                }
             }
             if (stage == "Stage_CityNight")
             {
@@ -472,7 +501,7 @@ namespace Airerage.Runtime.Tests
                 Assert.That(shinjuku.GetFloat("_NightStrength"), Is.GreaterThan(1f), "夜の明かりが光らない");
                 Assert.That(shinjuku.GetFloat("_BandFill"), Is.EqualTo(0f), "写真の窓と合わない窓の帯を重ねている");
                 // 夜の道路は光らせない（大通りとのつなぎ目が目立った。2026-11-18 の指摘）。街明かりのもやは奥と手前の 2 枚。
-                Assert.That(tokyo.Find("Streets").GetComponent<Renderer>().sharedMaterial.GetFloat("_NightStrength"), Is.EqualTo(0f), "夜の道路が光る");
+                Assert.That(tokyo.Find("StreetsLeft").GetComponent<Renderer>().sharedMaterial.GetFloat("_NightStrength"), Is.EqualTo(0f), "夜の道路が光る");
                 Transform glow = scene.GetRootGameObjects().Single(g => g.name == "Backdrop").transform.Find("CityGlow");
                 Assert.That(glow, Is.Not.Null, "夜の街明かりのもやがない");
                 Assert.That(glow.childCount, Is.EqualTo(2));
@@ -854,13 +883,36 @@ namespace Airerage.Runtime.Tests
             Assert.That(InScene<Renderer>(scene).Any(r => r.name == "Cloud"), Is.False);
         }
 
+        [TestCase("Stage_CityDay")]
+        [TestCase("Stage_CityNight")]
+        public void CityClouds_AreSolidCumulus_NotFlatSheets(string stage)
+        {
+            // 2026-11-26 の要望: 雲の厚い・薄いは横幅と縦幅のこと。平らな板（Z・Y の平面）をやめ、立体の雲のかたまりに（docs/15 6.74）。
+            Scene scene = Open($"Assets/_Project/Scenes/Stages/{stage}.unity");
+            Transform sea = InScene<Transform>(scene).Single(t => t.name == "CloudSea");
+            MeshRenderer[] puffs = sea.GetComponentsInChildren<MeshRenderer>(true);
+            Assert.That(puffs.Length, Is.GreaterThan(150), "雲のかたまりが少ない");
+            foreach (MeshRenderer puff in puffs)
+            {
+                Assert.That(puff.sharedMaterial.shader.name, Is.EqualTo("Airerage/CloudPuff"), $"{puff.name}: 立体の雲の材質でない");
+                Bounds bounds = puff.bounds;
+                Assert.That(Mathf.Min(bounds.size.x, Mathf.Min(bounds.size.y, bounds.size.z)), Is.GreaterThan(4f), $"{puff.name}: 平たい板になっている");
+                Assert.That(puff.GetComponent<Collider>(), Is.Null, "雲に当たりがある");
+                Assert.That(bounds.max.y, Is.LessThan(-23.9f), "雲が撃破の線の近くまで上がっている（落ちかけのプレイヤーが隠れる）");
+            }
+            // 手前は背が高く、奥は平たい（手前は厚く奥は薄い）。
+            float nearHeight = (float)puffs.Where(p => p.bounds.center.z < 120f).Average(p => p.bounds.size.y);
+            float farHeight = (float)puffs.Where(p => p.bounds.center.z > 450f).Average(p => p.bounds.size.y);
+            Assert.That(nearHeight, Is.GreaterThan(farHeight), "手前の雲が奥より厚くない");
+        }
+
         [Test]
         public void CityNight_WetRoads_ReflectTheNeon()
         {
             // 2026-11-18 の要望: 夜のビル街の地面にもネオンの照り返しを描いて、奥の街の光と地続きに。
             Scene scene = Open("Assets/_Project/Scenes/Stages/Stage_CityNight.unity");
             Renderer avenue = InScene<Renderer>(scene).Single(r => r.name == "Avenue");
-            Renderer streets = InScene<Renderer>(scene).Single(r => r.name == "Streets");
+            Renderer streets = InScene<Renderer>(scene).Single(r => r.name == "StreetsLeft");
             foreach (Renderer road in new[] { avenue, streets })
             {
                 Assert.That(road.sharedMaterial.shader.name, Is.EqualTo("Airerage/StageBackdrop"), $"{road.name} が照り返しのシェーダーでない");

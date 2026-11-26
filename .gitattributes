@@ -43,6 +43,8 @@
 *.blend filter=lfs diff=lfs merge=lfs -text
 *.glb   filter=lfs diff=lfs merge=lfs -text
 *.gltf  filter=lfs diff=lfs merge=lfs -text
+# ビルダーが作る大きな網（ビル街の実在の街を大通りの谷間で左右に分けた網。数 MB〜10 MB の文字のアセット。docs/15 6.74）
+Assets/_Project/Meshes/Stages/City/*_Corridor.asset filter=lfs diff=lfs merge=lfs -text
 # 受け取ったアセットの zip（ThirdParty/Inbox。中身を取り出したら消す）
 *.zip   filter=lfs diff=lfs merge=lfs -text
 # 音声・動画

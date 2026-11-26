@@ -25,7 +25,7 @@ Material:
     m_TexEnvs:
     - _BaseMap:
         m_Texture: {fileID: 2800000, guid: 5463cf3b8b8e79630bf91d3695b5e497, type: 3}
-        m_Scale: {x: 2.1599998, y: 179.5}
+        m_Scale: {x: 2.1599998, y: 469.5}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
         m_Texture: {fileID: 2800000, guid: b24025b21dbf902afbed8cd4c00d7564, type: 3}
@@ -42,8 +42,12 @@ Material:
     - _Cutoff: 0
     - _Metallic: 0
     - _Smoothness: 0.12
+    - _WindowBoost: 2.2
+    - _WindowGrid: 0
+    - _WindowMaskAll: 0
     m_Colors:
     - _BaseColor: {r: 1.05, g: 1.02, b: 0.98, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _WindowCell: {r: 2.4, g: 3.4, b: 0.12, a: 0.16}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

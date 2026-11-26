@@ -580,6 +580,8 @@ namespace Airerage.Runtime.Presentation
         // 明るくした柔らかい発光（ぼかした 3 重の輪。ROLL! は橙）に。格闘ゲームの開始の文字のように、1 文字ずつ大きく右から打ち付けて入り
         // （着いた瞬間に白く光る）、入るときに横一文字の光の筋が走る。ROLL! は大きく出て縮みながら消える。長い文字は画面の幅に収める。
         // 文字の下に、始まりまでのゲージ。
+        // 2026-11-26 の 2 回目の指摘（文字の中が灰色・縁をもっとぼかして鮮やかに・1 文字ずつ入る文字の上半分が出ない）: 演出の文字の
+        // 色を白に（既定のラベルの色が灰色だった）、縁を 6 重のぼかした光に、拡大しても切れない枠（はみ出しても切らない）に。
         private void DrawRoundCall()
         {
             EnsureIntroStyles();
@@ -614,12 +616,35 @@ namespace Airerage.Runtime.Presentation
         public const float CallLetterSeconds = 0.16f;
         public const float CallLetterStagger = 0.028f;
 
-        /// <summary>縁を光らせる色: ステージの色を明るく鮮やかに（暗い色のステージでも沈まないように。テスト用に公開）。</summary>
+        /// <summary>縁を光らせる色: ステージの色を明るく鮮やかに（暗い色のステージでも沈まないように。テスト用に公開）。
+        /// 2026-11-26 の要望（縁をもっと鮮やかに）で、白へ寄せるのをやめ、彩度を上げた。</summary>
         public static Color Glowing(Color stage)
         {
             Color.RGBToHSV(stage, out float h, out float s, out float v);
-            Color bright = Color.HSVToRGB(h, Mathf.Clamp01(s * 0.9f + 0.1f), Mathf.Max(v, 0.95f));
-            return Color.Lerp(bright, Color.white, 0.18f);
+            return Color.HSVToRGB(h, Mathf.Clamp(s * 1.15f + 0.12f, 0.55f, 1f), 1f);
+        }
+
+        // ぼかした発光の縁の輪（文字の太さの基準に対する半径・不透明度）。内側ほど濃く、外ほど薄く広い（重ねるとぼかした光になる）。
+        // 2026-11-26 の要望（もう少しぼかして発光させる）で、3 重から 6 重に広げた。下見は Python で同じ式から描いた。
+        private static readonly (float Radius, float Alpha, int Count)[] GlowRings =
+        {
+            (0.45f, 0.6f, 16), (1.1f, 0.3f, 16), (2f, 0.16f, 16), (3.2f, 0.09f, 12), (4.8f, 0.05f, 12), (7f, 0.03f, 12),
+        };
+
+        // 文字の縁の発光（GlowRings の写し）を描く。芯は描かない。
+        private static void DrawGlow(Rect rect, string text, GUIStyle style, Color glow, float alpha, float thick)
+        {
+            for (int ring = 0; ring < GlowRings.Length; ring++)
+            {
+                var spec = GlowRings[ring];
+                float radius = thick * spec.Radius;
+                GUI.color = new Color(glow.r, glow.g, glow.b, spec.Alpha * alpha);
+                for (int k = 0; k < spec.Count; k++)
+                {
+                    float angle = (k + (ring % 2) * 0.5f) * Mathf.PI * 2f / spec.Count;
+                    GUI.Label(new Rect(rect.x + Mathf.Cos(angle) * radius, rect.y + Mathf.Sin(angle) * radius, rect.width, rect.height), text, style);
+                }
+            }
         }
 
         // 文字を 1 文字ずつ: 大きく右から打ち付けて入り、着いた瞬間に白く光る。縁はぼかした光（3 重の輪）。ROLL! は 1 度に出す。
@@ -628,8 +653,24 @@ namespace Airerage.Runtime.Presentation
             string text = RoundCall;
             float total = _call.CalcSize(new GUIContent(text)).x;
             float x = center.x - total * 0.5f;
-            float height = Screen.height * 0.2f;
+            // 1 文字ずつ 2.1 倍から縮んで入るので、拡大しても収まる高さの枠にする（前は 0.2 で、拡大した文字の上が切れていた。2026-11-26）。
+            float height = Screen.height * 0.5f;
             float thick = Mathf.Max(3f, Screen.height * 0.0055f);
+            // 全部の文字が着いて光も引いたら、1 回で描く（写しの数を文字の数で割る）。
+            float settled = (text.Length - 1) * CallLetterStagger + CallLetterSeconds + 0.12f;
+            if (go || since >= settled)
+            {
+                var whole = new Rect(center.x - total * 0.5f, center.y - height * 0.5f, total, height);
+                float flashWhole = go ? Mathf.Clamp01(1f - since / 0.2f) : 0f;
+                DrawGlow(whole, text, _call, glow, alpha, thick);
+                GUI.color = new Color(1f, 1f, 1f, alpha);
+                GUI.Label(whole, text, _call);
+                if (flashWhole > 0f)
+                {
+                    DrawGlow(whole, text, _call, Color.white, flashWhole * 0.6f * alpha, thick * 0.6f);
+                }
+                return;
+            }
             for (int i = 0; i < text.Length; i++)
             {
                 string letter = text[i].ToString();
@@ -648,34 +689,19 @@ namespace Airerage.Runtime.Presentation
                 // 着いた瞬間の白い光（0.12 秒で引く）。
                 float flash = go ? Mathf.Clamp01(1f - since / 0.2f) : u >= 1f ? Mathf.Clamp01(1f - (local - CallLetterSeconds) / 0.12f) : 0f;
                 var rect = new Rect(x + slide, center.y - height * 0.5f, w, height);
-                var pivot = new Vector2(rect.center.x, rect.center.y);
                 Matrix4x4 saved = GUI.matrix;
+                // 拡大の中心は、外側の拡大（長い文字を画面に収める fit）をかけた後の画面の位置で渡す。
+                Vector3 pivot = saved.MultiplyPoint3x4(new Vector3(rect.center.x, rect.center.y, 0f));
                 GUIUtility.ScaleAroundPivot(new Vector2(letterScale, letterScale), pivot);
-                // ぼかした発光の縁: 外ほど薄い 3 重の輪（芯の白を囲む柔らかい光）。
-                for (int ring = 0; ring < 3; ring++)
-                {
-                    float radius = thick * (0.7f + ring * 0.85f);
-                    float ringAlpha = (ring == 0 ? 0.42f : ring == 1 ? 0.2f : 0.09f) * a;
-                    GUI.color = new Color(glow.r, glow.g, glow.b, ringAlpha);
-                    for (int k = 0; k < 12; k++)
-                    {
-                        float angle = (k + ring * 0.5f) * Mathf.PI * 2f / 12f;
-                        GUI.Label(new Rect(rect.x + Mathf.Cos(angle) * radius, rect.y + Mathf.Sin(angle) * radius, rect.width, rect.height),
-                            letter, _call);
-                    }
-                }
+                // ぼかした発光の縁（6 重の輪）。
+                DrawGlow(rect, letter, _call, glow, a, thick);
                 // 芯: 本来の白。
                 GUI.color = new Color(1f, 1f, 1f, a);
                 GUI.Label(rect, letter, _call);
                 if (flash > 0f)
                 {
-                    GUI.color = new Color(1f, 1f, 1f, flash * 0.55f * a);
-                    for (int k = 0; k < 8; k++)
-                    {
-                        float angle = k * Mathf.PI * 2f / 8f;
-                        GUI.Label(new Rect(rect.x + Mathf.Cos(angle) * thick * 0.6f, rect.y + Mathf.Sin(angle) * thick * 0.6f, rect.width, rect.height),
-                            letter, _call);
-                    }
+                    // 着いた瞬間の白い光（縁の内側を白く光らせる）。
+                    DrawGlow(rect, letter, _call, Color.white, flash * 0.6f * a, thick * 0.6f);
                 }
                 GUI.matrix = saved;
                 x += w;
@@ -707,22 +733,27 @@ namespace Airerage.Runtime.Presentation
         // 2026-11-26 の要望（暗い・縁をぼかして発光させる）: 溝は 6 割の黒から、縁の色を少し含んだ半透明の暗い色に。縁は硬い白い線をやめ、
         // 外ほど薄い光の重ね（ぼかした発光）に。満ちている所の上下に同じ色のにじみと上の照り、先に白い光、GET READY に替わる所に小さな
         // 区切り。ROLL! で白く光る。
+        private static readonly (float Grow, float Alpha)[] GaugeGlow =
+        {
+            (0.5f, 0.55f), (1.2f, 0.3f), (2.2f, 0.17f), (3.6f, 0.1f), (5.4f, 0.06f), (8f, 0.035f),
+        };
+
         private void DrawStartGauge(float y, float alpha, bool go, Color glow)
         {
             float width = Mathf.Min(Screen.width * 0.5f, Screen.height * 0.85f);
             float height = Mathf.Max(10f, Screen.height * 0.014f);
             var track = new Rect(Screen.width * 0.5f - width * 0.5f, y, width, height);
             float border = Mathf.Max(2f, height * 0.18f);
-            // ぼかした発光の縁（外ほど薄い 4 重）。
-            for (int ring = 3; ring >= 0; ring--)
+            // ぼかした発光の縁（外ほど薄く広い 6 重。2026-11-26 の要望でもっとぼかした）。
+            for (int ring = GaugeGlow.Length - 1; ring >= 0; ring--)
             {
-                float grow = border * (0.6f + ring * 0.9f);
-                GUI.color = new Color(glow.r, glow.g, glow.b, (ring == 0 ? 0.5f : 0.22f / ring) * alpha);
+                float grow = border * GaugeGlow[ring].Grow;
+                GUI.color = new Color(glow.r, glow.g, glow.b, GaugeGlow[ring].Alpha * alpha);
                 GUI.DrawTexture(new Rect(track.x - grow, track.y - grow, track.width + grow * 2f, track.height + grow * 2f), Texture2D.whiteTexture);
             }
-            // 溝（縁の色を少し含んだ半透明の暗い色）。
-            Color groove = Color.Lerp(new Color(0.05f, 0.06f, 0.1f), glow, 0.18f);
-            GUI.color = new Color(groove.r, groove.g, groove.b, 0.72f * alpha);
+            // 溝（縁の色を含んだ半透明の暗い色。暗く沈まないように、前より縁の色を多く・薄く）。
+            Color groove = Color.Lerp(new Color(0.05f, 0.06f, 0.1f), glow, 0.3f);
+            GUI.color = new Color(groove.r, groove.g, groove.b, 0.55f * alpha);
             GUI.DrawTexture(track, Texture2D.whiteTexture);
             float fill = Mathf.Clamp01(StartGauge);
             if (fill > 0f)
@@ -883,12 +914,23 @@ namespace Airerage.Runtime.Presentation
             {
                 return;
             }
-            _call = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.12f), alignment = TextAnchor.MiddleCenter };
-            _stageTitle = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.058f), alignment = TextAnchor.MiddleLeft };
-            _stageSub = new GUIStyle(GUI.skin.label) { font = GameFonts.JapaneseBold, fontSize = Mathf.RoundToInt(h * 0.024f), alignment = TextAnchor.UpperLeft };
-            _plateName = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.03f), alignment = TextAnchor.MiddleCenter };
-            _plateSub = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBold, fontSize = Mathf.RoundToInt(h * 0.016f), alignment = TextAnchor.MiddleCenter };
-            _loading = new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBold, fontSize = Mathf.RoundToInt(h * 0.026f), alignment = TextAnchor.MiddleRight, clipping = TextClipping.Overflow };
+            // 文字そのものの色は白にする（既定のラベルの色は灰色で、GUI.color と掛け合わさって文字の中が灰色に、縁の光もくすんでいた。
+            // 2026-11-26 の指摘）。ラウンドコールは 1 文字ずつ大きく拡大して入るので、枠からはみ出しても切らない（Overflow・折り返しなし）。
+            _call = Plain(new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.12f), alignment = TextAnchor.MiddleCenter });
+            _stageTitle = Plain(new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.058f), alignment = TextAnchor.MiddleLeft });
+            _stageSub = Plain(new GUIStyle(GUI.skin.label) { font = GameFonts.JapaneseBold, fontSize = Mathf.RoundToInt(h * 0.024f), alignment = TextAnchor.UpperLeft });
+            _plateName = Plain(new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBlack, fontSize = Mathf.RoundToInt(h * 0.03f), alignment = TextAnchor.MiddleCenter });
+            _plateSub = Plain(new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBold, fontSize = Mathf.RoundToInt(h * 0.016f), alignment = TextAnchor.MiddleCenter });
+            _loading = Plain(new GUIStyle(GUI.skin.label) { font = GameFonts.LatinBold, fontSize = Mathf.RoundToInt(h * 0.026f), alignment = TextAnchor.MiddleRight });
+        }
+
+        // 演出の文字の共通の設定: 色は白（GUI.color で塗る）、枠で切らない、折り返さない。
+        private static GUIStyle Plain(GUIStyle style)
+        {
+            style.normal.textColor = Color.white;
+            style.clipping = TextClipping.Overflow;
+            style.wordWrap = false;
+            return style;
         }
 
         // 結果: 右上の表と同じ札（PlayerStatusPlate）を、大きくして順位の順に並べる。順位は札の順位の四角（1 位 金・2 位 銀・3 位 銅）、

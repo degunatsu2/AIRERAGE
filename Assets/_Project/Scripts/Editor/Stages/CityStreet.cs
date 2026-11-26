@@ -28,9 +28,12 @@ namespace Airerage.Editor.Stages
         public const float Ground = -110f;
         public const float CurbHeight = 0.15f;
 
-        /// <summary>手前の端（横断歩道）と奥の端（西新宿の道路の地面の手前。ワールドの z）。</summary>
+        /// <summary>
+        /// 手前の端（横断歩道）と奥の端（ワールドの z）。2026-11-26 の要望（大通りをもっと奥まで伸ばし、車や人の通りが見えるように）で、
+        /// 西新宿の道路の地面の手前（380）から、西新宿の高層ビル群の間の谷間を抜けて霧に溶ける所（カメラの遠い端の手前）まで伸ばした。
+        /// </summary>
         public const float NearZ = 21f;
-        public const float FarZ = 380f;
+        public const float FarZ = 960f;
 
         /// <summary>車線の幅・車道の端（路肩の外。中心からの x）・植樹帯の外の端・歩道の外の端（m）。</summary>
         public const float LaneWidth = 3.25f;
@@ -39,8 +42,8 @@ namespace Airerage.Editor.Stages
         public const float PlantingOuter = 8.68f;
         public const float SidewalkOuter = 13f;
 
-        /// <summary>道路照明の数（前の 20 本の半分）・間隔（片側 52 m、左右交互で 26 m ごと）・最初の位置（z）。</summary>
-        public const int LampCount = 10;
+        /// <summary>道路照明の数（奥の端まで）・間隔（片側 52 m、左右交互で 26 m ごと）・最初の位置（z）。</summary>
+        public const int LampCount = 35;
         public const float LampSpacing = 26f;
         public const float LampStart = 34f;
 
@@ -49,9 +52,9 @@ namespace Airerage.Editor.Stages
         public const float CrosswalkFar = 27.5f;
         public const float StopLineZ = 29.5f;
 
-        /// <summary>使い回す車と人影の数（重くならない程度に）。</summary>
-        public const int CarPool = 14;
-        public const int PersonPool = 18;
+        /// <summary>使い回す車と人影の数（重くならない程度に。大通りを奥まで伸ばしたので、前の 14 台・18 人から増やした）。</summary>
+        public const int CarPool = 32;
+        public const int PersonPool = 40;
 
         private const string MeshStage = "City";
         private const string Roads = "Kenney/CityRoads";

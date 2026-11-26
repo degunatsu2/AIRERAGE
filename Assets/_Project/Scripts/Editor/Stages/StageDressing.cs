@@ -624,11 +624,11 @@ namespace Airerage.Editor.Stages
             // ビルは、その外側（遠い列）と手前の低い列だけ。
             Material plateau = PlateauMaterial(look, folder, hazeTop);
             Transform tokyo = Child(root, "Tokyo");
-            bool city = CreatePlateauCity(tokyo, far, plateau != null ? plateau : mid, beacon, look);
+            bool city = CreatePlateauCity(tokyo, far, plateau != null ? plateau : mid, beacon, look, out CorridorSplit heroSplit);
             if (city && look.PlateauStreets)
             {
-                // 建物を道路の地面の上に立たせる（根元を切らない。2026-11-18 の要望）。
-                CreatePlateauStreets(tokyo, look, folder, hazeTop);
+                // 建物を道路の地面の上に立たせる（根元を切らない。2026-11-18 の要望）。谷間があれば左右に分けて建物に合わせる。
+                CreatePlateauStreets(tokyo, look, folder, hazeTop, heroSplit);
             }
             if (look.CityGlowColor.maxColorComponent > 0f)
             {
@@ -698,7 +698,7 @@ namespace Airerage.Editor.Stages
         }
 
         // 実在の街の地面（道路の地図を貼った板。昼は歩道の灰色に車道、夜は街灯の橙の道路）。地図は実際の位置に合わせ、外はくり返す。
-        private static void CreatePlateauStreets(Transform root, StageLook look, string folder, float hazeTop)
+        private static void CreatePlateauStreets(Transform root, StageLook look, string folder, float hazeTop, CorridorSplit split)
         {
             Texture2D day = LoadAtlas(PlateauGroundPath, 2048, TextureWrapMode.Repeat, 8);
             if (day == null)
@@ -714,10 +714,28 @@ namespace Airerage.Editor.Stages
             // 板の UV（0〜1）から地図の UV へ: 東は +x、北は +z（建物の OBJ と同じ。奥行きは PlateauDepthScale に縮めてある）。地図の左が西、
             // 上が北。
             float span = PlateauGroundHalf * 2f;
+            if (split.Mesh != null)
+            {
+                // 谷間で左右に分けた建物に合わせて、地面も左右に分ける（谷間には大通り。CityStreet）。左の板は左の建物と同じだけずらす。
+                float inner = look.AvenueCorridor;
+                float half = (StreetsHalfWidth - inner) * 0.5f;
+                StreetsPlane(root, look, folder, hazeTop, "StreetsLeft", new Vector3(-inner - half, center.y, center.z), half * 2f, depth, split.LeftShift, heroZ, span);
+                StreetsPlane(root, look, folder, hazeTop, "StreetsRight", new Vector3(inner + half, center.y, center.z), half * 2f, depth, split.RightShift, heroZ, span);
+                return;
+            }
+            StreetsPlane(root, look, folder, hazeTop, "Streets", center, width, depth, 0f, heroZ, span);
+        }
+
+        // 道路の地図の板（center に width × depth。地図は建物を heroX だけ横にずらした所に合わせる）。
+        private static void StreetsPlane(Transform root, StageLook look, string folder, float hazeTop, string name, Vector3 center, float width, float depth,
+            float heroX, float heroZ, float span)
+        {
+            Texture2D day = LoadAtlas(PlateauGroundPath, 2048, TextureWrapMode.Repeat, 8);
             var tiling = new Vector2(width / (span * look.PlateauScale), depth / (span * PlateauDepthScale));
-            var offset = new Vector2(0.5f + center.x / (span * look.PlateauScale) - tiling.x * 0.5f,
+            var offset = new Vector2(0.5f + (center.x - heroX) / (span * look.PlateauScale) - tiling.x * 0.5f,
                 0.5f + (center.z - heroZ) / (span * PlateauDepthScale) - tiling.y * 0.5f);
-            Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("BackdropStreets", "Airerage/StageBackdrop", m =>
+            string materialName = name == "Streets" ? "BackdropStreets" : $"Backdrop{name}";
+            Material material = SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(materialName, "Airerage/StageBackdrop", m =>
             {
                 m.SetColor("_BaseColor", look.MidColor);
                 m.SetColor("_HazeColor", look.HazeColor);
@@ -742,7 +760,7 @@ namespace Airerage.Editor.Stages
                 // 夜は濡れた道路のネオンの照り返し（手前の大通りと同じ）。
                 m.SetFloat("_WetReflect", look.WetReflect);
             }, folder);
-            GameObject streets = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, "Streets", material, new Vector3(width, depth, 1f));
+            GameObject streets = SandboxWireSceneBuilder.CreateVisual(PrimitiveType.Quad, name, material, new Vector3(width, depth, 1f));
             streets.transform.SetParent(root, false);
             streets.transform.SetPositionAndRotation(center, Quaternion.Euler(90f, 0f, 0f));
             NoShadows(streets);
@@ -979,8 +997,9 @@ namespace Airerage.Editor.Stages
         private const float PlateauMidKeepOut = 300f;
 
         // 西新宿（手前・濃い色）と周りの街（奥・遠い色）を置き、高いビルの屋上に航空障害灯を付ける。モデルがなければ false。
-        private static bool CreatePlateauCity(Transform root, Material far, Material mid, Material beacon, StageLook look)
+        private static bool CreatePlateauCity(Transform root, Material far, Material mid, Material beacon, StageLook look, out CorridorSplit heroSplit)
         {
+            heroSplit = default;
             float ground = look.PlateauGround;
             Mesh shinjuku = LoadObjMesh($"{PlateauFolder}/Shinjuku_LOD2.obj");
             Mesh tokyo = LoadObjMesh($"{PlateauFolder}/Tokyo_LOD1.obj");
@@ -990,11 +1009,194 @@ namespace Airerage.Editor.Stages
                 return false;
             }
             var scale = new Vector3(look.PlateauScale, look.PlateauScale, PlateauDepthScale);
+            if (look.AvenueCorridor > 0f)
+            {
+                // 大通りの谷間: 西新宿は切れるビルがいちばん少ない所で分け（ずらす量は左右 ±200m まで探す）、周りの街は真ん中で分ける。
+                heroSplit = SplitForCorridor(shinjuku, "Shinjuku", scale.x, look.AvenueCorridor, 200f);
+                shinjuku = heroSplit.Mesh;
+                tokyo = SplitForCorridor(tokyo, "Tokyo", scale.x, look.AvenueCorridor, 0f).Mesh;
+            }
             Transform hero = PlaceMesh(root, "Shinjuku", shinjuku, mid, new Vector3(0f, ground, ShinjukuZ + look.PlateauPush), scale);
             PlaceMesh(root, "Surroundings", tokyo, far, new Vector3(0f, ground, TokyoZ + look.PlateauPush), scale);
             // 航空障害灯: 25m の升目ごとのいちばん高い所のうち、上から 14 か所（150m より高く、互いに 60m 以上離す）。
             AddBeacons(Child(root, "Beacons"), hero, shinjuku, beacon, 14, 150f, 2.4f);
             return true;
+        }
+
+        /// <summary>谷間で分けた街のメッシュと、左右の建物を元の並びからずらした量（ワールドの x）。</summary>
+        private struct CorridorSplit
+        {
+            public Mesh Mesh;
+            public float LeftShift;
+            public float RightShift;
+        }
+
+        /// <summary>
+        /// 実在の街のメッシュ（source。ワールドの x の倍率 scaleX で、x 0 に置く）を、大通りの谷間（ワールドの x の絶対値が corridor より内側）を
+        /// 空けるように、ビルごとに左右へ分けてずらしたメッシュを作る（2026-11-26 の要望: 背景奥のビル群の位置を調整して大通りを奥まで伸ばす）。
+        /// ビルは頂点の位置でつながった面のかたまり。分ける線は、そこをまたぐビル（の高さの合計）がいちばん少ない所を ±search の範囲で探し
+        /// （search 0 なら 0）、街全体をその分だけ横へずらして分ける線を x 0 に合わせる。またぐビルは除く（西新宿は低い 3 棟ほど）。
+        /// 左のビルは右の端が −corridor より外に、右のビルは左の端が corridor より外になるように、それぞれ同じだけずらす（左右の中の並びは
+        /// 変えない）。作ったメッシュは Assets/_Project/Meshes/Stages/City に保存する（同じ元から毎回同じ形）。
+        /// </summary>
+        private static CorridorSplit SplitForCorridor(Mesh source, string name, float scaleX, float corridor, float search)
+        {
+            Vector3[] vertices = source.vertices;
+            int count = vertices.Length;
+            var parent = new int[count];
+            for (int i = 0; i < count; i++)
+            {
+                parent[i] = i;
+            }
+            int Find(int a)
+            {
+                while (parent[a] != a)
+                {
+                    parent[a] = parent[parent[a]];
+                    a = parent[a];
+                }
+                return a;
+            }
+            void Union(int a, int b)
+            {
+                int ra = Find(a);
+                int rb = Find(b);
+                if (ra != rb)
+                {
+                    parent[ra] = rb;
+                }
+            }
+            // 同じ位置の頂点（面ごとに分かれた頂点）をつなぐ。
+            var welded = new Dictionary<Vector3Int, int>();
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 v = vertices[i];
+                var key = new Vector3Int(Mathf.RoundToInt(v.x * 100f), Mathf.RoundToInt(v.y * 100f), Mathf.RoundToInt(v.z * 100f));
+                if (welded.TryGetValue(key, out int other))
+                {
+                    Union(i, other);
+                }
+                else
+                {
+                    welded[key] = i;
+                }
+            }
+            var submeshes = new List<int[]>();
+            for (int sub = 0; sub < source.subMeshCount; sub++)
+            {
+                int[] triangles = source.GetTriangles(sub);
+                for (int t = 0; t < triangles.Length; t += 3)
+                {
+                    Union(triangles[t], triangles[t + 1]);
+                    Union(triangles[t], triangles[t + 2]);
+                }
+                submeshes.Add(triangles);
+            }
+            // ビルごとの左右の端（ワールドの x）と高さ。
+            var minX = new Dictionary<int, float>();
+            var maxX = new Dictionary<int, float>();
+            var height = new Dictionary<int, float>();
+            var root = new int[count];
+            for (int i = 0; i < count; i++)
+            {
+                int r = Find(i);
+                root[i] = r;
+                float x = vertices[i].x * scaleX;
+                minX[r] = minX.TryGetValue(r, out float a) ? Mathf.Min(a, x) : x;
+                maxX[r] = maxX.TryGetValue(r, out float b) ? Mathf.Max(b, x) : x;
+                height[r] = height.TryGetValue(r, out float h) ? Mathf.Max(h, vertices[i].y) : vertices[i].y;
+            }
+            // 真ん中から離れるほど少し損にする（またぐビルが同じくらいなら、街をあまり横へずらさない所で分ける）。
+            const float OffCenterCost = 0.6f;
+            float split = 0f;
+            float best = float.MaxValue;
+            for (float candidate = -search; candidate <= search + 0.01f; candidate += 2f)
+            {
+                float cost = Mathf.Abs(candidate) * OffCenterCost;
+                foreach (int r in minX.Keys)
+                {
+                    if (minX[r] < candidate && maxX[r] > candidate)
+                    {
+                        cost += height[r];
+                    }
+                }
+                if (cost < best - 0.01f)
+                {
+                    best = cost;
+                    split = candidate;
+                }
+            }
+            // 左右のビルの内側の端（分ける線に合わせた後）。
+            float leftInner = float.MinValue;
+            float rightInner = float.MaxValue;
+            foreach (int r in minX.Keys)
+            {
+                if (maxX[r] <= split)
+                {
+                    leftInner = Mathf.Max(leftInner, maxX[r] - split);
+                }
+                else if (minX[r] >= split)
+                {
+                    rightInner = Mathf.Min(rightInner, minX[r] - split);
+                }
+            }
+            float leftShift = -split + (leftInner > -corridor ? -corridor - leftInner : 0f);
+            float rightShift = -split + (rightInner < corridor ? corridor - rightInner : 0f);
+            var moved = new Vector3[count];
+            for (int i = 0; i < count; i++)
+            {
+                int r = root[i];
+                float shift = maxX[r] <= split ? leftShift : minX[r] >= split ? rightShift : 0f;
+                moved[i] = new Vector3(vertices[i].x + shift / scaleX, vertices[i].y, vertices[i].z);
+            }
+            string folder = "Assets/_Project/Meshes/Stages/City";
+            string path = $"{folder}/{name}_Corridor.asset";
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (mesh == null)
+            {
+                SandboxWireSceneBuilder.EnsureFolder(folder);
+                mesh = new Mesh { name = $"{name}_Corridor" };
+                AssetDatabase.CreateAsset(mesh, path);
+            }
+            mesh.Clear();
+            mesh.indexFormat = count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
+            mesh.vertices = moved;
+            mesh.normals = source.normals;
+            for (int channel = 0; channel < 4; channel++)
+            {
+                var uvs = new List<Vector2>();
+                source.GetUVs(channel, uvs);
+                if (uvs.Count == count)
+                {
+                    mesh.SetUVs(channel, uvs);
+                }
+            }
+            mesh.subMeshCount = submeshes.Count;
+            int dropped = 0;
+            for (int sub = 0; sub < submeshes.Count; sub++)
+            {
+                int[] triangles = submeshes[sub];
+                var kept = new List<int>(triangles.Length);
+                for (int t = 0; t < triangles.Length; t += 3)
+                {
+                    int r = root[triangles[t]];
+                    if (maxX[r] <= split || minX[r] >= split)
+                    {
+                        kept.Add(triangles[t]);
+                        kept.Add(triangles[t + 1]);
+                        kept.Add(triangles[t + 2]);
+                    }
+                    else
+                    {
+                        dropped++;
+                    }
+                }
+                mesh.SetTriangles(kept, sub);
+            }
+            mesh.RecalculateBounds();
+            EditorUtility.SetDirty(mesh);
+            Debug.Log($"大通りの谷間: {name} を x {split:0} で分けた（左 {leftShift:0.0}m・右 {rightShift:0.0}m ずらす、またぐ面 {dropped} 枚を除く）");
+            return new CorridorSplit { Mesh = mesh, LeftShift = leftShift, RightShift = rightShift };
         }
 
         // 実在の街 mesh（置いた所 placed）の高い屋上に、航空障害灯を count か所まで付ける（25m の升目ごとのいちばん高い所のうち、minHeight m
@@ -1066,9 +1268,46 @@ namespace Airerage.Editor.Stages
                     continue;
                 }
                 var scale = new Vector3(district.Scale, district.Scale, PlateauDepthScale);
+                if (look.AvenueCorridor > 0f)
+                {
+                    // 大通りの谷間をふさぐビルを左右へ（地区の位置 district.X を足したワールドの x で分ける）。
+                    mesh = SplitDistrict(mesh, district.Name, district.X, district.Scale, look.AvenueCorridor);
+                }
                 Transform placed = PlaceMesh(root, district.Name, mesh, material, new Vector3(district.X, ground, district.Z), scale);
                 AddBeacons(lights, placed, mesh, beacon, district.Far ? 4 : 3, 120f, district.Far ? 3f : 2.4f);
             }
+        }
+
+        // 地区（district.X に置く）の谷間: ワールドの x 0 を境に分ける。地区のメッシュの x を置く所の分だけずらして分け、戻す。
+        private static Mesh SplitDistrict(Mesh source, string name, float placeX, float scaleX, float corridor)
+        {
+            // 置く所が谷間から十分に離れていれば分けない（ビルの端が谷間に掛からない）。
+            Bounds bounds = source.bounds;
+            float worldMin = placeX + bounds.min.x * scaleX;
+            float worldMax = placeX + bounds.max.x * scaleX;
+            if (worldMin >= corridor || worldMax <= -corridor)
+            {
+                return source;
+            }
+            Vector3[] original = source.vertices;
+            var centered = Object.Instantiate(source);
+            var shifted = new Vector3[original.Length];
+            for (int i = 0; i < original.Length; i++)
+            {
+                shifted[i] = new Vector3(original[i].x + placeX / scaleX, original[i].y, original[i].z);
+            }
+            centered.vertices = shifted;
+            // 大きなビルを切らないように、分ける線を ±30m の範囲で探す（地区の中の並びはそのまま、谷間の左右へ分かれる）。
+            CorridorSplit split = SplitForCorridor(centered, name, scaleX, corridor, 30f);
+            Object.DestroyImmediate(centered);
+            Vector3[] back = split.Mesh.vertices;
+            for (int i = 0; i < back.Length; i++)
+            {
+                back[i].x -= placeX / scaleX;
+            }
+            split.Mesh.vertices = back;
+            split.Mesh.RecalculateBounds();
+            return split.Mesh;
         }
 
         // OBJ のモデルからメッシュを読む（材質は作らず、法線は計算し、頂点を読めるように読み込みの設定を合わせる）。

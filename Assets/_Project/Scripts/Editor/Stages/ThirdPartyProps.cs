@@ -58,6 +58,16 @@ namespace Airerage.Editor.Stages
         public static GameObject Place(StageDecor decor, Pack pack, string model, Vector3 position, float scale, float yaw, Color tint, string folder,
             string emissionTexture, Color emission)
         {
+            return Place(decor, pack, model, position, scale, yaw, tint, folder, emissionTexture, emission, false);
+        }
+
+        /// <summary>
+        /// neonWindows が true なら、発光の絵の窓の所を 1 枚ずつの窓に分けて、ビルごとのネオンの色で光らせる（夜のビル街。
+        /// PropLit の _WindowGrid。2026-11-26 の要望）。
+        /// </summary>
+        public static GameObject Place(StageDecor decor, Pack pack, string model, Vector3 position, float scale, float yaw, Color tint, string folder,
+            string emissionTexture, Color emission, bool neonWindows)
+        {
             string path = $"{Root}/{pack.Folder}/{model}.obj";
             GameObject source = LoadModel(path);
             if (source == null)
@@ -69,7 +79,7 @@ namespace Airerage.Editor.Stages
             go.name = $"Prop_{model}";
             go.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
             go.transform.localScale = Vector3.one * scale;
-            Material material = MaterialFor(pack, tint, folder, emissionTexture, emission);
+            Material material = MaterialFor(pack, tint, folder, emissionTexture, emission, neonWindows);
             foreach (Renderer renderer in go.GetComponentsInChildren<Renderer>(true))
             {
                 var materials = new Material[renderer.sharedMaterials.Length];
@@ -319,11 +329,26 @@ namespace Airerage.Editor.Stages
             return AssetDatabase.LoadAssetAtPath<GameObject>(path);
         }
 
+        /// <summary>
+        /// PropLit の夜の窓（1 枚ずつの窓をネオンの色で光らせる）を設定する。maskAll が 1 なら発光の絵を見ずに全部の縦の面を窓にする。
+        /// </summary>
+        public static void NeonWindows(Material m, bool on, float maskAll)
+        {
+            m.SetFloat("_WindowGrid", on ? 1f : 0f);
+            m.SetVector("_WindowCell", new Vector4(2.4f, 3.4f, 0.12f, 0.16f));
+            m.SetFloat("_WindowBoost", 2.2f);
+            m.SetFloat("_WindowMaskAll", maskAll);
+        }
+
         // パックの色の絵の材質（色合いごと。ステージの材質のフォルダに保存して GUID を保つ）。
-        private static Material MaterialFor(Pack pack, Color tint, string folder, string emissionTexture, Color emission)
+        private static Material MaterialFor(Pack pack, Color tint, string folder, string emissionTexture, Color emission, bool neonWindows)
         {
             bool glows = !string.IsNullOrEmpty(emissionTexture);
             string glowKey = glows ? $"_E{ColorUtility.ToHtmlStringRGB(emission / Mathf.Max(1f, emission.maxColorComponent))}{Mathf.RoundToInt(emission.maxColorComponent * 10f)}" : string.Empty;
+            if (glows && neonWindows)
+            {
+                glowKey += "_W";
+            }
             string key = $"{folder}|{pack.Folder}|{ColorUtility.ToHtmlStringRGB(tint)}{glowKey}";
             if (Materials.TryGetValue(key, out Material cached) && cached != null)
             {
@@ -362,6 +387,7 @@ namespace Airerage.Editor.Stages
                 m.SetFloat("_Metallic", 0f);
                 m.SetTexture("_EmissionMap", emissionMap);
                 m.SetColor("_EmissionColor", emissionMap != null ? emission : Color.black);
+                NeonWindows(m, glows && neonWindows, 0f);
             }, folder);
             Materials[key] = material;
             return material;

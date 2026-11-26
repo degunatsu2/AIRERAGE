@@ -311,22 +311,18 @@ namespace Airerage.Editor.Stages
         {
             Material facade = night ? decor.Lit("Facade", new Color(0.1f, 0.11f, 0.16f)) : decor.Lit("Facade", new Color(0.55f, 0.6f, 0.68f));
             Material glass = night ? decor.Lit("FacadeGlass", new Color(0.07f, 0.1f, 0.18f)) : decor.Lit("FacadeGlass", new Color(0.4f, 0.55f, 0.72f));
-            Material window = night ? decor.Unlit("Window", new Color(1f, 0.85f, 0.45f)) : decor.Lit("Window", new Color(0.25f, 0.38f, 0.55f));
-            Material windowCool = night ? decor.Unlit("WindowCool", new Color(0.45f, 0.85f, 1f)) : decor.Lit("WindowCool", new Color(0.32f, 0.45f, 0.6f));
+            // 昼の窓の帯（夜は 1 枚ずつ光る窓 nightRow を使う）。
+            Material window = night ? null : decor.Lit("Window", new Color(0.25f, 0.38f, 0.55f));
+            Material windowCool = night ? null : decor.Lit("WindowCool", new Color(0.32f, 0.45f, 0.6f));
             Material neonPink = decor.Unlit("NeonPink", new Color(1f, 0.25f, 0.8f));
             Material neonCyan = decor.Unlit("NeonCyan", new Color(0.2f, 0.95f, 1f));
-            // 背景のビルの夜の明かり: ネオン風の色で、光る強さ（ブルームでにじむ）。2026-11-18 の要望（より煌びやかに）。
-            Material[] skyLights = night
-                ? new[]
-                {
-                    decor.Unlit("SkyWarm", Glow(new Color(1f, 0.8f, 0.48f), 2.4f)),
-                    decor.Unlit("SkyCool", Glow(new Color(0.72f, 0.88f, 1f), 2.2f)),
-                    decor.Unlit("SkyPink", Glow(new Color(1f, 0.28f, 0.86f), 2.6f)),
-                    decor.Unlit("SkyCyan", Glow(new Color(0.22f, 0.95f, 1f), 2.6f)),
-                    decor.Unlit("SkyPurple", Glow(new Color(0.66f, 0.36f, 1f), 2.6f)),
-                    decor.Unlit("SkyAmber", Glow(new Color(1f, 0.58f, 0.16f), 2.4f)),
-                }
-                : null;
+            // 夜の箱のビル（地上の低い街並み・背景のビルの根元の柱）と足場のビルの正面: 1 枚ずつの窓をネオンの色で光らせる
+            // （2026-11-26 の要望: ビルに張り付いたネオンの四角い板をやめ、窓を光らせる。PropLit の _WindowGrid）。
+            Material nightBlock = night ? NightWindowMaterial("NightWindowBlock", new Color(0.1f, 0.11f, 0.16f), new Vector4(2.4f, 3.4f, 0.12f, 0.16f)) : null;
+            Material nightShaft = night ? NightWindowMaterial("NightWindowShaft", new Color(0.13f, 0.14f, 0.2f), new Vector4(2.4f, 3.4f, 0.12f, 0.16f)) : null;
+            // 足場のビルの正面の窓の列（帯の板を、窓が 1 枚ずつ並んだ列に。帯の高さ 0.9m を 1 つの格子に収める）。
+            // 消えている窓が夜の光と照り返しで茶色っぽく見えないように、地の色は黒・つやなし（足場のビルの暗い面になじませる）。
+            Material nightRow = night ? NightWindowMaterial("NightWindowRow", Color.black, new Vector4(2.1f, 2f, 0.1f, 0f), 0f) : null;
             // 夜の道路は濡れたアスファルトのネオンの照り返し（2026-11-18 の要望: 奥の街の光と地続きに。西新宿の道路の地面と同じ照り返し）。
             Material street = night
                 ? SandboxWireSceneBuilder.LoadOrCreateShaderMaterial("WetStreet", "Airerage/StageBackdrop", m =>
@@ -364,12 +360,9 @@ namespace Airerage.Editor.Stages
                         continue;
                     }
                     Material m = decor.Random.NextDouble() < 0.3 ? windowCool : window;
-                    if (night && decor.Random.NextDouble() < 0.35)
-                    {
-                        // 夜は消えている窓もある。
-                        continue;
-                    }
-                    decor.Quad("Windows", new Vector3((building.MinX + building.MaxX) * 0.5f, y, -2.02f), new Vector2(width - 1.2f, 0.9f), m);
+                    // 夜は窓が 1 枚ずつ並んだ列（窓ごとに点いている・消えている。色はビルごとのネオン）。
+                    decor.Quad("Windows", new Vector3((building.MinX + building.MaxX) * 0.5f, y, -2.02f), new Vector2(width - 1.2f, 0.9f),
+                        night ? nightRow : m);
                 }
             }
             // くりぬいた中の奥の壁と天井の灯り（中が空いているのが分かるように）。
@@ -383,8 +376,11 @@ namespace Airerage.Editor.Stages
             // 高層ビルの足もとへ続く）。大通りは西新宿の道路の地面（CityStreetsFront から奥。StageDressing）の手前まで。
             decor.Box("Street", new Vector3(0f, CityStreet.Ground, 6f), new Vector3(110f, 0.5f, 30f), street);
             // 地上の地面は足場のビルの手前（z −150）から（2026-11-25: 雲を減らしてあちこちに切れ間ができたので、どこからのぞいても地面がある）。
+            // 大通りの奥の端（谷間の先）までは、谷間の下にも地面を敷く（西新宿の道路の地図の板は谷間を空けて左右に分かれている）。
             decor.Box("Avenue", new Vector3(0f, CityStreet.Ground - 0.25f, (CityGroundFront + CityStreetsFront) * 0.5f),
                 new Vector3(1600f, 0.5f, CityStreetsFront - CityGroundFront), street);
+            decor.Box("AvenueCorridor", new Vector3(0f, CityStreet.Ground - 0.25f, (CityStreetsFront + CityStreet.FarZ) * 0.5f),
+                new Vector3(CityStreet.SidewalkOuter * 2f + 2f, 0.5f, CityStreet.FarZ - CityStreetsFront), street);
             // 足場のビルの根元を隠す雲海（2026-11-25 の要望。CityClouds）。
             CityClouds.Build(decor, night);
             // 大通りの車道・歩道・植樹帯・道路照明・横断歩道と信号、行き交う車と人影（2026-11-25 の要望: 電灯を半分にして置き直し、
@@ -392,7 +388,7 @@ namespace Airerage.Editor.Stages
             CityStreet.Build(decor, night);
             // 大通りの両側の低い街並み（見通しの奥を空っぽに見せない。高層ビルを隠さない低さ）。
             // 2026-11-25: 大通りの手前（z 30 から）にも並べて、通りの両側を建物が縁取る実際の街並みに（低いので遊ぶ画面からの見通しは隠さない）。
-            for (float z = 30f; z < 300f; z += decor.Range(40f, 60f))
+            for (float z = 30f; z < CityStreetsFront - 30f; z += decor.Range(40f, 60f))
             {
                 for (float x = -280f; x < 280f;)
                 {
@@ -403,14 +399,10 @@ namespace Airerage.Editor.Stages
                     {
                         float height = decor.Range(4f, 14f) + Mathf.Abs(middle) / 280f * 12f;
                         float depth = decor.Range(10f, 22f);
+                        // 夜は窓が 1 枚ずつ光る（前は正面に明かりの板を貼っていた）。
+                        Material blockMaterial = decor.Random.NextDouble() < 0.5 ? facade : glass;
                         decor.Box("Block", new Vector3(middle, CityStreet.Ground + height * 0.5f, z), new Vector3(width, height, depth),
-                            decor.Random.NextDouble() < 0.5 ? facade : glass);
-                        if (night && decor.Random.NextDouble() < 0.6)
-                        {
-                            // 夜は正面にまばらな窓の明かり（灰色の塊に見えないように）。
-                            decor.Quad("BlockLights", new Vector3(middle, CityStreet.Ground + height * decor.Range(0.35f, 0.8f), z - depth * 0.5f - 0.05f),
-                                new Vector2(width * decor.Range(0.3f, 0.75f), 0.8f), SkyLight(decor, skyLights));
-                        }
+                            night ? nightBlock : blockMaterial);
                     }
                     x += width + decor.Range(3f, 9f);
                 }
@@ -461,22 +453,12 @@ namespace Airerage.Editor.Stages
                         continue;
                     }
                     float realTop = -30f + model.Height * scale;
+                    // 夜はモデルの窓（ガラスの所）を 1 枚ずつの窓に分けて、ビルごとのネオンの色で光らせる（2026-11-26 の要望。前は窓のガラスを
+                    // 一面に光らせ、正面に明かりの板を貼っていて、ネオンの四角い板が張り付いて見えた）。
                     ThirdPartyProps.Place(decor, ThirdPartyProps.CityCommercial, model.Name, new Vector3(centerX, -30f, z), scale,
-                        turned ? 270f : 180f, buildingTint, decor.Folder, emission, windowGlow);
+                        turned ? 270f : 180f, buildingTint, decor.Folder, emission, windowGlow, neonWindows: night);
                     decor.Box("TowerFoot", new Vector3(centerX, (-30f + CityStreet.Ground) * 0.5f, z), new Vector3(width * 0.94f, -30f - CityStreet.Ground, depth * 0.94f),
-                        shaft);
-                    if (night)
-                    {
-                        // 窓の明かり（正面。ネオン風の色。前の箱のビルと同じ。モデルの窓の色は屋根と同じ色の所があり光らせられないため）。
-                        for (float y = realTop - 3f; y > -10f; y -= decor.Range(2.5f, 4f))
-                        {
-                            if (decor.Random.NextDouble() < 0.55)
-                            {
-                                decor.Quad("Lights", new Vector3(centerX, y, z - depth * 0.5f - 0.08f), new Vector2(width * decor.Range(0.3f, 0.8f), 0.7f),
-                                    SkyLight(decor, skyLights));
-                            }
-                        }
-                    }
+                        night ? nightShaft : shaft);
                     if (night && decor.Random.NextDouble() < 0.4)
                     {
                         // 屋上の赤い航空障害灯。
@@ -549,12 +531,19 @@ namespace Airerage.Editor.Stages
             return new Color(color.r * intensity, color.g * intensity, color.b * intensity, 1f);
         }
 
-        // 背景の夜の明かりの色を選ぶ（暖かい白が多め、ネオンの色を混ぜる）。
-        private static Material SkyLight(StageDecor decor, Material[] lights)
+        // 夜の窓の材質（PropLit。全部の縦の面を窓にして、1 枚ずつネオンの色で光らせる）。cell は窓の格子（幅・高さ・横と縦の枠の割合）。
+        private static Material NightWindowMaterial(string name, Color baseColor, Vector4 cell, float smoothness = 0.2f)
         {
-            double pick = decor.Random.NextDouble();
-            return pick < 0.32 ? lights[0] : pick < 0.44 ? lights[1] : pick < 0.6 ? lights[2] : pick < 0.76 ? lights[3] : pick < 0.9 ? lights[4] : lights[5];
+            return SandboxWireSceneBuilder.LoadOrCreateShaderMaterial(name, ThirdPartyProps.PropShader, m =>
+            {
+                m.SetColor("_BaseColor", baseColor);
+                m.SetFloat("_Smoothness", smoothness);
+                m.SetFloat("_Metallic", 0f);
+                ThirdPartyProps.NeonWindows(m, true, 1f);
+                m.SetVector("_WindowCell", cell);
+            }, "Assets/_Project/Materials/Stages/CityNight");
         }
+
 
         // 地上の地面の手前の端（ワールドの z）。
         private const float CityGroundFront = -150f;
@@ -620,6 +609,8 @@ namespace Airerage.Editor.Stages
             look.PlateauPush = CityPlateauPush;
             look.PlateauStreets = true;
             look.PlateauStreetsFront = CityStreetsFront;
+            // 大通りを西新宿の高層ビル群の間の谷間に通して奥まで伸ばす（2026-11-26 の要望）。ビルは歩道の外の端に沿って並ぶ。
+            look.AvenueCorridor = CityStreet.SidewalkOuter;
             look.CityFogFadeStart = CityStreetsFront;
             look.CityFogFadeEnd = CityFogFadeEnd;
         }
