@@ -101,6 +101,7 @@ namespace Airerage.Core.Simulation
             Coins = new CoinLedger(_coins);
             _collision = new WorldCollision(collision);
             _simulator = new CharacterSimulator(_collision, _zoneList);
+            _simulator.SetCoilUsers(_states, _clones);
             Bounds = bounds;
             _thief = new ThiefContext(sorted, _traps, Rules, BankSpots, _clones, _cloneMinds);
             ItemTuning.Validate().ThrowIfInvalid();
@@ -375,12 +376,17 @@ namespace Airerage.Core.Simulation
             }
             // THIEF が置いたギミックも、ステージのギミックと一緒に効かせる（このティックの初めの物から決める）。
             ThiefRules.RefreshZones(_zoneList, Zones, _objects, _states);
+            // コイルガンの側のクールタイム（撃ち出した直後の使用中）を、全員と分身で同じように進める（StageZones.IsCoilBusy）。
+            StageZones.CountDownCoil(_states);
+            StageZones.CountDownCoil(_clones);
             // 置かれた物のアンカーポイントは、このティックの初めの物から決める（巻き戻しても全員で同じ）。
             _collision.Refresh(_objects);
             // 動く足場と扉: このティックの位置の当たりを作り、動いた分だけ乗っている人とつないだワイヤーを運ぶ。
             _collision.SetPlatforms(_platforms, _stage, Tick);
             // ドーナツ（キッチンのドーナツフライヤー）の真ん中もアンカーにし、つないだワイヤーを運ぶ（2026-11-24）。
             StageTraps.AddAnchors(_collision, _traps, Tick, Rules.Seed);
+            // THIEF が写して置いたプラズマ球の真ん中のアンカー（つなぐと電気を帯びたワイヤー。2026-11-25 の要望）。
+            ThiefRules.AddPlacedAnchors(_collision, Zones, _objects);
             StagePlatforms.Carry(_platforms, _stage, _states, _tickConfigs, Tick);
             StageTraps.CarryWires(_traps, _states, _tickConfigs, Tick, Rules.Seed, Bounds);
             for (int i = 0; i < _states.Count; i++)
@@ -429,7 +435,8 @@ namespace Airerage.Core.Simulation
             ItemRules.StepWorld(_states, _tickConfigs, ItemTuning, _objects, _collision, Bounds, Rules, CoinSpawns, Tick,
                 phase == MatchPhase.Playing || phase == MatchPhase.Overtime, _projectileHits, Coins);
             // 電気を帯びたワイヤー（研究所のプラズマ球にワイヤーをつないでいる間、ロープに触れた相手に電気の攻撃）。
-            StageZones.StepChargedWires(Zones, _states, _tickConfigs, _projectileHits);
+            // THIEF が置いたプラズマ球も含めて調べる（効かせているギミックの一覧）。
+            StageZones.StepChargedWires(_zoneList, _states, _tickConfigs, _projectileHits);
             _hits.Resolve(_states, _tickConfigs, Tick, _objects, Rules.Seed, _projectileHits);
             ThiefRules.PopClones(_clones, _states, _tickConfigs, _objects, Tick);
             SkillRules.EndObjects(_objects, Coins, _states, _tickConfigs, Rules, Tick, BankSpots,

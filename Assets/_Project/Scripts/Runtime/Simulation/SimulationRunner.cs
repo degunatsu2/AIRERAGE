@@ -164,6 +164,7 @@ namespace Airerage.Runtime.Simulation
         IReadOnlyList<StageTrap> ISimulationFeed.Traps => _world?.Traps;
         StageState ISimulationFeed.Stage => _world?.Stage;
         IReadOnlyList<StageZone> ISimulationFeed.Zones => _world?.Zones;
+        IReadOnlyList<StageZone> ISimulationFeed.ActiveZones => _world?.ActiveZones;
         bool ISimulationFeed.TryGetClone(int index, out CharacterState clone) => SimWorldFeed.TryGetClone(_world, index, out clone);
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => _world != null ? _world.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => _world != null ? _world.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
@@ -431,7 +432,7 @@ namespace Airerage.Runtime.Simulation
             }
             if (_wireView != null)
             {
-                _wireView.Render(_previous, current, alpha, PlayerConfig.Wire, StageZones.IsWireCharged(current, _world.Zones));
+                _wireView.Render(_previous, current, alpha, PlayerConfig.Wire, StageZones.IsWireCharged(current, _world.ActiveZones));
             }
             if (_aimIndicator != null)
             {

@@ -62,6 +62,12 @@ namespace Airerage.Runtime.Simulation
         /// <summary>ステージのギミック（SimWorld.Zones。THIEF が置いたギミックの元。始まっていなければ null）。</summary>
         IReadOnlyList<StageZone> Zones { get; }
 
+        /// <summary>
+        /// 効かせているギミックの一覧（SimWorld.ActiveZones: ステージのギミックの後に THIEF が置いたギミック。CombatState.CaptureZone は
+        /// この一覧の番号）。悪魔の手とコイルガンのどちらに収まっているかの区別（表示と効果音）に使う。始まっていなければ null。
+        /// </summary>
+        IReadOnlyList<StageZone> ActiveZones { get; }
+
         /// <summary>キャラクター index の分身（THIEF の E）が出ていれば、その状態（SimWorld.GetClone）。</summary>
         bool TryGetClone(int index, out CharacterState clone);
 

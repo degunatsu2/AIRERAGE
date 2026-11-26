@@ -600,7 +600,8 @@ namespace Airerage.Runtime.Presentation
                     }
                 }
             }
-            return _zoneFeed != null && StageZones.IsInCoil(state, _zoneFeed.Zones);
+            // THIEF が置いたコイルガンも、効かせているギミックの一覧で見分ける（2026-11-25 の指摘: 悪魔の手の演出が出ていた）。
+            return _zoneFeed != null && StageZones.IsInCoil(state, _zoneFeed.ActiveZones);
         }
 
         // 状態の変化（受けた時刻、FATAL を受けた数、ワイヤーキャンセルのクールタイムの始まり）から、一瞬の光を出す。

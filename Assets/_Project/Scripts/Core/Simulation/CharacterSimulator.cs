@@ -26,6 +26,8 @@ namespace Airerage.Core.Simulation
         private readonly WireController _wire;
         private readonly IReadOnlyList<StageZone> _zones;
         private readonly ICollisionQuery _collision;
+        private IReadOnlyList<CharacterState> _coilUsers;
+        private IReadOnlyList<CharacterState> _coilClones;
 
         /// <param name="zones">ステージのギミック（効かせる順に並べたもの）。null ならない。</param>
         public CharacterSimulator(ICollisionQuery collision, IReadOnlyList<StageZone> zones = null)
@@ -38,6 +40,16 @@ namespace Airerage.Core.Simulation
             _wire = new WireController(collision, _motor);
             _zones = zones;
             _collision = collision;
+        }
+
+        /// <summary>
+        /// コイルガンが使用中かを調べる全員の状態（SimWorld のキャラクターと分身の一覧。進めるたびに書き戻されるので、同じティックに先に
+        /// 入った人も数える。StageZones.IsCoilBusy）。渡さなければ、コイルガンは使用中にならない。
+        /// </summary>
+        public void SetCoilUsers(IReadOnlyList<CharacterState> characters, IReadOnlyList<CharacterState> clones)
+        {
+            _coilUsers = characters;
+            _coilClones = clones;
         }
 
         /// <param name="tick">試合のティック数（周期・動きのあるステージのギミック）。</param>
@@ -237,7 +249,7 @@ namespace Airerage.Core.Simulation
             ActionController.AfterMove(ref state, wasGrounded, velocityBeforeMove, config);
             Bounce(ref state, velocityBeforeMove, config.Combat);
             WallCling.TryStart(ref state, velocityBeforeMove, movement, _motor, halfExtents);
-            StageZones.Apply(ref state, startPosition, config, _zones, tick, seed, _collision);
+            StageZones.Apply(ref state, startPosition, config, _zones, tick, seed, _collision, _coilUsers, _coilClones);
 
             // ゲームプレイは XY 平面（docs/01_game_design.md 4章）。
             state.Position.Z = 0f;

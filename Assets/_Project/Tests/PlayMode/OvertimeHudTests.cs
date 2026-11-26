@@ -43,6 +43,7 @@ namespace Airerage.PlayMode.Tests
             public System.Collections.Generic.IReadOnlyList<StageTrap> Traps => World.Traps;
             public StageState Stage => World.Stage;
             public System.Collections.Generic.IReadOnlyList<StageZone> Zones => World.Zones;
+            public System.Collections.Generic.IReadOnlyList<StageZone> ActiveZones => World.ActiveZones;
             public bool TryGetClone(int index, out CharacterState clone) => SimWorldFeed.TryGetClone(World, index, out clone);
             public IReadOnlyList<CoinSpawnPoint> CoinSpawns => World.CoinSpawns;
             public IReadOnlyList<BankSpot> BankSpots => World.BankSpots;

@@ -646,8 +646,32 @@ namespace Airerage.Core.Skills
             float width = hazard ? MathF.Max(PlacedFit, maxX - minX - PlacedFit) : 0f;
             float cap = hazard ? MathF.Max(0f, MathF.Min(source.CapHeight, maxY - minY - PlacedFit)) : 0f;
             float fall = hazard ? MathF.Max(0f, MathF.Min(source.FallLength, maxY - minY - PlacedFit)) : 0f;
-            // 電気を帯びた危険（プラズマ球）は、触れると当たる危険として写す（置いた所にアンカーポイントはないので、ワイヤーの電気は写さない）。
-            return new StageZone(source.Kind, minX, minY, maxX, maxY, direction, source.Power, source.Limit, timing, source.Target, width, default, 0, 0, cap, fall);
+            // 電気を帯びた危険（研究所のプラズマ球）は、電気も写す。真ん中のアンカーポイントも一緒に写るので（AddPlacedAnchors）、つないだ
+            // ワイヤーは電気を帯びる（2026-11-25 の要望）。
+            return new StageZone(source.Kind, minX, minY, maxX, maxY, direction, source.Power, source.Limit, timing, source.Target, width, default, 0, 0, cap, fall,
+                source.Electric);
+        }
+
+        /// <summary>
+        /// 置いたギミックのうち、電気を帯びた物（研究所のプラズマ球を写した物）の真ん中を、アンカーポイントにする（ステージのプラズマ球の
+        /// 真ん中のアンカーと同じ。つないだワイヤーは電気を帯びる。StageZones.IsWireCharged。2026-11-25 の要望）。SimWorld が毎ティック、
+        /// 動く足場の当たりを作った後に呼ぶ（次の SetPlatforms で消える）。置いた物は動かないので、ワイヤーの接続先は動かない物（0）。
+        /// </summary>
+        public static void AddPlacedAnchors(WorldCollision collision, IReadOnlyList<StageZone> stageZones, WorldObjects objects)
+        {
+            if (collision == null || stageZones == null || objects == null)
+            {
+                return;
+            }
+            int keep = stageZones.Count;
+            for (int o = 0; o < objects.Count; o++)
+            {
+                WorldObject item = objects[o];
+                if (item.Kind == WorldObjectKind.PlacedZone && !item.Ended && item.Stored >= 0 && item.Stored < keep && stageZones[item.Stored].Electric)
+                {
+                    collision.AddMovingAnchor(new Vector3(item.Position.X, item.Position.Y, 0f), 0f, 0);
+                }
+            }
         }
 
         /// <summary>

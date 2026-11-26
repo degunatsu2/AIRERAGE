@@ -185,6 +185,7 @@ namespace Airerage.Net
         IReadOnlyList<StageTrap> ISimulationFeed.Traps => Running ? _session.World.Traps : null;
         StageState ISimulationFeed.Stage => Running ? _session.World.Stage : null;
         IReadOnlyList<StageZone> ISimulationFeed.Zones => Running ? _session.World.Zones : null;
+        IReadOnlyList<StageZone> ISimulationFeed.ActiveZones => Running ? _session.World.ActiveZones : null;
         bool ISimulationFeed.TryGetClone(int index, out CharacterState clone) => SimWorldFeed.TryGetClone(Running ? _session.World : null, index, out clone);
         IReadOnlyList<CoinSpawnPoint> ISimulationFeed.CoinSpawns => Running ? _session.World.CoinSpawns : (IReadOnlyList<CoinSpawnPoint>)Array.Empty<CoinSpawnPoint>();
         IReadOnlyList<BankSpot> ISimulationFeed.BankSpots => Running ? _session.World.BankSpots : (IReadOnlyList<BankSpot>)Array.Empty<BankSpot>();
@@ -668,7 +669,7 @@ namespace Airerage.Net
                 _characterViews[p].RenderAction(current, _session.World.GetConfig(p).Combat, _session.World.Rules.RespawnDelayTicks,
                     _session.World.GetConfig(p).Movement, _session.World.GetConfig(p).Skills);
                 _characterViews[p].SetCostume(((ISimulationFeed)this).CharacterOf(p));
-                _wireViews[p].Render(previous, current, alpha, wire, StageZones.IsWireCharged(current, _session.World.Zones));
+                _wireViews[p].Render(previous, current, alpha, wire, StageZones.IsWireCharged(current, _session.World.ActiveZones));
                 bool cloned = SimWorldFeed.TryGetClone(_session.World, p, out CharacterState clone);
                 _characterViews[p].RenderClone(cloned, clone, halfExtents, _session.World.Tick, _wireViews[p]);
             }

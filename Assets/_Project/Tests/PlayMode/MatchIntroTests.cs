@@ -44,6 +44,7 @@ namespace Airerage.PlayMode.Tests
             public IReadOnlyList<StageTrap> Traps => null;
             public StageState Stage => null;
             public IReadOnlyList<StageZone> Zones => null;
+            public IReadOnlyList<StageZone> ActiveZones => null;
             public bool TryGetClone(int index, out CharacterState clone)
             {
                 clone = default;

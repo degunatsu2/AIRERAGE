@@ -255,6 +255,15 @@ namespace Airerage.Core.Combat
         public int CaptureZone;
         public int CaptureCount;
 
+        /// <summary>
+        /// この人を撃ち出したコイルガンの番号（CoilCooldownZone。CaptureZone と同じ番号の付け方）と、そのコイルガンが撃ち出してから
+        /// 使用中のまま残るティック（コイルガンの側のクールタイム。0 なら残っていない。StageZones.IsCoilBusy。2026-11-25 の要望）。
+        /// 撃ち出された人がすぐ別のコイルガンに入っても（CaptureZone が変わっても）、撃ち出したコイルガンのクールタイムは残る。
+        /// 数えるのは SimWorld.Step の初め。
+        /// </summary>
+        public int CoilCooldownZone;
+        public int CoilCooldownTicks;
+
         /// <summary>上から来た投射物を防いだ数（PASTRY CHEF のボウル。AttackData.BlocksProjectilesAbove。表示と効果音）。</summary>
         public int ShieldBlockCount;
 
@@ -413,7 +422,7 @@ namespace Airerage.Core.Combat
                 && StunKnockbackX.Equals(other.StunKnockbackX) && StunKnockbackY.Equals(other.StunKnockbackY)
                 && WaterTicksLeft == other.WaterTicksLeft && WaterFloatTicks == other.WaterFloatTicks && DrownTicks == other.DrownTicks
                 && SplashCount == other.SplashCount && CaptureTicks == other.CaptureTicks && CaptureZone == other.CaptureZone
-                && CaptureCount == other.CaptureCount && StealKind == other.StealKind && StealSource == other.StealSource
+                && CaptureCount == other.CaptureCount && CoilCooldownZone == other.CoilCooldownZone && CoilCooldownTicks == other.CoilCooldownTicks && StealKind == other.StealKind && StealSource == other.StealSource
                 && StealUses == other.StealUses && StealSerial == other.StealSerial && StealFromSerial == other.StealFromSerial
                 && StealCount == other.StealCount && StealSavedSpent == other.StealSavedSpent && StealSavedCooldown == other.StealSavedCooldown
                 && StealSavedMax == other.StealSavedMax && StealSavedCooldownTicks == other.StealSavedCooldownTicks
@@ -452,14 +461,14 @@ namespace Airerage.Core.Combat
                                     HashCode.Combine(StealKind, StealSource, StealUses, StealSerial, InvisibleTicksLeft, CloneTicksLeft, ClonePopCount,
                                         HashCode.Combine(HeistTicks, HeistSpot, NearBank, HeistPayoutCount, HeistLastPayout, StealFromSerial, StealCount,
                                             HashCode.Combine(FlakStance, FlakLevelShift, FlakAxis, FlakShotCount, MineBlastCount, MaydayPhase, MaydayTicks,
-                                                HashCode.Combine(MaydayFrom, MaydayTarget, MaydayRejectCount, Team))))))))));
+                                                HashCode.Combine(MaydayFrom, MaydayTarget, MaydayRejectCount, Team, CoilCooldownZone, CoilCooldownTicks))))))))));
         }
 
         public override string ToString()
         {
             string attacker = HasLastAttacker ? $"P{LastAttacker}@{LastDamagedTick}" : "-";
             return $"hitstop={HitstopTicksLeft} last={attacker} combo={ComboCount}({ComboDamage}) ko={Knockouts} falls={Falls}"
-                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} capture={CaptureTicks}@{CaptureZone}({CaptureCount}) shield={ShieldBlockCount}{(HasLeft ? " left" : "")} steal={StealKind}:{StealSource}x{StealUses}@{StealSerial}/{StealFromSerial}({StealCount}) invisible={InvisibleTicksLeft} clone={CloneTicksLeft}({ClonePopCount}) heist={HeistTicks}@{HeistSpot}{(NearBank ? " nearBank" : "")}({HeistPayoutCount},{HeistLastPayout}) flak={(FlakStance ? "stance" : "-")}{FlakLevelShift:+0;-0;0}({FlakShotCount}) mines={MineBlastCount} mayday={MaydayPhase}:{MaydayTicks} {MaydayFrom}->{MaydayTarget}({MaydayRejectCount}) team={Team}";
+                + $" cancel={(AttackCancelUsed ? "used" : "-")} wireCd={WireCancelCooldownTicksLeft} buf={AttackBufferTicksLeft}({BufferedAttack},{BufferedFacing}) gauge={Gauge} sp={Special1CooldownTicksLeft}/{Special2CooldownTicksLeft} guardCd={GuardCooldownTicksLeft} bounce={BounceCount} fatal={FatalHitCount} parry={JustGuardCount} guarded={GuardedCount} held={HitstopPresses} respawn={RespawnTicksLeft} inv={InvincibleTicksLeft} reward={RewardDamage}->P{RewardAttacker} hold={(Holding ? HoldSlot + ":" + HoldTicks : "-")} serial={AttackSerial} boost={CoinBoostTicksLeft} bonus={CoinBonusMilli} jackpot={JackpotHitCount} gaugeBonus={GaugeBonusRemainder} speed={SpeedBoostTicksLeft} sky={SkyBoostTicksLeft} spent={Special1Spent}/{Special2Spent} slowFall={SlowFallSerial} portals={PortalCount} inPortal={InPortalId} warpCd={WarpCooldownTicks} frozen={FrozenTicksLeft}({FreezeCount}) hazard={HazardImmunityTicks}({HazardHitCount}) cream={CreamSpeedPercent}%/{CreamWallJumpPercent}%{(CreamNoCling ? " noCling" : "")} stick={CreamStickTicksLeft}{(CreamStickSpent ? "*" : "")} chain={ChainCount}/{ChainTicksLeft} inverter={(InverterOn ? "on" : "off")} stun={StunTicksLeft}({StunGuardTicks},{StunCount}) whipGuard={WhipGuardTicks} waveCd={WaveCooldownTicks} stunKb={(HasStunKnockback ? $"({StunKnockbackX},{StunKnockbackY})" : "-")} water={WaterTicksLeft}/{WaterFloatTicks} drown={DrownTicks} splash={SplashCount} capture={CaptureTicks}@{CaptureZone}({CaptureCount}) coilCd={CoilCooldownTicks}@{CoilCooldownZone} shield={ShieldBlockCount}{(HasLeft ? " left" : "")} steal={StealKind}:{StealSource}x{StealUses}@{StealSerial}/{StealFromSerial}({StealCount}) invisible={InvisibleTicksLeft} clone={CloneTicksLeft}({ClonePopCount}) heist={HeistTicks}@{HeistSpot}{(NearBank ? " nearBank" : "")}({HeistPayoutCount},{HeistLastPayout}) flak={(FlakStance ? "stance" : "-")}{FlakLevelShift:+0;-0;0}({FlakShotCount}) mines={MineBlastCount} mayday={MaydayPhase}:{MaydayTicks} {MaydayFrom}->{MaydayTarget}({MaydayRejectCount}) team={Team}";
         }
     }
 }

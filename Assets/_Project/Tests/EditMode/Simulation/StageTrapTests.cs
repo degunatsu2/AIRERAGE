@@ -129,8 +129,109 @@ namespace Airerage.Core.Tests.Simulation
             Vector2 velocity = new Vector2(shot.Velocity.X, shot.Velocity.Y);
             Assert.That(velocity.X, Is.LessThan(-12f), "照準の向き（左上）へ撃ち出されない");
             Assert.That(velocity.Y, Is.GreaterThan(8f), "照準の向き（左上）へ撃ち出されない");
-            Assert.That(shot.Combat.HazardImmunityTicks, Is.GreaterThan(0), "撃ち出した直後に、また収まる");
+            Assert.That(shot.Combat.CoilCooldownTicks, Is.GreaterThan(0), "撃ち出した直後のコイルガンが使用中にならない");
+            Assert.That(StageZones.IsCoilBusy(0, new[] { shot }), Is.True, "撃ち出した直後のコイルガンが使用中にならない");
+            Assert.That(shot.Combat.HazardImmunityTicks, Is.EqualTo(0), "人の側の免除が残っている（コイルガンの側で数える）");
             Assert.That(shot.AirJumpsUsed, Is.EqualTo(0), "撃ち出されて空中ジャンプが戻らない");
+        }
+
+        // 2026-11-25 の要望: コイルガンのクールタイムはコイルガンの側で数える（同時に 1 人だけ・撃ち出した直後に明ける・
+        // 撃ち出された人はほかのコイルガンにすぐ入れる）。
+        [Test]
+        public void TheCoilGun_TakesOnlyOnePerson_EvenWhenTwoTouchItInTheSameTick()
+        {
+            var world = new SimWorld(Floor(), null, new[] { Coil() });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-1f, 6f, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(1f, 6f, 0f), -1);
+            Step(world, 1);
+            CharacterState first = world.GetState(0);
+            CharacterState second = world.GetState(1);
+            Assert.That(first.Combat.IsCaptured, Is.True, "前提: 先に進めた人が収まる");
+            Assert.That(second.Combat.IsCaptured, Is.False, "使用中のコイルガンに、同じティックに 2 人目が入った");
+            // 2 人目がためている間にコイルの中に戻ってきても入らない。
+            for (int t = 0; t < StageZones.CoilChargeTicks - 5; t++)
+            {
+                CharacterState inside = world.GetState(1);
+                inside.Position = new Vector3(1f, 6f, 0f);
+                inside.Velocity = Vector3.Zero;
+                world.SetState(1, inside);
+                Step(world, 1);
+                Assert.That(world.GetState(1).Combat.IsCaptured, Is.False, $"使用中のコイルガンに 2 人目が入った（{t} ティック目）");
+            }
+            Assert.That(world.GetState(0).Combat.IsCaptured, Is.True, "1 人目がまだ中にいない");
+        }
+
+        [Test]
+        public void TheCoilGun_FreesUpRightAfterItShoots_AndTheNextPersonGetsIn()
+        {
+            var world = new SimWorld(Floor(), null, new[] { Coil() });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-1f, 6f, 0f), 1);
+            world.AddCharacter(new CharacterConfig(), new Vector3(10f, 0.9f, 0f), -1);
+            Step(world, 1);
+            Assert.That(world.GetState(0).Combat.IsCaptured, Is.True, "前提: 収まった");
+            int shotAt = -1;
+            for (int t = 0; t < StageZones.CoilChargeTicks + 5 && shotAt < 0; t++)
+            {
+                Step(world, 1);
+                if (!world.GetState(0).Combat.IsCaptured)
+                {
+                    shotAt = world.Tick;
+                }
+            }
+            Assert.That(shotAt, Is.GreaterThan(0), "前提: 撃ち出された");
+            // 撃ち出された人は、撃ち出した直後のコイルガンに戻らない（中心から撃ち出されて、まだ重なっている間も）。
+            int busyTicks = 0;
+            while (StageZones.IsCoilBusy(0, new[] { world.GetState(0), world.GetState(1) }) && busyTicks < 60)
+            {
+                Assert.That(world.GetState(0).Combat.IsCaptured, Is.False, "撃ち出した直後に、また収まった");
+                Step(world, 1);
+                busyTicks++;
+            }
+            Assert.That(busyTicks, Is.InRange(StageZones.CoilCooldownTicks - 1, StageZones.CoilCooldownTicks + 1),
+                "撃ち出してからコイルガンが空くまでの長さが違う");
+            float exit = world.GetState(0).Position.X - 2f - 0.4f;
+            Assert.That(exit, Is.GreaterThan(0f), "空いたときに、撃ち出された人がまだコイルの中にいる（クールタイムが短すぎる）");
+            // 空いたコイルガンには、次の人がすぐ入れる。
+            CharacterState next = world.GetState(1);
+            next.Position = new Vector3(0f, 6f, 0f);
+            next.Velocity = Vector3.Zero;
+            world.SetState(1, next);
+            Step(world, 1);
+            Assert.That(world.GetState(1).Combat.IsCaptured, Is.True, "空いたコイルガンに次の人が入れない");
+            Assert.That(world.GetState(1).Combat.CaptureZone, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ShotFromOneCoilGun_YouCanGetIntoTheNextOneRightAway()
+        {
+            // 左のコイルガン（右向き）のすぐ右に、もう 1 つのコイルガン（上向き）。撃ち出されたらすぐ次に収まる（人の側のクールタイムはない）。
+            var next = new StageZone(StageZoneKind.CoilGun, 3f, 4.7f, 7f, 7.3f, Vector2.UnitY, 26f);
+            var world = new SimWorld(Floor(), null, new[] { Coil(), next });
+            world.AddCharacter(new CharacterConfig(), new Vector3(-1f, 6f, 0f), 1);
+            Step(world, 1);
+            CharacterState held = world.GetState(0);
+            Assert.That(held.Combat.IsCaptured, Is.True, "前提: 収まった");
+            int first = held.Combat.CaptureZone;
+            int secondZone = -1;
+            int ticks = 0;
+            for (int t = 0; t < StageZones.CoilChargeTicks + 30 && secondZone < 0; t++)
+            {
+                Step(world, 1);
+                CharacterState state = world.GetState(0);
+                if (state.Combat.IsCaptured && state.Combat.CaptureZone != first)
+                {
+                    secondZone = state.Combat.CaptureZone;
+                    ticks = t;
+                }
+            }
+            Assert.That(secondZone, Is.GreaterThanOrEqualTo(0), "撃ち出された後、隣のコイルガンに入れない");
+            Assert.That(world.ActiveZones[secondZone].Kind, Is.EqualTo(StageZoneKind.CoilGun));
+            Assert.That(ticks, Is.LessThan(StageZones.CoilChargeTicks + 10), "隣のコイルガンに入るまでが遅い");
+            // 2 つ目のコイルガンも、ためてから撃ち出す（上へ）。
+            Step(world, StageZones.CoilChargeTicks + 1);
+            CharacterState shot = world.GetState(0);
+            Assert.That(shot.Combat.IsCaptured, Is.False, "2 つ目のコイルガンが撃ち出さない");
+            Assert.That(shot.Velocity.Y, Is.GreaterThan(20f), "2 つ目のコイルガンの向き（上）へ撃ち出さない");
         }
 
         [Test]

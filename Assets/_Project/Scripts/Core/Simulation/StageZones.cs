@@ -69,8 +69,13 @@ namespace Airerage.Core.Simulation
         /// <summary>コイルガンが電気をためる長さ（ティック。1 秒。ユーザーの要望、2026-11-24）。</summary>
         public const int CoilChargeTicks = 60;
 
-        /// <summary>コイルガンで撃ち出した後、またコイルに収まらない（ほかの危険にも当たらない）ティック数【仮】。</summary>
-        public const int CoilImmunityTicks = 40;
+        /// <summary>
+        /// コイルガンの側のクールタイム（ティック。2026-11-25 の要望: 人の側ではなくコイルガンの側で数える。撃ち出した直後に明ける短さ）。
+        /// コイルガンは、中に人がいる間と、撃ち出してからこのティック数の間は使用中で、ほかの人も、撃ち出された人も入らない（IsCoilBusy）。
+        /// 撃ち出された人は、ほかのコイルガンにはすぐ入れる。長さは、40 m/s で撃ち出された人が、中心から 3.8 × 2.6m のコイルの外へ
+        /// 出るまで（どの向きでも 5 ティックほど）より少し長い 10 ティック（約 0.17 秒）。前は人の側で 40 ティック、ほかの危険にも当たらなかった。
+        /// </summary>
+        public const int CoilCooldownTicks = 10;
 
         /// <summary>コイルガンの照準の、向きとみなす最小の長さ（これより短い照準の入力では、前の向きのまま）。</summary>
         public const float CoilAimDeadzone = 0.2f;
@@ -303,8 +308,11 @@ namespace Airerage.Core.Simulation
         /// <param name="tick">試合のティック数（周期と動き）。</param>
         /// <param name="seed">試合の種（ランダムな周期と位置）。</param>
         /// <param name="collision">地形（吹雪の風上に地形があるか。null なら吹雪で必ず凍る）。</param>
+        /// <param name="coilUsers">コイルガンが使用中かを調べる、全員の状態（SimWorld のキャラクター。このティックに先に進めた人は進めた後）。null なら調べない。</param>
+        /// <param name="coilClones">同じく THIEF の分身（番号は coilUsers と同じ。持ち主の分身が出ている間だけ数える）。</param>
         public static void Apply(ref CharacterState state, Vector3 startPosition, CharacterConfig config, IReadOnlyList<StageZone> zones, int tick,
-            int seed = 0, ICollisionQuery collision = null)
+            int seed = 0, ICollisionQuery collision = null, IReadOnlyList<CharacterState> coilUsers = null,
+            IReadOnlyList<CharacterState> coilClones = null)
         {
             if (zones == null)
             {
@@ -409,8 +417,9 @@ namespace Airerage.Core.Simulation
                         }
                         break;
                     case StageZoneKind.CoilGun:
-                        if (CanBeHitByStage(state) && !state.Combat.IsUntouchable && state.Combat.HazardImmunityTicks <= 0
-                            && zone.Overlaps(state.Position, halfExtents))
+                        // コイルガンが使用中（だれかが中にいる・撃ち出した直後）なら入らない（同じティックに先に入った人も数える）。
+                        if (CanBeHitByStage(state) && !state.Combat.IsUntouchable && zone.Overlaps(state.Position, halfExtents)
+                            && !IsCoilBusy(i, coilUsers, coilClones))
                         {
                             // コイルの中に収まる（悪魔の手と同じ握られ方）。コイルの向きの初めはギミックの向き。
                             Capture(ref state, i, config.Wire);
@@ -482,7 +491,8 @@ namespace Airerage.Core.Simulation
         /// <summary>
         /// コイルガンの中の人を 1 ティック進める: コイルの中心に収まったまま、照準 aim（CoilAimDeadzone 以上の長さのとき）を
         /// コイルの向き（CombatState.SkillAim）として覚え、収まってから CoilChargeTicks たったら、その向きへ速さ Power で撃ち出す
-        /// （空中ジャンプが戻る。CoilImmunityTicks の間は、また収まらない）。2026-11-24 の要望。
+        /// （空中ジャンプが戻る。2026-11-24 の要望）。撃ち出してから CoilCooldownTicks の間は、このコイルガンが使用中（CombatState.CoilCooldownTicks。
+        /// 数えるのは SimWorld.Step の初め。人の側の危険の免除はない。2026-11-25）。
         /// </summary>
         private static void HoldInCoil(ref CharacterState state, StageZone coil, Vector2 aim)
         {
@@ -500,7 +510,8 @@ namespace Airerage.Core.Simulation
             Vector2 direction = CoilDirection(state.Combat.SkillAim, coil.Direction);
             state.Velocity = new Vector3(direction.X * coil.Power, direction.Y * coil.Power, 0f);
             state.Combat.CaptureTicks = 0;
-            state.Combat.HazardImmunityTicks = CoilImmunityTicks;
+            state.Combat.CoilCooldownZone = state.Combat.CaptureZone;
+            state.Combat.CoilCooldownTicks = CoilCooldownTicks;
             TakeOff(ref state);
         }
 
@@ -523,6 +534,56 @@ namespace Airerage.Core.Simulation
         {
             int index = state.Combat.CaptureZone;
             return zones != null && index >= 0 && index < zones.Count && zones[index].Kind == StageZoneKind.CoilGun;
+        }
+
+        /// <summary>
+        /// コイルガン zoneIndex（効かせるギミックの一覧での番号。CombatState.CaptureZone と同じ）が使用中か: だれか（キャラクター・出ている
+        /// 分身）が中にいるか、撃ち出してから CoilCooldownTicks たっていない（2026-11-25 の要望: コイルガンの側のクールタイム。同時に 1 人だけ）。
+        /// </summary>
+        public static bool IsCoilBusy(int zoneIndex, IReadOnlyList<CharacterState> characters, IReadOnlyList<CharacterState> clones = null)
+        {
+            if (characters == null)
+            {
+                return false;
+            }
+            for (int k = 0; k < characters.Count; k++)
+            {
+                if (HoldsCoil(characters[k], zoneIndex))
+                {
+                    return true;
+                }
+            }
+            if (clones != null)
+            {
+                for (int k = 0; k < clones.Count && k < characters.Count; k++)
+                {
+                    if (characters[k].Combat.CloneTicksLeft > 0 && HoldsCoil(clones[k], zoneIndex))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool HoldsCoil(in CharacterState state, int zoneIndex)
+        {
+            return (state.Combat.CaptureTicks > 0 && state.Combat.CaptureZone == zoneIndex)
+                || (state.Combat.CoilCooldownTicks > 0 && state.Combat.CoilCooldownZone == zoneIndex);
+        }
+
+        /// <summary>コイルガンの側のクールタイムを 1 ティック進める（SimWorld.Step の初めに、全員と分身に）。</summary>
+        public static void CountDownCoil(List<CharacterState> states)
+        {
+            for (int k = 0; k < states.Count; k++)
+            {
+                if (states[k].Combat.CoilCooldownTicks > 0)
+                {
+                    CharacterState state = states[k];
+                    state.Combat.CoilCooldownTicks--;
+                    states[k] = state;
+                }
+            }
         }
 
         /// <summary>コイルガンの中で、撃ち出すまでのため具合（0〜1。中にいなければ 0）。</summary>

@@ -109,7 +109,41 @@ namespace Airerage.Runtime.Presentation
             {
                 Fit(child, sx, sy, mirrored);
             }
+            if (original.Electric)
+            {
+                // 電気を帯びた危険（研究所のプラズマ球）は、範囲の中のアンカーポイントの菱形も一緒に写す（シミュレーションでは
+                // ThiefRules.AddPlacedAnchors が真ん中をアンカーにする。2026-11-25 の要望）。
+                CopyAnchorMarks(source.transform.position, original, copy.transform, sx, sy, mirrored);
+            }
             return Finish(copy, holder, parent, $"Placed{source.name}");
+        }
+
+        // 本物のギミック original（中心 center）の範囲の中にあるアンカーポイントの見た目（WireAnchorPoint の物体）を、写し copy の子に写す
+        // （範囲の中の位置を保つ。地形の読み込みに入らないように、WireAnchorPoint は外す）。
+        private static void CopyAnchorMarks(Vector3 center, in StageZone original, Transform copy, float sx, float sy, bool mirrored)
+        {
+            foreach (WireAnchorPoint anchor in Object.FindObjectsByType<WireAnchorPoint>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                Vector3 at = anchor.transform.position;
+                if (!original.Contains(new System.Numerics.Vector3(at.x, at.y, 0f)))
+                {
+                    continue;
+                }
+                GameObject mark = Object.Instantiate(anchor.gameObject, copy);
+                Object.DestroyImmediate(mark.GetComponent<WireAnchorPoint>());
+                foreach (Collider collider in mark.GetComponentsInChildren<Collider>(true))
+                {
+                    Object.DestroyImmediate(collider);
+                }
+                mark.name = "PlacedAnchorPoint";
+                Vector3 offset = at - center;
+                mark.transform.position = copy.position + new Vector3(offset.x * sx * (mirrored ? -1f : 1f), offset.y * sy, offset.z);
+                mark.transform.rotation = anchor.transform.rotation;
+                Vector3 parentScale = copy.lossyScale;
+                Vector3 scale = anchor.transform.lossyScale;
+                mark.transform.localScale = new Vector3(scale.x / Mathf.Max(1e-4f, parentScale.x), scale.y / Mathf.Max(1e-4f, parentScale.y),
+                    scale.z / Mathf.Max(1e-4f, parentScale.z));
+            }
         }
 
         /// <summary>本物の仕掛け source の見た目を写す（StageTrapView・StageTrapAuthoring は外す。mirrored なら左右を反転）。写しは parent の子。</summary>

@@ -300,6 +300,136 @@ namespace Airerage.Core.Tests.Skills
             Assert.That(speed, Is.GreaterThan(30f), "置いたコイルガンが撃ち出さない");
         }
 
+        // THIEF に、奪ったことにしたコイルガン（world.Zones の source 番号）を右へ置かせ、置いたコイルガンの中心を返す。
+        private static Vector2 PlaceStolenCoil(SimWorld world, int source)
+        {
+            Step(world, 2);
+            Edit(world, 0, s =>
+            {
+                s.Combat.StealKind = StealKind.Zone;
+                s.Combat.StealSource = source;
+                s.Combat.StealUses = 1;
+                return s;
+            });
+            Step(world, 1, Aimed(InputButtons.Special1, Vector2.UnitX));
+            Step(world, 20);
+            WorldObject placed = world.Objects.Items.Single(o => o.Kind == WorldObjectKind.PlacedZone && !o.Ended);
+            return new Vector2(placed.Position.X, placed.Position.Y);
+        }
+
+        [Test]
+        public void PlacedCoilGun_TakesOnePersonAtATime_AndChainsIntoAnotherCoilGun()
+        {
+            // 2026-11-25 の要望: コイルガンのクールタイムはコイルガンの側（同時に 1 人だけ・撃ち出した直後に明ける）。THIEF が置いた
+            // コイルガンでも同じで、撃ち出された人は、すぐ先のコイルガンに入れる（人の側のクールタイムで入れないことがない）。
+            var coil = new StageZone(StageZoneKind.CoilGun, -21.9f, 8.7f, -18.1f, 11.3f, Vector2.UnitX, 40f);
+            Vector3[] dummies = { new Vector3(-12f, GroundY, 0f), new Vector3(-14f, GroundY, 0f) };
+            Vector2 at = PlaceStolenCoil(World(new SimWorld(TestArenas.Ground(), zones: new[] { coil }), new Vector3(0f, GroundY, 0f), dummies), 0);
+            // 置いたコイルガンの 6m 右に、上向きのコイルガンを置いた同じステージで、もう一度。
+            var next = new StageZone(StageZoneKind.CoilGun, at.X + 4.1f, at.Y - 1.3f, at.X + 7.9f, at.Y + 1.3f, Vector2.UnitY, 40f);
+            var world = World(new SimWorld(TestArenas.Ground(), zones: new[] { coil, next }), new Vector3(0f, GroundY, 0f), dummies);
+            int source = world.Zones.ToList().FindIndex(z => z.Equals(coil));
+            int nextIndex = world.Zones.ToList().FindIndex(z => z.Equals(next));
+            Vector2 placedAt = PlaceStolenCoil(world, source);
+            Assert.That(Vector2.Distance(placedAt, at), Is.LessThan(1e-3f), "前提: 同じ所に置いた");
+            int placedIndex = world.Zones.Count;
+            Assert.That(world.ActiveZones[placedIndex].Kind, Is.EqualTo(StageZoneKind.CoilGun), "前提: 置いたコイルガンが効く一覧にある");
+            // 2 人が同じティックに置いたコイルガンに触れる → 1 人だけ収まる。
+            System.Func<CharacterState, CharacterState> intoPlaced = s =>
+            {
+                s.Position = new Vector3(placedAt.X, placedAt.Y, 0f);
+                s.Velocity = Vector3.Zero;
+                return s;
+            };
+            Edit(world, 1, intoPlaced);
+            Edit(world, 2, intoPlaced);
+            Step(world, 1);
+            Assert.That(world.GetState(1).Combat.IsCaptured, Is.True, "置いたコイルガンに収まらない");
+            Assert.That(world.GetState(1).Combat.CaptureZone, Is.EqualTo(placedIndex));
+            Assert.That(world.GetState(2).Combat.IsCaptured, Is.False, "置いたコイルガンに 2 人が同時に入った");
+            // 2 人目は、コイルの中に居続けても、1 人目が撃ち出されて少しするまで入らない。
+            int shotAt = -1;
+            int secondInAt = -1;
+            int chainedAt = -1;
+            for (int t = 0; t < StageZones.CoilChargeTicks + 40; t++)
+            {
+                if (!world.GetState(2).Combat.IsCaptured)
+                {
+                    Edit(world, 2, intoPlaced);
+                }
+                Step(world, 1);
+                CharacterState first = world.GetState(1);
+                if (shotAt < 0 && first.Combat.CaptureZone == placedIndex && !first.Combat.IsCaptured)
+                {
+                    shotAt = t;
+                }
+                if (chainedAt < 0 && first.Combat.IsCaptured && first.Combat.CaptureZone == nextIndex)
+                {
+                    chainedAt = t;
+                }
+                if (secondInAt < 0 && world.GetState(2).Combat.IsCaptured)
+                {
+                    secondInAt = t;
+                    Assert.That(world.GetState(2).Combat.CaptureZone, Is.EqualTo(placedIndex));
+                    Assert.That(shotAt, Is.GreaterThanOrEqualTo(0), "1 人目が中にいる間に 2 人目が入った");
+                }
+            }
+            Assert.That(shotAt, Is.GreaterThanOrEqualTo(0), "置いたコイルガンが撃ち出さない");
+            Assert.That(secondInAt - shotAt, Is.InRange(StageZones.CoilCooldownTicks - 1, StageZones.CoilCooldownTicks + 1),
+                "撃ち出してから次の人が入るまでの長さが、コイルガンのクールタイムと違う");
+            Assert.That(chainedAt, Is.GreaterThan(shotAt), "撃ち出された人が、すぐ先のコイルガンに入れない");
+            Assert.That(chainedAt - shotAt, Is.LessThan(StageZones.CoilCooldownTicks + 5), "すぐ先のコイルガンに入るまでが遅い");
+        }
+
+        [Test]
+        public void StolenPlasmaGlobe_BringsItsAnchor_AndAWireOnItIsCharged()
+        {
+            // 2026-11-25 の要望: 研究所の電球（プラズマ球）を THIEF の Q で奪ったら、つなぐと電気のワイヤーになるアンカーも一緒に写す。
+            var globe = new StageZone(StageZoneKind.Hazard, -20.9f, 9.1f, -19.1f, 10.9f, Vector2.UnitY, 8f, 12f, new StageZoneTiming(30, 30, 0),
+                Vector2.Zero, -19.1f - -20.9f, default, 0, 0, 0.9f, 0f, electric: true);
+            Assert.That(ThiefRules.IsStealable(globe), Is.True, "前提: プラズマ球を奪える");
+            var world = World(new SimWorld(TestArenas.Ground(), zones: new[] { globe }), new Vector3(0f, GroundY, 0f),
+                new Vector3(-12f, GroundY, 0f), new Vector3(-14f, GroundY, 0f));
+            Vector2 at = PlaceStolenCoil(world, 0);
+            StageZone placed = world.ActiveZones[world.Zones.Count];
+            Assert.That(placed.Electric, Is.True, "置いたプラズマ球が電気を帯びていない");
+            var center = new Vector3(at.X, at.Y, 0f);
+            Assert.That(world.Collision.AnchorPoints.Any(p => Vector3.Distance(p, center) < 1e-3f), Is.True, "置いたプラズマ球の真ん中にアンカーがない");
+            // 真ん中のアンカーにつないで、右上の空中にいる人のロープに、ほかの人が触れると電気が当たる。
+            Edit(world, 1, s =>
+            {
+                s.Position = center + new Vector3(5f, 4f, 0f);
+                s.Velocity = Vector3.Zero;
+                s.Grounded = false;
+                s.Wire.Phase = Airerage.Core.Wire.WirePhase.Attached;
+                s.Wire.Anchor = center;
+                s.Wire.AnchorBody = 0;
+                s.Wire.RopeLength = Vector3.Distance(s.Position, center);
+                // ワイヤーのボタンを押し続けている（離すと外れる）。
+                s.PreviousButtons = InputButtons.Wire;
+                return s;
+            });
+            CharacterState holder = world.GetState(1);
+            Assert.That(StageZones.IsWireCharged(holder, world.ActiveZones), Is.True, "置いたプラズマ球につないだワイヤーが電気を帯びない");
+            Vector3 middle = (holder.Position + center) * 0.5f;
+            Edit(world, 2, s => { s.Position = middle + new Vector3(0.3f, 0f, 0f); s.Velocity = Vector3.Zero; return s; });
+            Step(world, 1, default, Press(InputButtons.Wire));
+            Assert.That(world.GetState(1).Wire.Phase, Is.EqualTo(Airerage.Core.Wire.WirePhase.Attached), "前提: つないだまま");
+            Assert.That(world.GetState(2).Combat.WhipGuardTicks, Is.GreaterThan(0), "電気を帯びたロープに触れた人に当たらない");
+            // 置いたプラズマ球が消えたら、アンカーもなくなる。
+            for (int o = 0; o < world.Objects.Count; o++)
+            {
+                WorldObject item = world.Objects[o];
+                if (item.Kind == WorldObjectKind.PlacedZone)
+                {
+                    item.Ended = true;
+                    world.Objects[o] = item;
+                }
+            }
+            Step(world, 2);
+            Assert.That(world.Collision.AnchorPoints.Any(p => Vector3.Distance(p, center) < 1e-3f), Is.False, "置いた物が消えてもアンカーが残る");
+        }
+
         [Test]
         public void PlacedJumpPad_LaunchesPeople()
         {
