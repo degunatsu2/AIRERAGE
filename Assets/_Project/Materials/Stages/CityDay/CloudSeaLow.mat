@@ -16,7 +16,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 2978
+  m_CustomRenderQueue: 2975
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: 
@@ -27,6 +27,7 @@ Material:
     m_Floats:
     - _BankBillow: 8
     - _BankDip: 0
+    - _BankHoles: 0
     - _BankTop: -24
     - _ClearCenterX: 0
     - _ClearEnd: 520
@@ -36,11 +37,17 @@ Material:
     - _Coverage: 0.43
     - _Mode: 0
     - _NearFade: 6
+    - _NearThin: 0.1
+    - _NearThinEnd: 220
+    - _NearThinStart: 70
     - _Opacity: 0.93
     - _PatchScale: 0.22
     - _Patchiness: 0.65
     - _Scale: 0.005
     - _Seed: 3
+    - _ShellFar: 380
+    - _ShellLift: 0
+    - _ShellNear: 170
     - _Softness: 0.16
     m_Colors:
     - _Drift: {r: 0.55, g: 0.15, b: 0, a: 0}

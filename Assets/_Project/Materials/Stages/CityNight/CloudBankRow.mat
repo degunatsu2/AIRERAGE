@@ -26,16 +26,23 @@ Material:
     m_Ints: []
     m_Floats:
     - _BankBillow: 12
-    - _BankDip: 30
+    - _BankDip: 38
+    - _BankHoles: 0.6
     - _BankTop: -19
     - _Coverage: 0.46
     - _Mode: 1
     - _NearFade: 4
-    - _Opacity: 0.97
+    - _NearThin: 0
+    - _NearThinEnd: 1
+    - _NearThinStart: 0
+    - _Opacity: 0.88
     - _PatchScale: 0.22
     - _Patchiness: 0.25
     - _Scale: 0.03
     - _Seed: 13
+    - _ShellFar: 1
+    - _ShellLift: 0
+    - _ShellNear: 0
     - _Softness: 0.12
     m_Colors:
     - _Drift: {r: 1.2, g: 0.2, b: 0, a: 0}

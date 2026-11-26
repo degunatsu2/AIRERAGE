@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: BackdropCityIkebukuro
+  m_Shader: {fileID: 4800000, guid: 40c7982c86ab45738ef898e7fc2855f7, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: c6222ee1845ad18399b41b18a1bab0ea, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NightTex:
+        m_Texture: {fileID: 2800000, guid: 5fd05f1a66bc7147ebba1ff716c815c8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BandFill: 0
+    - _BandSpacing: 4.5
+    - _BandStrength: 0
+    - _Blink: 0
+    - _FogAmount: 1
+    - _FogFadeEnd: -99999
+    - _FogFadeStart: -100000
+    - _HazeBottom: -180
+    - _HazeTop: -30
+    - _LightShade: 0.6
+    - _NeonMix: 0
+    - _NightSides: 1
+    - _NightStrength: 5.5
+    - _TexBlend: 1
+    - _TopTint: 1.12
+    - _WetReflect: 0
+    - _WindowGlow: 1
+    m_Colors:
+    - _BandColor: {r: 1, g: 0.78, b: 0.45, a: 1}
+    - _BaseColor: {r: 0.07, g: 0.075, b: 0.13, a: 1}
+    - _HazeColor: {r: 0.14, g: 0.072500005, b: 0.19999999, a: 1}
+    - _TexTint: {r: 0.099819995, g: 0.1025675, b: 0.15959999, a: 0.763}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

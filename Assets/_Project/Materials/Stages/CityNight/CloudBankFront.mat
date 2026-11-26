@@ -27,6 +27,7 @@ Material:
     m_Floats:
     - _BankBillow: 7
     - _BankDip: 0
+    - _BankHoles: 0
     - _BankTop: -25
     - _ClearCenterX: 0
     - _ClearEnd: 100000
@@ -36,11 +37,17 @@ Material:
     - _Coverage: 0.46
     - _Mode: 1
     - _NearFade: 4
+    - _NearThin: 0
+    - _NearThinEnd: 1
+    - _NearThinStart: 0
     - _Opacity: 0.97
     - _PatchScale: 0.22
     - _Patchiness: 0.25
     - _Scale: 0.03
     - _Seed: 11
+    - _ShellFar: 1
+    - _ShellLift: 0
+    - _ShellNear: 0
     - _Softness: 0.12
     m_Colors:
     - _Drift: {r: 1.2, g: 0.2, b: 0, a: 0}
