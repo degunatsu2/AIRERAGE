@@ -26,6 +26,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _BankBillow: 7
+    - _BankDip: 0
     - _BankTop: -25
     - _ClearCenterX: 0
     - _ClearEnd: 100000
@@ -36,6 +37,8 @@ Material:
     - _Mode: 1
     - _NearFade: 4
     - _Opacity: 0.97
+    - _PatchScale: 0.22
+    - _Patchiness: 0.25
     - _Scale: 0.03
     - _Seed: 11
     - _Softness: 0.12

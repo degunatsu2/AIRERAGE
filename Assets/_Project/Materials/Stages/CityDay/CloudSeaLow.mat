@@ -26,16 +26,19 @@ Material:
     m_Ints: []
     m_Floats:
     - _BankBillow: 8
+    - _BankDip: 0
     - _BankTop: -24
     - _ClearCenterX: 0
     - _ClearEnd: 520
     - _ClearHalfWidth: 34
     - _ClearSoft: 30
     - _ClearStart: 95
-    - _Coverage: 0.33
+    - _Coverage: 0.43
     - _Mode: 0
     - _NearFade: 6
-    - _Opacity: 0.97
+    - _Opacity: 0.93
+    - _PatchScale: 0.22
+    - _Patchiness: 0.65
     - _Scale: 0.005
     - _Seed: 3
     - _Softness: 0.16
