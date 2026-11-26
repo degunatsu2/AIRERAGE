@@ -60,12 +60,15 @@ namespace Airerage.PlayMode.Tests
                 string tag = stage.Replace("Stage_", "");
                 Shoot(camera, camera.transform.position, camera.transform.rotation, camera.fieldOfView, $"Avenue_{tag}_0Game");
                 Shoot(camera, new Vector3(0f, 12f, -70f), Quaternion.Euler(6f, 0f, 0f), 40f, $"Avenue_{tag}_1Overview");
-                // 空撮のように高い所から見下ろす（雲海と、雲の切れ間から遥か下の大通り）。
+                // 空撮のように高い所から見下ろす（雲海と、所々の雲の切れ間から遥か下の地上）。
                 Shoot(camera, new Vector3(0f, 45f, -60f), Quaternion.Euler(28f, 0f, 0f), 45f, $"Avenue_{tag}_2Aerial");
                 Shoot(camera, new Vector3(-40f, 8f, -45f), Quaternion.Euler(4f, 20f, 0f), 45f, $"Avenue_{tag}_3Side");
-                // 雲の切れ間の中から大通りを見る（車と人影）。
+                // 雲海の下から大通りを見る（車と人影）。
                 Shoot(camera, new Vector3(0f, CityStreetHeight + 14f, 150f), Quaternion.Euler(16f, 0f, 0f), 50f, $"Avenue_{tag}_4Street");
                 Shoot(camera, new Vector3(-6f, CityStreetHeight + 2.5f, 160f), Quaternion.Euler(4f, 8f, 0f), 55f, $"Avenue_{tag}_5EyeLevel");
+                // 遊ぶ画面の高さから地平線を見る（雲海から頭を出す遠くの超高層ビル群）。
+                Shoot(camera, new Vector3(0f, 6f, -40f), Quaternion.Euler(3f, 0f, 0f), 50f, $"Avenue_{tag}_7Horizon");
+                Shoot(camera, new Vector3(-60f, 10f, -40f), Quaternion.Euler(3f, -30f, 0f), 50f, $"Avenue_{tag}_8HorizonLeft");
                 yield return Wait(4f);
                 Shoot(camera, new Vector3(0f, CityStreetHeight + 14f, 150f), Quaternion.Euler(16f, 0f, 0f), 50f, $"Avenue_{tag}_6StreetLater");
             }

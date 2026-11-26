@@ -3,9 +3,12 @@
 // こぶの谷と下は青みの灰色）と、天空・高層ビルのステージの描き方（雲の層を何枚も重ねて厚みと視差を出す、下を霞に溶かす、雲の切れ間から
 // 遠い地面をのぞかせる）を参考にした。絵は使わず、世界の位置で決まるノイズ（ゆがめた fbm）で描く。当たりも影もない。
 // - _Mode 0（雲の層）: 水平な板。xz の位置のノイズで雲の厚さを決め、_Coverage より厚い所に雲を描く（ふちは柔らかく）。光の向き
-//   （_LightDir）へずらしたノイズとの差で、日の当たる面と影の面を塗り分ける。_Clear* の範囲（大通りの上）は雲を薄くして切れ間にする。
+//   （_LightDir）へずらしたノイズとの差で、日の当たる面と影の面を塗り分ける。_Coverage を大きな周期のノイズで上下させ（_Patchiness）、
+//   雲のかたまりと切れ間が全体に散らばるようにする（2026-11-25 の指摘: 大通りの上だけ四角く開けた切れ間は不自然。前は _Clear* の範囲を
+//   薄くしていた）。
 // - _Mode 1（雲の土手）: カメラに向いた縦の板。上の縁の高さを x のノイズで上下させて、もくもくしたこぶの並びにする（縁の近くほど
-//   明るく、下ほど暗く）。足場のビルの根元の手前と間に置いて隠す。
+//   明るく、下ほど暗く）。足場のビルの根元の手前と間に置いて隠す。_BankDip > 0 なら、上の縁を大きな周期でさらに深く下げる
+//   （うねる雲の連なり。下がった所から奥がのぞく）。
 // _GlowColor は下から照らす街の明かり（夜。影の面と下ほど強く）。遠くは霧の色に溶ける。
 Shader "Airerage/CloudSea"
 {
@@ -21,13 +24,11 @@ Shader "Airerage/CloudSea"
         _Scale ("Noise scale (per meter)", Float) = 0.012
         _Drift ("Drift (m/s, xz or xy)", Vector) = (1.5, 0.4, 0, 0)
         _LightDir ("Light offset (xz)", Vector) = (-0.6, 0.5, 0, 0)
-        _ClearCenterX ("Clear corridor center x", Float) = 0
-        _ClearHalfWidth ("Clear corridor half width (m)", Float) = 0
-        _ClearStart ("Clear corridor start z", Float) = 100000
-        _ClearEnd ("Clear corridor end z", Float) = 100000
-        _ClearSoft ("Clear corridor softness (m)", Float) = 30
+        _Patchiness ("Large-scale coverage variation (layer)", Range(0, 1)) = 0.25
+        _PatchScale ("Large-scale variation scale (x noise scale)", Float) = 0.22
         _BankTop ("Bank top (world y)", Float) = -24
         _BankBillow ("Bank billow height (m)", Float) = 8
+        _BankDip ("Bank large dips (m)", Float) = 0
         _NearFade ("Fade near the camera (m)", Float) = 6
         _Seed ("Seed", Float) = 0
     }
@@ -61,13 +62,11 @@ Shader "Airerage/CloudSea"
                 float _Scale;
                 float4 _Drift;
                 float4 _LightDir;
-                float _ClearCenterX;
-                float _ClearHalfWidth;
-                float _ClearStart;
-                float _ClearEnd;
-                float _ClearSoft;
+                half _Patchiness;
+                float _PatchScale;
                 float _BankTop;
                 float _BankBillow;
+                float _BankDip;
                 float _NearFade;
                 float _Seed;
             CBUFFER_END
@@ -148,10 +147,8 @@ Shader "Airerage/CloudSea"
                 {
                     float2 p = world.xz * _Scale + seed;
                     float thick = Thickness(p, drift);
-                    // 大通りの上の切れ間（遠くの地面をのぞかせる）。
-                    float corridor = (1.0 - smoothstep(_ClearHalfWidth, _ClearHalfWidth + _ClearSoft, abs(world.x - _ClearCenterX)))
-                        * smoothstep(_ClearStart, _ClearStart + _ClearSoft * 2.0, world.z) * (1.0 - smoothstep(_ClearEnd - _ClearSoft * 2.0, _ClearEnd, world.z));
-                    float coverage = _Coverage + (Fbm(p * 0.22 + seed * 0.1) - 0.5) * 0.25 + corridor * 0.55;
+                    // 大きな周期で雲の多い所と少ない所を作る（かたまりと切れ間。所々から遥か下の地上がのぞく）。
+                    float coverage = _Coverage + (Fbm(p * _PatchScale + seed * 0.1) - 0.5) * _Patchiness;
                     float density = thick - coverage;
                     alpha = smoothstep(0.0, _Softness, density) * _Opacity;
                     // 光の向きへずらした厚さとの差: 光の側が厚い所は影、薄い所は日なた（こぶの立体感）。
@@ -164,6 +161,8 @@ Shader "Airerage/CloudSea"
                     // 雲の土手: 上の縁を x のノイズで上下させ、こぶの並びにする。縁から下は厚い雲。
                     float2 p = float2(world.x, world.z) * _Scale + seed;
                     float edge = _BankTop - _BankBillow * (0.35 + 0.65 * Fbm(float2(world.x * _Scale * 2.2 + seed.x - drift.x * 2.0, seed.y)));
+                    // 大きなうねり（雲の連なりが低く下がる所）。
+                    edge -= _BankDip * smoothstep(0.38, 0.62, Fbm(float2(world.x * _Scale * 0.45 + seed.y * 3.1, seed.x * 0.7)));
                     float depth = edge - world.y;
                     float puff = Fbm(float2(world.x, world.y) * _Scale * 3.0 + seed - drift * float2(2.0, 0.4));
                     float density = depth / max(_BankBillow, 0.01) + (puff - 0.5) * 0.8;

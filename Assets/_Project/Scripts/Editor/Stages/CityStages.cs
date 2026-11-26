@@ -382,8 +382,10 @@ namespace Airerage.Editor.Stages
             // 地上（遊ぶ屋上の約 110m 下。間は雲海）: ビルの足もとの道路と、その先へまっすぐ延びる大通り（霧で薄れて、遠くの西新宿の
             // 高層ビルの足もとへ続く）。大通りは西新宿の道路の地面（CityStreetsFront から奥。StageDressing）の手前まで。
             decor.Box("Street", new Vector3(0f, CityStreet.Ground, 6f), new Vector3(110f, 0.5f, 30f), street);
-            decor.Box("Avenue", new Vector3(0f, CityStreet.Ground - 0.25f, (20f + CityStreetsFront) * 0.5f), new Vector3(1600f, 0.5f, CityStreetsFront - 20f), street);
-            // 足場のビルの根元を隠す雲海と、大通りの上の雲の切れ間（2026-11-25 の要望。CityClouds）。
+            // 地上の地面は足場のビルの手前（z −150）から（2026-11-25: 雲を減らしてあちこちに切れ間ができたので、どこからのぞいても地面がある）。
+            decor.Box("Avenue", new Vector3(0f, CityStreet.Ground - 0.25f, (CityGroundFront + CityStreetsFront) * 0.5f),
+                new Vector3(1600f, 0.5f, CityStreetsFront - CityGroundFront), street);
+            // 足場のビルの根元を隠す雲海（2026-11-25 の要望。CityClouds）。
             CityClouds.Build(decor, night);
             // 大通りの車道・歩道・植樹帯・道路照明・横断歩道と信号、行き交う車と人影（2026-11-25 の要望: 電灯を半分にして置き直し、
             // アセットで歩道と車道、歩道に人影、車道にまばらな車。実際の街並みを参考に。CityStreet。docs/15 6.70）。
@@ -418,6 +420,8 @@ namespace Airerage.Editor.Stages
             // 大通りの先の西新宿の高層ビル群（PLATEAU）を見通せるようにする（2026-11-17 の回答: ビル街の背景が変わって見えない）。
             // ビルは Kenney の City Kit Commercial（CC0）のモデル（2026-11-18 の要望: 背景を無料のアセットで精巧に）。夜は窓の色の所だけが光る。
             Color buildingTint = night ? new Color(0.4f, 0.41f, 0.52f) : new Color(0.86f, 0.88f, 0.94f);
+            // ビルの足もと（モデルの下 −30 から地上まで。雲の切れ間から根元が浮いて見えないように。2026-11-25）。
+            Material shaft = decor.Lit("TowerShaft", night ? new Color(0.13f, 0.14f, 0.2f) : new Color(0.6f, 0.64f, 0.72f));
             Color windowGlow = night ? Glow(Color.white, 1.4f) : Color.black;
             string emission = night ? ThirdPartyProps.CityCommercialNightEmission : null;
             float[] rows = { 18f, 38f, 70f };
@@ -459,6 +463,8 @@ namespace Airerage.Editor.Stages
                     float realTop = -30f + model.Height * scale;
                     ThirdPartyProps.Place(decor, ThirdPartyProps.CityCommercial, model.Name, new Vector3(centerX, -30f, z), scale,
                         turned ? 270f : 180f, buildingTint, decor.Folder, emission, windowGlow);
+                    decor.Box("TowerFoot", new Vector3(centerX, (-30f + CityStreet.Ground) * 0.5f, z), new Vector3(width * 0.94f, -30f - CityStreet.Ground, depth * 0.94f),
+                        shaft);
                     if (night)
                     {
                         // 窓の明かり（正面。ネオン風の色。前の箱のビルと同じ。モデルの窓の色は屋根と同じ色の所があり光らせられないため）。
@@ -550,6 +556,9 @@ namespace Airerage.Editor.Stages
             return pick < 0.32 ? lights[0] : pick < 0.44 ? lights[1] : pick < 0.6 ? lights[2] : pick < 0.76 ? lights[3] : pick < 0.9 ? lights[4] : lights[5];
         }
 
+        // 地上の地面の手前の端（ワールドの z）。
+        private const float CityGroundFront = -150f;
+
         // 背景のビル群を置かない真ん中の幅（x の絶対値。両側のビルの列のあいだから大通りの先を見通す）。
         private const float CityVistaHalfWidth = 50f;
 
@@ -604,6 +613,8 @@ namespace Airerage.Editor.Stages
         // 西新宿を道路の地面の上に、少し小さく奥へ置く（昼夜共通）。
         private static void PlaceTokyo(StageLook look)
         {
+            // 地平線まで、雲海から頭を出す遠くの超高層ビル（2026-11-25 の指摘: 背景の奥に建物がなくて不自然。StageDressing.DistantTowers）。
+            look.DistantTowers = true;
             look.PlateauGround = CityPlateauGround;
             look.PlateauScale = CityPlateauScale;
             look.PlateauPush = CityPlateauPush;

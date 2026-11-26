@@ -635,6 +635,13 @@ namespace Airerage.Editor.Stages
                 CreateCityGlow(Child(root, "CityGlow"), look, folder);
             }
             Skyline(Child(root, "Far"), far, beacon, random, 440f, 580f, -25f, 15f, 60f, 0.35f, city ? PlateauHalfWidth : 0f);
+            if (look.DistantTowers)
+            {
+                Material distant = BackdropMaterial("BackdropDistant", look.FarColor, look, folder, hazeTop, 0f, true);
+                distant.SetFloat("_FogAmount", look.DistantFogAmount);
+                EditorUtility.SetDirty(distant);
+                DistantTowers(Child(root, "Distant"), distant, beacon, new Random(look.Seed + 7));
+            }
             Skyline(Child(root, "Mid"), mid, beacon, random, 240f, 320f, -45f, -15f, 45f, 0.45f, city ? PlateauMidKeepOut : 0f);
 
             // 近い列: 左右の外側だけに大きなビル（遊ぶ所の真後ろを空けて、足場と見分けやすく）。
@@ -1042,6 +1049,36 @@ namespace Airerage.Editor.Stages
             go.AddComponent<MeshRenderer>().sharedMaterial = material;
             NoShadows(go);
             return go.transform;
+        }
+
+        // 遠くの超高層ビル群（2026-11-25 の指摘: ビル街の背景の奥に建物がなくて不自然）: 実在の西新宿の奥（z 640〜900。試合のカメラの
+        // 描画の距離 1000m に収まる所）に、地平線の端から
+        // 端まで、雲海（上の面 y −27）から頭を出す高いビルを、かたまりとすき間をつけて並べる。実際の雲海・霧の上に突き出す都市の写真の
+        // ように、手前ほど高く大きく、遠いほど低く霧に薄れる。根元は雲海の下まで（y −160）伸ばす。航空障害灯も付ける。
+        private static void DistantTowers(Transform parent, Material body, Material beacon, Random random)
+        {
+            float cursor = -1300f;
+            while (cursor < 1300f)
+            {
+                int cluster = random.Next(3, 8);
+                float clusterZ = Range(random, 680f, 860f);
+                for (int i = 0; i < cluster && cursor < 1300f; i++)
+                {
+                    float width = Range(random, 22f, 58f);
+                    float x = cursor + width * 0.5f;
+                    float z = clusterZ + Range(random, -40f, 40f);
+                    // 手前（z が小さい）ほど高い。ときどき飛び抜けて高い超高層ビル。
+                    float near = Mathf.InverseLerp(900f, 640f, z);
+                    float top = Range(random, -14f, 18f) + near * Range(random, 8f, 40f);
+                    if (random.NextDouble() < 0.18)
+                    {
+                        top += Range(random, 45f, 110f);
+                    }
+                    Building(parent, body, beacon, new Vector3(x, top, z), width, top + 160f, random, 0.45f);
+                    cursor += width + Range(random, 3f, 14f);
+                }
+                cursor += Range(random, 40f, 140f);
+            }
         }
 
         // ビルの列: かたまりで置き、かたまりの間をあける（等間隔に並べると単調になる）。真ん中ほど低く、外ほど高く、ときどき高いビル。

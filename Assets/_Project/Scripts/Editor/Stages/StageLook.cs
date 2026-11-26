@@ -175,6 +175,14 @@ namespace Airerage.Editor.Stages
         /// ぶつ切りになっている）。地面は PlateauStreetsFront（ワールドの z）から奥。
         /// </summary>
         public bool PlateauStreets;
+
+        /// <summary>
+        /// 地平線まで、雲海・もやから頭を出す遠くの超高層ビルを並べるか（ビル街の昼夜。2026-11-25 の指摘: 背景の奥に建物がなくて不自然）。
+        /// 実在の西新宿（PLATEAU）の奥と左右に、霧で薄れた影として並べる（StageDressing.DistantTowers）。
+        /// </summary>
+        public bool DistantTowers;
+        /// <summary>遠くの超高層ビルに掛ける霧の割合（1 で空の色に消える。少し残して、遠くのビル群の影に見せる）。</summary>
+        public float DistantFogAmount = 0.62f;
         public float PlateauStreetsFront = 380f;
         /// <summary>実在の街の霧の割合を、手前の霧の濃い所（1）から CityFogAmount へなじませる範囲（ワールドの z）。</summary>
         public float CityFogFadeStart = -100000f;
